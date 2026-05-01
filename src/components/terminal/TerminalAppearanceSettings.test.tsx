@@ -1,0 +1,58 @@
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TerminalAppearanceSettings } from "./TerminalAppearanceSettings";
+import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../../lib/terminalProfile";
+
+const ipcMocks = vi.hoisted(() => ({
+  listSystemFonts: vi.fn(),
+}));
+
+vi.mock("../../lib/ipc", () => ({
+  ...ipcMocks,
+}));
+
+function renderAppearance(profile: TerminalProfile = DEFAULT_TERMINAL_PROFILE) {
+  const onProfileChange = vi.fn();
+  render(<TerminalAppearanceSettings profile={profile} onProfileChange={onProfileChange} showCustomColors />);
+  return { onProfileChange };
+}
+
+describe("TerminalAppearanceSettings", () => {
+  beforeEach(() => {
+    ipcMocks.listSystemFonts.mockReset();
+    ipcMocks.listSystemFonts.mockResolvedValue(["Arial", "Source Code Pro", "JetBrains Mono"]);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("lists OS fonts and selects Source Code Pro by default when available", async () => {
+    renderAppearance();
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
+
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("Source Code Pro");
+    expect(screen.getByRole("option", { name: "Arial" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Fira Code" })).not.toBeInTheDocument();
+  });
+
+  it("uses a safe fallback font list when OS font loading fails", async () => {
+    ipcMocks.listSystemFonts.mockRejectedValueOnce(new Error("font access failed"));
+
+    renderAppearance();
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
+    expect(screen.getByRole("option", { name: "Fira Code" })).toBeInTheDocument();
+  });
+
+  it("updates the preview when a theme is selected", async () => {
+    const user = userEvent.setup();
+    const { onProfileChange } = renderAppearance();
+
+    await user.click(screen.getByRole("button", { name: "Use theme Kanagawa Wave" }));
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "kanagawa-wave" }));
+  });
+});

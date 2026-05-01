@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   X,
   Terminal as TerminalIcon,
@@ -33,6 +33,14 @@ import {
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
+import {
+  getSessionTerminalProfile,
+  loadGlobalTerminalProfile,
+  parseSessionOptions,
+  type TerminalCursorStyle,
+  type TerminalProfile,
+} from "../../lib/terminalProfile";
+import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 
 /* ------------------------------------------------------------------ */
 /*  Local types                                                        */
@@ -404,29 +412,49 @@ function AdvancedSshSettings({
   );
 }
 
-function TerminalSettings() {
-  const [bg, setBg] = useState("#1d1f21");
-  const [fg, setFg] = useState("#eaeaea");
-  const [font, setFont] = useState("Consolas, 11pt");
-  const [cursor, setCursor] = useState("Block (blink)");
-  const [scheme, setScheme] = useState("MobaXterm classic");
-  const [scrollback, setScrollback] = useState("10000");
-  const [saveLog, setSaveLog] = useState(true);
-  const [kwHighlight, setKwHighlight] = useState(true);
+const TERMINAL_CURSOR_OPTIONS: Array<{ label: string; style: TerminalCursorStyle; blink: boolean }> = [
+  { label: "Block (blink)", style: "block", blink: true },
+  { label: "Block (steady)", style: "block", blink: false },
+  { label: "Underline", style: "underline", blink: true },
+  { label: "Vertical bar", style: "bar", blink: true },
+];
+
+function TerminalSettings({
+  profile,
+  onProfileChange,
+}: {
+  profile: TerminalProfile;
+  onProfileChange: (profile: TerminalProfile) => void;
+}) {
+  const [scrollback, setScrollback] = useState(String(profile.scrollback));
   const [antiAlias, setAntiAlias] = useState(true);
   const [bell, setBell] = useState("Visual flash");
   const [backspace, setBackspace] = useState("Control-H (default)");
   const [locale, setLocale] = useState("UTF-8");
   const [ambigWide, setAmbigWide] = useState(true);
+  const selectedCursor = TERMINAL_CURSOR_OPTIONS.find((option) =>
+    option.style === profile.cursorStyle && option.blink === profile.cursorBlink
+  )?.label ?? "Block (blink)";
+
+  useEffect(() => {
+    setScrollback(String(profile.scrollback));
+  }, [profile.scrollback]);
+
+  const updateProfile = (patch: Partial<TerminalProfile>) => {
+    onProfileChange({ ...profile, ...patch });
+  };
 
   return (
     <div data-testid="terminal-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <Field label="Font">
-        <Select
-          value={font}
-          options={["Consolas, 11pt", "JetBrains Mono, 12pt", "Fira Code, 12pt", "Menlo, 13pt", "Cascadia Code, 11pt"]}
-          onChange={setFont}
+      <div className="col-span-12">
+        <TerminalAppearanceSettings
+          profile={profile}
+          onProfileChange={onProfileChange}
+          showCustomColors
         />
+      </div>
+
+      <Field label="Font rendering">
         <label className="ml-2 flex items-center gap-1.5">
           <Checkbox checked={antiAlias} onChange={setAntiAlias} /> Anti-aliasing
         </label>
@@ -434,50 +462,12 @@ function TerminalSettings() {
 
       <Field label="Cursor">
         <Select
-          value={cursor}
-          options={["Block (blink)", "Block (steady)", "Underline", "Vertical bar"]}
-          onChange={setCursor}
-        />
-      </Field>
-
-      <Field label="Background">
-        <input
-          type="color"
-          value={bg}
-          onChange={(e) => setBg(e.target.value)}
-          aria-label="Terminal background color"
-          className="w-7 h-6 border border-[#8aa0bd] rounded-sm"
-        />
-        <input
-          className="moba-input w-24 ml-1 moba-mono"
-          value={bg}
-          aria-label="Terminal background hex"
-          onChange={(e) => setBg(e.target.value)}
-        />
-        <span className="text-[var(--moba-text-muted)] ml-3">Foreground</span>
-        <input
-          type="color"
-          value={fg}
-          onChange={(e) => setFg(e.target.value)}
-          aria-label="Terminal foreground color"
-          className="w-7 h-6 border border-[#8aa0bd] rounded-sm"
-        />
-        <input
-          className="moba-input w-24 ml-1 moba-mono"
-          value={fg}
-          aria-label="Terminal foreground hex"
-          onChange={(e) => setFg(e.target.value)}
-        />
-      </Field>
-
-      <Field label="Color scheme">
-        <Select
-          value={scheme}
-          options={[
-            "MobaXterm classic", "Solarized Dark", "Solarized Light",
-            "Dracula", "Tokyo Night", "Monokai", "Light high-contrast",
-          ]}
-          onChange={setScheme}
+          value={selectedCursor}
+          options={TERMINAL_CURSOR_OPTIONS.map((option) => option.label)}
+          onChange={(value) => {
+            const option = TERMINAL_CURSOR_OPTIONS.find((item) => item.label === value);
+            if (option) updateProfile({ cursorStyle: option.style, cursorBlink: option.blink });
+          }}
         />
       </Field>
 
@@ -486,18 +476,36 @@ function TerminalSettings() {
           className="moba-input w-24"
           value={scrollback}
           aria-label="Scrollback lines"
-          onChange={(e) => setScrollback(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (!/^\d*$/.test(next)) return;
+            setScrollback(next);
+            if (next) updateProfile({ scrollback: Math.min(200000, Number(next)) });
+          }}
+          onBlur={() => {
+            const parsed = Number(scrollback);
+            if (Number.isFinite(parsed) && parsed > 0) {
+              const clamped = Math.max(100, Math.min(200000, Math.round(parsed)));
+              setScrollback(String(clamped));
+              updateProfile({ scrollback: clamped });
+            } else {
+              setScrollback(String(profile.scrollback));
+            }
+          }}
         />
         <span className="ml-1 text-[var(--moba-text-muted)]">lines</span>
         <label className="ml-3 flex items-center gap-1.5">
-          <Checkbox checked={saveLog} onChange={setSaveLog} />
+          <Checkbox checked={profile.loggingEnabled} onChange={(value) => updateProfile({ loggingEnabled: value })} />
           Save scrollback to log file on disconnect
         </label>
       </Field>
 
       <Field label="Keyword highlighting">
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={kwHighlight} onChange={setKwHighlight} />
+          <Checkbox
+            checked={profile.syntaxMode === "keywords"}
+            onChange={(value) => updateProfile({ syntaxMode: value ? "keywords" : "default" })}
+          />
           Enable
         </label>
         <button className="moba-btn ml-2" type="button" disabled title="Keyword editor is not implemented yet">Edit keywords…</button>
@@ -533,31 +541,6 @@ function TerminalSettings() {
           Treat ambiguous as wide
         </label>
       </Field>
-
-      {/* Live preview */}
-      <div className="col-span-12 mt-2">
-        <div className="text-[11px] uppercase tracking-wider text-[var(--moba-text-muted)] mb-1">
-          Preview
-        </div>
-        <div
-          data-testid="terminal-preview"
-          className="rounded p-3 moba-mono text-[12px] leading-relaxed"
-          style={{ background: bg, color: fg }}
-        >
-          <span style={{ color: "#62d36f" }}>user@host</span>
-          <span style={{ color: "#bbbbbb" }}>:</span>
-          <span style={{ color: "#83a7d8" }}>~/srv</span>
-          {"$ tail -f /var/log/nginx/error.log"}
-          <br />
-          <span style={{ color: "#e3a85e" }}>warning</span>
-          {": 2 worker connections are not enough"}
-          <br />
-          <span style={{ color: "#ff6b6b" }}>error</span>
-          {": connect() failed (111: Connection refused)"}
-          <br />
-          <span className="moba-blink">▌</span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -937,6 +920,11 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
 
+  /* --- terminal profile --- */
+  const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
+    getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
+  );
+
   /* --- test connection --- */
   const [testResult, setTestResult] = useState<{
     ok: boolean;
@@ -996,6 +984,7 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
 
   const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
     const now = Math.floor(Date.now() / 1000);
+    const previousOptions = parseSessionOptions(session?.options_json);
     let auth: AuthMethod = "Password";
     if (authMethod === "PrivateKey")
       auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
@@ -1013,9 +1002,11 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
       username: username || null,
       auth_method: auth,
       options_json: JSON.stringify({
+        ...previousOptions,
         x11, compression, startupCmd, jumpHost: jumpHost || "",
         jumpUser, jumpPort, description, tags, doNotExit,
         remoteEnv, sshBrowser, followPath, usePrivKey, useJump,
+        terminalProfile,
       }),
       created_at: session?.created_at ?? now,
       updated_at: now,
@@ -1095,6 +1086,7 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
     setJumpPort("22");
     setDescription("");
     setTags("");
+    setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setSaveError(null);
     setTestResult(null);
   };
@@ -1367,7 +1359,9 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
             />
           )}
 
-          {activeSection === "terminal" && <TerminalSettings />}
+          {activeSection === "terminal" && (
+            <TerminalSettings profile={terminalProfile} onProfileChange={setTerminalProfile} />
+          )}
           {activeSection === "network" && <NetworkSettings />}
           {activeSection === "bookmark" && (
             <BookmarkSettings

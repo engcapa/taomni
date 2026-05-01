@@ -15,11 +15,13 @@ import { StatusBar } from "../components/statusbar/StatusBar";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
+import { SettingsPanel } from "../components/settings/SettingsPanel";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, type SessionConfig } from "../lib/ipc";
+import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 
 interface PendingAuth {
   session: SessionConfig;
@@ -114,13 +116,14 @@ export function MainLayout() {
     setShowSessionEditor(true);
   }, []);
 
-  const openLocalTab = useCallback((title = "Local terminal", sessionId?: string) => {
+  const openLocalTab = useCallback((title = "Local terminal", sessionId?: string, terminalProfile?: TerminalProfile) => {
     const id = `local-${Date.now()}`;
     addTab({
       id,
       type: "terminal",
       title,
       sessionId,
+      terminalProfile,
       closable: true,
     });
     if (sessionId) void markConnected(sessionId);
@@ -147,7 +150,7 @@ export function MainLayout() {
         openSshTab(session, authMethod, authData);
       }
     } else if (session.session_type === "LocalShell") {
-      openLocalTab(session.name || "Local terminal", session.id);
+      openLocalTab(session.name || "Local terminal", session.id, getSessionTerminalProfile(session.options_json));
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
@@ -169,6 +172,7 @@ export function MainLayout() {
         authMethod,
         authData,
       },
+      terminalProfile: getSessionTerminalProfile(session.options_json),
     });
     void markConnected(session.id);
   }, [addTab, markConnected]);
@@ -225,6 +229,21 @@ export function MainLayout() {
     });
   }, [addTab]);
 
+  const openSettingsTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "settings");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+
+    addTab({
+      id: "settings",
+      type: "settings",
+      title: "Settings",
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
   const handleCommand = useCallback((command: RibbonCommand | "close-active" | "reload-sessions") => {
     switch (command) {
       case "new-session":
@@ -265,7 +284,7 @@ export function MainLayout() {
         openPlaceholderTab("Packages", "Package management is not part of Phase 1-2.");
         break;
       case "settings":
-        openPlaceholderTab("Settings", "Global settings are not persisted yet. Use per-session settings in the session editor.");
+        openSettingsTab();
         break;
       case "games":
       case "macros":
@@ -283,6 +302,7 @@ export function MainLayout() {
     loadSessions,
     openLocalTab,
     openPlaceholderTab,
+    openSettingsTab,
     removeTab,
     requestAppExit,
     setActiveTab,
@@ -359,13 +379,16 @@ export function MainLayout() {
                       tabId={tab.id}
                       tabTitle={tab.title}
                       ssh={tab.ssh}
+                      terminalProfile={tab.terminalProfile}
                       visible={activeTabId === tab.id}
                     />
                   </div>
                 ))}
 
-                {/* Non-terminal, non-welcome tabs */}
-                {activeTab && activeTab.type !== "welcome" && activeTab.type !== "terminal" && (
+                {activeTab?.type === "settings" && <SettingsPanel />}
+
+                {/* Non-terminal, non-welcome, non-settings tabs */}
+                {activeTab && activeTab.type !== "welcome" && activeTab.type !== "terminal" && activeTab.type !== "settings" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
               </div>

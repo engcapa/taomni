@@ -6,6 +6,7 @@ mod tunnel;
 mod nettools;
 mod serial;
 mod config;
+mod appearance;
 
 use state::AppState;
 use tauri::{AppHandle, Manager};
@@ -47,6 +48,7 @@ pub fn run() {
             terminal::test_ssh_connection,
             terminal::write_terminal,
             terminal::resize_terminal,
+            terminal::send_terminal_signal,
             terminal::close_terminal,
             session::list_sessions,
             session::get_session,
@@ -56,6 +58,7 @@ pub fn run() {
             session::list_session_groups,
             session::save_session_group,
             session::delete_session_group,
+            appearance::list_system_fonts,
             exit_app,
         ])
         .run(tauri::generate_context!())

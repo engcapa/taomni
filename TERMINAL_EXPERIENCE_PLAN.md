@@ -2,6 +2,13 @@
 
 > 目标：让 local terminal 与 SSH session terminal 共用同一套接近 MobaXterm 的终端渲染、右键菜单、常规操作和配置模型。本文档基于 MobaXterm SSH terminal 右键菜单截图制定。
 
+## 0. Status Legend
+
+- `[x]` 已完成并通过当前验证
+- `[~]` 部分完成，仍有未覆盖能力或验证缺口
+- `[ ]` 未完成
+- `[blocked]` 需要后端、协议或平台能力补齐后继续
+
 ## 1. Scope
 
 ### 1.1 Shared terminal surface
@@ -80,30 +87,42 @@ Event Log
 
 ### P0 - Core terminal operations
 
-- Add terminal context menu with MobaXterm-like grouping and shortcut labels.
-- Implement Copy, Copy All, Paste, and Find.
-- Implement font family switching, font size increase/decrease/reset, and ligature toggle.
-- Implement Reset terminal output, Clear terminal scrollback, Set terminal title, Toggle scrollbar, Fullscreen terminal, and Read-only terminal.
-- Add keyboard shortcuts: Shift+Insert, Ctrl+Shift+F, F11, Ctrl+0, Ctrl+MouseWheel font resize.
-- Keep unsupported items visible but disabled so the intended product shape is clear.
+- [x] Add terminal context menu with MobaXterm-like grouping and shortcut labels.
+- [x] Implement Copy, Copy All, Paste, and Find.
+- [x] Implement font family switching, font size increase/decrease/reset, and ligature toggle.
+- [x] Implement Reset terminal output, Clear terminal scrollback, Set terminal title, Toggle scrollbar, Fullscreen terminal, and Read-only terminal.
+- [x] Add keyboard shortcuts: Shift+Insert, Ctrl+Shift+F, F11, Ctrl+0, Ctrl+MouseWheel font resize.
+- [x] Keep unsupported items visible but disabled so the intended product shape is clear.
+  - Note: implemented special commands are enabled; remaining future items stay disabled.
 
 ### P1 - Persistence and export
 
-- Persist `TerminalProfile` globally and per session.
-- Wire Session Editor terminal settings into `TerminalPanel`.
-- Implement Save to file and Record terminal output to file.
-- Add Event Log view for connection, resize, auth, disconnect, error, and reconnect events.
-- Implement basic keyword highlighting for error/warning/success.
+- [x] Persist `TerminalProfile` globally and per session.
+  - Global profile is stored in browser localStorage for unsaved terminals.
+  - Per-session profile is stored in session `options_json.terminalProfile`.
+- [x] Wire Session Editor terminal settings into `TerminalPanel`.
+- [x] Implement Save to file and Record terminal output to file.
+  - Uses browser download for buffer export and recording flush.
+- [~] Add Event Log view for connection, resize, auth, disconnect, error, and reconnect events.
+  - Implemented: connection, auth, resize, disconnect, error, export/log/macro/signal.
+  - Remaining: reconnect events need a reconnect workflow first.
+- [x] Implement basic keyword highlighting for error/warning/success.
 
 ### P2 - Advanced compatibility
 
-- Implement formatted copy as HTML/RTF where the platform clipboard supports it.
-- Implement macro recording/playback.
-- Add Z-modem send/receive.
-- Implement backend-specific special commands:
-  - Local: real OS signal delivery.
-  - SSH: SSH channel signal/break where supported, Ctrl+C fallback for SIGINT.
-- Add SFTP-aware actions for SSH sessions.
+- [~] Implement formatted copy as HTML/RTF where the platform clipboard supports it.
+  - Implemented HTML + plain text clipboard write where `ClipboardItem` is available.
+  - Remaining: native RTF clipboard payload.
+- [x] Implement macro recording/playback.
+- [blocked] Add Z-modem send/receive.
+- [~] Implement backend-specific special commands:
+  - [~] Local: real OS signal delivery.
+    - Implemented Unix SIGINT/SIGTERM/SIGKILL/SIGQUIT/SIGHUP by child pid.
+    - Remaining: full cross-platform parity.
+  - [~] SSH: SSH channel signal/break where supported, Ctrl+C fallback for SIGINT.
+    - Implemented SSH channel signals with Ctrl+C fallback for SIGINT.
+    - Remaining: SSH break request.
+- [ ] Add SFTP-aware actions for SSH sessions.
 
 ## 4. Proposed TerminalProfile
 
@@ -130,10 +149,16 @@ export interface TerminalProfile {
 
 ## 5. Acceptance Criteria
 
-- Local terminal and SSH terminal both show the same context menu.
-- Copy/Paste/Find works without reconnecting or remounting the terminal.
-- Font and display changes apply live to the current terminal.
-- Read-only mode prevents user input from being written to the PTY/SSH channel while output still renders.
-- Fullscreen mode stays within the app and restores layout cleanly.
-- Disabled future items are visually disabled and do not execute placeholder behavior.
+- [x] Local terminal and SSH terminal both show the same context menu.
+- [x] Copy/Paste/Find works without reconnecting or remounting the terminal.
+- [x] Font and display changes apply live to the current terminal.
+- [x] Read-only mode prevents user input from being written to the PTY/SSH channel while output still renders.
+- [x] Fullscreen mode stays within the app and restores layout cleanly.
+- [x] Disabled future items are visually disabled and do not execute placeholder behavior.
 
+## 6. Verification
+
+- [x] `pnpm test` - 6 tests passed.
+- [x] `pnpm exec tsc -b` - passed.
+- [x] `pnpm build` - passed; Vite reports existing large chunk warning.
+- [x] `cargo check` in `src-tauri` - passed; existing dead-code warnings remain.

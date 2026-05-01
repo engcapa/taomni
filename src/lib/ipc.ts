@@ -61,6 +61,13 @@ export async function resizeTerminal(
   return invoke("resize_terminal", { sessionId, cols, rows });
 }
 
+export async function sendTerminalSignal(
+  sessionId: string,
+  signal: string,
+): Promise<void> {
+  return invoke("send_terminal_signal", { sessionId, signal });
+}
+
 export async function closeTerminal(sessionId: string): Promise<void> {
   return invoke("close_terminal", { sessionId });
 }
@@ -170,4 +177,8 @@ export async function deleteSessionGroup(id: string): Promise<void> {
 
 export async function exitApp(): Promise<void> {
   return invoke("exit_app", {});
+}
+
+export async function listSystemFonts(): Promise<string[]> {
+  return invoke<string[]>("list_system_fonts", {});
 }

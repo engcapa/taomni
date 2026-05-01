@@ -4,12 +4,27 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { terminalThemes } from "../../lib/themes";
+import {
+  loadGlobalTerminalProfile,
+  resolveTerminalTheme,
+  saveGlobalTerminalProfile,
+  type TerminalProfile,
+  type TerminalSyntaxMode,
+} from "../../lib/terminalProfile";
+import { TERMINAL_THEME_DEFINITIONS, resolveThemeId } from "../../lib/themes";
+import {
+  findFontName,
+  getPrimaryFontName,
+  makeTerminalFontFamily,
+  SAFE_TERMINAL_FONT_FALLBACKS,
+  useSystemFonts,
+} from "../../lib/systemFonts";
 import {
   createLocalTerminal,
   createSshTerminal,
   writeTerminal,
   resizeTerminal,
+  sendTerminalSignal,
   closeTerminal,
   listenTerminalOutput,
   listenTerminalExit,
@@ -34,15 +49,11 @@ interface TerminalPanelProps {
   tabTitle?: string;
   theme?: string;
   ssh?: SshConnectInfo;
+  terminalProfile?: TerminalProfile;
   visible?: boolean;
 }
 
 const DEFAULT_FONT_SIZE = 14;
-const FONT_OPTIONS = [
-  { label: "Consolas", css: "'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace" },
-  { label: "JetBrains Mono", css: "'JetBrains Mono', 'Consolas', 'Menlo', monospace" },
-  { label: "Cascadia Code", css: "'Cascadia Code', 'Consolas', 'Menlo', monospace" },
-];
 
 interface SearchMatch {
   row: number;
@@ -50,11 +61,23 @@ interface SearchMatch {
   length: number;
 }
 
+interface KeywordHighlight extends SearchMatch {
+  kind: "error" | "warning" | "success";
+}
+
+interface TerminalEventLogEntry {
+  id: number;
+  time: string;
+  type: string;
+  detail: string;
+}
+
 export function TerminalPanel({
   tabId,
   tabTitle = "Terminal",
   theme = "classic",
   ssh,
+  terminalProfile,
   visible = true,
 }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,21 +91,50 @@ export function TerminalPanel({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fallbackSearchRef = useRef<{ query: string; index: number }>({ query: "", index: -1 });
   const contextMenu = useContextMenu();
+  const fontState = useSystemFonts();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
+  const initialProfileRef = useRef<TerminalProfile | null>(null);
+  if (!initialProfileRef.current) {
+    initialProfileRef.current = terminalProfile ?? loadGlobalTerminalProfile();
+  }
+  const initialProfile = initialProfileRef.current;
 
-  const [fontFamily, setFontFamily] = useState(FONT_OPTIONS[0].css);
-  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
-  const [fontLigatures, setFontLigatures] = useState(false);
-  const [showScrollbar, setShowScrollbar] = useState(true);
-  const [readOnly, setReadOnly] = useState(false);
+  const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
+  const [fontSize, setFontSize] = useState(initialProfile.fontSize);
+  const [fontLigatures, setFontLigatures] = useState(initialProfile.fontLigatures);
+  const [showScrollbar, setShowScrollbar] = useState(initialProfile.showScrollbar);
+  const [readOnly, setReadOnly] = useState(initialProfile.readOnly);
+  const [themeName, setThemeName] = useState(initialProfile.theme || theme);
+  const [cursorStyle] = useState(initialProfile.cursorStyle);
+  const [cursorBlink] = useState(initialProfile.cursorBlink);
+  const [scrollback] = useState(initialProfile.scrollback);
+  const [syntaxMode, setSyntaxMode] = useState<TerminalSyntaxMode>(initialProfile.syntaxMode);
+  const [loggingActive, setLoggingActive] = useState(initialProfile.loggingEnabled);
   const [fullscreen, setFullscreen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [eventLogOpen, setEventLogOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [searchStatus, setSearchStatus] = useState("");
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [viewportVersion, setViewportVersion] = useState(0);
+  const [eventLog, setEventLog] = useState<TerminalEventLogEntry[]>([]);
+  const [macroRecording, setMacroRecording] = useState(false);
+  const outputLogRef = useRef("");
+  const loggingActiveRef = useRef(loggingActive);
+  const macroRecordingRef = useRef(macroRecording);
+  const macroBufferRef = useRef("");
+  const lastMacroRef = useRef("");
+  const macroPlaybackRef = useRef(false);
+  const eventIdRef = useRef(0);
+  const quickFontOptions = useMemo(() => {
+    const available = fontState.fonts;
+    const preferred = SAFE_TERMINAL_FONT_FALLBACKS
+      .map((font) => findFontName(available, font))
+      .filter((font): font is string => !!font);
+    return preferred.length > 0 ? preferred : available.slice(0, 8);
+  }, [fontState.fonts]);
 
   const fitVisibleTerminal = useCallback(() => {
     const el = containerRef.current;
@@ -108,15 +160,59 @@ export function TerminalPanel({
     termRef.current?.focus();
   }, []);
 
+  const appendEvent = useCallback((type: string, detail: string) => {
+    const entry: TerminalEventLogEntry = {
+      id: ++eventIdRef.current,
+      time: new Date().toLocaleTimeString(),
+      type,
+      detail,
+    };
+    setEventLog((items) => [...items.slice(-199), entry]);
+  }, []);
+
+  const currentProfile = useCallback((): TerminalProfile => ({
+    ...initialProfile,
+    fontFamily,
+    fontSize,
+    fontLigatures,
+    theme: themeName,
+    scrollback,
+    cursorStyle,
+    cursorBlink,
+    showScrollbar,
+    readOnly,
+    syntaxMode,
+    loggingEnabled: loggingActive,
+  }), [
+    cursorBlink,
+    cursorStyle,
+    fontFamily,
+    fontLigatures,
+    fontSize,
+    initialProfile,
+    loggingActive,
+    readOnly,
+    scrollback,
+    showScrollbar,
+    syntaxMode,
+    themeName,
+  ]);
+
   const writeInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
     if (!sid || readOnlyRef.current) return;
+    if (macroRecordingRef.current && !macroPlaybackRef.current) {
+      macroBufferRef.current += data;
+    }
     writeTerminal(sid, encodeBase64(data)).catch(console.error);
   }, []);
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
     if (!sid || readOnlyRef.current) return;
+    if (macroRecordingRef.current && !macroPlaybackRef.current) {
+      macroBufferRef.current += data;
+    }
     writeTerminal(sid, encodeBinaryStringBase64(data)).catch(console.error);
   }, []);
 
@@ -156,6 +252,37 @@ export function TerminalPanel({
     focusTerminal();
   }, [focusTerminal, writeClipboardText]);
 
+  const copyFormattedSelection = useCallback(async () => {
+    const term = termRef.current;
+    if (!term) return;
+    const text = term.getSelection();
+    if (!text) {
+      setStatusMessage("Nothing to copy");
+      return;
+    }
+
+    const resolvedTheme = resolveTerminalTheme(themeName);
+    const html = `<pre style="margin:0;font-family:${escapeHtml(fontFamily)};font-size:${fontSize}px;background:${resolvedTheme.background ?? "#1d1f21"};color:${resolvedTheme.foreground ?? "#eaeaea"};white-space:pre-wrap;">${escapeHtml(text)}</pre>`;
+
+    try {
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([text], { type: "text/plain" }),
+          }),
+        ]);
+        setStatusMessage("Copied formatted selection");
+      } else {
+        await writeClipboardText(text, "Copied selection");
+      }
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : "Formatted copy failed");
+    } finally {
+      focusTerminal();
+    }
+  }, [focusTerminal, fontFamily, fontSize, setStatusMessage, themeName, writeClipboardText]);
+
   const pasteFromClipboard = useCallback(async () => {
     if (readOnlyRef.current) {
       setStatusMessage("Terminal is read-only");
@@ -167,12 +294,90 @@ export function TerminalPanel({
         ? await navigator.clipboard.readText()
         : window.prompt("Paste text") ?? "";
       if (!text) return;
+      if (
+        initialProfile.multilinePasteConfirm &&
+        /\r?\n/.test(text) &&
+        !window.confirm(`Paste ${text.split(/\r?\n/).length} lines into this terminal?`)
+      ) {
+        return;
+      }
       writeInput(normalizePasteText(text));
       focusTerminal();
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
     }
-  }, [focusTerminal, setStatusMessage, writeInput]);
+  }, [focusTerminal, initialProfile.multilinePasteConfirm, setStatusMessage, writeInput]);
+
+  const saveBufferToFile = useCallback(() => {
+    const term = termRef.current;
+    if (!term) return;
+    downloadTextFile(
+      `${safeFilePart(tabTitle)}-${timestampFilePart()}.txt`,
+      getBufferText(term),
+      "text/plain",
+    );
+    appendEvent("export", "Saved terminal buffer to file");
+    setStatusMessage("Saved terminal buffer");
+    focusTerminal();
+  }, [appendEvent, focusTerminal, setStatusMessage, tabTitle]);
+
+  const flushRecordedOutput = useCallback((reason: string) => {
+    if (!outputLogRef.current) {
+      setStatusMessage("No recorded output to save");
+      return;
+    }
+    downloadTextFile(
+      `${safeFilePart(tabTitle)}-recording-${timestampFilePart()}.txt`,
+      outputLogRef.current,
+      "text/plain",
+    );
+    appendEvent("log", reason);
+    outputLogRef.current = "";
+    setStatusMessage("Saved terminal recording");
+  }, [appendEvent, setStatusMessage, tabTitle]);
+
+  const toggleOutputRecording = useCallback(() => {
+    setLoggingActive((active) => {
+      if (active) {
+        flushRecordedOutput("Stopped output recording and saved file");
+        return false;
+      }
+      outputLogRef.current = "";
+      appendEvent("log", "Started output recording");
+      setStatusMessage("Recording terminal output");
+      return true;
+    });
+    focusTerminal();
+  }, [appendEvent, flushRecordedOutput, focusTerminal, setStatusMessage]);
+
+  const toggleMacroRecording = useCallback(() => {
+    setMacroRecording((active) => {
+      if (active) {
+        lastMacroRef.current = macroBufferRef.current;
+        appendEvent("macro", `Recorded ${lastMacroRef.current.length} input character${lastMacroRef.current.length === 1 ? "" : "s"}`);
+        setStatusMessage(lastMacroRef.current ? "Macro recorded" : "Macro recording was empty");
+        return false;
+      }
+      macroBufferRef.current = "";
+      appendEvent("macro", "Started macro recording");
+      setStatusMessage("Recording terminal macro");
+      return true;
+    });
+    focusTerminal();
+  }, [appendEvent, focusTerminal, setStatusMessage]);
+
+  const executeMacro = useCallback(() => {
+    const macro = lastMacroRef.current;
+    if (!macro) {
+      setStatusMessage("No macro recorded");
+      return;
+    }
+    macroPlaybackRef.current = true;
+    writeInput(macro);
+    macroPlaybackRef.current = false;
+    appendEvent("macro", `Executed macro (${macro.length} input character${macro.length === 1 ? "" : "s"})`);
+    focusTerminal();
+  }, [appendEvent, focusTerminal, setStatusMessage, writeInput]);
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
@@ -249,6 +454,32 @@ export function TerminalPanel({
     setFontSize(DEFAULT_FONT_SIZE);
   }, []);
 
+  const setSyntaxModeAndFocus = useCallback((mode: TerminalSyntaxMode) => {
+    setSyntaxMode(mode);
+    focusTerminal();
+  }, [focusTerminal]);
+
+  const sendSpecialSignal = useCallback((signal: string, fallback?: string) => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    sendTerminalSignal(sid, signal)
+      .then(() => {
+        appendEvent("signal", `Sent ${signal}`);
+        setStatusMessage(`Sent ${signal}`);
+      })
+      .catch((err) => {
+        if (fallback) {
+          writeInput(fallback);
+          appendEvent("signal", `Sent ${signal} fallback control character`);
+          setStatusMessage(`Sent ${signal} fallback`);
+        } else {
+          appendEvent("error", `${signal} failed: ${String(err)}`);
+          setStatusMessage(err instanceof Error ? err.message : String(err));
+        }
+      });
+    focusTerminal();
+  }, [appendEvent, focusTerminal, setStatusMessage, writeInput]);
+
   const handleShortcutKey = useCallback((event: KeyboardEvent): boolean => {
     if (event.key === "F11") {
       event.preventDefault();
@@ -263,6 +494,11 @@ export function TerminalPanel({
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "f") {
       event.preventDefault();
       openSearch();
+      return false;
+    }
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      saveBufferToFile();
       return false;
     }
     if (event.ctrlKey && (event.key === "+" || event.key === "=")) {
@@ -280,6 +516,11 @@ export function TerminalPanel({
       resetFontSize();
       return false;
     }
+    if (event.ctrlKey && event.code === "Space") {
+      event.preventDefault();
+      executeMacro();
+      return false;
+    }
     if (searchOpen && event.key === "Escape") {
       event.preventDefault();
       closeSearch();
@@ -289,10 +530,12 @@ export function TerminalPanel({
   }, [
     closeSearch,
     decreaseFontSize,
+    executeMacro,
     increaseFontSize,
     openSearch,
     pasteFromClipboard,
     resetFontSize,
+    saveBufferToFile,
     searchOpen,
   ]);
 
@@ -302,24 +545,33 @@ export function TerminalPanel({
     return [
       { label: "Copy", onClick: copySelection, disabled: !hasSelection },
       { label: "Copy All", onClick: copyAll },
-      { label: "Copy formatted text (RTF)", disabled: true },
+      { label: "Copy formatted text (HTML/RTF)", onClick: () => void copyFormattedSelection(), disabled: !hasSelection },
       { label: "Paste", shortcut: "Shift+Insert", onClick: () => void pasteFromClipboard(), disabled: readOnly },
       { label: "Find", shortcut: "Ctrl+Shift+F", onClick: openSearch },
       { label: "", separator: true },
       {
         label: "Font settings",
         children: [
-          ...FONT_OPTIONS.map((font) => ({
-            label: `Use font "${font.label}"`,
-            checked: fontFamily === font.css,
-            onClick: () => setFontFamily(font.css),
+          ...quickFontOptions.map((font) => ({
+            label: `Use font "${font}"`,
+            checked: getPrimaryFontName(fontFamily).toLowerCase() === font.toLowerCase(),
+            onClick: () => setFontFamily(makeTerminalFontFamily(font)),
           })),
+          ...(quickFontOptions.length === 0 ? [{ label: "Loading fonts...", disabled: true }] : []),
           { label: "Display font ligatures", checked: fontLigatures, onClick: () => setFontLigatures((v) => !v) },
           { label: "", separator: true },
           { label: "Increase font size", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
           { label: "Decrease font size", shortcut: "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
           { label: "Reset font size to default", shortcut: "Ctrl+0", onClick: resetFontSize },
         ],
+      },
+      {
+        label: "Theme",
+        children: TERMINAL_THEME_DEFINITIONS.map((definition) => ({
+          label: definition.name,
+          checked: resolveThemeId(themeName) === definition.id,
+          onClick: () => setThemeName(definition.id),
+        })),
       },
       {
         label: "Terminal display",
@@ -335,8 +587,8 @@ export function TerminalPanel({
       {
         label: "Syntax highlighting",
         children: [
-          { label: "Default", checked: true },
-          { label: "Error/Warning/Success keywords", disabled: true },
+          { label: "Default", checked: syntaxMode === "default", onClick: () => setSyntaxModeAndFocus("default") },
+          { label: "Error/Warning/Success keywords", checked: syntaxMode === "keywords", onClick: () => setSyntaxModeAndFocus("keywords") },
           { label: "Unix shell script", disabled: true },
           { label: "Cisco (network configuration)", disabled: true },
           { label: "Perl syntax", disabled: true },
@@ -344,10 +596,10 @@ export function TerminalPanel({
         ],
       },
       { label: "", separator: true },
-      { label: "Execute macro", shortcut: "Ctrl+Space", disabled: true },
-      { label: "Record new macro", disabled: true },
-      { label: "Record terminal output to file", disabled: true },
-      { label: "Save to file", shortcut: "Ctrl+Shift+S", disabled: true },
+      { label: "Execute macro", shortcut: "Ctrl+Space", onClick: executeMacro, disabled: !lastMacroRef.current },
+      { label: macroRecording ? "Stop macro recording" : "Record new macro", checked: macroRecording, onClick: toggleMacroRecording },
+      { label: loggingActive ? "Stop recording terminal output" : "Record terminal output to file", checked: loggingActive, onClick: toggleOutputRecording },
+      { label: "Save to file", shortcut: "Ctrl+Shift+S", onClick: saveBufferToFile },
       { label: "Print", shortcut: "Ctrl+Shift+P", disabled: true },
       { label: "", separator: true },
       { label: "Receive file using Z-modem", disabled: true },
@@ -358,41 +610,65 @@ export function TerminalPanel({
         label: "Special Command",
         children: [
           { label: "Break", disabled: true },
-          { label: "SIGINT (Interrupt)", onClick: () => writeInput("\x03") },
-          { label: "SIGTERM (Terminate)", disabled: true },
-          { label: "SIGKILL (Kill)", disabled: true },
-          { label: "SIGQUIT (Quit)", onClick: () => writeInput("\x1c") },
-          { label: "SIGHUP (Hangup)", disabled: true },
+          { label: "SIGINT (Interrupt)", onClick: () => sendSpecialSignal("SIGINT", "\x03") },
+          { label: "SIGTERM (Terminate)", onClick: () => sendSpecialSignal("SIGTERM") },
+          { label: "SIGKILL (Kill)", onClick: () => sendSpecialSignal("SIGKILL") },
+          { label: "SIGQUIT (Quit)", onClick: () => sendSpecialSignal("SIGQUIT", "\x1c") },
+          { label: "SIGHUP (Hangup)", onClick: () => sendSpecialSignal("SIGHUP") },
           { label: "More signals", disabled: true },
           { label: "", separator: true },
           { label: "IGNORE message", disabled: true },
         ],
       },
-      { label: "Event Log", disabled: true },
+      { label: "Event Log", onClick: () => setEventLogOpen(true) },
     ];
   }, [
     clearScrollback,
     copyAll,
+    copyFormattedSelection,
     copySelection,
     decreaseFontSize,
+    executeMacro,
     fontFamily,
     fontLigatures,
     fullscreen,
     increaseFontSize,
     openSearch,
     pasteFromClipboard,
+    quickFontOptions,
     readOnly,
     renameTerminal,
     resetFontSize,
     resetOutput,
+    saveBufferToFile,
     showScrollbar,
+    syntaxMode,
+    setSyntaxModeAndFocus,
+    themeName,
+    sendSpecialSignal,
     tabId,
-    writeInput,
+    toggleMacroRecording,
+    toggleOutputRecording,
+    loggingActive,
+    macroRecording,
   ]);
 
   useEffect(() => {
     readOnlyRef.current = readOnly;
   }, [readOnly]);
+
+  useEffect(() => {
+    loggingActiveRef.current = loggingActive;
+  }, [loggingActive]);
+
+  useEffect(() => {
+    macroRecordingRef.current = macroRecording;
+  }, [macroRecording]);
+
+  useEffect(() => {
+    if (terminalProfile) return;
+    saveGlobalTerminalProfile(currentProfile());
+  }, [currentProfile, terminalProfile]);
 
   // Initialize once for the lifetime of this tab. Visibility changes must not
   // dispose the terminal, otherwise PTY/SSH sessions reconnect on tab switch.
@@ -408,12 +684,12 @@ export function TerminalPanel({
     let resizeTimer: ReturnType<typeof setTimeout>;
 
     const term = new Terminal({
-      theme: terminalThemes[theme] ?? terminalThemes.classic,
+      theme: resolveTerminalTheme(themeName),
       fontFamily,
       fontSize,
-      cursorBlink: true,
-      cursorStyle: "block",
-      scrollback: 10000,
+      cursorBlink,
+      cursorStyle,
+      scrollback,
     });
     termRef.current = term;
 
@@ -441,7 +717,10 @@ export function TerminalPanel({
     });
     const scrollDisposable = term.onScroll(() => setViewportVersion((v) => v + 1));
     const renderDisposable = term.onRender(() => setViewportVersion((v) => v + 1));
-    const resizeDisposable = term.onResize(() => setViewportVersion((v) => v + 1));
+    const resizeDisposable = term.onResize(({ cols, rows }) => {
+      setViewportVersion((v) => v + 1);
+      appendEvent("resize", `${cols}x${rows}`);
+    });
 
     const observer = new ResizeObserver(() => {
       clearTimeout(resizeTimer);
@@ -458,7 +737,11 @@ export function TerminalPanel({
       : createLocalTerminal(cols, rows);
 
     if (ssh) {
+      appendEvent("connection", `Connecting to ${ssh.username}@${ssh.host}:${ssh.port}`);
+      appendEvent("auth", `Using ${ssh.authMethod} authentication`);
       term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
+    } else {
+      appendEvent("connection", "Starting local terminal");
     }
 
     connectPromise
@@ -468,17 +751,27 @@ export function TerminalPanel({
           return;
         }
         sessionIdRef.current = sid;
+        appendEvent("connection", `Connected (${sid})`);
 
         unlistenOutput = await listenTerminalOutput(sid, (b64) => {
-          term.write(decodeBase64(b64));
+          const output = decodeBase64(b64);
+          if (loggingActiveRef.current) {
+            outputLogRef.current += new TextDecoder().decode(output);
+          }
+          term.write(output);
         });
 
         unlistenExit = await listenTerminalExit(sid, () => {
+          appendEvent("disconnect", "Terminal session ended");
+          if (loggingActiveRef.current && outputLogRef.current) {
+            flushRecordedOutput("Session ended; saved recorded output");
+          }
           term.write("\r\n\x1b[33m[Session ended]\x1b[0m\r\n");
         });
       })
       .catch((err) => {
         console.error("Failed to create terminal:", err);
+        appendEvent("error", `Connection failed: ${String(err)}`);
         term.write(`\x1b[31mConnection failed: ${err}\x1b[0m\r\n`);
       });
 
@@ -491,6 +784,9 @@ export function TerminalPanel({
       clearTimeout(resizeTimer);
       unlistenOutput?.();
       unlistenExit?.();
+      if (loggingActiveRef.current && outputLogRef.current) {
+        flushRecordedOutput("Terminal closed; saved recorded output");
+      }
       if (sessionIdRef.current) closeTerminal(sessionIdRef.current).catch(() => {});
       term.dispose();
       termRef.current = null;
@@ -508,10 +804,13 @@ export function TerminalPanel({
     term.options = {
       fontFamily,
       fontSize,
-      theme: terminalThemes[theme] ?? terminalThemes.classic,
+      theme: resolveTerminalTheme(themeName),
+      cursorBlink,
+      cursorStyle,
+      scrollback,
     };
     window.setTimeout(() => requestAnimationFrame(fitVisibleTerminal), 0);
-  }, [fitVisibleTerminal, fontFamily, fontSize, theme]);
+  }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, scrollback, themeName]);
 
   // When a hidden tab becomes visible again, only re-measure and repaint xterm.
   useEffect(() => {
@@ -593,18 +892,29 @@ export function TerminalPanel({
     [activeSearchIndex, fontSize, fullscreen, searchMatches, showScrollbar, viewportVersion],
   );
 
+  const keywordHighlights = useMemo(
+    () => getVisibleKeywordHighlights(
+      termRef.current,
+      panelRef.current,
+      containerRef.current,
+      syntaxMode,
+    ),
+    [fontSize, fullscreen, showScrollbar, syntaxMode, viewportVersion],
+  );
+
   const panelClasses = [
     "relative w-full h-full",
     fullscreen ? "fixed inset-0 z-[9000]" : "",
     showScrollbar ? "" : "terminal-hide-scrollbar",
     fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");
+  const resolvedTheme = resolveTerminalTheme(themeName);
 
   return (
     <div
       ref={panelRef}
       className={panelClasses}
-      style={{ background: terminalThemes[theme]?.background ?? "#1d1f21" }}
+      style={{ background: resolvedTheme.background ?? "#1d1f21" }}
       onWheel={(event) => {
         if (!event.ctrlKey) return;
         event.preventDefault();
@@ -617,6 +927,23 @@ export function TerminalPanel({
       onContextMenu={(event) => contextMenu.show(event, buildContextMenu())}
     >
       <div ref={containerRef} className="w-full h-full" />
+
+      {keywordHighlights.length > 0 && (
+        <div className="absolute inset-0 z-20 pointer-events-none">
+          {keywordHighlights.map((highlight) => (
+            <div
+              key={`kw-${highlight.row}-${highlight.col}-${highlight.kind}`}
+              className={`terminal-keyword-hit terminal-keyword-${highlight.kind}`}
+              style={{
+                left: highlight.left,
+                top: highlight.top,
+                width: highlight.width,
+                height: highlight.height,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {searchHighlights.length > 0 && (
         <div className="absolute inset-0 z-30 pointer-events-none">
@@ -679,6 +1006,39 @@ export function TerminalPanel({
             Close
           </button>
           {searchStatus && <span className="px-1 text-[11px] text-[#b22222]">{searchStatus}</span>}
+        </div>
+      )}
+
+      {eventLogOpen && (
+        <div
+          className="absolute right-4 bottom-4 z-50 w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-slate-500 bg-white shadow-xl text-[12px] overflow-hidden"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
+        >
+          <div className="h-8 flex items-center px-3 border-b bg-slate-100">
+            <span className="font-semibold">Event Log</span>
+            <button className="moba-btn ml-auto h-6 px-2" type="button" onClick={() => setEventLogOpen(false)}>
+              Close
+            </button>
+          </div>
+          <div className="max-h-[320px] overflow-auto">
+            {eventLog.length === 0 ? (
+              <div className="p-3 text-slate-500">No terminal events yet.</div>
+            ) : (
+              <table className="w-full border-collapse">
+                <tbody>
+                  {eventLog.map((entry) => (
+                    <tr key={entry.id} className="border-b border-slate-100">
+                      <td className="w-20 px-2 py-1 text-slate-500 moba-mono">{entry.time}</td>
+                      <td className="w-24 px-2 py-1 font-semibold">{entry.type}</td>
+                      <td className="px-2 py-1">{entry.detail}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 
@@ -831,6 +1191,77 @@ function getVisibleSearchHighlights(
     }));
 }
 
+function getVisibleKeywordHighlights(
+  term: Terminal | null,
+  panel: HTMLDivElement | null,
+  container: HTMLDivElement | null,
+  mode: TerminalSyntaxMode,
+) {
+  if (mode !== "keywords" || !term || !panel || !container) return [];
+  const matches = collectKeywordMatches(term);
+  if (matches.length === 0) return [];
+
+  const screen = container.querySelector<HTMLElement>(".xterm-screen");
+  if (!screen) return [];
+
+  const screenRect = screen.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  if (screenRect.width === 0 || screenRect.height === 0 || term.cols === 0 || term.rows === 0) {
+    return [];
+  }
+
+  const cellWidth = screenRect.width / term.cols;
+  const cellHeight = screenRect.height / term.rows;
+  const viewportTop = term.buffer.active.viewportY;
+  const viewportBottom = viewportTop + term.rows - 1;
+  const baseLeft = screenRect.left - panelRect.left;
+  const baseTop = screenRect.top - panelRect.top;
+
+  return matches
+    .filter((match) => match.row >= viewportTop && match.row <= viewportBottom)
+    .map((match) => ({
+      ...match,
+      left: baseLeft + match.col * cellWidth,
+      top: baseTop + (match.row - viewportTop) * cellHeight,
+      width: Math.max(cellWidth, match.length * cellWidth),
+      height: cellHeight,
+    }));
+}
+
+function collectKeywordMatches(term: Terminal): KeywordHighlight[] {
+  const rules: Array<{ kind: KeywordHighlight["kind"]; pattern: RegExp }> = [
+    { kind: "error", pattern: /\b(error|fail(?:ed|ure)?|denied|panic|fatal)\b/gi },
+    { kind: "warning", pattern: /\b(warn(?:ing)?|caution)\b/gi },
+    { kind: "success", pattern: /\b(success|ok|done|passed)\b/gi },
+  ];
+  const buffer = term.buffer.active;
+  const matches: KeywordHighlight[] = [];
+
+  for (let row = 0; row < buffer.length; row++) {
+    const line = buffer.getLine(row);
+    if (!line) continue;
+
+    const { text, stringIndexToCell } = lineToSearchText(line);
+    for (const rule of rules) {
+      for (const match of text.matchAll(rule.pattern)) {
+        if (typeof match.index !== "number" || !match[0]) continue;
+        const startCell = stringIndexToCell[match.index];
+        const lastCell = stringIndexToCell[match.index + match[0].length - 1];
+        if (typeof startCell !== "number" || typeof lastCell !== "number") continue;
+        const lastWidth = line.getCell(lastCell)?.getWidth() || 1;
+        matches.push({
+          row,
+          col: startCell,
+          length: Math.max(1, lastCell + lastWidth - startCell),
+          kind: rule.kind,
+        });
+      }
+    }
+  }
+
+  return matches;
+}
+
 function firstVisibleMatchIndex(
   term: Terminal,
   matches: SearchMatch[],
@@ -869,6 +1300,34 @@ function fallbackCopyText(text: string): boolean {
   } finally {
     document.body.removeChild(textarea);
   }
+}
+
+function downloadTextFile(filename: string, text: string, type: string): void {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function timestampFilePart(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function safeFilePart(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "terminal";
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function encodeBinaryStringBase64(str: string): string {

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionEditor } from "./SessionEditor";
@@ -13,6 +13,7 @@ const ipcMocks = vi.hoisted(() => ({
   listSessionGroups: vi.fn(),
   saveSessionGroup: vi.fn(),
   deleteSessionGroup: vi.fn(),
+  listSystemFonts: vi.fn(),
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -28,12 +29,14 @@ function renderEditor() {
 describe("SessionEditor SSH settings tabs", () => {
   beforeEach(() => {
     Object.values(ipcMocks).forEach((mock) => mock.mockReset());
+    window.localStorage.clear();
     ipcMocks.listSessions.mockResolvedValue([]);
     ipcMocks.listSessionGroups.mockResolvedValue([]);
     ipcMocks.saveSession.mockResolvedValue(undefined);
     ipcMocks.deleteSession.mockResolvedValue(undefined);
     ipcMocks.saveSessionGroup.mockResolvedValue(undefined);
     ipcMocks.testSshConnection.mockResolvedValue("Connection successful");
+    ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
   });
 
   afterEach(() => {
@@ -86,6 +89,9 @@ describe("SessionEditor SSH settings tabs", () => {
     renderEditor();
 
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("Source Code Pro");
 
     const background = screen.getByLabelText("Terminal background hex");
     await user.clear(background);
@@ -156,5 +162,35 @@ describe("SessionEditor SSH settings tabs", () => {
       tags: "prod,web",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists Terminal settings through the session store save path", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.type(screen.getByLabelText("Remote host"), "dev.example.com");
+    await user.click(screen.getByRole("button", { name: /terminal settings/i }));
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText("Terminal font"), "JetBrains Mono");
+    const fontSize = screen.getByLabelText("Terminal font size");
+    await user.clear(fontSize);
+    await user.type(fontSize, "12");
+    const scrollback = screen.getByLabelText("Scrollback lines");
+    await user.clear(scrollback);
+    await user.type(scrollback, "20000");
+    await user.click(screen.getByLabelText("Save scrollback to log file on disconnect"));
+    await user.click(screen.getByLabelText("Enable"));
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    expect(JSON.parse(savedConfig.options_json).terminalProfile).toMatchObject({
+      fontSize: 12,
+      scrollback: 20000,
+      loggingEnabled: true,
+      syntaxMode: "keywords",
+    });
+    expect(JSON.parse(savedConfig.options_json).terminalProfile.fontFamily).toContain("JetBrains Mono");
   });
 });

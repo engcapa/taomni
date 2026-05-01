@@ -332,3 +332,21 @@ body {
     0 0 0 1px rgba(64, 156, 255, 0.9);
   mix-blend-mode: normal;
 }
+
+.terminal-keyword-hit {
+  position: absolute;
+  border-radius: 2px;
+  mix-blend-mode: screen;
+}
+.terminal-keyword-error {
+  background: rgba(255, 91, 91, 0.36);
+  box-shadow: inset 0 0 0 1px rgba(255, 91, 91, 0.7);
+}
+.terminal-keyword-warning {
+  background: rgba(247, 181, 56, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(247, 181, 56, 0.72);
+}
+.terminal-keyword-success {
+  background: rgba(80, 210, 120, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(80, 210, 120, 0.7);
+}

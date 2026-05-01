@@ -1,6 +1,7 @@
 import type { SshConnectInfo } from "../components/terminal/TerminalPanel";
+import type { TerminalProfile } from "../lib/terminalProfile";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "placeholder";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder";
 
 export interface Tab {
   id: string;
@@ -10,6 +11,7 @@ export interface Tab {
   connectionId?: string;
   closable: boolean;
   ssh?: SshConnectInfo;
+  terminalProfile?: TerminalProfile;
   message?: string;
 }
 

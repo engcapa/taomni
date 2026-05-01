@@ -3,6 +3,7 @@ pub mod ssh;
 
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
+use russh::Sig;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
@@ -182,6 +183,31 @@ pub async fn resize_terminal(
 }
 
 #[tauri::command]
+pub async fn send_terminal_signal(
+    session_id: String,
+    signal: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let terminals = state.terminals.read().await;
+    let terminal = terminals
+        .get(&session_id)
+        .ok_or_else(|| format!("Terminal {} not found", session_id))?;
+
+    match terminal {
+        ActiveTerminal::Local { child, .. } => {
+            send_local_signal(child, &signal)
+        }
+        ActiveTerminal::Ssh { channel, .. } => {
+            let sig = ssh_signal_from_name(&signal)?;
+            let ch = channel.lock().await;
+            ch.signal(sig)
+                .await
+                .map_err(|e| format!("SSH signal failed: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
 pub async fn close_terminal(
     session_id: String,
     state: State<'_, AppState>,
@@ -189,6 +215,60 @@ pub async fn close_terminal(
     let mut terminals = state.terminals.write().await;
     terminals.remove(&session_id);
     Ok(())
+}
+
+#[cfg(unix)]
+fn send_local_signal(
+    child: &Mutex<Box<dyn portable_pty::Child + Send + Sync>>,
+    signal: &str,
+) -> Result<(), String> {
+    let sig = match signal {
+        "SIGINT" => libc::SIGINT,
+        "SIGTERM" => libc::SIGTERM,
+        "SIGKILL" => libc::SIGKILL,
+        "SIGQUIT" => libc::SIGQUIT,
+        "SIGHUP" => libc::SIGHUP,
+        _ => return Err(format!("Unsupported local signal {}", signal)),
+    };
+    let child = child.lock().map_err(|e| format!("Lock failed: {}", e))?;
+    let pid = child
+        .process_id()
+        .ok_or_else(|| "Local terminal process id is unavailable".to_string())?;
+    let rc = unsafe { libc::kill(pid as i32, sig) };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "Local signal {} failed: {}",
+            signal,
+            std::io::Error::last_os_error()
+        ))
+    }
+}
+
+#[cfg(not(unix))]
+fn send_local_signal(
+    child: &Mutex<Box<dyn portable_pty::Child + Send + Sync>>,
+    signal: &str,
+) -> Result<(), String> {
+    match signal {
+        "SIGTERM" | "SIGKILL" => {
+            let mut child = child.lock().map_err(|e| format!("Lock failed: {}", e))?;
+            child.kill().map_err(|e| format!("Local kill failed: {}", e))
+        }
+        _ => Err(format!("Local signal {} is not supported on this platform", signal)),
+    }
+}
+
+fn ssh_signal_from_name(signal: &str) -> Result<Sig, String> {
+    match signal {
+        "SIGINT" => Ok(Sig::INT),
+        "SIGTERM" => Ok(Sig::TERM),
+        "SIGKILL" => Ok(Sig::KILL),
+        "SIGQUIT" => Ok(Sig::QUIT),
+        "SIGHUP" => Ok(Sig::HUP),
+        _ => Err(format!("Unsupported SSH signal {}", signal)),
+    }
 }
 
 #[tauri::command]
