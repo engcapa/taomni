@@ -13,6 +13,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!password) return;
     onSubmit(password);
   };
 
@@ -54,7 +55,8 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             Cancel
           </button>
           <button type="submit"
-                  className="moba-btn font-semibold"
+                  className="moba-btn font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!password}
                   data-primary="true">
             Connect
           </button>

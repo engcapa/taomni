@@ -25,12 +25,25 @@ A cross-platform SSH/terminal client inspired by MobaXterm, built with React + V
 
 Since Tauri's native backend is not available in the browser, stub modules are used:
 
-- `src/stubs/tauri-core.ts` — Stubs `invoke()` using localStorage for session/group persistence
+- `src/stubs/tauri-core.ts` — Stubs `invoke()`. Session/group CRUD goes through localStorage; SSH commands (`create_ssh_terminal`, `test_ssh_connection`, `write_terminal`, `resize_terminal`, `send_terminal_signal`, `close_terminal`) are bridged to a real WebSocket-based SSH proxy (see below). `create_local_terminal` throws — local PTY is unavailable in the browser.
 - `src/stubs/tauri-window.ts` — Stubs window/close APIs
-- `src/stubs/tauri-event.ts` — Stubs event listen/emit APIs
+- `src/stubs/tauri-event.ts` — Stubs event listen/emit APIs (in-memory pub/sub)
 - `src/stubs/tauri-shell.ts` — Stubs shell command APIs
+- `src/stubs/sshClient.ts` — Maintains one WebSocket per SSH session, sends connect/data/resize/signal/close messages, and re-emits server-pushed `output`/`closed` frames as `terminal-output-{sid}` / `terminal-exit-{sid}` events on the in-memory bus so `TerminalPanel` works unchanged.
 
 These stubs are aliased via `vite.config.ts` at build time.
+
+## Real SSH in the Browser (WebSocket proxy)
+
+The Vite dev server hosts an SSH proxy alongside it so the browser preview can talk to real SSH servers:
+
+- **`vite-plugins/sshProxy.ts`** — A Vite plugin that attaches a `ws.WebSocketServer` (noServer mode) to Vite's HTTP server's `upgrade` event, listening on path `/__newmob/ssh-bridge`. For each WS connection it spins up an `ssh2.Client`, opens an interactive shell, and pipes bytes both ways (binary frames are base64-encoded inside small JSON envelopes).
+- **Wire protocol**:
+  - Client → server: `{type:"connect",host,port,username,authMethod,authData,cols,rows,test?}` · `{type:"data",data:base64}` · `{type:"resize",cols,rows}` · `{type:"signal",signal}` · `{type:"close"}`
+  - Server → client: `{type:"ready"}` (or `{type:"ok",message}` for `test:true`) · `{type:"output",data:base64}` · `{type:"error",message}` · `{type:"closed"}`
+- **Auth**: `Password` works directly. `PrivateKey` requires the PEM key text to be passed as `authData` (file paths can't be read in the browser). `Agent` is rejected.
+- **Hosts the Replit container can reach** are the only valid SSH targets (e.g. `test.rebex.net:22` user `demo` / pass `password` is a public demo).
+- The same proxy is unused by the desktop Tauri build, which keeps using the original Rust `russh` backend. The plugin is `apply: "serve"` so it never runs in production builds.
 
 ## Development
 
@@ -50,7 +63,7 @@ Configured as a **static** site deployment:
 ## Notes
 
 - Session data is persisted in `localStorage` (keys: `newmob.sessions.v1`, `newmob.groups.v1`)
-- Terminal connections (SSH, local shell) are simulated in browser mode — actual connections require the Tauri backend
+- SSH connections in browser preview are real (via the WebSocket proxy above). Local PTY and the placeholder protocols (RDP/VNC/SFTP/Telnet/Serial) are still UI-only.
 - The app theme (light/dark/system) is stored in `localStorage` under `newmob.appTheme.v1`
 
 ## Known Pitfalls / Fixes
@@ -59,3 +72,9 @@ Configured as a **static** site deployment:
   React passes the `MouseEvent` as the first argument, which then propagates as `groupPath` and crashes
   `splitGroupPath` with `path.replace is not a function`. Always wrap: `onClick={() => onNewSession?.()}`.
   `splitGroupPath` also has a `typeof !== "string"` guard as defence-in-depth.
+
+- **`AuthPrompt` must not submit on empty password.** When QuickConnect's Enter keypress
+  immediately mounts the modal, `autoFocus` on the password input combined with a still-active
+  Enter event can submit the form before the user types anything, which then opens an SSH session
+  with no credentials. The modal validates `if (!password) return` and disables the Connect
+  button until something is typed.

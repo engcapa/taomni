@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
+import { sshProxyPlugin } from "./vite-plugins/sshProxy";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), sshProxyPlugin()],
   clearScreen: false,
   resolve: {
     alias: {

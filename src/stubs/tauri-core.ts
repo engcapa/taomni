@@ -1,4 +1,13 @@
 import type { SessionConfig, SessionGroup, LocalShellOption } from "../lib/ipc";
+import {
+  isSshSession,
+  sshClose,
+  sshConnect,
+  sshResize,
+  sshSignal,
+  sshTest,
+  sshWrite,
+} from "./sshClient";
 
 const SESSION_STORAGE_KEY = "newmob.sessions.v1";
 const GROUP_STORAGE_KEY = "newmob.groups.v1";
@@ -92,8 +101,8 @@ export async function invoke<T>(cmd: string, args?: InvokeArgs): Promise<T> {
       const shells: LocalShellOption[] = [
         {
           id: "browser-shell",
-          name: "Browser Shell (simulated)",
-          path: "/bin/sh",
+          name: "Browser preview (SSH only)",
+          path: "/dev/null",
           args: [],
           isDefault: true,
           canElevate: false,
@@ -104,18 +113,65 @@ export async function invoke<T>(cmd: string, args?: InvokeArgs): Promise<T> {
     case "list_system_fonts": {
       return [] as T;
     }
-    case "create_local_terminal":
-    case "create_ssh_terminal":
-    case "test_ssh_connection": {
-      const sessionId = `session-${Date.now()}`;
-      return sessionId as T;
+    case "create_local_terminal": {
+      throw new Error(
+        "Local terminal is not available in browser preview. Use the Quick connect bar or 'New session' to open an SSH connection (e.g. demo@test.rebex.net).",
+      );
     }
-    case "write_terminal":
-    case "resize_terminal":
-    case "send_terminal_signal":
-    case "close_terminal":
-    case "open_local_shell_as_administrator": {
+    case "create_ssh_terminal": {
+      const cols = (args?.cols as number) ?? 80;
+      const rows = (args?.rows as number) ?? 24;
+      return (await sshConnect({
+        host: args?.host as string,
+        port: (args?.port as number) || 22,
+        username: args?.username as string,
+        authMethod: args?.authMethod as string,
+        authData: (args?.authData as string | null) ?? null,
+        cols,
+        rows,
+      })) as T;
+    }
+    case "test_ssh_connection": {
+      return (await sshTest({
+        host: args?.host as string,
+        port: (args?.port as number) || 22,
+        username: args?.username as string,
+        authMethod: args?.authMethod as string,
+        authData: (args?.authData as string | null) ?? null,
+      })) as T;
+    }
+    case "write_terminal": {
+      const sid = args?.sessionId as string;
+      if (isSshSession(sid)) {
+        sshWrite(sid, args?.data as string);
+      }
       return undefined as T;
+    }
+    case "resize_terminal": {
+      const sid = args?.sessionId as string;
+      if (isSshSession(sid)) {
+        sshResize(sid, args?.cols as number, args?.rows as number);
+      }
+      return undefined as T;
+    }
+    case "send_terminal_signal": {
+      const sid = args?.sessionId as string;
+      if (isSshSession(sid)) {
+        sshSignal(sid, args?.signal as string);
+      }
+      return undefined as T;
+    }
+    case "close_terminal": {
+      const sid = args?.sessionId as string;
+      if (isSshSession(sid)) {
+        sshClose(sid);
+      }
+      return undefined as T;
+    }
+    case "open_local_shell_as_administrator": {
+      throw new Error(
+        "Administrator local terminals are not available in browser preview.",
+      );
     }
     case "exit_app": {
       window.close();
