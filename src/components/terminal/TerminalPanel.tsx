@@ -62,6 +62,7 @@ interface TerminalPanelProps {
   };
   terminalProfile?: TerminalProfile;
   visible?: boolean;
+  onCwdChange?: (cwd: string) => void;
 }
 
 const DEFAULT_FONT_SIZE = 14;
@@ -91,7 +92,12 @@ export function TerminalPanel({
   localShell,
   terminalProfile,
   visible = true,
+  onCwdChange,
 }: TerminalPanelProps) {
+  const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
+  useEffect(() => {
+    cwdCallbackRef.current = onCwdChange;
+  }, [onCwdChange]);
   const containerRef = useRef<HTMLDivElement>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
@@ -727,6 +733,20 @@ export function TerminalPanel({
     term.loadAddon(new WebLinksAddon());
     term.open(el);
 
+    // OSC 7 — host writes its current working directory as `file://host/path`
+    // so the attached SFTP browser can follow `cd` automatically.
+    try {
+      term.parser.registerOscHandler(7, (data) => {
+        const cwd = parseOsc7(data);
+        if (cwd) {
+          cwdCallbackRef.current?.(cwd);
+        }
+        return true;
+      });
+    } catch {
+      /* parser API absent in some xterm builds */
+    }
+
     if (shouldUseLinuxImeGuard()) {
       // Linux WebKitGTK can forward IME preedit text through xterm before the final commit.
       const guard = new TerminalImeInputGuard({ commit: sendTerminalInput });
@@ -794,6 +814,24 @@ export function TerminalPanel({
           }
           term.write(output);
         });
+
+        if (ssh) {
+          // Best-effort: teach the remote shell to emit OSC 7 on every
+          // prompt so the SFTP browser can follow the cwd.  We send the
+          // snippet a short while after connection so the shell PS1 has
+          // already drawn at least once and the user typically still
+          // sees a clean prompt afterwards.
+          window.setTimeout(() => {
+            if (destroyed || sessionIdRef.current !== sid) return;
+            const snippet =
+              " __newmob_osc7(){ printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; };" +
+              " case \"${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}\" in" +
+              " bash) PROMPT_COMMAND=\"__newmob_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}\" ;;" +
+              " zsh) precmd_functions+=(__newmob_osc7) ;;" +
+              " esac; __newmob_osc7\r";
+            writeTerminal(sid, encodeBase64(snippet)).catch(() => {});
+          }, 1200);
+        }
 
         unlistenExit = await listenTerminalExit(sid, () => {
           appendEvent("disconnect", "Terminal session ended");
@@ -1393,6 +1431,17 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function parseOsc7(data: string): string | null {
+  // OSC 7 payload looks like `file://hostname/path/with%20spaces`.
+  const match = data.match(/^file:\/\/[^/]*(\/.*)$/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
 }
 
 function encodeBinaryStringBase64(str: string): string {

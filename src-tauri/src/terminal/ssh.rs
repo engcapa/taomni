@@ -129,3 +129,50 @@ pub async fn connect_ssh(
 
     Ok((handle, channel, output_rx))
 }
+
+/// Authenticate against the server and return the handle without opening a
+/// PTY/shell. The SFTP module reuses this to open its own subsystem channel.
+pub async fn connect_ssh_authenticated(
+    host: &str,
+    port: u16,
+    username: &str,
+    auth: SshAuth,
+) -> Result<client::Handle<SshHandler>, String> {
+    let config = Arc::new(client::Config { ..Default::default() });
+    let handler = SshHandler {
+        output_tx: Arc::new(Mutex::new(None)),
+    };
+
+    let mut handle = client::connect(config, (host, port), handler)
+        .await
+        .map_err(|e| format!("SSH connect failed: {}", e))?;
+
+    match auth {
+        SshAuth::Password(password) => {
+            let ok = handle
+                .authenticate_password(username, &password)
+                .await
+                .map_err(|e| format!("SSH auth failed: {}", e))?;
+            if !ok {
+                return Err("SSH password authentication rejected".to_string());
+            }
+        }
+        SshAuth::PrivateKey(key_path) => {
+            let key_path = shellexpand::tilde(&key_path).to_string();
+            let key = russh_keys::load_secret_key(&key_path, None)
+                .map_err(|e| format!("Failed to load key {}: {}", key_path, e))?;
+            let ok = handle
+                .authenticate_publickey(username, Arc::new(key))
+                .await
+                .map_err(|e| format!("SSH key auth failed: {}", e))?;
+            if !ok {
+                return Err("SSH key authentication rejected".to_string());
+            }
+        }
+        SshAuth::Agent => {
+            return Err("SSH agent auth not yet implemented".to_string());
+        }
+    }
+
+    Ok(handle)
+}

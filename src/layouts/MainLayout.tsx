@@ -16,6 +16,14 @@ import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
+import { FileBrowser } from "../components/filebrowser/FileBrowser";
+import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
+import {
+  detachedWindowUrl,
+  writeDetachedHandoff,
+} from "../components/filebrowser/SftpDetachedWindow";
+import { FolderOpen } from "lucide-react";
+import type { SftpTabInfo } from "../types";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -51,6 +59,26 @@ export function MainLayout() {
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
   const [newSessionGroupPath, setNewSessionGroupPath] = useState<string | null>(null);
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
+  const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
+  const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
+
+  const toggleAttachedSidebar = useCallback((tabId: string) => {
+    setAttachedSidebars((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
+  }, []);
+
+  const handleTerminalCwd = useCallback((tabId: string, cwd: string) => {
+    setTerminalCwds((prev) => (prev[tabId] === cwd ? prev : { ...prev, [tabId]: cwd }));
+  }, []);
+
+  const openDetachedSftp = useCallback((params: SftpTabInfo, title: string) => {
+    writeDetachedHandoff({ ...params, title });
+    const url = detachedWindowUrl(params.sessionId);
+    const features = "width=1200,height=760,resizable=yes,scrollbars=yes";
+    const handle = window.open(url, `newmob_sftp_${params.sessionId}`, features);
+    if (!handle) {
+      setStatusMessage("Browser blocked the SFTP window. Allow pop-ups for this site.");
+    }
+  }, [setStatusMessage]);
 
   useEffect(() => {
     void loadSessions();
@@ -142,19 +170,51 @@ export function MainLayout() {
     setShowSessionEditor(true);
   }, []);
 
+  const openSftpTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
+    const tabId = `sftp-${session.id}-${Date.now()}`;
+    addTab({
+      id: tabId,
+      type: "sftp",
+      title: `${session.name || `${session.username ?? "user"}@${session.host}`} (SFTP)`,
+      sessionId: session.id,
+      closable: true,
+      sftp: {
+        sessionId: tabId,
+        host: session.host,
+        port: session.port,
+        username: session.username ?? "root",
+        authMethod,
+        authData,
+        attachedToTerminal: false,
+      },
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   const handleConnectSession = useCallback((session: SessionConfig) => {
-    if (session.session_type === "SSH") {
-      const authMethod = typeof session.auth_method === "string"
+    const resolveAuth = (): { method: string; data: string | null } => {
+      const method = typeof session.auth_method === "string"
         ? session.auth_method
         : "PrivateKey";
+      const data = typeof session.auth_method === "object" && "PrivateKey" in session.auth_method
+        ? session.auth_method.PrivateKey.key_path
+        : null;
+      return { method, data };
+    };
 
-      if (authMethod === "Password") {
+    if (session.session_type === "SSH") {
+      const { method, data } = resolveAuth();
+      if (method === "Password") {
         setPendingAuth({ session });
       } else {
-        const authData = typeof session.auth_method === "object" && "PrivateKey" in session.auth_method
-          ? session.auth_method.PrivateKey.key_path
-          : null;
-        openSshTab(session, authMethod, authData);
+        openSshTab(session, method, data);
+      }
+    } else if (session.session_type === "SFTP") {
+      const { method, data } = resolveAuth();
+      if (method === "Password") {
+        setPendingAuth({ session });
+      } else {
+        openSftpTab(session, method, data);
       }
     } else if (session.session_type === "LocalShell") {
       openLocalTab(session.name || "Local terminal", session.id, getSessionTerminalProfile(session.options_json));
@@ -162,7 +222,7 @@ export function MainLayout() {
       openUnsupportedTab(session);
       void markConnected(session.id);
     }
-  }, [markConnected, openLocalTab]);
+  }, [markConnected, openLocalTab, openSftpTab]);
 
   const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const id = `ssh-${session.id}-${Date.now()}`;
@@ -202,9 +262,13 @@ export function MainLayout() {
 
   const handleAuthSubmit = useCallback((password: string) => {
     if (!pendingAuth) return;
-    openSshTab(pendingAuth.session, "Password", password);
+    if (pendingAuth.session.session_type === "SFTP") {
+      openSftpTab(pendingAuth.session, "Password", password);
+    } else {
+      openSshTab(pendingAuth.session, "Password", password);
+    }
     setPendingAuth(null);
-  }, [pendingAuth, openSshTab]);
+  }, [pendingAuth, openSftpTab, openSshTab]);
 
   const handleQuickConnect = useCallback((value: string) => {
     try {
@@ -212,12 +276,16 @@ export function MainLayout() {
       const session = parsed.config;
       if (session.session_type === "LocalShell") {
         openLocalTab(session.name);
-      } else if (session.session_type === "SSH") {
+      } else if (session.session_type === "SSH" || session.session_type === "SFTP") {
         if (session.auth_method === "Password") {
           setPendingAuth({ session });
         } else {
           const authMethod = typeof session.auth_method === "string" ? session.auth_method : "PrivateKey";
-          openSshTab(session, authMethod, parsed.authData);
+          if (session.session_type === "SFTP") {
+            openSftpTab(session, authMethod, parsed.authData);
+          } else {
+            openSshTab(session, authMethod, parsed.authData);
+          }
         }
       } else {
         openUnsupportedTab(session);
@@ -225,7 +293,7 @@ export function MainLayout() {
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : String(err));
     }
-  }, [openLocalTab, openSshTab, openUnsupportedTab, setStatusMessage]);
+  }, [openLocalTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
 
   const openPlaceholderTab = useCallback((title: string, message: string) => {
     addTab({
@@ -321,6 +389,7 @@ export function MainLayout() {
   ]);
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
+  const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
 
   return (
     <div
@@ -376,28 +445,120 @@ export function MainLayout() {
                   />
                 )}
 
-                {/* All terminal tabs stay mounted, hidden via display */}
-                {terminalTabs.map((tab) => (
-                  <div
-                    key={tab.id}
-                    className="absolute inset-0"
-                    style={{ display: activeTabId === tab.id ? "block" : "none" }}
-                  >
-                    <TerminalPanel
-                      tabId={tab.id}
-                      tabTitle={tab.title}
-                      ssh={tab.ssh}
-                      localShell={tab.localShell}
-                      terminalProfile={tab.terminalProfile}
-                      visible={activeTabId === tab.id}
-                    />
-                  </div>
-                ))}
+                {/* All terminal tabs stay mounted, hidden via display.
+                    Each SSH terminal also hosts an attached SFTP sidebar
+                    that the user can toggle on the top-right corner. */}
+                {terminalTabs.map((tab) => {
+                  const isActive = activeTabId === tab.id;
+                  const sidebarOpen = !!attachedSidebars[tab.id] && !!tab.ssh;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0 flex"
+                      style={{ display: isActive ? "flex" : "none" }}
+                    >
+                      <div className="flex-1 min-w-0 relative">
+                        <TerminalPanel
+                          tabId={tab.id}
+                          tabTitle={tab.title}
+                          ssh={tab.ssh}
+                          localShell={tab.localShell}
+                          terminalProfile={tab.terminalProfile}
+                          visible={isActive}
+                          onCwdChange={tab.ssh ? (cwd) => handleTerminalCwd(tab.id, cwd) : undefined}
+                        />
+                        {tab.ssh && (
+                          <button
+                            type="button"
+                            className="absolute top-1 right-2 z-30 px-2 py-0.5 text-[11px] rounded shadow flex items-center gap-1"
+                            style={{
+                              background: sidebarOpen ? "var(--moba-accent)" : "var(--moba-quick-bg)",
+                              color: sidebarOpen ? "#fff" : "var(--moba-text)",
+                              border: "1px solid var(--moba-divider)",
+                            }}
+                            title={sidebarOpen ? "Hide SFTP browser" : "Open SFTP browser"}
+                            onClick={() => toggleAttachedSidebar(tab.id)}
+                          >
+                            <FolderOpen className="w-3 h-3" />
+                            SFTP
+                          </button>
+                        )}
+                      </div>
+                      {sidebarOpen && tab.ssh && (
+                        <div
+                          className="shrink-0"
+                          style={{
+                            width: 380,
+                            borderLeft: "1px solid var(--moba-divider)",
+                            background: "var(--moba-bg)",
+                          }}
+                        >
+                          <SftpSidebar
+                            sessionId={`attached-${tab.id}`}
+                            host={tab.ssh.host}
+                            port={tab.ssh.port}
+                            username={tab.ssh.username}
+                            authMethod={tab.ssh.authMethod}
+                            authData={tab.ssh.authData}
+                            cwdHint={terminalCwds[tab.id] ?? null}
+                            title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
+                            onClose={() => toggleAttachedSidebar(tab.id)}
+                            onDetach={() =>
+                              openDetachedSftp(
+                                {
+                                  sessionId: `attached-${tab.id}`,
+                                  host: tab.ssh!.host,
+                                  port: tab.ssh!.port,
+                                  username: tab.ssh!.username,
+                                  authMethod: tab.ssh!.authMethod,
+                                  authData: tab.ssh!.authData,
+                                  initialPath: terminalCwds[tab.id],
+                                  attachedToTerminal: true,
+                                },
+                                `${tab.title} — SFTP`,
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* SFTP standalone tabs stay mounted so transfers can finish
+                    even when the user switches to another tab. */}
+                {sftpTabs.map((tab) => {
+                  if (!tab.sftp) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <FileBrowser
+                        sessionId={tab.sftp.sessionId}
+                        host={tab.sftp.host}
+                        port={tab.sftp.port}
+                        username={tab.sftp.username}
+                        authMethod={tab.sftp.authMethod}
+                        authData={tab.sftp.authData}
+                        initialPath={tab.sftp.initialPath}
+                        detachable
+                        onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}
+                      />
+                    </div>
+                  );
+                })}
 
                 {activeTab?.type === "settings" && <SettingsPanel />}
 
-                {/* Non-terminal, non-welcome, non-settings tabs */}
-                {activeTab && activeTab.type !== "welcome" && activeTab.type !== "terminal" && activeTab.type !== "settings" && (
+                {/* Non-terminal, non-sftp, non-welcome, non-settings tabs */}
+                {activeTab &&
+                  activeTab.type !== "welcome" &&
+                  activeTab.type !== "terminal" &&
+                  activeTab.type !== "sftp" &&
+                  activeTab.type !== "settings" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
               </div>

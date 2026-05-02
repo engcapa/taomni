@@ -14,6 +14,18 @@ export interface Tab {
   localShell?: LocalShellSelection;
   terminalProfile?: TerminalProfile;
   message?: string;
+  sftp?: SftpTabInfo;
+}
+
+export interface SftpTabInfo {
+  sessionId: string;
+  host: string;
+  port: number;
+  username: string;
+  authMethod: string;
+  authData: string | null;
+  initialPath?: string;
+  attachedToTerminal?: boolean;
 }
 
 export interface LocalShellSelection {
