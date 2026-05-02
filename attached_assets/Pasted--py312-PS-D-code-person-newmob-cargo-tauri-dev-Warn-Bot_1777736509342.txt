@@ -1,0 +1,85 @@
+(py312) PS D:\code\person\newmob> cargo tauri dev
+    Warn Both `C:\Users\zhyha\.cargo\config` and `C:\Users\zhyha\.cargo\config.toml` exist. Using `C:\Users\zhyha\.cargo\config`
+    Running BeforeDevCommand (`pnpm dev`)
+
+> newmob@0.1.0 dev D:\code\person\newmob
+> vite
+
+failed to load config from D:\code\person\newmob\vite.config.ts
+error when starting dev server:
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'ws' imported from D:\code\person\newmob\vite.config.ts.timestamp-1777736230401-3091a530dcc1d.mjs
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:255:9)
+    at packageResolve (node:internal/modules/esm/resolve:767:81)
+    at moduleResolve (node:internal/modules/esm/resolve:853:18)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:783:12)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:707:25)
+    at ModuleLoader.resolve (node:internal/modules/esm/loader:690:38)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:307:38)
+    at ModuleJob._link (node:internal/modules/esm/module_job:183:49)
+ ELIFECYCLE  Command failed with exit code 1.
+    Error The "beforeDevCommand" terminated with a non-zero status code.
+(py312) PS D:\code\person\newmob> pnpm install
+Lockfile is up to date, resolution step is skipped
+Packages: +20 -5
+++++++++++++++++++++-----
+Progress: resolved 20, reused 7, downloaded 13, added 20, done
+
+devDependencies:
++ @types/ssh2 1.15.5
++ @types/ws 8.18.1
++ ssh2 1.17.0
++ ws 8.20.0
+
+╭ Warning ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                            │
+│   Ignored build scripts: cpu-features@0.0.10, ssh2@1.17.0.                                 │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.   │
+│                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────╯
+Done in 875ms using pnpm v10.30.1
+(py312) PS D:\code\person\newmob> cargo tauri dev
+    Warn Both `C:\Users\zhyha\.cargo\config` and `C:\Users\zhyha\.cargo\config.toml` exist. Using `C:\Users\zhyha\.cargo\config`
+    Running BeforeDevCommand (`pnpm dev`)
+
+> newmob@0.1.0 dev D:\code\person\newmob
+> vite
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 306 ms
+
+  ➜  Local:   http://localhost:5000/
+  ➜  Network: http://192.168.0.108:5000/
+  ➜  Network: http://192.168.56.1:5000/
+  ➜  Network: http://10.8.0.38:5000/
+  ➜  Network: http://192.168.154.1:5000/
+  ➜  Network: http://192.168.35.1:5000/
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+(py312) PS D:\code\person\newmob> cargo tauri dev
+    Warn Both `C:\Users\zhyha\.cargo\config` and `C:\Users\zhyha\.cargo\config.toml` exist. Using `C:\Users\zhyha\.cargo\config`
+    Running BeforeDevCommand (`pnpm dev`)
+
+> newmob@0.1.0 dev D:\code\person\newmob
+> vite
+
+
+  VITE v5.4.21  ready in 269 ms
+
+  ➜  Local:   http://localhost:5000/
+  ➜  Network: http://192.168.0.108:5000/
+  ➜  Network: http://192.168.56.1:5000/
+  ➜  Network: http://10.8.0.38:5000/
+  ➜  Network: http://192.168.154.1:5000/
+  ➜  Network: http://192.168.35.1:5000/
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
+    Warn Waiting for your frontend dev server to start on http://localhost:1420/...
