@@ -6,6 +6,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {
   loadGlobalTerminalProfile,
+  parseSessionOptions,
   resolveTerminalTheme,
   saveGlobalTerminalProfile,
   type TerminalProfile,
@@ -47,6 +48,7 @@ export interface SshConnectInfo {
   username: string;
   authMethod: string;
   authData: string | null;
+  optionsJson?: string;
 }
 
 interface TerminalPanelProps {
@@ -781,6 +783,9 @@ export function TerminalPanel({
         }
         sessionIdRef.current = sid;
         appendEvent("connection", `Connected (${sid})`);
+        if (ssh) {
+          term.write(formatSshInfoBanner(ssh));
+        }
 
         unlistenOutput = await listenTerminalOutput(sid, (b64) => {
           const output = decodeBase64(b64);
@@ -1079,6 +1084,32 @@ export function TerminalPanel({
       {contextMenu.render}
     </div>
   );
+}
+
+function formatSshInfoBanner(ssh: SshConnectInfo): string {
+  const options = parseSessionOptions(ssh.optionsJson);
+  const compression = options.compression === true;
+  const x11 = options.x11 !== false;
+  const sshBrowser = typeof options.sshBrowser === "string" ? options.sshBrowser : "SFTP protocol (recommended)";
+  const sshBrowserEnabled = sshBrowser !== "Disabled";
+  const rows = [
+    "NewMob SSH terminal",
+    "SSH session to " + ssh.username + "@" + ssh.host,
+    "Direct SSH      : " + checkMark(true),
+    "SSH compression : " + checkMark(compression),
+    "SSH-browser     : " + checkMark(sshBrowserEnabled) + (sshBrowserEnabled ? "  " + sshBrowser : ""),
+    "X11-forwarding  : " + checkMark(x11) + (x11 ? "  (remote display is forwarded through SSH)" : ""),
+    "",
+    "For more info, edit SSH session advanced settings.",
+  ];
+  const width = Math.max(68, ...rows.map((row) => row.length + 4));
+  const border = "+" + "-".repeat(width - 2) + "+";
+  const body = rows.map((row) => "| " + row.padEnd(width - 4) + " |");
+  return "\r\n" + [border, ...body, border].join("\r\n") + "\r\n";
+}
+
+function checkMark(enabled: boolean): string {
+  return enabled ? "✓" : "✗";
 }
 
 function getBufferText(term: Terminal): string {

@@ -110,6 +110,14 @@ function extractAuthType(
   return "Password";
 }
 
+function optionBoolean(options: Record<string, unknown>, key: string, fallback: boolean): boolean {
+  return typeof options[key] === "boolean" ? options[key] : fallback;
+}
+
+function optionString(options: Record<string, unknown>, key: string, fallback: string): string {
+  return typeof options[key] === "string" ? options[key] : fallback;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Tiny local UI primitives (match prototype)                         */
 /* ------------------------------------------------------------------ */
@@ -752,6 +760,8 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
   const { addSession, updateSession, removeSession, createFolderPath, sessions, groups } = useSessionStore();
   const isEdit = !!session;
 
+  const initialOptions = useMemo(() => parseSessionOptions(session?.options_json), [session?.options_json]);
+
   /* --- core fields --- */
   const [proto, setProto] = useState<Proto>(
     sessionTypeToProto(session?.session_type),
@@ -786,24 +796,24 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
   const [showPwd, setShowPwd] = useState(false);
 
   /* --- advanced SSH --- */
-  const [x11, setX11] = useState(true);
-  const [compression, setCompression] = useState(false);
-  const [startupCmd, setStartupCmd] = useState("");
-  const [doNotExit, setDoNotExit] = useState(false);
-  const [remoteEnv, setRemoteEnv] = useState("Interactive shell");
-  const [sshBrowser, setSshBrowser] = useState("SFTP protocol (recommended)");
-  const [followPath, setFollowPath] = useState(true);
+  const [x11, setX11] = useState(() => optionBoolean(initialOptions, "x11", true));
+  const [compression, setCompression] = useState(() => optionBoolean(initialOptions, "compression", false));
+  const [startupCmd, setStartupCmd] = useState(() => optionString(initialOptions, "startupCmd", ""));
+  const [doNotExit, setDoNotExit] = useState(() => optionBoolean(initialOptions, "doNotExit", false));
+  const [remoteEnv, setRemoteEnv] = useState(() => optionString(initialOptions, "remoteEnv", "Interactive shell"));
+  const [sshBrowser, setSshBrowser] = useState(() => optionString(initialOptions, "sshBrowser", "SFTP protocol (recommended)"));
+  const [followPath, setFollowPath] = useState(() => optionBoolean(initialOptions, "followPath", true));
   const [usePrivKey, setUsePrivKey] = useState(
     extractAuthType(session?.auth_method) === "PrivateKey",
   );
-  const [useJump, setUseJump] = useState(false);
-  const [jumpHost, setJumpHost] = useState("");
-  const [jumpUser, setJumpUser] = useState("");
-  const [jumpPort, setJumpPort] = useState("22");
+  const [useJump, setUseJump] = useState(() => optionBoolean(initialOptions, "useJump", false));
+  const [jumpHost, setJumpHost] = useState(() => optionString(initialOptions, "jumpHost", ""));
+  const [jumpUser, setJumpUser] = useState(() => optionString(initialOptions, "jumpUser", ""));
+  const [jumpPort, setJumpPort] = useState(() => optionString(initialOptions, "jumpPort", "22"));
 
   /* --- bookmark --- */
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState("");
+  const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
+  const [tags, setTags] = useState(() => optionString(initialOptions, "tags", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -942,6 +952,7 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
   };
 
   const handleReset = () => {
+    const nextOptions = parseSessionOptions(session?.options_json);
     const nextProto = sessionTypeToProto(session?.session_type);
     setProto(nextProto);
     setSection("advanced");
@@ -957,20 +968,20 @@ export function SessionEditor({ session, defaultGroupPath = null, onClose }: Ses
     setKeyPath(extractKeyPath(session?.auth_method));
     setPassword("");
     setShowPwd(false);
-    setX11(true);
-    setCompression(false);
-    setStartupCmd("");
-    setDoNotExit(false);
-    setRemoteEnv("Interactive shell");
-    setSshBrowser("SFTP protocol (recommended)");
-    setFollowPath(true);
+    setX11(optionBoolean(nextOptions, "x11", true));
+    setCompression(optionBoolean(nextOptions, "compression", false));
+    setStartupCmd(optionString(nextOptions, "startupCmd", ""));
+    setDoNotExit(optionBoolean(nextOptions, "doNotExit", false));
+    setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
+    setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
+    setFollowPath(optionBoolean(nextOptions, "followPath", true));
     setUsePrivKey(nextAuth === "PrivateKey");
-    setUseJump(false);
-    setJumpHost("");
-    setJumpUser("");
-    setJumpPort("22");
-    setDescription("");
-    setTags("");
+    setUseJump(optionBoolean(nextOptions, "useJump", false));
+    setJumpHost(optionString(nextOptions, "jumpHost", ""));
+    setJumpUser(optionString(nextOptions, "jumpUser", ""));
+    setJumpPort(optionString(nextOptions, "jumpPort", "22"));
+    setDescription(optionString(nextOptions, "description", ""));
+    setTags(optionString(nextOptions, "tags", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setSaveError(null);
     setTestResult(null);

@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionEditor } from "./SessionEditor";
 
@@ -20,10 +21,16 @@ vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
 }));
 
-function renderEditor() {
+function renderEditor(session?: ComponentProps<typeof SessionEditor>["session"]) {
   const onClose = vi.fn();
-  render(<SessionEditor onClose={onClose} />);
+  render(<SessionEditor session={session} onClose={onClose} />);
   return { onClose };
+}
+
+function checkboxInLabel(text: string): HTMLInputElement {
+  const input = screen.getByText(text).closest("label")?.querySelector("input");
+  if (!(input instanceof HTMLInputElement)) throw new Error(`Checkbox not found: ${text}`);
+  return input;
 }
 
 describe("SessionEditor SSH settings tabs", () => {
@@ -82,6 +89,65 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(doNotExit).not.toBeChecked();
     await user.click(screen.getByText("Do not exit after command ends"));
     expect(doNotExit).toBeChecked();
+  });
+
+  it("loads and preserves saved Advanced SSH options", async () => {
+    const user = userEvent.setup();
+    const session = {
+      id: "ssh-1",
+      name: "saved-prod",
+      session_type: "SSH",
+      group_path: null,
+      host: "prod.example.com",
+      port: 22,
+      username: "deploy",
+      auth_method: "Agent" as const,
+      options_json: JSON.stringify({
+        x11: false,
+        compression: true,
+        startupCmd: "tmux new -A -s main",
+        doNotExit: true,
+        remoteEnv: "Interactive shell",
+        sshBrowser: "Disabled",
+        followPath: false,
+        useJump: true,
+        jumpHost: "bastion.example.com",
+        jumpUser: "jump",
+        jumpPort: "2222",
+      }),
+      created_at: 1,
+      updated_at: 1,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    renderEditor(session);
+
+    expect(checkboxInLabel("Use SSH compression (slow links)")).toBeChecked();
+    expect(checkboxInLabel("Enable")).not.toBeChecked();
+    expect(screen.getByLabelText("Execute command")).toHaveValue("tmux new -A -s main");
+    expect(screen.getByLabelText("Do not exit after command ends")).toBeChecked();
+    expect(screen.getByDisplayValue("Disabled")).toBeInTheDocument();
+    expect(checkboxInLabel("Follow SSH path (experimental)")).not.toBeChecked();
+    expect(checkboxInLabel("Enable jump host")).toBeChecked();
+    expect(screen.getByDisplayValue("bastion.example.com")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("jump")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("2222")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    expect(JSON.parse(savedConfig.options_json)).toMatchObject({
+      x11: false,
+      compression: true,
+      startupCmd: "tmux new -A -s main",
+      doNotExit: true,
+      sshBrowser: "Disabled",
+      followPath: false,
+      useJump: true,
+      jumpHost: "bastion.example.com",
+      jumpUser: "jump",
+      jumpPort: "2222",
+    });
   });
 
   it("updates Terminal settings preview and numeric fields", async () => {

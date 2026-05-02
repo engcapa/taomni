@@ -178,6 +178,7 @@ export function MainLayout() {
         username: session.username ?? "root",
         authMethod,
         authData,
+        optionsJson: session.options_json,
       },
       terminalProfile: getSessionTerminalProfile(session.options_json),
     });
