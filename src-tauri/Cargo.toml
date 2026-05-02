@@ -37,3 +37,7 @@ async-trait = "0.1"
 shellexpand = "3"
 libc = "0.2"
 font-kit = "0.14"
+dirs = "5"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["fileapi"] }

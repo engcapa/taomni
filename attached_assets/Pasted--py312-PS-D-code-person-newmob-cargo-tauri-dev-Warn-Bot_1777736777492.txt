@@ -1,0 +1,89 @@
+(py312) PS D:\code\person\newmob> cargo tauri dev
+    Warn Both `C:\Users\zhyha\.cargo\config` and `C:\Users\zhyha\.cargo\config.toml` exist. Using `C:\Users\zhyha\.cargo\config`
+    Running BeforeDevCommand (`pnpm dev`)
+
+> newmob@0.1.0 dev D:\code\person\newmob
+> vite
+
+
+  VITE v5.4.21  ready in 269 ms
+
+  ➜  Local:   http://localhost:1420/
+  ➜  Network: http://192.168.0.108:1420/
+  ➜  Network: http://192.168.56.1:1420/
+  ➜  Network: http://10.8.0.38:1420/
+  ➜  Network: http://192.168.154.1:1420/
+  ➜  Network: http://192.168.35.1:1420/
+    Info Watching D:\code\person\newmob\src-tauri for changes...
+   Compiling futures-io v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling tokio-util v0.7.18
+   Compiling tokio-stream v0.1.18
+   Compiling russh-sftp v2.1.2
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling pageant v0.0.1
+   Compiling russh-keys v0.46.0
+   Compiling russh v0.46.0
+   Compiling newmob v0.1.0 (D:\code\person\newmob\src-tauri)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `winapi`
+  --> src\filebrowser\local.rs:24:28
+   |
+24 |     let bitmask = unsafe { winapi::um::fileapi::GetLogicalDrives() };
+   |                            ^^^^^^ use of unresolved module or unlinked crate `winapi`
+   |
+   = help: if you wanted to use a crate named `winapi`, use `cargo add winapi` to add it to your `Cargo.toml`
+
+warning: unused import: `std::ffi::OsString`
+  --> src\filebrowser\local.rs:20:9
+   |
+20 |     use std::ffi::OsString;
+   |         ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::os::windows::ffi::OsStringExt`
+  --> src\filebrowser\local.rs:21:9
+   |
+21 |     use std::os::windows::ffi::OsStringExt;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `len` found for struct `russh_sftp::client::fs::ReadDir` in the current scope
+    --> src\filebrowser\sftp.rs:86:58
+     |
+  86 |         let mut entries = Vec::with_capacity(dir_entries.len());
+     |                                                          ^^^
+     |
+help: there is a method `le` with a similar name, but with different arguments
+    --> C:\Users\zhyha\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\iter\traits\iterator.rs:3875:5
+     |
+3875 | /     fn le<I>(self, other: I) -> bool
+3876 | |     where
+3877 | |         I: IntoIterator,
+3878 | |         Self::Item: PartialOrd<I::Item>,
+3879 | |         Self: Sized,
+     | |____________________^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `dirs`
+  --> src\filebrowser\local.rs:13:5
+   |
+13 |     dirs::home_dir()
+   |     ^^^^ use of unresolved module or unlinked crate `dirs`
+   |
+   = help: if you wanted to use a crate named `dirs`, use `cargo add dirs` to add it to your `Cargo.toml`
+
+error[E0282]: type annotations needed
+  --> src\filebrowser\local.rs:14:15
+   |
+14 |         .map(|p| p.to_string_lossy().to_string())
+   |               ^  - type must be known at this point
+   |
+help: consider giving this closure parameter an explicit type
+   |
+14 |         .map(|p: /* Type */| p.to_string_lossy().to_string())
+   |                ++++++++++++
+
+Some errors have detailed explanations: E0282, E0433, E0599.
+For more information about an error, try `rustc --explain E0282`.
+warning: `newmob` (lib) generated 2 warnings
+error: could not compile `newmob` (lib) due to 4 previous errors; 2 warnings emitted

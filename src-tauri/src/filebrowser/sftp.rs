@@ -83,7 +83,7 @@ impl ActiveSftp {
                 .await
                 .map_err(|e| format!("Failed to read {}: {}", path, e))?
         };
-        let mut entries = Vec::with_capacity(dir_entries.len());
+        let mut entries: Vec<FileEntryDto> = Vec::new();
         for item in dir_entries {
             let name = item.file_name();
             if name == "." || name == ".." {
