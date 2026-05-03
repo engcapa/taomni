@@ -48,6 +48,10 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 
 export interface SshConnectInfo {
+  /** Persisted session config id, if this terminal was opened from a
+   *  saved session. Used so the SessionEditor can subscribe to runtime
+   *  forward errors for the session it is editing. */
+  sessionId?: string;
   host: string;
   port: number;
   username: string;
@@ -864,12 +868,27 @@ export function TerminalPanel({
 
         // Surface per-row local-forward errors (parse, bind, accept,
         // direct-tcpip open) in the same event log the user already sees
-        // for connection / auth / disconnect events.
+        // for connection / auth / disconnect events. Also re-broadcast
+        // as a window-level CustomEvent keyed by the persisted session
+        // config id so an open SessionEditor can show the failure
+        // inline next to the offending forward row.
         unlistenForwardError = await listenTerminalForwardError(sid, (err) => {
           appendEvent(
             "error",
             `Local forward ${err.local} → ${err.remote}: ${err.message}`,
           );
+          if (ssh?.sessionId) {
+            window.dispatchEvent(
+              new CustomEvent("newmob:forward-error", {
+                detail: {
+                  sessionConfigId: ssh.sessionId,
+                  local: err.local,
+                  remote: err.remote,
+                  message: err.message,
+                },
+              }),
+            );
+          }
         });
       })
       .catch((err) => {

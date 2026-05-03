@@ -137,11 +137,29 @@ pub async fn create_ssh_terminal(
 
     let sid = session_id.clone();
     let app = app_handle.clone();
+    let terminals = state.terminals.clone();
     tokio::spawn(async move {
         let event_name = format!("terminal-output-{}", sid);
         while let Some(data) = output_rx.recv().await {
             let encoded = B64.encode(&data);
             let _ = app.emit(&event_name, encoded);
+        }
+        // SSH session ended naturally (peer closed, network drop, exit).
+        // Remove the terminal entry and abort any session-attached
+        // forward listeners so their bound TCP ports are released and
+        // the in-flight bridge tasks (owned by per-listener JoinSets)
+        // are torn down. This mirrors what `close_terminal` does on an
+        // explicit user close, so forwards always end with the SSH
+        // session — never outlive it.
+        let removed = {
+            let mut map = terminals.write().await;
+            map.remove(&sid)
+        };
+        if let Some(ActiveTerminal::Ssh { forwards, .. }) = removed {
+            let mut tasks = forwards.lock().await;
+            for h in tasks.drain(..) {
+                h.abort();
+            }
         }
         let _ = app.emit(&format!("terminal-exit-{}", sid), "closed");
     });

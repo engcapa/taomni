@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   X,
   Terminal as TerminalIcon,
@@ -459,13 +459,39 @@ function TerminalSettings({
 function NetworkSettings({
   value,
   onChange,
+  sessionConfigId,
 }: {
   value: NetworkSettingsValue;
   onChange: (next: NetworkSettingsValue) => void;
+  /** When set, the Network tab subscribes to runtime forward errors
+   *  for this saved session and renders the latest failure inline next
+   *  to the offending row. */
+  sessionConfigId?: string;
 }) {
   const [newFwdLocal, setNewFwdLocal] = useState("");
   const [newFwdRemote, setNewFwdRemote] = useState("");
   const [newFwdDesc, setNewFwdDesc] = useState("");
+  // Per-row latest forward error, keyed by `${local}->${remote}`.
+  const [forwardErrors, setForwardErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!sessionConfigId) return;
+    const onErr = (ev: Event) => {
+      const detail = (ev as CustomEvent<{
+        sessionConfigId: string;
+        local: string;
+        remote: string;
+        message: string;
+      }>).detail;
+      if (!detail || detail.sessionConfigId !== sessionConfigId) return;
+      setForwardErrors((m) => ({
+        ...m,
+        [`${detail.local}->${detail.remote}`]: detail.message,
+      }));
+    };
+    window.addEventListener("newmob:forward-error", onErr as EventListener);
+    return () => window.removeEventListener("newmob:forward-error", onErr as EventListener);
+  }, [sessionConfigId]);
 
   const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
   const proxy = proxyKindToLabel(value.proxyKind);
@@ -602,43 +628,58 @@ function NetworkSettings({
             <span className="w-32">→ Remote address:port</span>
             <span>Description</span>
           </div>
-          {forwards.map((forward) => (
-            <div key={forward.id} className="flex items-center gap-1.5">
-              <input
-                className="moba-input w-32"
-                value={forward.local}
-                aria-label="Forward local address"
-                onChange={(e) =>
-                  setForwards((items) =>
-                    items.map((item) => item.id === forward.id ? { ...item, local: e.target.value } : item),
-                  )
-                }
-              />
-              <input
-                className="moba-input w-40"
-                value={forward.remote}
-                aria-label="Forward remote address"
-                onChange={(e) =>
-                  setForwards((items) =>
-                    items.map((item) => item.id === forward.id ? { ...item, remote: e.target.value } : item),
-                  )
-                }
-              />
-              <input
-                className="moba-input flex-1"
-                value={forward.desc}
-                aria-label="Forward description"
-                onChange={(e) =>
-                  setForwards((items) =>
-                    items.map((item) => item.id === forward.id ? { ...item, desc: e.target.value } : item),
-                  )
-                }
-              />
-              <button className="moba-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
-                Remove
-              </button>
-            </div>
-          ))}
+          {forwards.map((forward) => {
+            const errKey = `${forward.local.trim()}->${forward.remote.trim()}`;
+            const rowError = forwardErrors[errKey];
+            return (
+              <div key={forward.id} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    className="moba-input w-32"
+                    value={forward.local}
+                    aria-label="Forward local address"
+                    onChange={(e) =>
+                      setForwards((items) =>
+                        items.map((item) => item.id === forward.id ? { ...item, local: e.target.value } : item),
+                      )
+                    }
+                  />
+                  <input
+                    className="moba-input w-40"
+                    value={forward.remote}
+                    aria-label="Forward remote address"
+                    onChange={(e) =>
+                      setForwards((items) =>
+                        items.map((item) => item.id === forward.id ? { ...item, remote: e.target.value } : item),
+                      )
+                    }
+                  />
+                  <input
+                    className="moba-input flex-1"
+                    value={forward.desc}
+                    aria-label="Forward description"
+                    onChange={(e) =>
+                      setForwards((items) =>
+                        items.map((item) => item.id === forward.id ? { ...item, desc: e.target.value } : item),
+                      )
+                    }
+                  />
+                  <button className="moba-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
+                    Remove
+                  </button>
+                </div>
+                {rowError && (
+                  <div
+                    className="text-[11px] text-red-400 ml-[2px]"
+                    role="status"
+                    data-testid={`forward-row-error-${forward.id}`}
+                  >
+                    {rowError}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <div className="flex items-center gap-1.5">
             <input className="moba-input w-32" placeholder="127.0.0.1:9090" value={newFwdLocal} aria-label="New forward local address" onChange={(e) => setNewFwdLocal(e.target.value)} />
             <input className="moba-input w-40" placeholder="metrics.lan:9090" value={newFwdRemote} aria-label="New forward remote address" onChange={(e) => setNewFwdRemote(e.target.value)} />
@@ -1319,7 +1360,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             <TerminalSettings profile={terminalProfile} onProfileChange={setTerminalProfile} />
           )}
           {activeSection === "network" && (
-            <NetworkSettings value={networkSettings} onChange={setNetworkSettings} />
+            <NetworkSettings
+              value={networkSettings}
+              onChange={setNetworkSettings}
+              sessionConfigId={session?.id}
+            />
           )}
           {activeSection === "bookmark" && (
             <BookmarkSettings

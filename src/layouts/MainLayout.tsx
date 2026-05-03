@@ -287,6 +287,7 @@ export function MainLayout() {
       sessionId: session.id,
       closable: true,
       ssh: {
+        sessionId: session.id,
         host: session.host,
         port: session.port,
         username: session.username ?? "root",
