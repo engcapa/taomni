@@ -1,0 +1,23 @@
+app:
+  base_url: http://localhost:5000
+  mode: browser
+
+ssh:
+  host: 127.0.0.1
+  port: 2222
+  user: testuser
+  password: ${env:QA_SSH_PASSWORD}
+
+sftp:
+  host: 127.0.0.1
+  port: 2222
+  user: testuser
+  password: ${env:QA_SSH_PASSWORD}
+  remote_test_dir: /config/qa-ui-auto
+
+fixtures:
+  start_local_sshd: false
+
+report:
+  dir: qa-ui-auto-report-smoke
+  keep_runs: 5

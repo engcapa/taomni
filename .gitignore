@@ -106,3 +106,9 @@ qa-ui-auto-report/
 qa-ui-auto-report-*/
 testcase-for-auto.fresh-*.md
 testcase-for-auto.md.bak-*
+
+# playwright
+.playwright-cli
+
+# python
+**/__pycache__/

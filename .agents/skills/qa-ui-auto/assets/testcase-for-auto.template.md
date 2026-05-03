@@ -27,8 +27,8 @@
 - mode: browser
 
 1. open ${cfg:app.base_url}
-2. wait_for 'role=tablist'
-3. expect_visible 'text="Local Terminal"'
+2. wait_for 'text="Quick connect:"'
+3. expect_visible 'text="Ready"'
 4. screenshot 01-launch.png
 
 ## TC-002: Open settings panel and toggle theme
@@ -36,11 +36,10 @@
 - mode: browser
 
 1. open ${cfg:app.base_url}
-2. click '[data-testid="menubar-settings"]'
+2. click 'text="Settings"'
 3. wait_for '[data-testid="settings-panel"]'
-4. click '[data-testid="theme-toggle"]'
+4. click 'button[aria-label="Cycle application theme"]'
 5. screenshot 02-theme-toggled.png
-6. click '[data-testid="settings-close"]'
 
 ## TC-003: Create a local terminal tab
 - tags: terminal, p0

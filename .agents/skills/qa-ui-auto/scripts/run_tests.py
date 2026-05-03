@@ -92,52 +92,106 @@ def wait_for_url(url: str, timeout: float = 30.0) -> bool:
 
 # ─── playwright-cli adapter ──────────────────────────────────────────────────
 
+def _playwright_command() -> list[str]:
+    path = shutil.which("playwright-cli")
+    if not path:
+        return ["playwright-cli"]
+    suffix = Path(path).suffix.lower()
+    if platform.system() == "Windows" and suffix == ".ps1":
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if shell:
+            return [shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", path]
+    return [path]
+
+
 def _pw(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(["playwright-cli", *args], cwd=cwd,
+    return subprocess.run([*_playwright_command(), *args], cwd=cwd,
                           capture_output=True, text=True)
+
+
+def _js(value: str) -> str:
+    return json.dumps(value)
+
+
+def _session(report_dir: Path) -> str:
+    return f"qa-ui-auto-{report_dir.name.lower()}"
 
 
 def dispatch(step, profile_dir: Path, report_dir: Path) -> tuple[bool, str]:
     """Execute one step via playwright-cli. Returns (ok, message)."""
     v = step.verb
     a = step.args
-    common = ["--user-data-dir", str(profile_dir)]
+    session = _session(report_dir)
+    common = [f"-s={session}"]
     try:
         if v == "open" or v == "goto":
-            r = _pw(["open", a[0], *common], profile_dir)
+            r = _pw([*common, "open", a[0], "--profile", str(profile_dir)],
+                    profile_dir)
         elif v == "click":
-            r = _pw(["click", a[0], *common], profile_dir)
+            code = f"async page => await page.locator({_js(a[0])}).first().click({{ timeout: 10000 }})"
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "dblclick":
-            r = _pw(["dblclick", a[0], *common], profile_dir)
+            code = f"async page => await page.locator({_js(a[0])}).first().dblclick({{ timeout: 10000 }})"
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "type":
-            r = _pw(["type", a[0], *common], profile_dir)
+            code = f"async page => await page.keyboard.type({_js(a[0])})"
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "fill":
-            r = _pw(["fill", a[0], a[1], *common], profile_dir)
+            code = f"async page => await page.locator({_js(a[0])}).first().fill({_js(a[1])}, {{ timeout: 10000 }})"
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "press":
-            r = _pw(["press", a[0], *common], profile_dir)
+            code = f"async page => await page.keyboard.press({_js(a[0])})"
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "select":
-            r = _pw(["select", a[0], a[1], *common], profile_dir)
+            code = f"async page => await page.locator({_js(a[0])}).first().selectOption({_js(a[1])})"
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "wait_for":
-            r = _pw(["wait-for", a[0], *common], profile_dir)
+            code = (
+                f"async page => await page.locator({_js(a[0])}).first()"
+                ".waitFor({ state: 'visible', timeout: 10000 })"
+            )
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v in ("wait", "sleep"):
             time.sleep(float(a[0]))
             return True, f"slept {a[0]}s"
         elif v == "expect_visible":
-            r = _pw(["expect", "visible", a[0], *common], profile_dir)
+            code = (
+                f"async page => await page.locator({_js(a[0])}).first()"
+                ".waitFor({ state: 'visible', timeout: 10000 })"
+            )
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "expect_text":
-            r = _pw(["expect", "text", a[0], a[1], *common], profile_dir)
+            code = (
+                "async page => { "
+                f"const text = await page.locator({_js(a[0])}).first()"
+                ".textContent({ timeout: 10000 }); "
+                f"if (!text || !text.includes({_js(a[1])})) "
+                f"throw new Error(`expected text to include ${_js(a[1])}, got ${text}`); "
+                "return true; }"
+            )
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "expect_url":
-            r = _pw(["expect", "url", a[0], *common], profile_dir)
+            code = (
+                "async page => { "
+                f"if (!page.url().includes({_js(a[0])})) "
+                f"throw new Error(`expected URL to include ${_js(a[0])}, got ${page.url()}`); "
+                "return true; }"
+            )
+            r = _pw([*common, "run-code", code], profile_dir)
         elif v == "screenshot":
             target = report_dir / (a[0] if a else "screenshot.png")
             target.parent.mkdir(parents=True, exist_ok=True)
-            r = _pw(["screenshot", "--path", str(target), *common], profile_dir)
+            r = _pw([*common, "screenshot", "--filename", str(target)],
+                    profile_dir)
         elif v == "eval":
-            r = _pw(["eval", a[0], *common], profile_dir)
+            r = _pw([*common, "run-code", a[0]], profile_dir)
         else:
             return False, f"unknown verb {v}"
-        ok = r.returncode == 0
-        msg = (r.stdout + r.stderr).strip().splitlines()[-1] if (r.stdout or r.stderr) else ""
+        combined = (r.stdout + r.stderr).strip()
+        has_cli_error = "### Error" in combined or "\nError:" in combined or combined.startswith("Error:")
+        ok = r.returncode == 0 and not has_cli_error
+        msg = combined.splitlines()[-1] if combined else ""
         return ok, msg or ("ok" if ok else "failed")
     except Exception as e:
         return False, f"exception: {e}"
@@ -149,6 +203,7 @@ def run_case(case: TestCase, cfg: dict, env: dict, report_root: Path) -> dict:
     case_dir = report_root / case.id
     case_dir.mkdir(parents=True, exist_ok=True)
     profile_dir = case_dir / "profile"
+    profile_dir.mkdir(parents=True, exist_ok=True)
     log(f"▶ {case.id}: {case.title}")
     steps_log = []
     failed = False
@@ -242,12 +297,19 @@ def main() -> int:
     if report_root.exists():
         # rotate
         keep = int(cfg.get("report", {}).get("keep_runs", 5))
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         archive = report_root.with_name(
-            f"{report_root.name}-{datetime.now():%Y%m%d-%H%M%S}")
-        report_root.rename(archive)
-        siblings = sorted(report_root.parent.glob(f"{report_root.name}-*"))
-        for old in siblings[:-keep]:
-            shutil.rmtree(old, ignore_errors=True)
+            f"{report_root.name}-{stamp}")
+        try:
+            report_root.rename(archive)
+        except PermissionError:
+            report_root = report_root.with_name(
+                f"{report_root.name}-run-{stamp}")
+            log(f"could not rotate locked report dir; writing to {report_root}")
+        else:
+            siblings = sorted(report_root.parent.glob(f"{report_root.name}-*"))
+            for old in siblings[:-keep]:
+                shutil.rmtree(old, ignore_errors=True)
     report_root.mkdir(parents=True, exist_ok=True)
 
     env = dict(os.environ)

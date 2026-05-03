@@ -5,13 +5,12 @@ UI changes, update both the component and this list. The template
 `testcase-for-auto.md` is regenerated from these selectors.
 
 ## Menubar / global
-- `[data-testid="menubar-settings"]`     — open settings panel
+- `text="Settings"`                      — open settings panel
 - `[data-testid="settings-panel"]`       — settings panel root
-- `[data-testid="settings-close"]`       — close settings
-- `[data-testid="theme-toggle"]`         — light/dark toggle
+- `button[aria-label="Cycle application theme"]` — light/dark toggle
 
 ## Tab bar / terminals
-- `role=tablist`                         — main tab strip
+- `text="Quick connect:"`                — main window quick connect bar
 - `[data-testid="new-local-terminal"]`   — "+" button → spawn local PTY
 - `[data-testid="terminal-pane"]`        — active xterm container
 
