@@ -515,8 +515,6 @@ function NetworkSettings({
   const setProxySave = (v: boolean) => patch({ proxySaveAuth: v });
   const setKeepAlive = (v: boolean) => patch({ keepAlive: v });
   const setKeepAliveInterval = (v: string) => patch({ keepAliveIntervalSecs: v });
-  const setTcpNodelay = (v: boolean) => patch({ tcpNodelay: v });
-  const setDisableNagle = (v: boolean) => patch({ disableNagle: v });
   const setIpVersion = (label: string) => patch({ ipVersion: ipLabelToKind(label) });
   const setForwards = (
     updater: (items: NetworkSettingsValue["localForwards"]) => NetworkSettingsValue["localForwards"],

@@ -33,6 +33,7 @@ UI changes, update both the component and this list. The template
 - `[data-testid="terminal-appearance-settings"]` - shared terminal profile controls
 - `[data-testid="terminal-theme-gallery"]` - terminal theme preview gallery
 - `[data-testid="terminal-preview"]` - terminal appearance preview
+- `[data-testid="terminal-preview-cursor"]` - cursor rendered inside the terminal appearance preview
 
 ## Session editor
 - `[data-testid="session-new"]` - sidebar "new session" action

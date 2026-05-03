@@ -295,9 +295,9 @@
 
 ---
 
-## Phase 3：SFTP 文件浏览器
+## Phase 3：SFTP 文件浏览器 ✅ DONE
 
-### Task 3.1 — SFTP 后端操作
+### Task 3.1 — SFTP 后端操作 ✅ DONE
 
 **范围：** Rust 端实现 SFTP 文件操作
 
@@ -326,7 +326,7 @@
 
 ---
 
-### Task 3.2 — 双面板文件浏览器 UI
+### Task 3.2 — 双面板文件浏览器 UI ✅ DONE
 
 **范围：** 前端实现本地/远程双面板文件管理器
 
@@ -357,7 +357,7 @@
 
 ---
 
-### Task 3.3 — SFTP 侧边栏（SSH 会话附带）
+### Task 3.3 — SFTP 侧边栏（SSH 会话附带） ✅ DONE
 
 **范围：** SSH 终端标签页自动附带 SFTP 侧边栏
 
@@ -380,9 +380,9 @@
 
 ---
 
-## Phase 4：端口转发与高级 SSH 功能
+## Phase 4：端口转发与高级 SSH 功能 ✅ DONE
 
-### Task 4.1 — 端口转发后端
+### Task 4.1 — 端口转发后端 ✅ DONE
 
 **范围：** Rust 端实现 SSH 隧道（Local/Remote/Dynamic）
 
@@ -404,7 +404,7 @@
 
 ---
 
-### Task 4.2 — 隧道管理 UI
+### Task 4.2 — 隧道管理 UI ✅ DONE
 
 **范围：** 前端隧道创建和状态监控界面
 
@@ -425,7 +425,7 @@
 
 ---
 
-### Task 4.3 — 高级 SSH 功能
+### Task 4.3 — 高级 SSH 功能 ✅ DONE
 
 **范围：** ProxyJump、Agent 转发、X11 转发、keepalive、自动重连
 
