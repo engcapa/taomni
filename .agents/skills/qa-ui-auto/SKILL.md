@@ -75,12 +75,12 @@ Test cases and config live at the **project root**, not inside the skill, so use
    - Parses `testcase-for-auto.md` into ordered cases and steps.
    - For each case, opens a fresh browser context: `playwright-cli open http://localhost:5000 --user-data-dir qa-ui-auto-report/profile-<case>`.
    - Executes each step as a `playwright-cli` command (`click`, `type`, `press`, `expect`, `screenshot`).
-   - On failure, captures a screenshot + the page HTML into `qa-ui-auto-report/<case>/`.
+   - On failure, captures a screenshot, DOM snapshot, page console logs, the injected page console buffer, and page HTML into `qa-ui-auto-report/<case>/`.
    - Writes `qa-ui-auto-report/summary.json` and a Markdown summary.
    The native runner starts or connects to `tauri-driver` at `webdriver.host:webdriver.port`, creates one Tauri WebDriver session per case with `tauri:options.application`, drives the real native WebView through W3C WebDriver, captures screenshots through WebDriver, and writes the same report format.
 6. **Report.** Print the Markdown summary to stdout. Exit non-zero if any case failed so the parent agent loop can react.
 7. **Failure artifacts.** For every failed case, inspect and report the artifacts listed under that failed step in `summary.md`.
-   - Browser mode captures failure screenshot, DOM snapshot, console output from `playwright-cli console`, and page HTML where available.
+   - Browser mode captures failure screenshot, DOM snapshot, console output from `playwright-cli console` at default/info/warning/error levels, an in-page console buffer JSON (`console.log/info/warn/error/debug`, `window.error`, `unhandledrejection`), and page HTML where available.
    - Native mode captures failure screenshot, page HTML, a JSON file containing the injected in-page console buffer (`console.log/info/warn/error/debug`, `window.error`, `unhandledrejection`) and basic runtime state such as `window.__TAURI__` availability.
    - Native mode also lists `tauri-driver.out.log` and `tauri-driver.err.log` in the run artifacts. Treat these as backend/native-driver logs; Tauri/Rust process output normally flows through the driver-launched process. If the Rust app exits early or WebDriver cannot create a session, surface the tail of these logs in the final answer.
 
