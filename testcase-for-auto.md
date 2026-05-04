@@ -1194,3 +1194,48 @@
 4. eval 'async page => { let promptSeen = false; page.on("dialog", async (dialog) => { promptSeen = true; await dialog.dismiss(); }); await page.evaluate(() => { const event = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(event); if (event.defaultPrevented || event.returnValue) { window.confirm("Are you sure you want to exit?"); } }); }'
 5. sleep 1
 6. screenshot 045-close-app-confirmation.png
+
+## TC-046: Tunnel manager toggles authentication display globally
+- tags: tunnel, p1
+- mode: browser
+
+1. open ${cfg:app.base_url}
+2. click '[data-testid="ribbon-tunneling"]'
+3. wait_for 'text="New SSH tunnel"'
+4. click 'text="New SSH tunnel"'
+5. sleep 1
+6. fill 'input[placeholder="e.g. postgres-replica"]' 'qa-ui-auto-tunnel-auth'
+7. fill 'input[placeholder="ssh.example.com"]' '${cfg:ssh.host}'
+8. fill 'input[placeholder="user"]' '${cfg:ssh.user}'
+9. eval 'async page => { await page.locator(`button:has-text("Save")`).first().click({ force: true }); }'
+10. wait_for 'text="qa-ui-auto-tunnel-auth"'
+11. eval 'async page => { await page.locator(`button[title*="Hide all credentials" i], button[title*="Show all credentials" i]`).first().click(); }'
+12. sleep 1
+13. eval 'async page => { await page.evaluate(() => { window.confirm = () => true; }); const row = page.locator(`tr:has-text("qa-ui-auto-tunnel-auth")`); await row.locator(`button:has(svg.lucide-trash-2)`).first().click(); }'
+14. screenshot 046-tunnel-auth-display.png
+
+## TC-047: Tunnel manager reorder controls
+- tags: tunnel, reorder, p1
+- mode: browser
+
+1. open ${cfg:app.base_url}
+2. click '[data-testid="ribbon-tunneling"]'
+3. wait_for 'text="New SSH tunnel"'
+4. click 'text="New SSH tunnel"'
+5. sleep 1
+6. fill 'input[placeholder="e.g. postgres-replica"]' 'qa-tunnel-1'
+7. fill 'input[placeholder="ssh.example.com"]' '${cfg:ssh.host}'
+8. eval 'async page => { await page.locator(`button:has-text("Save")`).first().click({ force: true }); }'
+9. wait_for 'text="qa-tunnel-1"'
+10. click 'text="New SSH tunnel"'
+11. sleep 1
+12. fill 'input[placeholder="e.g. postgres-replica"]' 'qa-tunnel-2'
+13. fill 'input[placeholder="ssh.example.com"]' '${cfg:ssh.host}'
+14. eval 'async page => { await page.locator(`button:has-text("Save")`).first().click({ force: true }); }'
+15. wait_for 'text="qa-tunnel-2"'
+16. eval 'async page => { const rows = page.locator(`tr:has-text("qa-tunnel-")`); const firstRow = rows.first(); await firstRow.locator(`button[title*="Move down" i], button[title*="move down" i]`).first().click(); }'
+17. sleep 1
+18. eval 'async page => { await page.evaluate(() => { window.confirm = () => true; }); const row1 = page.locator(`tr:has-text("qa-tunnel-1")`); await row1.locator(`button:has(svg.lucide-trash-2)`).first().click(); }'
+19. sleep 1
+20. eval 'async page => { await page.evaluate(() => { window.confirm = () => true; }); const row2 = page.locator(`tr:has-text("qa-tunnel-2")`); await row2.locator(`button:has(svg.lucide-trash-2)`).first().click(); }'
+21. screenshot 047-tunnel-reorder.png
