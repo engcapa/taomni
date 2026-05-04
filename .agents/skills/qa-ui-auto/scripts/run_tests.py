@@ -168,7 +168,7 @@ def browser_dispatch(step, profile_dir: Path, report_dir: Path) -> tuple[bool, s
                 f"const text = await page.locator({_js(a[0])}).first()"
                 ".textContent({ timeout: 10000 }); "
                 f"if (!text || !text.includes({_js(a[1])})) "
-                f"throw new Error(`expected text to include ${_js(a[1])}, got ${text}`); "
+                f"throw new Error(`expected text to include {_js(a[1])}, got ${{text}}`); "
                 "return true; }"
             )
             r = _pw([*common, "run-code", code], profile_dir)
