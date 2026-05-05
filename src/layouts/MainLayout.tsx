@@ -69,6 +69,8 @@ export function MainLayout() {
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
+  // Maps tab.id → backend terminal session ID (set once the SSH/local session connects).
+  const terminalSessionIds = useRef<Record<string, string>>({});
 
   const toggleAttachedSidebar = useCallback((tabId: string) => {
     setAttachedSidebars((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
@@ -538,6 +540,7 @@ export function MainLayout() {
                         terminalProfile={tab.terminalProfile}
                         visible={isActive}
                         onCwdChange={tab.ssh ? (cwd) => handleTerminalCwd(tab.id, cwd) : undefined}
+                        onSessionReady={(sid) => { terminalSessionIds.current[tab.id] = sid; }}
                       />
                       {tab.ssh && (
                         <button
@@ -570,8 +573,10 @@ export function MainLayout() {
                       title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
                       onClose={() => toggleAttachedSidebar(tab.id)}
                       onOpenTerminalHere={(p) => {
+                        const sid = terminalSessionIds.current[tab.id];
+                        if (!sid) return;
                         const escaped = p.replace(/'/g, "'\\''");
-                        void writeTerminal(tab.id, encodeBase64(`cd '${escaped}'\n`));
+                        void writeTerminal(sid, encodeBase64(`cd '${escaped}'\n`));
                       }}
                       onDetach={() =>
                         openDetachedSftp(

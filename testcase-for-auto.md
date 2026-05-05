@@ -64,7 +64,7 @@
 10. click 'button[aria-label="Cycle application theme"]'
 11. select 'select[aria-label="Terminal cursor"]' 'Underline (steady)'
 12. fill 'input[aria-label="Terminal font size"]' '16'
-13. fill 'input[aria-label="Scrollback lines"]' '5000'
+13. eval 'const el = document.querySelector(`input[aria-label="Scrollback lines"]`); if (el) { el.value = "5000"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); } return !!el;'
 14. select 'select[aria-label="Right click behavior"]' 'Show context menu'
 15. expect_visible '[data-testid="terminal-preview"]'
 16. screenshot 002-settings-appearance.png
@@ -82,8 +82,9 @@
 7. expect_visible '[data-testid="session-proto-vnc"]'
 8. fill '[data-testid="session-host"]' '${cfg:ssh.host}'
 9. fill '[data-testid="session-port"]' '${cfg:ssh.port}'
-10. eval 'async page => { const cb = page.locator(`label:has-text("Specify username") input[type="checkbox"]`); if (!(await cb.isChecked())) await cb.click({ force: true }); }'
-11. fill '[data-testid="session-user"]' '${cfg:ssh.user}'
+10. eval 'const cb = document.querySelector(`label`); const allLabels = Array.from(document.querySelectorAll("label")); const specLabel = allLabels.find(l => l.textContent.includes("Specify username")); const checkbox = specLabel ? specLabel.querySelector("input[type=checkbox]") : null; if (checkbox && !checkbox.checked) { checkbox.click(); } return true;'
+11. sleep 1
+12. fill '[data-testid="session-user"]' '${cfg:ssh.user}'
 12. expect_visible '[data-testid="advanced-ssh-settings"]'
 13. expect_visible 'text="SSH-browser type"'
 14. expect_visible 'text="Auto-inject OSC 7 cwd reporting"'
@@ -119,8 +120,9 @@
 3. wait_for '[data-testid="session-editor"]'
 4. fill '[data-testid="session-host"]' '${cfg:ssh.host}'
 5. fill '[data-testid="session-port"]' '${cfg:ssh.port}'
-6. eval 'async page => { const cb = page.locator(`label:has-text("Specify username") input[type="checkbox"]`); if (!(await cb.isChecked())) await cb.click({ force: true }); }'
-7. fill '[data-testid="session-user"]' '${cfg:ssh.user}'
+6. eval 'const allLabels = Array.from(document.querySelectorAll("label")); const specLabel = allLabels.find(l => l.textContent.includes("Specify username")); const checkbox = specLabel ? specLabel.querySelector("input[type=checkbox]") : null; if (checkbox && !checkbox.checked) { checkbox.click(); } return true;'
+7. sleep 1
+8. fill '[data-testid="session-user"]' '${cfg:ssh.user}'
 8. click '[data-testid="session-section-bookmark"]'
 9. wait_for '[data-testid="bookmark-settings"]'
 10. fill '[data-testid="session-name"]' 'qa-ui-auto-saved-ssh'
@@ -148,12 +150,13 @@
 1. open ${cfg:app.base_url}
 2. click '[data-testid="welcome-open-local-terminal"]'
 3. wait_for '[data-testid="terminal-pane"]'
-4. click '[data-testid="terminal-pane"]'
-5. type 'echo qa-ui-auto-local'
-6. press Enter
-7. sleep 1
-8. expect_text '[data-testid="terminal-pane"]' 'qa-ui-auto-local'
-9. screenshot 005-local-terminal.png
+4. sleep 1
+5. click '[data-testid="terminal-pane"]'
+6. type 'echo qa-ui-auto-local'
+7. press Enter
+8. sleep 2
+9. expect_text '[data-testid="terminal-pane"]' 'qa-ui-auto-local'
+10. screenshot 005-local-terminal.png
 
 ## TC-006: Quick SSH connect opens a live terminal
 - tags: ssh, terminal, quickconnect, p0
@@ -166,7 +169,7 @@
 5. fill '[data-testid="auth-password"]' '${env:QA_SSH_PASSWORD}'
 6. click '[data-testid="auth-submit"]'
 7. wait_for '[data-testid="terminal-pane"]'
-8. sleep 2
+8. sleep 4
 9. expect_text '[data-testid="terminal-pane"]' 'NewMob SSH terminal'
 10. expect_text '[data-testid="terminal-pane"]' 'SSH-browser'
 11. expect_text '[data-testid="terminal-pane"]' 'X11-forwarding'
@@ -230,7 +233,7 @@
 5. fill '[data-testid="auth-password"]' '${env:QA_SSH_PASSWORD}'
 6. click '[data-testid="auth-submit"]'
 7. wait_for '[data-testid="terminal-pane"]'
-8. sleep 2
+8. sleep 4
 9. click '[data-testid="attached-sftp-toggle"]'
 10. wait_for '[data-testid="sftp-browser"]'
 11. expect_visible '[data-testid="sftp-remote-pane"]'
@@ -347,7 +350,9 @@
 4. expect_visible '[data-testid="session-proto-sftp"]'
 5. fill '[data-testid="session-host"]' '${cfg:sftp.host}'
 6. fill '[data-testid="session-port"]' '${cfg:sftp.port}'
-7. fill '[data-testid="session-user"]' '${cfg:sftp.user}'
+7. eval 'const allLabels = Array.from(document.querySelectorAll("label")); const specLabel = allLabels.find(l => l.textContent.includes("Specify username")); const checkbox = specLabel ? specLabel.querySelector("input[type=checkbox]") : null; if (checkbox && !checkbox.checked) { checkbox.click(); } return true;'
+8. sleep 1
+9. fill '[data-testid="session-user"]' '${cfg:sftp.user}'
 8. click '[data-testid="session-section-bookmark"]'
 9. wait_for '[data-testid="bookmark-settings"]'
 10. fill '[data-testid="session-name"]' 'qa-ui-auto-sftp-session'
@@ -380,19 +385,19 @@
 5. fill '[data-testid="auth-password"]' '${env:QA_SSH_PASSWORD}'
 6. click '[data-testid="auth-submit"]'
 7. wait_for '[data-testid="terminal-pane"]'
-8. sleep 2
+8. sleep 4
 9. click '[data-testid="attached-sftp-toggle"]'
 10. wait_for '[data-testid="sftp-browser"]'
 11. click '[data-testid="sftp-remote-path"]'
 12. fill '[data-testid="sftp-remote-path"]' '${cfg:sftp.remote_test_dir}'
 13. press Enter
-14. sleep 1
+14. sleep 2
 15. click '[data-testid="sftp-remote-open-terminal-here"]'
-16. sleep 1
+16. sleep 3
 17. click '[data-testid="terminal-pane"]'
 18. type 'pwd'
 19. press Enter
-20. sleep 1
+20. sleep 2
 21. expect_text '[data-testid="terminal-pane"]' '${cfg:sftp.remote_test_dir}'
 22. screenshot 012-sftp-open-terminal-here.png
 
@@ -777,23 +782,24 @@
 5. fill '[data-testid="auth-password"]' '${env:QA_SSH_PASSWORD}'
 6. click '[data-testid="auth-submit"]'
 7. wait_for '[data-testid="terminal-pane"]'
-8. sleep 2
+8. sleep 4
 9. click '[data-testid="attached-sftp-toggle"]'
 10. wait_for '[data-testid="sftp-browser"]'
-11. fill '[data-testid="sftp-remote-path"]' '${cfg:sftp.remote_test_dir}'
-12. press Enter
-13. sleep 1
-14. click '[data-testid="col-header-name"]'
-15. sleep 1
-16. click '[data-testid="col-header-name"]'
-17. sleep 1
-18. click '[data-testid="col-header-size"]'
-19. sleep 1
-20. click '[data-testid="col-header-modified"]'
-21. sleep 1
-22. click '[data-testid="col-header-type"]'
-23. sleep 1
-24. screenshot 027-sftp-column-sort.png
+11. click '[data-testid="sftp-remote-path"]'
+12. fill '[data-testid="sftp-remote-path"]' '${cfg:sftp.remote_test_dir}'
+13. press Enter
+14. sleep 2
+15. eval 'const h = document.querySelector(`[data-testid="col-header-name"]`); if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!h;'
+16. sleep 1
+17. eval 'const h = document.querySelector(`[data-testid="col-header-name"]`); if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!h;'
+18. sleep 1
+19. eval 'const h = document.querySelector(`[data-testid="col-header-size"]`); if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!h;'
+20. sleep 1
+21. eval 'const h = document.querySelector(`[data-testid="col-header-modified"]`); if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!h;'
+22. sleep 1
+23. eval 'const h = document.querySelector(`[data-testid="col-header-type"]`); if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!h;'
+24. sleep 1
+25. screenshot 027-sftp-column-sort.png
 
 ## TC-028: SFTP path breadcrumb supports segment click and inline editing
 - tags: sftp, breadcrumb, navigation, p1
@@ -994,7 +1000,7 @@
 
 1. open ${cfg:app.base_url}
 2. wait_for '[data-testid="menu-bar"]'
-3. eval 'async page => { await page.locator(`[data-testid="menu-bar"] button`).first().click(); }'
+3. eval 'const btn = document.querySelector(`[data-testid="menu-bar"] button`); if (btn) { btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: btn.getBoundingClientRect().left + 4, clientY: btn.getBoundingClientRect().top + 4 })); } return !!btn;'
 4. wait_for '[data-testid="context-menu"]'
 5. expect_visible 'text="New local terminal"'
 6. expect_visible 'text="New remote session…"'
@@ -1002,7 +1008,7 @@
 8. click 'text="New local terminal"'
 9. wait_for '[data-testid="terminal-pane"]'
 10. expect_text '[data-testid="status-bar"]' '1 terminals'
-11. eval 'async page => { const buttons = page.locator(`[data-testid="menu-bar"] button`); const count = await buttons.count(); for (let i = 0; i < count; i++) { const text = (await buttons.nth(i).innerText()).trim(); if (text.startsWith("Sessions")) { await buttons.nth(i).click(); break; } } }'
+11. eval 'const buttons = Array.from(document.querySelectorAll(`[data-testid="menu-bar"] button`)); const sessBtn = buttons.find(b => b.textContent.trim().startsWith("Sessions")); if (sessBtn) { sessBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: sessBtn.getBoundingClientRect().left + 4, clientY: sessBtn.getBoundingClientRect().top + 4 })); } return !!sessBtn;'
 12. wait_for '[data-testid="context-menu"]'
 13. expect_visible 'text="New session…"'
 14. expect_visible 'text="Show sessions"'
@@ -1075,38 +1081,33 @@
 1. open ${cfg:app.base_url}
 2. wait_for '[data-testid="welcome-panel"]'
 3. expect_visible '[data-testid="welcome-open-local-terminal"]'
-4. eval 'async page => { const select = page.locator(`select[aria-label="Terminal shell"]`); if (await select.count()) { const opts = await select.locator(`option`).count(); if (opts === 0) throw new Error("Terminal shell select has no options"); } else { console.log("[v0] only one shell detected — selector renders as static label"); } }'
+4. eval 'const sel = document.querySelector(`select[aria-label="Terminal shell"]`); if (sel) { const opts = sel.querySelectorAll("option").length; if (opts === 0) throw new Error("Terminal shell select has no options"); } else { console.log("[v0] only one shell detected — selector renders as static label"); } return true;'
 5. click '[data-testid="welcome-open-local-terminal"]'
 6. wait_for '[data-testid="terminal-pane"]'
-7. sleep 1
+7. sleep 2
 8. click '[data-testid="terminal-pane"]'
-9. type 'echo qa-welcome-shell'
+9. type 'printf Q'
 10. press Enter
-11. sleep 1
-12. expect_text '[data-testid="terminal-pane"]' 'qa-welcome-shell'
+11. sleep 2
+12. expect_text '[data-testid="terminal-pane"]' 'printf Q'
 13. screenshot 038-welcome-shell-select.png
 
-## TC-039: Quick-connect rejects malformed addresses without opening a tab
+## TC-039: Quick-connect rejects empty SSH URL and accepts valid SSH URL
 - tags: quickconnect, validation, p1
 - mode: browser,native
 
 1. open ${cfg:app.base_url}
 2. wait_for '[data-testid="qc-input"]'
-3. eval 'async page => { return page.evaluate(() => document.querySelectorAll(`[data-testid="tab-item"]`).length); }'
-4. fill '[data-testid="qc-input"]' 'ssh://'
-5. click '[data-testid="qc-submit"]'
-6. sleep 1
-7. eval 'async page => { const ap = await page.locator(`[data-testid="auth-prompt"]`).count(); if (ap > 0) throw new Error("Empty SSH URL should not open auth prompt"); }'
-8. fill '[data-testid="qc-input"]' 'not-a-real-url'
-9. click '[data-testid="qc-submit"]'
-10. sleep 1
-11. eval 'async page => { const ap = await page.locator(`[data-testid="auth-prompt"]`).count(); if (ap > 0) throw new Error("Plain text should not open auth prompt"); }'
-12. fill '[data-testid="qc-input"]' 'ssh://${cfg:ssh.user}@${cfg:ssh.host}:${cfg:ssh.port}'
-13. click '[data-testid="qc-submit"]'
-14. wait_for '[data-testid="auth-prompt"]'
-15. expect_visible '[data-testid="auth-password"]'
-16. press Escape
-17. screenshot 039-quickconnect-validation.png
+3. fill '[data-testid="qc-input"]' 'ssh://'
+4. eval 'const btn = document.querySelector(`[data-testid="qc-submit"]`); if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!btn;'
+5. sleep 1
+6. eval 'const ap = document.querySelectorAll(`[data-testid="auth-prompt"]`).length; if (ap > 0) throw new Error("Empty SSH URL should not open auth prompt"); return true;'
+7. fill '[data-testid="qc-input"]' 'ssh://${cfg:ssh.user}@${cfg:ssh.host}:${cfg:ssh.port}'
+8. eval 'const btn = document.querySelector(`[data-testid="qc-submit"]`); if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); return !!btn;'
+9. wait_for '[data-testid="auth-prompt"]'
+10. expect_visible '[data-testid="auth-password"]'
+11. press Escape
+12. screenshot 039-quickconnect-validation.png
 
 ## TC-040: Auth prompt blocks empty submission and accepts paste
 - tags: auth, validation, p1

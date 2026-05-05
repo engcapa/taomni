@@ -236,6 +236,35 @@ class NativeSession:
         self.request("POST", self.element_path(element, "/click"), {})
         return f"clicked {selector}"
 
+    def dblclick(self, selector: str) -> str:
+        element = self.find(selector, interactive=True)
+        # Use W3C Actions API so WebKitGTK registers a real double-click.
+        rect = self.request("GET", self.element_path(element, "/rect"))
+        x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
+        y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
+        self.request(
+            "POST",
+            self.endpoint("/actions"),
+            {
+                "actions": [
+                    {
+                        "type": "pointer",
+                        "id": "mouse",
+                        "parameters": {"pointerType": "mouse"},
+                        "actions": [
+                            {"type": "pointerMove", "duration": 0, "x": x, "y": y, "origin": "viewport"},
+                            {"type": "pointerDown", "button": 0},
+                            {"type": "pointerUp", "button": 0},
+                            {"type": "pause", "duration": 50},
+                            {"type": "pointerDown", "button": 0},
+                            {"type": "pointerUp", "button": 0},
+                        ],
+                    }
+                ]
+            },
+        )
+        return f"double-clicked {selector}"
+
     def fill(self, selector: str, text: str) -> str:
         element = self.find(selector)
         try:
@@ -276,6 +305,18 @@ class NativeSession:
         return f"sent keys {text}"
 
     def text(self, selector: str) -> str:
+        # For terminal-pane, read the data-terminal-text attribute which is
+        # kept in sync by TerminalPanel via a 500ms interval. This bypasses
+        # the xterm.js canvas rendering that makes innerText always empty.
+        try:
+            attr = self.execute(
+                f"const el = document.querySelector({json.dumps(selector)});"
+                "return el ? (el.getAttribute('data-terminal-text') ?? el.innerText ?? '') : '';"
+            )
+            if attr is not None:
+                return str(attr)
+        except WebDriverError:
+            pass
         element = self.find(selector)
         return str(self.request("GET", self.element_path(element, "/text")) or "")
 

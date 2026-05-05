@@ -75,6 +75,8 @@ interface TerminalPanelProps {
   terminalProfile?: TerminalProfile;
   visible?: boolean;
   onCwdChange?: (cwd: string) => void;
+  /** Called once the backend terminal session ID is known (after connect). */
+  onSessionReady?: (sessionId: string) => void;
 }
 
 const DEFAULT_FONT_SIZE = 14;
@@ -105,11 +107,14 @@ export function TerminalPanel({
   terminalProfile,
   visible = true,
   onCwdChange,
+  onSessionReady,
 }: TerminalPanelProps) {
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
+  const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   useEffect(() => {
     cwdCallbackRef.current = onCwdChange;
-  }, [onCwdChange]);
+    onSessionReadyRef.current = onSessionReady;
+  }, [onCwdChange, onSessionReady]);
   const containerRef = useRef<HTMLDivElement>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
@@ -827,6 +832,7 @@ export function TerminalPanel({
           return;
         }
         sessionIdRef.current = sid;
+        onSessionReadyRef.current?.(sid);
         appendEvent("connection", `Connected (${sid})`);
         if (ssh) {
           term.write(formatSshInfoBanner(ssh));
@@ -1037,6 +1043,20 @@ export function TerminalPanel({
     fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");
   const resolvedTheme = resolveTerminalTheme(themeName);
+
+  // Keep data-terminal-text in sync so WebDriver / automation can read
+  // terminal content without depending on xterm's canvas rendering.
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const update = () => {
+      const term = termRef.current;
+      el.setAttribute("data-terminal-text", term ? getBufferText(term) : "");
+    };
+    update();
+    const id = window.setInterval(update, 500);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <div

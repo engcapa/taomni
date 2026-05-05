@@ -328,8 +328,7 @@ def native_dispatch(session, step: Step, report_dir: Path) -> tuple[bool, str]:
         if v == "click":
             return True, session.click(a[0])
         if v == "dblclick":
-            session.click(a[0])
-            return True, session.click(a[0])
+            return True, session.dblclick(a[0])
         if v == "type":
             return True, session.send_keys(a[0])
         if v == "fill":
