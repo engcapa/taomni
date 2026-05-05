@@ -38,6 +38,11 @@ shellexpand = "3"
 libc = "0.2"
 font-kit = "0.14"
 dirs = "5"
+flate2 = "1"
+tungstenite = "0.24"
+tokio-tungstenite = "0.24"
+des = "0.8"
+generic-array = "0.14"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["fileapi"] }
