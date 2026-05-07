@@ -11,6 +11,9 @@ const devPort = isTauriBuild ? 1420 : 5000;
 export default defineConfig({
   plugins: [react(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin()])],
   clearScreen: false,
+  optimizeDeps: {
+    include: ["zmodem.js"],
+  },
   resolve: {
     alias: isTauriBuild
       ? {}

@@ -45,7 +45,16 @@ import {
   listenTerminalForwardError,
   encodeBase64,
   decodeBase64,
+  selectUploadFile,
+  selectSaveDirectory,
+  readFileBytes,
+  writeFileBytes,
 } from "../../lib/ipc";
+import {
+  ZmodemSession,
+  type ZmodemState,
+  type ZmodemProgress,
+} from "../../lib/zmodem";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -167,6 +176,10 @@ export function TerminalPanel({
   const [viewportVersion, setViewportVersion] = useState(0);
   const [eventLog, setEventLog] = useState<TerminalEventLogEntry[]>([]);
   const [macroRecording, setMacroRecording] = useState(false);
+  const [zmodemState, setZmodemState] = useState<ZmodemState>("idle");
+  const [zmodemProgress, setZmodemProgress] = useState<ZmodemProgress | null>(null);
+  const zmodemRef = useRef<ZmodemSession | null>(null);
+  const zmodemSaveDirRef = useRef<string | undefined>(undefined);
   const outputLogRef = useRef("");
   const loggingActiveRef = useRef(loggingActive);
   const macroRecordingRef = useRef(macroRecording);
@@ -540,6 +553,50 @@ export function TerminalPanel({
     focusTerminal();
   }, [focusTerminal]);
 
+  const startZmodemReceive = useCallback(() => {
+    if (!zmodemRef.current) {
+      setStatusMessage("Terminal not ready for ZMODEM");
+      return;
+    }
+    if (zmodemRef.current.isActive) {
+      setStatusMessage("A ZMODEM transfer is already in progress");
+      return;
+    }
+    setStatusMessage("Waiting for remote sz… (run: sz <file> on the remote)");
+    focusTerminal();
+  }, [focusTerminal, setStatusMessage]);
+
+  const startZmodemSend = useCallback(async () => {
+    if (!zmodemRef.current) {
+      setStatusMessage("Terminal not ready for ZMODEM");
+      return;
+    }
+    if (zmodemRef.current.isActive) {
+      setStatusMessage("A ZMODEM transfer is already in progress");
+      return;
+    }
+    try {
+      const filePaths = await selectUploadFile();
+      if (!filePaths || filePaths.length === 0) return;
+      const files: Array<{ name: string; bytes: Uint8Array }> = [];
+      for (const filePath of filePaths) {
+        const b64 = await readFileBytes(filePath);
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const fileName = filePath.replace(/\\/g, "/").split("/").pop() ?? "file";
+        files.push({ name: fileName, bytes });
+      }
+      zmodemRef.current.queueSend(files);
+      sendTerminalInput("rz\r");
+      const names = files.map((f) => f.name).join(", ");
+      setStatusMessage(`Sending ${files.length === 1 ? files[0].name : `${files.length} files (${names})`} via ZMODEM…`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : "ZMODEM send failed");
+    }
+    focusTerminal();
+  }, [focusTerminal, sendTerminalInput, setStatusMessage]);
+
   const sendSpecialSignal = useCallback((signal: string, fallback?: string) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
@@ -683,8 +740,8 @@ export function TerminalPanel({
       { label: "Save to file", shortcut: "Ctrl+Shift+S", onClick: saveBufferToFile },
       { label: "Print", shortcut: "Ctrl+Shift+P", disabled: true },
       { label: "", separator: true },
-      { label: "Receive file using Z-modem", disabled: true },
-      { label: "Send file using Z-modem", disabled: true },
+      { label: "Receive file using Z-modem", onClick: startZmodemReceive, disabled: zmodemState !== "idle" },
+      { label: "Send file using Z-modem", onClick: () => void startZmodemSend(), disabled: zmodemState !== "idle" },
       { label: "", separator: true },
       { label: "Change current terminal settings...", disabled: true },
       {
@@ -732,6 +789,9 @@ export function TerminalPanel({
     toggleOutputRecording,
     loggingActive,
     macroRecording,
+    startZmodemReceive,
+    startZmodemSend,
+    zmodemState,
   ]);
 
   const handleTerminalContextMenu = useCallback((event: ReactMouseEvent) => {
@@ -933,19 +993,61 @@ export function TerminalPanel({
           term.write(formatSshInfoBanner(ssh));
         }
 
-        unlistenOutput = await listenTerminalOutput(sid, (b64) => {
-          let output = decodeBase64(b64);
-          const suppressor = injectedInputEchoSuppressorRef.current;
-          if (suppressor) {
-            output = suppressor.filter(output);
-            if (suppressor.done) injectedInputEchoSuppressorRef.current = null;
-          }
-          if (output.length === 0) return;
+        // Create a ZmodemSession for this terminal connection.
+        // It intercepts the output stream to detect ZMODEM handshakes.
+        const zmodem = new ZmodemSession(
+          (bytes) => {
+            // Send ZMODEM protocol bytes back to the remote.
+            let b64 = "";
+            for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
+            writeTerminal(sid, btoa(b64)).catch(console.error);
+          },
+          {
+            onTerminalData: (data) => {
+              // Non-ZMODEM bytes — write to xterm as normal.
+              const suppressor = injectedInputEchoSuppressorRef.current;
+              let filtered = suppressor ? suppressor.filter(data) : data;
+              if (suppressor?.done) injectedInputEchoSuppressorRef.current = null;
+              if (filtered.length === 0) return;
+              if (loggingActiveRef.current) {
+                outputLogRef.current += new TextDecoder().decode(filtered);
+              }
+              term.write(filtered);
+            },
+            onStateChange: (state, progress) => {
+              setZmodemState(state);
+              setZmodemProgress(progress ?? null);
+            },
+            onProgress: (progress) => {
+              setZmodemProgress({ ...progress });
+            },
+            onSelectSaveDir: async () => {
+              const dir = await selectSaveDirectory(zmodemSaveDirRef.current);
+              if (dir) zmodemSaveDirRef.current = dir;
+              return dir;
+            },
+            onWriteFile: async (fullPath, bytes) => {
+              let binary = "";
+              for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+              await writeFileBytes(fullPath, btoa(binary));
+            },
+            onComplete: (fileName) => {
+              appendEvent("zmodem", `Transfer complete: ${fileName}`);
+              setStatusMessage(`ZMODEM: ${fileName} transferred`);
+            },
+            onError: (message) => {
+              appendEvent("error", `ZMODEM error: ${message}`);
+              setStatusMessage(`ZMODEM error: ${message}`);
+            },
+          },
+        );
+        zmodemRef.current = zmodem;
 
-          if (loggingActiveRef.current) {
-            outputLogRef.current += new TextDecoder().decode(output);
-          }
-          term.write(output);
+        unlistenOutput = await listenTerminalOutput(sid, (b64) => {
+          const raw = decodeBase64(b64);
+          // Feed all output through the ZMODEM sentry.
+          // The sentry calls onTerminalData for non-ZMODEM bytes.
+          zmodem.consume(raw);
         });
 
         unlistenExit = await listenTerminalExit(sid, () => {
@@ -1285,6 +1387,31 @@ export function TerminalPanel({
         </div>
       )}
 
+      {zmodemState !== "idle" && (
+        <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 flex items-center gap-3 rounded border border-slate-400 bg-white px-4 py-2 shadow-lg text-[12px]">
+          <span className="font-semibold">
+            {zmodemState === "receiving" ? "Receiving" : "Sending"} via Z-modem
+          </span>
+          {zmodemProgress && (
+            <>
+              <span className="text-slate-600 moba-mono">{zmodemProgress.fileName}</span>
+              <span className="text-slate-500">
+                {formatZmodemBytes(zmodemProgress.bytesTransferred)}
+                {zmodemProgress.fileSize > 0 && ` / ${formatZmodemBytes(zmodemProgress.fileSize)}`}
+              </span>
+              {zmodemProgress.fileSize > 0 && (
+                <div className="w-32 h-2 rounded bg-slate-200 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all"
+                    style={{ width: `${Math.min(100, Math.round(zmodemProgress.bytesTransferred / zmodemProgress.fileSize * 100))}%` }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {contextMenu.render}
     </div>
   );
@@ -1620,4 +1747,10 @@ function encodeBinaryStringBase64(str: string): string {
     binary += String.fromCharCode(str.charCodeAt(i) & 0xff);
   }
   return btoa(binary);
+}
+
+function formatZmodemBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
