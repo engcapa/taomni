@@ -226,7 +226,23 @@ export async function selectPrivateKeyFile(currentPath?: string): Promise<string
   return invoke<string | null>("select_private_key_file", { currentPath: currentPath ?? null });
 }
 
-// ── VNC ────────────────────────────────────────────────────────────
+export async function selectUploadFile(): Promise<string[]> {
+  return invoke<string[]>("select_upload_file", {});
+}
+
+export async function selectSaveDirectory(currentPath?: string): Promise<string | null> {
+  return invoke<string | null>("select_save_directory", { currentPath: currentPath ?? null });
+}
+
+export async function readFileBytes(path: string): Promise<string> {
+  return invoke<string>("read_file_bytes", { path });
+}
+
+export async function writeFileBytes(path: string, data: string): Promise<void> {
+  return invoke("write_file_bytes", { path, data });
+}
+
+// --- VNC ────────────────────────────────────────────────────────────
 
 export interface VncConnectResult {
   session_id: string;

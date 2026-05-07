@@ -5,6 +5,35 @@ pub fn select_private_key_file(current_path: Option<String>) -> Result<Option<St
     platform::select_private_key_file(current_path.as_deref())
 }
 
+#[tauri::command]
+pub fn select_upload_file() -> Result<Vec<String>, String> {
+    platform::select_upload_file()
+}
+
+#[tauri::command]
+pub fn select_save_directory(current_path: Option<String>) -> Result<Option<String>, String> {
+    platform::select_save_directory(current_path.as_deref())
+}
+
+#[tauri::command]
+pub fn write_file_bytes(path: String, data: String) -> Result<(), String> {
+    let expanded = shellexpand::tilde(&path).to_string();
+    let bytes = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        &data,
+    )
+    .map_err(|e| format!("Failed to decode base64: {}", e))?;
+    std::fs::write(&expanded, &bytes).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+pub fn read_file_bytes(path: String) -> Result<String, String> {
+    let expanded = shellexpand::tilde(&path).to_string();
+    let bytes = std::fs::read(&expanded)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    Ok(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes))
+}
+
 fn expanded_path(value: &str) -> PathBuf {
     PathBuf::from(shellexpand::tilde(value).to_string())
 }
@@ -41,8 +70,8 @@ mod platform {
     use std::os::windows::ffi::OsStrExt;
     use std::ptr;
     use winapi::um::commdlg::{
-        CommDlgExtendedError, GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
-        OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+        CommDlgExtendedError, GetOpenFileNameW, OFN_ALLOWMULTISELECT, OFN_EXPLORER,
+        OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST, OPENFILENAMEW,
     };
 
     pub fn select_private_key_file(current_path: Option<&str>) -> Result<Option<String>, String> {
@@ -52,13 +81,22 @@ mod platform {
             let len = wide.len().saturating_sub(1).min(file_buf.len() - 1);
             file_buf[..len].copy_from_slice(&wide[..len]);
         }
-
         let filter = wide_filter(&[
             ("Private key files", "*.pem;*.key;id_*;*.ppk;*"),
             ("All files", "*"),
         ]);
         let title = wide("Select private key");
         let initial_dir = initial_dir_from(current_path).map(|path| wide_os(path.as_os_str()));
+        open_file_dialog(&mut file_buf, &filter, &title, initial_dir.as_ref())
+    }
+
+    pub fn select_upload_file() -> Result<Vec<String>, String> {
+        // Use a large buffer: Windows multi-select format is
+        // "dir\0file1\0file2\0\0" so we need plenty of space.
+        let mut file_buf = [0u16; 65536];
+        let filter = wide_filter(&[("All files", "*")]);
+        let title = wide("Select files to send");
+        let initial_dir = dirs::home_dir().map(|p| wide_os(p.as_os_str()));
 
         let mut ofn: OPENFILENAMEW = unsafe { zeroed() };
         ofn.lStructSize = size_of::<OPENFILENAMEW>() as u32;
@@ -68,6 +106,53 @@ mod platform {
         ofn.lpstrTitle = title.as_ptr();
         ofn.lpstrInitialDir = initial_dir
             .as_ref()
+            .map(|dir| dir.as_ptr())
+            .unwrap_or(ptr::null());
+        ofn.Flags = OFN_EXPLORER
+            | OFN_FILEMUSTEXIST
+            | OFN_PATHMUSTEXIST
+            | OFN_HIDEREADONLY
+            | OFN_NOCHANGEDIR
+            | OFN_ALLOWMULTISELECT;
+
+        let ok = unsafe { GetOpenFileNameW(&mut ofn) };
+        if ok == 0 {
+            let err = unsafe { CommDlgExtendedError() };
+            return if err == 0 { Ok(vec![]) } else { Err(format!("Windows file dialog failed: 0x{err:04x}")) };
+        }
+
+        // Parse the result buffer.
+        // Single file: one null-terminated string.
+        // Multiple files: "dir\0file1\0file2\0\0"
+        let segments: Vec<String> = file_buf
+            .split(|&c| c == 0)
+            .filter(|s| !s.is_empty())
+            .map(|s| String::from_utf16_lossy(s))
+            .collect();
+
+        Ok(match segments.as_slice() {
+            [] => vec![],
+            [single] => vec![single.clone()],
+            [dir, files @ ..] => files
+                .iter()
+                .map(|f| format!("{}\\{}", dir, f))
+                .collect(),
+        })
+    }
+
+    fn open_file_dialog(
+        file_buf: &mut [u16; 32768],
+        filter: &[u16],
+        title: &[u16],
+        initial_dir: Option<&Vec<u16>>,
+    ) -> Result<Option<String>, String> {
+        let mut ofn: OPENFILENAMEW = unsafe { zeroed() };
+        ofn.lStructSize = size_of::<OPENFILENAMEW>() as u32;
+        ofn.lpstrFilter = filter.as_ptr();
+        ofn.lpstrFile = file_buf.as_mut_ptr();
+        ofn.nMaxFile = file_buf.len() as u32;
+        ofn.lpstrTitle = title.as_ptr();
+        ofn.lpstrInitialDir = initial_dir
             .map(|dir| dir.as_ptr())
             .unwrap_or(ptr::null());
         ofn.Flags = OFN_EXPLORER
@@ -112,6 +197,31 @@ mod platform {
         out.push(0);
         out
     }
+
+    pub fn select_save_directory(current_path: Option<&str>) -> Result<Option<String>, String> {
+        use std::process::Command;
+        let initial = super::initial_dir_from(current_path)
+            .or_else(dirs::download_dir)
+            .or_else(dirs::home_dir)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let script = format!(
+            r#"Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select save directory'; $d.SelectedPath = '{}'; if ($d.ShowDialog() -eq 'OK') {{ $d.SelectedPath }} else {{ '' }}"#,
+            initial.replace('\'', "''")
+        );
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .map_err(|e| format!("powershell: {e}"))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("powershell: {}", stderr.trim()));
+        }
+        let path = String::from_utf8_lossy(&output.stdout)
+            .trim_end_matches(&['\r', '\n'][..])
+            .to_string();
+        Ok((!path.is_empty()).then_some(path))
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -119,9 +229,48 @@ mod platform {
     use std::process::Command;
 
     pub fn select_private_key_file(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        run_osascript(r#"POSIX path of (choose file with prompt "Select private key")"#)
+    }
+
+    pub fn select_upload_file() -> Result<Vec<String>, String> {
+        run_osascript_multi(r#"POSIX path of (choose file with prompt "Select files to send" with multiple selections allowed)"#)
+    }
+
+    pub fn select_save_directory(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        run_osascript(r#"POSIX path of (choose folder with prompt "Select save directory")"#)
+    }
+
+    fn run_osascript_multi(script: &str) -> Result<Vec<String>, String> {
         let output = Command::new("osascript")
             .arg("-e")
-            .arg(r#"POSIX path of (choose file with prompt "Select private key")"#)
+            .arg(script)
+            .output()
+            .map_err(|e| format!("open file dialog: {e}"))?;
+
+        if output.status.success() {
+            let raw = String::from_utf8_lossy(&output.stdout);
+            // osascript returns comma-separated paths for multiple selections
+            let paths: Vec<String> = raw
+                .trim_end_matches(&['\r', '\n'][..])
+                .split(", ")
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            return Ok(paths);
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("-128") || stderr.to_ascii_lowercase().contains("cancel") {
+            Ok(vec![])
+        } else {
+            Err(format!("open file dialog: {}", stderr.trim()))
+        }
+    }
+
+    fn run_osascript(script: &str) -> Result<Option<String>, String> {
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
             .output()
             .map_err(|e| format!("open file dialog: {e}"))?;
 
@@ -149,14 +298,90 @@ mod platform {
 
     pub fn select_private_key_file(current_path: Option<&str>) -> Result<Option<String>, String> {
         let initial = initial_dir_from(current_path);
+        open_file_dialog("Select private key", initial.as_deref())
+    }
 
-        match run_zenity(initial.as_deref()) {
+    pub fn select_upload_file() -> Result<Vec<String>, String> {
+        open_file_dialog_multi("Select files to send", dirs::home_dir().as_deref())
+    }
+
+    pub fn select_save_directory(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        let initial = dirs::download_dir().or_else(dirs::home_dir);
+        open_dir_dialog("Select save directory", initial.as_deref())
+    }
+
+    fn open_file_dialog_multi(title: &str, initial_dir: Option<&Path>) -> Result<Vec<String>, String> {
+        match run_zenity_multi(title, initial_dir) {
             Ok(result) => return result,
             Err(DialogAttempt::NotFound) => {}
             Err(DialogAttempt::Failed(err)) => return Err(err),
         }
 
-        match run_kdialog(initial.as_deref()) {
+        match run_kdialog_multi(title, initial_dir) {
+            Ok(result) => result,
+            Err(DialogAttempt::NotFound) => {
+                Err("No native file dialog helper found. Install zenity or kdialog.".to_string())
+            }
+            Err(DialogAttempt::Failed(err)) => Err(err),
+        }
+    }
+
+    fn run_zenity_multi(
+        title: &str,
+        initial_dir: Option<&Path>,
+    ) -> Result<Result<Vec<String>, String>, DialogAttempt> {
+        let mut cmd = Command::new("zenity");
+        cmd.arg("--file-selection")
+            .arg("--multiple")
+            .arg("--separator=\n")
+            .arg(format!("--title={}", title));
+        if let Some(dir) = initial_dir {
+            cmd.arg(format!("--filename={}", dir_with_separator(dir)));
+        }
+        handle_output_multi(cmd.output(), "zenity")
+    }
+
+    fn run_kdialog_multi(
+        _title: &str,
+        initial_dir: Option<&Path>,
+    ) -> Result<Result<Vec<String>, String>, DialogAttempt> {
+        let mut cmd = Command::new("kdialog");
+        cmd.arg("--getopenfilenames")
+            .arg(initial_dir.unwrap_or_else(|| Path::new("~")));
+        handle_output_multi(cmd.output(), "kdialog")
+    }
+
+    fn handle_output_multi(
+        result: std::io::Result<Output>,
+        helper: &str,
+    ) -> Result<Result<Vec<String>, String>, DialogAttempt> {
+        match result {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(DialogAttempt::NotFound),
+            Err(err) => Err(DialogAttempt::Failed(format!("{helper}: {err}"))),
+            Ok(output) if output.status.success() => {
+                let paths: Vec<String> = String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                Ok(Ok(paths))
+            }
+            Ok(output) if output.status.code() == Some(1) => Ok(Ok(vec![])),
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Err(DialogAttempt::Failed(format!("{helper}: {}", stderr.trim())))
+            }
+        }
+    }
+
+    fn open_file_dialog(title: &str, initial_dir: Option<&Path>) -> Result<Option<String>, String> {
+        match run_zenity(title, initial_dir) {
+            Ok(result) => return result,
+            Err(DialogAttempt::NotFound) => {}
+            Err(DialogAttempt::Failed(err)) => return Err(err),
+        }
+
+        match run_kdialog(title, initial_dir) {
             Ok(result) => result,
             Err(DialogAttempt::NotFound) => {
                 Err("No native file dialog helper found. Install zenity or kdialog.".to_string())
@@ -171,11 +396,12 @@ mod platform {
     }
 
     fn run_zenity(
+        title: &str,
         initial_dir: Option<&Path>,
     ) -> Result<Result<Option<String>, String>, DialogAttempt> {
         let mut cmd = Command::new("zenity");
         cmd.arg("--file-selection")
-            .arg("--title=Select private key");
+            .arg(format!("--title={}", title));
         if let Some(dir) = initial_dir {
             cmd.arg(format!("--filename={}", dir_with_separator(dir)));
         }
@@ -183,6 +409,7 @@ mod platform {
     }
 
     fn run_kdialog(
+        _title: &str,
         initial_dir: Option<&Path>,
     ) -> Result<Result<Option<String>, String>, DialogAttempt> {
         let mut cmd = Command::new("kdialog");
@@ -222,11 +449,59 @@ mod platform {
         }
         value
     }
+
+    fn open_dir_dialog(title: &str, initial_dir: Option<&Path>) -> Result<Option<String>, String> {
+        match run_zenity_dir(title, initial_dir) {
+            Ok(result) => return result,
+            Err(DialogAttempt::NotFound) => {}
+            Err(DialogAttempt::Failed(err)) => return Err(err),
+        }
+
+        match run_kdialog_dir(title, initial_dir) {
+            Ok(result) => result,
+            Err(DialogAttempt::NotFound) => {
+                Err("No native file dialog helper found. Install zenity or kdialog.".to_string())
+            }
+            Err(DialogAttempt::Failed(err)) => Err(err),
+        }
+    }
+
+    fn run_zenity_dir(
+        title: &str,
+        initial_dir: Option<&Path>,
+    ) -> Result<Result<Option<String>, String>, DialogAttempt> {
+        let mut cmd = Command::new("zenity");
+        cmd.arg("--file-selection")
+            .arg("--directory")
+            .arg(format!("--title={}", title));
+        if let Some(dir) = initial_dir {
+            cmd.arg(format!("--filename={}", dir_with_separator(dir)));
+        }
+        handle_output(cmd.output(), "zenity")
+    }
+
+    fn run_kdialog_dir(
+        _title: &str,
+        initial_dir: Option<&Path>,
+    ) -> Result<Result<Option<String>, String>, DialogAttempt> {
+        let mut cmd = Command::new("kdialog");
+        cmd.arg("--getexistingdirectory")
+            .arg(initial_dir.unwrap_or_else(|| Path::new("~")));
+        handle_output(cmd.output(), "kdialog")
+    }
 }
 
 #[cfg(not(any(windows, unix)))]
 mod platform {
     pub fn select_private_key_file(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        Err("Native file dialog is not supported on this platform".to_string())
+    }
+
+    pub fn select_upload_file() -> Result<Vec<String>, String> {
+        Err("Native file dialog is not supported on this platform".to_string())
+    }
+
+    pub fn select_save_directory(_current_path: Option<&str>) -> Result<Option<String>, String> {
         Err("Native file dialog is not supported on this platform".to_string())
     }
 }
