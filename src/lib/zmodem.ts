@@ -8,12 +8,19 @@ export interface ZmodemProgress {
   bytesTransferred: number;
 }
 
+export interface ZmodemSendFile {
+  name: string;
+  bytes: Uint8Array;
+}
+
 export interface ZmodemCallbacks {
   onTerminalData: (data: Uint8Array) => void;
   onStateChange: (state: ZmodemState, progress?: ZmodemProgress) => void;
   onProgress: (progress: ZmodemProgress) => void;
   /** Called once before the first file arrives. Return the directory to save into, or null to cancel. */
   onSelectSaveDir: () => Promise<string | null>;
+  /** Called when the remote starts rz without a queued file. Return files to send, or null/empty to cancel. */
+  onSelectSendFiles?: () => Promise<ZmodemSendFile[] | null>;
   /** Called for each received file with the resolved full path and bytes. */
   onWriteFile: (fullPath: string, bytes: Uint8Array) => Promise<void>;
   onComplete: (fileName: string) => void;
@@ -31,7 +38,7 @@ const SEND_CHUNK = 8192;
 export class ZmodemSession {
   private readonly sentry: Sentry;
   private active = false;
-  private pendingSend: Array<{ name: string; bytes: Uint8Array }> = [];
+  private pendingSend: ZmodemSendFile[] = [];
 
   constructor(
     sender: (data: Uint8Array) => void,
@@ -61,8 +68,7 @@ export class ZmodemSession {
             this.pendingSend = [];
             this.doSendAll(zsession, files);
           } else {
-            zsession.abort();
-            this.callbacks.onError("Unexpected ZMODEM send session (no file queued)");
+            this.doSelectAndSend(zsession);
           }
         }
       },
@@ -84,7 +90,7 @@ export class ZmodemSession {
     return this.active;
   }
 
-  queueSend(files: Array<{ name: string; bytes: Uint8Array }>): void {
+  queueSend(files: ZmodemSendFile[]): void {
     this.pendingSend = files;
   }
 
@@ -144,7 +150,51 @@ export class ZmodemSession {
     })();
   }
 
-  private doSendAll(zsession: Session, files: Array<{ name: string; bytes: Uint8Array }>): void {
+  private doSelectAndSend(zsession: Session): void {
+    const selectFiles = this.callbacks.onSelectSendFiles;
+    if (!selectFiles) {
+      zsession.abort();
+      this.callbacks.onError("Unexpected ZMODEM send session (no file queued)");
+      return;
+    }
+
+    this.active = true;
+    this.callbacks.onStateChange("sending");
+
+    void (async () => {
+      let delegatedToSender = false;
+      try {
+        const files = await selectFiles();
+        if (!files || files.length === 0) {
+          zsession.abort();
+          return;
+        }
+        delegatedToSender = true;
+        this.doSendAll(zsession, files);
+      } catch (err) {
+        try {
+          zsession.abort();
+        } catch {
+          /* session may already be closed */
+        }
+        this.callbacks.onError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!delegatedToSender) {
+          this.active = false;
+          this.callbacks.onStateChange("idle");
+        }
+      }
+    })();
+  }
+
+  private doSendAll(zsession: Session, files: ZmodemSendFile[]): void {
+    if (files.length === 0) {
+      zsession.abort();
+      this.active = false;
+      this.callbacks.onStateChange("idle");
+      return;
+    }
+
     this.active = true;
     const first = files[0];
     const progress: ZmodemProgress = {

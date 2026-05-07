@@ -54,6 +54,7 @@ import {
   ZmodemSession,
   type ZmodemState,
   type ZmodemProgress,
+  type ZmodemSendFile,
 } from "../../lib/zmodem";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -566,6 +567,22 @@ export function TerminalPanel({
     focusTerminal();
   }, [focusTerminal, setStatusMessage]);
 
+  const selectZmodemSendFiles = useCallback(async (): Promise<ZmodemSendFile[]> => {
+    const filePaths = await selectUploadFile();
+    if (!filePaths || filePaths.length === 0) return [];
+
+    const files: ZmodemSendFile[] = [];
+    for (const filePath of filePaths) {
+      const b64 = await readFileBytes(filePath);
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const fileName = filePath.replace(/\\/g, "/").split("/").pop() ?? "file";
+      files.push({ name: fileName, bytes });
+    }
+    return files;
+  }, []);
+
   const startZmodemSend = useCallback(async () => {
     if (!zmodemRef.current) {
       setStatusMessage("Terminal not ready for ZMODEM");
@@ -576,17 +593,8 @@ export function TerminalPanel({
       return;
     }
     try {
-      const filePaths = await selectUploadFile();
-      if (!filePaths || filePaths.length === 0) return;
-      const files: Array<{ name: string; bytes: Uint8Array }> = [];
-      for (const filePath of filePaths) {
-        const b64 = await readFileBytes(filePath);
-        const binary = atob(b64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const fileName = filePath.replace(/\\/g, "/").split("/").pop() ?? "file";
-        files.push({ name: fileName, bytes });
-      }
+      const files = await selectZmodemSendFiles();
+      if (files.length === 0) return;
       zmodemRef.current.queueSend(files);
       sendTerminalInput("rz\r");
       const names = files.map((f) => f.name).join(", ");
@@ -595,7 +603,7 @@ export function TerminalPanel({
       setStatusMessage(err instanceof Error ? err.message : "ZMODEM send failed");
     }
     focusTerminal();
-  }, [focusTerminal, sendTerminalInput, setStatusMessage]);
+  }, [focusTerminal, selectZmodemSendFiles, sendTerminalInput, setStatusMessage]);
 
   const sendSpecialSignal = useCallback((signal: string, fallback?: string) => {
     const sid = sessionIdRef.current;
@@ -1025,6 +1033,21 @@ export function TerminalPanel({
               const dir = await selectSaveDirectory(zmodemSaveDirRef.current);
               if (dir) zmodemSaveDirRef.current = dir;
               return dir;
+            },
+            onSelectSendFiles: async () => {
+              appendEvent("zmodem", "Remote rz requested local files");
+              setStatusMessage("Remote rz detected; choose local files to send");
+              const files = await selectZmodemSendFiles();
+              if (files.length === 0) {
+                appendEvent("zmodem", "Send canceled");
+                setStatusMessage("ZMODEM send canceled");
+                focusTerminal();
+                return null;
+              }
+              const names = files.map((f) => f.name).join(", ");
+              setStatusMessage(`Sending ${files.length === 1 ? files[0].name : `${files.length} files (${names})`} via ZMODEM…`);
+              focusTerminal();
+              return files;
             },
             onWriteFile: async (fullPath, bytes) => {
               let binary = "";
