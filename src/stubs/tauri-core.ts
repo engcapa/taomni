@@ -130,7 +130,6 @@ export class Channel<T = unknown> {
 }
 
 const writeStreams = new Map<string, { path: string; chunks: Uint8Array[] }>();
-const fileReadUrls = new Map<string, string>();
 
 function basename(path: string): string {
   const idx = path.lastIndexOf("/");
@@ -146,10 +145,6 @@ function bytesB64ToArrayBuffer(b64: string): ArrayBuffer {
 
 function arrayBufferToB64(data: ArrayBuffer): string {
   const bytes = new Uint8Array(data);
-  return uint8ArrayToB64(bytes);
-}
-
-function uint8ArrayToB64(bytes: Uint8Array): string {
   let binary = "";
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
@@ -267,20 +262,6 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "read_file_bytes": {
       return (await vfsReadBytes((args as InvokeArgs)?.path as string)) as T;
     }
-    case "create_file_read_url": {
-      const token = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const data = await vfsReadBytes((args as InvokeArgs)?.path as string);
-      const url = URL.createObjectURL(new Blob([data], { type: "application/octet-stream" }));
-      fileReadUrls.set(token, url);
-      return { token, url } as T;
-    }
-    case "release_file_read_url": {
-      const token = (args as InvokeArgs)?.token as string;
-      const url = fileReadUrls.get(token);
-      if (url) URL.revokeObjectURL(url);
-      fileReadUrls.delete(token);
-      return undefined as T;
-    }
     case "write_stream_open": {
       const handleId = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       writeStreams.set(handleId, { path: (args as InvokeArgs)?.path as string, chunks: [] });
@@ -345,15 +326,8 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       })) as T;
     }
     case "write_terminal": {
-      const sid = options?.headers?.["x-session-id"] as string;
-      const bytes = rawBytesFromInvokeArgs(args);
-      if (isSshSession(sid)) sshWrite(sid, uint8ArrayToB64(bytes));
-      return undefined as T;
-    }
-    case "write_terminal_text": {
       const sid = args?.sessionId as string;
-      const data = new TextEncoder().encode(args?.data as string);
-      if (isSshSession(sid)) sshWrite(sid, uint8ArrayToB64(data));
+      if (isSshSession(sid)) sshWrite(sid, args?.data as string);
       return undefined as T;
     }
     case "resize_terminal": {
@@ -563,12 +537,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return undefined as T;
     }
     case "sftp_upload_bytes": {
-      const sid = decodeURIComponent(options?.headers?.["x-session-id"] ?? "");
-      const transferId = decodeURIComponent(options?.headers?.["x-transfer-id"] ?? "");
-      const remotePath = decodeURIComponent(options?.headers?.["x-remote-path"] ?? "");
-      const bytes = rawBytesFromInvokeArgs(args);
-      const bytesB64 = uint8ArrayToB64(bytes);
-      const total = bytes.byteLength;
+      const sid = args?.sessionId as string;
+      const transferId = args?.transferId as string;
+      const remotePath = args?.remotePath as string;
+      const bytesB64 = args?.bytesB64 as string;
+      const total = atob(bytesB64).length;
       void emit(`sftp-progress-${transferId}`, { bytes: 0, total, rate: 0, eta: 0 });
       try {
         await sftpUploadBytesRemote(sid, transferId, remotePath, bytesB64);
@@ -589,7 +562,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const remotePath = args?.remotePath as string;
       const b64 = await sftpDownloadBytesRemote(sid, transferId, remotePath);
       void emit(`sftp-transfer-complete-${transferId}`, { success: true });
-      return bytesB64ToArrayBuffer(b64) as T;
+      return b64 as T;
     }
     case "sftp_cancel_transfer": {
       // Best-effort: cancel on every attached SFTP session.

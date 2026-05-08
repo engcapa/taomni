@@ -53,11 +53,7 @@ const ipcMocks = vi.hoisted(() => ({
   createLocalTerminal: vi.fn(async (sessionId: string) => sessionId),
   createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
   createTerminalSessionId: vi.fn(() => "terminal-session"),
-  encodeBinaryString: vi.fn((value: string) => {
-    const bytes = new Uint8Array(value.length);
-    for (let i = 0; i < value.length; i++) bytes[i] = value.charCodeAt(i) & 0xff;
-    return bytes;
-  }),
+  encodeBase64: vi.fn((value: string) => btoa(value)),
   listenTerminalExit: vi.fn(async () => vi.fn()),
   listenTerminalForwardError: vi.fn(async () => vi.fn()),
   listSystemFonts: vi.fn(async () => ["Source Code Pro"]),
@@ -166,7 +162,7 @@ describe("TerminalPanel focus behavior", () => {
     await waitFor(() => {
       expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
         "terminal-session",
-        "pasted text",
+        btoa("pasted text"),
       );
     });
   });
@@ -199,7 +195,7 @@ describe("TerminalPanel focus behavior", () => {
     await waitFor(() => {
       expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
         "terminal-session",
-        "right click paste",
+        btoa("right click paste"),
       );
     });
     expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();

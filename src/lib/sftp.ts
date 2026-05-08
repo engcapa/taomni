@@ -288,15 +288,14 @@ export async function sftpUploadBytes(
   transferId: string,
   localName: string,
   remotePath: string,
-  bytes: Uint8Array,
+  bytesB64: string,
 ): Promise<void> {
-  return invoke("sftp_upload_bytes", bytes, {
-    headers: {
-      "x-session-id": encodeURIComponent(sessionId),
-      "x-transfer-id": encodeURIComponent(transferId),
-      "x-local-name": encodeURIComponent(localName),
-      "x-remote-path": encodeURIComponent(remotePath),
-    },
+  return invoke("sftp_upload_bytes", {
+    sessionId,
+    transferId,
+    localName,
+    remotePath,
+    bytesB64,
   });
 }
 
@@ -304,13 +303,12 @@ export async function sftpDownloadBytes(
   sessionId: string,
   transferId: string,
   remotePath: string,
-): Promise<Uint8Array> {
-  const buffer = await invoke<ArrayBuffer>("sftp_download_bytes", {
+): Promise<string> {
+  return invoke<string>("sftp_download_bytes", {
     sessionId,
     transferId,
     remotePath,
   });
-  return new Uint8Array(buffer);
 }
 
 export async function listenSftpProgress(
