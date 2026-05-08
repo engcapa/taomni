@@ -969,7 +969,10 @@ export function TerminalPanel({
       (bytes) => {
         let b64 = "";
         for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
-        writeTerminal(sid, btoa(b64)).catch(console.error);
+        return writeTerminal(sid, btoa(b64)).catch((err) => {
+          console.error(err);
+          throw err;
+        });
       },
       {
         onTerminalData: (data) => {
@@ -1017,10 +1020,12 @@ export function TerminalPanel({
         onComplete: (fileName) => {
           appendEvent("zmodem", `Transfer complete: ${fileName}`);
           setStatusMessage(`ZMODEM: ${fileName} transferred`);
+          window.setTimeout(focusTerminal, 0);
         },
         onError: (message) => {
           appendEvent("error", `ZMODEM error: ${message}`);
           setStatusMessage(`ZMODEM error: ${message}`);
+          window.setTimeout(focusTerminal, 0);
         },
       },
     );

@@ -19,6 +19,7 @@ declare module "zmodem.js" {
     type: "send" | "receive";
     on(event: "offer", cb: (offer: Offer) => void): void;
     on(event: "session_end", cb: () => void): void;
+    on(event: "receive", cb: (payload: unknown) => void): void;
     start(): void;
     close(): Promise<void>;
     send_offer(details: { name: string; size: number; mtime: number }): Promise<Transfer | undefined>;

@@ -30,6 +30,9 @@ export interface ZmodemCallbacks {
 }
 
 const SEND_CHUNK = 8192;
+const RECEIVE_FINALIZE_GRACE_MS = 750;
+
+type ZmodemSender = (data: Uint8Array) => void | Promise<void>;
 
 /**
  * Wraps a zmodem.js Sentry to detect and handle ZMODEM transfers over the
@@ -38,30 +41,42 @@ const SEND_CHUNK = 8192;
  * channel when a handshake is detected.
  */
 export class ZmodemSession {
-  private readonly sentry: Sentry;
+  private sentry: Sentry;
   private active = false;
   private pendingSend: ZmodemSendFile[] = [];
+  private sendChain: Promise<void> = Promise.resolve();
+  private sendErrorReported = false;
+  private currentSession: Session | null = null;
+  private receiveFinalizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    sender: (data: Uint8Array) => void,
+    private readonly sender: ZmodemSender,
     private readonly callbacks: ZmodemCallbacks,
   ) {
-    this.sentry = new Sentry({
+    this.sentry = this.createSentry();
+  }
+
+  private createSentry(): Sentry {
+    return new Sentry({
       to_terminal: (octets: number[]) => {
-        callbacks.onTerminalData(new Uint8Array(octets));
+        this.callbacks.onTerminalData(new Uint8Array(octets));
       },
       sender: (octets: number[]) => {
-        sender(new Uint8Array(octets));
+        this.queueSendToPeer(octets);
       },
       on_retract: () => {
         if (this.active) {
           this.active = false;
           this.pendingSend = [];
-          callbacks.onStateChange("idle");
+          this.currentSession = null;
+          this.clearReceiveFinalizeTimer();
+          this.callbacks.onStateChange("idle");
         }
       },
       on_detect: (detection) => {
+        this.resetSendQueue();
         const zsession = detection.confirm();
+        this.currentSession = zsession;
         if (zsession.type === "receive") {
           this.doReceive(zsession);
         } else {
@@ -82,9 +97,7 @@ export class ZmodemSession {
       this.sentry.consume(Array.from(data));
     } catch (err) {
       this.callbacks.onError(err instanceof Error ? err.message : String(err));
-      this.active = false;
-      this.pendingSend = [];
-      this.callbacks.onStateChange("idle");
+      this.resetProtocolState();
     }
   }
 
@@ -96,6 +109,59 @@ export class ZmodemSession {
     this.pendingSend = files;
   }
 
+  private resetSendQueue(): void {
+    this.sendChain = Promise.resolve();
+    this.sendErrorReported = false;
+  }
+
+  private resetProtocolState(): void {
+    this.clearReceiveFinalizeTimer();
+    this.resetSendQueue();
+    this.currentSession = null;
+    this.active = false;
+    this.pendingSend = [];
+    this.sentry = this.createSentry();
+    this.callbacks.onStateChange("idle");
+  }
+
+  private clearReceiveFinalizeTimer(): void {
+    if (this.receiveFinalizeTimer) {
+      clearTimeout(this.receiveFinalizeTimer);
+      this.receiveFinalizeTimer = null;
+    }
+  }
+
+  private finishSession(zsession: Session): void {
+    if (this.currentSession !== zsession) return;
+    this.clearReceiveFinalizeTimer();
+    this.currentSession = null;
+    this.active = false;
+    this.callbacks.onStateChange("idle");
+  }
+
+  private scheduleReceiveFinalize(zsession: Session): void {
+    this.clearReceiveFinalizeTimer();
+    this.receiveFinalizeTimer = setTimeout(() => {
+      if (this.currentSession !== zsession || !this.active) return;
+      this.resetProtocolState();
+    }, RECEIVE_FINALIZE_GRACE_MS);
+  }
+
+  private queueSendToPeer(octets: number[]): void {
+    const bytes = new Uint8Array(octets);
+    this.sendChain = this.sendChain
+      .then(() => this.sender(bytes))
+      .catch((err: unknown) => {
+        if (!this.sendErrorReported) {
+          this.sendErrorReported = true;
+          this.callbacks.onError(err instanceof Error ? err.message : String(err));
+          this.resetProtocolState();
+        }
+        throw err;
+      });
+    void this.sendChain.catch(() => undefined);
+  }
+
   private doReceive(zsession: Session): void {
     this.active = true;
     this.callbacks.onStateChange("receiving");
@@ -104,8 +170,7 @@ export class ZmodemSession {
       const saveDir = await this.callbacks.onSelectSaveDir();
       if (!saveDir) {
         zsession.abort();
-        this.active = false;
-        this.callbacks.onStateChange("idle");
+        this.resetProtocolState();
         return;
       }
 
@@ -161,8 +226,13 @@ export class ZmodemSession {
       });
 
       zsession.on("session_end", () => {
-        this.active = false;
-        this.callbacks.onStateChange("idle");
+        this.finishSession(zsession);
+      });
+
+      zsession.on("receive", (payload: unknown) => {
+        if (isZfinHeader(payload)) {
+          this.scheduleReceiveFinalize(zsession);
+        }
       });
 
       zsession.start();
@@ -255,8 +325,17 @@ export class ZmodemSession {
         this.callbacks.onError(err instanceof Error ? err.message : String(err));
       } finally {
         this.active = false;
+        if (this.currentSession === zsession) this.currentSession = null;
         this.callbacks.onStateChange("idle");
       }
     })();
   }
+}
+
+function isZfinHeader(payload: unknown): boolean {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    (payload as { NAME?: unknown }).NAME === "ZFIN"
+  );
 }

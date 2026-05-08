@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Offer, Session, Transfer } from "zmodem.js";
 import { ZmodemSession, type ZmodemCallbacks } from "./zmodem";
 
 const zmodemMock = vi.hoisted(() => {
   let options: {
     on_detect: (detection: { confirm: () => Session }) => void;
+    sender: (octets: number[]) => void;
   } | null = null;
 
   const Sentry = vi.fn().mockImplementation((opts) => {
@@ -29,6 +30,10 @@ vi.mock("zmodem.js", () => ({
 describe("ZmodemSession", () => {
   beforeEach(() => {
     zmodemMock.reset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("asks for local files when the remote starts rz without queued files", async () => {
@@ -186,6 +191,52 @@ describe("ZmodemSession", () => {
     expect(callbacks.onComplete).not.toHaveBeenCalled();
     expect(callbacks.onError).toHaveBeenCalledWith("disk full");
   });
+
+  it("releases receive mode when the sender finishes without a final OO trailer", async () => {
+    vi.useFakeTimers();
+    const session = makeReceiveSession();
+    const callbacks = makeCallbacks({
+      onSelectSaveDir: vi.fn(async () => "/downloads"),
+    });
+
+    new ZmodemSession(vi.fn(), callbacks);
+    detect(session);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(session.start).toHaveBeenCalledTimes(1);
+    expect(callbacks.onStateChange).toHaveBeenCalledWith("receiving");
+
+    session.emitReceive({ NAME: "ZFIN" });
+    await vi.advanceTimersByTimeAsync(750);
+
+    expect(callbacks.onStateChange).toHaveBeenLastCalledWith("idle");
+  });
+
+  it("serializes ZMODEM writes to the terminal backend", async () => {
+    const callbacks = makeCallbacks();
+    const releases: Array<() => void> = [];
+    const sent: number[][] = [];
+    const sender = vi.fn((data: Uint8Array) => new Promise<void>((resolve) => {
+      sent.push(Array.from(data));
+      releases.push(resolve);
+    }));
+
+    new ZmodemSession(sender, callbacks);
+    zmodemMock.getOptions()?.sender([1]);
+    zmodemMock.getOptions()?.sender([2]);
+
+    await Promise.resolve();
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sent).toEqual([[1]]);
+
+    releases[0]();
+
+    await expect.poll(() => sender.mock.calls.length).toBe(2);
+    expect(sent).toEqual([[1], [2]]);
+    releases[1]();
+  });
 });
 
 function makeCallbacks(overrides: Partial<ZmodemCallbacks> = {}): ZmodemCallbacks {
@@ -232,10 +283,14 @@ function makeSendSession(transfer: Transfer) {
 
 function makeReceiveSession() {
   let offerHandler: ((offer: Offer) => void) | null = null;
+  let receiveHandler: ((payload: unknown) => void) | null = null;
+  let sessionEndHandler: (() => void) | null = null;
   const session = {
     type: "receive" as const,
     on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
       if (event === "offer") offerHandler = handler as (offer: Offer) => void;
+      if (event === "receive") receiveHandler = handler as (payload: unknown) => void;
+      if (event === "session_end") sessionEndHandler = handler as () => void;
     }),
     start: vi.fn(),
     close: vi.fn(async () => undefined),
@@ -243,11 +298,19 @@ function makeReceiveSession() {
     emitOffer: (offer: Offer) => {
       offerHandler?.(offer);
     },
+    emitReceive: (payload: unknown) => {
+      receiveHandler?.(payload);
+    },
+    emitSessionEnd: () => {
+      sessionEndHandler?.();
+    },
   };
   return session as unknown as Session & {
     start: ReturnType<typeof vi.fn>;
     abort: ReturnType<typeof vi.fn>;
     emitOffer: (offer: Offer) => void;
+    emitReceive: (payload: unknown) => void;
+    emitSessionEnd: () => void;
   };
 }
 
