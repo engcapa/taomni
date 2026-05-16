@@ -106,6 +106,8 @@ pub fn run() {
             config::select_upload_file,
             config::select_save_directory,
             config::select_save_file_path,
+            config::select_file_path,
+            config::select_folder_path,
             config::read_file_bytes,
             config::read_stream_open,
             config::read_stream_read,

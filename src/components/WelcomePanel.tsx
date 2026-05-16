@@ -6,10 +6,12 @@ import {
   RefreshCw,
   Activity,
   ScrollText,
+  FolderOpen,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseOpenSshConfig } from "../lib/quickConnect";
 import { listLocalShells, openLocalShellAsAdministrator, type LocalShellOption } from "../lib/ipc";
+import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import type { LocalShellSelection } from "../types";
@@ -17,9 +19,10 @@ import type { LocalShellSelection } from "../types";
 interface WelcomePanelProps {
   onStartLocalTerminal: (shell?: LocalShellSelection) => void;
   onNewSession: () => void;
+  onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
 }
 
-export function WelcomePanel({ onStartLocalTerminal, onNewSession }: WelcomePanelProps) {
+export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath }: WelcomePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
@@ -80,6 +83,16 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession }: WelcomePane
     setStatusMessage(`Imported ${imported.length} SSH session${imported.length === 1 ? "" : "s"}`);
   };
 
+  const handleOpenHomeFolder = async () => {
+    if (!onOpenLocalPath) return;
+    try {
+      const home = await sftpLocalHome();
+      if (home) onOpenLocalPath(home, { embedFolder: true });
+    } catch (error) {
+      setStatusMessage(`Home lookup failed: ${String(error)}`);
+    }
+  };
+
   return (
     <div className="w-full h-full flex" style={{ background: "var(--moba-bg)" }}>
       <input
@@ -127,6 +140,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession }: WelcomePane
                 );
               }}
               onStartAsAdministrator={handleStartAsAdministrator}
+              onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
             />
             <ActionCard
               icon={<Plus className="w-5 h-5" />}
@@ -215,6 +229,7 @@ function LocalTerminalCard({
   kbd,
   onStart,
   onStartAsAdministrator,
+  onOpenHomeFolder,
 }: {
   shells: LocalShellOption[];
   selectedShell?: LocalShellOption;
@@ -224,6 +239,7 @@ function LocalTerminalCard({
   kbd: string;
   onStart: () => void;
   onStartAsAdministrator: () => void;
+  onOpenHomeFolder?: () => void;
 }) {
   const hasChoices = shells.length > 1;
   const canElevate = selectedShell?.canElevate ?? false;
@@ -280,7 +296,19 @@ function LocalTerminalCard({
             {selectedShell?.name ?? (shellStatus === "loading" ? "Detecting shells..." : "Default shell")}
           </div>
         )}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
+          {onOpenHomeFolder && (
+            <button
+              data-testid="welcome-open-home-folder"
+              className="moba-btn h-8 px-3 inline-flex items-center gap-1.5"
+              onClick={onOpenHomeFolder}
+              title="Open home folder in a NewMob tab"
+              type="button"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>Home folder</span>
+            </button>
+          )}
           <button data-testid="welcome-open-local-terminal" className="moba-btn h-8 px-3" onClick={onStart} type="button">
             Open
           </button>

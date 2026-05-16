@@ -16,6 +16,7 @@ import {
   FileText,
   Terminal,
   FolderOpen,
+  ExternalLink,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -44,6 +45,8 @@ interface FileToolbarProps {
   onUploadSelected?: () => void;
   /** Local pane only: open selected files/dirs with the system default app. */
   onOpenLocalSelected?: () => void;
+  /** Local pane only: reveal the current directory in the OS file manager. */
+  onRevealInOs?: () => void;
   /** Open OS file picker and upload to current dir (remote pane only in browser). */
   onUploadFromDisk?: () => void;
   /** Remote pane only: ask the parent terminal to `cd` into the current dir. */
@@ -75,6 +78,7 @@ export function FileToolbar(props: FileToolbarProps) {
     onDownloadSelected,
     onUploadSelected,
     onOpenLocalSelected,
+    onRevealInOs,
     onUploadFromDisk,
     onOpenTerminalHere,
     onDetach,
@@ -141,6 +145,15 @@ export function FileToolbar(props: FileToolbarProps) {
           onClick={onOpenLocalSelected}
         >
           <FolderOpen className="w-3.5 h-3.5" />
+        </ToolBtn>
+      )}
+      {side === "local" && onRevealInOs && (
+        <ToolBtn
+          testId="sftp-local-reveal-in-os"
+          title="Open current folder in OS file manager"
+          onClick={onRevealInOs}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
         </ToolBtn>
       )}
 

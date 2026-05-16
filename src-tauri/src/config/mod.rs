@@ -27,6 +27,16 @@ pub fn select_upload_file() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn select_file_path(current_path: Option<String>) -> Result<Option<String>, String> {
+    platform::select_file_path(current_path.as_deref())
+}
+
+#[tauri::command]
+pub fn select_folder_path(current_path: Option<String>) -> Result<Option<String>, String> {
+    platform::select_folder_path(current_path.as_deref())
+}
+
+#[tauri::command]
 pub fn select_save_directory(current_path: Option<String>) -> Result<Option<String>, String> {
     platform::select_save_directory(current_path.as_deref())
 }
@@ -426,6 +436,45 @@ mod platform {
         Ok((!path.is_empty()).then_some(path))
     }
 
+    pub fn select_folder_path(current_path: Option<&str>) -> Result<Option<String>, String> {
+        // Folder pickers reuse the same PowerShell FolderBrowserDialog as
+        // select_save_directory; only the dialog title differs.
+        use std::process::Command;
+        let initial = super::initial_dir_from(current_path)
+            .or_else(dirs::home_dir)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let script = format!(
+            r#"Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select folder to open'; $d.SelectedPath = '{}'; if ($d.ShowDialog() -eq 'OK') {{ $d.SelectedPath }} else {{ '' }}"#,
+            initial.replace('\'', "''")
+        );
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .map_err(|e| format!("powershell: {e}"))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("powershell: {}", stderr.trim()));
+        }
+        let path = String::from_utf8_lossy(&output.stdout)
+            .trim_end_matches(&['\r', '\n'][..])
+            .to_string();
+        Ok((!path.is_empty()).then_some(path))
+    }
+
+    pub fn select_file_path(current_path: Option<&str>) -> Result<Option<String>, String> {
+        let mut file_buf = [0u16; 32768];
+        if let Some(file) = existing_file_from(current_path) {
+            let wide = wide_os(file.as_os_str());
+            let len = wide.len().saturating_sub(1).min(file_buf.len() - 1);
+            file_buf[..len].copy_from_slice(&wide[..len]);
+        }
+        let filter = wide_filter(&[("All files", "*")]);
+        let title = wide("Select file to open");
+        let initial_dir = initial_dir_from(current_path).map(|path| wide_os(path.as_os_str()));
+        open_file_dialog(&mut file_buf, &filter, &title, initial_dir.as_ref())
+    }
+
     pub fn select_save_file_path(
         default_name: Option<&str>,
         current_path: Option<&str>,
@@ -493,6 +542,14 @@ mod platform {
 
     pub fn select_save_directory(_current_path: Option<&str>) -> Result<Option<String>, String> {
         run_osascript(r#"POSIX path of (choose folder with prompt "Select save directory")"#)
+    }
+
+    pub fn select_folder_path(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        run_osascript(r#"POSIX path of (choose folder with prompt "Select folder to open")"#)
+    }
+
+    pub fn select_file_path(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        run_osascript(r#"POSIX path of (choose file with prompt "Select file to open")"#)
     }
 
     pub fn select_save_file_path(
@@ -576,6 +633,16 @@ mod platform {
     pub fn select_save_directory(_current_path: Option<&str>) -> Result<Option<String>, String> {
         let initial = dirs::download_dir().or_else(dirs::home_dir);
         open_dir_dialog("Select save directory", initial.as_deref())
+    }
+
+    pub fn select_folder_path(current_path: Option<&str>) -> Result<Option<String>, String> {
+        let initial = initial_dir_from(current_path).or_else(dirs::home_dir);
+        open_dir_dialog("Select folder to open", initial.as_deref())
+    }
+
+    pub fn select_file_path(current_path: Option<&str>) -> Result<Option<String>, String> {
+        let initial = initial_dir_from(current_path);
+        open_file_dialog("Select file to open", initial.as_deref())
     }
 
     pub fn select_save_file_path(
@@ -838,6 +905,14 @@ mod platform {
         _default_name: Option<&str>,
         _current_path: Option<&str>,
     ) -> Result<Option<String>, String> {
+        Err("Native file dialog is not supported on this platform".to_string())
+    }
+
+    pub fn select_folder_path(_current_path: Option<&str>) -> Result<Option<String>, String> {
+        Err("Native file dialog is not supported on this platform".to_string())
+    }
+
+    pub fn select_file_path(_current_path: Option<&str>) -> Result<Option<String>, String> {
         Err("Native file dialog is not supported on this platform".to_string())
     }
 }

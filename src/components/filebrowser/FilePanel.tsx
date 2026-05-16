@@ -84,6 +84,8 @@ interface FilePanelProps {
   onOpenTerminalHere?: (path: string) => void;
   /** Local pane only: open selected files/dirs with the system default app. */
   onOpenLocalSelected?: (entries: FileEntry[]) => void;
+  /** Local pane only: reveal the current directory in the OS file manager. */
+  onRevealInOs?: (path: string) => void;
 }
 
 const SUPPORTED_PREVIEW_EXT = new Set([
@@ -113,6 +115,7 @@ export function FilePanel({
   onNewFile,
   onOpenTerminalHere,
   onOpenLocalSelected,
+  onRevealInOs,
 }: FilePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const session = useSftpStore((s) => s.sessions[sessionId]);
@@ -466,6 +469,11 @@ export function FilePanel({
         onOpenLocalSelected={
           side === "local" && onOpenLocalSelected && selectedEntries.length > 0
             ? () => onOpenLocalSelected(selectedEntries)
+            : undefined
+        }
+        onRevealInOs={
+          side === "local" && onRevealInOs && pane.path
+            ? () => onRevealInOs(pane.path)
             : undefined
         }
         onOpenTerminalHere={

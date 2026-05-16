@@ -23,7 +23,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
-import { selectPrivateKeyFile, testSshConnection } from "../../lib/ipc";
+import { selectFilePath, selectFolderPath, selectPrivateKeyFile, testSshConnection } from "../../lib/ipc";
 import {
   getSessionNetworkSettings,
   ipKindToLabel,
@@ -87,7 +87,7 @@ const DEFAULT_PORTS: Record<string, number> = {
 /** Map UI proto to the backend session_type string. */
 function protoToSessionType(p: Proto): string {
   const map: Partial<Record<Proto, string>> = {
-    Rlogin: "Telnet", File: "LocalShell", Shell: "LocalShell",
+    Rlogin: "Telnet", Shell: "LocalShell",
     Browser: "LocalShell", Mosh: "SSH", S3: "SFTP", WSL: "LocalShell",
   };
   return map[p] ?? p;
@@ -696,6 +696,8 @@ function BookmarkSettings({
   tags, setTags,
   proto,
   onNewFolder,
+  fileEmbedInTab, setFileEmbedInTab,
+  fileExtraArgs, setFileExtraArgs,
 }: {
   name: string; setName: (v: string) => void;
   groupPath: string; setGroupPath: (v: string) => void;
@@ -704,6 +706,8 @@ function BookmarkSettings({
   tags: string; setTags: (v: string) => void;
   proto: Proto;
   onNewFolder: () => void;
+  fileEmbedInTab: boolean; setFileEmbedInTab: (v: boolean) => void;
+  fileExtraArgs: string; setFileExtraArgs: (v: string) => void;
 }) {
   const [bgImage, setBgImage] = useState("");
   const [bgOpacity, setBgOpacity] = useState("35%");
@@ -787,20 +791,42 @@ function BookmarkSettings({
         />
       </Field>
 
-      <Field label="Behavior on startup">
-        <label className="flex items-center gap-1.5">
-          <Checkbox checked={autoConnect} onChange={setAutoConnect} />
-          Auto-connect when MobaXterm starts
-        </label>
-        <label className="ml-3 flex items-center gap-1.5">
-          <Checkbox checked={openNewWindow} onChange={setOpenNewWindow} />
-          Open in new window
-        </label>
-        <label className="ml-3 flex items-center gap-1.5">
-          <Checkbox checked={reconnect} onChange={setReconnect} />
-          Reconnect on disconnection
-        </label>
-      </Field>
+      {proto === "File" && (
+        <>
+          <Field label="File options">
+            <label className="flex items-center gap-1.5">
+              <Checkbox checked={fileEmbedInTab} onChange={setFileEmbedInTab} />
+              Try to open the folder in a NewMob tab (experimental)
+            </label>
+          </Field>
+          <Field label="Additional parameters">
+            <input
+              className="moba-input flex-1"
+              value={fileExtraArgs}
+              aria-label="Additional parameters"
+              onChange={(e) => setFileExtraArgs(e.target.value)}
+              placeholder="(passed when launching files; ignored for folders/URLs)"
+            />
+          </Field>
+        </>
+      )}
+
+      {proto !== "File" && (
+        <Field label="Behavior on startup">
+          <label className="flex items-center gap-1.5">
+            <Checkbox checked={autoConnect} onChange={setAutoConnect} />
+            Auto-connect when MobaXterm starts
+          </label>
+          <label className="ml-3 flex items-center gap-1.5">
+            <Checkbox checked={openNewWindow} onChange={setOpenNewWindow} />
+            Open in new window
+          </label>
+          <label className="ml-3 flex items-center gap-1.5">
+            <Checkbox checked={reconnect} onChange={setReconnect} />
+            Reconnect on disconnection
+          </label>
+        </Field>
+      )}
 
       <Field label="Keyboard shortcut">
         <input
@@ -892,6 +918,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
   const [tags, setTags] = useState(() => optionString(initialOptions, "tags", ""));
 
+  /* --- file session options --- */
+  const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
+  const [fileExtraArgs, setFileExtraArgs] = useState(() => optionString(initialOptions, "fileExtraArgs", ""));
+
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
@@ -939,6 +969,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const handleProtoChange = (p: Proto) => {
     setProto(p);
     setPort(String(DEFAULT_PORTS[p] ?? 22));
+    // For File proto only the Bookmark sub-tab is meaningful; jump there so
+    // the user lands on the relevant content.
+    if (p === "File") setSection("bookmark");
   };
 
   /* Keep authMethod in sync with the radio group */
@@ -968,7 +1001,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     else if (authMethod === "Agent") auth = "Agent";
     else if (authMethod === "None") auth = "None";
 
-    const displayName = name || (host ? `${username ? username + "@" : ""}${host}` : "Local terminal");
+    const displayName = name
+      || (proto === "File" && host
+        ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
+        : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal"));
     return {
       id: session?.id ?? crypto.randomUUID(),
       name: displayName,
@@ -983,6 +1019,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         x11, compression, startupCmd, jumpHost: jumpHost || "",
         jumpUser, jumpPort, description, tags, doNotExit,
         remoteEnv, sshBrowser, usePrivKey, useJump,
+        fileEmbedInTab, fileExtraArgs,
         terminalProfile,
         // Strip the proxy password unless the user explicitly opted into
         // "Save in vault". `options_json` lands in the SQLite session row
@@ -1001,6 +1038,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const validate = () => {
     if (needsHost && !host.trim()) return "Remote host is required.";
+    if (proto === "File" && !host.trim()) return "File or folder path (or URL) is required.";
     if (isSSH && specifyUser && !username.trim()) return "Username is enabled but empty.";
     if (authMethod === "PrivateKey" && !keyPath.trim()) return "Private key path is required.";
     return null;
@@ -1069,6 +1107,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setJumpPort(optionString(nextOptions, "jumpPort", "22"));
     setDescription(optionString(nextOptions, "description", ""));
     setTags(optionString(nextOptions, "tags", ""));
+    setFileEmbedInTab(optionBoolean(nextOptions, "fileEmbedInTab", true));
+    setFileExtraArgs(optionString(nextOptions, "fileExtraArgs", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setSaveError(null);
@@ -1101,6 +1141,26 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       handleAuthRadio("privatekey");
     } catch (err) {
       setSaveError(`Could not open private key chooser: ${String(err)}`);
+    }
+  };
+
+  const handleBrowseFileTarget = async () => {
+    setSaveError(null);
+    try {
+      const selected = await selectFilePath(host || undefined);
+      if (selected) setHost(selected.trim());
+    } catch (err) {
+      setSaveError(`Could not open file chooser: ${String(err)}`);
+    }
+  };
+
+  const handleBrowseFolderTarget = async () => {
+    setSaveError(null);
+    try {
+      const selected = await selectFolderPath(host || undefined);
+      if (selected) setHost(selected.trim());
+    } catch (err) {
+      setSaveError(`Could not open folder chooser: ${String(err)}`);
     }
   };
 
@@ -1151,18 +1211,24 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
-  const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = [
-    ...(isSSH
-      ? [{ id: "advanced" as SectionTab, label: "Advanced SSH settings", icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
-      : []),
-    { id: "terminal", label: "Terminal settings", icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> },
-    { id: "network",  label: "Network settings",  icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
-    { id: "bookmark", label: "Bookmark settings",  icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
-  ];
+  const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = proto === "File"
+    ? [
+        { id: "bookmark", label: "Bookmark settings", icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+      ]
+    : [
+        ...(isSSH
+          ? [{ id: "advanced" as SectionTab, label: "Advanced SSH settings", icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+          : []),
+        { id: "terminal", label: "Terminal settings", icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "network",  label: "Network settings",  icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "bookmark", label: "Bookmark settings",  icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+      ];
 
   /* If we switched away from SSH and were on the advanced tab, fall back */
   const activeSection =
-    section === "advanced" && !isSSH ? "terminal" : section;
+    proto === "File"
+      ? "bookmark"
+      : (section === "advanced" && !isSSH ? "terminal" : section);
 
   return (
     <div
@@ -1307,6 +1373,57 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           </div>
         )}
 
+        {/* Basic File settings — appears for the File protocol only */}
+        {proto === "File" && (
+          <div
+            className="px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+          >
+            <div
+              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              style={{ color: "var(--moba-accent)" }}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Basic File/folder settings
+            </div>
+            <div className="grid grid-cols-12 gap-2 items-center">
+              <label className="col-span-2 text-[12px] text-right">
+                File / folder / URL *
+              </label>
+              <div className="col-span-10 flex items-center gap-1">
+                <input
+                  data-testid="session-file-target"
+                  className="moba-input flex-1"
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  aria-label="File or folder path or URL"
+                  placeholder="C:\\Users\\me\\notes  ·  /home/me/Downloads  ·  https://example.com"
+                />
+                <button
+                  title="Browse folder"
+                  className="moba-btn px-2"
+                  onClick={() => void handleBrowseFolderTarget()}
+                  type="button"
+                >
+                  <Folder className="w-3.5 h-3.5 inline -mt-0.5" />
+                </button>
+                <button
+                  title="Browse file"
+                  className="moba-btn px-2"
+                  onClick={() => void handleBrowseFileTarget()}
+                  type="button"
+                >
+                  <FileText className="w-3.5 h-3.5 inline -mt-0.5" />
+                </button>
+              </div>
+              <div className="col-span-12 text-[11px] text-[var(--moba-text-muted)]">
+                Local path or http(s):// URL. Files and URLs open with the system default handler;
+                folders embed in a NewMob tab when the option is enabled (Bookmark settings).
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Section tabs */}
         <div className="px-3 pt-2 flex shrink-0" style={{ background: "transparent" }}>
           {sectionTabs.map((t) => (
@@ -1376,6 +1493,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               tags={tags} setTags={setTags}
               proto={proto}
               onNewFolder={handleNewFolder}
+              fileEmbedInTab={fileEmbedInTab} setFileEmbedInTab={setFileEmbedInTab}
+              fileExtraArgs={fileExtraArgs} setFileExtraArgs={setFileExtraArgs}
             />
           )}
         </div>

@@ -27,6 +27,7 @@ pub enum SessionType {
     SFTP,
     Serial,
     LocalShell,
+    File,
 }
 
 impl SessionType {
@@ -40,6 +41,7 @@ impl SessionType {
             Self::SFTP => "SFTP",
             Self::Serial => "Serial",
             Self::LocalShell => "LocalShell",
+            Self::File => "File",
         }
     }
 
@@ -53,6 +55,7 @@ impl SessionType {
             "SFTP" => Self::SFTP,
             "Serial" => Self::Serial,
             "LocalShell" => Self::LocalShell,
+            "File" => Self::File,
             _ => Self::SSH,
         }
     }
@@ -64,7 +67,7 @@ impl SessionType {
             Self::RDP => 3389,
             Self::VNC => 5900,
             Self::FTP => 21,
-            Self::Serial | Self::LocalShell => 0,
+            Self::Serial | Self::LocalShell | Self::File => 0,
         }
     }
 }

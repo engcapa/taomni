@@ -45,8 +45,17 @@ export interface SftpSessionState {
 interface SftpStoreState {
   sessions: Record<string, SftpSessionState>;
   attach: (opts: AttachOptions) => Promise<void>;
+  /**
+   * Attach a session id to the store without opening any SFTP channel —
+   * used by the embedded local file-browser tab (File session type) so it
+   * can reuse the same `FilePanel` plumbing as the SFTP local pane while
+   * never touching the remote side.
+   */
+  attachLocalOnly: (sessionId: string, initialPath?: string) => Promise<void>;
   ensureSession: (sessionId: string) => SftpSessionState;
   detach: (sessionId: string) => Promise<void>;
+  /** Counterpart to `attachLocalOnly` — drops the store entry, no backend. */
+  detachLocalOnly: (sessionId: string) => void;
   refreshPane: (sessionId: string, side: PaneSide) => Promise<void>;
   navigate: (sessionId: string, side: PaneSide, path: string) => Promise<void>;
   navigateBack: (sessionId: string, side: PaneSide) => Promise<void>;
@@ -312,6 +321,57 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
     } catch (err) {
       console.warn("[sftp-store] detach failed:", err);
     }
+    set((state) => {
+      const next = { ...state.sessions };
+      delete next[sessionId];
+      return { sessions: next };
+    });
+  },
+
+  attachLocalOnly: async (sessionId, initialPath) => {
+    // Set up store state for a session that only uses the local pane —
+    // no backend SFTP channel is opened. The remote pane stays empty and
+    // unused. Refcount mirrors `attach` so the matching `detachLocalOnly`
+    // tears the entry down on the last consumer.
+    sessionRefCounts.set(sessionId, (sessionRefCounts.get(sessionId) ?? 0) + 1);
+    if (get().sessions[sessionId]?.attached) return;
+
+    let path = initialPath?.trim() || "";
+    if (!path) {
+      path = await sftpLocalHome().catch(() => "");
+    }
+    const entries = path
+      ? await listSide(sessionId, "local", path).catch(() => [])
+      : [];
+    set((state) => ({
+      sessions: {
+        ...state.sessions,
+        [sessionId]: {
+          ...(state.sessions[sessionId] ?? freshSession(sessionId)),
+          attached: true,
+          attaching: false,
+          homeDir: null,
+          error: null,
+          remote: emptyPane(),
+          local: {
+            ...emptyPane(),
+            path,
+            entries,
+            history: path ? [path] : [],
+            historyIndex: path ? 0 : -1,
+          },
+        },
+      },
+    }));
+  },
+
+  detachLocalOnly: (sessionId) => {
+    const remaining = (sessionRefCounts.get(sessionId) ?? 0) - 1;
+    if (remaining > 0) {
+      sessionRefCounts.set(sessionId, remaining);
+      return;
+    }
+    sessionRefCounts.delete(sessionId);
     set((state) => {
       const next = { ...state.sessions };
       delete next[sessionId];

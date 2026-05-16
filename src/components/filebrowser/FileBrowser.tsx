@@ -631,6 +631,17 @@ export function FileBrowser(props: FileBrowserProps) {
               acceptCrossPane
               onCrossPaneDrop={handleCrossPaneToLocal}
               onOpenLocalSelected={(entries) => void handleOpenLocal(entries)}
+              onRevealInOs={(path) => {
+                if (!path) return;
+                void (async () => {
+                  try {
+                    const { sftpOpenPath } = await import("../../lib/sftp");
+                    await sftpOpenPath(path);
+                  } catch (err) {
+                    setStatus(`Open failed: ${err}`);
+                  }
+                })();
+              }}
               filterText={localFilter}
               onFilterTextChange={setLocalFilter}
               onUploadSelected={(entries) => {

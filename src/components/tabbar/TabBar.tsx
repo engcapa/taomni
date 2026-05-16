@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Copy,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu } from "../ContextMenu";
@@ -185,6 +186,8 @@ function TabIcon({ kind, ssh }: { kind: TabKind; ssh?: boolean }) {
       return <Monitor className="w-3 h-3" style={{ color: "#a04b9c" }} />;
     case "nettools":
       return <NetworkIcon className="w-3 h-3" style={{ color: "#236a98" }} />;
+    case "file-browser":
+      return <FileText className="w-3 h-3" style={{ color: "var(--moba-text-muted)" }} />;
     default:
       return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }

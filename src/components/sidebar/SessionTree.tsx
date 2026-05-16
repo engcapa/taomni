@@ -623,6 +623,8 @@ function sessionIcon(type: string) {
       return <Wifi className="w-3.5 h-3.5" style={{ color: "#236a98" }} />;
     case "LocalShell":
       return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#62d36f" }} />;
+    case "File":
+      return <FileText className="w-3.5 h-3.5" style={{ color: "var(--moba-text-muted)" }} />;
     default:
       return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#2b5d8b" }} />;
   }

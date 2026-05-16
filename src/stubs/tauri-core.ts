@@ -277,6 +277,16 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const selected = window.prompt("Save file path in browser VFS", current);
       return (selected?.trim() || null) as T;
     }
+    case "select_file_path": {
+      const current = ((args as InvokeArgs | undefined)?.currentPath as string | null) || VFS_ROOT;
+      const selected = window.prompt("File path in browser VFS", current);
+      return (selected?.trim() || null) as T;
+    }
+    case "select_folder_path": {
+      const current = ((args as InvokeArgs | undefined)?.currentPath as string | null) || VFS_ROOT;
+      const selected = window.prompt("Folder path in browser VFS", current);
+      return (selected?.trim() || null) as T;
+    }
     case "read_file_bytes": {
       return (await vfsReadBytes((args as InvokeArgs)?.path as string)) as T;
     }

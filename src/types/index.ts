@@ -1,7 +1,7 @@
 import type { SshConnectInfo } from "../components/terminal/TerminalPanel";
 import type { TerminalProfile } from "../lib/terminalProfile";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser";
 
 export interface VncConnectInfo {
   sessionId: string;
@@ -9,6 +9,10 @@ export interface VncConnectInfo {
   port: number;
   username?: string | null;
   password?: string;
+}
+
+export interface FileBrowserTabInfo {
+  initialPath: string;
 }
 
 export interface Tab {
@@ -24,6 +28,7 @@ export interface Tab {
   message?: string;
   sftp?: SftpTabInfo;
   vnc?: VncConnectInfo;
+  fileBrowser?: FileBrowserTabInfo;
   hasNewOutput?: boolean;
 }
 

@@ -22,9 +22,11 @@ import { AuthPrompt } from "../components/session/AuthPrompt";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
 import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
+import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { isTauriRuntime } from "../lib/runtime";
 import { openSftpWindow } from "../lib/sftp";
+import { sftpOpenPath, sftpStat } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
 import {
@@ -339,6 +341,76 @@ export function MainLayout() {
     });
   }, [addTab]);
 
+  const openFileBrowserTab = useCallback((title: string, initialPath: string, sessionId?: string) => {
+    const id = `file-${sessionId ?? "ad-hoc"}-${Date.now()}`;
+    addTab({
+      id,
+      type: "file-browser",
+      title,
+      sessionId,
+      closable: true,
+      fileBrowser: { initialPath },
+    });
+  }, [addTab]);
+
+  // Open a local path or URL: URLs and files always go to the system handler;
+  // folders open in an embedded NewMob tab when `embedFolder` is true, otherwise
+  // they fall through to the OS file manager via sftpOpenPath.
+  const handleOpenLocalPath = useCallback(async (
+    target: string,
+    opts: { embedFolder?: boolean; title?: string; sessionId?: string } = {},
+  ) => {
+    const trimmed = target.trim();
+    if (!trimmed) return;
+    const isUrl = /^(https?|file|ftp):\/\//i.test(trimmed);
+    if (isUrl) {
+      try {
+        await sftpOpenPath(trimmed);
+      } catch (err) {
+        setStatusMessage(`Open failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
+    let isDir = false;
+    try {
+      const info = await sftpStat("", trimmed, "local");
+      isDir = info.fileType === "dir";
+    } catch (err) {
+      setStatusMessage(`Stat failed: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    if (isDir && opts.embedFolder) {
+      openFileBrowserTab(opts.title ?? trimmed, trimmed, opts.sessionId);
+      return;
+    }
+    try {
+      await sftpOpenPath(trimmed);
+    } catch (err) {
+      setStatusMessage(`Open failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [openFileBrowserTab, setStatusMessage]);
+
+  const openFileSession = useCallback((session: SessionConfig) => {
+    const target = session.host?.trim();
+    if (!target) {
+      setStatusMessage("File session has no path or URL configured.");
+      return;
+    }
+    let embed = true;
+    try {
+      const opts = JSON.parse(session.options_json || "{}") as Record<string, unknown>;
+      if (typeof opts.fileEmbedInTab === "boolean") embed = opts.fileEmbedInTab;
+    } catch {
+      /* defaults */
+    }
+    void handleOpenLocalPath(target, {
+      embedFolder: embed,
+      title: session.name || target,
+      sessionId: session.id,
+    });
+    void markConnected(session.id);
+  }, [handleOpenLocalPath, markConnected, setStatusMessage]);
+
   const handleConnectSession = useCallback((session: SessionConfig) => {
     const resolveAuth = (): { method: string; data: string | null } => {
       const method = typeof session.auth_method === "string"
@@ -373,11 +445,13 @@ export function MainLayout() {
       } else {
         openVncTab(session, data ?? undefined);
       }
+    } else if (session.session_type === "File") {
+      openFileSession(session);
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
     }
-  }, [markConnected, openLocalTab, openSftpTab, openVncTab]);
+  }, [markConnected, openLocalTab, openSftpTab, openVncTab, openFileSession]);
 
   const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const id = `ssh-${session.id}-${Date.now()}`;
@@ -581,6 +655,7 @@ export function MainLayout() {
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
+  const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
 
   return (
     <div
@@ -677,6 +752,7 @@ export function MainLayout() {
                   <WelcomePanel
                     onStartLocalTerminal={(localShell) => openLocalTab(localShell?.name ?? "Local terminal", undefined, undefined, localShell)}
                     onNewSession={handleNewSession}
+                    onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                   />
                 )}
 
@@ -840,6 +916,24 @@ export function MainLayout() {
                   );
                 })}
 
+                {/* Embedded local file-browser tabs (File session type). */}
+                {fileBrowserTabs.map((tab) => {
+                  if (!tab.fileBrowser) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <LocalFileBrowserPanel
+                        tabId={tab.id}
+                        initialPath={tab.fileBrowser.initialPath}
+                      />
+                    </div>
+                  );
+                })}
+
                 {activeTab?.type === "nettools" && (
                   <TunnelManager
                     onStatusMessage={setStatusMessage}
@@ -853,6 +947,7 @@ export function MainLayout() {
                   activeTab.type !== "terminal" &&
                   activeTab.type !== "sftp" &&
                   activeTab.type !== "vnc" &&
+                  activeTab.type !== "file-browser" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "nettools" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
