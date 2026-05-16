@@ -15,6 +15,7 @@ import {
   KeyRound,
   FileText,
   Terminal,
+  FolderOpen,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -41,6 +42,8 @@ interface FileToolbarProps {
   onDownloadSelected?: () => void;
   /** Local pane: upload selected files to remote. Remote pane: undefined. */
   onUploadSelected?: () => void;
+  /** Local pane only: open selected files/dirs with the system default app. */
+  onOpenLocalSelected?: () => void;
   /** Open OS file picker and upload to current dir (remote pane only in browser). */
   onUploadFromDisk?: () => void;
   /** Remote pane only: ask the parent terminal to `cd` into the current dir. */
@@ -71,6 +74,7 @@ export function FileToolbar(props: FileToolbarProps) {
     onPreview,
     onDownloadSelected,
     onUploadSelected,
+    onOpenLocalSelected,
     onUploadFromDisk,
     onOpenTerminalHere,
     onDetach,
@@ -121,6 +125,22 @@ export function FileToolbar(props: FileToolbarProps) {
       {side === "remote" && onUploadFromDisk && (
         <ToolBtn testId="sftp-remote-upload-from-disk" title="Upload files from this computer" onClick={onUploadFromDisk}>
           <HardDriveUpload className="w-3.5 h-3.5" />
+        </ToolBtn>
+      )}
+      {side === "local" && onOpenLocalSelected && (
+        <ToolBtn
+          testId="sftp-local-open-selected"
+          title={
+            hasSelection
+              ? selectionCount === 1
+                ? "Open with system default app"
+                : `Open ${selectionCount} selected with system default app`
+              : "Open selected with system default app"
+          }
+          disabled={!hasSelection}
+          onClick={onOpenLocalSelected}
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
         </ToolBtn>
       )}
 

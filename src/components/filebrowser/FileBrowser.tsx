@@ -225,16 +225,11 @@ export function FileBrowser(props: FileBrowserProps) {
         setDownloadPrompt(entry);
         return;
       }
-      if (isPreviewable(entry)) {
-        try {
-          const { sftpReadFileText } = await import("../../lib/sftp");
-          const text = await sftpReadFileText(props.sessionId, entry.path, "local");
-          setPreviewing({ entry, side: "local", text });
-        } catch (err) {
-          setStatus(`Preview failed: ${err}`);
-        }
-      } else {
-        setStatus(`Local: ${entry.path} (${entry.size} bytes)`);
+      try {
+        const { sftpOpenPath } = await import("../../lib/sftp");
+        await sftpOpenPath(entry.path);
+      } catch (err) {
+        setStatus(`Failed to open ${entry.name}: ${err}`);
       }
     },
     [navigate, props.sessionId, props.onTerminalSync, setStatus],
@@ -249,12 +244,38 @@ export function FileBrowser(props: FileBrowserProps) {
     [controller, session?.local.path],
   );
 
+  const handleOpenLocal = useCallback(
+    async (entries: FileEntry[]) => {
+      const { sftpOpenPath } = await import("../../lib/sftp");
+      for (const entry of entries) {
+        if (entry.fileType === "dir") {
+          await navigate(props.sessionId, "local", entry.path);
+          return;
+        }
+        try {
+          await sftpOpenPath(entry.path);
+        } catch (err) {
+          setStatus(`Failed to open ${entry.name}: ${err}`);
+        }
+      }
+    },
+    [navigate, props.sessionId, setStatus],
+  );
+
   const localContext = useCallback(
     (entry: FileEntry, _anchor: { x: number; y: number }, selectedEntries: FileEntry[]): MenuItem[] => {
       const targets = selectedEntries.length > 0 ? selectedEntries : [entry];
       const target = targets[0] ?? entry;
       const multi = targets.length > 1;
       const items: MenuItem[] = [];
+      items.push({
+        label: entry.fileType === "dir"
+          ? "Open folder"
+          : multi
+            ? `Open ${targets.length} files`
+            : "Open",
+        onClick: () => void handleOpenLocal(targets),
+      });
       items.push({
         label: multi ? `Upload ${targets.length} selected to remote` : "Upload to remote",
         onClick: () => {
@@ -293,7 +314,7 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       return items;
     },
-    [controller, session?.remote.path],
+    [controller, handleOpenLocal, session?.remote.path],
   );
 
   const remoteContext = useCallback(
@@ -609,6 +630,7 @@ export function FileBrowser(props: FileBrowserProps) {
               onEmptyContext={localEmptyContext}
               acceptCrossPane
               onCrossPaneDrop={handleCrossPaneToLocal}
+              onOpenLocalSelected={(entries) => void handleOpenLocal(entries)}
               filterText={localFilter}
               onFilterTextChange={setLocalFilter}
               onUploadSelected={(entries) => {
