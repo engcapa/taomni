@@ -1549,43 +1549,29 @@ export function TerminalPanel({
     return () => el.removeEventListener("wheel", handleWheel, { capture: true });
   }, [decreaseFontSize, increaseFontSize, visible]);
 
-  // Linux/WebKitGTK fires a native X11 PRIMARY-selection paste via a DOM
-  // `paste` event on the focused .xterm-helper-textarea when the middle button
-  // is clicked. xterm.js has its own capture-phase `paste` listener that
-  // injects the clipboard text into the PTY — this runs in addition to our
-  // onAuxClick handler, causing double-paste (e.g. selection "pwd" AND the
-  // previous clipboard "python --version" both land on the command line).
+  // Suppress xterm.js's built-in paste handler. Every paste path that targets
+  // the terminal is owned by our own code:
+  //   * Ctrl+Shift+V / Cmd+V / Shift+Insert → handleShortcutKey → pasteFromClipboard
+  //   * right-click / right-click paste behavior → pasteFromClipboard
+  //   * middle-click → handleMiddleClick (selection-or-clipboard)
+  // Letting xterm.js also handle the native `paste` event causes double-paste
+  // on Linux/WebKitGTK, where middle-clicking the focused .xterm-helper-textarea
+  // fires a native X11 PRIMARY-selection paste in addition to our onAuxClick.
   //
-  // Fix: track middle-button presses with a short-lived flag, then block the
-  // `paste` event in the capture phase while that flag is set. Our onAuxClick
-  // handler still runs and performs the correct selection-or-clipboard paste.
+  // Capturing on the xterm container (not the whole panel) keeps this scoped
+  // to the .xterm-helper-textarea and avoids breaking paste in sibling inputs
+  // like the find bar. No-op on macOS / Windows: those platforms have no
+  // native middle-click paste, and shortcut-driven paste is preventDefault'd
+  // on keydown before any `paste` event fires.
   useEffect(() => {
-    const el = panelRef.current;
+    const el = containerRef.current;
     if (!el) return;
-    let middleClickPending = false;
-    let pendingTimer = 0;
-    const onMouseDown = (event: MouseEvent) => {
-      if (event.button !== 1) return;
-      middleClickPending = true;
-      clearTimeout(pendingTimer);
-      // Clear the flag after a short window; the paste event arrives within
-      // a few ms of mousedown on WebKitGTK.
-      pendingTimer = window.setTimeout(() => { middleClickPending = false; }, 200);
-    };
     const onPaste = (event: ClipboardEvent) => {
-      if (!middleClickPending) return;
-      middleClickPending = false;
-      clearTimeout(pendingTimer);
       event.stopImmediatePropagation();
       event.preventDefault();
     };
-    el.addEventListener("mousedown", onMouseDown, { capture: true });
     el.addEventListener("paste", onPaste, { capture: true });
-    return () => {
-      clearTimeout(pendingTimer);
-      el.removeEventListener("mousedown", onMouseDown, { capture: true });
-      el.removeEventListener("paste", onPaste, { capture: true });
-    };
+    return () => el.removeEventListener("paste", onPaste, { capture: true });
   }, []);
 
   useEffect(() => {
