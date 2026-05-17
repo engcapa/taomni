@@ -1,0 +1,35 @@
+id: TC-auto-F6-4
+title: Quick connect bar exposes navigation controls (back / forward / home / refresh)
+description: |
+  Auto-generated focused coverage for F6.4 (QuickConnect). Asserts the
+  four navigation buttons mount alongside the address input, then clicks
+  each. Back/forward call window.history (no-op when no history is
+  loaded), home calls onHome (returns to welcome). Refresh button on the
+  far right of the bar reloads sessions; we click it and assert the
+  panel still renders. None of these are destructive so all four can
+  fire in one case.
+covers: [F6.4]
+tags: [auto-generated, smoke, p1, sessions, quickconnect, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 30
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="quick-connect"]'
+  - assert_visible: '[data-testid="qc-back"]'
+  - assert_visible: '[data-testid="qc-forward"]'
+  - assert_visible: '[data-testid="qc-home"]'
+  - assert_visible: '[data-testid="qc-refresh"]'
+
+  - click: '[data-testid="qc-back"]'
+  - wait: 0.3
+  - click: '[data-testid="qc-forward"]'
+  - wait: 0.3
+  - click: '[data-testid="qc-home"]'
+  - wait: 0.3
+  - assert_visible: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="qc-refresh"]'
+  - wait: 0.5
+  - assert_visible: '[data-testid="quick-connect"]'
+
+  - screenshot: F6.4-qc-nav.png

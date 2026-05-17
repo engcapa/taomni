@@ -3,8 +3,8 @@
   "totals": {
     "features_with_controls": 32,
     "required": 160,
-    "covered_required": 134,
-    "shallow": 9,
+    "covered_required": 151,
+    "shallow": 7,
     "orphans": 96
   },
   "features": {
@@ -115,22 +115,22 @@
     },
     "F6.2": {
       "required": 8,
-      "covered_required": 6,
-      "shallow": 2
+      "covered_required": 8,
+      "shallow": 0
     },
     "F6.3": {
       "required": 33,
-      "covered_required": 24,
+      "covered_required": 33,
       "shallow": 0
     },
     "F6.4": {
       "required": 7,
-      "covered_required": 3,
+      "covered_required": 7,
       "shallow": 0
     },
     "F6.5": {
       "required": 5,
-      "covered_required": 3,
+      "covered_required": 5,
       "shallow": 0
     },
     "F7.2": {

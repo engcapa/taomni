@@ -1,0 +1,54 @@
+id: TC-auto-F6-3
+title: Session editor switches sections and accepts every advanced/network/bookmark field
+description: |
+  Auto-generated focused coverage for F6.3 (SessionEditor). Walks the
+  four section tabs (advanced / terminal / network / bookmark) by
+  clicking each session-section-* tab, then fills the previously
+  uncovered network and bookmark inputs (proxy port/user/password,
+  keep-alive interval, background image/opacity, additional parameters,
+  keyboard shortcut). Closes without saving — TC-016 / TC-003 already
+  cover the persist path.
+covers: [F6.3]
+tags: [auto-generated, smoke, p1, sessions, session-editor, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-new"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-ssh"]'
+
+  # Advanced SSH section
+  - click: '[data-testid="session-section-advanced"]'
+  - wait_for: '[data-testid="advanced-ssh-settings"]'
+  - assert_visible: '[data-testid="advanced-ssh-settings"]'
+
+  # Terminal section
+  - click: '[data-testid="session-section-terminal"]'
+  - wait_for: '[data-testid="terminal-settings"]'
+  - assert_visible: '[data-testid="terminal-settings"]'
+
+  # Network section: fill proxy + keep-alive inputs
+  - click: '[data-testid="session-section-network"]'
+  - wait_for: '[data-testid="network-settings"]'
+  - fill: {selector: 'input[aria-label="Proxy port"]', value: '3128'}
+  - fill: {selector: 'input[aria-label="Proxy username"]', value: qa-user}
+  - fill: {selector: 'input[aria-label="Proxy password"]', value: qa-pass}
+  - fill: {selector: 'input[aria-label="Keep-alive interval"]', value: '30'}
+
+  # Bookmark section: fill background / extra-params / shortcut inputs
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill: {selector: 'input[aria-label="Background image"]', value: '/tmp/bg.png'}
+  - fill: {selector: 'input[aria-label="Background opacity"]', value: '0.6'}
+  - fill: {selector: 'input[aria-label="Additional parameters"]', value: '-o ServerAliveInterval=15'}
+  - fill: {selector: 'input[aria-label="Keyboard shortcut"]', value: 'Ctrl+Shift+Q'}
+
+  - press: Escape
+  - wait_for:
+      selector: '[data-testid="session-editor"]'
+      state: detached
+      timeout_sec: 5
+  - screenshot: F6.3-session-editor-sections.png

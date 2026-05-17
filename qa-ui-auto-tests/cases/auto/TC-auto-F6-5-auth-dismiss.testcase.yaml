@@ -1,0 +1,43 @@
+id: TC-auto-F6-5
+title: Auth prompt close and cancel buttons dismiss without submitting
+description: |
+  Auto-generated focused coverage for F6.5 (AuthPrompt). The prompt
+  exposes two dismissal affordances besides Esc — the title-bar close
+  button (auth-close) and the footer Cancel button (auth-cancel). Both
+  must dismiss without firing onSubmit. This case opens the prompt
+  twice (via QuickConnect), once per affordance, and asserts the prompt
+  detaches and the welcome panel is restored. No SSH dial is required —
+  the prompt mounts as soon as the address resolves.
+covers: [F6.5]
+tags: [auto-generated, smoke, p1, sessions, auth, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="qc-input"]'
+
+  # First trip: dismiss via header X (auth-close)
+  - fill: {selector: '[data-testid="qc-input"]', value: 'ssh://qa-user@127.0.0.1:22'}
+  - click: '[data-testid="qc-submit"]'
+  - wait_for: '[data-testid="auth-prompt"]'
+  - assert_visible: '[data-testid="auth-close"]'
+  - click: '[data-testid="auth-close"]'
+  - wait_for:
+      selector: '[data-testid="auth-prompt"]'
+      state: detached
+      timeout_sec: 5
+
+  # Second trip: dismiss via footer Cancel (auth-cancel)
+  - fill: {selector: '[data-testid="qc-input"]', value: 'ssh://qa-user@127.0.0.1:22'}
+  - click: '[data-testid="qc-submit"]'
+  - wait_for: '[data-testid="auth-prompt"]'
+  - assert_visible: '[data-testid="auth-cancel"]'
+  - click: '[data-testid="auth-cancel"]'
+  - wait_for:
+      selector: '[data-testid="auth-prompt"]'
+      state: detached
+      timeout_sec: 5
+
+  - assert_visible: '[data-testid="welcome-panel"]'
+  - screenshot: F6.5-auth-dismiss.png
