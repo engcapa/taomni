@@ -79,7 +79,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   const { setStatusMessage } = useAppStore();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ root: true });
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
-  const [createFolderParent, setCreateFolderParent] = useState<{ path: string | null } | null>(null);
+  const [folderDialog, setFolderDialog] = useState<
+    | { mode: "create"; parentPath: string | null }
+    | { mode: "rename"; parentPath: string | null; folderPath: string; initialName: string }
+    | null
+  >(null);
   const ctx = useContextMenu();
 
   useEffect(() => {
@@ -130,11 +134,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const createFolder = (parentPath: string | null) => {
-    setCreateFolderParent({ path: normalizeGroupPath(parentPath) });
+    setFolderDialog({ mode: "create", parentPath: normalizeGroupPath(parentPath) });
   };
 
   const handleCreateFolderSubmit = async (folderPath: string) => {
-    setCreateFolderParent(null);
     const normalized = normalizeGroupPath(folderPath);
     if (!normalized) return;
 
@@ -143,18 +146,40 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     setStatusMessage(`Created folder ${folderOptionLabel(normalized)}`);
   };
 
-  const renameFolder = async (folderPath: string) => {
-    const next = window.prompt("Edit folder", folderOptionLabel(folderPath));
-    const normalized = normalizeGroupPath(next);
-    if (!normalized || normalized === normalizeGroupPath(folderPath)) return;
-    if (groupPathContains(folderPath, normalized)) {
+  const renameFolder = (folderPath: string) => {
+    const normalized = normalizeGroupPath(folderPath);
+    if (!normalized) return;
+    setFolderDialog({
+      mode: "rename",
+      parentPath: parentGroupPath(normalized),
+      folderPath: normalized,
+      initialName: leafGroupName(normalized),
+    });
+  };
+
+  const handleRenameFolderSubmit = async (sourcePath: string, targetPath: string) => {
+    const oldNormalized = normalizeGroupPath(sourcePath);
+    const newNormalized = normalizeGroupPath(targetPath);
+    if (!oldNormalized || !newNormalized || oldNormalized === newNormalized) return;
+    if (groupPathContains(oldNormalized, newNormalized)) {
       window.alert("A folder cannot be moved inside itself.");
       return;
     }
 
-    await renameFolderPath(folderPath, normalized);
-    expandPath(normalized);
-    setStatusMessage(`Renamed folder to ${folderOptionLabel(normalized)}`);
+    await renameFolderPath(oldNormalized, newNormalized);
+    expandPath(newNormalized);
+    setStatusMessage(`Renamed folder to ${folderOptionLabel(newNormalized)}`);
+  };
+
+  const handleFolderDialogSubmit = async (folderPath: string) => {
+    const dialog = folderDialog;
+    setFolderDialog(null);
+    if (!dialog) return;
+    if (dialog.mode === "create") {
+      await handleCreateFolderSubmit(folderPath);
+    } else {
+      await handleRenameFolderSubmit(dialog.folderPath, folderPath);
+    }
   };
 
   const deleteFolder = async (folderPath: string) => {
@@ -338,7 +363,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     ctx.show(e, [
       { label: "New session", icon: <Plus className="w-3 h-3" />, onClick: () => onNewSession?.(toStoredGroupPath(folderPath)) },
       { label: "New folder", icon: <FolderPlus className="w-3 h-3" />, onClick: () => createFolder(folderPath) },
-      { label: "Edit folder", icon: <Edit3 className="w-3 h-3" />, disabled: isRoot, onClick: () => normalized && void renameFolder(normalized) },
+      { label: "Edit folder", icon: <Edit3 className="w-3 h-3" />, disabled: isRoot, onClick: () => { if (normalized) renameFolder(normalized); } },
       { label: "Delete folder", icon: <Trash2 className="w-3 h-3" />, danger: true, disabled: isRoot, onClick: () => normalized && void deleteFolder(normalized) },
       { label: "Create a desktop shortcut", icon: <Star className="w-3 h-3" />, onClick: () => unavailable("Create a desktop shortcut") },
       { label: "", separator: true },
@@ -380,11 +405,13 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
 
   return (
     <>
-      {createFolderParent && (
+      {folderDialog && (
         <FolderNameDialog
-          parentPath={createFolderParent.path}
-          onCancel={() => setCreateFolderParent(null)}
-          onSubmit={handleCreateFolderSubmit}
+          parentPath={folderDialog.parentPath}
+          initialName={folderDialog.mode === "rename" ? folderDialog.initialName : "New folder"}
+          title={folderDialog.mode === "rename" ? "Edit folder" : "New folder"}
+          onCancel={() => setFolderDialog(null)}
+          onSubmit={handleFolderDialogSubmit}
         />
       )}
       <div
