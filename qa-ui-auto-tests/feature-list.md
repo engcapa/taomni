@@ -5,7 +5,7 @@
 > - ✅ 已完成
 > - 🟡 已部分完成（关键路径可用，仍有未覆盖的能力，列出具体范围）
 > - 未完成的能力不写入本文档（详见各 plan 文档的待办项）
-> 当前对照版本：v0.1.0 → v0.1.17（含本仓库 `package.json` 标识的当前版本）。
+> 当前对照版本：v0.1.0 → v0.1.21（含本仓库 `package.json` 标识的当前版本）。
 
 ---
 
@@ -129,6 +129,7 @@ area: main/tabs
 components: [TabBar]
 files:
   - src/components/tabbar/TabBar.tsx
+  - src/stores/appStore.ts
 controls:
   - id: tab-bar
     selector: '[data-testid="tab-bar"]'
@@ -136,6 +137,13 @@ controls:
   - id: tab-item               # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
     selector: '[data-testid="tab-item"]'
     kind: interactive
+  - id: tab-title              # the title span inside a tab; double-click to rename
+    selector: '[data-testid="tab-title"]'
+    kind: interactive
+  - id: tab-title-input        # inline rename input; only present while editing
+    selector: '[data-testid="tab-title-input"]'
+    kind: interactive
+    optional: true
   - id: new-local-terminal     # the "+" plus tab button
     selector: '[data-testid="new-local-terminal"]'
     kind: interactive
@@ -152,7 +160,9 @@ controls:
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
 - 标签操作：新建、切换、关闭、中键关闭
-- 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端
+- **拖拽排序**：标签可通过 HTML5 drag-and-drop 重新排列，拖拽时显示 drop indicator
+- **重命名**：双击标签标题或右键菜单 "Rename" 进入内联编辑，Enter 确认 / Esc 取消 / 失焦自动提交
+- 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端、重命名
 - SSH / SFTP / VNC 标签 **常驻挂载**（切换标签不销毁，传输/输出/连接不中断）
 - 关闭应用前若有终端活跃会弹出确认
 
@@ -1054,6 +1064,10 @@ controls:
     selector: 'input[aria-label="SSH password"]'
     kind: interactive
     optional: true        # only when authMethod=Password
+  - id: save-in-vault
+    selector: '[data-testid="session-save-in-vault"]'
+    kind: interactive
+    optional: true        # only when authMethod=Password and vault is not empty
   - id: advanced-private-key
     selector: 'input[aria-label="Private key path"]'
     kind: interactive
@@ -1798,27 +1812,164 @@ controls:
 
 ---
 
-## 12. 自动化测试基线
+## 12. 凭证保险库（Credential Vault）
 
-### 12.1 单元测试（Vitest）✅
-- 测试文件 15 个，覆盖：
+### 12.1 保险库管理 `VaultSettings` ✅
+
+<!-- feature
+id: F12.1
+status: done
+area: vault
+components: [VaultSettings, VaultSetupDialog, VaultUnlockDialog]
+files:
+  - src/components/vault/VaultSettings.tsx
+  - src/components/vault/VaultSetupDialog.tsx
+  - src/components/vault/VaultUnlockDialog.tsx
+  - src/stores/vaultStore.ts
+  - src-tauri/src/vault/
+controls:
+  - id: settings-root
+    selector: '[data-testid="vault-settings"]'
+    kind: display
+  - id: state-badge
+    selector: '[data-testid="vault-state-badge"]'
+    kind: display
+  - id: init-button
+    selector: '[data-testid="vault-init-button"]'
+    kind: interactive
+    optional: true       # only when state=empty
+  - id: unlock-button
+    selector: '[data-testid="vault-unlock-button"]'
+    kind: interactive
+    optional: true       # only when state=locked
+  - id: lock-button
+    selector: '[data-testid="vault-lock-button"]'
+    kind: interactive
+    optional: true       # only when state=unlocked
+  - id: change-master-button
+    selector: '[data-testid="vault-change-master-button"]'
+    kind: interactive
+    optional: true       # only when state=unlocked
+  - id: change-master-form
+    selector: '[data-testid="vault-change-master-form"]'
+    kind: display
+    optional: true       # only when change-master action is active
+  - id: change-master-old
+    selector: '[data-testid="vault-change-master-old"]'
+    kind: interactive
+    optional: true
+  - id: change-master-new1
+    selector: '[data-testid="vault-change-master-new1"]'
+    kind: interactive
+    optional: true
+  - id: change-master-new2
+    selector: '[data-testid="vault-change-master-new2"]'
+    kind: interactive
+    optional: true
+  - id: change-master-submit
+    selector: '[data-testid="vault-change-master-submit"]'
+    kind: interactive
+    optional: true
+  - id: entries-section
+    selector: '[data-testid="vault-entries-section"]'
+    kind: display
+    optional: true       # only when state=unlocked
+  # VaultSetupDialog
+  - id: setup-dialog
+    selector: '[data-testid="vault-setup-dialog"]'
+    kind: display
+    optional: true       # only when init action is active
+  - id: setup-pw1
+    selector: '[data-testid="vault-setup-pw1"]'
+    kind: interactive
+    optional: true
+  - id: setup-pw2
+    selector: '[data-testid="vault-setup-pw2"]'
+    kind: interactive
+    optional: true
+  - id: setup-cancel
+    selector: '[data-testid="vault-setup-cancel"]'
+    kind: interactive
+    optional: true
+  - id: setup-confirm
+    selector: '[data-testid="vault-setup-confirm"]'
+    kind: interactive
+    optional: true
+  - id: setup-too-short
+    selector: '[data-testid="vault-setup-too-short"]'
+    kind: display
+    optional: true       # only when pw1 is 1-7 chars
+  - id: setup-mismatch
+    selector: '[data-testid="vault-setup-mismatch"]'
+    kind: display
+    optional: true       # only when pw2 differs from pw1
+  - id: setup-error
+    selector: '[data-testid="vault-setup-error"]'
+    kind: display
+    optional: true       # only on submit error
+  # VaultUnlockDialog
+  - id: unlock-dialog
+    selector: '[data-testid="vault-unlock-dialog"]'
+    kind: display
+    optional: true       # only when unlock action is active
+  - id: unlock-pw
+    selector: '[data-testid="vault-unlock-pw"]'
+    kind: interactive
+    optional: true
+  - id: unlock-reason
+    selector: '[data-testid="vault-unlock-reason"]'
+    kind: display
+    optional: true       # only when reason prop is provided
+  - id: unlock-cancel
+    selector: '[data-testid="vault-unlock-cancel"]'
+    kind: interactive
+    optional: true
+  - id: unlock-confirm
+    selector: '[data-testid="vault-unlock-confirm"]'
+    kind: interactive
+    optional: true
+  - id: unlock-error
+    selector: '[data-testid="vault-unlock-error"]'
+    kind: display
+    optional: true       # only on wrong password
+-->
+
+- AES-256-GCM 加密存储，密钥由 Argon2id 从主密码派生
+- 三态生命周期：empty（未初始化）→ locked（已设置但未解锁）→ unlocked（可读写）
+- **初始化**：VaultSetupDialog 设置主密码（≥8 字符，二次确认）
+- **解锁**：VaultUnlockDialog 输入主密码解锁，错误密码提示
+- **锁定**：一键锁定，从内存中清除密钥
+- **修改主密码**：输入旧密码 + 新密码（≥8 字符，二次确认）
+- **条目管理**：解锁后展示已保存条目列表，支持删除
+- 会话编辑器 / 隧道编辑器中 "Save in vault" 复选框将密码加密存入保险库
+- 打开已保存密码的会话时自动触发解锁流程
+
+---
+
+## 13. 自动化测试基线
+
+### 13.1 单元测试（Vitest）✅
+- 测试文件 17 个，覆盖：
   - `ChmodDialog`、`FileToolbarWiring`、`SftpPolish`
   - `SessionEditor`
   - `AppThemeSwitcher`、`SettingsPanel`、`TerminalAppearanceSettings`
   - `MainLayout`
   - `CommonCommandsPalette`、`TerminalPanel`
   - `clipboard`、`zmodem`、`terminalOutputFilter`、`terminalImeGuard`、`sessionImportExport`
+  - `VaultSetupDialog`、`VaultUnlockDialog`
+  - `appStore`（含 moveTab / updateTabTitle）
 
-### 12.2 Rust 测试 ✅
+### 13.2 Rust 测试 ✅
 - `appearance::lists_installed_font_families` 验证 OS 字体枚举
 - VNC `encodings` 模块单元测试（Hextile / ZRLE 解码、跨 rectangle 共享 zlib 状态）
 - VNC `clipboard` 模块单元测试（Extended caps body 编/解码）
+- Vault `crypto` + `db` 模块单元测试（加密/解密、条目 CRUD、主密码变更）
 - `cargo check` 通过
 
-### 12.3 端到端测试用例（`qa-ui-auto-tests/cases/*.testcase.yaml`，被 `qa-ui-auto` 消费）✅ 70 条
+### 13.3 端到端测试用例（`qa-ui-auto-tests/cases/*.testcase.yaml`，被 `qa-ui-auto` 消费）✅ 70 条
 - 覆盖 TC-001 ～ TC-107：主界面、设置、会话编辑器、SSH/SFTP/QuickConnect 全流程、终端右键菜单与快捷键、SFTP 多种交互（chmod / rename / 拖拽 / 多选 / 双击下载 / 列宽 / 创建文件夹）、独立 SFTP 标签、open-terminal-here、会话树搜索 / 复制 / 拖拽、标签栏右键、应用主题循环、隧道编辑器与重排、终端字体连字 / 语法高亮、本地管理员启动、tab 中键关闭、会话 import/export 多格式、OpenSSH config 导入、Welcome active connections、custom title bar、compact mode、MultiExec、command palette、capture toolbar、zmodem 冲突、VNC scaffold 等
 
-### 12.4 部署 ✅
+### 13.4 部署 ✅
 - Replit 上验证通过：Tauri 桌面构建（`pnpm tauri build --debug --no-bundle`）通过 VNC 查看；Web 模式作为静态站点构建到 `dist/`
 - GitHub Actions：`release.yml` 推送 `v<version>` tag 触发跨平台打包
 

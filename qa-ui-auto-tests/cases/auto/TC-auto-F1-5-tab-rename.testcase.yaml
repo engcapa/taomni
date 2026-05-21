@@ -1,0 +1,34 @@
+id: TC-auto-F1-5-tab-rename
+title: Tab rename via double-click and context menu
+covers: [F1.5]
+tags: [auto-generated, smoke, needs-review, tabs]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: "[data-testid=\"tab-bar\"]"
+  # Open a local terminal tab
+  - click: "[data-testid=\"new-local-terminal\"]"
+  - wait_for: "[data-testid=\"terminal-pane\"]"
+  - wait: 0.5
+  - assert_count: {selector: '[data-testid="tab-item"]', min: 2}
+  # Verify tab-title elements exist
+  - assert_visible: '[data-testid="tab-title"]'
+  # Double-click the terminal tab title (nth=1, index 0 is Welcome which is not renameable)
+  - dblclick: '[data-testid="tab-title"] >> nth=1'
+  - wait_for: '[data-testid="tab-title-input"]'
+  # Type a new name and confirm with Enter
+  - fill: {selector: '[data-testid="tab-title-input"]', value: "My Custom Tab"}
+  - press: {key: "Enter", selector: '[data-testid="tab-title-input"]'}
+  - wait: 0.3
+  # Verify the rename took effect
+  - assert_visible: '[data-testid="tab-item"][data-tab-title="My Custom Tab"]'
+  # Now test Escape cancels rename: double-click again
+  - dblclick: '[data-testid="tab-title"] >> nth=1'
+  - wait_for: '[data-testid="tab-title-input"]'
+  - fill: {selector: '[data-testid="tab-title-input"]', value: "Should Not Save"}
+  - press: {key: "Escape", selector: '[data-testid="tab-title-input"]'}
+  - wait: 0.3
+  # Title should still be the previously saved name
+  - assert_visible: '[data-testid="tab-item"][data-tab-title="My Custom Tab"]'
+  - screenshot: auto-F1-5-tab-rename.png

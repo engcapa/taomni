@@ -1,11 +1,11 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 32,
-    "required": 164,
-    "covered_required": 164,
+    "features_with_controls": 33,
+    "required": 167,
+    "covered_required": 167,
     "shallow": 7,
-    "orphans": 90
+    "orphans": 93
   },
   "features": {
     "F1.2": {
@@ -24,8 +24,8 @@
       "shallow": 0
     },
     "F1.5": {
-      "required": 6,
-      "covered_required": 6,
+      "required": 7,
+      "covered_required": 7,
       "shallow": 0
     },
     "F1.6": {
@@ -164,6 +164,11 @@
       "shallow": 0
     },
     "F11.1": {
+      "required": 2,
+      "covered_required": 2,
+      "shallow": 0
+    },
+    "F12.1": {
       "required": 2,
       "covered_required": 2,
       "shallow": 0

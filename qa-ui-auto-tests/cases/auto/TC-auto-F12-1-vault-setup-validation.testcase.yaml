@@ -1,0 +1,27 @@
+id: TC-auto-F12-1-vault-setup-validation
+title: Vault setup dialog validates password requirements
+covers: [F12.1]
+tags: [auto-generated, smoke, needs-review, vault, validation]
+modes: [native]
+fixtures: [reset_db]
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: "[data-testid=\"tab-bar\"]"
+  - click: "[data-testid=\"ribbon-settings\"]"
+  - wait_for: "[data-testid=\"settings-panel\"]"
+  - assert_visible: '[data-testid="vault-settings"]'
+  # Open setup dialog
+  - click: '[data-testid="vault-init-button"]'
+  - wait_for: '[data-testid="vault-setup-dialog"]'
+  # Type a short password — should show "too short" warning
+  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "short"}
+  - assert_visible: '[data-testid="vault-setup-too-short"]'
+  # Type mismatched passwords
+  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "LongEnough1!"}
+  - fill: {selector: '[data-testid="vault-setup-pw2"]', value: "Different99!"}
+  - assert_visible: '[data-testid="vault-setup-mismatch"]'
+  # Cancel should close the dialog
+  - click: '[data-testid="vault-setup-cancel"]'
+  - wait: 0.5
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "empty"}
+  - screenshot: auto-F12-1-vault-setup-validation.png
