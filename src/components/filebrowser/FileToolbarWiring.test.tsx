@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FilePanel } from "./FilePanel";
 import { FileBrowser } from "./FileBrowser";
 import { useSftpStore, type PaneState } from "../../stores/sftpStore";
+import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 import type { FileEntry } from "../../lib/sftp";
 
 const controllerMocks = vi.hoisted(() => ({
@@ -23,6 +24,18 @@ const controllerMocks = vi.hoisted(() => ({
   retry: vi.fn(async () => undefined),
 }));
 
+const sftpMocks = vi.hoisted(() => ({
+  sftpStat: vi.fn(async (_sessionId: string, path: string): Promise<FileEntry> => ({
+    name: path.replace(/\\/g, "/").split("/").pop() || "file",
+    path,
+    size: 12,
+    mtime: 1_700_000_000,
+    mode: 0o644,
+    fileType: "file",
+    isHidden: false,
+  })),
+}));
+
 vi.mock("../../lib/sftpController", () => ({
   useSftpController: () => controllerMocks,
 }));
@@ -37,6 +50,7 @@ vi.mock("../../lib/sftp", async () => {
     sftpAttach: vi.fn(async () => undefined),
     sftpDetach: vi.fn(async () => undefined),
     sftpRealpath: vi.fn(async (_sid: string, p: string) => p),
+    sftpStat: sftpMocks.sftpStat,
   };
 });
 
@@ -535,6 +549,67 @@ describe("FileBrowser → FilePanel toolbar wiring", () => {
     expect(uploadArgs[0]).toMatchObject({
       path: "/work/notes.txt",
     });
+  });
+
+  it("uploads OS-dropped files to the current remote directory", async () => {
+    seedSession();
+    renderBrowser();
+
+    const remotePanel = screen.getByText("REMOTE").closest("div.h-full") as HTMLElement;
+    const remoteList = within(remotePanel).getByTestId("sftp-remote-list");
+    const image = new File(["image"], "drop.png", { type: "image/png" });
+    const dataTransfer = {
+      types: ["Files"],
+      files: [image],
+      dropEffect: "none",
+      getData: () => "",
+    };
+
+    fireEvent.dragOver(remoteList, { dataTransfer });
+    fireEvent.drop(remoteList, { dataTransfer });
+
+    await waitFor(() => {
+      expect(controllerMocks.uploadBlob).toHaveBeenCalledWith("/work", image);
+    });
+    expect(dataTransfer.dropEffect).toBe("copy");
+  });
+
+  it("uploads native Tauri dropped file paths to the current remote directory", async () => {
+    seedSession();
+    renderBrowser();
+
+    const remotePanel = screen.getByText("REMOTE").closest("div.h-full") as HTMLElement;
+    const remoteList = within(remotePanel).getByTestId("sftp-remote-list");
+    const originalElementFromPoint = document.elementFromPoint;
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => remoteList),
+    });
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent(NATIVE_FILE_DROP_EVENT, {
+          detail: {
+            paths: ["/home/me/drop.png"],
+            clientX: 10,
+            clientY: 10,
+          },
+        }),
+      );
+
+      await waitFor(() => {
+        expect(sftpMocks.sftpStat).toHaveBeenCalledWith(SESSION_ID, "/home/me/drop.png", "local");
+        expect(controllerMocks.upload).toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/home/me/drop.png", name: "drop.png" }),
+          "/work",
+        );
+      });
+    } finally {
+      Object.defineProperty(document, "elementFromPoint", {
+        configurable: true,
+        value: originalElementFromPoint,
+      });
+    }
   });
 
   it("wires the local-pane context Upload action to the full multi-selection", async () => {

@@ -12,6 +12,12 @@ import {
   type DriveEntry,
   type FileEntry,
 } from "../../lib/sftp";
+import {
+  NATIVE_FILE_DROP_EVENT,
+  type NativeFileDropDetail,
+  droppedFiles,
+  isOsFileDrag,
+} from "../../lib/osFileDrop";
 
 interface ColWidths {
   name: number;
@@ -77,6 +83,7 @@ interface FilePanelProps {
   onDownloadSelected?: (entries: FileEntry[]) => void;
   onUploadSelected?: (entries: FileEntry[]) => void;
   onUploadFromDisk?: (files: File[]) => void;
+  onUploadPathsFromDisk?: (paths: string[]) => void;
   onDeleteSelected?: (entries: FileEntry[]) => void;
   onChmodSelected?: (entries: FileEntry[]) => void;
   onPreviewSelected?: (entry: FileEntry) => void;
@@ -109,6 +116,7 @@ export function FilePanel({
   onDownloadSelected,
   onUploadSelected,
   onUploadFromDisk,
+  onUploadPathsFromDisk,
   onDeleteSelected,
   onChmodSelected,
   onPreviewSelected,
@@ -118,6 +126,7 @@ export function FilePanel({
   onRevealInOs,
 }: FilePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const session = useSftpStore((s) => s.sessions[sessionId]);
   const navigate = useSftpStore((s) => s.navigate);
   const navigateBack = useSftpStore((s) => s.navigateBack);
@@ -223,6 +232,25 @@ export function FilePanel({
     setSelection(sessionId, side, []);
   }, [sessionId, side, setSelection, pane?.path]);
 
+  useEffect(() => {
+    if (side !== "remote" || !onUploadPathsFromDisk) return;
+
+    const handleNativeFileDrop = (event: Event) => {
+      const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
+      if (!detail?.paths?.length) return;
+
+      const list = listRef.current;
+      const target = document.elementFromPoint(detail.clientX, detail.clientY);
+      if (!list || !target || !list.contains(target)) return;
+
+      setDraggingOver(false);
+      onUploadPathsFromDisk(detail.paths);
+    };
+
+    window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
+    return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
+  }, [onUploadPathsFromDisk, side]);
+
   const selectedEntries = useMemo<FileEntry[]>(() => {
     if (!pane) return [];
     const set = new Set(pane.selection);
@@ -313,9 +341,13 @@ export function FilePanel({
   };
 
   const handleDragOver = (e: DragEvent) => {
-    // OS file drops are intentionally NOT accepted here — use the toolbar
-    // "Upload from disk" button instead. Only intra-app cross-pane drags
-    // (REMOTE ↔ LOCAL inside the same SFTP session) are honoured.
+    if (side === "remote" && onUploadFromDisk && isOsFileDrag(e.dataTransfer)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setDraggingOver(true);
+      return;
+    }
+
     if (acceptCrossPane && e.dataTransfer.types.includes("application/x-newmob-files")) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
@@ -330,6 +362,12 @@ export function FilePanel({
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     setDraggingOver(false);
+
+    if (side === "remote" && onUploadFromDisk && isOsFileDrag(e.dataTransfer)) {
+      const files = droppedFiles(e.dataTransfer);
+      if (files.length > 0) onUploadFromDisk(files);
+      return;
+    }
 
     if (acceptCrossPane) {
       const raw = e.dataTransfer.getData("application/x-newmob-files");
@@ -502,6 +540,7 @@ export function FilePanel({
       </div>
 
       <div
+        ref={listRef}
         data-testid={`sftp-${side}-list`}
         className="flex-1 overflow-auto text-[12px] relative"
         onDragOver={handleDragOver}

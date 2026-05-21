@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalPanel } from "./TerminalPanel";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
+import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
@@ -253,6 +254,73 @@ describe("TerminalPanel focus behavior", () => {
       });
     } finally {
       terminalMocks.modes.bracketedPasteMode = false;
+    }
+  });
+
+  it("inserts shell-quoted dropped file paths into the terminal", async () => {
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    const dataTransfer = {
+      types: ["Files", "text/uri-list"],
+      files: [new File(["x"], "a b.png", { type: "image/png" })],
+      dropEffect: "none",
+      getData: (format: string) => (format === "text/uri-list" ? "file:///home/me/a%20b.png" : ""),
+    };
+
+    fireEvent.dragOver(screen.getByTestId("terminal-pane"), { dataTransfer });
+    fireEvent.drop(screen.getByTestId("terminal-pane"), { dataTransfer });
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("'/home/me/a b.png' "),
+      );
+    });
+    expect(dataTransfer.dropEffect).toBe("copy");
+  });
+
+  it("inserts native Tauri dropped file paths into the terminal", async () => {
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    const pane = screen.getByTestId("terminal-pane");
+    const originalElementFromPoint = document.elementFromPoint;
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => pane),
+    });
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent(NATIVE_FILE_DROP_EVENT, {
+          detail: {
+            paths: ["/home/me/a b.png"],
+            clientX: 10,
+            clientY: 10,
+          },
+        }),
+      );
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("'/home/me/a b.png' "),
+        );
+      });
+    } finally {
+      Object.defineProperty(document, "elementFromPoint", {
+        configurable: true,
+        value: originalElementFromPoint,
+      });
     }
   });
 

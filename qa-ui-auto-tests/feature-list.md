@@ -501,6 +501,12 @@ controls:
 - 跨平台复制/粘贴快捷键：macOS `Cmd+C / Cmd+V`，Windows / Linux `Ctrl+Shift+C / Ctrl+Shift+V`
 - **CopyOnSelect**：选区释放后自动复制到剪贴板（开关存在 `terminalProfile`，每会话可覆盖）
 - **中键粘贴（middle-click paste）**：当前选区优先，无选区则回退剪贴板内容；read-only 模式下被拦截
+- **OS 文件拖入终端**：拖到终端面板时按当前 shell 引号风格（unix/powershell/cmd）插入引号路径，多文件以空格分隔，末尾保留一个空格
+  - SSH 远程终端：固定 unix 引号（路径仅插入文本，不会触发上传）
+  - 本地终端：按解析后的 `localShellId`（powershell / command-prompt / git-bash）选择风格，未知时按主机平台回退
+  - 来源：Linux/macOS 走 Tauri `onDragDropEvent` 绝对路径；Windows 走 webview HTML5 `text/uri-list`
+  - read-only 模式下被拦截，状态栏给出提示
+  - **e2e 测试限制**：与 SFTP 同因——单元测试 `src/lib/osFileDrop.test.ts` + `TerminalPanel.test.tsx` 覆盖引号格式与事件路由，平台行为需手动回归
 - Find（Ctrl+Shift+F），结果计数、上下匹配、关闭
 - HTML + 纯文本剪贴板写入（`ClipboardItem` 可用时）
 
@@ -1526,7 +1532,12 @@ controls:
   - 本地：对应操作
 - chmod 对话框：Owner / Group / Other 三组权限位 + Apply
 - 跨面板拖拽（REMOTE↔LOCAL）：HTML5 drag-drop + `application/x-newmob-files` MIME，支持多选与文件夹
-- OS 文件拖入面板：**已禁用**（占位提示用工具栏 Upload）；Tauri 主窗口与分离窗口都设置 `dragDropEnabled=false`
+- OS 文件拖入远程面板 → 直接上传到当前远程目录
+  - Linux/macOS：通过 Tauri `onDragDropEvent` 拿到绝对路径，前端 `sftpStat(side="local") → controller.upload`
+  - Windows：通过 webview HTML5 `dataTransfer.files`（拿不到绝对路径，按 File blob 上传）
+  - 与跨面板拖拽并存：根据 `dataTransfer.types` 区分 OS drop（`Files` / `text/uri-list`）vs 内部 drop（`application/x-newmob-files`）
+  - 主窗口 + 分离 SFTP 窗口 `dragDropEnabled=true`，仅 Windows `disable_drag_drop_handler()`
+  - **e2e 测试限制**：依赖真实 OS 拖拽产生的 `DataTransfer.types=Files`/`text/uri-list` 或 Tauri `onDragDropEvent`，Playwright `drag_to` 与 `tauri-driver` 都无法合成此 payload；当前 verb-catalog 也禁止 `dispatchEvent`/`new DataTransfer`。覆盖由单元测试 `src/lib/osFileDrop.test.ts` + `FileToolbarWiring.test.tsx` 承担，平台行为（Win/macOS/Linux）需手动回归
 - 双击文件：下载后用系统编辑器打开（"先下载"确认）
 - Open terminal here：把远程当前路径发到关联终端（`cd 'path'`）
 

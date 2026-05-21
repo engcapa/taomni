@@ -504,19 +504,19 @@ pub async fn open_sftp_window(
     log::info!("Opening SFTP window with path: {}", path_str);
     let url = WebviewUrl::App(std::path::PathBuf::from(path_str));
     let title = title.unwrap_or_else(|| format!("SFTP — {}", session_id));
-    WebviewWindowBuilder::new(&app_handle, &label, url)
+    let builder = WebviewWindowBuilder::new(&app_handle, &label, url)
         .title(&title)
         .inner_size(1200.0, 760.0)
         .min_inner_size(720.0, 420.0)
         .resizable(true)
-        // Disable Tauri's native drag-drop interception so the webview's
-        // own HTML5 dragstart/dragover/drop events fire normally. Without
-        // this, REMOTE↔LOCAL drag inside the SFTP browser silently
-        // no-ops on Windows (WebView2) because Tauri swallows the events
-        // before React sees them. Mirrors the same flag in tauri.conf.json
-        // for the main window.
-        .disable_drag_drop_handler()
-        .enable_clipboard_access()
+        .enable_clipboard_access();
+    // Disable Tauri's native drag-drop interception only on Windows so the
+    // webview's own HTML5 dragstart/dragover/drop events fire normally there.
+    // Linux/macOS keep Tauri file-drop enabled because it provides absolute
+    // paths for terminal path insertion.
+    #[cfg(windows)]
+    let builder = builder.disable_drag_drop_handler();
+    builder
         .build()
         .map_err(|e| format!("failed to open SFTP window: {}", e))?;
     Ok(())
