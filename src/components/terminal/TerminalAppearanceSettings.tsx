@@ -326,6 +326,11 @@ export function TerminalAppearanceSettings({
               onChange={(checked) => updateProfile({ copyOnSelect: checked })}
             />
             <CheckControl
+              label="Allow SSH OSC 52 clipboard"
+              checked={profile.allowRemoteOsc52Clipboard}
+              onChange={(checked) => updateProfile({ allowRemoteOsc52Clipboard: checked })}
+            />
+            <CheckControl
               label="Read-only terminal"
               checked={profile.readOnly}
               onChange={(checked) => updateProfile({ readOnly: checked })}

@@ -21,6 +21,7 @@ export interface TerminalProfile {
   cursorBlink: boolean;
   showScrollbar: boolean;
   copyOnSelect: boolean;
+  allowRemoteOsc52Clipboard: boolean;
   rightClickBehavior: TerminalRightClickBehavior;
   readOnly: boolean;
   bracketedPaste: boolean;
@@ -44,6 +45,7 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   cursorBlink: true,
   showScrollbar: true,
   copyOnSelect: false,
+  allowRemoteOsc52Clipboard: false,
   rightClickBehavior: "menu",
   readOnly: false,
   bracketedPaste: true,
@@ -112,6 +114,10 @@ export function normalizeTerminalProfile(input: unknown): TerminalProfile {
     cursorBlink: readBoolean(source.cursorBlink, DEFAULT_TERMINAL_PROFILE.cursorBlink),
     showScrollbar: readBoolean(source.showScrollbar, DEFAULT_TERMINAL_PROFILE.showScrollbar),
     copyOnSelect: readBoolean(source.copyOnSelect, DEFAULT_TERMINAL_PROFILE.copyOnSelect),
+    allowRemoteOsc52Clipboard: readBoolean(
+      source.allowRemoteOsc52Clipboard,
+      DEFAULT_TERMINAL_PROFILE.allowRemoteOsc52Clipboard,
+    ),
     rightClickBehavior: readEnum(
       source.rightClickBehavior,
       ["menu", "paste", "copy-or-paste"] as const,

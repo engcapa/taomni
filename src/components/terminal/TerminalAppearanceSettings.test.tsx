@@ -96,4 +96,15 @@ describe("TerminalAppearanceSettings", () => {
     expect(cursor).toHaveStyle({ borderBottom: expect.stringContaining("solid") });
     expect(cursor).not.toHaveClass("moba-blink");
   });
+
+  it("updates the remote OSC 52 clipboard setting", async () => {
+    const user = userEvent.setup();
+    const { onProfileChange } = renderAppearance();
+
+    await user.click(screen.getByRole("checkbox", { name: "Allow SSH OSC 52 clipboard" }));
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      allowRemoteOsc52Clipboard: true,
+    }));
+  });
 });
