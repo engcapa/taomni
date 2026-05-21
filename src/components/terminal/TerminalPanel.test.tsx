@@ -53,7 +53,7 @@ const fitMocks = vi.hoisted(() => ({
 
 const ipcMocks = vi.hoisted(() => ({
   closeTerminal: vi.fn(async () => undefined),
-  createLocalTerminal: vi.fn(async (sessionId: string) => sessionId),
+  createLocalTerminal: vi.fn(async (sessionId: string) => ({ sessionId, shellId: "default" })),
   createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
   createTerminalSessionId: vi.fn(() => "terminal-session"),
   encodeBase64: vi.fn((value: string) => btoa(value)),

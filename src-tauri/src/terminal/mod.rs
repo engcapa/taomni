@@ -6,6 +6,7 @@ pub mod ssh;
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use russh::Sig;
+use serde::Serialize;
 use std::io::{Read, Write};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -46,6 +47,17 @@ pub fn open_local_shell_as_administrator(shell: Option<String>) -> Result<(), St
     pty::open_shell_as_administrator(shell)
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalTerminalCreated {
+    pub session_id: String,
+    /// `LocalShellOption.id` of the shell that was actually launched. Lets the
+    /// frontend skip features (e.g. inline history suggestions) that conflict
+    /// with shells that already provide them, even when the caller didn't pass
+    /// an explicit `shell` arg and we resolved a default.
+    pub shell_id: String,
+}
+
 #[tauri::command]
 pub async fn create_local_terminal(
     session_id: String,
@@ -56,9 +68,9 @@ pub async fn create_local_terminal(
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
-) -> Result<String, String> {
+) -> Result<LocalTerminalCreated, String> {
     validate_session_id(&session_id)?;
-    let (handle, reader) = pty::create_pty(cols, rows, shell, cwd)?;
+    let (handle, reader, shell_id) = pty::create_pty(cols, rows, shell, cwd)?;
 
     let terminal = ActiveTerminal::Local {
         writer: Mutex::new(handle.writer),
@@ -80,7 +92,10 @@ pub async fn create_local_terminal(
         read_loop_local(reader, sid, app, on_output);
     });
 
-    Ok(session_id)
+    Ok(LocalTerminalCreated {
+        session_id,
+        shell_id,
+    })
 }
 
 #[tauri::command]
