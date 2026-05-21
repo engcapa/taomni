@@ -14,9 +14,12 @@ import {
   Trash2,
   FileText,
 } from "lucide-react";
+import { useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu } from "../ContextMenu";
 import type { Tab, TabKind } from "../../types";
+
+type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 
 export function TabBar() {
   const {
@@ -27,6 +30,7 @@ export function TabBar() {
     removeTab,
     removeTabs,
     addTab,
+    moveTab,
     toggleCompactMode,
     multiExecActive,
     multiExecSelectedTabIds,
@@ -34,6 +38,8 @@ export function TabBar() {
     toggleMultiExecTab,
   } = useAppStore();
   const ctx = useContextMenu();
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
 
   const handleNewTab = () => {
     const id = `terminal-${Date.now()}`;
@@ -78,6 +84,56 @@ export function TabBar() {
     ]);
   };
 
+  const computeDropSide = (event: React.DragEvent<HTMLElement>): "before" | "after" => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+  };
+
+  const clearDragState = () => {
+    setDraggedId(null);
+    setDropIndicator(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
+    setDraggedId(tab.id);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      try {
+        e.dataTransfer.setData("application/x-newmob-tab", tab.id);
+      } catch {
+        // Some browsers reject custom MIME types; the in-memory state is the source of truth.
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
+    if (!draggedId) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    const side = computeDropSide(e);
+    if (draggedId === tab.id) {
+      setDropIndicator(null);
+      return;
+    }
+    setDropIndicator((prev) => {
+      if (prev && prev.tabId === tab.id && prev.side === side) return prev;
+      return { tabId: tab.id, side };
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
+    if (!draggedId) {
+      clearDragState();
+      return;
+    }
+    e.preventDefault();
+    const side = computeDropSide(e);
+    if (draggedId !== tab.id) {
+      moveTab(draggedId, tab.id, side);
+    }
+    clearDragState();
+  };
+
   return (
     <div
       data-testid="tab-bar"
@@ -88,18 +144,30 @@ export function TabBar() {
       {ctx.render}
       {tabs.map((tab) => {
         const isSelected = multiExecActive && tab.type === "terminal" && multiExecSelectedTabIds.has(tab.id);
+        const dropSide = dropIndicator && dropIndicator.tabId === tab.id ? dropIndicator.side : undefined;
         return (
           <div
             key={tab.id}
             data-testid="tab-item"
+            data-tab-id={tab.id}
             data-tab-title={tab.title}
             data-tab-type={tab.type}
             data-multiexec-selected={isSelected || undefined}
+            data-dragging={draggedId === tab.id || undefined}
+            data-drop-side={dropSide}
             className="moba-tab relative"
             data-active={activeTabId === tab.id}
+            draggable
             onClick={() => setActiveTab(tab.id)}
             onMouseDown={(e) => handleMouseDown(e, tab)}
             onContextMenu={(e) => handleTabContext(e, tab)}
+            onDragStart={(e) => handleDragStart(e, tab)}
+            onDragOver={(e) => handleDragOver(e, tab)}
+            onDragLeave={() =>
+              setDropIndicator((prev) => (prev && prev.tabId === tab.id ? null : prev))
+            }
+            onDrop={(e) => handleDrop(e, tab)}
+            onDragEnd={clearDragState}
           >
             {multiExecActive && tab.type === "terminal" && (
               <button
