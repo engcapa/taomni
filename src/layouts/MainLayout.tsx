@@ -105,8 +105,28 @@ export function MainLayout() {
   const [terminalCwdVersions, setTerminalCwdVersions] = useState<Record<string, number>>({});
   const [terminalCwdRequestTokens, setTerminalCwdRequestTokens] = useState<Record<string, number>>({});
   const [vaultUnlockReason, setVaultUnlockReason] = useState<string | null>(null);
+  const pendingVaultActionRef = useRef<(() => void) | null>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
+
+  // Run `action` only after the vault is known to be unlocked. If it's
+  // already unlocked we run inline; otherwise we surface the unlock
+  // dialog and queue the action to run on a successful unlock. This
+  // keeps a connect from racing past a locked vault and showing
+  // "Connection failed: VAULT_LOCKED" before the user has even seen
+  // the prompt.
+  const runWhenVaultUnlocked = useCallback(
+    (reason: string, action: () => void) => {
+      const state = useVaultStore.getState().state;
+      if (state === "unlocked" || state === "empty") {
+        action();
+        return;
+      }
+      pendingVaultActionRef.current = action;
+      setVaultUnlockReason(reason);
+    },
+    [],
+  );
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -120,7 +140,9 @@ export function MainLayout() {
   // hunting through settings.
   useEffect(() => {
     const handler = () => {
-      setVaultUnlockReason("This connection uses a saved password — unlock the vault to continue.");
+      setVaultUnlockReason((prev) =>
+        prev ?? "This connection uses a saved password — unlock the vault to continue.",
+      );
     };
     window.addEventListener(VAULT_LOCKED_EVENT, handler);
     return () => window.removeEventListener(VAULT_LOCKED_EVENT, handler);
@@ -465,7 +487,10 @@ export function MainLayout() {
       if (method === "Password") {
         const ref = passwordRefFromOptions();
         if (ref) {
-          openSshTab(session, "Password", ref);
+          runWhenVaultUnlocked(
+            "This connection uses a saved password — unlock the vault to continue.",
+            () => openSshTab(session, "Password", ref),
+          );
         } else {
           setPendingAuth({ session });
         }
@@ -477,7 +502,10 @@ export function MainLayout() {
       if (method === "Password") {
         const ref = passwordRefFromOptions();
         if (ref) {
-          openSftpTab(session, "Password", ref);
+          runWhenVaultUnlocked(
+            "This connection uses a saved password — unlock the vault to continue.",
+            () => openSftpTab(session, "Password", ref),
+          );
         } else {
           setPendingAuth({ session });
         }
@@ -491,7 +519,10 @@ export function MainLayout() {
       if (method === "Password") {
         const ref = passwordRefFromOptions();
         if (ref) {
-          openVncTab(session, ref);
+          runWhenVaultUnlocked(
+            "This connection uses a saved password — unlock the vault to continue.",
+            () => openVncTab(session, ref),
+          );
         } else {
           setPendingAuth({ session });
         }
@@ -504,7 +535,7 @@ export function MainLayout() {
       openUnsupportedTab(session);
       void markConnected(session.id);
     }
-  }, [markConnected, openLocalTab, openSftpTab, openVncTab, openFileSession]);
+  }, [markConnected, openLocalTab, openSftpTab, openVncTab, openFileSession, runWhenVaultUnlocked]);
 
   const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const id = `ssh-${session.id}-${Date.now()}`;
@@ -1078,10 +1109,16 @@ export function MainLayout() {
       {vaultUnlockReason && (
         <VaultUnlockDialog
           reason={vaultUnlockReason}
-          onCancel={() => setVaultUnlockReason(null)}
+          onCancel={() => {
+            pendingVaultActionRef.current = null;
+            setVaultUnlockReason(null);
+          }}
           onSubmit={async (pw) => {
             await unlockVault(pw);
+            const pending = pendingVaultActionRef.current;
+            pendingVaultActionRef.current = null;
             setVaultUnlockReason(null);
+            if (pending) pending();
           }}
         />
       )}
