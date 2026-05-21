@@ -5,6 +5,7 @@ import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
+  const modes = { bracketedPasteMode: false };
   const terminalCtor = vi.fn().mockImplementation(() => ({
     cols: 80,
     rows: 24,
@@ -15,6 +16,7 @@ const terminalMocks = vi.hoisted(() => {
         getLine: vi.fn(),
       },
     },
+    modes,
     parser: {
       registerOscHandler: vi.fn(),
     },
@@ -29,6 +31,7 @@ const terminalMocks = vi.hoisted(() => {
     onScroll: vi.fn(() => ({ dispose: vi.fn() })),
     onRender: vi.fn(() => ({ dispose: vi.fn() })),
     onResize: vi.fn(() => ({ dispose: vi.fn() })),
+    onSelectionChange: vi.fn(() => ({ dispose: vi.fn() })),
     attachCustomKeyEventHandler: vi.fn(),
     refresh: vi.fn(),
     write: vi.fn(),
@@ -41,7 +44,7 @@ const terminalMocks = vi.hoisted(() => {
     select: vi.fn(),
   }));
 
-  return { focus, terminalCtor };
+  return { focus, modes, terminalCtor };
 });
 
 const fitMocks = vi.hoisted(() => ({
@@ -173,6 +176,62 @@ describe("TerminalPanel focus behavior", () => {
         btoa("pasted text"),
       );
     });
+  });
+
+  it("converts LF to CR for multi-line paste when bracketed paste is off", async () => {
+    terminalMocks.modes.bracketedPasteMode = false;
+    const readText = vi.fn(async () => "line1\nline2\nline3");
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { readText },
+    });
+    vi.stubGlobal("confirm", () => true);
+    const onSessionReady = vi.fn();
+
+    render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("line1\rline2\rline3"),
+      );
+    });
+  });
+
+  it("wraps multi-line paste in CSI 200~/201~ when bracketed paste is on", async () => {
+    terminalMocks.modes.bracketedPasteMode = true;
+    const readText = vi.fn(async () => "line1\nline2\nline3");
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { readText },
+    });
+    vi.stubGlobal("confirm", () => true);
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("\x1b[200~line1\nline2\nline3\x1b[201~"),
+        );
+      });
+    } finally {
+      terminalMocks.modes.bracketedPasteMode = false;
+    }
   });
 
   it("honors the right-click paste terminal setting", async () => {

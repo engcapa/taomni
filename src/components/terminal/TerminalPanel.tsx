@@ -598,7 +598,7 @@ export function TerminalPanel({
       ) {
         return;
       }
-      writeBroadcastInput(normalizePasteText(text));
+      writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
       focusTerminal();
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
@@ -1121,7 +1121,7 @@ export function TerminalPanel({
     }
     const selection = termRef.current?.getSelection();
     if (selection) {
-      writeBroadcastInput(normalizePasteText(selection));
+      writeBroadcastInput(formatPasteForTerminal(termRef.current, selection));
       focusTerminal();
       return;
     }
@@ -2322,6 +2322,20 @@ function firstVisibleMatchIndex(
 
 function normalizePasteText(text: string): string {
   return text.replace(/\r?\n/g, "\r");
+}
+
+// When the running app has enabled DEC bracketed paste (CSI ?2004h), wrap the
+// payload so the app can distinguish a paste from typed input. The LFs inside
+// the envelope are preserved on purpose: modern TUIs (Claude Code, ipython,
+// nano, lazygit, ...) read \n as "newline inside the paste" and \r as "submit",
+// and on Windows ConPTY there is no termios ICRNL to translate \r→\n the way
+// Linux PTYs do. Without this wrapping a 9-line paste arrives as 9 separate
+// Enter presses on Windows.
+function formatPasteForTerminal(term: Terminal | null, text: string): string {
+  if (term?.modes.bracketedPasteMode) {
+    return `\x1b[200~${text.replace(/\r\n/g, "\n")}\x1b[201~`;
+  }
+  return normalizePasteText(text);
 }
 
 function downloadTextFile(filename: string, text: string, type: string): void {
