@@ -13,8 +13,9 @@ import {
   Copy,
   Trash2,
   FileText,
+  Pencil,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu } from "../ContextMenu";
 import type { Tab, TabKind } from "../../types";
@@ -31,6 +32,7 @@ export function TabBar() {
     removeTabs,
     addTab,
     moveTab,
+    updateTabTitle,
     toggleCompactMode,
     multiExecActive,
     multiExecSelectedTabIds,
@@ -40,6 +42,38 @@ export function TabBar() {
   const ctx = useContextMenu();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+
+  useEffect(() => {
+    if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
+      setEditingTabId(null);
+      setDraftTitle("");
+    }
+  }, [tabs, editingTabId]);
+
+  const startRename = (tab: Tab) => {
+    if (!tab.closable) return;
+    setActiveTab(tab.id);
+    setEditingTabId(tab.id);
+    setDraftTitle(tab.title);
+  };
+
+  const commitRename = () => {
+    if (!editingTabId) return;
+    const next = draftTitle.trim();
+    const target = tabs.find((t) => t.id === editingTabId);
+    if (next && target && next !== target.title) {
+      updateTabTitle(editingTabId, next);
+    }
+    setEditingTabId(null);
+    setDraftTitle("");
+  };
+
+  const cancelRename = () => {
+    setEditingTabId(null);
+    setDraftTitle("");
+  };
 
   const handleNewTab = () => {
     const id = `terminal-${Date.now()}`;
@@ -64,6 +98,7 @@ export function TabBar() {
       { label: "Close others", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
       { label: "Close all", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
       { label: "", separator: true, onClick: () => {} },
+      { label: "Rename tab", icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
       { label: "Duplicate tab", icon: <Copy className="w-3 h-3" />, onClick: () => {
         addTab({ ...tab, id: `dup-${Date.now()}`, closable: true });
       }, disabled: tab.type === "welcome" },
@@ -157,11 +192,23 @@ export function TabBar() {
             data-drop-side={dropSide}
             className="moba-tab relative"
             data-active={activeTabId === tab.id}
-            draggable
-            onClick={() => setActiveTab(tab.id)}
-            onMouseDown={(e) => handleMouseDown(e, tab)}
+            draggable={editingTabId !== tab.id}
+            onClick={() => {
+              if (editingTabId === tab.id) return;
+              setActiveTab(tab.id);
+            }}
+            onMouseDown={(e) => {
+              if (editingTabId === tab.id) return;
+              handleMouseDown(e, tab);
+            }}
             onContextMenu={(e) => handleTabContext(e, tab)}
-            onDragStart={(e) => handleDragStart(e, tab)}
+            onDragStart={(e) => {
+              if (editingTabId === tab.id) {
+                e.preventDefault();
+                return;
+              }
+              handleDragStart(e, tab);
+            }}
             onDragOver={(e) => handleDragOver(e, tab)}
             onDragLeave={() =>
               setDropIndicator((prev) => (prev && prev.tabId === tab.id ? null : prev))
@@ -197,7 +244,48 @@ export function TabBar() {
                 />
               )}
             </div>
-            <span className="truncate max-w-[180px]">{tab.title}</span>
+            <span
+              data-testid="tab-title"
+              className="truncate max-w-[180px]"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                startRename(tab);
+              }}
+            >
+              {editingTabId === tab.id ? (
+                <input
+                  data-testid="tab-title-input"
+                  autoFocus
+                  type="text"
+                  value={draftTitle}
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  draggable={false}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                    e.stopPropagation();
+                  }}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={commitRename}
+                  className="bg-transparent border-b border-[var(--moba-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+                  style={{ color: "inherit", font: "inherit" }}
+                />
+              ) : (
+                tab.title
+              )}
+            </span>
             {tab.closable && (
               <X
                 className="w-3 h-3 ml-1 opacity-60 hover:opacity-100"
