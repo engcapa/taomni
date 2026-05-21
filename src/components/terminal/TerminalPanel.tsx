@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type MutableRefObject,
+} from "react";
 import { Terminal, type IBufferLine } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -85,6 +94,14 @@ import { CommonCommandsPalette } from "./CommonCommandsPalette";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
+import {
+  NATIVE_FILE_DROP_EVENT,
+  type NativeFileDropDetail,
+  droppedFilePaths,
+  formatDroppedPathsForShell,
+  isOsFileDrag,
+  shellQuoteStyleForTerminalDrop,
+} from "../../lib/osFileDrop";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 
@@ -619,6 +636,63 @@ export function TerminalPanel({
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
     }
   }, [focusTerminal, multilinePasteConfirm, setStatusMessage, writeBroadcastInput]);
+
+  const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
+    if (!isOsFileDrag(event.dataTransfer)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const insertDroppedPaths = useCallback((paths: string[]) => {
+    if (readOnlyRef.current) {
+      setStatusMessage("Terminal is read-only");
+      focusTerminal();
+      return;
+    }
+
+    const quoteStyle = shellQuoteStyleForTerminalDrop({
+      isSsh: !isLocal,
+      localShellId: resolvedLocalShellId ?? localShell?.id ?? null,
+    });
+    const text = formatDroppedPathsForShell(paths, quoteStyle);
+    if (!text) return;
+
+    writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
+    appendEvent("input", `Inserted ${paths.length} dropped file path${paths.length === 1 ? "" : "s"}`);
+    setStatusMessage(`Inserted ${paths.length} file path${paths.length === 1 ? "" : "s"}`);
+    focusTerminal();
+  }, [appendEvent, focusTerminal, isLocal, localShell?.id, resolvedLocalShellId, setStatusMessage, writeBroadcastInput]);
+
+  const handleTerminalDrop = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
+    if (!isOsFileDrag(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const paths = droppedFilePaths(event.dataTransfer);
+    if (paths.length === 0) {
+      setStatusMessage("Dropped file paths are not available in this environment");
+      focusTerminal();
+      return;
+    }
+
+    insertDroppedPaths(paths);
+  }, [focusTerminal, insertDroppedPaths, setStatusMessage]);
+
+  useEffect(() => {
+    const handleNativeFileDrop = (event: Event) => {
+      const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
+      if (!detail?.paths?.length) return;
+
+      const panel = panelRef.current;
+      const target = document.elementFromPoint(detail.clientX, detail.clientY);
+      if (!panel || !target || !panel.contains(target)) return;
+
+      insertDroppedPaths(detail.paths);
+    };
+
+    window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
+    return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
+  }, [insertDroppedPaths]);
 
   const saveBufferToFile = useCallback(() => {
     const term = termRef.current;
@@ -1727,6 +1801,8 @@ export function TerminalPanel({
           decreaseFontSize();
         }
       }}
+      onDragOver={handleTerminalDragOver}
+      onDrop={handleTerminalDrop}
       onContextMenu={handleTerminalContextMenu}
       onAuxClick={handleMiddleClick}
     >

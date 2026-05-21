@@ -19,7 +19,7 @@ import { FileTransferQueue } from "./FileTransferQueue";
 import { ChmodDialog } from "./ChmodDialog";
 import { useSftpStore, type PaneSide } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
-import { joinPath, basename, type FileEntry, type FsSide } from "../../lib/sftp";
+import { joinPath, basename, sftpStat, type FileEntry, type FsSide } from "../../lib/sftp";
 import type { MenuItem } from "../ContextMenu";
 import { useAppStore } from "../../stores/appStore";
 
@@ -423,6 +423,21 @@ export function FileBrowser(props: FileBrowserProps) {
     [controller, session?.remote.path],
   );
 
+  const handleLocalPaths = useCallback(
+    async (paths: string[]) => {
+      const remoteDir = session?.remote.path ?? "/";
+      for (const path of paths) {
+        try {
+          const entry = await sftpStat(props.sessionId, path, "local");
+          await controller.upload(entry, remoteDir);
+        } catch (err) {
+          setStatus(`Upload failed: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    },
+    [controller, props.sessionId, session?.remote.path, setStatus],
+  );
+
   const handleCrossPaneToLocal = useCallback(
     async (entries: FileEntry[]) => {
       const localDir = session?.local.path ?? "";
@@ -578,6 +593,7 @@ export function FileBrowser(props: FileBrowserProps) {
                 }
               }}
               onUploadFromDisk={(files) => void handleLocalFiles(files)}
+              onUploadPathsFromDisk={(paths) => void handleLocalPaths(paths)}
               onDeleteSelected={(entries) => {
                 if (entries.length === 0) return;
                 const summary = entries.length === 1
