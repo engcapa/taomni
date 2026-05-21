@@ -1,0 +1,69 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { useAppStore } from "./appStore";
+import type { Tab } from "../types";
+
+const tab = (id: string, overrides: Partial<Tab> = {}): Tab => ({
+  id,
+  type: "terminal",
+  title: id,
+  closable: true,
+  ...overrides,
+});
+
+describe("appStore.moveTab", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [tab("a"), tab("b"), tab("c"), tab("d")],
+      activeTabId: "a",
+    });
+  });
+
+  it("moves a tab before a later target", () => {
+    useAppStore.getState().moveTab("a", "c", "before");
+    expect(useAppStore.getState().tabs.map((t) => t.id)).toEqual(["b", "a", "c", "d"]);
+  });
+
+  it("moves a tab after a later target", () => {
+    useAppStore.getState().moveTab("a", "c", "after");
+    expect(useAppStore.getState().tabs.map((t) => t.id)).toEqual(["b", "c", "a", "d"]);
+  });
+
+  it("moves a tab before an earlier target", () => {
+    useAppStore.getState().moveTab("d", "b", "before");
+    expect(useAppStore.getState().tabs.map((t) => t.id)).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("moves a tab after an earlier target", () => {
+    useAppStore.getState().moveTab("d", "b", "after");
+    expect(useAppStore.getState().tabs.map((t) => t.id)).toEqual(["a", "b", "d", "c"]);
+  });
+
+  it("is a no-op when source and target are the same", () => {
+    const before = useAppStore.getState().tabs;
+    useAppStore.getState().moveTab("b", "b", "before");
+    expect(useAppStore.getState().tabs).toBe(before);
+  });
+
+  it("is a no-op when dropping a tab onto its existing neighbor in the no-shift direction", () => {
+    const before = useAppStore.getState().tabs;
+    useAppStore.getState().moveTab("b", "a", "after");
+    expect(useAppStore.getState().tabs).toBe(before);
+    useAppStore.getState().moveTab("b", "c", "before");
+    expect(useAppStore.getState().tabs).toBe(before);
+  });
+
+  it("ignores unknown ids", () => {
+    const before = useAppStore.getState().tabs;
+    useAppStore.getState().moveTab("missing", "a", "after");
+    expect(useAppStore.getState().tabs).toBe(before);
+    useAppStore.getState().moveTab("a", "missing", "after");
+    expect(useAppStore.getState().tabs).toBe(before);
+  });
+
+  it("preserves the active tab id even after reordering", () => {
+    useAppStore.setState({ activeTabId: "a" });
+    useAppStore.getState().moveTab("a", "d", "after");
+    expect(useAppStore.getState().activeTabId).toBe("a");
+    expect(useAppStore.getState().tabs.map((t) => t.id)).toEqual(["b", "c", "d", "a"]);
+  });
+});

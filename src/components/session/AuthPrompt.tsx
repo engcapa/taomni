@@ -1,20 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound, X } from "lucide-react";
+import { useVaultStore } from "../../stores/vaultStore";
 
 interface AuthPromptProps {
   host: string;
   username: string;
-  onSubmit: (password: string) => void;
+  onSubmit: (password: string, saveToVault: boolean) => void;
   onCancel: () => void;
 }
 
 export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptProps) {
   const [password, setPassword] = useState("");
+  const [save, setSave] = useState(false);
+  const vaultState = useVaultStore((s) => s.state);
+  const refreshVault = useVaultStore((s) => s.refresh);
+
+  useEffect(() => {
+    void refreshVault().catch(() => undefined);
+  }, [refreshVault]);
+
+  // If the vault was uninitialized when we mounted but the user set it up
+  // mid-prompt (e.g. via another window), `save` stays disabled until they
+  // toggle the checkbox; that's fine — keeping behavior minimal.
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) return;
-    onSubmit(password);
+    onSubmit(password, save);
   };
 
   return (
@@ -49,6 +61,28 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             className="moba-input w-full h-8 text-[13px]"
             placeholder="Password"
           />
+          <label
+            className="flex items-center gap-1.5 mt-3 text-[11px] cursor-pointer"
+            title={
+              vaultState === "empty"
+                ? "Set a master password in the vault settings first."
+                : "When checked, the password is encrypted with your master password and stored for next time."
+            }
+          >
+            <input
+              type="checkbox"
+              data-testid="auth-save-to-vault"
+              className="moba-checkbox"
+              checked={save}
+              onChange={(e) => setSave(e.target.checked)}
+              disabled={vaultState === "empty"}
+            />
+            <span style={{ color: "var(--moba-text-muted)" }}>
+              {vaultState === "empty"
+                ? "Save in vault (set up a master password first)"
+                : "Save password in vault for this session"}
+            </span>
+          </label>
         </div>
 
         <div className="h-12 flex items-center justify-end px-3 gap-2 border-t"

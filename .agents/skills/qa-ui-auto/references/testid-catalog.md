@@ -48,6 +48,8 @@
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
+- `[data-testid="tab-title"]` — interactive — F1.5.tab-title
+- `[data-testid="tab-title-input"]` — interactive [optional] — F1.5.tab-title-input
 - `[data-testid="new-local-terminal"]` — interactive — F1.5.new-local-terminal
 - `[data-testid="tab-split-view"]` — display — F1.5.split-view
 - `[data-testid="tab-multiexec-toggle"]` — interactive — F1.5.multiexec-toggle
@@ -133,6 +135,7 @@
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body
 - `input[aria-label="Execute command"]` — interactive — F6.3.advanced-execute-command
 - `input[aria-label="SSH password"]` — interactive [optional] — F6.3.advanced-ssh-password
+- `[data-testid="session-save-in-vault"]` — interactive [optional] — F6.3.save-in-vault
 - `input[aria-label="Private key path"]` — interactive [optional] — F6.3.advanced-private-key
 - `input[aria-label="Jump host"]` — interactive [optional] — F6.3.advanced-jump-host
 - `input[aria-label="Jump user"]` — interactive [optional] — F6.3.advanced-jump-user
@@ -355,6 +358,35 @@
 - `[data-testid="tunnel-editor-save"]` — interactive — F8.2.editor-save
   ↳ `button:has-text("Save")` — alias
 - `[data-testid="tunnel-editor-cancel"]` — interactive [optional] — F8.2.editor-cancel
+
+## vault (F12.1)
+
+- `[data-testid="vault-settings"]` — display — F12.1.settings-root
+- `[data-testid="vault-state-badge"]` — display — F12.1.state-badge
+- `[data-testid="vault-init-button"]` — interactive [optional] — F12.1.init-button
+- `[data-testid="vault-unlock-button"]` — interactive [optional] — F12.1.unlock-button
+- `[data-testid="vault-lock-button"]` — interactive [optional] — F12.1.lock-button
+- `[data-testid="vault-change-master-button"]` — interactive [optional] — F12.1.change-master-button
+- `[data-testid="vault-change-master-form"]` — display [optional] — F12.1.change-master-form
+- `[data-testid="vault-change-master-old"]` — interactive [optional] — F12.1.change-master-old
+- `[data-testid="vault-change-master-new1"]` — interactive [optional] — F12.1.change-master-new1
+- `[data-testid="vault-change-master-new2"]` — interactive [optional] — F12.1.change-master-new2
+- `[data-testid="vault-change-master-submit"]` — interactive [optional] — F12.1.change-master-submit
+- `[data-testid="vault-entries-section"]` — display [optional] — F12.1.entries-section
+- `[data-testid="vault-setup-dialog"]` — display [optional] — F12.1.setup-dialog
+- `[data-testid="vault-setup-pw1"]` — interactive [optional] — F12.1.setup-pw1
+- `[data-testid="vault-setup-pw2"]` — interactive [optional] — F12.1.setup-pw2
+- `[data-testid="vault-setup-cancel"]` — interactive [optional] — F12.1.setup-cancel
+- `[data-testid="vault-setup-confirm"]` — interactive [optional] — F12.1.setup-confirm
+- `[data-testid="vault-setup-too-short"]` — display [optional] — F12.1.setup-too-short
+- `[data-testid="vault-setup-mismatch"]` — display [optional] — F12.1.setup-mismatch
+- `[data-testid="vault-setup-error"]` — display [optional] — F12.1.setup-error
+- `[data-testid="vault-unlock-dialog"]` — display [optional] — F12.1.unlock-dialog
+- `[data-testid="vault-unlock-pw"]` — interactive [optional] — F12.1.unlock-pw
+- `[data-testid="vault-unlock-reason"]` — display [optional] — F12.1.unlock-reason
+- `[data-testid="vault-unlock-cancel"]` — interactive [optional] — F12.1.unlock-cancel
+- `[data-testid="vault-unlock-confirm"]` — interactive [optional] — F12.1.unlock-confirm
+- `[data-testid="vault-unlock-error"]` — display [optional] — F12.1.unlock-error
 
 ## vnc (F9.6)
 

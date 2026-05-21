@@ -1,0 +1,35 @@
+id: TC-auto-F12-1-vault-change-master
+title: Vault change master password form validates and updates
+covers: [F12.1]
+tags: [auto-generated, smoke, needs-review, vault, security]
+modes: [native]
+fixtures: [reset_db]
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: "[data-testid=\"tab-bar\"]"
+  - click: "[data-testid=\"ribbon-settings\"]"
+  - wait_for: "[data-testid=\"settings-panel\"]"
+  - assert_visible: '[data-testid="vault-settings"]'
+  # Initialize vault first
+  - click: '[data-testid="vault-init-button"]'
+  - wait_for: '[data-testid="vault-setup-dialog"]'
+  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "OldPass123!"}
+  - fill: {selector: '[data-testid="vault-setup-pw2"]', value: "OldPass123!"}
+  - click: '[data-testid="vault-setup-confirm"]'
+  - wait: 1
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "unlocked"}
+  # Open change master password form
+  - click: '[data-testid="vault-change-master-button"]'
+  - wait_for: '[data-testid="vault-change-master-form"]'
+  - assert_visible: '[data-testid="vault-change-master-old"]'
+  - assert_visible: '[data-testid="vault-change-master-new1"]'
+  - assert_visible: '[data-testid="vault-change-master-new2"]'
+  # Fill in the change form
+  - fill: {selector: '[data-testid="vault-change-master-old"]', value: "OldPass123!"}
+  - fill: {selector: '[data-testid="vault-change-master-new1"]', value: "NewPass456!"}
+  - fill: {selector: '[data-testid="vault-change-master-new2"]', value: "NewPass456!"}
+  - click: '[data-testid="vault-change-master-submit"]'
+  - wait: 1
+  # Should show success message; vault remains unlocked
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "unlocked"}
+  - screenshot: auto-F12-1-vault-change-master.png

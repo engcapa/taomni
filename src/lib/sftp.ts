@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { withVaultLockedNotice } from "./ipc";
 
 export type FileType =
   | "file"
@@ -94,14 +95,16 @@ export interface AttachResult {
 }
 
 export async function sftpAttach(opts: AttachOptions): Promise<AttachResult> {
-  return invoke<AttachResult>("sftp_attach", {
-    sessionId: opts.sessionId,
-    host: opts.host,
-    port: opts.port,
-    username: opts.username,
-    authMethod: opts.authMethod,
-    authData: opts.authData,
-  });
+  return withVaultLockedNotice(() =>
+    invoke<AttachResult>("sftp_attach", {
+      sessionId: opts.sessionId,
+      host: opts.host,
+      port: opts.port,
+      username: opts.username,
+      authMethod: opts.authMethod,
+      authData: opts.authData,
+    }),
+  );
 }
 
 export async function sftpDetach(sessionId: string): Promise<void> {

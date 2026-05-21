@@ -242,6 +242,26 @@ body {
 .moba-tab[data-multiexec-selected="true"][data-active="true"] {
   background: color-mix(in srgb, var(--moba-accent) 12%, var(--moba-tab-active));
 }
+.moba-tab[data-dragging="true"] {
+  opacity: 0.5;
+}
+.moba-tab[data-drop-side]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--moba-accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 3;
+}
+.moba-tab[data-drop-side="before"]::after {
+  left: -2px;
+}
+.moba-tab[data-drop-side="after"]::after {
+  right: -2px;
+}
 
 .moba-app-titlebar {
   background: linear-gradient(to bottom, var(--moba-titlebar-from), var(--moba-titlebar-to));

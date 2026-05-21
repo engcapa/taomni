@@ -13,10 +13,14 @@ import {
   Copy,
   Trash2,
   FileText,
+  Pencil,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu } from "../ContextMenu";
 import type { Tab, TabKind } from "../../types";
+
+type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 
 export function TabBar() {
   const {
@@ -27,6 +31,8 @@ export function TabBar() {
     removeTab,
     removeTabs,
     addTab,
+    moveTab,
+    updateTabTitle,
     toggleCompactMode,
     multiExecActive,
     multiExecSelectedTabIds,
@@ -34,6 +40,40 @@ export function TabBar() {
     toggleMultiExecTab,
   } = useAppStore();
   const ctx = useContextMenu();
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+
+  useEffect(() => {
+    if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
+      setEditingTabId(null);
+      setDraftTitle("");
+    }
+  }, [tabs, editingTabId]);
+
+  const startRename = (tab: Tab) => {
+    if (!tab.closable) return;
+    setActiveTab(tab.id);
+    setEditingTabId(tab.id);
+    setDraftTitle(tab.title);
+  };
+
+  const commitRename = () => {
+    if (!editingTabId) return;
+    const next = draftTitle.trim();
+    const target = tabs.find((t) => t.id === editingTabId);
+    if (next && target && next !== target.title) {
+      updateTabTitle(editingTabId, next);
+    }
+    setEditingTabId(null);
+    setDraftTitle("");
+  };
+
+  const cancelRename = () => {
+    setEditingTabId(null);
+    setDraftTitle("");
+  };
 
   const handleNewTab = () => {
     const id = `terminal-${Date.now()}`;
@@ -58,6 +98,7 @@ export function TabBar() {
       { label: "Close others", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
       { label: "Close all", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
       { label: "", separator: true, onClick: () => {} },
+      { label: "Rename tab", icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
       { label: "Duplicate tab", icon: <Copy className="w-3 h-3" />, onClick: () => {
         addTab({ ...tab, id: `dup-${Date.now()}`, closable: true });
       }, disabled: tab.type === "welcome" },
@@ -78,6 +119,56 @@ export function TabBar() {
     ]);
   };
 
+  const computeDropSide = (event: React.DragEvent<HTMLElement>): "before" | "after" => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+  };
+
+  const clearDragState = () => {
+    setDraggedId(null);
+    setDropIndicator(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
+    setDraggedId(tab.id);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      try {
+        e.dataTransfer.setData("application/x-newmob-tab", tab.id);
+      } catch {
+        // Some browsers reject custom MIME types; the in-memory state is the source of truth.
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
+    if (!draggedId) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    const side = computeDropSide(e);
+    if (draggedId === tab.id) {
+      setDropIndicator(null);
+      return;
+    }
+    setDropIndicator((prev) => {
+      if (prev && prev.tabId === tab.id && prev.side === side) return prev;
+      return { tabId: tab.id, side };
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
+    if (!draggedId) {
+      clearDragState();
+      return;
+    }
+    e.preventDefault();
+    const side = computeDropSide(e);
+    if (draggedId !== tab.id) {
+      moveTab(draggedId, tab.id, side);
+    }
+    clearDragState();
+  };
+
   return (
     <div
       data-testid="tab-bar"
@@ -88,18 +179,42 @@ export function TabBar() {
       {ctx.render}
       {tabs.map((tab) => {
         const isSelected = multiExecActive && tab.type === "terminal" && multiExecSelectedTabIds.has(tab.id);
+        const dropSide = dropIndicator && dropIndicator.tabId === tab.id ? dropIndicator.side : undefined;
         return (
           <div
             key={tab.id}
             data-testid="tab-item"
+            data-tab-id={tab.id}
             data-tab-title={tab.title}
             data-tab-type={tab.type}
             data-multiexec-selected={isSelected || undefined}
+            data-dragging={draggedId === tab.id || undefined}
+            data-drop-side={dropSide}
             className="moba-tab relative"
             data-active={activeTabId === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            onMouseDown={(e) => handleMouseDown(e, tab)}
+            draggable={editingTabId !== tab.id}
+            onClick={() => {
+              if (editingTabId === tab.id) return;
+              setActiveTab(tab.id);
+            }}
+            onMouseDown={(e) => {
+              if (editingTabId === tab.id) return;
+              handleMouseDown(e, tab);
+            }}
             onContextMenu={(e) => handleTabContext(e, tab)}
+            onDragStart={(e) => {
+              if (editingTabId === tab.id) {
+                e.preventDefault();
+                return;
+              }
+              handleDragStart(e, tab);
+            }}
+            onDragOver={(e) => handleDragOver(e, tab)}
+            onDragLeave={() =>
+              setDropIndicator((prev) => (prev && prev.tabId === tab.id ? null : prev))
+            }
+            onDrop={(e) => handleDrop(e, tab)}
+            onDragEnd={clearDragState}
           >
             {multiExecActive && tab.type === "terminal" && (
               <button
@@ -129,7 +244,48 @@ export function TabBar() {
                 />
               )}
             </div>
-            <span className="truncate max-w-[180px]">{tab.title}</span>
+            <span
+              data-testid="tab-title"
+              className="truncate max-w-[180px]"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                startRename(tab);
+              }}
+            >
+              {editingTabId === tab.id ? (
+                <input
+                  data-testid="tab-title-input"
+                  autoFocus
+                  type="text"
+                  value={draftTitle}
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  draggable={false}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                    e.stopPropagation();
+                  }}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={commitRename}
+                  className="bg-transparent border-b border-[var(--moba-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+                  style={{ color: "inherit", font: "inherit" }}
+                />
+              ) : (
+                tab.title
+              )}
+            </span>
             {tab.closable && (
               <X
                 className="w-3 h-3 ml-1 opacity-60 hover:opacity-100"

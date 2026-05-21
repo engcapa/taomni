@@ -122,15 +122,30 @@ pub async fn create_ssh_terminal(
     }
 
     let auth = match auth_method.as_str() {
-        "Password" => ssh::SshAuth::Password(auth_data.unwrap_or_default()),
+        "Password" => {
+            let raw = auth_data.unwrap_or_default();
+            let resolved = state.vault.resolve(&raw)?;
+            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+        }
         "PrivateKey" => ssh::SshAuth::PrivateKey(
             auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()),
         ),
         "Agent" => ssh::SshAuth::Agent,
-        _ => ssh::SshAuth::Password(auth_data.unwrap_or_default()),
+        _ => {
+            let raw = auth_data.unwrap_or_default();
+            let resolved = state.vault.resolve(&raw)?;
+            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+        }
     };
 
     let network = network::NetworkSettings::from_json(network_settings_json.as_deref());
+    let network = match network {
+        Some(mut n) => {
+            n.resolve_proxy_pass(&state.vault)?;
+            Some(n)
+        }
+        None => None,
+    };
 
     let (handle, channel, mut output_rx) =
         ssh::connect_ssh(&host, port, &username, auth, cols, rows, network.as_ref()).await?;
@@ -391,17 +406,33 @@ pub async fn test_ssh_connection(
     auth_method: String,
     auth_data: Option<String>,
     network_settings_json: Option<String>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
     let auth = match auth_method.as_str() {
-        "Password" => ssh::SshAuth::Password(auth_data.unwrap_or_default()),
+        "Password" => {
+            let raw = auth_data.unwrap_or_default();
+            let resolved = state.vault.resolve(&raw)?;
+            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+        }
         "PrivateKey" => ssh::SshAuth::PrivateKey(
             auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()),
         ),
         "Agent" => ssh::SshAuth::Agent,
-        _ => ssh::SshAuth::Password(auth_data.unwrap_or_default()),
+        _ => {
+            let raw = auth_data.unwrap_or_default();
+            let resolved = state.vault.resolve(&raw)?;
+            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+        }
     };
 
     let network = network::NetworkSettings::from_json(network_settings_json.as_deref());
+    let network = match network {
+        Some(mut n) => {
+            n.resolve_proxy_pass(&state.vault)?;
+            Some(n)
+        }
+        None => None,
+    };
 
     let start = std::time::Instant::now();
     let (handle, channel, _rx) =

@@ -6,6 +6,7 @@ import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
   const modes = { bracketedPasteMode: false };
+  const oscHandlers = new Map<number, (data: string) => boolean | Promise<boolean>>();
   const terminalCtor = vi.fn().mockImplementation(() => ({
     cols: 80,
     rows: 24,
@@ -18,7 +19,10 @@ const terminalMocks = vi.hoisted(() => {
     },
     modes,
     parser: {
-      registerOscHandler: vi.fn(),
+      registerOscHandler: vi.fn((ident: number, handler: (data: string) => boolean | Promise<boolean>) => {
+        oscHandlers.set(ident, handler);
+        return { dispose: vi.fn() };
+      }),
     },
     loadAddon: vi.fn(),
     open: vi.fn((el: HTMLElement) => {
@@ -44,7 +48,7 @@ const terminalMocks = vi.hoisted(() => {
     select: vi.fn(),
   }));
 
-  return { focus, modes, terminalCtor };
+  return { focus, modes, terminalCtor, oscHandlers };
 });
 
 const fitMocks = vi.hoisted(() => ({
@@ -117,8 +121,26 @@ class ResizeObserverMock {
   disconnect = vi.fn();
 }
 
+function encodeOsc52Text(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return `c;${btoa(binary)}`;
+}
+
+const sshInfo = {
+  host: "example.test",
+  port: 22,
+  username: "user",
+  authMethod: "Password",
+  authData: "secret",
+};
+
 describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
+    terminalMocks.oscHandlers.clear();
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       return window.setTimeout(() => callback(performance.now()), 0);
@@ -266,6 +288,74 @@ describe("TerminalPanel focus behavior", () => {
       );
     });
     expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();
+  });
+
+  it("accepts OSC 52 clipboard writes from local terminals", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText },
+    });
+
+    render(<TerminalPanel visible terminalProfile={DEFAULT_TERMINAL_PROFILE} />);
+
+    await waitFor(() => {
+      expect(terminalMocks.oscHandlers.get(52)).toBeTruthy();
+    });
+
+    terminalMocks.oscHandlers.get(52)?.(encodeOsc52Text("local copy"));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("local copy");
+    });
+  });
+
+  it("blocks OSC 52 clipboard writes from SSH terminals by default", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText },
+    });
+
+    render(<TerminalPanel visible ssh={sshInfo} terminalProfile={DEFAULT_TERMINAL_PROFILE} />);
+
+    await waitFor(() => {
+      expect(terminalMocks.oscHandlers.get(52)).toBeTruthy();
+    });
+
+    terminalMocks.oscHandlers.get(52)?.(encodeOsc52Text("remote copy"));
+    await Promise.resolve();
+
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("accepts OSC 52 clipboard writes from SSH terminals when enabled", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText },
+    });
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          allowRemoteOsc52Clipboard: true,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.oscHandlers.get(52)).toBeTruthy();
+    });
+
+    terminalMocks.oscHandlers.get(52)?.(encodeOsc52Text("remote copy"));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("remote copy");
+    });
   });
 
   it("omits the no-op ZMODEM receive action from the context menu", async () => {

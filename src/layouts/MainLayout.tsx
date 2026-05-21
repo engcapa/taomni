@@ -42,6 +42,14 @@ import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
 import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, type SessionConfig } from "../lib/ipc";
+import {
+  vaultPut,
+  isVaultLockedError,
+  VAULT_LOCKED_EVENT,
+} from "../lib/ipc";
+import { useVaultStore } from "../stores/vaultStore";
+import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
+import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 import type { LocalShellSelection } from "../types";
 
@@ -73,7 +81,7 @@ export function MainLayout() {
     clearMultiExecSelection,
     setTabHasNewOutput,
   } = useAppStore();
-  const { loadSessions, markConnected, sessions } = useSessionStore();
+  const { loadSessions, markConnected, sessions, updateSession } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
@@ -96,6 +104,49 @@ export function MainLayout() {
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
   const [terminalCwdVersions, setTerminalCwdVersions] = useState<Record<string, number>>({});
   const [terminalCwdRequestTokens, setTerminalCwdRequestTokens] = useState<Record<string, number>>({});
+  const [vaultUnlockReason, setVaultUnlockReason] = useState<string | null>(null);
+  const pendingVaultActionRef = useRef<(() => void) | null>(null);
+  const refreshVault = useVaultStore((s) => s.refresh);
+  const unlockVault = useVaultStore((s) => s.unlock);
+
+  // Run `action` only after the vault is known to be unlocked. If it's
+  // already unlocked we run inline; otherwise we surface the unlock
+  // dialog and queue the action to run on a successful unlock. This
+  // keeps a connect from racing past a locked vault and showing
+  // "Connection failed: VAULT_LOCKED" before the user has even seen
+  // the prompt.
+  const runWhenVaultUnlocked = useCallback(
+    (reason: string, action: () => void) => {
+      const state = useVaultStore.getState().state;
+      if (state === "unlocked" || state === "empty") {
+        action();
+        return;
+      }
+      pendingVaultActionRef.current = action;
+      setVaultUnlockReason(reason);
+    },
+    [],
+  );
+
+  // Pull initial vault status so dialogs that consult it (SessionEditor,
+  // TunnelEditor, AuthPrompt) render against fresh state.
+  useEffect(() => {
+    void refreshVault().catch(() => undefined);
+  }, [refreshVault]);
+
+  // Listen for VAULT_LOCKED events emitted by ipc helpers (e.g. when an
+  // SSH connect tries to resolve a vault: reference while the vault is
+  // locked). Surface the unlock dialog so the user can resolve it without
+  // hunting through settings.
+  useEffect(() => {
+    const handler = () => {
+      setVaultUnlockReason((prev) =>
+        prev ?? "This connection uses a saved password — unlock the vault to continue.",
+      );
+    };
+    window.addEventListener(VAULT_LOCKED_EVENT, handler);
+    return () => window.removeEventListener(VAULT_LOCKED_EVENT, handler);
+  }, []);
   // Maps tab.id → backend terminal session ID (set once the SSH/local session connects).
   const terminalSessionIds = useRef<Record<string, string>>({});
 
@@ -422,17 +473,42 @@ export function MainLayout() {
       return { method, data };
     };
 
+    // For password auth, look for a saved vault reference first. The
+    // backend will resolve it; if the vault is locked, the IPC layer
+    // raises VAULT_LOCKED and our global listener pops the unlock dialog.
+    const passwordRefFromOptions = (): string | null => {
+      const opts = parseSessionOptions(session.options_json);
+      const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
+      return ref && ref.startsWith("vault:") ? ref : null;
+    };
+
     if (session.session_type === "SSH") {
       const { method, data } = resolveAuth();
       if (method === "Password") {
-        setPendingAuth({ session });
+        const ref = passwordRefFromOptions();
+        if (ref) {
+          runWhenVaultUnlocked(
+            "This connection uses a saved password — unlock the vault to continue.",
+            () => openSshTab(session, "Password", ref),
+          );
+        } else {
+          setPendingAuth({ session });
+        }
       } else {
         openSshTab(session, method, data);
       }
     } else if (session.session_type === "SFTP") {
       const { method, data } = resolveAuth();
       if (method === "Password") {
-        setPendingAuth({ session });
+        const ref = passwordRefFromOptions();
+        if (ref) {
+          runWhenVaultUnlocked(
+            "This connection uses a saved password — unlock the vault to continue.",
+            () => openSftpTab(session, "Password", ref),
+          );
+        } else {
+          setPendingAuth({ session });
+        }
       } else {
         openSftpTab(session, method, data);
       }
@@ -441,7 +517,15 @@ export function MainLayout() {
     } else if (session.session_type === "VNC") {
       const { method, data } = resolveAuth();
       if (method === "Password") {
-        setPendingAuth({ session });
+        const ref = passwordRefFromOptions();
+        if (ref) {
+          runWhenVaultUnlocked(
+            "This connection uses a saved password — unlock the vault to continue.",
+            () => openVncTab(session, ref),
+          );
+        } else {
+          setPendingAuth({ session });
+        }
       } else {
         openVncTab(session, data ?? undefined);
       }
@@ -451,7 +535,7 @@ export function MainLayout() {
       openUnsupportedTab(session);
       void markConnected(session.id);
     }
-  }, [markConnected, openLocalTab, openSftpTab, openVncTab, openFileSession]);
+  }, [markConnected, openLocalTab, openSftpTab, openVncTab, openFileSession, runWhenVaultUnlocked]);
 
   const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const id = `ssh-${session.id}-${Date.now()}`;
@@ -490,17 +574,43 @@ export function MainLayout() {
     });
   }, [addTab]);
 
-  const handleAuthSubmit = useCallback((password: string) => {
+  const handleAuthSubmit = useCallback(async (password: string, saveToVault: boolean) => {
     if (!pendingAuth) return;
-    if (pendingAuth.session.session_type === "SFTP") {
-      openSftpTab(pendingAuth.session, "Password", password);
-    } else if (pendingAuth.session.session_type === "VNC") {
-      openVncTab(pendingAuth.session, password);
+    const session = pendingAuth.session;
+    let credential: string = password;
+
+    if (saveToVault) {
+      try {
+        const kind =
+          session.session_type === "VNC" ? "vnc-password" : "ssh-password";
+        const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
+        const result = await vaultPut(kind, label, password);
+        credential = result.reference;
+
+        // Persist the vault reference back into options_json so future
+        // connects find it without re-prompting.
+        const opts = parseSessionOptions(session.options_json);
+        const updated = JSON.stringify({ ...opts, passwordRef: result.reference });
+        await updateSession({ ...session, options_json: updated });
+      } catch (err) {
+        if (isVaultLockedError(err)) {
+          setVaultUnlockReason("Unlock the vault to save this password.");
+        }
+        // On any vault error, fall back to one-shot connect with the typed
+        // plaintext — don't block the user.
+        credential = password;
+      }
+    }
+
+    if (session.session_type === "SFTP") {
+      openSftpTab(session, "Password", credential);
+    } else if (session.session_type === "VNC") {
+      openVncTab(session, credential);
     } else {
-      openSshTab(pendingAuth.session, "Password", password);
+      openSshTab(session, "Password", credential);
     }
     setPendingAuth(null);
-  }, [pendingAuth, openSftpTab, openSshTab, openVncTab]);
+  }, [pendingAuth, openSftpTab, openSshTab, openVncTab, updateSession]);
 
   const handleQuickConnect = useCallback((value: string) => {
     try {
@@ -993,6 +1103,23 @@ export function MainLayout() {
           username={pendingAuth.session.username ?? "root"}
           onSubmit={handleAuthSubmit}
           onCancel={() => setPendingAuth(null)}
+        />
+      )}
+
+      {vaultUnlockReason && (
+        <VaultUnlockDialog
+          reason={vaultUnlockReason}
+          onCancel={() => {
+            pendingVaultActionRef.current = null;
+            setVaultUnlockReason(null);
+          }}
+          onSubmit={async (pw) => {
+            await unlockVault(pw);
+            const pending = pendingVaultActionRef.current;
+            pendingVaultActionRef.current = null;
+            setVaultUnlockReason(null);
+            if (pending) pending();
+          }}
         />
       )}
 

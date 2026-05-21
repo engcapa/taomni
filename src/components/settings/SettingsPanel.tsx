@@ -9,6 +9,7 @@ import {
 } from "../../lib/terminalProfile";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { AppThemeSwitcher } from "./AppThemeSwitcher";
+import { VaultSettings } from "../vault/VaultSettings";
 
 export function SettingsPanel() {
   const [profile, setProfile] = useState<TerminalProfile>(() => loadGlobalTerminalProfile());
@@ -60,6 +61,10 @@ export function SettingsPanel() {
           </button>
         </div>
         <TerminalAppearanceSettings profile={profile} onProfileChange={setProfile} showCustomColors />
+
+        <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]">
+          <VaultSettings />
+        </section>
       </div>
     </div>
   );

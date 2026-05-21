@@ -21,6 +21,7 @@ interface AppState {
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
   setActiveTab: (id: string) => void;
+  moveTab: (fromId: string, targetId: string, position: "before" | "after") => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleCompactMode: () => void;
@@ -106,6 +107,22 @@ export const useAppStore = create<AppState>((set) => ({
     })),
 
   setActiveTab: (id) => set({ activeTabId: id }),
+
+  moveTab: (fromId, targetId, position) =>
+    set((s) => {
+      if (fromId === targetId) return s;
+      const from = s.tabs.findIndex((t) => t.id === fromId);
+      const target = s.tabs.findIndex((t) => t.id === targetId);
+      if (from === -1 || target === -1) return s;
+
+      const next = s.tabs.slice();
+      const [moved] = next.splice(from, 1);
+      const adjustedTarget = target > from ? target - 1 : target;
+      const insertAt = position === "after" ? adjustedTarget + 1 : adjustedTarget;
+      next.splice(insertAt, 0, moved);
+      if (next.every((t, i) => t === s.tabs[i])) return s;
+      return { tabs: next };
+    }),
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),

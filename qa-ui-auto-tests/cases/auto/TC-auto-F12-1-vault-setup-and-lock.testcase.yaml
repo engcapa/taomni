@@ -1,0 +1,42 @@
+id: TC-auto-F12-1-vault-setup-and-lock
+title: Credential vault setup, lock, and unlock lifecycle
+covers: [F12.1]
+tags: [auto-generated, smoke, needs-review, vault, security]
+modes: [native]
+fixtures: [reset_db]
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: "[data-testid=\"tab-bar\"]"
+  # Open settings to access vault
+  - click: "[data-testid=\"ribbon-settings\"]"
+  - wait_for: "[data-testid=\"settings-panel\"]"
+  # Vault settings should be visible with empty state
+  - assert_visible: '[data-testid="vault-settings"]'
+  - assert_visible: '[data-testid="vault-state-badge"]'
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "empty"}
+  # Click "Set master password" to initialize
+  - click: '[data-testid="vault-init-button"]'
+  - wait_for: '[data-testid="vault-setup-dialog"]'
+  # Fill in master password (min 8 chars)
+  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "TestPass123!"}
+  - fill: {selector: '[data-testid="vault-setup-pw2"]', value: "TestPass123!"}
+  - click: '[data-testid="vault-setup-confirm"]'
+  - wait: 1
+  # Vault should now be unlocked
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "unlocked"}
+  - assert_visible: '[data-testid="vault-lock-button"]'
+  - assert_visible: '[data-testid="vault-change-master-button"]'
+  - assert_visible: '[data-testid="vault-entries-section"]'
+  # Lock the vault
+  - click: '[data-testid="vault-lock-button"]'
+  - wait: 0.5
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "locked"}
+  - assert_visible: '[data-testid="vault-unlock-button"]'
+  # Unlock the vault
+  - click: '[data-testid="vault-unlock-button"]'
+  - wait_for: '[data-testid="vault-unlock-dialog"]'
+  - fill: {selector: '[data-testid="vault-unlock-pw"]', value: "TestPass123!"}
+  - click: '[data-testid="vault-unlock-confirm"]'
+  - wait: 1
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "unlocked"}
+  - screenshot: auto-F12-1-vault-lifecycle.png

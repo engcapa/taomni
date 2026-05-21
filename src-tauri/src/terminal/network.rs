@@ -71,6 +71,17 @@ impl NetworkSettings {
             None
         }
     }
+
+    /// If `proxy_pass` is a `vault:<id>` reference, replace it in-place with
+    /// the resolved plaintext. Non-references are left as-is. Returns the
+    /// vault error string when locked / missing so the caller can bubble
+    /// `VAULT_LOCKED` to the UI.
+    pub fn resolve_proxy_pass(&mut self, vault: &crate::vault::Vault) -> Result<(), String> {
+        if let Some(plain) = vault.resolve(&self.proxy_pass)? {
+            self.proxy_pass = (*plain).clone();
+        }
+        Ok(())
+    }
 }
 
 /// Resolve `host:port` honouring the IP-version preference, then connect

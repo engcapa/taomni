@@ -189,6 +189,26 @@ fn ssh_auth_from(creds: &TunnelSshCreds) -> Result<SshAuth, String> {
     }
 }
 
+/// Replace `config.ssh.auth_data` with the resolved plaintext when it is
+/// `vault:<id>`. Called by command entrypoints before spawning the forward
+/// task, so the spawned task never needs to carry a `Vault` handle.
+fn resolve_tunnel_creds(
+    config: &mut TunnelConfig,
+    vault: &crate::vault::Vault,
+) -> Result<(), String> {
+    if !matches!(config.ssh.auth_method, TunnelAuthMethod::Password) {
+        return Ok(());
+    }
+    let raw = match config.ssh.auth_data.as_deref() {
+        Some(s) => s,
+        None => return Ok(()),
+    };
+    if let Some(plain) = vault.resolve(raw)? {
+        config.ssh.auth_data = Some((*plain).clone());
+    }
+    Ok(())
+}
+
 fn emit_status(app: &AppHandle, info: &TunnelStatusInfo) {
     let _ = app.emit("tunnel-status", info.clone());
 }
@@ -570,10 +590,11 @@ pub async fn start_tunnel(
         let _guard = state.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
-    let config = configs
+    let mut config = configs
         .into_iter()
         .find(|t| t.id == id)
         .ok_or_else(|| format!("tunnel {} not found", id))?;
+    resolve_tunnel_creds(&mut config, &state.vault)?;
 
     let starting = TunnelStatusInfo {
         id: id.clone(),
@@ -709,10 +730,11 @@ pub async fn test_tunnel(
         let _guard = state.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
-    let config = configs
+    let mut config = configs
         .into_iter()
         .find(|t| t.id == id)
         .ok_or_else(|| format!("tunnel {} not found", id))?;
+    resolve_tunnel_creds(&mut config, &state.vault)?;
     let auth = ssh_auth_from(&config.ssh)?;
     let handle = connect_ssh_authenticated(
         &config.ssh.host,

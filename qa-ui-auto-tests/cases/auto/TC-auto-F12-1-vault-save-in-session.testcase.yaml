@@ -1,0 +1,31 @@
+id: TC-auto-F12-1-vault-save-in-session
+title: Session editor shows Save in vault checkbox when vault is initialized
+covers: [F12.1, F6.3]
+tags: [auto-generated, smoke, needs-review, vault, sessions]
+modes: [native]
+fixtures: [reset_db]
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: "[data-testid=\"tab-bar\"]"
+  # Initialize vault first via settings
+  - click: "[data-testid=\"ribbon-settings\"]"
+  - wait_for: "[data-testid=\"settings-panel\"]"
+  - click: '[data-testid="vault-init-button"]'
+  - wait_for: '[data-testid="vault-setup-dialog"]'
+  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "TestPass123!"}
+  - fill: {selector: '[data-testid="vault-setup-pw2"]', value: "TestPass123!"}
+  - click: '[data-testid="vault-setup-confirm"]'
+  - wait: 1
+  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "unlocked"}
+  # Open session editor
+  - click: "[data-testid=\"ribbon-session\"]"
+  - wait_for: "[data-testid=\"session-editor\"]"
+  # Select SSH protocol and go to Advanced section
+  - click: '[data-testid="session-proto-ssh"]'
+  - click: '[data-testid="session-section-advanced"]'
+  - wait_for: '[data-testid="advanced-ssh-settings"]'
+  # The "Save in vault" checkbox should be visible and enabled
+  - assert_visible: '[data-testid="session-save-in-vault"]'
+  # Check the "Save in vault" checkbox
+  - set_check: {selector: '[data-testid="session-save-in-vault"]', checked: true}
+  - screenshot: auto-F12-1-vault-save-in-session.png

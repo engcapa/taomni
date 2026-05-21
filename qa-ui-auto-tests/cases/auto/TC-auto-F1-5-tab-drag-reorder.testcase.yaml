@@ -1,0 +1,21 @@
+id: TC-auto-F1-5-tab-drag-reorder
+title: Tab drag-and-drop reorders tabs in the tab bar
+covers: [F1.5]
+tags: [auto-generated, smoke, needs-review, tabs, drag-drop]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: "[data-testid=\"tab-bar\"]"
+  # Create two terminal tabs so we have 3 tabs total (Welcome + 2 terminals)
+  - click: "[data-testid=\"new-local-terminal\"]"
+  - wait_for: "[data-testid=\"terminal-pane\"]"
+  - wait: 0.5
+  - click: "[data-testid=\"new-local-terminal\"]"
+  - wait: 0.5
+  - assert_count: {selector: '[data-testid="tab-item"]', min: 3}
+  # Drag the first terminal tab to after the second terminal tab
+  - drag_to: {from: '[data-testid="tab-item"][data-tab-type="terminal"] >> nth=0', to: '[data-testid="tab-item"][data-tab-type="terminal"] >> nth=1'}
+  - wait: 0.5
+  - assert_count: {selector: '[data-testid="tab-item"]', min: 3}
+  - screenshot: auto-F1-5-tab-drag-reorder.png

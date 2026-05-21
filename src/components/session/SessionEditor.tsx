@@ -23,7 +23,16 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
-import { selectFilePath, selectFolderPath, selectPrivateKeyFile, testSshConnection } from "../../lib/ipc";
+import { useVaultStore } from "../../stores/vaultStore";
+import {
+  selectFilePath,
+  selectFolderPath,
+  selectPrivateKeyFile,
+  testSshConnection,
+  vaultPut,
+  isVaultReference,
+  isVaultLockedError,
+} from "../../lib/ipc";
 import {
   getSessionNetworkSettings,
   ipKindToLabel,
@@ -233,6 +242,10 @@ function AdvancedSshSettings({
   authRadio, setAuthRadio,
   showPwd, setShowPwd,
   password, setPassword,
+  passwordRef,
+  clearPasswordRef,
+  saveInVault, setSaveInVault,
+  vaultState,
   usePrivKey, setUsePrivKey,
   keyPath, setKeyPath,
   useJump, setUseJump,
@@ -250,6 +263,10 @@ function AdvancedSshSettings({
   authRadio: string; setAuthRadio: (v: string) => void;
   showPwd: boolean; setShowPwd: (v: boolean) => void;
   password: string; setPassword: (v: string) => void;
+  passwordRef: string;
+  clearPasswordRef: () => void;
+  saveInVault: boolean; setSaveInVault: (v: boolean) => void;
+  vaultState: "empty" | "locked" | "unlocked";
   usePrivKey: boolean; setUsePrivKey: (v: boolean) => void;
   keyPath: string; setKeyPath: (v: string) => void;
   useJump: boolean; setUseJump: (v: boolean) => void;
@@ -341,7 +358,11 @@ function AdvancedSshSettings({
                 type={showPwd ? "text" : "password"}
                 value={password}
                 aria-label="SSH password"
-                onChange={(e) => setPassword(e.target.value)}
+                placeholder={passwordRef ? "•••••• (saved in vault)" : ""}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (passwordRef) clearPasswordRef();
+                }}
               />
               <button
                 className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
@@ -354,7 +375,24 @@ function AdvancedSshSettings({
                   : <Eye className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />}
               </button>
             </div>
-            <button className="moba-btn" type="button" disabled title="Credential vault is not implemented yet">Save in vault</button>
+            <label
+              className="flex items-center gap-1 text-[11px] cursor-pointer"
+              title={
+                vaultState === "empty"
+                  ? "Set a master password in the vault settings first."
+                  : "When checked, the password is encrypted with your master password and stored in the credential vault."
+              }
+            >
+              <input
+                type="checkbox"
+                className="moba-checkbox"
+                data-testid="session-save-in-vault"
+                checked={saveInVault}
+                onChange={(e) => setSaveInVault(e.target.checked)}
+                disabled={vaultState === "empty"}
+              />
+              Save in vault
+            </label>
             <span className="moba-pill">
               <Shield className="w-3 h-3" /> Encrypted, master-password protected
             </span>
@@ -898,6 +936,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   );
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  const [passwordRef, setPasswordRef] = useState<string>(
+    () => optionString(initialOptions, "passwordRef", ""),
+  );
+  const [saveInVault, setSaveInVault] = useState<boolean>(
+    () => !!passwordRef,
+  );
+  const vaultState = useVaultStore((s) => s.state);
 
   /* --- advanced SSH --- */
   const [x11, setX11] = useState(() => optionBoolean(initialOptions, "x11", true));
@@ -917,6 +962,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   /* --- bookmark --- */
   const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
   const [tags, setTags] = useState(() => optionString(initialOptions, "tags", ""));
+
+  /* --- vault refresh on mount so the Save in vault checkbox state is correct --- */
+  const refreshVault = useVaultStore((s) => s.refresh);
+  useEffect(() => {
+    void refreshVault().catch(() => undefined);
+  }, [refreshVault]);
 
   /* --- file session options --- */
   const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
@@ -1021,9 +1072,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         remoteEnv, sshBrowser, usePrivKey, useJump,
         fileEmbedInTab, fileExtraArgs,
         terminalProfile,
+        // SSH password vault reference (vault:<id>). Empty string means no
+        // saved password; the user types it on connect.
+        passwordRef: passwordRef || "",
         // Strip the proxy password unless the user explicitly opted into
         // "Save in vault". `options_json` lands in the SQLite session row
         // in plaintext, so this is the gate keeping secrets out at rest.
+        // When proxySaveAuth is on AND the value is already a vault: ref,
+        // we keep it (the resolution happens server-side).
         networkSettings: networkSettings.proxySaveAuth
           ? networkSettings
           : { ...networkSettings, proxyPass: "" },
@@ -1051,7 +1107,78 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       return;
     }
     setSaveError(null);
-    const config = buildConfig();
+
+    // If the user wants to remember the SSH password and typed a fresh
+    // plaintext into the password field, push it into the vault first and
+    // capture the resulting `vault:<id>` reference. We do this *before*
+    // building the config so the reference lands in options_json.
+    let nextPasswordRef = passwordRef;
+    if (
+      isSSH &&
+      authMethod === "Password" &&
+      saveInVault &&
+      vaultState !== "empty" &&
+      password.length > 0
+    ) {
+      try {
+        const label = `${username || "user"}@${host || "?"}:${port}`;
+        const result = await vaultPut("ssh-password", label, password);
+        nextPasswordRef = result.reference;
+        setPasswordRef(result.reference);
+        setPassword("");
+      } catch (err) {
+        if (isVaultLockedError(err)) {
+          setSaveError("Vault is locked — unlock it first to save the password.");
+        } else {
+          setSaveError(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
+    } else if (!saveInVault) {
+      // User unchecked Save in vault: forget any previous reference.
+      nextPasswordRef = "";
+    }
+
+    // Same dance for the proxy password when proxySaveAuth is enabled and
+    // the user typed a fresh plaintext (i.e. the value isn't already a
+    // vault: reference).
+    let nextProxyPass = networkSettings.proxyPass;
+    if (
+      networkSettings.proxySaveAuth &&
+      vaultState !== "empty" &&
+      networkSettings.proxyPass.length > 0 &&
+      !isVaultReference(networkSettings.proxyPass)
+    ) {
+      try {
+        const label = `proxy://${networkSettings.proxyHost}:${networkSettings.proxyPort}`;
+        const result = await vaultPut("proxy-password", label, networkSettings.proxyPass);
+        nextProxyPass = result.reference;
+        setNetworkSettings({ ...networkSettings, proxyPass: result.reference });
+      } catch (err) {
+        if (isVaultLockedError(err)) {
+          setSaveError("Vault is locked — unlock it first to save the proxy password.");
+        } else {
+          setSaveError(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
+    }
+
+    setPasswordRef(nextPasswordRef);
+    const config = buildConfig({
+      options_json: JSON.stringify({
+        ...stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
+        x11, compression, startupCmd, jumpHost: jumpHost || "",
+        jumpUser, jumpPort, description, tags, doNotExit,
+        remoteEnv, sshBrowser, usePrivKey, useJump,
+        fileEmbedInTab, fileExtraArgs,
+        terminalProfile,
+        passwordRef: nextPasswordRef || "",
+        networkSettings: networkSettings.proxySaveAuth
+          ? { ...networkSettings, proxyPass: nextProxyPass }
+          : { ...networkSettings, proxyPass: "" },
+      }),
+    });
 
     if (isEdit) {
       await updateSession(config);
@@ -1094,6 +1221,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setKeyPath(extractKeyPath(session?.auth_method));
     setPassword("");
     setShowPwd(false);
+    const restoredRef = optionString(nextOptions, "passwordRef", "");
+    setPasswordRef(restoredRef);
+    setSaveInVault(!!restoredRef);
     setX11(optionBoolean(nextOptions, "x11", true));
     setCompression(optionBoolean(nextOptions, "compression", false));
     setStartupCmd(optionString(nextOptions, "startupCmd", ""));
@@ -1458,6 +1588,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               authRadio={authRadio} setAuthRadio={handleAuthRadio}
               showPwd={showPwd} setShowPwd={setShowPwd}
               password={password} setPassword={setPassword}
+              passwordRef={passwordRef}
+              clearPasswordRef={() => setPasswordRef("")}
+              saveInVault={saveInVault} setSaveInVault={setSaveInVault}
+              vaultState={vaultState}
               usePrivKey={usePrivKey} setUsePrivKey={(value) => {
                 if (value) {
                   handleAuthRadio("privatekey");

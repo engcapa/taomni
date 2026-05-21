@@ -136,6 +136,7 @@ interface TerminalPanelProps {
 const DEFAULT_FONT_SIZE = 14;
 const CWD_QUERY_COMMAND =
   " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __newmob_cwd_sync_done";
+const OSC52_MAX_DECODED_BYTES = 1024 * 1024;
 
 interface SearchMatch {
   row: number;
@@ -218,6 +219,7 @@ export function TerminalPanel({
   const [syntaxMode, setSyntaxMode] = useState<TerminalSyntaxMode>(initialProfile.syntaxMode);
   const [rightClickBehavior, setRightClickBehavior] = useState(initialProfile.rightClickBehavior);
   const [copyOnSelect, setCopyOnSelect] = useState(initialProfile.copyOnSelect);
+  const [allowRemoteOsc52Clipboard, setAllowRemoteOsc52Clipboard] = useState(initialProfile.allowRemoteOsc52Clipboard);
   const [loggingActive, setLoggingActive] = useState(initialProfile.loggingEnabled);
   const [multilinePasteConfirm, setMultilinePasteConfirm] = useState(initialProfile.multilinePasteConfirm);
   const [inlineSuggestionsEnabled, setInlineSuggestionsEnabled] = useState(initialProfile.inlineSuggestions);
@@ -247,6 +249,7 @@ export function TerminalPanel({
   const outputLogRef = useRef("");
   const loggingActiveRef = useRef(loggingActive);
   const copyOnSelectRef = useRef(copyOnSelect);
+  const allowRemoteOsc52ClipboardRef = useRef(allowRemoteOsc52Clipboard);
   const macroRecordingRef = useRef(macroRecording);
   const macroBufferRef = useRef("");
   const lastMacroRef = useRef("");
@@ -307,6 +310,8 @@ export function TerminalPanel({
     cursorStyle,
     cursorBlink,
     showScrollbar,
+    copyOnSelect,
+    allowRemoteOsc52Clipboard,
     readOnly,
     rightClickBehavior,
     multilinePasteConfirm,
@@ -318,6 +323,8 @@ export function TerminalPanel({
   }), [
     cursorBlink,
     cursorStyle,
+    allowRemoteOsc52Clipboard,
+    copyOnSelect,
     fontFamily,
     fontLigatures,
     fontSize,
@@ -1155,6 +1162,10 @@ export function TerminalPanel({
   }, [copyOnSelect]);
 
   useEffect(() => {
+    allowRemoteOsc52ClipboardRef.current = allowRemoteOsc52Clipboard;
+  }, [allowRemoteOsc52Clipboard]);
+
+  useEffect(() => {
     if (!terminalProfile) {
       appliedTerminalProfileSignatureRef.current = null;
       return;
@@ -1177,6 +1188,7 @@ export function TerminalPanel({
     setSyntaxMode(terminalProfile.syntaxMode);
     setRightClickBehavior(terminalProfile.rightClickBehavior);
     setCopyOnSelect(terminalProfile.copyOnSelect);
+    setAllowRemoteOsc52Clipboard(terminalProfile.allowRemoteOsc52Clipboard);
     setLoggingActive(terminalProfile.loggingEnabled);
     setMultilinePasteConfirm(terminalProfile.multilinePasteConfirm);
     setInlineSuggestionsEnabled(terminalProfile.inlineSuggestions);
@@ -1235,6 +1247,28 @@ export function TerminalPanel({
         if (cwd) {
           cwdCallbackRef.current?.(cwd);
         }
+        return true;
+      });
+    } catch {
+      /* parser API absent in some xterm builds */
+    }
+
+    try {
+      term.parser.registerOscHandler(52, (data) => {
+        const text = parseOsc52ClipboardText(data);
+        if (text === null) return true;
+
+        if (!isLocal && !allowRemoteOsc52ClipboardRef.current) {
+          setStatusMessage("Remote OSC 52 clipboard is disabled");
+          return true;
+        }
+        if (!text) return true;
+
+        void clipboardWriteText(text)
+          .then(() => setStatusMessage("Copied via OSC 52"))
+          .catch((err) => {
+            setStatusMessage(err instanceof Error ? err.message : "OSC 52 clipboard copy failed");
+          });
         return true;
       });
     } catch {
@@ -2390,6 +2424,30 @@ function parseOsc7(data: string): string | null {
     return decodeURIComponent(match[1]);
   } catch {
     return match[1];
+  }
+}
+
+function parseOsc52ClipboardText(data: string): string | null {
+  const separator = data.indexOf(";");
+  if (separator < 0) return null;
+
+  const targets = data.slice(0, separator);
+  if (targets && !targets.includes("c") && !targets.includes("s")) return null;
+
+  const encoded = data.slice(separator + 1).replace(/\s/g, "");
+  if (!encoded || encoded === "?") return encoded === "" ? "" : null;
+  if (encoded.length > Math.ceil((OSC52_MAX_DECODED_BYTES * 4) / 3) + 4) return null;
+
+  try {
+    const binary = atob(encoded);
+    if (binary.length > OSC52_MAX_DECODED_BYTES) return null;
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
   }
 }
 
