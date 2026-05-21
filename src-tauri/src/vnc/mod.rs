@@ -30,7 +30,16 @@ pub async fn vnc_connect(
 ) -> Result<VncConnectResult, String> {
     let session_id = Uuid::new_v4().to_string();
 
-    let session = spawn_vnc_relay(host, port, username, password).await?;
+    let resolved_password = match password.as_deref() {
+        Some(p) => state
+            .vault
+            .resolve(p)?
+            .map(|z| (*z).clone())
+            .or(Some(p.to_string())),
+        None => None,
+    };
+
+    let session = spawn_vnc_relay(host, port, username, resolved_password).await?;
 
     let result = VncConnectResult {
         session_id: session_id.clone(),
@@ -60,13 +69,22 @@ pub async fn vnc_disconnect(state: State<'_, AppState>, session_id: String) -> R
 /// Test a VNC connection (handshake + auth only, no WS relay).
 #[tauri::command]
 pub async fn vnc_test_connection(
+    state: State<'_, AppState>,
     host: String,
     port: u16,
     username: Option<String>,
     password: Option<String>,
 ) -> Result<String, String> {
+    let resolved = match password.as_deref() {
+        Some(p) => state
+            .vault
+            .resolve(p)?
+            .map(|z| (*z).clone())
+            .or(Some(p.to_string())),
+        None => None,
+    };
     let mut rfb = crate::vnc::rfb::RfbConnection::connect(&host, port)?;
-    rfb.authenticate(username.as_deref(), password.as_deref())?;
+    rfb.authenticate(username.as_deref(), resolved.as_deref())?;
     Ok(format!(
         "Connection successful: {}x{} - {}",
         rfb.width, rfb.height, rfb.name

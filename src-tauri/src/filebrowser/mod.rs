@@ -46,6 +46,21 @@ fn auth_from(method: &str, data: Option<String>) -> SshAuth {
     }
 }
 
+fn auth_from_with_vault(
+    method: &str,
+    data: Option<String>,
+    vault: &crate::vault::Vault,
+) -> Result<SshAuth, String> {
+    if method == "Password" {
+        let raw = data.unwrap_or_default();
+        let resolved = vault.resolve(&raw)?;
+        return Ok(SshAuth::Password(
+            resolved.map(|z| (*z).clone()).unwrap_or(raw),
+        ));
+    }
+    Ok(auth_from(method, data))
+}
+
 #[tauri::command]
 pub async fn sftp_attach(
     session_id: String,
@@ -57,7 +72,7 @@ pub async fn sftp_attach(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<AttachResultPayload, String> {
-    let auth = auth_from(&auth_method, auth_data);
+    let auth = auth_from_with_vault(&auth_method, auth_data, &state.vault)?;
     let session = sftp::open_sftp(&host, port, &username, auth).await?;
     let home = session.home.clone();
 

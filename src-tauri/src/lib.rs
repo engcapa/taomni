@@ -9,8 +9,10 @@ mod config;
 mod appearance;
 mod vnc;
 mod history;
+mod vault;
 
 use state::AppState;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager, WebviewWindowBuilder};
 
 #[tauri::command]
@@ -33,7 +35,11 @@ pub fn run() {
                 .expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
 
-            app.manage(AppState::new(conn));
+            let vault_path = vault::default_vault_path(app.handle());
+            let v = vault::Vault::open(&vault_path).expect("failed to open vault");
+            let vault_arc = Arc::new(v);
+
+            app.manage(AppState::new(conn, vault_arc));
 
             // Auto-start any tunnels with autostart=true.
             let app_for_autostart = app.handle().clone();
@@ -137,6 +143,15 @@ pub fn run() {
             history::history_match_prefix,
             history::history_list_recent,
             history::history_clear,
+            vault::vault_status,
+            vault::vault_init,
+            vault::vault_unlock,
+            vault::vault_lock,
+            vault::vault_change_master,
+            vault::vault_put,
+            vault::vault_update,
+            vault::vault_delete,
+            vault::vault_list,
             exit_app,
         ])
         .run(tauri::generate_context!())

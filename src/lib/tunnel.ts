@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { withVaultLockedNotice } from "./ipc";
 
 export type TunnelKind = "Local" | "Remote" | "Dynamic";
 
@@ -60,7 +61,7 @@ export async function deleteTunnel(id: string): Promise<void> {
 }
 
 export async function startTunnel(id: string): Promise<TunnelStatusInfo> {
-  return invoke<TunnelStatusInfo>("start_tunnel", { id });
+  return withVaultLockedNotice(() => invoke<TunnelStatusInfo>("start_tunnel", { id }));
 }
 
 export async function stopTunnel(id: string): Promise<TunnelStatusInfo> {

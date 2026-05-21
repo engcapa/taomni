@@ -15,6 +15,8 @@ import {
 import type { TunnelConfig, TunnelKind } from "../../lib/tunnel";
 import { defaultTunnel } from "../../lib/tunnel";
 import type { SessionConfig } from "../../lib/ipc";
+import { vaultPut, isVaultReference, isVaultLockedError } from "../../lib/ipc";
+import { useVaultStore } from "../../stores/vaultStore";
 
 interface Props {
   initial?: TunnelConfig;
@@ -34,6 +36,12 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
   const [draft, setDraft] = useState<TunnelConfig>(() => initial ?? defaultTunnel("Local"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const vaultState = useVaultStore((s) => s.state);
+  const refreshVault = useVaultStore((s) => s.refresh);
+
+  useEffect(() => {
+    void refreshVault().catch(() => undefined);
+  }, [refreshVault]);
 
   useEffect(() => {
     if (initial) setDraft(initial);
@@ -113,9 +121,46 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
     setError(null);
     setBusy(true);
     try {
-      await onSave(draft);
+      let next = draft;
+      // If the user wants to remember the SSH gateway password and the
+      // current authData is a fresh plaintext, push it into the vault and
+      // replace authData with the resulting `vault:<id>` reference.
+      if (
+        next.ssh.authMethod === "Password" &&
+        next.ssh.saveAuth &&
+        vaultState !== "empty" &&
+        next.ssh.authData &&
+        !isVaultReference(next.ssh.authData)
+      ) {
+        const label = `${next.ssh.username || "user"}@${next.ssh.host || "?"}:${next.ssh.port}`;
+        const result = await vaultPut("tunnel-password", label, next.ssh.authData);
+        next = {
+          ...next,
+          ssh: { ...next.ssh, authData: result.reference },
+        };
+        setDraft(next);
+      } else if (
+        next.ssh.authMethod === "Password" &&
+        !next.ssh.saveAuth &&
+        next.ssh.authData &&
+        isVaultReference(next.ssh.authData)
+      ) {
+        // User unchecked Save credentials: drop the vault reference (the
+        // backend persistence layer already strips authData when save_auth
+        // is false, but clear it explicitly for clarity).
+        next = {
+          ...next,
+          ssh: { ...next.ssh, authData: null },
+        };
+        setDraft(next);
+      }
+      await onSave(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (isVaultLockedError(err)) {
+        setError("Vault is locked — unlock it first to save the password.");
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setBusy(false);
     }
@@ -307,28 +352,44 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                       ? "~/.ssh/id_ed25519"
                       : draft.ssh.authMethod === "Agent"
                         ? "(using SSH agent)"
-                        : ""
+                        : draft.ssh.authData && isVaultReference(draft.ssh.authData)
+                          ? "•••••• (saved in vault)"
+                          : ""
                   }
-                  value={draft.ssh.authData ?? ""}
+                  value={
+                    draft.ssh.authData && isVaultReference(draft.ssh.authData)
+                      ? ""
+                      : (draft.ssh.authData ?? "")
+                  }
                   onChange={(e) => updateSsh("authData", e.target.value)}
                   disabled={draft.ssh.authMethod === "Agent"}
                 />
               </Field>
               <Field label="Vault" disabled={draft.ssh.authMethod === "Agent"}>
-                <label className="flex items-center gap-1.5 text-[11px]">
+                <label
+                  className="flex items-center gap-1.5 text-[11px]"
+                  title={
+                    vaultState === "empty"
+                      ? "Set a master password in the vault settings first."
+                      : undefined
+                  }
+                >
                   <input
                     type="checkbox"
                     className="moba-checkbox"
                     checked={!!draft.ssh.saveAuth}
                     onChange={(e) => updateSsh("saveAuth", e.target.checked)}
-                    disabled={draft.ssh.authMethod === "Agent"}
+                    disabled={
+                      draft.ssh.authMethod === "Agent" ||
+                      (vaultState === "empty" && !draft.ssh.saveAuth)
+                    }
                   />
-                  Save credentials to disk
+                  Save credentials in vault
                 </label>
               </Field>
-              {draft.ssh.saveAuth && draft.ssh.authMethod === "Password" && (
+              {draft.ssh.saveAuth && draft.ssh.authMethod === "Password" && vaultState === "empty" && (
                 <div className="text-[10.5px] pl-[6.25rem]" style={{ color: "#a04b00" }}>
-                  Stored in plaintext in the app data folder until secure credential storage lands.
+                  Vault not initialized — set a master password in vault settings before saving.
                 </div>
               )}
             </DiagramCard>

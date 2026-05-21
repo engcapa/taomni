@@ -97,6 +97,22 @@ vi.mock("../lib/ipc", () => ({
   listSessions: vi.fn(async () => []),
   markSessionConnected: vi.fn(async () => 0),
   writeTerminal: vi.fn(async () => undefined),
+  // Vault helpers used by MainLayout's lock-aware connect flow.
+  VAULT_LOCKED_EVENT: "vault-locked",
+  vaultPut: vi.fn(async () => ({ id: "stub", reference: "vault:stub" })),
+  isVaultLockedError: () => false,
+}));
+
+vi.mock("../stores/vaultStore", () => ({
+  useVaultStore: Object.assign(
+    (selector: (s: { state: string; refresh: () => Promise<void>; unlock: () => Promise<void> }) => unknown) =>
+      selector({
+        state: "empty",
+        refresh: async () => undefined,
+        unlock: async () => undefined,
+      }),
+    { getState: () => ({ state: "empty" }) },
+  ),
 }));
 
 describe("MainLayout attached SFTP sidebar", () => {

@@ -8,6 +8,7 @@ use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::terminal::ActiveTerminal;
 use crate::tunnel::TunnelRegistry;
+use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
 
 pub struct WriteStreamHandle {
@@ -29,10 +30,11 @@ pub struct AppState {
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
+    pub vault: Arc<Vault>,
 }
 
 impl AppState {
-    pub fn new(db: rusqlite::Connection) -> Self {
+    pub fn new(db: rusqlite::Connection, vault: Arc<Vault>) -> Self {
         Self {
             terminals: Arc::new(RwLock::new(HashMap::new())),
             sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -43,6 +45,7 @@ impl AppState {
             write_handles: Arc::new(Mutex::new(HashMap::new())),
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
+            vault,
         }
     }
 }
