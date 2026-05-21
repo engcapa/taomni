@@ -30,6 +30,12 @@ function createBinaryOutputChannel(callback: (data: Uint8Array) => void): Channe
   return channel;
 }
 
+export interface LocalTerminalCreated {
+  sessionId: string;
+  /** `LocalShellOption.id` of the shell the backend actually launched. */
+  shellId: string;
+}
+
 export async function createLocalTerminal(
   sessionId: string,
   cols: number,
@@ -37,8 +43,8 @@ export async function createLocalTerminal(
   shell?: string,
   cwd?: string,
   onOutput?: (data: Uint8Array) => void,
-): Promise<string> {
-  return invoke<string>("create_local_terminal", {
+): Promise<LocalTerminalCreated> {
+  return invoke<LocalTerminalCreated>("create_local_terminal", {
     sessionId,
     cols,
     rows,

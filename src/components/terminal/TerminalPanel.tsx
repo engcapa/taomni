@@ -338,9 +338,17 @@ export function TerminalPanel({
   // Per-host command history for inline ghost-text suggestions.
   const historyHostKey = useMemo(() => makeHostKey(ssh), [ssh]);
   const isLocal = !ssh;
+  // Tracks which local shell the backend actually launched. Lets us suppress
+  // inline history suggestions on shells that already provide their own
+  // (PSReadLine on PowerShell). Resolved on connect — the prop only carries
+  // the user's selection, which can be missing when opening a saved
+  // LocalShell session, so we trust the backend's resolved id instead.
+  const [resolvedLocalShellId, setResolvedLocalShellId] = useState<string | null>(null);
   const isLocalPowerShell = useMemo(
-    () => !ssh && (localShell?.id === "powershell" || localShell?.id === "windows-powershell"),
-    [ssh, localShell?.id],
+    () =>
+      isLocal &&
+      (resolvedLocalShellId === "powershell" || resolvedLocalShellId === "windows-powershell"),
+    [isLocal, resolvedLocalShellId],
   );
   const suggestionsActive = inlineSuggestionsEnabled && !isLocalPowerShell;
   const history = useCommandHistory(historyHostKey, inlineSuggestionsMax);
@@ -598,7 +606,7 @@ export function TerminalPanel({
       ) {
         return;
       }
-      writeBroadcastInput(normalizePasteText(text));
+      writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
       focusTerminal();
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
@@ -1121,7 +1129,7 @@ export function TerminalPanel({
     }
     const selection = termRef.current?.getSelection();
     if (selection) {
-      writeBroadcastInput(normalizePasteText(selection));
+      writeBroadcastInput(formatPasteForTerminal(termRef.current, selection));
       focusTerminal();
       return;
     }
@@ -1381,7 +1389,10 @@ export function TerminalPanel({
             return JSON.stringify(toNetworkSettingsPayload(ns));
           })(),
           (raw) => zmodem.consume(raw),
-        )
+        ).then<{ sessionId: string; shellId: string | null }>((sessionId) => ({
+          sessionId,
+          shellId: null,
+        }))
       : createLocalTerminal(
           sid,
           cols,
@@ -1389,7 +1400,7 @@ export function TerminalPanel({
           localShell?.id,
           undefined,
           (raw) => zmodem.consume(raw),
-        );
+        ).then(({ sessionId, shellId }) => ({ sessionId, shellId }));
 
     if (ssh) {
       appendEvent("connection", `Connecting to ${ssh.username}@${ssh.host}:${ssh.port}`);
@@ -1400,13 +1411,14 @@ export function TerminalPanel({
     }
 
     connectPromise
-      .then(async (connectedSid) => {
+      .then(async ({ sessionId: connectedSid, shellId }) => {
         if (destroyed) {
           closeTerminal(connectedSid).catch(() => {});
           return;
         }
         sessionIdRef.current = connectedSid;
         zmodemRef.current = zmodem;
+        if (shellId) setResolvedLocalShellId(shellId);
         onSessionReadyRef.current?.(connectedSid);
         appendEvent("connection", `Connected (${connectedSid})`);
         if (ssh) {
@@ -2322,6 +2334,20 @@ function firstVisibleMatchIndex(
 
 function normalizePasteText(text: string): string {
   return text.replace(/\r?\n/g, "\r");
+}
+
+// When the running app has enabled DEC bracketed paste (CSI ?2004h), wrap the
+// payload so the app can distinguish a paste from typed input. The LFs inside
+// the envelope are preserved on purpose: modern TUIs (Claude Code, ipython,
+// nano, lazygit, ...) read \n as "newline inside the paste" and \r as "submit",
+// and on Windows ConPTY there is no termios ICRNL to translate \r→\n the way
+// Linux PTYs do. Without this wrapping a 9-line paste arrives as 9 separate
+// Enter presses on Windows.
+function formatPasteForTerminal(term: Terminal | null, text: string): string {
+  if (term?.modes.bracketedPasteMode) {
+    return `\x1b[200~${text.replace(/\r\n/g, "\n")}\x1b[201~`;
+  }
+  return normalizePasteText(text);
 }
 
 function downloadTextFile(filename: string, text: string, type: string): void {
