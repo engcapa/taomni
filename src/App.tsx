@@ -8,17 +8,27 @@ import { useAppTheme } from "./lib/appTheme";
 import { attachSftpSync } from "./lib/sftpSync";
 import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindow";
 import { dispatchNativeFileDrop, isOsFileDrag } from "./lib/osFileDrop";
-import { isTauriRuntime } from "./lib/runtime";
+import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
+import { useAppStore } from "./stores/appStore";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
+  const uiFontFamily = useAppStore((s) => s.uiFontFamily);
+  const uiFontSize = useAppStore((s) => s.uiFontSize);
 
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.appTheme = resolvedTheme;
     root.dataset.appThemeMode = mode;
     root.style.colorScheme = resolvedTheme;
+    root.dataset.appPlatform = getAppPlatform();
   }, [mode, resolvedTheme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--moba-ui-font-family", uiFontFamily);
+    root.style.setProperty("--moba-ui-font-size", `${uiFontSize}px`);
+  }, [uiFontFamily, uiFontSize]);
 
   // Mirror the transfer queue across same-origin windows so a user can see
   // the same uploads/downloads from both the main app and a detached SFTP

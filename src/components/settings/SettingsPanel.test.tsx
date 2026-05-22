@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setAppThemeMode } from "../../lib/appTheme";
@@ -31,9 +31,10 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
+    const terminalFontSelect = screen.getByLabelText("Terminal font");
+    await waitFor(() => expect(within(terminalFontSelect).getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
 
-    await user.selectOptions(screen.getByLabelText("Terminal font"), "JetBrains Mono");
+    await user.selectOptions(terminalFontSelect, "JetBrains Mono");
     const fontSize = screen.getByLabelText("Terminal font size");
     await user.clear(fontSize);
     await user.type(fontSize, "18");
@@ -64,4 +65,27 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByRole("button", { name: "Follow system" }));
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("system");
   });
+
+  it("persists global UI typography settings", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    // Select alternative UI font
+    const fontSelect = screen.getByLabelText("UI Font Family");
+    await user.selectOptions(fontSelect, '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+    expect(window.localStorage.getItem("newmob.uiFontFamily")).toContain("Outfit");
+
+    // Slider for base size
+    const sizeSlider = screen.getByLabelText("UI Base Font Size");
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(sizeSlider, { target: { value: "16" } });
+    expect(window.localStorage.getItem("newmob.uiFontSize")).toBe("16");
+
+    // Test Reset UI Font button
+    const resetButton = screen.getByRole("button", { name: "Reset UI Font" });
+    await user.click(resetButton);
+    expect(window.localStorage.getItem("newmob.uiFontFamily")).toContain("Inter");
+    expect(window.localStorage.getItem("newmob.uiFontSize")).toBe("12");
+  });
 });
+

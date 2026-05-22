@@ -3,9 +3,9 @@ import { appThemeModeLabel, useAppTheme, type AppThemeMode } from "../../lib/app
 import { useAppStore } from "../../stores/appStore";
 
 const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
-  { mode: "light", icon: <Sun className="w-3.5 h-3.5" /> },
-  { mode: "dark", icon: <Moon className="w-3.5 h-3.5" /> },
-  { mode: "system", icon: <Monitor className="w-3.5 h-3.5" /> },
+  { mode: "light", icon: <Sun className="w-[16px] h-[16px]" /> },
+  { mode: "dark", icon: <Moon className="w-[16px] h-[16px]" /> },
+  { mode: "system", icon: <Monitor className="w-[16px] h-[16px]" /> },
 ];
 
 export function TitleBarTrayControls() {
@@ -34,7 +34,7 @@ export function TitleBarTrayControls() {
         active={compactMode}
         onClick={toggleCompactMode}
       >
-        {compactMode ? <PanelTopOpen className="w-3.5 h-3.5" /> : <PanelTopClose className="w-3.5 h-3.5" />}
+        {compactMode ? <PanelTopOpen className="w-[16px] h-[16px]" /> : <PanelTopClose className="w-[16px] h-[16px]" />}
       </TrayButton>
     </div>
   );

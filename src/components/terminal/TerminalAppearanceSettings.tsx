@@ -15,6 +15,8 @@ import {
   type UserCommonCommand,
 } from "../../lib/terminalProfile";
 import {
+  getPrimaryFontName,
+  isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
   useSystemFonts,
@@ -54,7 +56,29 @@ export function TerminalAppearanceSettings({
 }: TerminalAppearanceSettingsProps) {
   const fontState = useSystemFonts();
   const fontOptions = useTerminalFontOptions(fontState.fonts);
+  const partitionedFonts = useMemo(() => {
+    const mono: string[] = [];
+    const prop: string[] = [];
+    for (const font of fontOptions) {
+      if (isMonospaceFont(font)) {
+        mono.push(font);
+      } else {
+        prop.push(font);
+      }
+    }
+    return { mono, prop };
+  }, [fontOptions]);
+
   const selectedFont = resolveSelectedFontName(profile.fontFamily, fontOptions);
+
+  const showFontWarning = useMemo(() => {
+    return selectedFont ? !isMonospaceFont(selectedFont) : false;
+  }, [selectedFont]);
+
+  const primaryFont = useMemo(() => getPrimaryFontName(profile.fontFamily), [profile.fontFamily]);
+  const safeFontFamily = useMemo(() => {
+    return isMonospaceFont(primaryFont) ? profile.fontFamily : makeTerminalFontFamily("Source Code Pro");
+  }, [primaryFont, profile.fontFamily]);
   const colors = terminalProfileThemeColors(profile);
   const [bg, setBg] = useState(colors.background);
   const [fg, setFg] = useState(colors.foreground);
@@ -124,12 +148,30 @@ export function TerminalAppearanceSettings({
               disabled={fontOptions.length === 0}
               onChange={(event) => updateProfile({ fontFamily: makeTerminalFontFamily(event.target.value) })}
             >
-              {fontOptions.map((font) => (
-                <option key={font} value={font}>
-                  {font}
-                </option>
-              ))}
+              {partitionedFonts.mono.length > 0 && (
+                <optgroup label="Monospace Fonts (Recommended)">
+                  {partitionedFonts.mono.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {partitionedFonts.prop.length > 0 && (
+                <optgroup label="Proportional Fonts (Not Recommended)">
+                  {partitionedFonts.prop.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
+            {showFontWarning && (
+              <p className="mt-1.5 text-[11px] text-[#ff6b6b] leading-snug">
+                ⚠️ This font is not monospace. It will be forced into a grid in the terminal, causing uneven character spacing.
+              </p>
+            )}
           </label>
 
           <div className="col-span-8 md:col-span-3">
@@ -363,7 +405,7 @@ export function TerminalAppearanceSettings({
         <TerminalPreview
           background={showCustomColors ? bg : colors.background}
           foreground={showCustomColors ? fg : colors.foreground}
-          fontFamily={profile.fontFamily}
+          fontFamily={safeFontFamily}
           fontSize={profile.fontSize}
           cursorStyle={profile.cursorStyle}
           cursorBlink={profile.cursorBlink}

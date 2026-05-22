@@ -4,9 +4,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 export function WindowControls() {
   return (
     <div className="moba-window-controls flex items-stretch self-stretch shrink-0" data-testid="window-controls">
-      <WindowButton testId="window-min" title="Minimize" icon={<Minus className="w-4 h-4" />} onClick={() => void getCurrentWindow().minimize()} />
-      <WindowButton testId="window-max" title="Maximize" icon={<Maximize2 className="w-3.5 h-3.5" />} onClick={() => void getCurrentWindow().toggleMaximize()} />
-      <WindowButton testId="window-close" danger title="Close" icon={<X className="w-4 h-4" />} onClick={() => void getCurrentWindow().close()} />
+      <WindowButton testId="window-min" title="Minimize" icon={<Minus className="w-[18px] h-[18px]" />} onClick={() => void getCurrentWindow().minimize()} />
+      <WindowButton testId="window-max" title="Maximize" icon={<Maximize2 className="w-[16px] h-[16px]" />} onClick={() => void getCurrentWindow().toggleMaximize()} />
+      <WindowButton testId="window-close" danger title="Close" icon={<X className="w-[18px] h-[18px]" />} onClick={() => void getCurrentWindow().close()} />
     </div>
   );
 }

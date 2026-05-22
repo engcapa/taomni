@@ -826,6 +826,8 @@ function DownloadPrompt({
       onClick={onCancel}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="w-[420px] rounded shadow-lg p-4"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(e) => e.stopPropagation()}
@@ -882,6 +884,8 @@ function PreviewModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="w-[80vw] h-[70vh] rounded shadow-lg flex flex-col"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(e) => e.stopPropagation()}
