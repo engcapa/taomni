@@ -221,6 +221,22 @@ fn entry_for(path: &Path) -> Result<FileEntryDto, String> {
     } else {
         None
     };
+    // For symlinks, follow one level to record the *target*'s type so that
+    // callers can route a "symlink → dir" double-click into a directory
+    // navigation instead of handing it to the OS file manager via xdg-open.
+    let target_file_type = if meta.file_type().is_symlink() {
+        fs::metadata(path).ok().map(|m| {
+            if m.is_dir() {
+                "dir".to_string()
+            } else if m.is_file() {
+                "file".to_string()
+            } else {
+                "unknown".to_string()
+            }
+        })
+    } else {
+        None
+    };
 
     Ok(FileEntryDto {
         name: name.clone(),
@@ -229,6 +245,7 @@ fn entry_for(path: &Path) -> Result<FileEntryDto, String> {
         mtime,
         mode,
         file_type: file_type.into(),
+        target_file_type,
         is_hidden: name.starts_with('.'),
         symlink_target,
         owner: None,

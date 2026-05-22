@@ -26,7 +26,7 @@ import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowse
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { isTauriRuntime } from "../lib/runtime";
 import { openSftpWindow } from "../lib/sftp";
-import { sftpOpenPath, sftpStat } from "../lib/sftp";
+import { sftpOpenPath, sftpStat, effectiveFileType } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
 import {
@@ -425,7 +425,7 @@ export function MainLayout() {
     let isDir = false;
     try {
       const info = await sftpStat("", trimmed, "local");
-      isDir = info.fileType === "dir";
+      isDir = effectiveFileType(info) === "dir";
     } catch (err) {
       setStatusMessage(`Stat failed: ${err instanceof Error ? err.message : String(err)}`);
       return;

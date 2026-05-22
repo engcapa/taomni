@@ -29,6 +29,12 @@ pub struct FileEntryDto {
     pub mode: u32,
     #[serde(rename = "fileType")]
     pub file_type: String,
+    /// Effective type after one level of symlink resolution. `None` for
+    /// non-symlinks; `"dir"` / `"file"` / `"unknown"` when the link target
+    /// could be stat'd; left as `None` for broken or permission-denied
+    /// links (callers fall back to `file_type`).
+    #[serde(rename = "targetFileType", skip_serializing_if = "Option::is_none")]
+    pub target_file_type: Option<String>,
     #[serde(rename = "isHidden")]
     pub is_hidden: bool,
     #[serde(rename = "symlinkTarget")]
@@ -100,6 +106,19 @@ impl ActiveSftp {
                 let sftp = self.sftp.lock().await;
                 if let Ok(target) = sftp.read_link(full.clone()).await {
                     dto.symlink_target = Some(target);
+                }
+                // STAT (vs LSTAT used by read_dir) follows the link — the
+                // returned attrs describe the *target*. We only need its
+                // type so callers can distinguish "symlink → dir" from
+                // "symlink → file" when handling double-click / open.
+                if let Ok(target_attrs) = sftp.metadata(full.clone()).await {
+                    let t = match target_attrs.file_type() {
+                        SftpFileType::Dir => "dir",
+                        SftpFileType::File => "file",
+                        SftpFileType::Symlink => "symlink",
+                        SftpFileType::Other => "unknown",
+                    };
+                    dto.target_file_type = Some(t.into());
                 }
             }
             entries.push(dto);
@@ -775,6 +794,7 @@ fn entry_from_attrs(
         mtime,
         mode,
         file_type: file_type.into(),
+        target_file_type: None,
         symlink_target: None,
         owner: attrs.uid.map(|u| u.to_string()),
         group: attrs.gid.map(|g| g.to_string()),
