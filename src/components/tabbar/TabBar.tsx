@@ -15,12 +15,19 @@ import {
   FileText,
   Pencil,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu } from "../ContextMenu";
+import {
+  startCustomDrag,
+  useCustomDropTarget,
+  type CustomDragData,
+} from "../../lib/customDnD";
 import type { Tab, TabKind } from "../../types";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
+
+const TAB_DRAG_MIME = "newmob/tab";
 
 export function TabBar() {
   const {
@@ -119,9 +126,8 @@ export function TabBar() {
     ]);
   };
 
-  const computeDropSide = (event: React.DragEvent<HTMLElement>): "before" | "after" => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+  const computeDropSide = (rect: DOMRect, clientX: number): "before" | "after" => {
+    return clientX < rect.left + rect.width / 2 ? "before" : "after";
   };
 
   const clearDragState = () => {
@@ -129,44 +135,21 @@ export function TabBar() {
     setDropIndicator(null);
   };
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
-    setDraggedId(tab.id);
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-      try {
-        e.dataTransfer.setData("application/x-newmob-tab", tab.id);
-      } catch {
-        // Some browsers reject custom MIME types; the in-memory state is the source of truth.
-      }
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
-    if (!draggedId) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    const side = computeDropSide(e);
-    if (draggedId === tab.id) {
-      setDropIndicator(null);
-      return;
-    }
-    setDropIndicator((prev) => {
-      if (prev && prev.tabId === tab.id && prev.side === side) return prev;
-      return { tabId: tab.id, side };
+  const handleTabPointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    tab: Tab,
+    el: HTMLDivElement,
+  ) => {
+    if (editingTabId === tab.id) return;
+    if (e.button !== 0) return;
+    startCustomDrag({
+      event: e,
+      data: { mime: TAB_DRAG_MIME, payload: { tabId: tab.id } },
+      ghostText: tab.title,
+      ghostElement: el,
+      onActivate: () => setDraggedId(tab.id),
+      onEnd: clearDragState,
     });
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, tab: Tab) => {
-    if (!draggedId) {
-      clearDragState();
-      return;
-    }
-    e.preventDefault();
-    const side = computeDropSide(e);
-    if (draggedId !== tab.id) {
-      moveTab(draggedId, tab.id, side);
-    }
-    clearDragState();
   };
 
   return (
@@ -181,121 +164,53 @@ export function TabBar() {
         const isSelected = multiExecActive && tab.type === "terminal" && multiExecSelectedTabIds.has(tab.id);
         const dropSide = dropIndicator && dropIndicator.tabId === tab.id ? dropIndicator.side : undefined;
         return (
-          <div
+          <TabItem
             key={tab.id}
-            data-testid="tab-item"
-            data-tab-id={tab.id}
-            data-tab-title={tab.title}
-            data-tab-type={tab.type}
-            data-multiexec-selected={isSelected || undefined}
-            data-dragging={draggedId === tab.id || undefined}
-            data-drop-side={dropSide}
-            className="moba-tab relative"
-            data-active={activeTabId === tab.id}
-            draggable={editingTabId !== tab.id}
-            onClick={() => {
-              if (editingTabId === tab.id) return;
-              setActiveTab(tab.id);
-            }}
-            onMouseDown={(e) => {
-              if (editingTabId === tab.id) return;
-              handleMouseDown(e, tab);
-            }}
-            onContextMenu={(e) => handleTabContext(e, tab)}
-            onDragStart={(e) => {
-              if (editingTabId === tab.id) {
-                e.preventDefault();
+            tab={tab}
+            active={activeTabId === tab.id}
+            multiExecSelected={!!isSelected}
+            multiExecActive={multiExecActive}
+            dragging={draggedId === tab.id}
+            draggedId={draggedId}
+            dropSide={dropSide}
+            editing={editingTabId === tab.id}
+            draftTitle={draftTitle}
+            onStartDrag={handleTabPointerDown}
+            onDragOverTab={(t, rect, clientX) => {
+              if (!draggedId || draggedId === t.id) {
+                setDropIndicator(null);
                 return;
               }
-              handleDragStart(e, tab);
+              const side = computeDropSide(rect, clientX);
+              setDropIndicator((prev) => {
+                if (prev && prev.tabId === t.id && prev.side === side) return prev;
+                return { tabId: t.id, side };
+              });
             }}
-            onDragOver={(e) => handleDragOver(e, tab)}
-            onDragLeave={() =>
-              setDropIndicator((prev) => (prev && prev.tabId === tab.id ? null : prev))
+            onDragLeaveTab={(t) =>
+              setDropIndicator((prev) => (prev && prev.tabId === t.id ? null : prev))
             }
-            onDrop={(e) => handleDrop(e, tab)}
-            onDragEnd={clearDragState}
-          >
-            {multiExecActive && tab.type === "terminal" && (
-              <button
-                type="button"
-                title={isSelected ? "Remove from MultiExec" : "Add to MultiExec"}
-                className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full border flex items-center justify-center z-10 flex-shrink-0"
-                style={{
-                  background: isSelected ? "var(--moba-accent)" : "var(--moba-chrome-bg)",
-                  borderColor: isSelected ? "var(--moba-accent)" : "var(--moba-divider)",
-                  fontSize: 7,
-                  color: isSelected ? "#fff" : "var(--moba-text-muted)",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleMultiExecTab(tab.id);
-                }}
-              >
-                {isSelected ? "✓" : ""}
-              </button>
-            )}
-            <div className="relative flex-shrink-0">
-              <TabIcon kind={tab.type} ssh={!!tab.ssh} />
-              {tab.hasNewOutput && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 pointer-events-none"
-                  aria-label="New output"
-                />
-              )}
-            </div>
-            <span
-              data-testid="tab-title"
-              className="truncate max-w-[180px]"
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                startRename(tab);
-              }}
-            >
-              {editingTabId === tab.id ? (
-                <input
-                  data-testid="tab-title-input"
-                  autoFocus
-                  type="text"
-                  value={draftTitle}
-                  onChange={(e) => setDraftTitle(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                  onDragStart={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  draggable={false}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitRename();
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelRename();
-                    }
-                    e.stopPropagation();
-                  }}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onBlur={commitRename}
-                  className="bg-transparent border-b border-[var(--moba-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
-                  style={{ color: "inherit", font: "inherit" }}
-                />
-              ) : (
-                tab.title
-              )}
-            </span>
-            {tab.closable && (
-              <X
-                className="w-3 h-3 ml-1 opacity-60 hover:opacity-100"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeTab(tab.id);
-                }}
-              />
-            )}
-          </div>
+            onDropOnTab={(t, rect, clientX) => {
+              if (!draggedId) return;
+              const side = computeDropSide(rect, clientX);
+              if (draggedId !== t.id) {
+                moveTab(draggedId, t.id, side);
+              }
+              clearDragState();
+            }}
+            onActivate={(t) => {
+              if (editingTabId === t.id) return;
+              setActiveTab(t.id);
+            }}
+            onMouseDown={handleMouseDown}
+            onContextMenu={handleTabContext}
+            onDraftTitleChange={setDraftTitle}
+            onCommitRename={commitRename}
+            onCancelRename={cancelRename}
+            onStartRename={startRename}
+            onToggleMultiExecTab={toggleMultiExecTab}
+            onRemove={removeTab}
+          />
         );
       })}
 
@@ -379,5 +294,179 @@ function IconBtn({
     >
       {icon}
     </button>
+  );
+}
+
+interface TabItemProps {
+  tab: Tab;
+  active: boolean;
+  multiExecActive: boolean;
+  multiExecSelected: boolean;
+  dragging: boolean;
+  draggedId: string | null;
+  dropSide: "before" | "after" | undefined;
+  editing: boolean;
+  draftTitle: string;
+  onStartDrag: (e: React.PointerEvent<HTMLDivElement>, tab: Tab, el: HTMLDivElement) => void;
+  onDragOverTab: (tab: Tab, rect: DOMRect, clientX: number) => void;
+  onDragLeaveTab: (tab: Tab) => void;
+  onDropOnTab: (tab: Tab, rect: DOMRect, clientX: number) => void;
+  onActivate: (tab: Tab) => void;
+  onMouseDown: (e: React.MouseEvent, tab: Tab) => void;
+  onContextMenu: (e: React.MouseEvent, tab: Tab) => void;
+  onDraftTitleChange: (next: string) => void;
+  onCommitRename: () => void;
+  onCancelRename: () => void;
+  onStartRename: (tab: Tab) => void;
+  onToggleMultiExecTab: (id: string) => void;
+  onRemove: (id: string) => void;
+}
+
+function TabItem(props: TabItemProps) {
+  const {
+    tab,
+    active,
+    multiExecActive,
+    multiExecSelected,
+    dragging,
+    draggedId,
+    dropSide,
+    editing,
+    draftTitle,
+    onStartDrag,
+    onDragOverTab,
+    onDragLeaveTab,
+    onDropOnTab,
+    onActivate,
+    onMouseDown,
+    onContextMenu,
+    onDraftTitleChange,
+    onCommitRename,
+    onCancelRename,
+    onStartRename,
+    onToggleMultiExecTab,
+    onRemove,
+  } = props;
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useCustomDropTarget<HTMLDivElement>(ref, {
+    accepts: (data: CustomDragData) => data.mime === TAB_DRAG_MIME && draggedId !== null,
+    onDragOver: (detail) => {
+      const el = ref.current;
+      if (!el) return;
+      onDragOverTab(tab, el.getBoundingClientRect(), detail.clientX);
+    },
+    onDragLeave: () => onDragLeaveTab(tab),
+    onDrop: (detail) => {
+      const el = ref.current;
+      if (!el) return;
+      onDropOnTab(tab, el.getBoundingClientRect(), detail.clientX);
+    },
+  });
+
+  return (
+    <div
+      ref={ref}
+      data-testid="tab-item"
+      data-tab-id={tab.id}
+      data-tab-title={tab.title}
+      data-tab-type={tab.type}
+      data-multiexec-selected={multiExecSelected || undefined}
+      data-dragging={dragging || undefined}
+      data-drop-side={dropSide}
+      className="moba-tab relative"
+      data-active={active}
+      onClick={() => onActivate(tab)}
+      onMouseDown={(e) => {
+        if (editing) return;
+        onMouseDown(e, tab);
+      }}
+      onPointerDown={(e) => {
+        if (editing) return;
+        const el = ref.current;
+        if (!el) return;
+        onStartDrag(e, tab, el);
+      }}
+      onContextMenu={(e) => onContextMenu(e, tab)}
+    >
+      {multiExecActive && tab.type === "terminal" && (
+        <button
+          type="button"
+          title={multiExecSelected ? "Remove from MultiExec" : "Add to MultiExec"}
+          className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full border flex items-center justify-center z-10 flex-shrink-0"
+          style={{
+            background: multiExecSelected ? "var(--moba-accent)" : "var(--moba-chrome-bg)",
+            borderColor: multiExecSelected ? "var(--moba-accent)" : "var(--moba-divider)",
+            fontSize: 7,
+            color: multiExecSelected ? "#fff" : "var(--moba-text-muted)",
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMultiExecTab(tab.id);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {multiExecSelected ? "✓" : ""}
+        </button>
+      )}
+      <div className="relative flex-shrink-0">
+        <TabIcon kind={tab.type} ssh={!!tab.ssh} />
+        {tab.hasNewOutput && (
+          <span
+            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 pointer-events-none"
+            aria-label="New output"
+          />
+        )}
+      </div>
+      <span
+        data-testid="tab-title"
+        className="truncate max-w-[180px]"
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onStartRename(tab);
+        }}
+      >
+        {editing ? (
+          <input
+            data-testid="tab-title-input"
+            autoFocus
+            type="text"
+            value={draftTitle}
+            onChange={(e) => onDraftTitleChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onCommitRename();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                onCancelRename();
+              }
+              e.stopPropagation();
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={onCommitRename}
+            className="bg-transparent border-b border-[var(--moba-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+            style={{ color: "inherit", font: "inherit" }}
+          />
+        ) : (
+          tab.title
+        )}
+      </span>
+      {tab.closable && (
+        <X
+          className="w-3 h-3 ml-1 opacity-60 hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(tab.id);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        />
+      )}
+    </div>
   );
 }
