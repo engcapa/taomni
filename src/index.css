@@ -325,6 +325,12 @@ body {
 }
 
 .moba-compact-titlebar {
+  /* Pin to a fixed pixel height: the global :root font-size is 12px, so
+     Tailwind's h-8 (2rem) collapses to 24px and the inner tabbar (32px)
+     would spill into the terminal area below. flex-shrink: 0 keeps the
+     parent flex column from compressing it further. */
+  height: 32px;
+  flex-shrink: 0;
   background: linear-gradient(to bottom, var(--moba-titlebar-from), var(--moba-titlebar-to));
   border-bottom: 1px solid var(--moba-chrome-border);
   color: var(--moba-text);
@@ -336,6 +342,9 @@ body {
   padding-top: 5px;
   background: transparent !important;
   border-bottom: none;
+  /* Clip tabs that would otherwise spill past the tabbar's right edge
+     into the trailing tray/window-controls area. */
+  overflow: hidden;
 }
 
 .moba-compact-titlebar .moba-tab {

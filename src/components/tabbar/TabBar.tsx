@@ -14,6 +14,10 @@ import {
   Trash2,
   FileText,
   Pencil,
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
@@ -39,6 +43,7 @@ export function TabBar() {
     removeTabs,
     addTab,
     moveTab,
+    moveTabToIndex,
     updateTabTitle,
     toggleCompactMode,
     multiExecActive,
@@ -100,6 +105,9 @@ export function TabBar() {
   };
 
   const handleTabContext = (e: React.MouseEvent, tab: Tab) => {
+    const idx = tabs.findIndex((t) => t.id === tab.id);
+    const isFirst = idx === 0;
+    const isLast = idx === tabs.length - 1;
     ctx.show(e, [
       { label: "Close", icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
       { label: "Close others", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
@@ -109,6 +117,11 @@ export function TabBar() {
       { label: "Duplicate tab", icon: <Copy className="w-3 h-3" />, onClick: () => {
         addTab({ ...tab, id: `dup-${Date.now()}`, closable: true });
       }, disabled: tab.type === "welcome" },
+      { label: "", separator: true, onClick: () => {} },
+      { label: "Move to first", icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
+      { label: "Move left", icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
+      { label: "Move right", icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
+      { label: "Move to last", icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
     ]);
   };
 
@@ -142,13 +155,20 @@ export function TabBar() {
   ) => {
     if (editingTabId === tab.id) return;
     if (e.button !== 0) return;
+    e.preventDefault();
     startCustomDrag({
       event: e,
       data: { mime: TAB_DRAG_MIME, payload: { tabId: tab.id } },
       ghostText: tab.title,
       ghostElement: el,
-      onActivate: () => setDraggedId(tab.id),
-      onEnd: clearDragState,
+      onActivate: () => {
+        setDraggedId(tab.id);
+        document.body.style.userSelect = "none";
+      },
+      onEnd: () => {
+        clearDragState();
+        document.body.style.userSelect = "";
+      },
     });
   };
 
