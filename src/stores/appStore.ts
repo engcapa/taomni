@@ -26,6 +26,7 @@ interface AppState {
   updateTabTitle: (id: string, title: string) => void;
   setActiveTab: (id: string) => void;
   moveTab: (fromId: string, targetId: string, position: "before" | "after") => void;
+  moveTabToIndex: (id: string, toIndex: number) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleCompactMode: () => void;
@@ -168,6 +169,18 @@ export const useAppStore = create<AppState>((set) => ({
       const insertAt = position === "after" ? adjustedTarget + 1 : adjustedTarget;
       next.splice(insertAt, 0, moved);
       if (next.every((t, i) => t === s.tabs[i])) return s;
+      return { tabs: next };
+    }),
+
+  moveTabToIndex: (id, toIndex) =>
+    set((s) => {
+      const from = s.tabs.findIndex((t) => t.id === id);
+      if (from === -1) return s;
+      const clamped = Math.max(0, Math.min(toIndex, s.tabs.length - 1));
+      if (from === clamped) return s;
+      const next = s.tabs.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(clamped, 0, moved);
       return { tabs: next };
     }),
 
