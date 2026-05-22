@@ -3,7 +3,7 @@ import { FilePanel } from "./FilePanel";
 import { ChmodDialog } from "./ChmodDialog";
 import { useSftpStore } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
-import { sftpOpenPath, type FileEntry } from "../../lib/sftp";
+import { sftpOpenPath, effectiveFileType, type FileEntry } from "../../lib/sftp";
 import { useAppStore } from "../../stores/appStore";
 import type { MenuItem } from "../ContextMenu";
 
@@ -45,7 +45,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
 
   const handleOpen = useCallback(async (entries: FileEntry[]) => {
     for (const entry of entries) {
-      if (entry.fileType === "dir") {
+      if (effectiveFileType(entry) === "dir") {
         await navigate(tabId, "local", entry.path);
         return;
       }
@@ -58,7 +58,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
   }, [navigate, setStatus, tabId]);
 
   const handleDoubleClick = useCallback(async (entry: FileEntry) => {
-    if (entry.fileType === "dir") {
+    if (effectiveFileType(entry) === "dir") {
       await navigate(tabId, "local", entry.path);
       return;
     }
@@ -75,8 +75,9 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
       const target = targets[0] ?? entry;
       const multi = targets.length > 1;
       const items: MenuItem[] = [];
+      const effective = effectiveFileType(entry);
       items.push({
-        label: entry.fileType === "dir"
+        label: effective === "dir"
           ? "Open folder"
           : multi
             ? `Open ${targets.length} files`
@@ -87,7 +88,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
         items.push({
           label: "Reveal in OS file manager",
           onClick: () => {
-            const path = target.fileType === "dir" ? target.path : (session?.local.path ?? "");
+            const path = effective === "dir" ? target.path : (session?.local.path ?? "");
             void sftpOpenPath(path).catch((err) => setStatus(`Open failed: ${err}`));
           },
         });

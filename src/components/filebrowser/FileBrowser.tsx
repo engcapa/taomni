@@ -19,7 +19,7 @@ import { FileTransferQueue } from "./FileTransferQueue";
 import { ChmodDialog } from "./ChmodDialog";
 import { useSftpStore, type PaneSide } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
-import { joinPath, basename, sftpStat, type FileEntry, type FsSide } from "../../lib/sftp";
+import { joinPath, basename, sftpStat, effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
 import type { MenuItem } from "../ContextMenu";
 import { useAppStore } from "../../stores/appStore";
 
@@ -216,7 +216,7 @@ export function FileBrowser(props: FileBrowserProps) {
 
   const handleDoubleClick = useCallback(
     async (side: PaneSide, entry: FileEntry) => {
-      if (entry.fileType === "dir") {
+      if (effectiveFileType(entry) === "dir") {
         await navigate(props.sessionId, side, entry.path);
         if (side === "remote") props.onTerminalSync?.(entry.path);
         return;
@@ -248,7 +248,7 @@ export function FileBrowser(props: FileBrowserProps) {
     async (entries: FileEntry[]) => {
       const { sftpOpenPath } = await import("../../lib/sftp");
       for (const entry of entries) {
-        if (entry.fileType === "dir") {
+        if (effectiveFileType(entry) === "dir") {
           await navigate(props.sessionId, "local", entry.path);
           return;
         }
@@ -269,7 +269,7 @@ export function FileBrowser(props: FileBrowserProps) {
       const multi = targets.length > 1;
       const items: MenuItem[] = [];
       items.push({
-        label: entry.fileType === "dir"
+        label: effectiveFileType(entry) === "dir"
           ? "Open folder"
           : multi
             ? `Open ${targets.length} files`
