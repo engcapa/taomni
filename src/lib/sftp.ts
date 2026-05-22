@@ -21,6 +21,13 @@ export interface FileEntry {
   mtime: number;
   mode: number;
   fileType: FileType;
+  /**
+   * Effective type after one level of symlink resolution. Only populated
+   * when `fileType === "symlink"` AND the target was reachable. Lets the
+   * UI decide whether a double-click on a symlink should navigate (target
+   * is a directory) or be handed to the OS opener (target is a file).
+   */
+  targetFileType?: FileType | null;
   isHidden: boolean;
   symlinkTarget?: string | null;
   owner?: string | null;
@@ -261,6 +268,20 @@ export async function openSftpWindow(
 
 export async function sftpOpenPath(path: string): Promise<void> {
   return invoke("sftp_open_path", { path });
+}
+
+/**
+ * Returns the *effective* type for navigation/open routing. A symlink
+ * whose target stat'd as a directory should be treated like a directory
+ * (so double-click navigates inside it instead of falling through to
+ * `xdg-open`, which would launch the system file manager). Falls back
+ * to the link's own type when the target is unreachable.
+ */
+export function effectiveFileType(entry: FileEntry): FileType {
+  if (entry.fileType === "symlink" && entry.targetFileType) {
+    return entry.targetFileType;
+  }
+  return entry.fileType;
 }
 
 export async function sftpReadFileText(
