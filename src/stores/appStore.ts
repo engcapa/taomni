@@ -4,6 +4,8 @@ import type { Tab } from "../types";
 export type SideTab = "sessions" | "tools" | "macros" | "games";
 
 const COMPACT_MODE_KEY = "newmob.compactMode";
+const UI_FONT_FAMILY_KEY = "newmob.uiFontFamily";
+const UI_FONT_SIZE_KEY = "newmob.uiFontSize";
 
 interface AppState {
   tabs: Tab[];
@@ -15,6 +17,8 @@ interface AppState {
   statusMessage: string;
   multiExecActive: boolean;
   multiExecSelectedTabIds: Set<string>;
+  uiFontFamily: string;
+  uiFontSize: number;
 
   addTab: (tab: Tab) => void;
   removeTab: (id: string) => void;
@@ -34,6 +38,8 @@ interface AppState {
   selectAllTerminalTabs: () => void;
   clearMultiExecSelection: () => void;
   setTabHasNewOutput: (tabId: string, hasNewOutput: boolean) => void;
+  setUiFontFamily: (font: string) => void;
+  setUiFontSize: (size: number) => void;
 }
 
 function readCompactMode() {
@@ -49,6 +55,45 @@ function writeCompactMode(compact: boolean) {
     window.localStorage.setItem(COMPACT_MODE_KEY, compact ? "true" : "false");
   } catch {
     // Ignore storage failures; compact mode still works for this run.
+  }
+}
+
+function readUiFontFamily(): string {
+  try {
+    return window.localStorage.getItem(UI_FONT_FAMILY_KEY) || "Inter";
+  } catch {
+    return "Inter";
+  }
+}
+
+function writeUiFontFamily(font: string) {
+  try {
+    window.localStorage.setItem(UI_FONT_FAMILY_KEY, font);
+  } catch {
+    // Ignore storage failures
+  }
+}
+
+function readUiFontSize(): number {
+  try {
+    const val = window.localStorage.getItem(UI_FONT_SIZE_KEY);
+    if (val) {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) {
+        return parsed;
+      }
+    }
+    return 12;
+  } catch {
+    return 12;
+  }
+}
+
+function writeUiFontSize(size: number) {
+  try {
+    window.localStorage.setItem(UI_FONT_SIZE_KEY, size.toString());
+  } catch {
+    // Ignore storage failures
   }
 }
 
@@ -69,6 +114,8 @@ export const useAppStore = create<AppState>((set) => ({
   statusMessage: "Ready",
   multiExecActive: false,
   multiExecSelectedTabIds: new Set(),
+  uiFontFamily: readUiFontFamily(),
+  uiFontSize: readUiFontSize(),
 
   addTab: (tab) =>
     set((s) => ({
@@ -189,5 +236,17 @@ export const useAppStore = create<AppState>((set) => ({
       const tab = s.tabs.find((t) => t.id === tabId);
       if (!tab || tab.hasNewOutput === hasNewOutput) return s;
       return { tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, hasNewOutput } : t)) };
+    }),
+
+  setUiFontFamily: (font) =>
+    set(() => {
+      writeUiFontFamily(font);
+      return { uiFontFamily: font };
+    }),
+
+  setUiFontSize: (size) =>
+    set(() => {
+      writeUiFontSize(size);
+      return { uiFontSize: size };
     }),
 }));

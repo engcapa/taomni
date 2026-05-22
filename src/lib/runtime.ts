@@ -13,3 +13,15 @@ export function isTauriRuntime(): boolean {
 
 export const RUNTIME_KIND: "tauri" | "browser" =
   isTauriRuntime() ? "tauri" : "browser";
+
+export type AppPlatform = "windows" | "macos" | "linux" | "unknown";
+
+export function getAppPlatform(): AppPlatform {
+  if (typeof window === "undefined") return "unknown";
+  const userAgent = `${navigator.platform} ${navigator.userAgent}`.toLowerCase();
+  if (userAgent.includes("mac") || userAgent.includes("iphone") || userAgent.includes("ipad") || userAgent.includes("ipod")) return "macos";
+  if (userAgent.includes("win")) return "windows";
+  if (userAgent.includes("linux")) return "linux";
+  return "unknown";
+}
+

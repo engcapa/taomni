@@ -11,6 +11,8 @@ export interface MenuItem {
   separator?: boolean;
   disabled?: boolean;
   children?: MenuItem[];
+  openOnClick?: boolean;
+  customPanel?: React.ReactNode;
 }
 
 interface ContextMenuProps {
@@ -74,27 +76,40 @@ const MenuSurface = forwardRef<HTMLDivElement, {
   items: MenuItem[];
   onClose: () => void;
   style?: CSSProperties;
-}>(({ items, onClose, style }, ref) => (
-  <div
-    ref={ref}
-    data-testid="context-menu"
-    className="min-w-[220px] py-1 rounded shadow-lg border text-[12px]"
-    style={{ ...style, background: "var(--moba-panel-bg)", borderColor: "var(--moba-divider)", color: "var(--moba-text)" }}
-  >
-    {items.map((item, i) => (
-      <MenuRow key={i} item={item} onClose={onClose} />
-    ))}
-  </div>
-));
+}>(({ items, onClose, style }, ref) => {
+  const isLongMenu = items.length > 12 && !items.some(i => i.children?.length);
+  const scrollStyle: CSSProperties = isLongMenu ? { maxHeight: "300px", overflowY: "auto" } : {};
+  return (
+    <div
+      ref={ref}
+      data-testid="context-menu"
+      className="min-w-[220px] py-1 rounded shadow-lg border text-[12px]"
+      style={{
+        background: "var(--moba-panel-bg)",
+        borderColor: "var(--moba-divider)",
+        color: "var(--moba-text)",
+        ...style,
+        ...scrollStyle,
+      }}
+    >
+      {items.map((item, i) => (
+        <MenuRow key={i} item={item} onClose={onClose} />
+      ))}
+    </div>
+  );
+});
 
 MenuSurface.displayName = "MenuSurface";
 
 function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
   if (item.separator) {
     return <div className="h-px mx-2 my-1" style={{ background: "var(--moba-divider)" }} />;
   }
 
-  const hasChildren = !!item.children?.length;
+  const hasChildren = !!item.children?.length || !!item.customPanel;
   const content = (
     <>
       <span className="w-4 flex-shrink-0 text-center">{item.checked ? "✓" : item.icon}</span>
@@ -107,20 +122,30 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
   );
 
   if (hasChildren) {
+    const isVisible = item.openOnClick ? isOpen : isHovered;
     return (
-      <div className="relative group/menu-row">
+      <div
+        className="relative group/menu-row"
+        onMouseEnter={!item.openOnClick ? () => setIsHovered(true) : undefined}
+        onMouseLeave={item.openOnClick ? () => setIsOpen(false) : () => setIsHovered(false)}
+      >
         <button
           data-testid={`context-menu-item-${slugForTestId(item.label)}`}
           className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] disabled:opacity-40"
           style={item.danger ? { color: "#b22222" } : undefined}
           disabled={item.disabled}
+          onClick={item.openOnClick ? () => setIsOpen(!isOpen) : undefined}
           type="button"
         >
           {content}
         </button>
-        {!item.disabled && (
-          <div className="hidden group-hover/menu-row:block absolute left-full top-[-4px] pl-1">
-            <MenuSurface items={item.children ?? []} onClose={onClose} />
+        {!item.disabled && isVisible && (
+          <div className="absolute left-full top-[-4px] pl-1 z-10 block">
+            {item.customPanel ? (
+              item.customPanel
+            ) : (
+              <MenuSurface items={item.children ?? []} onClose={onClose} />
+            )}
           </div>
         )}
       </div>

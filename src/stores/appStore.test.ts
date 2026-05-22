@@ -67,3 +67,20 @@ describe("appStore.moveTab", () => {
     expect(useAppStore.getState().tabs.map((t) => t.id)).toEqual(["b", "c", "d", "a"]);
   });
 });
+
+describe("appStore.uiAppearance", () => {
+  it("allows setting and persisting uiFontFamily", () => {
+    const font = "Outfit, sans-serif";
+    useAppStore.getState().setUiFontFamily(font);
+    expect(useAppStore.getState().uiFontFamily).toBe(font);
+    expect(window.localStorage.getItem("newmob.uiFontFamily")).toBe(font);
+  });
+
+  it("allows setting and persisting uiFontSize", () => {
+    const size = 14;
+    useAppStore.getState().setUiFontSize(size);
+    expect(useAppStore.getState().uiFontSize).toBe(size);
+    expect(window.localStorage.getItem("newmob.uiFontSize")).toBe("14");
+  });
+});
+

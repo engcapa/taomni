@@ -74,8 +74,12 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
   return (
     <div
       data-testid="menu-bar"
-      className="h-6 flex items-center text-[12px] px-2 gap-3 border-b"
-      style={{ borderColor: "var(--moba-chrome-border)", background: "var(--moba-menubar-bg)" }}
+      className="h-6 flex items-center px-2 gap-3 border-b"
+      style={{
+        borderColor: "var(--moba-chrome-border)",
+        background: "var(--moba-menubar-bg)",
+        fontSize: "var(--moba-ui-font-size)",
+      }}
     >
       {ctx.render}
       {items.map((m) => (

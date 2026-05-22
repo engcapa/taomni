@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileBrowser } from "./FileBrowser";
 import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
+import { getAppPlatform } from "../../lib/runtime";
 
 interface DetachedSftpParams {
   /**
@@ -180,6 +181,26 @@ export function detectDetachedSftpRoute(): string | null {
 
 export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const { mode, resolvedTheme } = useAppTheme();
+  const [uiFontFamily, setUiFontFamily] = useState(() => {
+    try {
+      return localStorage.getItem("newmob.uiFontFamily") || "Inter";
+    } catch {
+      return "Inter";
+    }
+  });
+  const [uiFontSize, setUiFontSize] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem("newmob.uiFontSize");
+      if (val) {
+        const parsed = parseInt(val, 10);
+        if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) return parsed;
+      }
+      return 12;
+    } catch {
+      return 12;
+    }
+  });
+
   const [params, setParams] = useState<DetachedSftpParams | null>(() =>
     consumeDetachedHandoff(sessionId),
   );
@@ -198,11 +219,33 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   );
 
   useEffect(() => {
+    const handler = (event: StorageEvent) => {
+      if (event.key === "newmob.uiFontFamily" && event.newValue) {
+        setUiFontFamily(event.newValue);
+      } else if (event.key === "newmob.uiFontSize" && event.newValue) {
+        const parsed = parseInt(event.newValue, 10);
+        if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) {
+          setUiFontSize(parsed);
+        }
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  useEffect(() => {
     const root = document.documentElement;
     root.dataset.appTheme = resolvedTheme;
     root.dataset.appThemeMode = mode;
     root.style.colorScheme = resolvedTheme;
+    root.dataset.appPlatform = getAppPlatform();
   }, [mode, resolvedTheme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--moba-ui-font-family", uiFontFamily);
+    root.style.setProperty("--moba-ui-font-size", `${uiFontSize}px`);
+  }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => {
     if (params) return;
@@ -318,6 +361,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
 
   return (
     <div
+      data-testid="sftp-detached-window"
       className="w-screen h-screen flex flex-col"
       style={{ background: "var(--moba-chrome-bg)", color: "var(--moba-text)" }}
     >

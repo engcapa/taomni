@@ -421,7 +421,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       )}
       <div
         data-testid="session-tree"
-        className="flex-1 moba-scroll-y text-[12px]"
+        className="flex-1 moba-scroll-y"
         onContextMenu={(event) => folderContextMenu(event, null)}
       >
         {ctx.render}
@@ -452,7 +452,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           onConnectSession={onConnectSession}
         />
         {filteredSessions.length === 0 && !loading && (
-          <div className="pl-6 py-2 text-[11px] text-[var(--moba-text-muted)]">
+          <div className="pl-6 py-2 text-[var(--moba-text-muted)]" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)" }}>
             {searchQuery ? "No matching sessions." : "No sessions yet. Right-click User sessions to create one."}
           </div>
         )}
@@ -587,7 +587,7 @@ function TreeFolder({
     <div>
       <div
         ref={headerRef}
-        className="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-[var(--moba-hover)]"
+        className="moba-tree-row"
         data-drag-over={dragOver}
         style={dragOver ? { background: "var(--moba-selected)" } : undefined}
         onClick={onToggle}
@@ -605,7 +605,7 @@ function TreeFolder({
         )}
         <span className="flex-1 font-medium truncate">{node.name}</span>
         {count !== undefined && hasChildren && (
-          <span className="text-[10px] text-slate-500">({count})</span>
+          <span className="text-slate-500" style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)" }}>({count})</span>
         )}
       </div>
       {open && <div className="pl-4">{children}</div>}
@@ -650,7 +650,7 @@ function SessionItem({
       data-testid="session-tree-item"
       data-session-name={session.name}
       data-session-type={session.session_type}
-      className="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-[var(--moba-hover)] group"
+      className="moba-tree-row group"
       data-selected={selected}
       style={selected ? { background: "var(--moba-selected)" } : undefined}
       onPointerDown={handlePointerDown}
@@ -669,8 +669,8 @@ function SessionItem({
         )}
       </span>
       <span
-        className="text-[10px] px-1 rounded"
-        style={{ background: "#e1ecfa", color: "#1e3a5f" }}
+        className="px-1 rounded"
+        style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)", background: "#e1ecfa", color: "#1e3a5f" }}
       >
         {session.session_type}
       </span>

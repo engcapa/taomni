@@ -17,7 +17,6 @@ import {
   loadGlobalTerminalProfile,
   parseSessionOptions,
   resolveTerminalTheme,
-  saveGlobalTerminalProfile,
   type TerminalProfile,
   type TerminalSyntaxMode,
   type UserCommonCommand,
@@ -30,10 +29,12 @@ import { TERMINAL_THEME_DEFINITIONS, resolveThemeId } from "../../lib/themes";
 import {
   findFontName,
   getPrimaryFontName,
+  isMonospaceFont,
   makeTerminalFontFamily,
   SAFE_TERMINAL_FONT_FALLBACKS,
   useSystemFonts,
 } from "../../lib/systemFonts";
+import { FontPickerPanel } from "./FontPickerPanel";
 import {
   attachTerminalImeGuard,
   shouldUseLinuxImeGuard,
@@ -317,47 +318,7 @@ export function TerminalPanel({
     setEventLog((items) => [...items.slice(-199), entry]);
   }, []);
 
-  const currentProfile = useCallback((): TerminalProfile => ({
-    ...initialProfile,
-    fontFamily,
-    fontSize,
-    fontLigatures,
-    theme: themeName,
-    scrollback,
-    cursorStyle,
-    cursorBlink,
-    showScrollbar,
-    copyOnSelect,
-    allowRemoteOsc52Clipboard,
-    readOnly,
-    rightClickBehavior,
-    multilinePasteConfirm,
-    syntaxMode,
-    loggingEnabled: loggingActive,
-    inlineSuggestions: inlineSuggestionsEnabled,
-    inlineSuggestionsMax,
-    commonCommands,
-  }), [
-    cursorBlink,
-    cursorStyle,
-    allowRemoteOsc52Clipboard,
-    copyOnSelect,
-    fontFamily,
-    fontLigatures,
-    fontSize,
-    initialProfile,
-    loggingActive,
-    multilinePasteConfirm,
-    readOnly,
-    rightClickBehavior,
-    scrollback,
-    showScrollbar,
-    syntaxMode,
-    inlineSuggestionsEnabled,
-    inlineSuggestionsMax,
-    commonCommands,
-    themeName,
-  ]);
+
 
   // Per-host command history for inline ghost-text suggestions.
   const historyHostKey = useMemo(() => makeHostKey(ssh), [ssh]);
@@ -1068,12 +1029,23 @@ export function TerminalPanel({
       {
         label: "Font settings",
         children: [
-          ...quickFontOptions.map((font) => ({
+          ...quickFontOptions.slice(0, 2).map((font) => ({
             label: `Use font "${font}"`,
             checked: getPrimaryFontName(fontFamily).toLowerCase() === font.toLowerCase(),
             onClick: () => setFontFamily(makeTerminalFontFamily(font)),
           })),
+          {
+            label: "More fonts...",
+            customPanel: (
+              <FontPickerPanel
+                fonts={fontState.fonts}
+                selectedFont={getPrimaryFontName(fontFamily)}
+                onSelect={(font) => setFontFamily(makeTerminalFontFamily(font))}
+              />
+            ),
+          },
           ...(quickFontOptions.length === 0 ? [{ label: "Loading fonts...", disabled: true }] : []),
+          { label: "", separator: true },
           { label: "Display font ligatures", checked: fontLigatures, onClick: () => setFontLigatures((v) => !v) },
           { label: "", separator: true },
           { label: "Increase font size", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
@@ -1274,10 +1246,7 @@ export function TerminalPanel({
     macroRecordingRef.current = macroRecording;
   }, [macroRecording]);
 
-  useEffect(() => {
-    if (terminalProfile) return;
-    saveGlobalTerminalProfile(currentProfile());
-  }, [currentProfile, terminalProfile]);
+
 
   // Initialize once for the lifetime of this tab. Visibility changes must not
   // dispose the terminal, otherwise PTY/SSH sessions reconnect on tab switch.
@@ -1293,9 +1262,12 @@ export function TerminalPanel({
     let detachImeGuard: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
 
+    const primaryFont = getPrimaryFontName(fontFamily);
+    const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : makeTerminalFontFamily("Source Code Pro");
+
     const term = new Terminal({
       theme: resolveTerminalTheme(themeName),
-      fontFamily,
+      fontFamily: safeFontFamily,
       fontSize,
       cursorBlink,
       cursorStyle,
@@ -1602,8 +1574,11 @@ export function TerminalPanel({
     const term = termRef.current;
     if (!term) return;
 
+    const primaryFont = getPrimaryFontName(fontFamily);
+    const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : makeTerminalFontFamily("Source Code Pro");
+
     term.options = {
-      fontFamily,
+      fontFamily: safeFontFamily,
       fontSize,
       theme: resolveTerminalTheme(themeName),
       cursorBlink,

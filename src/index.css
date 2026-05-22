@@ -1,99 +1,144 @@
+@import "@fontsource/outfit/300.css";
+@import "@fontsource/outfit/400.css";
+@import "@fontsource/outfit/500.css";
+@import "@fontsource/outfit/600.css";
+@import "@fontsource/outfit/700.css";
+
+@import "@fontsource/inter/300.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --moba-bg: #ffffff;
-  --moba-chrome-bg: #f0f0f0;
-  --moba-chrome-border: #c5c8cc;
-  --moba-titlebar-from: #e6ecf2;
-  --moba-titlebar-to: #cfd9e6;
-  --moba-menubar-bg: #f7f8fb;
-  --moba-quick-bg: #eef3f9;
-  --moba-accent: #2b5d8b;
-  --moba-accent-soft: #5586b5;
+  --moba-bg: #f8fafc;
+  --moba-chrome-bg: #f1f5f9;
+  --moba-chrome-border: #cbd5e1;
+  --moba-titlebar-from: #e2e8f0;
+  --moba-titlebar-to: #cbd5e1;
+  --moba-menubar-bg: #f8fafc;
+  --moba-quick-bg: #f1f5f9;
+  --moba-accent: #1e40af; /* More premium Royal Indigo Blue */
+  --moba-accent-soft: #3b82f6;
   --moba-tab-active: #ffffff;
-  --moba-tab-inactive: #d6e0ec;
-  --moba-tab-border: #8ba7c6;
-  --moba-sidebar-bg: #f5f6f8;
-  --moba-sidebar-border: #c0c4ca;
-  --moba-panel-bg: #f7faff;
-  --moba-card-bg: #fafcff;
-  --moba-card-border: #cdd7e4;
-  --moba-status-bg: #ecf1f6;
-  --moba-status-text: #1f3550;
-  --moba-text: #1d2330;
-  --moba-text-muted: #607089;
-  --moba-divider: #c8cdd4;
-  --moba-hover: #eaf2fb;
-  --moba-selected: #cfe2f7;
-  --moba-selected-border: #6c9bd0;
-  --moba-control-hover: rgba(255, 255, 255, 0.7);
+  --moba-tab-inactive: #e2e8f0;
+  --moba-tab-border: #cbd5e1;
+  --moba-sidebar-bg: #f8fafc;
+  --moba-sidebar-border: #e2e8f0;
+  --moba-panel-bg: #f8fafc;
+  --moba-card-bg: #ffffff;
+  --moba-card-border: #e2e8f0;
+  --moba-status-bg: #f1f5f9;
+  --moba-status-text: #1e293b;
+  --moba-text: #0f172a;
+  --moba-text-muted: #64748b;
+  --moba-divider: #e2e8f0;
+  --moba-hover: #f1f5f9;
+  --moba-selected: #dbeafe;
+  --moba-selected-border: #93c5fd;
+  --moba-control-hover: rgba(15, 23, 42, 0.05);
   --moba-input-bg: #ffffff;
-  --moba-input-border: #8aa0bd;
-  --moba-button-from: #fafbfd;
-  --moba-button-to: #dbe5f1;
+  --moba-input-border: #cbd5e1;
+  --moba-button-from: #ffffff;
+  --moba-button-to: #f1f5f9;
   --moba-button-hover-from: #ffffff;
-  --moba-button-hover-to: #cdddef;
-  --moba-button-disabled: #e5e9ef;
-  --moba-scrollbar-track: #e8edf3;
-  --moba-scrollbar-thumb: #b6c3d4;
-  --moba-scrollbar-thumb-hover: #95a8c1;
-  --moba-term-bg: #1d1f21;
-  --moba-term-text: #eaeaea;
-  --moba-term-prompt: #62d36f;
-  --moba-term-path: #83a7d8;
-  --moba-link: #1e5fa8;
-  --moba-ribbon-from: #eef3f9;
-  --moba-ribbon-to: #c9d6e6;
-  --moba-ribbon-border: #9eb3cb;
+  --moba-button-hover-to: #e2e8f0;
+  --moba-button-disabled: #f1f5f9;
+  --moba-scrollbar-track: #f8fafc;
+  --moba-scrollbar-thumb: #cbd5e1;
+  --moba-scrollbar-thumb-hover: #94a3b8;
+  --moba-term-bg: #0f172a;
+  --moba-term-text: #f8fafc;
+  --moba-term-prompt: #10b981;
+  --moba-term-path: #3b82f6;
+  --moba-link: #2563eb;
+  --moba-ribbon-from: #f8fafc;
+  --moba-ribbon-to: #e2e8f0;
+  --moba-ribbon-border: #cbd5e1;
 
-  font-family: "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+  /* Premium Multi-Level Shadows */
+  --moba-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --moba-shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.02);
+  --moba-shadow-lg: 0 16px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+  --moba-transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Global UI font variables with system fallbacks */
+  --moba-ui-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --moba-ui-font-size: 12px;
+
+  font-family: var(--moba-ui-font-family);
+  font-size: var(--moba-ui-font-size);
   color: var(--moba-text);
+}
+
+/* Cross-platform typography smoothing options */
+html[data-app-platform="windows"],
+html[data-app-platform="linux"] {
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+}
+
+html[data-app-platform="macos"] {
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Form controls reset to inherit global UI styling */
+button, input, select, textarea, optgroup {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 html[data-app-theme="dark"] {
-  --moba-bg: #15171c;
-  --moba-chrome-bg: #1b1d23;
-  --moba-chrome-border: #383d49;
-  --moba-titlebar-from: #252936;
-  --moba-titlebar-to: #191c24;
-  --moba-menubar-bg: #191c22;
-  --moba-quick-bg: #20242d;
-  --moba-accent: #5aa2d6;
-  --moba-accent-soft: #6fb2df;
-  --moba-tab-active: #20232b;
-  --moba-tab-inactive: #181b22;
-  --moba-tab-border: #454b59;
-  --moba-sidebar-bg: #181b21;
-  --moba-sidebar-border: #3b414d;
-  --moba-panel-bg: #1c2028;
-  --moba-card-bg: #202530;
-  --moba-card-border: #3c4452;
-  --moba-status-bg: #171a20;
-  --moba-status-text: #c9d4e2;
-  --moba-text: #e3e8ef;
-  --moba-text-muted: #9aa7b7;
-  --moba-divider: #363c48;
-  --moba-hover: #2a3442;
-  --moba-selected: #263f58;
-  --moba-selected-border: #6aa3d5;
-  --moba-control-hover: rgba(91, 112, 138, 0.35);
-  --moba-input-bg: #11141a;
-  --moba-input-border: #596579;
-  --moba-button-from: #2b313c;
-  --moba-button-to: #1d222b;
-  --moba-button-hover-from: #333b49;
-  --moba-button-hover-to: #252c37;
-  --moba-button-disabled: #242933;
-  --moba-scrollbar-track: #171b22;
-  --moba-scrollbar-thumb: #3d4654;
-  --moba-scrollbar-thumb-hover: #596579;
-  --moba-link: #77b7ef;
-  --moba-ribbon-from: #222735;
-  --moba-ribbon-to: #1a1e28;
-  --moba-ribbon-border: #3e4656;
+  --moba-bg: #0b0f19; /*星空暗夜深蓝色调和底色*/
+  --moba-chrome-bg: #0f172a; 
+  --moba-chrome-border: #1e293b;
+  --moba-titlebar-from: #1e293b;
+  --moba-titlebar-to: #0f172a;
+  --moba-menubar-bg: #0b0f19;
+  --moba-quick-bg: #1e293b;
+  --moba-accent: #60a5fa;
+  --moba-accent-soft: #93c5fd;
+  --moba-tab-active: #0b0f19;
+  --moba-tab-inactive: #1e293b;
+  --moba-tab-border: #334155;
+  --moba-sidebar-bg: #0b0f19;
+  --moba-sidebar-border: #1e293b;
+  --moba-panel-bg: #0f172a;
+  --moba-card-bg: #1e293b;
+  --moba-card-border: #334155;
+  --moba-status-bg: #0b0f19;
+  --moba-status-text: #cbd5e1;
+  --moba-text: #f8fafc;
+  --moba-text-muted: #94a3b8;
+  --moba-divider: #1e293b;
+  --moba-hover: #1e293b;
+  --moba-selected: #1e3a8a;
+  --moba-selected-border: #3b82f6;
+  --moba-control-hover: rgba(255, 255, 255, 0.05);
+  --moba-input-bg: #0b0f19;
+  --moba-input-border: #334155;
+  --moba-button-from: #1e293b;
+  --moba-button-to: #0f172a;
+  --moba-button-hover-from: #334155;
+  --moba-button-hover-to: #1e293b;
+  --moba-button-disabled: #0f172a;
+  --moba-scrollbar-track: #0b0f19;
+  --moba-scrollbar-thumb: #334155;
+  --moba-scrollbar-thumb-hover: #475569;
+  --moba-link: #60a5fa;
+  --moba-ribbon-from: #0f172a;
+  --moba-ribbon-to: #0b0f19;
+  --moba-ribbon-border: #1e293b;
+
+  /* Ambient shadows optimized for night theme */
+  --moba-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --moba-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+  --moba-shadow-lg: 0 16px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(0, 0, 0, 0.25);
 }
 
 body {
@@ -127,10 +172,11 @@ body {
   cursor: pointer;
   user-select: none;
   min-width: 56px;
-  font-size: 11px;
+  font-size: calc(var(--moba-ui-font-size) - 1px);
   color: var(--moba-text);
   background: transparent;
   border: none;
+  transition: var(--moba-transition);
 }
 .moba-ribbon-btn:hover {
   background: var(--moba-control-hover);
@@ -142,12 +188,13 @@ body {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   padding: 12px 4px;
-  font-size: 11px;
+  font-size: calc(var(--moba-ui-font-size) - 1px);
   letter-spacing: 0.04em;
   color: var(--moba-text);
   border-bottom: 1px solid var(--moba-sidebar-border);
   cursor: pointer;
   user-select: none;
+  transition: var(--moba-transition);
 }
 .moba-side-tab[data-active="true"] {
   background: var(--moba-tab-active);
@@ -161,7 +208,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: calc(var(--moba-ui-font-size) - 1px);
   padding: 1px 6px;
   border-radius: 9999px;
   background: var(--moba-selected);
@@ -179,13 +226,14 @@ body {
 /* Form inputs */
 .moba-input {
   height: 22px;
-  font-size: 12px;
+  font-size: var(--moba-ui-font-size);
   padding: 0 6px;
   border: 1px solid var(--moba-input-border);
   background: var(--moba-input-bg);
   color: var(--moba-text);
   border-radius: 2px;
   outline: none;
+  transition: var(--moba-transition);
 }
 .moba-input:focus {
   border-color: var(--moba-accent);
@@ -214,7 +262,7 @@ body {
   align-items: center;
   gap: 6px;
   padding: 4px 10px 4px 10px;
-  font-size: 12px;
+  font-size: var(--moba-ui-font-size);
   border: 1px solid var(--moba-tab-border);
   border-bottom: none;
   background: var(--moba-tab-inactive);
@@ -225,6 +273,7 @@ body {
   cursor: pointer;
   height: 24px;
   line-height: 1;
+  transition: var(--moba-transition);
 }
 .moba-tab[data-active="true"] {
   background: var(--moba-tab-active);
@@ -323,22 +372,91 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 6px 1px 4px;
-  font-size: 12px;
+  padding: 3px 6px 3px 4px;
+  font-size: var(--moba-ui-font-size);
+  font-family: var(--moba-ui-font-family);
   cursor: pointer;
   white-space: nowrap;
+  background-color: var(--moba-sidebar-bg);
+  color: var(--moba-text);
+  transition: var(--moba-transition);
 }
-.moba-tree-row:hover { background: var(--moba-hover); }
+.moba-tree-row:hover {
+  background-color: var(--moba-hover);
+}
 .moba-tree-row[data-selected="true"] {
-  background: var(--moba-selected);
+  background-color: var(--moba-selected);
   outline: 1px dotted var(--moba-selected-border);
 }
+
+/* Sidebar and Session Tree Subpixel optimization */
+[data-testid="sidebar"],
+[data-testid="session-tree"] {
+  background-color: var(--moba-sidebar-bg) !important;
+  font-family: var(--moba-ui-font-family) !important;
+  font-size: var(--moba-ui-font-size) !important;
+}
+
+[data-testid="sftp-browser"],
+[data-testid="sftp-detached-window"],
+[role="dialog"] {
+  font-family: var(--moba-ui-font-family) !important;
+}
+
+[data-testid="sftp-browser"] *:not(.moba-mono):not(.font-mono),
+[data-testid="sftp-detached-window"] *:not(.moba-mono):not(.font-mono),
+[role="dialog"] *:not(.moba-mono):not(.font-mono) {
+  font-family: inherit;
+}
+
+[data-testid="sftp-browser"] .text-\[12px\],
+[data-testid="sftp-detached-window"] .text-\[12px\],
+[role="dialog"] .text-\[12px\] {
+  font-size: var(--moba-ui-font-size) !important;
+}
+
+[data-testid="sftp-browser"] .text-\[11px\],
+[data-testid="sftp-detached-window"] .text-\[11px\],
+[role="dialog"] .text-\[11px\] {
+  font-size: calc(var(--moba-ui-font-size) - 1px) !important;
+}
+
+[data-testid="sftp-browser"] .text-\[10px\],
+[data-testid="sftp-detached-window"] .text-\[10px\],
+[role="dialog"] .text-\[10px\] {
+  font-size: calc(var(--moba-ui-font-size) - 2px) !important;
+}
+
+[data-testid="sftp-browser"] .text-xs,
+[data-testid="sftp-detached-window"] .text-xs,
+[role="dialog"] .text-xs {
+  font-size: var(--moba-ui-font-size) !important;
+}
+
+[data-testid="sftp-browser"] .text-sm,
+[data-testid="sftp-detached-window"] .text-sm,
+[role="dialog"] .text-sm {
+  font-size: calc(var(--moba-ui-font-size) + 2px) !important;
+}
+
+[data-testid="sftp-browser"] .text-\[14px\],
+[data-testid="sftp-detached-window"] .text-\[14px\],
+[role="dialog"] .text-\[14px\] {
+  font-size: calc(var(--moba-ui-font-size) + 2px) !important;
+}
+
+[data-testid="sftp-browser"] .text-base,
+[data-testid="sftp-detached-window"] .text-base,
+[role="dialog"] .text-base {
+  font-size: calc(var(--moba-ui-font-size) + 4px) !important;
+}
+
 
 .moba-status {
   background: var(--moba-status-bg);
   border-top: 1px solid var(--moba-divider);
   color: var(--moba-status-text);
-  font-size: 11px;
+  font-size: calc(var(--moba-ui-font-size) - 1px);
 }
 
 .moba-divider-h { height: 1px; background: var(--moba-divider); }
@@ -347,12 +465,13 @@ body {
 .moba-btn {
   height: 26px;
   padding: 0 14px;
-  font-size: 12px;
+  font-size: var(--moba-ui-font-size);
   background: linear-gradient(to bottom, var(--moba-button-from), var(--moba-button-to));
   border: 1px solid var(--moba-input-border);
   border-radius: 3px;
   cursor: pointer;
   color: var(--moba-text);
+  transition: var(--moba-transition);
 }
 .moba-btn:hover { background: linear-gradient(to bottom, var(--moba-button-hover-from), var(--moba-button-hover-to)); }
 .moba-btn:disabled {
@@ -362,10 +481,20 @@ body {
 }
 .moba-btn:disabled:hover { background: var(--moba-button-disabled); }
 .moba-btn[data-primary="true"] {
-  background: linear-gradient(to bottom, #4a87c0, #2b5d8b);
-  border-color: #1f4267; color: #fff; font-weight: 600;
+  background: linear-gradient(to bottom, var(--moba-accent-soft), var(--moba-accent));
+  border-color: var(--moba-accent); color: #fff; font-weight: 600;
 }
-.moba-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, #5896d0, #346fa0); }
+
+/* Card Hover Environment Shadow Depth Effect */
+.moba-card-hover {
+  transition: var(--moba-transition);
+}
+.moba-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--moba-shadow-md);
+  border-color: var(--moba-accent-soft);
+}
+.moba-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--moba-accent-soft) 85%, #fff), color-mix(in srgb, var(--moba-accent) 85%, #fff)); }
 
 .moba-proto-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -373,7 +502,7 @@ body {
   width: 64px;
   border: 1px solid transparent;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: calc(var(--moba-ui-font-size) - 1px);
   cursor: pointer;
   background: transparent;
   color: var(--moba-text);
@@ -388,7 +517,7 @@ body {
 
 .moba-section-tab {
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: var(--moba-ui-font-size);
   border: 1px solid var(--moba-input-border);
   border-bottom: none;
   background: var(--moba-tab-inactive);

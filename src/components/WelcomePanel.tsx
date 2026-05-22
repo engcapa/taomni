@@ -249,7 +249,7 @@ function LocalTerminalCard({
 
   return (
     <div
-      className="text-left p-3 rounded-md border hover:shadow-sm transition"
+      className="text-left p-3 rounded-md border moba-card-hover"
       style={{ borderColor: "var(--moba-card-border)", background: "var(--moba-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -345,7 +345,7 @@ function ActionCard({
 }) {
   return (
     <button
-      className="text-left p-3 rounded-md border hover:shadow-sm transition"
+      className="text-left p-3 rounded-md border moba-card-hover"
       style={{ borderColor: "var(--moba-card-border)", background: "var(--moba-card-bg)" }}
       onClick={onClick}
       type="button"

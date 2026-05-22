@@ -34,11 +34,14 @@ export function useSystemFonts(): SystemFontState {
   useEffect(() => {
     let cancelled = false;
 
+    console.log("[useSystemFonts] Hook mounted, calling listSystemFonts()");
     listSystemFonts()
       .then((fonts) => {
         if (cancelled) return;
+        console.log("[useSystemFonts] listSystemFonts() resolved with:", fonts);
         const normalized = normalizeFontFamilies(fonts);
         if (normalized.length === 0) {
+          console.log("[useSystemFonts] normalized length is 0, using fallback");
           setState({
             fonts: SAFE_TERMINAL_FONT_FALLBACKS,
             loading: false,
@@ -47,15 +50,18 @@ export function useSystemFonts(): SystemFontState {
           });
           return;
         }
+        console.log("[useSystemFonts] normalized fonts:", normalized);
         setState({ fonts: normalized, loading: false, source: "system", error: null });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[useSystemFonts] listSystemFonts() rejected with error:", msg);
         setState({
           fonts: SAFE_TERMINAL_FONT_FALLBACKS,
           loading: false,
           source: "fallback",
-          error: err instanceof Error ? err.message : String(err),
+          error: msg,
         });
       });
 
@@ -150,4 +156,33 @@ function formatFontFamilyToken(font: string): string {
 
 function sameFont(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+let canvas: HTMLCanvasElement | null = null;
+export function isMonospaceFont(fontName: string): boolean {
+  if (typeof document === "undefined") return true;
+  try {
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) return true;
+    const testChars = ["i", "w", "m", "I", "W", "M", "1", " ", "l"];
+    // CRITICAL FIX: Use "sans-serif" as the fallback font during measurement instead of "monospace".
+    // If the browser fails to load/recognize the font, it will fall back to "sans-serif" (which is proportional),
+    // causing the character widths to differ and correctly returning false (not monospace / not loaded yet).
+    // If it fell back to "monospace", it would always return true even if the font is not installed or proportional.
+    context.font = `20px ${formatFontFamilyToken(fontName)}, sans-serif`;
+    const firstWidth = context.measureText(testChars[0]).width;
+    for (let i = 1; i < testChars.length; i++) {
+      const width = context.measureText(testChars[i]).width;
+      if (Math.abs(width - firstWidth) > 0.05) {
+        return false;
+      }
+    }
+    return true;
+  } catch (e) {
+    console.error("[isMonospaceFont] Failed to measure font:", e);
+    return true;
+  }
 }

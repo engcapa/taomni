@@ -127,6 +127,7 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
               data-testid="session-search"
               aria-label="Search sessions"
               className="moba-input pl-6 w-[140px]"
+              style={{ paddingLeft: "24px" }}
               placeholder="Search sessions…"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -139,7 +140,7 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
           <UtilityPanel tab={activeSideTab} />
         )}
         <div className="h-[160px] border-t flex flex-col shrink-0" style={{ borderColor: "var(--moba-sidebar-border)", background: "var(--moba-panel-bg)" }}>
-          <div className="h-6 flex items-center px-2 text-[11px] font-semibold border-b" style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
+          <div className="h-6 flex items-center px-2 font-semibold border-b" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)", borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
             <Clock className="w-3.5 h-3.5 mr-1 text-[var(--moba-text-muted)]" />
             Recent connections
             <div className="ml-auto flex items-center gap-1">
@@ -153,9 +154,9 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
               <IconBtn title="Refresh sessions" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void loadSessions()} />
             </div>
           </div>
-          <div className="flex-1 moba-scroll-y text-[12px] py-1">
+          <div className="flex-1 moba-scroll-y py-1" style={{ fontSize: "var(--moba-ui-font-size)" }}>
             {recentSessions.length === 0 ? (
-              <div className="px-2 py-2 text-[11px] text-[var(--moba-text-muted)]">
+              <div className="px-2 py-2 text-[var(--moba-text-muted)]" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)" }}>
                 No recent connections yet.
                 {onNewSftpSession && (
                   <button
@@ -178,7 +179,7 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
                 >
                   <TerminalIcon className="w-3 h-3 text-[var(--moba-accent)]" />
                   <span className="flex-1 truncate">{session.name}</span>
-                  <span className="text-[10px] text-slate-500">{session.session_type}</span>
+                  <span className="text-slate-500" style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)" }}>{session.session_type}</span>
                 </button>
               ))
             )}
@@ -198,8 +199,8 @@ function UtilityPanel({ tab }: { tab: Exclude<SideTab, "sessions"> }) {
   }[tab];
 
   return (
-    <div className="flex-1 p-3 text-[12px] text-[var(--moba-text-muted)]">
-      <div className="flex items-center gap-2 font-semibold text-[var(--moba-text)] mb-2">
+    <div className="flex-1 p-3 text-[var(--moba-text-muted)]" style={{ fontSize: "var(--moba-ui-font-size)" }}>
+      <div className="flex items-center gap-2 font-semibold text-[var(--moba-text)] mb-2" style={{ fontSize: "var(--moba-ui-font-size)" }}>
         {meta.icon}
         {meta.title}
       </div>
