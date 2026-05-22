@@ -18,6 +18,19 @@ import {
   droppedFiles,
   isOsFileDrag,
 } from "../../lib/osFileDrop";
+import {
+  startCustomDrag,
+  useCustomDropTarget,
+  type CustomDragData,
+} from "../../lib/customDnD";
+
+const CROSS_PANE_DRAG_MIME = "newmob/sftp-files";
+
+interface CrossPaneDragPayload {
+  sessionId: string;
+  side: PaneSide;
+  paths: string[];
+}
 
 interface ColWidths {
   name: number;
@@ -265,6 +278,28 @@ export function FilePanel({
     firstSelected.fileType === "file"
   );
 
+  useCustomDropTarget<HTMLDivElement>(listRef, {
+    accepts: (data: CustomDragData) => {
+      if (!acceptCrossPane) return false;
+      if (data.mime !== CROSS_PANE_DRAG_MIME) return false;
+      const payload = data.payload as CrossPaneDragPayload | null;
+      if (!payload) return false;
+      // Reject same-pane drags so dropping back doesn't trigger a copy.
+      return !(payload.sessionId === sessionId && payload.side === side);
+    },
+    onDragEnter: () => setDraggingOver(true),
+    onDragLeave: () => setDraggingOver(false),
+    onDrop: (detail) => {
+      setDraggingOver(false);
+      const payload = detail.data.payload as CrossPaneDragPayload | null;
+      if (!payload) return;
+      const otherPane = useSftpStore.getState().sessions[payload.sessionId]?.[payload.side];
+      if (!otherPane) return;
+      const entries = otherPane.entries.filter((entry) => payload.paths.includes(entry.path));
+      if (entries.length > 0) onCrossPaneDrop?.(entries);
+    },
+  });
+
   if (!pane) {
     return (
       <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
@@ -328,27 +363,30 @@ export function FilePanel({
     setSelection(sessionId, side, []);
   };
 
-  const handleDragStart = (entry: FileEntry, e: DragEvent) => {
+  const handleRowPointerDown = (entry: FileEntry, e: React.PointerEvent<HTMLTableRowElement>) => {
+    if (e.button !== 0) return;
     const sel = pane.selection.includes(entry.path) ? pane.selection : [entry.path];
-    const payload = JSON.stringify({
-      sessionId,
-      side,
-      paths: sel,
+    const ghostText = sel.length === 1 ? entry.name : `${sel.length} items`;
+    startCustomDrag({
+      event: e,
+      data: {
+        mime: CROSS_PANE_DRAG_MIME,
+        payload: {
+          sessionId,
+          side,
+          paths: sel,
+        } satisfies CrossPaneDragPayload,
+      },
+      ghostText,
     });
-    e.dataTransfer.setData("application/x-newmob-files", payload);
-    e.dataTransfer.setData("text/plain", sel.join("\n"));
-    e.dataTransfer.effectAllowed = "copy";
   };
 
+  // Browser dev mode: OS file drag delivers `File` objects through HTML5 DnD.
+  // Inside Tauri, OS file drops arrive via `NATIVE_FILE_DROP_EVENT` instead
+  // (because dragDropEnabled=true intercepts HTML5 file drops on Windows).
+  // Cross-pane intra-app drag is handled by useCustomDropTarget below.
   const handleDragOver = (e: DragEvent) => {
     if (side === "remote" && onUploadFromDisk && isOsFileDrag(e.dataTransfer)) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-      setDraggingOver(true);
-      return;
-    }
-
-    if (acceptCrossPane && e.dataTransfer.types.includes("application/x-newmob-files")) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
       setDraggingOver(true);
@@ -360,28 +398,11 @@ export function FilePanel({
   };
 
   const handleDrop = (e: DragEvent) => {
-    e.preventDefault();
-    setDraggingOver(false);
-
     if (side === "remote" && onUploadFromDisk && isOsFileDrag(e.dataTransfer)) {
+      e.preventDefault();
+      setDraggingOver(false);
       const files = droppedFiles(e.dataTransfer);
       if (files.length > 0) onUploadFromDisk(files);
-      return;
-    }
-
-    if (acceptCrossPane) {
-      const raw = e.dataTransfer.getData("application/x-newmob-files");
-      if (!raw) return;
-      try {
-        const data = JSON.parse(raw) as { sessionId: string; side: PaneSide; paths: string[] };
-        if (data.side === side && data.sessionId === sessionId) return;
-        const otherPane = useSftpStore.getState().sessions[data.sessionId]?.[data.side];
-        if (!otherPane) return;
-        const entries = otherPane.entries.filter((entry) => data.paths.includes(entry.path));
-        if (entries.length > 0) onCrossPaneDrop?.(entries);
-      } catch {
-        /* ignore malformed drag */
-      }
     }
   };
 
@@ -636,8 +657,7 @@ export function FilePanel({
               <tr
                 key={entry.path}
                 data-row
-                draggable
-                onDragStart={(e) => handleDragStart(entry, e)}
+                onPointerDown={(e) => handleRowPointerDown(entry, e)}
                 className="cursor-default select-none"
                 style={{
                   background: pane.selection.includes(entry.path)

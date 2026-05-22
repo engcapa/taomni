@@ -56,13 +56,11 @@ pub fn run() {
             }
 
             if let Some(main_window_config) = app.config().app.windows.first().cloned() {
-                let builder = WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
+                WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
                     // Required on Linux/Windows for navigator.clipboard.readText().
                     // Terminal right-click paste and Shift+Insert use that API.
-                    .enable_clipboard_access();
-                #[cfg(windows)]
-                let builder = builder.disable_drag_drop_handler();
-                builder.build()?;
+                    .enable_clipboard_access()
+                    .build()?;
             }
             Ok(())
         })

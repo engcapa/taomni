@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Terminal as TerminalIcon,
   Monitor,
@@ -25,6 +25,11 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { FolderNameDialog } from "./FolderNameDialog";
 import type { SessionConfig, SessionGroup } from "../../lib/ipc";
 import {
+  startCustomDrag,
+  useCustomDropTarget,
+  type CustomDragData,
+} from "../../lib/customDnD";
+import {
   parseCsvSessions,
   parseMobaXtermSessions,
   parseNewMobSessions,
@@ -45,6 +50,12 @@ import {
   splitGroupPath,
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
+
+const SESSION_DRAG_MIME = "newmob/session";
+
+interface SessionDragPayload {
+  sessionId: string;
+}
 
 interface SessionTreeProps {
   onNewSession?: (groupPath?: string | null) => void;
@@ -116,20 +127,14 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     });
   };
 
-  const handleDrop = (event: React.DragEvent, groupPath: string | null) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const sessionId = event.dataTransfer.getData("application/x-newmob-session");
+  const handleDrop = (groupPath: string | null, sessionId: string) => {
     setDragOverGroup(null);
-    if (sessionId) {
-      void moveSessionToGroup(sessionId, groupPath);
-      expandPath(groupPath);
-    }
+    if (!sessionId) return;
+    void moveSessionToGroup(sessionId, groupPath);
+    expandPath(groupPath);
   };
 
-  const handleDragOver = (event: React.DragEvent, groupPath: string | null) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleDragOver = (groupPath: string | null) => {
     setDragOverGroup(folderKey(groupPath));
   };
 
@@ -426,8 +431,8 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         open={expanded.root !== false}
         onToggle={() => toggle("root")}
         onContextMenu={(event) => folderContextMenu(event, null)}
-        onDrop={(event) => handleDrop(event, null)}
-        onDragOver={(event) => handleDragOver(event, null)}
+        onDropSession={(sessionId) => handleDrop(null, sessionId)}
+        onDragOverFolder={() => handleDragOver(null)}
         onDragLeave={() => setDragOverGroup(null)}
         dragOver={dragOverGroup === "root"}
       >
@@ -440,8 +445,8 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           onToggle={toggle}
           onFolderContextMenu={folderContextMenu}
           onSessionContextMenu={sessionContextMenu}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
+          onDropSession={handleDrop}
+          onDragOverFolder={handleDragOver}
           onDragLeave={() => setDragOverGroup(null)}
           onSelectSession={setSelectedSession}
           onConnectSession={onConnectSession}
@@ -467,8 +472,8 @@ function FolderContents({
   onToggle,
   onFolderContextMenu,
   onSessionContextMenu,
-  onDrop,
-  onDragOver,
+  onDropSession,
+  onDragOverFolder,
   onDragLeave,
   onSelectSession,
   onConnectSession,
@@ -481,8 +486,8 @@ function FolderContents({
   onToggle: (key: string) => void;
   onFolderContextMenu: (event: React.MouseEvent, path: string | null) => void;
   onSessionContextMenu: (event: React.MouseEvent, session: SessionConfig) => void;
-  onDrop: (event: React.DragEvent, groupPath: string | null) => void;
-  onDragOver: (event: React.DragEvent, groupPath: string | null) => void;
+  onDropSession: (groupPath: string | null, sessionId: string) => void;
+  onDragOverFolder: (groupPath: string | null) => void;
   onDragLeave: () => void;
   onSelectSession: (id: string | null) => void;
   onConnectSession?: (session: SessionConfig) => void;
@@ -501,8 +506,8 @@ function FolderContents({
             open={isOpen}
             onToggle={() => onToggle(key)}
             onContextMenu={(event) => onFolderContextMenu(event, folder.path)}
-            onDrop={(event) => onDrop(event, folder.path)}
-            onDragOver={(event) => onDragOver(event, folder.path)}
+            onDropSession={(sessionId) => onDropSession(folder.path, sessionId)}
+            onDragOverFolder={() => onDragOverFolder(folder.path)}
             onDragLeave={onDragLeave}
             dragOver={dragOverGroup === key}
           >
@@ -515,8 +520,8 @@ function FolderContents({
               onToggle={onToggle}
               onFolderContextMenu={onFolderContextMenu}
               onSessionContextMenu={onSessionContextMenu}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
+              onDropSession={onDropSession}
+              onDragOverFolder={onDragOverFolder}
               onDragLeave={onDragLeave}
               onSelectSession={onSelectSession}
               onConnectSession={onConnectSession}
@@ -546,8 +551,8 @@ function TreeFolder({
   onToggle,
   children,
   onContextMenu,
-  onDrop,
-  onDragOver,
+  onDropSession,
+  onDragOverFolder,
   onDragLeave,
   dragOver,
 }: {
@@ -557,25 +562,36 @@ function TreeFolder({
   onToggle: () => void;
   children?: React.ReactNode;
   onContextMenu?: (event: React.MouseEvent) => void;
-  onDrop?: (event: React.DragEvent) => void;
-  onDragOver?: (event: React.DragEvent) => void;
+  onDropSession?: (sessionId: string) => void;
+  onDragOverFolder?: () => void;
   onDragLeave?: () => void;
   dragOver?: boolean;
 }) {
   const isRoot = node.path === null;
   const hasChildren = node.folders.length > 0 || node.sessions.length > 0;
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useCustomDropTarget<HTMLDivElement>(headerRef, {
+    accepts: (data: CustomDragData) =>
+      data.mime === SESSION_DRAG_MIME && !!onDropSession,
+    onDragEnter: () => onDragOverFolder?.(),
+    onDragOver: () => onDragOverFolder?.(),
+    onDragLeave: () => onDragLeave?.(),
+    onDrop: (detail) => {
+      const payload = detail.data.payload as SessionDragPayload | null;
+      if (payload?.sessionId) onDropSession?.(payload.sessionId);
+    },
+  });
 
   return (
     <div>
       <div
+        ref={headerRef}
         className="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-[var(--moba-hover)]"
         data-drag-over={dragOver}
         style={dragOver ? { background: "var(--moba-selected)" } : undefined}
         onClick={onToggle}
         onContextMenu={onContextMenu}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
       >
         {open ? (
           <ChevronDown className="w-3 h-3 text-slate-500" />
@@ -611,20 +627,33 @@ function SessionItem({
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const icon = sessionIcon(session.session_type);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const el = ref.current;
+    if (!el) return;
+    startCustomDrag({
+      event: e,
+      data: {
+        mime: SESSION_DRAG_MIME,
+        payload: { sessionId: session.id } satisfies SessionDragPayload,
+      },
+      ghostText: session.name,
+      ghostElement: el,
+    });
+  };
 
   return (
     <div
+      ref={ref}
       data-testid="session-tree-item"
       data-session-name={session.name}
       data-session-type={session.session_type}
       className="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-[var(--moba-hover)] group"
       data-selected={selected}
       style={selected ? { background: "var(--moba-selected)" } : undefined}
-      draggable
-      onDragStart={(event) => {
-        event.dataTransfer.setData("application/x-newmob-session", session.id);
-        event.dataTransfer.effectAllowed = "move";
-      }}
+      onPointerDown={handlePointerDown}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
