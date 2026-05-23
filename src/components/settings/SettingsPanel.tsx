@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { RotateCcw, Type, Undo } from "lucide-react";
+import { Bot, RotateCcw, Type, Undo } from "lucide-react";
 import { appThemeModeLabel, useAppTheme } from "../../lib/appTheme";
 import {
   DEFAULT_TERMINAL_PROFILE,
@@ -12,6 +12,9 @@ import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { VaultSettings } from "../vault/VaultSettings";
 import { useAppStore } from "../../stores/appStore";
 import { useSystemFonts } from "../../lib/systemFonts";
+import { LlmProvidersPanel } from "./LlmProvidersPanel";
+import { AsrPanel } from "./AsrPanel";
+import { PrivacyToggle } from "./PrivacyToggle";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -175,6 +178,27 @@ export function SettingsPanel() {
 
         <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]">
           <VaultSettings />
+        </section>
+
+        <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+          <div className="mb-3 flex items-center gap-2">
+            <Bot className="w-4 h-4 text-[var(--moba-accent)]" />
+            <div>
+              <div className="text-[14px] font-semibold">AI 设置</div>
+              <div className="text-[11px] text-[var(--moba-text-muted)]">
+                语音识别 (ASR) · LLM Provider · 隐私模式
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <PrivacyToggle />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--moba-divider)]">
+            <AsrPanel />
+            <LlmProvidersPanel />
+          </div>
         </section>
       </div>
     </div>

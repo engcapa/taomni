@@ -34,6 +34,9 @@ russh-sftp = "2"
 tokio-util = { version = "0.7", features = ["compat", "io"] }
 futures = "0.3"
 async-trait = "0.1"
+thiserror = "1"
+reqwest = { version = "0.12", features = ["rustls-tls", "json", "stream"], default-features = false }
+heck = "0.5"
 shellexpand = "3"
 libc = "0.2"
 font-kit = "0.14"

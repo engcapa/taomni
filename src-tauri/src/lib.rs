@@ -10,6 +10,9 @@ mod appearance;
 mod vnc;
 mod history;
 mod vault;
+mod ai;
+mod asr;
+mod llm;
 
 use state::AppState;
 use std::sync::Arc;
@@ -152,6 +155,9 @@ pub fn run() {
             vault::vault_update,
             vault::vault_delete,
             vault::vault_list,
+            ai::commands::get_ai_config,
+            ai::commands::save_ai_config,
+            ai::commands::test_llm_connection,
             exit_app,
         ])
         .run(tauri::generate_context!())
