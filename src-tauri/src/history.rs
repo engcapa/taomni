@@ -128,3 +128,18 @@ pub async fn history_clear(
     }
     Ok(())
 }
+
+/// Non-command version for use by the agent tools module.
+pub fn db_search(conn: &rusqlite::Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<String>> {
+    let pattern = format!("%{}%", query);
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT command FROM command_history
+         WHERE command LIKE ?1
+         ORDER BY last_used_at DESC
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![pattern, limit as i64], |row| {
+        row.get::<_, String>(0)
+    })?;
+    rows.collect()
+}

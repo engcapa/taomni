@@ -1,0 +1,142 @@
+use crate::agent::tools::history::SearchHistoryTool;
+use crate::agent::tools::sessions::ListSessionsTool;
+use crate::agent::tools::terminal::{ExplainErrorTool, ReadTerminalTailTool, RunInTerminalTool};
+use crate::agent::tools::ToolRegistry;
+use crate::agent::{Agent, AgentStepResult, PendingAction};
+use crate::ai::config::{AiConfig, default_ai_config_path};
+use crate::llm::openai_compat::OpenAiCompatProvider;
+use crate::llm::{ChatMessage, ChatRequest, Llm, TaskKind};
+use crate::state::AppState;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::State;
+
+fn build_registry(state: &AppState) -> ToolRegistry {
+    let db = Arc::new(std::sync::Mutex::new(
+        // We can't move the connection, so we open a second read-only connection for agent tools.
+        // The main connection stays in AppState for writes.
+        rusqlite::Connection::open(
+            crate::ai::config::default_ai_config_path()
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("newmob.db"),
+        )
+        .unwrap_or_else(|_| rusqlite::Connection::open_in_memory().unwrap()),
+    ));
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Box::new(ListSessionsTool { db: db.clone() }));
+    registry.register(Box::new(SearchHistoryTool { db: db.clone() }));
+    registry.register(Box::new(RunInTerminalTool));
+    registry.register(Box::new(ReadTerminalTailTool));
+    registry.register(Box::new(ExplainErrorTool));
+    registry
+}
+
+/// Run a single-step agent to explain a terminal error.
+/// terminal_content is the last N lines of terminal output (provided by frontend after user confirmation).
+#[tauri::command]
+pub async fn agent_explain_error(
+    terminal_content: String,
+    session_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let registry = build_registry(&state);
+    let agent = Agent::from_config(TaskKind::AgentDefault, registry)
+        .ok_or("No LLM provider configured")?;
+
+    let system = "你是一个终端错误分析助手。分析用户提供的终端输出，解释错误原因，并给出具体的修复建议。用中文回答，简洁清晰。";
+    let user = format!("请分析以下终端输出中的错误：\n\n```\n{}\n```", terminal_content);
+
+    let req = ChatRequest {
+        messages: vec![
+            ChatMessage::system(system.to_string()),
+            ChatMessage::user(user),
+        ],
+        max_tokens: Some(800),
+        temperature: Some(0.3),
+        stream: false,
+    };
+
+    let config = AiConfig::load(&default_ai_config_path());
+    let provider_id = config.llm.task_routing
+        .get("agent_default")
+        .cloned()
+        .unwrap_or_else(|| config.llm.active.clone());
+    let provider_cfg = config.llm.providers.get(&provider_id)
+        .ok_or_else(|| format!("Provider '{}' not configured", provider_id))?;
+
+    let llm: Arc<dyn Llm> = Arc::new(OpenAiCompatProvider::new(
+        &provider_id,
+        &provider_cfg.base_url,
+        &provider_cfg.api_key,
+        &provider_cfg.model,
+    ));
+
+    let resp = llm.chat(req).await.map_err(|e| e.to_string())?;
+    Ok(resp.content)
+}
+
+/// Plan a single tool call from a natural language request.
+/// Returns the pending action for frontend confirmation.
+#[tauri::command]
+pub async fn agent_plan_tool(
+    request: String,
+    state: State<'_, AppState>,
+) -> Result<Option<PendingAction>, String> {
+    let registry = build_registry(&state);
+    let agent = Agent::from_config(TaskKind::AgentDefault, registry)
+        .ok_or("No LLM provider configured")?;
+
+    let system = "你是 NewMob 终端管理器的 AI 助手。根据用户请求，选择合适的工具执行操作。";
+    let call = agent.plan_single_tool(system, &request).await?;
+
+    if let Some(c) = call {
+        let preview = agent.tools.dry_run_preview(&c);
+        Ok(Some(PendingAction {
+            dry_run_preview: preview,
+            requires_confirmation: crate::agent::safety::requires_confirmation(&c.tool),
+            tool: c.tool,
+            args: c.args,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Execute a confirmed tool call (after user approved the ActionCard).
+#[tauri::command]
+pub async fn agent_execute_tool(
+    tool: String,
+    args: serde_json::Value,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    use crate::agent::tools::ToolCall;
+    let call = ToolCall { tool: tool.clone(), args };
+
+    // Safety check.
+    crate::agent::safety::check_tool_call(&call)?;
+
+    let registry = build_registry(&state);
+    let result = registry.execute(&call).await;
+    if result.ok {
+        Ok(result.output)
+    } else {
+        Err(result.output)
+    }
+}
+
+/// Run a multi-step agent (opt-in). Returns the first step result.
+/// Frontend must call agent_execute_tool + agent_continue for subsequent steps.
+#[tauri::command]
+pub async fn agent_run(
+    request: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<AgentStepResult>, String> {
+    let registry = build_registry(&state);
+    let agent = Agent::from_config(TaskKind::AgentDefault, registry)
+        .ok_or("No LLM provider configured")?;
+
+    let system = "你是 NewMob 终端管理器的 AI 助手。帮助用户管理 SSH 会话、执行命令、分析错误。每次只调用一个工具，等待结果后再继续。";
+    Ok(agent.run_steps(system, &request).await)
+}

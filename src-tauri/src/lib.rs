@@ -14,6 +14,7 @@ mod ai;
 mod asr;
 mod llm;
 mod tab;
+mod agent;
 
 use state::AppState;
 use std::sync::Arc;
@@ -162,6 +163,10 @@ pub fn run() {
             ai::commands::generate_shell_command,
             ai::commands::update_shell_audit_outcome,
             tab::tab_suggest_path,
+            agent::commands::agent_explain_error,
+            agent::commands::agent_plan_tool,
+            agent::commands::agent_execute_tool,
+            agent::commands::agent_run,
             exit_app,
         ])
         .run(tauri::generate_context!())
