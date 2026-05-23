@@ -1,6 +1,8 @@
 pub mod sessions;
 pub mod terminal;
 pub mod history;
+pub mod web_search;
+pub mod web_fetch;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

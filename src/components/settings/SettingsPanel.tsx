@@ -16,6 +16,7 @@ import { LlmProvidersPanel } from "./LlmProvidersPanel";
 import { AsrPanel } from "./AsrPanel";
 import { PrivacyToggle } from "./PrivacyToggle";
 import { AiShellPanel } from "./AiShellPanel";
+import { WebSearchPanel } from "./WebSearchPanel";
 import { useAiStore } from "../../stores/aiStore";
 
 const UI_FONTS = [
@@ -206,6 +207,10 @@ export function SettingsPanel() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--moba-divider)]">
             <AsrPanel />
             <LlmProvidersPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <WebSearchPanel />
           </div>
         </section>
       </div>

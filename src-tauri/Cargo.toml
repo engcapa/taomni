@@ -39,6 +39,8 @@ reqwest = { version = "0.12", features = ["rustls-tls", "json", "stream"], defau
 heck = "0.5"
 regex = "1"
 rig-core = { version = "=0.37.0", default-features = false, features = ["derive"] }
+urlencoding = "2"
+url = "2"
 shellexpand = "3"
 libc = "0.2"
 font-kit = "0.14"

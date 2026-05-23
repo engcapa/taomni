@@ -37,6 +37,15 @@ export interface LlmConfig {
 export interface AiConfig {
   asr: AsrConfig;
   llm: LlmConfig;
+  web_search: WebSearchConfig;
+}
+
+export interface WebSearchConfig {
+  client_provider: string;
+  client_enabled: boolean;
+  confirm_mode: string;
+  byok_key: string;
+  searxng_url?: string;
 }
 
 export interface TestConnectionResult {
@@ -89,6 +98,13 @@ const DEFAULT_CONFIG: AiConfig = {
       inline_qq: "deepseek",
       agent_default: "deepseek",
     },
+  },
+  web_search: {
+    client_provider: "searxng",
+    client_enabled: false,
+    confirm_mode: "per_call",
+    byok_key: "",
+    searxng_url: undefined,
   },
 };
 

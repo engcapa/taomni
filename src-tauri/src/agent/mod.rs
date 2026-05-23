@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod safety;
+pub mod search;
 pub mod tools;
 
 use crate::ai::config::{AiConfig, default_ai_config_path};
