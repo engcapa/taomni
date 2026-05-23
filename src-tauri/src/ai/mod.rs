@@ -1,5 +1,8 @@
 pub mod commands;
 pub mod config;
+pub mod shell_safety;
+pub mod shell_prompt;
+pub mod tools_shell;
 
 use crate::asr::manager::AsrManager;
 use crate::llm::router::LlmRouter;

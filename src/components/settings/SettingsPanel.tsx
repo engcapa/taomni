@@ -15,6 +15,8 @@ import { useSystemFonts } from "../../lib/systemFonts";
 import { LlmProvidersPanel } from "./LlmProvidersPanel";
 import { AsrPanel } from "./AsrPanel";
 import { PrivacyToggle } from "./PrivacyToggle";
+import { AiShellPanel } from "./AiShellPanel";
+import { useAiStore } from "../../stores/aiStore";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -33,6 +35,8 @@ export function SettingsPanel() {
   const setUiFontFamily = useAppStore((s) => s.setUiFontFamily);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const systemFonts = useSystemFonts();
+  const voiceShellEnabled = useAiStore((s) => s.voiceShellEnabled);
+  const toggleVoiceShell = useAiStore((s) => s.toggleVoiceShell);
 
   const currentSelectValue = useMemo(() => {
     if (UI_FONTS.some((f) => f.value === uiFontFamily)) {
@@ -193,6 +197,10 @@ export function SettingsPanel() {
 
           <div className="mb-3">
             <PrivacyToggle />
+          </div>
+
+          <div className="mb-3 pt-3 border-t border-[var(--moba-divider)]">
+            <AiShellPanel enabled={voiceShellEnabled} onToggle={toggleVoiceShell} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--moba-divider)]">

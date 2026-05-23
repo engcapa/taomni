@@ -50,12 +50,14 @@ interface AiStore {
   loading: boolean;
   saving: boolean;
   testResults: Record<string, TestConnectionResult | null>;
+  voiceShellEnabled: boolean;
 
   loadConfig: () => Promise<void>;
   saveConfig: (config: AiConfig) => Promise<void>;
   updateLlmProvider: (id: string, provider: LlmProviderConfig) => void;
   setActiveLlmProvider: (id: string) => void;
   testConnection: (providerId: string, provider: LlmProviderConfig) => Promise<void>;
+  toggleVoiceShell: () => void;
 }
 
 const DEFAULT_CONFIG: AiConfig = {
@@ -95,6 +97,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
   loading: false,
   saving: false,
   testResults: {},
+  voiceShellEnabled: false,
+
+  toggleVoiceShell: () => set((s) => ({ voiceShellEnabled: !s.voiceShellEnabled })),
 
   loadConfig: async () => {
     set({ loading: true });

@@ -158,6 +158,8 @@ pub fn run() {
             ai::commands::get_ai_config,
             ai::commands::save_ai_config,
             ai::commands::test_llm_connection,
+            ai::commands::generate_shell_command,
+            ai::commands::update_shell_audit_outcome,
             exit_app,
         ])
         .run(tauri::generate_context!())
