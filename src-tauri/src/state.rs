@@ -10,6 +10,7 @@ use crate::terminal::ActiveTerminal;
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
+use crate::agent::cc_bridge::process::CcProcess;
 
 pub struct WriteStreamHandle {
     pub path: PathBuf,
@@ -31,6 +32,8 @@ pub struct AppState {
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
     pub vault: Arc<Vault>,
+    /// Per-thread Claude Code process registry (v2.6).
+    pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
 }
 
 impl AppState {
@@ -46,6 +49,7 @@ impl AppState {
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
             vault,
+            cc_processes: tokio::sync::Mutex::new(HashMap::new()),
         }
     }
 }

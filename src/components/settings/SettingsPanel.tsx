@@ -17,6 +17,7 @@ import { AsrPanel } from "./AsrPanel";
 import { PrivacyToggle } from "./PrivacyToggle";
 import { AiShellPanel } from "./AiShellPanel";
 import { WebSearchPanel } from "./WebSearchPanel";
+import { ClaudeCodePanel } from "./ClaudeCodePanel";
 import { useAiStore } from "../../stores/aiStore";
 
 const UI_FONTS = [
@@ -211,6 +212,10 @@ export function SettingsPanel() {
 
           <div className="pt-3 border-t border-[var(--moba-divider)]">
             <WebSearchPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ClaudeCodePanel />
           </div>
         </section>
       </div>

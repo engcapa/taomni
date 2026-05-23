@@ -10,6 +10,9 @@ pub struct ChatThread {
     pub updated_at: i64,
     pub linked_session_id: Option<String>,
     pub source: String,
+    /// Claude Code session ID for --resume (v2.6).
+    #[serde(default)]
+    pub cc_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +81,7 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             updated_at: row.get(4)?,
             linked_session_id: row.get(5)?,
             source: row.get(6)?,
+            cc_session_id: None,
         })
     })?;
     rows.collect()

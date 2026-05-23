@@ -10,6 +10,8 @@ pub struct AiConfig {
     pub llm: LlmConfig,
     #[serde(default)]
     pub web_search: WebSearchConfig,
+    #[serde(default)]
+    pub cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig,
 }
 
 impl Default for AiConfig {
@@ -18,6 +20,7 @@ impl Default for AiConfig {
             asr: AsrConfig::default(),
             llm: LlmConfig::default(),
             web_search: WebSearchConfig::default(),
+            cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig::default(),
         }
     }
 }

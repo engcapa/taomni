@@ -1,3 +1,4 @@
+pub mod cc_bridge;
 pub mod commands;
 pub mod safety;
 pub mod search;

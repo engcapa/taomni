@@ -31,6 +31,7 @@ pub async fn chat_new_thread(
         updated_at: now(),
         linked_session_id,
         source: "drawer".into(),
+        cc_session_id: None,
     };
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::create_thread(&db, &thread).map_err(|e| e.to_string())?;

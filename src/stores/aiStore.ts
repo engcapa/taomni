@@ -38,6 +38,16 @@ export interface AiConfig {
   asr: AsrConfig;
   llm: LlmConfig;
   web_search: WebSearchConfig;
+  cc_bridge: CcBridgeConfig;
+}
+
+export interface CcBridgeConfig {
+  enabled: boolean;
+  binary: string;
+  min_version: string;
+  default_model: string;
+  permission_mode: string;
+  max_turns: number;
 }
 
 export interface WebSearchConfig {
@@ -105,6 +115,14 @@ const DEFAULT_CONFIG: AiConfig = {
     confirm_mode: "per_call",
     byok_key: "",
     searxng_url: undefined,
+  },
+  cc_bridge: {
+    enabled: false,
+    binary: "auto",
+    min_version: "1.0.0",
+    default_model: "sonnet",
+    permission_mode: "default",
+    max_turns: 20,
   },
 };
 
