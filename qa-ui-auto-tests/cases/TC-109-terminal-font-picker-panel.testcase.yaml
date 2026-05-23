@@ -1,0 +1,23 @@
+id: TC-109
+title: Terminal context menu opens the searchable font picker
+description: |
+  Covers the terminal right-click Font settings submenu and the More fonts
+  search panel introduced after the feature catalog was last updated.
+covers: [F4.2]
+tags: [smoke, p1, terminal, right-menu, font]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: "${cfg.app.base_url}"
+  - click: "[data-testid=\"welcome-open-local-terminal\"]"
+  - wait_for: "[data-testid=\"terminal-pane\"]"
+  - right_click: {selector: "[data-testid=\"terminal-pane\"]", position: {x: 24, y: 24}}
+  - wait_for: "[data-testid=\"context-menu\"]"
+  - hover: '[data-testid="context-menu-item-font-settings"]'
+  - wait_for: '[data-testid="context-menu-item-more-fonts"]'
+  - hover: '[data-testid="context-menu-item-more-fonts"]'
+  - wait_for: 'input[placeholder="Search fonts..."]'
+  - fill: {selector: 'input[placeholder="Search fonts..."]', value: "zz-no-such-font"}
+  - assert_visible: 'text="No matching fonts found"'
+  - screenshot: 109-terminal-font-picker.png
