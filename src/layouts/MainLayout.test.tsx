@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { MainLayout } from "./MainLayout";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { listSessions, type SessionConfig } from "../lib/ipc";
+import { listSessions, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
 const terminalLifecycle = vi.hoisted(() => ({
@@ -56,19 +56,34 @@ vi.mock("../components/statusbar/StatusBar", () => ({
 
 vi.mock("../components/terminal/TerminalPanel", () => ({
   TerminalPanel: ({
+    tabId,
     terminalProfile,
     sftpToggle,
+    visible,
+    activeForShortcuts,
+    inputLocked,
+    onSessionReady,
   }: {
+    tabId?: string;
     terminalProfile?: TerminalProfile;
     sftpToggle?: { open: boolean; onToggle: () => void };
+    visible?: boolean;
+    activeForShortcuts?: boolean;
+    inputLocked?: boolean;
+    onSessionReady?: (sessionId: string) => void;
   }) => {
     useEffect(() => {
       terminalLifecycle.mounted();
+      onSessionReady?.(`session-${tabId ?? "terminal"}`);
       return () => terminalLifecycle.unmounted();
     }, []);
     return (
       <div
         data-testid="terminal-panel"
+        data-tab-id={tabId}
+        data-visible={visible ? "true" : "false"}
+        data-active-shortcuts={activeForShortcuts ? "true" : "false"}
+        data-input-locked={inputLocked ? "true" : "false"}
         data-terminal-font-size={terminalProfile?.fontSize ?? ""}
         data-terminal-theme={terminalProfile?.theme ?? ""}
       >
@@ -148,6 +163,11 @@ describe("MainLayout attached SFTP sidebar", () => {
       activeTabId: "ssh-tab",
       sidebarCollapsed: false,
       compactMode: false,
+      terminalSplitActive: false,
+      terminalSplitLayout: "horizontal",
+      terminalSplitInputLockedTabIds: new Set(),
+      multiExecActive: false,
+      multiExecSelectedTabIds: new Set(),
       statusMessage: "Ready",
     });
   });
@@ -231,6 +251,189 @@ describe("MainLayout attached SFTP sidebar", () => {
 
     expect(screen.getByTestId("collapsed-sidebar-rail")).toBeInTheDocument();
     expect(screen.getByTestId("main-sidebar-resize-handle")).toHaveClass("hidden");
+  });
+
+  it("shows all terminal panes in split mode and switches layouts without remounting terminals", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: true,
+      terminalSplitLayout: "horizontal",
+      terminalSplitInputLockedTabIds: new Set(),
+    });
+
+    render(<MainLayout />);
+
+    const panels = screen.getAllByTestId("terminal-panel");
+    expect(panels).toHaveLength(2);
+    expect(panels.map((panel) => panel.getAttribute("data-visible"))).toEqual(["true", "true"]);
+    expect(panels[0]).toHaveAttribute("data-active-shortcuts", "true");
+    expect(panels[1]).toHaveAttribute("data-active-shortcuts", "false");
+    expect(screen.getByTestId("terminal-split-panes")).toHaveAttribute("data-layout", "horizontal");
+    expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByTestId("terminal-split-layout-grid"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("terminal-split-panes")).toHaveAttribute("data-layout", "grid");
+    });
+    expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(2);
+    expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+  });
+
+  it("resizes adjacent terminal panes in horizontal split mode", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: true,
+      terminalSplitLayout: "horizontal",
+      terminalSplitInputLockedTabIds: new Set(),
+    });
+
+    render(<MainLayout />);
+
+    const panesContainer = screen.getByTestId("terminal-split-panes");
+    Object.defineProperty(panesContainer, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, right: 1000, bottom: 500, width: 1000, height: 500 }),
+    });
+
+    const handle = screen.getByTestId("terminal-split-resize-handle");
+    fireEvent.pointerDown(handle, { clientX: 500, clientY: 0 });
+    fireEvent.pointerMove(window, { clientX: 700, clientY: 0 });
+    fireEvent.pointerUp(window);
+
+    const panes = screen.getAllByTestId("terminal-split-pane");
+    await waitFor(() => {
+      expect(Number.parseFloat((panes[0] as HTMLElement).style.flexGrow)).toBeCloseTo(1.4);
+      expect(Number.parseFloat((panes[1] as HTMLElement).style.flexGrow)).toBeCloseTo(0.6);
+    });
+    expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(2);
+    expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+  });
+
+  it("resizes grid split columns and rows", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+        { id: "term-3", type: "terminal", title: "Three", closable: true },
+        { id: "term-4", type: "terminal", title: "Four", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: true,
+      terminalSplitLayout: "grid",
+      terminalSplitInputLockedTabIds: new Set(),
+    });
+
+    render(<MainLayout />);
+
+    const panesContainer = screen.getByTestId("terminal-split-panes");
+    Object.defineProperty(panesContainer, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, right: 1000, bottom: 600, width: 1000, height: 600 }),
+    });
+
+    fireEvent.pointerDown(screen.getByTestId("terminal-split-grid-column-resize-handle"), {
+      clientX: 500,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { clientX: 650, clientY: 0 });
+    fireEvent.pointerUp(window);
+
+    await waitFor(() => {
+      expect((panesContainer as HTMLElement).style.gridTemplateColumns).toContain("1.3fr");
+      expect((panesContainer as HTMLElement).style.gridTemplateColumns).toContain("0.7fr");
+    });
+
+    fireEvent.pointerDown(screen.getByTestId("terminal-split-grid-row-resize-handle"), {
+      clientX: 0,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(window, { clientX: 0, clientY: 420 });
+    fireEvent.pointerUp(window);
+
+    await waitFor(() => {
+      expect((panesContainer as HTMLElement).style.gridTemplateRows).toContain("1.4fr");
+      expect((panesContainer as HTMLElement).style.gridTemplateRows).toContain("0.6fr");
+    });
+  });
+
+  it("updates the active terminal from a split pane click and passes input lock state", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: true,
+      terminalSplitLayout: "horizontal",
+      terminalSplitInputLockedTabIds: new Set(),
+    });
+
+    render(<MainLayout />);
+
+    const paneTwo = screen
+      .getAllByTestId("terminal-split-pane")
+      .find((pane) => pane.getAttribute("data-tab-id") === "term-2");
+    expect(paneTwo).toBeTruthy();
+
+    fireEvent.mouseDown(paneTwo!);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().activeTabId).toBe("term-2");
+      expect(paneTwo).toHaveAttribute("data-active", "true");
+    });
+
+    fireEvent.click(screen.getByTestId("terminal-split-lock-term-2"));
+
+    await waitFor(() => {
+      expect(paneTwo).toHaveAttribute("data-input-locked", "true");
+      expect(
+        screen
+          .getAllByTestId("terminal-panel")
+          .find((panel) => panel.getAttribute("data-tab-id") === "term-2"),
+      ).toHaveAttribute("data-input-locked", "true");
+    });
+  });
+
+  it("skips split-locked selected terminals when MultiExec broadcasts", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: true,
+      terminalSplitLayout: "horizontal",
+      terminalSplitInputLockedTabIds: new Set(["term-2"]),
+      multiExecActive: true,
+      multiExecSelectedTabIds: new Set(["term-1", "term-2"]),
+    });
+    vi.mocked(writeTerminal).mockClear();
+
+    render(<MainLayout />);
+
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    const input = screen.getByTestId("multiexec-input");
+    fireEvent.change(input, { target: { value: "date" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(writeTerminal).toHaveBeenCalledWith("session-term-1", btoa("date\r"));
+    });
+    expect(writeTerminal).not.toHaveBeenCalledWith("session-term-2", btoa("date\r"));
   });
 
   it("passes edited session terminal profiles to already-open terminal tabs", async () => {

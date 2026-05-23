@@ -147,9 +147,9 @@ controls:
   - id: new-local-terminal     # the "+" plus tab button
     selector: '[data-testid="new-local-terminal"]'
     kind: interactive
-  - id: split-view             # always-disabled placeholder — presence-only verification
+  - id: split-view             # toggles terminal split view
     selector: '[data-testid="tab-split-view"]'
-    kind: display
+    kind: interactive
   - id: multiexec-toggle
     selector: '[data-testid="tab-multiexec-toggle"]'
     kind: interactive
@@ -1990,7 +1990,6 @@ controls:
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >
-> - Ribbon `Split`
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
 > - Ribbon `Packages`、`Games`、`Macros`
 > - 会话协议 RDP（仅保留会话存储与编辑表单，连接动作打开占位 tab）
