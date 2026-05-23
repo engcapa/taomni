@@ -82,6 +82,7 @@ import {
   writeStreamAbort,
   checkFileExists,
 } from "../../lib/ipc";
+import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import {
   ZmodemSession,
   type ZmodemState,
@@ -1341,9 +1342,11 @@ export function TerminalPanel({
       detachImeGuard = attachTerminalImeGuard(el, guard);
     }
 
-    try {
-      term.loadAddon(new WebglAddon());
-    } catch { /* WebGL not available */ }
+    if (shouldUseTerminalWebgl()) {
+      try {
+        term.loadAddon(new WebglAddon());
+      } catch { /* WebGL not available */ }
+    }
 
     fitVisibleTerminal();
 
@@ -2474,6 +2477,13 @@ function safeFilePart(value: string): string {
 
 function terminalProfileSignature(profile: TerminalProfile): string {
   return JSON.stringify(profile);
+}
+
+function shouldUseTerminalWebgl(): boolean {
+  // Tauri uses WKWebView on macOS. On Intel/older macOS builds the WebGL
+  // renderer can flash, lose context, or leave the terminal blank, while
+  // xterm's default renderer stays stable for PTY/SSH output.
+  return !(isTauriRuntime() && getAppPlatform() === "macos");
 }
 
 function escapeHtml(value: string): string {
