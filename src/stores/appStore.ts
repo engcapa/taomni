@@ -2,10 +2,12 @@ import { create } from "zustand";
 import type { Tab } from "../types";
 
 export type SideTab = "sessions" | "tools" | "macros" | "games";
+export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
 const COMPACT_MODE_KEY = "newmob.compactMode";
 const UI_FONT_FAMILY_KEY = "newmob.uiFontFamily";
 const UI_FONT_SIZE_KEY = "newmob.uiFontSize";
+const TERMINAL_SPLIT_LAYOUT_KEY = "newmob.terminalSplitLayout";
 
 interface AppState {
   tabs: Tab[];
@@ -17,6 +19,9 @@ interface AppState {
   statusMessage: string;
   multiExecActive: boolean;
   multiExecSelectedTabIds: Set<string>;
+  terminalSplitActive: boolean;
+  terminalSplitLayout: TerminalSplitLayout;
+  terminalSplitInputLockedTabIds: Set<string>;
   uiFontFamily: string;
   uiFontSize: number;
 
@@ -38,6 +43,11 @@ interface AppState {
   toggleMultiExecTab: (tabId: string) => void;
   selectAllTerminalTabs: () => void;
   clearMultiExecSelection: () => void;
+  setTerminalSplitActive: (active: boolean) => void;
+  toggleTerminalSplit: () => void;
+  setTerminalSplitLayout: (layout: TerminalSplitLayout) => void;
+  toggleTerminalSplitInputLock: (tabId: string) => void;
+  clearTerminalSplitInputLocks: () => void;
   setTabHasNewOutput: (tabId: string, hasNewOutput: boolean) => void;
   setUiFontFamily: (font: string) => void;
   setUiFontSize: (size: number) => void;
@@ -98,6 +108,38 @@ function writeUiFontSize(size: number) {
   }
 }
 
+function readTerminalSplitLayout(): TerminalSplitLayout {
+  try {
+    const value = window.localStorage.getItem(TERMINAL_SPLIT_LAYOUT_KEY);
+    if (value === "horizontal" || value === "vertical" || value === "grid") {
+      return value;
+    }
+    return "horizontal";
+  } catch {
+    return "horizontal";
+  }
+}
+
+function writeTerminalSplitLayout(layout: TerminalSplitLayout) {
+  try {
+    window.localStorage.setItem(TERMINAL_SPLIT_LAYOUT_KEY, layout);
+  } catch {
+    // Ignore storage failures; layout changes still apply for this run.
+  }
+}
+
+function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
+  const next = new Set<string>();
+  for (const id of ids) {
+    if (validIds.has(id)) next.add(id);
+  }
+  return next;
+}
+
+function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
+  return !!activeTabId && tabs.some((tab) => tab.id === activeTabId && tab.type === "terminal");
+}
+
 export const useAppStore = create<AppState>((set) => ({
   tabs: [
     {
@@ -115,15 +157,22 @@ export const useAppStore = create<AppState>((set) => ({
   statusMessage: "Ready",
   multiExecActive: false,
   multiExecSelectedTabIds: new Set(),
+  terminalSplitActive: false,
+  terminalSplitLayout: readTerminalSplitLayout(),
+  terminalSplitInputLockedTabIds: new Set(),
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
 
   addTab: (tab) =>
-    set((s) => ({
-      tabs: [...s.tabs, tab],
-      activeTabId: tab.id,
-      statusMessage: `Opened ${tab.title}`,
-    })),
+    set((s) => {
+      const nextTabs = [...s.tabs, tab];
+      return {
+        tabs: nextTabs,
+        activeTabId: tab.id,
+        terminalSplitActive: tab.type === "terminal" ? s.terminalSplitActive : false,
+        statusMessage: `Opened ${tab.title}`,
+      };
+    }),
 
   removeTab: (id) =>
     set((s) => {
@@ -133,7 +182,15 @@ export const useAppStore = create<AppState>((set) => ({
       if (activeId === id) {
         activeId = next[Math.min(idx, next.length - 1)]?.id ?? null;
       }
-      return { tabs: next, activeTabId: activeId, statusMessage: "Closed tab" };
+      const validIds = new Set(next.map((tab) => tab.id));
+      return {
+        tabs: next,
+        activeTabId: activeId,
+        terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
+        terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
+        multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
+        statusMessage: "Closed tab",
+      };
     }),
 
   removeTabs: (ids) =>
@@ -145,7 +202,15 @@ export const useAppStore = create<AppState>((set) => ({
       if (!activeId || idSet.has(activeId)) {
         activeId = next[Math.min(activeIndex, next.length - 1)]?.id ?? null;
       }
-      return { tabs: next, activeTabId: activeId, statusMessage: "Closed tabs" };
+      const validIds = new Set(next.map((tab) => tab.id));
+      return {
+        tabs: next,
+        activeTabId: activeId,
+        terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
+        terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
+        multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
+        statusMessage: "Closed tabs",
+      };
     }),
 
   updateTabTitle: (id, title) =>
@@ -154,7 +219,14 @@ export const useAppStore = create<AppState>((set) => ({
       statusMessage: `Renamed tab to ${title}`,
     })),
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) =>
+    set((s) => {
+      const tab = s.tabs.find((item) => item.id === id);
+      return {
+        activeTabId: id,
+        terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,
+      };
+    }),
 
   moveTab: (fromId, targetId, position) =>
     set((s) => {
@@ -243,6 +315,87 @@ export const useAppStore = create<AppState>((set) => ({
 
   clearMultiExecSelection: () =>
     set({ multiExecSelectedTabIds: new Set() }),
+
+  setTerminalSplitActive: (active) =>
+    set((s) => {
+      if (!active) {
+        return {
+          terminalSplitActive: false,
+          statusMessage: "Terminal split view disabled",
+        };
+      }
+      const terminalTabs = s.tabs.filter((tab) => tab.type === "terminal");
+      if (terminalTabs.length === 0) {
+        return {
+          terminalSplitActive: false,
+          statusMessage: "No terminal tabs to split",
+        };
+      }
+      const activeTabId = activeTabIsTerminal(s.tabs, s.activeTabId)
+        ? s.activeTabId
+        : terminalTabs[0].id;
+      return {
+        terminalSplitActive: true,
+        activeTabId,
+        statusMessage: "Terminal split view enabled",
+      };
+    }),
+
+  toggleTerminalSplit: () =>
+    set((s) => {
+      if (s.terminalSplitActive) {
+        return {
+          terminalSplitActive: false,
+          statusMessage: "Terminal split view disabled",
+        };
+      }
+      const terminalTabs = s.tabs.filter((tab) => tab.type === "terminal");
+      if (terminalTabs.length === 0) {
+        return {
+          terminalSplitActive: false,
+          statusMessage: "No terminal tabs to split",
+        };
+      }
+      const activeTabId = activeTabIsTerminal(s.tabs, s.activeTabId)
+        ? s.activeTabId
+        : terminalTabs[0].id;
+      return {
+        terminalSplitActive: true,
+        activeTabId,
+        statusMessage: "Terminal split view enabled",
+      };
+    }),
+
+  setTerminalSplitLayout: (layout) => {
+    writeTerminalSplitLayout(layout);
+    set({
+      terminalSplitLayout: layout,
+      statusMessage: `Terminal split layout: ${layout}`,
+    });
+  },
+
+  toggleTerminalSplitInputLock: (tabId) =>
+    set((s) => {
+      if (!s.tabs.some((tab) => tab.id === tabId && tab.type === "terminal")) {
+        return s;
+      }
+      const next = new Set(s.terminalSplitInputLockedTabIds);
+      if (next.has(tabId)) {
+        next.delete(tabId);
+      } else {
+        next.add(tabId);
+      }
+      return {
+        terminalSplitInputLockedTabIds: next,
+        statusMessage: next.has(tabId) ? "Terminal pane input locked" : "Terminal pane input unlocked",
+      };
+    }),
+
+  clearTerminalSplitInputLocks: () =>
+    set({
+      terminalSplitInputLockedTabIds: new Set(),
+      statusMessage: "Terminal split input locks cleared",
+    }),
 
   setTabHasNewOutput: (tabId, hasNewOutput) =>
     set((s) => {

@@ -16,9 +16,9 @@ steps:
   - assert_visible: "text=\"Close all\""
   - assert_visible: "text=\"Duplicate tab\""
   - press: Escape
-  # Tab-strip toolbar: split-view (always disabled), multiexec, more
+  # Tab-strip toolbar: split-view, multiexec, more
   - assert_visible: '[data-testid="tab-split-view"]'
-  - assert_disabled: '[data-testid="tab-split-view"]'
+  - assert_enabled: '[data-testid="tab-split-view"]'
   - click: '[data-testid="tab-multiexec-toggle"]'
   - wait: 0.5
   - click: '[data-testid="tab-multiexec-toggle"]'
