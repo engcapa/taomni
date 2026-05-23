@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod instances;
+pub mod key_storage;
 pub mod searxng;
 pub mod serper;
 pub mod tavily;

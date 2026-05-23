@@ -15,6 +15,7 @@ import { useSystemFonts } from "../../lib/systemFonts";
 import { LlmProvidersPanel } from "./LlmProvidersPanel";
 import { AsrPanel } from "./AsrPanel";
 import { PrivacyToggle } from "./PrivacyToggle";
+import { AiMasterSwitch } from "./AiMasterSwitch";
 import { AiShellPanel } from "./AiShellPanel";
 import { WebSearchPanel } from "./WebSearchPanel";
 import { ClaudeCodePanel } from "./ClaudeCodePanel";
@@ -195,6 +196,10 @@ export function SettingsPanel() {
                 语音识别 (ASR) · LLM Provider · 隐私模式
               </div>
             </div>
+          </div>
+
+          <div className="mb-3">
+            <AiMasterSwitch />
           </div>
 
           <div className="mb-3">

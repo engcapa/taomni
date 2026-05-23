@@ -1,9 +1,8 @@
+pub mod fim_engine;
 pub mod path_scanner;
 
 use path_scanner::PathScanner;
 use std::sync::OnceLock;
-use tauri::State;
-use crate::state::AppState;
 
 static PATH_SCANNER: OnceLock<PathScanner> = OnceLock::new();
 
@@ -56,3 +55,112 @@ pub async fn tab_suggest_path(
 
     Ok(vec![])
 }
+
+/// Fill-in-the-middle completion for the current command line.
+///
+/// `prefix` is what's been typed so far; `recent_history` is up to 5 most
+/// recent (already-redacted) commands for context. Returns at most ~24 tokens
+/// of continuation, or `None` when no completion is appropriate.
+///
+/// Routes through the LLM router using `TaskKind::TabCompletion`. By default
+/// that points at the local sidecar — but if the sidecar isn't installed and
+/// the user has a cloud provider configured, we still get a useful answer.
+#[tauri::command]
+pub async fn tab_suggest_fim(
+    prefix: String,
+    recent_history: Vec<String>,
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Option<String>, String> {
+    use crate::llm::{ChatMessage, ChatRequest, TaskKind};
+
+    if prefix.trim().is_empty() {
+        return Ok(None);
+    }
+
+    // Cheap heuristic: don't ask the LLM for prefixes shorter than 3 chars.
+    if prefix.len() < 3 {
+        return Ok(None);
+    }
+
+    let ai_ctx = state.ai_ctx.read().await;
+    if ai_ctx.config.fully_disabled {
+        return Ok(None);
+    }
+
+    let history_section = if recent_history.is_empty() {
+        String::new()
+    } else {
+        format!("\n\n最近命令:\n{}", recent_history.join("\n"))
+    };
+
+    let req = ChatRequest {
+        messages: vec![
+            ChatMessage::system(
+                "你是 shell 命令补全助手。用户正在输入一行命令，请只返回最合理的下一段，\
+                 不要换行、不要解释、不要重复用户已输入的部分。如果没有把握，返回空字符串。",
+            ),
+            ChatMessage::user(format!("用户已输入: {prefix}{history_section}")),
+        ],
+        max_tokens: Some(24),
+        temperature: Some(0.1),
+        stream: false,
+    };
+
+    match ai_ctx.llm.complete(req, TaskKind::TabCompletion).await {
+        Ok(resp) => {
+            let text = resp.content.trim_matches(|c: char| c.is_whitespace() || c == '`').to_string();
+            if text.is_empty() || text.len() > 80 {
+                Ok(None)
+            } else {
+                Ok(Some(text))
+            }
+        }
+        Err(e) => {
+            tracing::debug!(?e, "tab_suggest_fim: LLM call failed");
+            Ok(None)
+        }
+    }
+}
+
+/// AI-driven rewrite of an existing command.
+/// Triggered by Ctrl+K. Goes through TaskKind::CommandRewrite (cloud by default).
+#[tauri::command]
+pub async fn tab_rewrite_command(
+    current_command: String,
+    instruction: String,
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<String, String> {
+    use crate::llm::{ChatMessage, ChatRequest, TaskKind};
+
+    let ai_ctx = state.ai_ctx.read().await;
+    if ai_ctx.config.fully_disabled {
+        return Err("AI is fully disabled.".into());
+    }
+
+    let req = ChatRequest {
+        messages: vec![
+            ChatMessage::system(
+                "你是 shell 命令改写助手。根据用户的改写要求，给出修改后的命令。\
+                 只返回最终命令文本，不要解释、不要 markdown 标记。",
+            ),
+            ChatMessage::user(format!(
+                "当前命令:\n{current_command}\n\n改写要求:\n{instruction}"
+            )),
+        ],
+        max_tokens: Some(120),
+        temperature: Some(0.2),
+        stream: false,
+    };
+
+    let resp = ai_ctx
+        .llm
+        .complete(req, TaskKind::CommandRewrite)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(resp
+        .content
+        .trim_matches(|c: char| c.is_whitespace() || c == '`')
+        .to_string())
+}
+

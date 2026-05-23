@@ -148,34 +148,67 @@ impl Tool for WebFetchTool {
     }
 }
 
-/// Very basic HTML stripping — removes tags and collapses whitespace.
+/// Lightweight HTML → readable text. Strips `<script>` / `<style>` /
+/// `<nav>` / `<aside>` / `<footer>` blocks, then drops the remaining tags
+/// and decodes a small set of common HTML entities. Not as good as a real
+/// readability extractor, but predictable, no-deps, and adequate for the
+/// agent's "skim this page" use case.
 fn strip_html(html: &str) -> String {
-    let mut result = String::with_capacity(html.len() / 2);
-    let mut in_tag = false;
-    let mut in_script = false;
-    let mut in_style = false;
     let lower = html.to_lowercase();
-
     let chars: Vec<char> = html.chars().collect();
     let lower_chars: Vec<char> = lower.chars().collect();
-    let mut i = 0;
 
+    let mut result = String::with_capacity(html.len() / 2);
+    let mut in_tag = false;
+    let mut in_block: Option<&'static str> = None;
+
+    let block_starters: &[(&str, &str)] = &[
+        ("<script", "</script"),
+        ("<style", "</style"),
+        ("<nav", "</nav"),
+        ("<aside", "</aside"),
+        ("<footer", "</footer"),
+        ("<noscript", "</noscript"),
+    ];
+
+    let mut i = 0;
     while i < chars.len() {
+        // Are we inside a block we want to skip entirely?
+        if let Some(end) = in_block {
+            let look = &lower_chars[i..(i + end.len()).min(lower_chars.len())];
+            if look.iter().collect::<String>() == end {
+                in_block = None;
+            }
+            i += 1;
+            continue;
+        }
+
+        // Open a skipped block?
         if chars[i] == '<' {
+            let lookahead: String = lower_chars[i..(i + 10).min(lower_chars.len())].iter().collect();
+            if let Some((_, end)) = block_starters.iter().find(|(s, _)| lookahead.starts_with(s)) {
+                in_block = Some(end);
+                i += 1;
+                continue;
+            }
             in_tag = true;
-            // Check for script/style tags.
-            let rest: String = lower_chars[i..].iter().take(8).collect();
-            if rest.starts_with("<script") { in_script = true; }
-            if rest.starts_with("<style") { in_style = true; }
-            if rest.starts_with("</scrip") { in_script = false; }
-            if rest.starts_with("</style") { in_style = false; }
         } else if chars[i] == '>' {
             in_tag = false;
-        } else if !in_tag && !in_script && !in_style {
+        } else if !in_tag {
             result.push(chars[i]);
         }
         i += 1;
     }
+
+    // Decode common entities.
+    let result = result
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'");
 
     // Collapse whitespace.
     let mut collapsed = String::with_capacity(result.len());

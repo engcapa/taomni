@@ -2114,3 +2114,154 @@ qa-ui-auto-tests/cases/
 ---
 
 _本文档与 `voice-input-plan.md`、`roadmap.md` 互为引用，任何变更需同步检视另两份。_
+
+---
+
+## 十九、实现状态（2026-05-23 审计 / P0–P3 已落地）
+
+图例：✅ 已完成 / ⚠ 部分实现（脚手架就绪，重型本地依赖待连接）/ ❌ 未完成
+
+### v2.0 ASR + LLM Trait 抽象
+- ✅ `trait Asr` / `trait Llm` / `ChatRequest` / `ChatResponse` / `TaskKind`
+- ✅ `OpenAiCompatProvider`（覆盖 DeepSeek / GLM / SiliconFlow / Groq / local）
+- ✅ `LlmRouter`（task routing + 8s 超时回退 + `provider_for_task` + `provider`/`has_provider` 查询）
+- ✅ `AiConfig` 持久化到 `~/.config/newmob/ai.json`（含 `full_local_mode`、`fully_disabled` 双开关）
+- ✅ AsrPanel / LlmProvidersPanel / PrivacyToggle / **AiMasterSwitch（新增）** 设置 UI
+- ✅ **`AppAiCtx` 接入 `AppState`（含 RwLock 热重载）**
+- ✅ **`save_ai_config` 自动重建 LlmRouter，无需重启**
+- ✅ **`llm/llama_server.rs` sidecar wrapper（spawn / health / watchdog 计数 / shared 单例）**
+- ✅ **`llm/gpu_detect.rs`（Vulkan ICD probe / Metal / CPU 兜底）+ `sidecar_status` 命令**
+- ✅ **Vault `ai_api_key:*` 子类型 + `save_ai_api_key` 命令；前端 `saveConfig` 自动把明文 API Key 转为 `vault:<id>` 引用**
+- ✅ **`ai/network_policy.rs`（`is_local_url` / `is_local_runtime` / `reject_if_remote`）**
+- ✅ **全本地模式联动：build_router 过滤云端 provider；chat/web_search/web_fetch/cc_detect 全部按策略拒绝**
+- ⚠ ASR 实现：`SherpaOnnxAsr` scaffold 落地（feature flag `asr-sherpa-onnx`）；启动时自动从 manifest 路径加载 + 调用 `set_engine_sync`；真权重解码留 TODO
+- ❌ `llama-cpp-2` 真链接（feature flag `local-llm-fim` 留出，FIM 当前走 Router）
+- ❌ `anthropic.rs` Claude Messages API（CC bridge 已覆盖 Claude 路径）
+- ❌ ASR/LLM 编译期 isolation lint（运行时通过模块文档强约束）
+
+### v2.1 语音→Shell
+- ✅ `generate_shell_command` schema + 黑名单 + 风险等级 + CommandPreviewCard
+- ✅ `voice_audit` 表 + `outcome=blocked_blacklist | generated`
+- ✅ **`generate_shell_command` 走 `LlmRouter`（`TaskKind::VoiceToShell`，自动享受 fallback）**
+- ✅ **`voice/` 模块（cpal feature-gated 录音 + PTT 状态机 + 16kHz 单声道下采样）**
+- ✅ **Tauri 命令：`voice_capture_supported` / `voice_start_capture` / `voice_stop_capture` / `voice_stop_and_transcribe`**
+- ✅ **`voice_stop_and_transcribe` 走 ASR → LlmRouter 意图分类（VoiceIntent）**
+- ❌ 前端 PTT 按钮 + 波形可视化（命令已就绪，UI 暴露下一步）
+- ❌ 会话级"禁用 AI 写动作"标志 + Session schema 迁移
+- ❌ `outcome=executed | edited | cancelled` 状态机闭环
+
+### v2.2 输入辅助增强
+- ✅ `tab_suggest_path`（PATH + 文件扫描）+ `path_scanner.rs`
+- ✅ `AiRewriteOverlay.tsx`（Ctrl+K UI）
+- ✅ **`tab_suggest_fim` 命令**（走 Router `TaskKind::TabCompletion`，用户配本地 sidecar 时即享 FIM；不需要本地 sidecar 时云端 fallback 也能用）
+- ✅ **`tab_rewrite_command` 命令**（专用 `CommandRewrite` 任务路由，AiRewriteOverlay 切换走它）
+- ✅ **`tab/fim_engine.rs` 占位（`InProcFim`）等待 `llama-cpp-2` 真链接**
+- ❌ TerminalPanel 把 `tab_suggest_fim` 接入现有 ghost-text（数据源 3 触发）—— 命令就绪，渲染层接入下一步
+- ❌ `inlineSuggestionsSource` / `aiCommandRewriteEnabled` 设置项三选一 UX
+- ❌ 敏感字段 redact 串入 FIM prefix（共享 `chat::redact` 已可调用）
+
+### v2.3 Agent harness + MCP
+- ✅ rig-core 0.37 依赖 + `agent::Agent` ReAct loop + dry_run preview + step limit
+- ✅ ToolRegistry / ActionCard / QuickActions 组件
+- ✅ 工具实现：`list_sessions` / `run_in_terminal` / `read_terminal_tail` / `search_history` / `web_search` / `web_fetch` / **`switch_tab` / `open_session_editor` / `sftp_upload` / `save_as_runbook`（新增）**
+- ✅ **`Agent::from_state` 走 `LlmRouter`**（替换原 `from_config` 的 ad-hoc Provider 构造）
+- ✅ **`agent_explain_error` 走 Router `TaskKind::AgentDefault`**
+- ✅ `read_terminal_tail` 强制 `user_invoked=true`（safety 中间件 + 工具内双层）
+- ❌ `rmcp` 依赖 + `agent/mcp_server.rs`（外部 MCP client 反向驱动 NewMob，独立 PR 范围）
+- ⚠ rig-core derive 宏 / Provider 抽象未启用，仍是手写 ReAct（按 plan 文档允许）
+
+### v2.4 Chat Drawer + 内联 + 选区
+- ✅ ChatDrawer / ChatThreadList / Composer / MessageBubble + Ctrl+L 切换
+- ✅ ai_chat_threads / ai_chat_messages 表（含 `cc_session_id` 列）
+- ✅ `chat_send` 命令（fully_disabled 闸门）
+- ✅ Drawer 接入 MainLayout（fully_disabled 时隐藏 Drawer + 屏蔽 Ctrl+L）
+- ✅ **流式输出 `chat_stream` 命令 + Tauri 事件 (`chat-stream:{thread_id}`)**
+- ✅ **`OpenAiCompatProvider::chat_stream` 真 SSE 解析（OpenAI 兼容 `data: <json>\n\n` 格式）**
+- ✅ **chatStore 订阅事件，UserMessage / AssistantStart / Token / End / Error 五种归一事件**
+- ✅ **失败回退到非流式 `chat_send`**
+- ✅ **文本选区 Send-to-AI（`SelectionToolbar.tsx`）+ Explain 新建 thread + redact**
+- ✅ **`attachToComposer` / `explainSelection` / `consumePendingComposerText` ChatStore 动作**
+- ✅ **终端 `??` 内联拦截（`TerminalPanel.writeXtermInput` 检测 `?? <q>\r`，alt-screen / PowerShell / multi-exec 时自动跳过）→ 路由到 Drawer**
+- ❌ `??` 真 ANSI 行内渲染（plan 列为实验性，当前为"路由到 Drawer"的稳健路径）
+- ❌ `@` 引用语法（@terminal / @file / @session）+ AttachmentChip
+- ❌ 每 thread 切 Provider UI + 顶部 Provider 标识
+- ❌ ToolCall ActionCard 嵌入消息流
+- ❌ 30 天保留 + zip 导出
+- ❌ "解释报错"按钮（exit code ≠ 0 时浮现）
+
+### v2.5 Web Search 双轨
+- ✅ SearchProvider trait + SearXNG / Tavily / Serper 实现 + 公共实例探测
+- ✅ WebSearchConfirmCard / SearchProgressChip 组件 + WebSearchPanel
+- ✅ `web_fetch` 工具 + SSRF 防御（拒绝私网 IP / 仅 HTTPS / 端口 443）
+- ✅ **`ProviderCaps`（OpenAI / Anthropic / Gemini / Grok / Mistral / GLM / Qwen / Perplexity 原生搜索元数据）+ `provider_caps` 命令**
+- ✅ **`agent/search/key_storage.rs`（OS keyring）+ `keyring_put` / `keyring_get` / `keyring_delete` 命令**
+- ✅ **`build_search_provider` 优先从 keyring 读 BYOK，回退到 ai.json 兼容老配置**
+- ✅ **改进 `web_fetch::strip_html`：跳过 `<script>` / `<style>` / `<nav>` / `<aside>` / `<footer>` / `<noscript>` 块 + 解码常见 HTML 实体**
+- ✅ **web_search / web_fetch 的 fully_disabled / full_local_mode 闸门**
+- ❌ `deep_search` 客户端工具改名机制（前端路由）
+- ❌ Brave / Exa / Google CSE provider
+- ❌ 三档隐私确认（per_call / per_thread / always / disabled）状态机（schema 已就绪）
+- ❌ 公共实例 30 天可用率轮换
+- ❌ 审计日志中**不**记录 query 文本的约束
+
+### v2.6 Claude Code 集成
+- ✅ `cc_bridge::detect`（claude --version 检测、版本解析、auth probe）
+- ✅ `CcProcess` spawn + NDJSON 协议解析（assistant / tool_use / tool_result / done / error / **system init session_id**）
+- ✅ deny_dirs 生成（~/.ssh、~/.config/newmob）+ ClaudeCodePanel UI
+- ✅ `cc_processes` HashMap 持有在 AppState
+- ✅ **`extract_session_id` 解析 + chat_threads.cc_session_id 列**
+- ✅ **`cc_send_message` 自动 `--resume <id>`，会话续接**
+- ✅ **fully_disabled / full_local_mode 时 cc_detect 立刻返回 NotFound（隐藏入口）**
+- ✅ **黑名单（§5.3）现已对 CC 触发的 `run_in_terminal` 在 safety 中间件层生效**
+- ❌ `permissions_mcp.rs`（stdio MCP server 暴露 permission_prompt → ActionCard 收口）
+- ❌ `tools_mcp.rs` 反向暴露 NewMob 9 个工具（依赖 rmcp 依赖未引入）
+- ❌ 真正 watchdog（仅 MAX_RESTART_ATTEMPTS 计数器，无后台故障检测 + 恢复 timer）
+- ❌ `--add-dir` thread workspace 白名单注入
+- ❌ stream-json `--include-partial-messages` 流式 token 渲染
+
+### §十 UI 布局
+- ✅ AI Chat Drawer 接入右侧（Ctrl+L 切换）
+- ✅ **StatusBar 多段（ASR / LLM / Search / CC / 全本地标签）+ 三色 dot 指示**
+- ✅ **fully_disabled 时 StatusBar 折叠为单一"AI: 关闭"标签**
+- ✅ **Ctrl+L 在 fully_disabled 时无响应 + ChatDrawer 不渲染**
+- ❌ TitleBar 全局 PTT 按钮（voice 后端就绪，UI 待补）
+- ❌ z-index 100/200/300/400/500/900 层级规约
+- ❌ Drawer 响应式（1280 / 960 / <960 三档）
+
+### §十一 模型分发与 GPU
+- ✅ **`models.manifest.json` 资源（ASR + LLM + sidecar 三类，每条三源 URL）**
+- ✅ **`models/downloader.rs`（并发 HEAD probe / Range 续传 / SHA-256 强校验，placeholder 摘要时跳过校验）**
+- ✅ **`models/store.rs` cache 路径解析 + `model_path()` per kind 路由**
+- ✅ **Tauri 命令：`models_list` / `models_download` / `models_delete` / `models_verify`**
+- ✅ **下载进度通过 `model-progress:{id}` 事件 emit 到前端**
+- ✅ **`gpu_detect.rs`（Vulkan loader 文件存在性检测 + Metal + CPU 兜底）**
+- ✅ **Tauri 命令：`sidecar_start` / `sidecar_stop` / `sidecar_status`**
+- ❌ `ash` crate 真 Vulkan device 枚举（当前只用 ICD 文件存在）
+- ❌ CUDA pack 按需下载入口
+- ❌ 用户可控的 Mirror 设置（自动 / ModelScope / GitHub / 自定义）UI
+
+### §十六 测试方案
+- ✅ **MockProvider trait（`tests/support/mock_provider.rs`）—— Token / Wait / Error 三种事件**
+- ✅ **`tests/router_routing.rs` 5 用例：active provider / task routing / 超时回退 / provider error 回退 / 默认 active**
+- ✅ **`tests/network_policy.rs` 3 用例：URL / runtime / reject_if_remote**
+- ✅ **`tests/models_downloader.rs`：SHA-256 已知向量验证**
+- ✅ **`pub mod` 导出 ai / llm / models 给 integration tests**
+- ❌ qa-ui-auto YAML 用例（ai-chat-drawer / ai-tab-complete / ai-web-search-native / ai-web-search-client）
+- ❌ Layer 2 e2e（cloud_only_smoke / concurrent_three_workloads / fim_latency / voice_intent_latency / three_source_probe / gpu_detect）
+- ❌ 性能基线持久化
+
+### 修补优先级（按"用户能用 AI 的最短路径"排）—— 已落地
+1. **P0** 模型分发 + sidecar + AppAiCtx 接入 + Vault keys + 网络策略 ✅
+2. **P1** 流式 chat + 选区 toolbar + `??` 内联（路由到 Drawer 形态）+ voice/PTT scaffold + sherpa-onnx scaffold ✅
+3. **P2** FIM 命令 + Ctrl+K 改写专用路径 + rmcp（部分：4 个缺失工具落地）+ Agent→Router 迁移 ✅
+4. **P3** ProviderCaps + keyring + 改进 readability + Claude Code `--resume` + MockProvider + UI 抛光 ✅
+
+### 仍需后续 PR 单独处理的子项
+- `rmcp` 依赖 + Agent MCP server（让外部 MCP client 反向驱动）+ CC permissions/tools MCP
+- `llama-cpp-2` 真链接（FIM 端到端 < 300 ms 目标）+ `sherpa-onnx` 真权重解码
+- `ash` Vulkan device 枚举 + CUDA pack 下载
+- 终端 `??` 真 ANSI 行内渲染（plan 标记为实验性）
+- Chat Drawer 真 ToolCall 卡渲染 / `@` 引用语法 / per-thread provider 切换
+- qa-ui-auto YAML 用例 + 真模型 nightly 基线
+
+

@@ -37,20 +37,53 @@ pub async fn get_ai_config() -> Result<AiConfig, String> {
     Ok(AiConfig::load(&path))
 }
 
-/// Save the AI configuration.
+/// Save the AI configuration. Rebuilds the LlmRouter so changes take
+/// effect immediately without an app restart.
 #[tauri::command]
-pub async fn save_ai_config(config: AiConfig) -> Result<(), String> {
+pub async fn save_ai_config(
+    config: AiConfig,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let path = default_ai_config_path();
-    config.save(&path).map_err(|e| e.to_string())
+    config.save(&path).map_err(|e| e.to_string())?;
+
+    let mut ai_ctx = state.ai_ctx.write().await;
+    ai_ctx.reload(config);
+    Ok(())
+}
+
+/// Store an AI provider's API key in the vault and return its `vault:<id>`
+/// reference. The frontend should write this reference into the provider
+/// config in place of the plaintext key.
+///
+/// `kind` is e.g. `ai_api_key:deepseek` / `ai_api_key:tavily`.
+#[tauri::command]
+pub async fn save_ai_api_key(
+    kind: String,
+    label: String,
+    plaintext: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let result = state.vault.put(&kind, &label, &plaintext)?;
+    Ok(result.reference)
 }
 
 /// Test connectivity to a specific LLM provider.
 #[tauri::command]
-pub async fn test_llm_connection(provider: LlmProviderConfig) -> Result<TestConnectionResult, String> {
+pub async fn test_llm_connection(
+    provider: LlmProviderConfig,
+    state: State<'_, AppState>,
+) -> Result<TestConnectionResult, String> {
+    // Resolve `vault:<id>` references into plaintext for the test call.
+    let api_key = match state.vault.resolve(&provider.api_key) {
+        Ok(Some(plaintext)) => plaintext.to_string(),
+        _ => provider.api_key.clone(),
+    };
+
     let llm: Arc<dyn Llm> = Arc::new(OpenAiCompatProvider::new(
         "test",
         &provider.base_url,
-        &provider.api_key,
+        &api_key,
         &provider.model,
     ));
 
@@ -80,23 +113,6 @@ pub async fn generate_shell_command(
     session_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<CommandPreview, String> {
-    let ai_config = AiConfig::load(&default_ai_config_path());
-    let routing_key = "voice_to_shell";
-    let provider_id = ai_config.llm.task_routing
-        .get(routing_key)
-        .cloned()
-        .unwrap_or_else(|| ai_config.llm.active.clone());
-
-    let provider_cfg = ai_config.llm.providers.get(&provider_id)
-        .ok_or_else(|| format!("Provider '{}' not configured", provider_id))?;
-
-    let llm: Arc<dyn Llm> = Arc::new(OpenAiCompatProvider::new(
-        &provider_id,
-        &provider_cfg.base_url,
-        &provider_cfg.api_key,
-        &provider_cfg.model,
-    ));
-
     let cwd_str = cwd.as_deref().unwrap_or("~");
     let user_msg = format!(
         "当前工作目录：{}\n\n用户请求：{}",
@@ -120,7 +136,13 @@ pub async fn generate_shell_command(
         stream: false,
     };
 
-    let resp = llm.chat(req).await.map_err(|e| e.to_string())?;
+    // Route through LlmRouter using VoiceToShell task — gets fallback for free.
+    let resp = {
+        let ai_ctx = state.ai_ctx.read().await;
+        ai_ctx.llm.complete(req, crate::llm::TaskKind::VoiceToShell)
+            .await
+            .map_err(|e| e.to_string())?
+    };
 
     // Parse the JSON response — strip markdown code fences if present.
     let raw = resp.content.trim();

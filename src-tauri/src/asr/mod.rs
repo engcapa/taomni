@@ -2,6 +2,7 @@
 // ASR produces plain text (transcription). It has no knowledge of LLM providers.
 
 pub mod manager;
+pub mod sherpa_onnx;
 
 use async_trait::async_trait;
 use thiserror::Error;

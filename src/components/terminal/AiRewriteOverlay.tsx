@@ -38,13 +38,12 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
     setError(null);
     setRewritten(null);
     try {
-      // Use generate_shell_command with the current command as context.
-      const result = await invoke<{ command: string }>("generate_shell_command", {
-        description: `当前命令：${currentCommand}\n\n改写要求：${instruction}`,
-        cwd: null,
-        sessionId: null,
+      // Dedicated rewrite path (TaskKind::CommandRewrite, cloud by default).
+      const newCmd = await invoke<string>("tab_rewrite_command", {
+        currentCommand,
+        instruction,
       });
-      setRewritten(result.command);
+      setRewritten(newCmd);
     } catch (e) {
       setError(String(e));
     } finally {

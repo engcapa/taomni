@@ -10,6 +10,8 @@ pub enum CcEvent {
     ToolUse { id: String, name: String, input: serde_json::Value },
     /// Result of a tool call.
     ToolResult { tool_use_id: String, content: String },
+    /// Session header; emitted on the first event with a fresh session id.
+    SessionInit { session_id: String },
     /// Session is complete.
     Done,
     /// An error occurred.
@@ -27,6 +29,20 @@ pub fn parse_ndjson_line(line: &str) -> Option<CcEvent> {
     let event_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
     match event_type {
+        "system" => {
+            // CC stream-json: {"type":"system","subtype":"init","session_id":"<id>",...}
+            if value.get("subtype").and_then(|v| v.as_str()) == Some("init") {
+                let session_id = value
+                    .get("session_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if !session_id.is_empty() {
+                    return Some(CcEvent::SessionInit { session_id });
+                }
+            }
+            Some(CcEvent::Unknown { raw: line.to_string() })
+        }
         "assistant" => {
             // CC stream-json: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
             let content = value
@@ -84,4 +100,12 @@ pub fn extract_answer(events: &[CcEvent]) -> String {
         })
         .collect::<Vec<_>>()
         .join("")
+}
+
+/// Pull a freshly-issued CC session id out of a stream, if present.
+pub fn extract_session_id(events: &[CcEvent]) -> Option<String> {
+    events.iter().find_map(|e| match e {
+        CcEvent::SessionInit { session_id } => Some(session_id.clone()),
+        _ => None,
+    })
 }

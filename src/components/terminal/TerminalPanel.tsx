@@ -94,6 +94,8 @@ import {
 import { ZmodemConflictDialog } from "./ZmodemConflictDialog";
 import { CommonCommandsPalette } from "./CommonCommandsPalette";
 import { AiRewriteOverlay } from "./AiRewriteOverlay";
+import { SelectionToolbar } from "./SelectionToolbar";
+import { useChatStore } from "../../stores/chatStore";
 import { useSuggestionSource } from "../../lib/terminal/aiSuggestionSource";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
@@ -223,6 +225,8 @@ export function TerminalPanel({
   const fontState = useSystemFonts();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
+  const attachToComposer = useChatStore((s) => s.attachToComposer);
+  const explainSelection = useChatStore((s) => s.explainSelection);
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
     initialProfileRef.current = terminalProfile ?? loadGlobalTerminalProfile();
@@ -252,6 +256,10 @@ export function TerminalPanel({
   const [inlineSuggestionsSource, setInlineSuggestionsSource] = useState(initialProfile.inlineSuggestionsSource);
   const [aiCommandRewriteEnabled, setAiCommandRewriteEnabled] = useState(initialProfile.aiCommandRewriteEnabled);
   const [aiRewriteOpen, setAiRewriteOpen] = useState(false);
+  const [selectionToolbar, setSelectionToolbar] = useState<{
+    rect: { top: number; left: number; right: number; bottom: number };
+    text: string;
+  } | null>(null);
   const [commonCommands, setCommonCommands] = useState<UserCommonCommand[]>(initialProfile.commonCommands);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -532,12 +540,41 @@ export function TerminalPanel({
     if (filtered === null) {
       return;
     }
+
+    // `??` inline interceptor: when the user has typed `?? <question>` and
+    // presses Enter on a normal-screen prompt, capture the question and
+    // route it to the AI Chat Drawer instead of forwarding to the shell.
+    // Disabled in alt-screen mode (vim/less/top), in PowerShell, and during
+    // multi-exec broadcast.
+    const endsWithEnter = filtered.endsWith("\r") || filtered.endsWith("\n");
+    if (endsWithEnter && !multiExecActiveRef.current) {
+      const term = termRef.current;
+      const altScreen = term?.buffer.active.type === "alternate";
+      const candidate = pendingRef.current + filtered.slice(0, filtered.length - 1);
+      if (
+        !altScreen
+        && !isLocalPowerShell
+        && candidate.startsWith("?? ")
+        && candidate.length > 3
+      ) {
+        const question = candidate.slice(3).trim();
+        // Clear the line on the shell (Ctrl+U wipes back to start in bash/zsh).
+        sendTerminalInput("\x15");
+        pendingRef.current = "";
+        invalidatedRef.current = false;
+        refreshSuggestion();
+        // Route to the AI Drawer.
+        void useChatStore.getState().attachToComposer(`?? ${question}`);
+        return;
+      }
+    }
+
     trackPending(filtered);
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(filtered);
     }
     sendTerminalInput(filtered);
-  }, [sendTerminalInput, trackPending]);
+  }, [sendTerminalInput, trackPending, refreshSuggestion, isLocalPowerShell]);
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
@@ -1413,6 +1450,34 @@ export function TerminalPanel({
       if (copyOnSelectRef.current && term.hasSelection()) {
         void writeClipboardText(term.getSelection(), "");
       }
+
+      // SelectionToolbar: show when there is a non-empty selection that
+      // contains useful content (ignore single-char accidental drags).
+      if (term.hasSelection()) {
+        const text = term.getSelection();
+        if (text && text.trim().length >= 2) {
+          // The xterm.js `core` API isn't public; pick the bounding rect of
+          // the visible terminal element and pin the toolbar to its top-right.
+          const container = containerRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            // Place above the visible terminal, anchored ~1/3 across.
+            setSelectionToolbar({
+              text,
+              rect: {
+                top: rect.top + 24,
+                left: rect.left + rect.width / 3,
+                right: rect.right,
+                bottom: rect.bottom,
+              },
+            });
+          }
+        } else {
+          setSelectionToolbar(null);
+        }
+      } else {
+        setSelectionToolbar(null);
+      }
     });
     const scrollDisposable = term.onScroll(() => setViewportVersion((v) => v + 1));
     const renderDisposable = term.onRender(() => setViewportVersion((v) => v + 1));
@@ -2159,6 +2224,25 @@ export function TerminalPanel({
           }}
         />
       )}
+
+      <SelectionToolbar
+        visible={!!selectionToolbar}
+        rect={selectionToolbar?.rect ?? null}
+        selectionText={selectionToolbar?.text ?? ""}
+        onCopy={(text) => {
+          void writeClipboardText(text, "");
+          setSelectionToolbar(null);
+        }}
+        onSendToAi={(text) => {
+          void attachToComposer(text);
+          setSelectionToolbar(null);
+        }}
+        onExplain={(text) => {
+          void explainSelection(text);
+          setSelectionToolbar(null);
+        }}
+        onDismiss={() => setSelectionToolbar(null)}
+      />
     </div>
   );
 }

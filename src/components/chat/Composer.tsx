@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
+import { useChatStore } from "../../stores/chatStore";
 
 interface ComposerProps {
   onSend: (content: string, terminalContext?: string) => Promise<void>;
@@ -10,6 +11,17 @@ interface ComposerProps {
 export function Composer({ onSend, sending, disabled }: ComposerProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pending = useChatStore((s) => s.pendingComposerText);
+  const consumePending = useChatStore((s) => s.consumePendingComposerText);
+
+  // Pick up text staged by the SelectionToolbar's "Send to AI".
+  useEffect(() => {
+    if (pending && pending.length > 0) {
+      setText((cur) => (cur ? `${cur}\n\n${pending}` : pending));
+      consumePending();
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [pending, consumePending]);
 
   const handleSend = async () => {
     const trimmed = text.trim();

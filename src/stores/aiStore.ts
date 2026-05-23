@@ -39,6 +39,8 @@ export interface AiConfig {
   llm: LlmConfig;
   web_search: WebSearchConfig;
   cc_bridge: CcBridgeConfig;
+  full_local_mode?: boolean;
+  fully_disabled?: boolean;
 }
 
 export interface CcBridgeConfig {
@@ -124,6 +126,8 @@ const DEFAULT_CONFIG: AiConfig = {
     permission_mode: "default",
     max_turns: 20,
   },
+  full_local_mode: false,
+  fully_disabled: false,
 };
 
 export const useAiStore = create<AiStore>((set, get) => ({
@@ -148,8 +152,41 @@ export const useAiStore = create<AiStore>((set, get) => ({
   saveConfig: async (config: AiConfig) => {
     set({ saving: true });
     try {
-      await invoke("save_ai_config", { config });
-      set({ config, saving: false });
+      // For each provider whose api_key is plaintext (not already a vault: ref),
+      // store it in the vault and replace the field with the returned `vault:<id>`
+      // reference. This is best-effort — if the vault is locked or empty, we
+      // fall back to saving the plaintext as-is so the existing flow still works.
+      const providers: Record<string, LlmProviderConfig> = {};
+      for (const [id, p] of Object.entries(config.llm.providers)) {
+        if (
+          p.api_key &&
+          p.api_key.length > 0 &&
+          !p.api_key.startsWith("vault:") &&
+          p.runtime !== "llama-server" &&
+          p.api_key !== "local"
+        ) {
+          try {
+            const ref = await invoke<string>("save_ai_api_key", {
+              kind: `ai_api_key:${id}`,
+              label: `LLM Provider: ${id}`,
+              plaintext: p.api_key,
+            });
+            providers[id] = { ...p, api_key: ref };
+          } catch {
+            providers[id] = p; // vault locked / empty — keep plaintext
+          }
+        } else {
+          providers[id] = p;
+        }
+      }
+
+      const safeConfig: AiConfig = {
+        ...config,
+        llm: { ...config.llm, providers },
+      };
+
+      await invoke("save_ai_config", { config: safeConfig });
+      set({ config: safeConfig, saving: false });
     } catch (e) {
       set({ saving: false });
       throw e;

@@ -1,4 +1,3 @@
-use crate::llm::TaskKind;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -12,6 +11,14 @@ pub struct AiConfig {
     pub web_search: WebSearchConfig,
     #[serde(default)]
     pub cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig,
+    /// Master switch: when true, all non-local network calls are refused
+    /// (LLM cloud providers, web_search, web_fetch, Claude Code).
+    #[serde(default)]
+    pub full_local_mode: bool,
+    /// Master switch: when true, the entire AI subsystem is silent
+    /// (no buttons, no status, no calls). Independent of full_local_mode.
+    #[serde(default)]
+    pub fully_disabled: bool,
 }
 
 impl Default for AiConfig {
@@ -21,6 +28,8 @@ impl Default for AiConfig {
             llm: LlmConfig::default(),
             web_search: WebSearchConfig::default(),
             cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig::default(),
+            full_local_mode: false,
+            fully_disabled: false,
         }
     }
 }

@@ -41,6 +41,29 @@ impl LlmRouter {
         self.fallback = Some(config);
     }
 
+    /// True if a provider with this id is registered.
+    pub fn has_provider(&self, id: &str) -> bool {
+        self.providers.contains_key(id)
+    }
+
+    /// Returns the active default provider id.
+    pub fn active(&self) -> &str {
+        &self.active
+    }
+
+    /// Returns the provider id that this task would actually route to.
+    pub fn provider_for_task(&self, task: TaskKind) -> String {
+        self.task_routing
+            .get(&task)
+            .cloned()
+            .unwrap_or_else(|| self.active.clone())
+    }
+
+    /// Get a direct reference to a provider by id (used by chat streaming etc).
+    pub fn provider(&self, id: &str) -> Option<Arc<dyn Llm>> {
+        self.providers.get(id).cloned()
+    }
+
     pub async fn complete(&self, req: ChatRequest, task: TaskKind) -> LlmResult<ChatResponse> {
         let primary_id = self.task_routing
             .get(&task)
@@ -90,3 +113,108 @@ impl LlmRouter {
         Ok(resp.content)
     }
 }
+
+// ── Build helpers ─────────────────────────────────────────────────────────────
+
+use crate::ai::config::{AiConfig, LlmConfig};
+use super::openai_compat::OpenAiCompatProvider;
+
+fn task_kind_from_str(s: &str) -> Option<TaskKind> {
+    Some(match s {
+        "voice_intent"    => TaskKind::VoiceIntent,
+        "voice_to_shell"  => TaskKind::VoiceToShell,
+        "tab_completion"  => TaskKind::TabCompletion,
+        "command_rewrite" => TaskKind::CommandRewrite,
+        "chat_drawer"     => TaskKind::ChatDrawer,
+        "inline_qq"       => TaskKind::InlineQq,
+        "agent_default"   => TaskKind::AgentDefault,
+        "web_search"      => TaskKind::WebSearch,
+        "code_mode"       => TaskKind::CodeMode,
+        _ => return None,
+    })
+}
+
+/// Resolve a possibly `vault:<id>`-prefixed value to plaintext.
+/// Returns the original value unchanged when no vault is provided or the
+/// value is already plaintext.
+fn resolve_api_key(value: &str, vault: Option<&crate::vault::Vault>) -> String {
+    if let Some(v) = vault {
+        match v.resolve(value) {
+            Ok(Some(plaintext)) => return plaintext.to_string(),
+            Ok(None) => {}                // not a vault ref, treat as plaintext
+            Err(_) => {}                  // locked / missing — return value as-is and let caller see the auth error
+        }
+    }
+    value.to_string()
+}
+
+/// Build an `LlmRouter` from the persisted `LlmConfig`.
+///
+/// All `runtime in {openai-compat, llama-server, ollama}` providers are wired
+/// through `OpenAiCompatProvider`. Providers with empty `api_key` AND non-local
+/// runtime are still registered (so the user can fill the key later without a
+/// restart) but they will fail at call-time.
+///
+/// Anthropic (`runtime=anthropic`) and Claude Code (`runtime=claude-cli`) are
+/// not registered here — they are handled by their own modules.
+///
+/// `full_local_mode` filters out cloud providers entirely and forces task
+/// routing to only fall through to local providers.
+pub fn build_router(
+    cfg: &LlmConfig,
+    vault: Option<&crate::vault::Vault>,
+    full_local_mode: bool,
+) -> LlmRouter {
+    let mut router = LlmRouter::new(&cfg.active);
+
+    for (id, p) in &cfg.providers {
+        if full_local_mode && !crate::ai::network_policy::is_local_runtime(&p.runtime) {
+            tracing::info!(provider = %id, runtime = %p.runtime, "skipping cloud provider in full-local mode");
+            continue;
+        }
+        match p.runtime.as_str() {
+            "openai-compat" | "llama-server" | "ollama" => {
+                let resolved_key = resolve_api_key(&p.api_key, vault);
+                let provider = Arc::new(OpenAiCompatProvider::new(
+                    id.as_str(),
+                    p.base_url.clone(),
+                    resolved_key,
+                    p.model.clone(),
+                ));
+                router.add_provider(id, provider);
+            }
+            _ => {
+                tracing::info!(provider = %id, runtime = %p.runtime, "skipping non-openai-compat provider in router");
+            }
+        }
+    }
+
+    for (task_str, provider_id) in &cfg.task_routing {
+        if let Some(task) = task_kind_from_str(task_str) {
+            // Only set the route if the target provider was actually registered.
+            // (full_local_mode might have skipped it.)
+            if router.has_provider(provider_id) {
+                router.set_task_route(task, provider_id.clone());
+            }
+        }
+    }
+
+    if cfg.fallback.enabled
+        && router.has_provider(&cfg.fallback.primary)
+        && router.has_provider(&cfg.fallback.secondary)
+    {
+        router.set_fallback(FallbackConfig {
+            primary:    cfg.fallback.primary.clone(),
+            secondary:  cfg.fallback.secondary.clone(),
+            timeout_ms: cfg.fallback.timeout_ms,
+        });
+    }
+
+    router
+}
+
+/// Build a router from a full AiConfig (currently only forwards llm).
+pub fn build_router_from_ai(cfg: &AiConfig, vault: Option<&crate::vault::Vault>) -> LlmRouter {
+    build_router(&cfg.llm, vault, cfg.full_local_mode)
+}
+

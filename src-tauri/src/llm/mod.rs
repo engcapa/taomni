@@ -1,6 +1,8 @@
 // ⚠️ This module must NOT use crate::asr::*
 // LLM receives plain text; it does not know about audio or ASR.
 
+pub mod gpu_detect;
+pub mod llama_server;
 pub mod openai_compat;
 pub mod router;
 
@@ -96,9 +98,43 @@ pub struct TokenUsage {
 pub trait Llm: Send + Sync {
     async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse>;
 
+    /// Streaming chat. Default implementation yields a single full event from
+    /// the non-streaming `chat` method, so providers that don't natively
+    /// stream still satisfy the trait.
+    async fn chat_stream(
+        &self,
+        req: ChatRequest,
+    ) -> LlmResult<futures::stream::BoxStream<'static, LlmResult<ChatStreamEvent>>> {
+        let resp = self.chat(req).await?;
+        let model = resp.model.clone();
+        let usage = resp.usage.clone();
+        let content = resp.content.clone();
+        let s = futures::stream::iter(vec![
+            Ok(ChatStreamEvent::Token { content }),
+            Ok(ChatStreamEvent::End { model, usage }),
+        ]);
+        Ok(Box::pin(s))
+    }
+
     /// Provider identifier for logging/display.
     fn provider_id(&self) -> &str;
 
     /// Model name being used.
     fn model(&self) -> &str;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ChatStreamEvent {
+    /// Incremental text token(s).
+    Token { content: String },
+    /// Stream finished cleanly. May include the final model id and token usage.
+    End {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        usage: Option<TokenUsage>,
+    },
+    /// Stream ended with an error.
+    Error { message: String },
 }

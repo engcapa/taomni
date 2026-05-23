@@ -1,4 +1,5 @@
 pub mod sessions;
+pub mod sftp_runbook;
 pub mod terminal;
 pub mod history;
 pub mod web_search;

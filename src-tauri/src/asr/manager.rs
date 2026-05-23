@@ -19,6 +19,14 @@ impl AsrManager {
         }
     }
 
+    /// Synchronously install an engine before the manager is shared.
+    /// Used at startup when the runtime hasn't begun yet.
+    pub fn set_engine_sync(&self, engine: Arc<dyn Asr>) {
+        // RwLock::blocking_write is safe to call from sync context.
+        let mut guard = self.engine.blocking_write();
+        *guard = engine;
+    }
+
     /// Replace the active engine (called when user changes ASR provider in settings).
     pub async fn set_engine(&self, engine: Arc<dyn Asr>) {
         let mut guard = self.engine.write().await;

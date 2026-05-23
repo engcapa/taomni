@@ -65,6 +65,7 @@ import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminal
 import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
+import { useAiStore } from "../stores/aiStore";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 
@@ -134,6 +135,7 @@ export function MainLayout() {
   const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
+  const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
   const toggleChatDrawer = useChatStore((s) => s.toggleDrawer);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
 
@@ -305,10 +307,11 @@ export function MainLayout() {
         event.preventDefault();
         toggleCompactMode();
       }
-      // Ctrl+L: toggle AI Chat Drawer
+      // Ctrl+L: toggle AI Chat Drawer (no-op when fully_disabled)
       if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "l") {
         event.preventDefault();
-        toggleChatDrawer();
+        const aiOff = useAiStore.getState().config?.fully_disabled === true;
+        if (!aiOff) toggleChatDrawer();
       }
     };
 
@@ -1366,7 +1369,7 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
-        {chatDrawerOpen && <ChatDrawer />}
+        {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
       </div>
 
       {!compactMode && <StatusBar />}

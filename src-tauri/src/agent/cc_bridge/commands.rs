@@ -1,6 +1,6 @@
 use crate::agent::cc_bridge::{detect, CcStatusResult};
 use crate::agent::cc_bridge::process::CcProcess;
-use crate::agent::cc_bridge::protocol::{CcEvent, extract_answer};
+use crate::agent::cc_bridge::protocol::{CcEvent, extract_answer, extract_session_id};
 use crate::agent::cc_bridge::config::{write_temp_settings, write_temp_mcp_config, sensitive_deny_dirs};
 use crate::ai::config::{AiConfig, default_ai_config_path};
 use serde::{Deserialize, Serialize};
@@ -13,12 +13,25 @@ use crate::state::AppState;
 /// Per-thread CC process registry (held in AppState via a separate Mutex).
 pub type CcProcessRegistry = Mutex<HashMap<String, Arc<CcProcess>>>;
 
-/// Detect Claude Code CLI status.
+/// Detect Claude Code CLI status. Returns NotFound when full-local mode is on,
+/// so the frontend hides the integration without leaking that CC is installed.
 #[tauri::command]
-pub async fn cc_detect() -> Result<CcStatusResult, String> {
-    let config = AiConfig::load(&default_ai_config_path());
-    let binary = if config.cc_bridge.binary == "auto" { None } else { Some(config.cc_bridge.binary.as_str()) };
-    Ok(detect(binary).await)
+pub async fn cc_detect(state: State<'_, AppState>) -> Result<CcStatusResult, String> {
+    let ai_ctx = state.ai_ctx.read().await;
+    if ai_ctx.config.full_local_mode || ai_ctx.config.fully_disabled {
+        return Ok(CcStatusResult {
+            status: crate::agent::cc_bridge::CcStatus::NotFound,
+            message: "Claude Code is hidden in full-local / fully-disabled mode.".into(),
+            binary_path: None,
+        });
+    }
+    let binary = if ai_ctx.config.cc_bridge.binary == "auto" {
+        None
+    } else {
+        Some(ai_ctx.config.cc_bridge.binary.clone())
+    };
+    drop(ai_ctx);
+    Ok(detect(binary.as_deref()).await)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,6 +45,7 @@ pub struct CcSendResponse {
     pub answer: String,
     pub events: Vec<CcEvent>,
     pub tool_calls: Vec<CcToolCall>,
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -48,11 +62,17 @@ pub async fn cc_send_message(
     req: CcSendRequest,
     state: State<'_, AppState>,
 ) -> Result<CcSendResponse, String> {
-    let config = AiConfig::load(&default_ai_config_path());
-    if !config.cc_bridge.enabled {
-        return Err("Claude Code integration is disabled.".into());
+    {
+        let ai_ctx = state.ai_ctx.read().await;
+        if ai_ctx.config.fully_disabled || ai_ctx.config.full_local_mode {
+            return Err("Claude Code is unavailable in full-local / fully-disabled mode.".into());
+        }
+        if !ai_ctx.config.cc_bridge.enabled {
+            return Err("Claude Code integration is disabled.".into());
+        }
     }
 
+    let config = AiConfig::load(&default_ai_config_path());
     let binary = if config.cc_bridge.binary == "auto" {
         crate::agent::cc_bridge::find_claude_binary()
             .ok_or("Claude Code CLI not found")?
@@ -70,24 +90,53 @@ pub async fn cc_send_message(
     write_temp_mcp_config(&mcp_path)
         .map_err(|e| format!("Failed to write CC MCP config: {}", e))?;
 
+    // Look up the saved session id for this thread (for --resume continuity).
+    let resume_session = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        crate::chat::store::list_threads(&db, 200)
+            .ok()
+            .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id))
+            .and_then(|t| t.cc_session_id)
+    };
+
     // Build extra args.
     let mut extra_args = vec![
         "--model".into(), config.cc_bridge.default_model.clone(),
         "--max-turns".into(), config.cc_bridge.max_turns.to_string(),
         "--settings".into(), settings_path.to_string_lossy().to_string(),
     ];
+    if let Some(sid) = &resume_session {
+        extra_args.push("--resume".into());
+        extra_args.push(sid.clone());
+    }
 
-    // Get or create CC process for this thread.
+    // Get or create CC process for this thread. Reuse only when the resume id
+    // matches; otherwise drop the old process and start fresh.
     let process = {
         let mut registry = state.cc_processes.lock().await;
-        registry.entry(req.thread_id.clone())
-            .or_insert_with(|| Arc::new(CcProcess::new(&binary, extra_args)))
-            .clone()
+        let existing = registry.get(&req.thread_id).cloned();
+        match existing {
+            Some(p) => p,
+            None => {
+                let p = Arc::new(CcProcess::new(&binary, extra_args));
+                registry.insert(req.thread_id.clone(), p.clone());
+                p
+            }
+        }
     };
 
     let events = process.send(&req.message).await?;
 
     let answer = extract_answer(&events);
+    let session_id = extract_session_id(&events).or(resume_session);
+
+    // Persist the session id so the next call resumes the same conversation.
+    if let Some(sid) = &session_id {
+        if let Ok(db) = state.db.lock() {
+            let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
+        }
+    }
+
     let tool_calls: Vec<CcToolCall> = events.iter()
         .filter_map(|e| match e {
             CcEvent::ToolUse { id, name, input } => Some(CcToolCall {
@@ -99,7 +148,7 @@ pub async fn cc_send_message(
         })
         .collect();
 
-    Ok(CcSendResponse { answer, events, tool_calls })
+    Ok(CcSendResponse { answer, events, tool_calls, session_id })
 }
 
 /// Stop the CC process for a thread.

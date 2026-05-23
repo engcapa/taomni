@@ -10,12 +10,14 @@ mod appearance;
 mod vnc;
 mod history;
 mod vault;
-mod ai;
+pub mod ai;
 mod asr;
-mod llm;
+pub mod llm;
 mod tab;
 mod agent;
 mod chat;
+pub mod models;
+mod voice;
 
 use state::AppState;
 use std::sync::Arc;
@@ -45,7 +47,14 @@ pub fn run() {
             let v = vault::Vault::open(&vault_path).expect("failed to open vault");
             let vault_arc = Arc::new(v);
 
-            app.manage(AppState::new(conn, vault_arc));
+            // Load AI config and build the AppAiCtx (AsrManager + LlmRouter).
+            // Vault is passed so api_key fields stored as `vault:<id>` get
+            // transparently resolved by the LLM router.
+            let ai_config_path = ai::config::default_ai_config_path();
+            let ai_config = ai::config::AiConfig::load(&ai_config_path);
+            let ai_ctx = ai::AppAiCtx::from_config(ai_config, vault_arc.clone());
+
+            app.manage(AppState::new(conn, vault_arc, ai_ctx));
 
             // Auto-start any tunnels with autostart=true.
             let app_for_autostart = app.handle().clone();
@@ -160,10 +169,13 @@ pub fn run() {
             vault::vault_list,
             ai::commands::get_ai_config,
             ai::commands::save_ai_config,
+            ai::commands::save_ai_api_key,
             ai::commands::test_llm_connection,
             ai::commands::generate_shell_command,
             ai::commands::update_shell_audit_outcome,
             tab::tab_suggest_path,
+            tab::tab_suggest_fim,
+            tab::tab_rewrite_command,
             agent::commands::agent_explain_error,
             agent::commands::agent_plan_tool,
             agent::commands::agent_execute_tool,
@@ -171,6 +183,10 @@ pub fn run() {
             agent::search::commands::web_search_execute,
             agent::search::commands::web_fetch_execute,
             agent::search::commands::probe_searxng_instances,
+            agent::search::commands::provider_caps,
+            agent::search::key_storage::keyring_put,
+            agent::search::key_storage::keyring_get,
+            agent::search::key_storage::keyring_delete,
             agent::cc_bridge::commands::cc_detect,
             agent::cc_bridge::commands::cc_send_message,
             agent::cc_bridge::commands::cc_stop_session,
@@ -179,6 +195,18 @@ pub fn run() {
             chat::chat_list_messages,
             chat::chat_delete_thread,
             chat::chat_send,
+            chat::chat_stream,
+            models::models_list,
+            models::models_download,
+            models::models_delete,
+            models::models_verify,
+            llm::llama_server::sidecar_start,
+            llm::llama_server::sidecar_stop,
+            llm::llama_server::sidecar_status,
+            voice::commands::voice_capture_supported,
+            voice::commands::voice_start_capture,
+            voice::commands::voice_stop_capture,
+            voice::commands::voice_stop_and_transcribe,
             exit_app,
         ])
         .run(tauri::generate_context!())

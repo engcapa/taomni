@@ -51,7 +51,14 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
             ON ai_chat_messages(thread_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_chat_threads_updated
             ON ai_chat_threads(updated_at DESC);",
-    )
+    )?;
+
+    // Idempotent column add for older installs that pre-date the v2.6 CC bridge.
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_threads ADD COLUMN cc_session_id TEXT",
+        [],
+    );
+    Ok(())
 }
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
@@ -69,7 +76,7 @@ pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -81,10 +88,18 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             updated_at: row.get(4)?,
             linked_session_id: row.get(5)?,
             source: row.get(6)?,
-            cc_session_id: None,
+            cc_session_id: row.get(7).ok(),
         })
     })?;
     rows.collect()
+}
+
+pub fn set_cc_session_id(conn: &Connection, thread_id: &str, session_id: &str) -> SqlResult<()> {
+    conn.execute(
+        "UPDATE ai_chat_threads SET cc_session_id = ?1 WHERE id = ?2",
+        params![session_id, thread_id],
+    )?;
+    Ok(())
 }
 
 pub fn delete_thread(conn: &Connection, id: &str) -> SqlResult<()> {

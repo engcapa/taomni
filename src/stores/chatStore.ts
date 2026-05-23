@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export interface ChatThread {
   id: string;
@@ -20,13 +21,25 @@ export interface ChatMessage {
   redacted: boolean;
 }
 
+type StreamEvent =
+  | { kind: "user_message"; message: ChatMessage }
+  | { kind: "assistant_start"; id: string; thread_id: string; created_at: number }
+  | { kind: "token"; id: string; content: string }
+  | { kind: "end"; id: string; thread_id: string; content: string; redacted_count: number }
+  | { kind: "error"; id: string; message: string };
+
 interface ChatStore {
   threads: ChatThread[];
   activeThreadId: string | null;
   messages: Record<string, ChatMessage[]>;
+  /// Currently-streaming assistant message id per thread (for cursor display).
+  streamingId: Record<string, string | null>;
   sending: boolean;
   drawerOpen: boolean;
   drawerWidth: number;
+  /// Text the Composer should pick up next render (e.g. `@selection ...`).
+  /// Cleared by the Composer once consumed.
+  pendingComposerText: string;
 
   loadThreads: () => Promise<void>;
   newThread: (providerId?: string, linkedSessionId?: string) => Promise<ChatThread>;
@@ -34,18 +47,27 @@ interface ChatStore {
   setActiveThread: (threadId: string | null) => void;
   loadMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
+  /// Open the drawer (creating a thread if needed) and stage `text` in the
+  /// composer. Used by the Selection toolbar's "Send to AI" action.
+  attachToComposer: (text: string) => Promise<void>;
+  consumePendingComposerText: () => string;
+  /// Open the drawer, create a fresh thread, and auto-send "请解释这段输出".
+  /// Used by the Selection toolbar's "Explain" action.
+  explainSelection: (text: string) => Promise<void>;
   toggleDrawer: () => void;
   setDrawerOpen: (open: boolean) => void;
   setDrawerWidth: (w: number) => void;
 }
 
-export const useChatStore = create<ChatStore>((set) => ({
+export const useChatStore = create<ChatStore>((set, get) => ({
   threads: [],
   activeThreadId: null,
   messages: {},
+  streamingId: {},
   sending: false,
   drawerOpen: false,
   drawerWidth: 380,
+  pendingComposerText: "",
 
   loadThreads: async () => {
     try {
@@ -88,55 +110,100 @@ export const useChatStore = create<ChatStore>((set) => ({
   sendMessage: async (threadId: string, content: string, terminalContext?: string) => {
     set({ sending: true });
 
-    // Optimistically add user message.
-    const optimisticUser: ChatMessage = {
-      id: `opt-${Date.now()}`,
-      thread_id: threadId,
-      role: "user",
-      content,
-      created_at: Date.now() / 1000,
-      redacted: false,
-    };
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [threadId]: [...(s.messages[threadId] ?? []), optimisticUser],
-      },
-    }));
-
+    let unlisten: UnlistenFn | null = null;
     try {
-      const resp = await invoke<{
-        user_message: ChatMessage;
-        assistant_message: ChatMessage;
-        redacted_count: number;
-      }>("chat_send", {
-        req: { thread_id: threadId, content, terminal_context: terminalContext ?? null },
+      unlisten = await listen<StreamEvent>(`chat-stream:${threadId}`, (event) => {
+        const e = event.payload;
+        const upsertMessage = (msg: ChatMessage) => {
+          const list = get().messages[threadId] ?? [];
+          const idx = list.findIndex((m) => m.id === msg.id);
+          const next = idx >= 0
+            ? list.map((m, i) => (i === idx ? msg : m))
+            : [...list, msg];
+          set((s) => ({ messages: { ...s.messages, [threadId]: next } }));
+        };
+
+        switch (e.kind) {
+          case "user_message":
+            upsertMessage(e.message);
+            break;
+          case "assistant_start":
+            upsertMessage({
+              id: e.id,
+              thread_id: e.thread_id,
+              role: "assistant",
+              content: "",
+              created_at: e.created_at,
+              redacted: false,
+            });
+            set((s) => ({ streamingId: { ...s.streamingId, [threadId]: e.id } }));
+            break;
+          case "token": {
+            const list = get().messages[threadId] ?? [];
+            const idx = list.findIndex((m) => m.id === e.id);
+            if (idx >= 0) {
+              const next = [...list];
+              next[idx] = { ...next[idx], content: next[idx].content + e.content };
+              set((s) => ({ messages: { ...s.messages, [threadId]: next } }));
+            }
+            break;
+          }
+          case "end": {
+            const list = get().messages[threadId] ?? [];
+            const idx = list.findIndex((m) => m.id === e.id);
+            if (idx >= 0) {
+              const next = [...list];
+              next[idx] = { ...next[idx], content: e.content };
+              set((s) => ({
+                messages: { ...s.messages, [threadId]: next },
+                streamingId: { ...s.streamingId, [threadId]: null },
+                threads: s.threads.map((t) =>
+                  t.id === threadId ? { ...t, updated_at: Date.now() / 1000 } : t
+                ),
+              }));
+            }
+            break;
+          }
+          case "error": {
+            const list = get().messages[threadId] ?? [];
+            const idx = list.findIndex((m) => m.id === e.id);
+            if (idx >= 0) {
+              const next = [...list];
+              next[idx] = { ...next[idx], content: `[错误] ${e.message}` };
+              set((s) => ({
+                messages: { ...s.messages, [threadId]: next },
+                streamingId: { ...s.streamingId, [threadId]: null },
+              }));
+            }
+            break;
+          }
+        }
       });
 
-      // Replace optimistic message with real ones.
-      set((s) => ({
-        messages: {
-          ...s.messages,
-          [threadId]: [
-            ...(s.messages[threadId] ?? []).filter((m) => m.id !== optimisticUser.id),
-            resp.user_message,
-            resp.assistant_message,
-          ],
-        },
-        threads: s.threads.map((t) =>
-          t.id === threadId ? { ...t, updated_at: resp.assistant_message.created_at } : t
-        ),
-      }));
+      await invoke("chat_stream", {
+        req: { thread_id: threadId, content, terminal_context: terminalContext ?? null },
+      });
     } catch (e) {
-      // Remove optimistic message on error.
-      set((s) => ({
-        messages: {
-          ...s.messages,
-          [threadId]: (s.messages[threadId] ?? []).filter((m) => m.id !== optimisticUser.id),
-        },
-      }));
-      throw e;
+      console.error("chat_stream failed, falling back to chat_send:", e);
+      try {
+        const resp = await invoke<{
+          user_message: ChatMessage;
+          assistant_message: ChatMessage;
+          redacted_count: number;
+        }>("chat_send", {
+          req: { thread_id: threadId, content, terminal_context: terminalContext ?? null },
+        });
+        set((s) => ({
+          messages: {
+            ...s.messages,
+            [threadId]: [...(s.messages[threadId] ?? []), resp.user_message, resp.assistant_message],
+          },
+        }));
+      } catch (e2) {
+        throw e2;
+      }
     } finally {
+      if (unlisten) unlisten();
       set({ sending: false });
     }
   },
@@ -144,4 +211,34 @@ export const useChatStore = create<ChatStore>((set) => ({
   toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
   setDrawerOpen: (open) => set({ drawerOpen: open }),
   setDrawerWidth: (w) => set({ drawerWidth: Math.max(280, Math.min(600, w)) }),
+
+  attachToComposer: async (text: string) => {
+    // Ensure drawer is open and a thread exists.
+    if (!get().activeThreadId) {
+      // Either pick the most recent thread or create a fresh one.
+      const existing = get().threads[0];
+      if (existing) {
+        set({ activeThreadId: existing.id });
+      } else {
+        await get().newThread();
+      }
+    }
+    set({
+      drawerOpen: true,
+      pendingComposerText: `> ${text.replace(/\n+/g, "\n> ")}\n\n`,
+    });
+  },
+
+  consumePendingComposerText: () => {
+    const text = get().pendingComposerText;
+    if (text) set({ pendingComposerText: "" });
+    return text;
+  },
+
+  explainSelection: async (text: string) => {
+    const thread = await get().newThread();
+    set({ drawerOpen: true });
+    // Fire-and-forget — sendMessage owns its own loading state.
+    void get().sendMessage(thread.id, `请解释下面这段终端输出：\n\n\`\`\`\n${text}\n\`\`\``);
+  },
 }));

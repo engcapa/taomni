@@ -4,10 +4,8 @@ pub mod safety;
 pub mod search;
 pub mod tools;
 
-use crate::ai::config::{AiConfig, default_ai_config_path};
-use crate::ai::shell_safety::check_blacklist;
-use crate::llm::openai_compat::OpenAiCompatProvider;
 use crate::llm::{ChatMessage, ChatRequest, Llm, TaskKind};
+use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tools::{ToolCall, ToolRegistry, ToolResult};
@@ -51,27 +49,15 @@ impl Agent {
         Self { llm, tools }
     }
 
-    /// Build an agent from the current AI config for a given task kind.
-    pub fn from_config(task: TaskKind, tools: ToolRegistry) -> Option<Self> {
-        let config = AiConfig::load(&default_ai_config_path());
-        let task_key = match task {
-            TaskKind::AgentDefault => "agent_default",
-            TaskKind::ChatDrawer   => "chat_drawer",
-            TaskKind::VoiceIntent  => "voice_intent",
-            _                      => "agent_default",
-        };
-        let provider_id = config.llm.task_routing
-            .get(task_key)
-            .cloned()
-            .unwrap_or_else(|| config.llm.active.clone());
-        let provider_cfg = config.llm.providers.get(&provider_id)?.clone();
-
-        let llm: Arc<dyn Llm> = Arc::new(OpenAiCompatProvider::new(
-            &provider_id,
-            &provider_cfg.base_url,
-            &provider_cfg.api_key,
-            &provider_cfg.model,
-        ));
+    /// Build an agent from the live `LlmRouter` for a given task kind.
+    /// Reads through `AppState.ai_ctx` so the active provider, fallback,
+    /// and task routing all stay in sync with the user's config without
+    /// re-reading ai.json on every call.
+    pub async fn from_state(state: &AppState, task: TaskKind, tools: ToolRegistry) -> Option<Self> {
+        let ai_ctx = state.ai_ctx.read().await;
+        // Pick the provider id this task would actually route to.
+        let provider_id = ai_ctx.llm.provider_for_task(task);
+        let llm = ai_ctx.llm.provider(&provider_id)?;
         Some(Self::new(llm, tools))
     }
 

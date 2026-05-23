@@ -1,17 +1,15 @@
 use crate::agent::tools::history::SearchHistoryTool;
-use crate::agent::tools::sessions::ListSessionsTool;
+use crate::agent::tools::sessions::{ListSessionsTool, OpenSessionEditorTool, SwitchTabTool};
+use crate::agent::tools::sftp_runbook::{SaveAsRunbookTool, SftpUploadTool};
 use crate::agent::tools::terminal::{ExplainErrorTool, ReadTerminalTailTool, RunInTerminalTool};
 use crate::agent::tools::ToolRegistry;
 use crate::agent::{Agent, AgentStepResult, PendingAction};
-use crate::ai::config::{AiConfig, default_ai_config_path};
-use crate::llm::openai_compat::OpenAiCompatProvider;
-use crate::llm::{ChatMessage, ChatRequest, Llm, TaskKind};
+use crate::llm::{ChatMessage, ChatRequest, TaskKind};
 use crate::state::AppState;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
 
-fn build_registry(state: &AppState) -> ToolRegistry {
+fn build_registry(state: &AppState, app: AppHandle) -> ToolRegistry {
     let db = Arc::new(std::sync::Mutex::new(
         // We can't move the connection, so we open a second read-only connection for agent tools.
         // The main connection stays in AppState for writes.
@@ -24,12 +22,18 @@ fn build_registry(state: &AppState) -> ToolRegistry {
         .unwrap_or_else(|_| rusqlite::Connection::open_in_memory().unwrap()),
     ));
 
+    let _ = state; // currently unused in v2.x; reserved for per-agent contextuals
+
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(ListSessionsTool { db: db.clone() }));
+    registry.register(Box::new(SwitchTabTool { app: app.clone(), db: db.clone() }));
+    registry.register(Box::new(OpenSessionEditorTool { app: app.clone() }));
     registry.register(Box::new(SearchHistoryTool { db: db.clone() }));
     registry.register(Box::new(RunInTerminalTool));
     registry.register(Box::new(ReadTerminalTailTool));
     registry.register(Box::new(ExplainErrorTool));
+    registry.register(Box::new(SftpUploadTool { app: app.clone() }));
+    registry.register(Box::new(SaveAsRunbookTool { app }));
     registry
 }
 
@@ -41,9 +45,7 @@ pub async fn agent_explain_error(
     session_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let registry = build_registry(&state);
-    let agent = Agent::from_config(TaskKind::AgentDefault, registry)
-        .ok_or("No LLM provider configured")?;
+    let _ = session_id; // currently unused; reserved for per-session policy
 
     let system = "你是一个终端错误分析助手。分析用户提供的终端输出，解释错误原因，并给出具体的修复建议。用中文回答，简洁清晰。";
     let user = format!("请分析以下终端输出中的错误：\n\n```\n{}\n```", terminal_content);
@@ -58,22 +60,12 @@ pub async fn agent_explain_error(
         stream: false,
     };
 
-    let config = AiConfig::load(&default_ai_config_path());
-    let provider_id = config.llm.task_routing
-        .get("agent_default")
-        .cloned()
-        .unwrap_or_else(|| config.llm.active.clone());
-    let provider_cfg = config.llm.providers.get(&provider_id)
-        .ok_or_else(|| format!("Provider '{}' not configured", provider_id))?;
-
-    let llm: Arc<dyn Llm> = Arc::new(OpenAiCompatProvider::new(
-        &provider_id,
-        &provider_cfg.base_url,
-        &provider_cfg.api_key,
-        &provider_cfg.model,
-    ));
-
-    let resp = llm.chat(req).await.map_err(|e| e.to_string())?;
+    let resp = {
+        let ai_ctx = state.ai_ctx.read().await;
+        ai_ctx.llm.complete(req, TaskKind::AgentDefault)
+            .await
+            .map_err(|e| e.to_string())?
+    };
     Ok(resp.content)
 }
 
@@ -82,10 +74,11 @@ pub async fn agent_explain_error(
 #[tauri::command]
 pub async fn agent_plan_tool(
     request: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<PendingAction>, String> {
-    let registry = build_registry(&state);
-    let agent = Agent::from_config(TaskKind::AgentDefault, registry)
+    let registry = build_registry(&state, app);
+    let agent = Agent::from_state(&state, TaskKind::AgentDefault, registry).await
         .ok_or("No LLM provider configured")?;
 
     let system = "你是 NewMob 终端管理器的 AI 助手。根据用户请求，选择合适的工具执行操作。";
@@ -109,6 +102,7 @@ pub async fn agent_plan_tool(
 pub async fn agent_execute_tool(
     tool: String,
     args: serde_json::Value,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     use crate::agent::tools::ToolCall;
@@ -117,7 +111,7 @@ pub async fn agent_execute_tool(
     // Safety check.
     crate::agent::safety::check_tool_call(&call)?;
 
-    let registry = build_registry(&state);
+    let registry = build_registry(&state, app);
     let result = registry.execute(&call).await;
     if result.ok {
         Ok(result.output)
@@ -131,12 +125,14 @@ pub async fn agent_execute_tool(
 #[tauri::command]
 pub async fn agent_run(
     request: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Vec<AgentStepResult>, String> {
-    let registry = build_registry(&state);
-    let agent = Agent::from_config(TaskKind::AgentDefault, registry)
+    let registry = build_registry(&state, app);
+    let agent = Agent::from_state(&state, TaskKind::AgentDefault, registry).await
         .ok_or("No LLM provider configured")?;
 
     let system = "你是 NewMob 终端管理器的 AI 助手。帮助用户管理 SSH 会话、执行命令、分析错误。每次只调用一个工具，等待结果后再继续。";
     Ok(agent.run_steps(system, &request).await)
 }
+

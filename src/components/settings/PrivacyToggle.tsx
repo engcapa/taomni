@@ -6,16 +6,25 @@ export function PrivacyToggle() {
 
   if (!config) return null;
 
-  // "全本地模式" = all task_routing forced to "local"
-  const isLocalMode = Object.values(config.llm.task_routing).every((v) => v === "local");
+  // "全本地模式" = full_local_mode flag in AiConfig.
+  // The router will refuse all non-local LLM providers, web search will be
+  // blocked, web_fetch will reject non-loopback hosts, and Claude Code will
+  // be hidden.
+  const isLocalMode = !!config.full_local_mode;
 
   const toggle = async () => {
-    const newRouting = Object.fromEntries(
-      Object.keys(config.llm.task_routing).map((k) => [k, isLocalMode ? getDefaultRoute(k) : "local"])
-    );
     const newConfig = {
       ...config,
-      llm: { ...config.llm, task_routing: newRouting },
+      full_local_mode: !isLocalMode,
+      // Also force task routing to "local" so we don't keep cloud routes
+      // dangling — the router would refuse them anyway, but this keeps the
+      // settings UI honest.
+      llm: {
+        ...config.llm,
+        task_routing: !isLocalMode
+          ? Object.fromEntries(Object.keys(config.llm.task_routing).map((k) => [k, "local"]))
+          : Object.fromEntries(Object.keys(config.llm.task_routing).map((k) => [k, getDefaultRoute(k)])),
+      },
     };
     await saveConfig(newConfig);
   };
@@ -40,8 +49,8 @@ export function PrivacyToggle() {
         </div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
           {isLocalMode
-            ? "所有 AI 任务强制走本地模型，零云端请求"
-            : "开启后所有 AI 任务路由到本地模型，需先下载本地模型"}
+            ? "云端 LLM、Web 搜索、Claude Code 全部被拒绝；仅本地 sidecar / Ollama 可用"
+            : "开启后强制本地，需先下载本地模型 + 启动 llama-server sidecar"}
         </div>
       </div>
       <div
