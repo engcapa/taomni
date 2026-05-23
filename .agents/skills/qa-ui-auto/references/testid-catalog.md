@@ -54,6 +54,11 @@
 - `[data-testid="tab-split-view"]` — display — F1.5.split-view
 - `[data-testid="tab-multiexec-toggle"]` — interactive — F1.5.multiexec-toggle
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
+- `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
+- `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
+- `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right
+- `[data-testid="context-menu-item-move-to-last"]` — interactive [optional] — F1.5.tab-menu-move-last
+- `span[aria-label="New output"]` — display [optional] — F1.5.tab-new-output-dot
 
 ## main/theme (F5.5)
 
@@ -253,9 +258,16 @@
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
 - `[data-testid="terminal-preview-cursor"]` — display — F5.2.preview-cursor
 - `input[aria-label="Terminal font size"]` — interactive — F5.2.font-size
+- `select[aria-label="Terminal font"]` — interactive — F5.2.font-family
+- `button[aria-label="Decrease text size"]` — interactive — F5.2.font-size-decrease
+- `button[aria-label="Increase text size"]` — interactive — F5.2.font-size-increase
+- `input[aria-label="Enable font ligatures"]` — interactive — F5.2.font-ligatures-toggle
 - `input[aria-label="Scrollback lines"]` — interactive — F5.2.scrollback
+- `input[aria-label="Maximum command history entries per host"]` — interactive — F5.2.inline-suggestions-max
 - `select[aria-label="Terminal cursor"]` — interactive — F5.2.cursor-style
 - `select[aria-label="Right click behavior"]` — interactive — F5.2.right-click-behavior
+- `input[aria-label="Terminal background hex"]` — interactive — F5.2.background-hex
+- `input[aria-label="Terminal foreground hex"]` — interactive — F5.2.foreground-hex
 
 ## terminal/file-transfer (F4.10)
 
@@ -296,7 +308,12 @@
 ## terminal/right-menu (F4.2)
 
 - `text="Font settings"` — interactive [optional] — F4.2.font-settings
-- `input[aria-label="Enable font ligatures"]` — interactive [optional] — F4.2.font-ligatures-toggle
+  ↳ `[data-testid="context-menu-item-font-settings"]` — alias
+- `[data-testid="context-menu-item-more-fonts"]` — interactive [optional] — F4.2.font-more-fonts
+- `input[placeholder="Search fonts..."]` — interactive [optional] — F4.2.font-picker-search
+- `text="No matching fonts found"` — display [optional] — F4.2.font-picker-empty
+- `[data-testid="context-menu-item-display-font-ligatures"]` — interactive [optional] — F4.2.font-ligatures-toggle
+  ↳ `text="Display font ligatures"` — alias
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `text="Read-only terminal"` — interactive [optional] — F4.2.read-only-toggle
 - `text="Toggle terminal scrollbar"` — interactive [optional] — F4.2.scrollbar-toggle

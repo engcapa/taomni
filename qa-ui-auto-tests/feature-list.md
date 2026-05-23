@@ -5,7 +5,7 @@
 > - ✅ 已完成
 > - 🟡 已部分完成（关键路径可用，仍有未覆盖的能力，列出具体范围）
 > - 未完成的能力不写入本文档（详见各 plan 文档的待办项）
-> 当前对照版本：v0.1.0 → v0.1.21（含本仓库 `package.json` 标识的当前版本）。
+> 当前对照版本：v0.1.0 → v0.1.24（含本仓库 `package.json` 标识的当前版本）。
 
 ---
 
@@ -101,6 +101,7 @@ area: main/window
 components: [CompactTitleBar]
 files:
   - src/components/tabbar/CompactTitleBar.tsx
+  - src/index.css
 controls:
   - id: titlebar
     selector: '[data-testid="compact-titlebar"]'
@@ -129,6 +130,7 @@ area: main/tabs
 components: [TabBar]
 files:
   - src/components/tabbar/TabBar.tsx
+  - src/lib/customDnD.ts
   - src/stores/appStore.ts
 controls:
   - id: tab-bar
@@ -156,13 +158,33 @@ controls:
   - id: tabs-more
     selector: '[data-testid="tab-more"]'
     kind: interactive
+  - id: tab-menu-move-first
+    selector: '[data-testid="context-menu-item-move-to-first"]'
+    kind: interactive
+    optional: true       # only visible in a tab context menu
+  - id: tab-menu-move-left
+    selector: '[data-testid="context-menu-item-move-left"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-move-right
+    selector: '[data-testid="context-menu-item-move-right"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-move-last
+    selector: '[data-testid="context-menu-item-move-to-last"]'
+    kind: interactive
+    optional: true
+  - id: tab-new-output-dot
+    selector: 'span[aria-label="New output"]'
+    kind: display
+    optional: true
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
 - 标签操作：新建、切换、关闭、中键关闭
-- **拖拽排序**：标签可通过 HTML5 drag-and-drop 重新排列，拖拽时显示 drop indicator
+- **拖拽排序**：标签通过 `customDnD` 指针驱动层重新排列，拖拽时显示 drop indicator
 - **重命名**：双击标签标题或右键菜单 "Rename" 进入内联编辑，Enter 确认 / Esc 取消 / 失焦自动提交
-- 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端、重命名
+- 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端、重命名、Move to first/left/right/last
 - SSH / SFTP / VNC 标签 **常驻挂载**（切换标签不销毁，传输/输出/连接不中断）
 - 关闭应用前若有终端活跃会弹出确认
 
@@ -457,6 +479,7 @@ id: F4.1
 status: done
 area: terminal/right-menu
 files:
+  - src-tauri/src/lib.rs
   - src/components/terminal/TerminalPanel.tsx
 controls:
   # Right-click menu items (text-based — ContextMenu generates testids dynamically by label slug)
@@ -518,15 +541,32 @@ status: done
 area: terminal/right-menu
 files:
   - src/components/terminal/TerminalPanel.tsx
+  - src/components/terminal/FontPickerPanel.tsx
 controls:
   - id: font-settings
     selector: 'text="Font settings"'
     kind: interactive
     optional: true
-  - id: font-ligatures-toggle
-    selector: 'input[aria-label="Enable font ligatures"]'
+    aliases:
+      - '[data-testid="context-menu-item-font-settings"]'
+  - id: font-more-fonts
+    selector: '[data-testid="context-menu-item-more-fonts"]'
     kind: interactive
     optional: true
+  - id: font-picker-search
+    selector: 'input[placeholder="Search fonts..."]'
+    kind: interactive
+    optional: true
+  - id: font-picker-empty
+    selector: 'text="No matching fonts found"'
+    kind: display
+    optional: true
+  - id: font-ligatures-toggle
+    selector: '[data-testid="context-menu-item-display-font-ligatures"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - 'text="Display font ligatures"'
   - id: terminal-display
     selector: 'text="Terminal display"'
     kind: interactive
@@ -545,7 +585,7 @@ controls:
     optional: true
 -->
 
-- 字体设置子菜单：切换字体家族、显示字体连字、字号增大/减小/重置
+- 字体设置子菜单：切换字体家族、More fonts 搜索面板、显示字体连字、字号增大/减小/重置
 - Ctrl+滚轮调整字号、Ctrl+0 重置
 - Terminal display 子菜单：Reset terminal output、Clear scrollback、Set terminal title、Toggle scrollbar、Fullscreen (F11)、Read-only
 
@@ -818,6 +858,17 @@ controls:
 ## 5. 终端外观与配置
 
 ### 5.1 OS 字体枚举 ✅
+
+<!-- feature
+id: F5.1
+status: done
+area: terminal/appearance
+files:
+  - src/lib/systemFonts.ts
+  - src-tauri/src/appearance/
+controls: []   # font enumeration is consumed by F4.2/F5.2 UI controls
+-->
+
 - Tauri 命令 `list_system_fonts`（基于 `font-kit`）
 - 前端 IPC 拉取系统字体列表，加载失败时使用安全 fallback
 - Source Code Pro 在可用时作为默认字体
@@ -848,14 +899,35 @@ controls:
   - id: font-size
     selector: 'input[aria-label="Terminal font size"]'
     kind: interactive
+  - id: font-family
+    selector: 'select[aria-label="Terminal font"]'
+    kind: interactive
+  - id: font-size-decrease
+    selector: 'button[aria-label="Decrease text size"]'
+    kind: interactive
+  - id: font-size-increase
+    selector: 'button[aria-label="Increase text size"]'
+    kind: interactive
+  - id: font-ligatures-toggle
+    selector: 'input[aria-label="Enable font ligatures"]'
+    kind: interactive
   - id: scrollback
     selector: 'input[aria-label="Scrollback lines"]'
+    kind: interactive
+  - id: inline-suggestions-max
+    selector: 'input[aria-label="Maximum command history entries per host"]'
     kind: interactive
   - id: cursor-style
     selector: 'select[aria-label="Terminal cursor"]'
     kind: interactive
   - id: right-click-behavior
     selector: 'select[aria-label="Right click behavior"]'
+    kind: interactive
+  - id: background-hex
+    selector: 'input[aria-label="Terminal background hex"]'
+    kind: interactive
+  - id: foreground-hex
+    selector: 'input[aria-label="Terminal foreground hex"]'
     kind: interactive
 -->
 
@@ -943,6 +1015,7 @@ components: [SessionTree, Sidebar]
 files:
   - src/components/sidebar/SessionTree.tsx
   - src/components/sidebar/Sidebar.tsx
+  - src/lib/customDnD.ts
 controls:
   - id: sidebar
     selector: '[data-testid="sidebar"]'
@@ -1271,9 +1344,11 @@ status: done
 area: sftp
 components: [FileBrowser, FilePanel]
 files:
+  - src/components/filebrowser/LocalFileBrowserPanel.tsx
   - src/components/filebrowser/FileBrowser.tsx
   - src/components/filebrowser/FilePanel.tsx
   - src/components/filebrowser/PathBreadcrumb.tsx
+  - src/lib/sftp.ts
 controls:
   - id: panel-root
     selector: '[data-testid="sftp-browser"]'
@@ -1397,10 +1472,12 @@ id: F7.5
 status: done
 area: sftp
 files:
+  - src-tauri/src/lib.rs
   - src/components/filebrowser/FileToolbar.tsx
   - src/components/filebrowser/FilePanel.tsx
   - src/components/filebrowser/PathBreadcrumb.tsx
   - src/components/filebrowser/ChmodDialog.tsx
+  - src/lib/customDnD.ts
 controls:
   # path input + breadcrumb (FilePanel renders PathBreadcrumb with testId={`sftp-${side}-path`})
   - id: local-path
@@ -1531,7 +1608,7 @@ controls:
   - 远程：Download to local、Rename、Permissions（chmod）、Delete、New folder、New file
   - 本地：对应操作
 - chmod 对话框：Owner / Group / Other 三组权限位 + Apply
-- 跨面板拖拽（REMOTE↔LOCAL）：HTML5 drag-drop + `application/x-newmob-files` MIME，支持多选与文件夹
+- 跨面板拖拽（REMOTE↔LOCAL）：`customDnD` 指针驱动层 + `application/x-newmob-files` MIME，支持多选与文件夹
 - OS 文件拖入远程面板 → 直接上传到当前远程目录
   - Linux/macOS：通过 Tauri `onDragDropEvent` 拿到绝对路径，前端 `sftpStat(side="local") → controller.upload`
   - Windows：通过 webview HTML5 `dataTransfer.files`（拿不到绝对路径，按 File blob 上传）
@@ -1977,8 +2054,8 @@ controls:
 - Vault `crypto` + `db` 模块单元测试（加密/解密、条目 CRUD、主密码变更）
 - `cargo check` 通过
 
-### 13.3 端到端测试用例（`qa-ui-auto-tests/cases/*.testcase.yaml`，被 `qa-ui-auto` 消费）✅ 70 条
-- 覆盖 TC-001 ～ TC-107：主界面、设置、会话编辑器、SSH/SFTP/QuickConnect 全流程、终端右键菜单与快捷键、SFTP 多种交互（chmod / rename / 拖拽 / 多选 / 双击下载 / 列宽 / 创建文件夹）、独立 SFTP 标签、open-terminal-here、会话树搜索 / 复制 / 拖拽、标签栏右键、应用主题循环、隧道编辑器与重排、终端字体连字 / 语法高亮、本地管理员启动、tab 中键关闭、会话 import/export 多格式、OpenSSH config 导入、Welcome active connections、custom title bar、compact mode、MultiExec、command palette、capture toolbar、zmodem 冲突、VNC scaffold 等
+### 13.3 端到端测试用例（`qa-ui-auto-tests/cases/*.testcase.yaml`，被 `qa-ui-auto` 消费）✅ 89 条
+- 覆盖 TC-001 ～ TC-109：主界面、设置、会话编辑器、SSH/SFTP/QuickConnect 全流程、终端右键菜单与快捷键、SFTP 多种交互（chmod / rename / 拖拽 / 多选 / 双击下载 / 列宽 / 创建文件夹）、独立 SFTP 标签、open-terminal-here、会话树搜索 / 复制 / 拖拽、标签栏右键与移动动作、应用主题循环、隧道编辑器与重排、终端字体连字 / 字体搜索 / 语法高亮、本地管理员启动、tab 中键关闭、会话 import/export 多格式、OpenSSH config 导入、Welcome active connections、custom title bar、compact mode、MultiExec、command palette、capture toolbar、zmodem 冲突、VNC scaffold 等
 
 ### 13.4 部署 ✅
 - Replit 上验证通过：Tauri 桌面构建（`pnpm tauri build --debug --no-bundle`）通过 VNC 查看；Web 模式作为静态站点构建到 `dist/`
