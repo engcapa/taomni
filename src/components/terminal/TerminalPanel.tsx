@@ -130,6 +130,8 @@ interface TerminalPanelProps {
   };
   terminalProfile?: TerminalProfile;
   visible?: boolean;
+  activeForShortcuts?: boolean;
+  inputLocked?: boolean;
   onCwdChange?: (cwd: string) => void;
   /** Incremented by the parent when the SFTP panel explicitly asks for cwd. */
   cwdRequestToken?: number;
@@ -181,6 +183,8 @@ export function TerminalPanel({
   localShell,
   terminalProfile,
   visible = true,
+  activeForShortcuts = visible,
+  inputLocked = false,
   onCwdChange,
   cwdRequestToken = 0,
   onSessionReady,
@@ -480,6 +484,7 @@ export function TerminalPanel({
   // Broadcast-aware input: used for paste and any injected text so that
   // MultiExec mode forwards the same data to all selected terminals.
   const writeBroadcastInput = useCallback((data: string) => {
+    if (readOnlyRef.current) return;
     trackPending(data);
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(data);
@@ -488,6 +493,7 @@ export function TerminalPanel({
   }, [sendTerminalInput, trackPending]);
 
   const writeXtermInput = useCallback((data: string) => {
+    if (readOnlyRef.current) return;
     const filtered = imeGuardRef.current?.filterTerminalData(data) ?? data;
     if (filtered === null) {
       return;
@@ -601,6 +607,10 @@ export function TerminalPanel({
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
+    if (readOnlyRef.current) {
+      event.dataTransfer.dropEffect = "none";
+      return;
+    }
     event.dataTransfer.dropEffect = "copy";
   }, []);
 
@@ -865,6 +875,7 @@ export function TerminalPanel({
   // WITHOUT running the pending-command tracker. Used by inline-suggestion
   // accept, which manages pending state explicitly.
   const sendUntrackedInput = useCallback((data: string) => {
+    if (readOnlyRef.current) return;
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(data);
     }
@@ -895,6 +906,7 @@ export function TerminalPanel({
   }, [sendUntrackedInput, refreshSuggestion, bumpGhost]);
 
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
+  const effectiveReadOnly = readOnly || inputLocked;
 
   const handleShortcutKey = useCallback((event: KeyboardEvent): boolean => {
     if (event.key === "F11") {
@@ -1023,7 +1035,7 @@ export function TerminalPanel({
       { label: "Copy", shortcut: copyShortcut, onClick: copySelection, disabled: !hasSelection },
       { label: "Copy All", onClick: copyAll },
       { label: "Copy formatted text (HTML/RTF)", onClick: () => void copyFormattedSelection(), disabled: !hasSelection },
-      { label: "Paste", shortcut: pasteShortcut, onClick: () => void pasteFromClipboard(), disabled: readOnly },
+      { label: "Paste", shortcut: pasteShortcut, onClick: () => void pasteFromClipboard(), disabled: effectiveReadOnly },
       { label: "Find", shortcut: "Ctrl+Shift+F", onClick: openSearch },
       { label: "", separator: true },
       {
@@ -1123,6 +1135,7 @@ export function TerminalPanel({
     openSearch,
     pasteFromClipboard,
     quickFontOptions,
+    effectiveReadOnly,
     readOnly,
     renameTerminal,
     resetFontSize,
@@ -1190,8 +1203,8 @@ export function TerminalPanel({
   }, [focusTerminal, pasteFromClipboard, setStatusMessage, writeBroadcastInput]);
 
   useEffect(() => {
-    readOnlyRef.current = readOnly;
-  }, [readOnly]);
+    readOnlyRef.current = effectiveReadOnly;
+  }, [effectiveReadOnly]);
 
   useEffect(() => {
     if (cwdRequestToken === 0 || cwdRequestToken === lastCwdRequestTokenRef.current) return;
@@ -1588,8 +1601,8 @@ export function TerminalPanel({
     window.setTimeout(() => requestAnimationFrame(fitVisibleTerminal), 0);
   }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, scrollback, themeName]);
 
-  // When a hidden tab becomes visible again, re-measure xterm and return
-  // keyboard focus so the active terminal is immediately ready for typing.
+  // When a hidden tab becomes visible again, re-measure xterm. Focus is
+  // reserved for the active pane so split view does not race visible panes.
   useEffect(() => {
     if (!visible) return;
 
@@ -1597,7 +1610,7 @@ export function TerminalPanel({
     const timer = window.setTimeout(() => {
       frame = window.requestAnimationFrame(() => {
         fitVisibleTerminal();
-        if (!searchOpen) {
+        if (activeForShortcuts && !searchOpen) {
           focusTerminal();
         }
       });
@@ -1607,10 +1620,10 @@ export function TerminalPanel({
       window.clearTimeout(timer);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [fitVisibleTerminal, focusTerminal, fullscreen, searchOpen, showScrollbar, visible]);
+  }, [activeForShortcuts, fitVisibleTerminal, focusTerminal, fullscreen, searchOpen, showScrollbar, visible]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!activeForShortcuts) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (handleShortcutKey(event) === false) {
@@ -1621,7 +1634,7 @@ export function TerminalPanel({
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [handleShortcutKey, visible]);
+  }, [activeForShortcuts, handleShortcutKey]);
 
   useEffect(() => {
     if (!visible) return;
@@ -1762,6 +1775,7 @@ export function TerminalPanel({
     <div
       ref={panelRef}
       data-testid="terminal-pane"
+      data-input-locked={inputLocked || undefined}
       className={panelClasses}
       style={{
         background: resolvedTheme.background ?? "#1d1f21",
@@ -1935,9 +1949,12 @@ export function TerminalPanel({
         </div>
       )}
 
-      {readOnly && (
-        <div className="absolute right-3 bottom-3 z-40 px-2 py-1 rounded border bg-white/90 text-[11px] text-slate-700 shadow-sm pointer-events-none">
-          Read-only
+      {effectiveReadOnly && (
+        <div
+          data-testid={inputLocked ? "terminal-input-locked" : "terminal-read-only"}
+          className="absolute right-3 bottom-3 z-40 px-2 py-1 rounded border bg-white/90 text-[11px] text-slate-700 shadow-sm pointer-events-none"
+        >
+          {inputLocked ? "Input locked" : "Read-only"}
         </div>
       )}
 

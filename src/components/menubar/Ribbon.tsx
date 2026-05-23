@@ -38,10 +38,11 @@ export type RibbonCommand =
 
 interface RibbonProps {
   xServerEnabled: boolean;
+  splitActive?: boolean;
   onCommand: (command: RibbonCommand) => void;
 }
 
-export function Ribbon({ xServerEnabled, onCommand }: RibbonProps) {
+export function Ribbon({ xServerEnabled, splitActive, onCommand }: RibbonProps) {
   return (
     <div data-testid="ribbon" className="moba-ribbon px-2 pt-1.5 pb-1 flex items-end gap-1">
       <RibbonBtn icon={<TerminalIcon className="w-6 h-6" style={{ color: "#2b5d8b" }} />} label="Session" highlight onClick={() => onCommand("new-session")} />
@@ -51,7 +52,7 @@ export function Ribbon({ xServerEnabled, onCommand }: RibbonProps) {
       <RibbonBtn icon={<Gamepad2 className="w-6 h-6" style={{ color: "#a04b9c" }} />} label="Games" onClick={() => onCommand("games")} />
       <RibbonBtn icon={<Bookmark className="w-6 h-6" style={{ color: "#c97a23" }} />} label="Sessions" onClick={() => onCommand("sessions")} />
       <RibbonBtn icon={<Layout className="w-6 h-6" style={{ color: "#3b7ac2" }} />} label="View" onClick={() => onCommand("view")} />
-      <RibbonBtn icon={<SplitSquareVertical className="w-6 h-6" style={{ color: "#2b5d8b" }} />} label="Split" onClick={() => onCommand("split")} />
+      <RibbonBtn icon={<SplitSquareVertical className="w-6 h-6" style={{ color: "#2b5d8b" }} />} label="Split" active={splitActive} onClick={() => onCommand("split")} />
       <RibbonBtn icon={<Users className="w-6 h-6" style={{ color: "#7a3d9d" }} />} label="MultiExec" onClick={() => onCommand("multiexec")} />
       <RibbonBtn icon={<Network className="w-6 h-6" style={{ color: "#236a98" }} />} label="Tunneling" onClick={() => onCommand("tunneling")} />
       <RibbonBtn icon={<Package className="w-6 h-6" style={{ color: "#7a4f1a" }} />} label="Packages" onClick={() => onCommand("packages")} />
@@ -73,11 +74,13 @@ function RibbonBtn({
   icon,
   label,
   highlight,
+  active,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   highlight?: boolean;
+  active?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -87,7 +90,9 @@ function RibbonBtn({
       onClick={onClick}
       type="button"
       style={
-        highlight
+        active
+          ? { background: "var(--moba-selected)", outline: "1px solid var(--moba-accent)" }
+          : highlight
           ? { background: "var(--moba-control-hover)", outline: "1px solid var(--moba-tab-border)" }
           : undefined
       }

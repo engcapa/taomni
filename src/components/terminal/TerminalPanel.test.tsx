@@ -8,6 +8,9 @@ const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
   const modes = { bracketedPasteMode: false };
   const oscHandlers = new Map<number, (data: string) => boolean | Promise<boolean>>();
+  const state = {
+    onDataHandler: null as ((data: string) => void) | null,
+  };
   const terminalCtor = vi.fn().mockImplementation(() => ({
     cols: 80,
     rows: 24,
@@ -31,7 +34,10 @@ const terminalMocks = vi.hoisted(() => {
       screen.className = "xterm-screen";
       el.appendChild(screen);
     }),
-    onData: vi.fn(() => ({ dispose: vi.fn() })),
+    onData: vi.fn((handler: (data: string) => void) => {
+      state.onDataHandler = handler;
+      return { dispose: vi.fn() };
+    }),
     onBinary: vi.fn(() => ({ dispose: vi.fn() })),
     onScroll: vi.fn(() => ({ dispose: vi.fn() })),
     onRender: vi.fn(() => ({ dispose: vi.fn() })),
@@ -49,7 +55,7 @@ const terminalMocks = vi.hoisted(() => {
     select: vi.fn(),
   }));
 
-  return { focus, modes, terminalCtor, oscHandlers };
+  return { focus, modes, terminalCtor, oscHandlers, state };
 });
 
 const fitMocks = vi.hoisted(() => ({
@@ -142,6 +148,7 @@ const sshInfo = {
 describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
     terminalMocks.oscHandlers.clear();
+    terminalMocks.state.onDataHandler = null;
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       return window.setTimeout(() => callback(performance.now()), 0);
@@ -322,6 +329,62 @@ describe("TerminalPanel focus behavior", () => {
         value: originalElementFromPoint,
       });
     }
+  });
+
+  it("blocks typed input when split input is locked", async () => {
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel visible inputLocked onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      expect(terminalMocks.state.onDataHandler).toBeTruthy();
+    });
+
+    terminalMocks.state.onDataHandler?.("blocked");
+
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+    expect(screen.getByTestId("terminal-input-locked")).toHaveTextContent("Input locked");
+  });
+
+  it("blocks clipboard paste when split input is locked", async () => {
+    const readText = vi.fn(async () => "locked paste");
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { readText },
+    });
+    const onSessionReady = vi.fn();
+
+    render(<TerminalPanel visible inputLocked onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+    await Promise.resolve();
+
+    expect(readText).not.toHaveBeenCalled();
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+  });
+
+  it("blocks dropped file paths when split input is locked", async () => {
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel visible inputLocked onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    const dataTransfer = {
+      types: ["Files", "text/uri-list"],
+      files: [new File(["x"], "a b.png", { type: "image/png" })],
+      dropEffect: "none",
+      getData: (format: string) => (format === "text/uri-list" ? "file:///home/me/a%20b.png" : ""),
+    };
+
+    fireEvent.drop(screen.getByTestId("terminal-pane"), { dataTransfer });
+
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
   });
 
   it("honors the right-click paste terminal setting", async () => {

@@ -84,3 +84,70 @@ describe("appStore.uiAppearance", () => {
   });
 });
 
+describe("appStore.terminalSplit", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useAppStore.setState({
+      tabs: [tab("a"), tab("b"), tab("settings", { type: "settings" })],
+      activeTabId: "a",
+      terminalSplitActive: false,
+      terminalSplitLayout: "horizontal",
+      terminalSplitInputLockedTabIds: new Set(),
+      multiExecSelectedTabIds: new Set(),
+    });
+  });
+
+  it("toggles terminal split view and keeps a terminal active", () => {
+    useAppStore.setState({ activeTabId: "settings" });
+
+    useAppStore.getState().toggleTerminalSplit();
+
+    expect(useAppStore.getState().terminalSplitActive).toBe(true);
+    expect(useAppStore.getState().activeTabId).toBe("a");
+
+    useAppStore.getState().toggleTerminalSplit();
+
+    expect(useAppStore.getState().terminalSplitActive).toBe(false);
+  });
+
+  it("persists terminal split layout", () => {
+    useAppStore.getState().setTerminalSplitLayout("grid");
+
+    expect(useAppStore.getState().terminalSplitLayout).toBe("grid");
+    expect(window.localStorage.getItem("newmob.terminalSplitLayout")).toBe("grid");
+  });
+
+  it("toggles pane input locks", () => {
+    useAppStore.getState().toggleTerminalSplitInputLock("b");
+
+    expect(useAppStore.getState().terminalSplitInputLockedTabIds.has("b")).toBe(true);
+
+    useAppStore.getState().toggleTerminalSplitInputLock("b");
+
+    expect(useAppStore.getState().terminalSplitInputLockedTabIds.has("b")).toBe(false);
+  });
+
+  it("exits split when activating a non-terminal tab", () => {
+    useAppStore.setState({ terminalSplitActive: true });
+
+    useAppStore.getState().setActiveTab("settings");
+
+    expect(useAppStore.getState().activeTabId).toBe("settings");
+    expect(useAppStore.getState().terminalSplitActive).toBe(false);
+  });
+
+  it("cleans closed tab ids from split locks and MultiExec selection", () => {
+    useAppStore.setState({
+      terminalSplitActive: true,
+      terminalSplitInputLockedTabIds: new Set(["b"]),
+      multiExecSelectedTabIds: new Set(["a", "b"]),
+    });
+
+    useAppStore.getState().removeTab("b");
+
+    expect(useAppStore.getState().terminalSplitInputLockedTabIds.has("b")).toBe(false);
+    expect(useAppStore.getState().multiExecSelectedTabIds.has("b")).toBe(false);
+    expect(useAppStore.getState().multiExecSelectedTabIds.has("a")).toBe(true);
+  });
+});
+

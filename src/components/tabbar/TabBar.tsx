@@ -48,8 +48,10 @@ export function TabBar() {
     toggleCompactMode,
     multiExecActive,
     multiExecSelectedTabIds,
+    terminalSplitActive,
     toggleMultiExec,
     toggleMultiExecTab,
+    toggleTerminalSplit,
   } = useAppStore();
   const ctx = useContextMenu();
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -248,7 +250,13 @@ export function TabBar() {
       <div className="flex items-center gap-1 pr-1 pb-0.5">
         {!compactMode && (
           <>
-            <IconBtn testId="tab-split-view" title="Split view is not active in this phase" icon={<SplitSquareVertical className="w-3.5 h-3.5" />} disabled />
+            <IconBtn
+              testId="tab-split-view"
+              title={terminalSplitActive ? "Disable terminal split view" : "Enable terminal split view"}
+              icon={<SplitSquareVertical className="w-3.5 h-3.5" />}
+              onClick={toggleTerminalSplit}
+              active={terminalSplitActive}
+            />
             <IconBtn
               testId="tab-multiexec-toggle"
               title={multiExecActive ? "Disable MultiExec" : "Enable MultiExec"}

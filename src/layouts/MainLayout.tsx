@@ -1,4 +1,15 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Panel,
@@ -34,9 +45,9 @@ import {
   detachedWindowUrl,
   writeDetachedHandoff,
 } from "../components/filebrowser/SftpDetachedWindow";
-import { X } from "lucide-react";
+import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import type { SftpTabInfo } from "../types";
-import { useAppStore } from "../stores/appStore";
+import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
@@ -59,6 +70,8 @@ interface PendingAuth {
   session: SessionConfig;
 }
 
+const MIN_SPLIT_WEIGHT = 0.35;
+
 export function MainLayout() {
   const {
     tabs,
@@ -76,9 +89,16 @@ export function MainLayout() {
     setStatusMessage,
     multiExecActive,
     multiExecSelectedTabIds,
+    terminalSplitActive,
+    terminalSplitLayout,
+    terminalSplitInputLockedTabIds,
     toggleMultiExec,
     selectAllTerminalTabs,
     clearMultiExecSelection,
+    toggleTerminalSplit,
+    setTerminalSplitLayout,
+    toggleTerminalSplitInputLock,
+    clearTerminalSplitInputLocks,
     setTabHasNewOutput,
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession } = useSessionStore();
@@ -104,8 +124,12 @@ export function MainLayout() {
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
   const [terminalCwdVersions, setTerminalCwdVersions] = useState<Record<string, number>>({});
   const [terminalCwdRequestTokens, setTerminalCwdRequestTokens] = useState<Record<string, number>>({});
+  const [splitPaneWeights, setSplitPaneWeights] = useState<Record<string, number>>({});
+  const [splitGridColumnWeights, setSplitGridColumnWeights] = useState<number[]>([]);
+  const [splitGridRowWeights, setSplitGridRowWeights] = useState<number[]>([]);
   const [vaultUnlockReason, setVaultUnlockReason] = useState<string | null>(null);
   const pendingVaultActionRef = useRef<(() => void) | null>(null);
+  const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
 
@@ -180,9 +204,14 @@ export function MainLayout() {
   }, [setStatusMessage]);
 
   const broadcastToSelectedTerminals = useCallback((data: string, sourceTabId?: string) => {
-    const { multiExecSelectedTabIds: selectedIds } = useAppStore.getState();
+    const {
+      multiExecSelectedTabIds: selectedIds,
+      terminalSplitActive: splitActive,
+      terminalSplitInputLockedTabIds: lockedIds,
+    } = useAppStore.getState();
     for (const tabId of selectedIds) {
       if (tabId === sourceTabId) continue; // skip the source terminal — it handles its own input
+      if (splitActive && lockedIds.has(tabId)) continue;
       const sessionId = terminalSessionIds.current[tabId];
       if (sessionId) {
         writeTerminal(sessionId, encodeBase64(data)).catch(console.error);
@@ -702,7 +731,7 @@ export function MainLayout() {
         }
         break;
       case "split":
-        setStatusMessage("Split view is not active in this phase");
+        toggleTerminalSplit();
         break;
       case "multiexec":
         toggleMultiExec();
@@ -758,6 +787,7 @@ export function MainLayout() {
     setStatusMessage,
     setSidebarCollapsed,
     toggleCompactMode,
+    toggleTerminalSplit,
     toggleSidebar,
     toggleXServer,
   ]);
@@ -766,6 +796,126 @@ export function MainLayout() {
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
+  const terminalSplitVisible =
+    terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
+  const effectiveMultiExecSelectedCount = terminalSplitActive
+    ? [...multiExecSelectedTabIds].filter((id) => !terminalSplitInputLockedTabIds.has(id)).length
+    : multiExecSelectedTabIds.size;
+  const splitGridColumns = Math.max(1, Math.ceil(Math.sqrt(terminalTabs.length)));
+  const splitGridRows = Math.max(1, Math.ceil(terminalTabs.length / splitGridColumns));
+  const splitPaneWeightsForTabs = useMemo(
+    () => terminalTabs.map((tab) => positiveWeight(splitPaneWeights[tab.id])),
+    [splitPaneWeights, terminalTabs],
+  );
+  const splitGridColumnWeightsForLayout = useMemo(
+    () => axisWeights(splitGridColumnWeights, splitGridColumns),
+    [splitGridColumnWeights, splitGridColumns],
+  );
+  const splitGridRowWeightsForLayout = useMemo(
+    () => axisWeights(splitGridRowWeights, splitGridRows),
+    [splitGridRowWeights, splitGridRows],
+  );
+  const splitGridColumnTemplate = weightsToGridTemplate(splitGridColumnWeightsForLayout);
+  const splitGridRowTemplate = weightsToGridTemplate(splitGridRowWeightsForLayout);
+  const terminalPanesClass = terminalSplitVisible
+    ? terminalSplitLayout === "horizontal"
+      ? "flex-1 min-h-0 flex flex-row relative"
+      : terminalSplitLayout === "vertical"
+        ? "flex-1 min-h-0 flex flex-col relative"
+        : "flex-1 min-h-0 grid relative"
+    : "contents";
+
+  const startLinearSplitResize = useCallback((
+    index: number,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (!terminalSplitVisible || terminalSplitLayout === "grid") return;
+    const container = splitPanesRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const horizontal = terminalSplitLayout === "horizontal";
+    const dimension = horizontal ? rect.width : rect.height;
+    if (dimension <= 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const ids = terminalTabs.map((tab) => tab.id);
+    const initialWeights = ids.map((id) => positiveWeight(splitPaneWeights[id]));
+    const totalWeight = sumWeights(initialWeights);
+    const startCoord = horizontal ? event.clientX : event.clientY;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const currentCoord = horizontal ? moveEvent.clientX : moveEvent.clientY;
+      const deltaWeight = ((currentCoord - startCoord) / dimension) * totalWeight;
+      const nextWeights = resizeAdjacentWeights(initialWeights, index, deltaWeight);
+      setSplitPaneWeights((prev) => {
+        const next = { ...prev };
+        ids.forEach((id, weightIndex) => {
+          next[id] = nextWeights[weightIndex];
+        });
+        return next;
+      });
+    };
+
+    const stop = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  }, [splitPaneWeights, terminalSplitLayout, terminalSplitVisible, terminalTabs]);
+
+  const startGridSplitResize = useCallback((
+    axis: "column" | "row",
+    index: number,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (!terminalSplitVisible || terminalSplitLayout !== "grid") return;
+    const container = splitPanesRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const dimension = axis === "column" ? rect.width : rect.height;
+    if (dimension <= 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const initialWeights = axis === "column"
+      ? splitGridColumnWeightsForLayout
+      : splitGridRowWeightsForLayout;
+    const totalWeight = sumWeights(initialWeights);
+    const startCoord = axis === "column" ? event.clientX : event.clientY;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const currentCoord = axis === "column" ? moveEvent.clientX : moveEvent.clientY;
+      const deltaWeight = ((currentCoord - startCoord) / dimension) * totalWeight;
+      const nextWeights = resizeAdjacentWeights(initialWeights, index, deltaWeight);
+      if (axis === "column") {
+        setSplitGridColumnWeights(nextWeights);
+      } else {
+        setSplitGridRowWeights(nextWeights);
+      }
+    };
+
+    const stop = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  }, [
+    splitGridColumnWeightsForLayout,
+    splitGridRowWeightsForLayout,
+    terminalSplitLayout,
+    terminalSplitVisible,
+  ]);
 
   return (
     <div
@@ -778,7 +928,11 @@ export function MainLayout() {
       {!compactMode && (
         <>
           <MenuBar activeTabClosable={!!activeTab?.closable} onCommand={handleCommand} />
-          <Ribbon xServerEnabled={xServerEnabled} onCommand={handleCommand} />
+          <Ribbon
+            xServerEnabled={xServerEnabled}
+            splitActive={terminalSplitActive}
+            onCommand={handleCommand}
+          />
           <QuickConnect
             onConnectInput={handleQuickConnect}
             onConnectSession={handleConnectSession}
@@ -848,7 +1002,7 @@ export function MainLayout() {
               {!compactMode && <TabBar />}
               {multiExecActive && (
                 <MultiExecBar
-                  selectedCount={multiExecSelectedTabIds.size}
+                  selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}
                   onSend={broadcastToSelectedTerminals}
                   onSelectAll={selectAllTerminalTabs}
@@ -866,113 +1020,251 @@ export function MainLayout() {
                   />
                 )}
 
-                {/* All terminal tabs stay mounted, hidden via display.
-                    Each SSH terminal also hosts an attached SFTP sidebar
-                    that the user can toggle on the top-right corner. */}
-                {terminalTabs.map((tab) => {
-                  const isActive = activeTabId === tab.id;
-                  const sidebarOpen = !!attachedSidebars[tab.id] && !!tab.ssh;
-                  const liveTerminalProfile = tab.sessionId
-                    ? terminalProfilesBySessionId.get(tab.sessionId) ?? tab.terminalProfile
-                    : tab.terminalProfile;
-                  const terminalNode = (
-                    <div className="h-full w-full relative">
-                      <TerminalPanel
-                        tabId={tab.id}
-                        tabTitle={tab.title}
-                        ssh={tab.ssh}
-                        localShell={tab.localShell}
-                        terminalProfile={liveTerminalProfile}
-                        visible={isActive}
-                        onCwdChange={tab.ssh ? (cwd) => handleTerminalCwd(tab.id, cwd) : undefined}
-                        cwdRequestToken={terminalCwdRequestTokens[tab.id] ?? 0}
-                        onSessionReady={(sid) => { terminalSessionIds.current[tab.id] = sid; }}
-                        onOutput={() => handleTerminalOutput(tab.id)}
-                        multiExecActive={multiExecActive}
-                        isMultiExecTarget={multiExecActive && multiExecSelectedTabIds.has(tab.id)}
-                        onInputBroadcast={isActive && multiExecActive ? (data) => broadcastToSelectedTerminals(data, tab.id) : undefined}
-                        sftpToggle={tab.ssh ? { open: sidebarOpen, onToggle: () => toggleAttachedSidebar(tab.id) } : undefined}
-                      />
-                    </div>
-                  );
-                  const sftpSidebarNode = sidebarOpen && tab.ssh ? (
-                    <SftpSidebar
-                      sessionId={`attached-${tab.id}`}
-                      host={tab.ssh.host}
-                      port={tab.ssh.port}
-                      username={tab.ssh.username}
-                      authMethod={tab.ssh.authMethod}
-                      authData={tab.ssh.authData}
-                      cwdHint={terminalCwds[tab.id] ?? null}
-                      cwdHintVersion={terminalCwdVersions[tab.id] ?? 0}
-                      title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
-                      onClose={() => toggleAttachedSidebar(tab.id)}
-                      onRequestTerminalCwd={() => requestTerminalCwd(tab.id)}
-                      onOpenTerminalHere={(p) => {
-                        const sid = terminalSessionIds.current[tab.id];
-                        if (!sid) return;
-                        const escaped = p.replace(/'/g, "'\\''");
-                        void writeTerminal(sid, encodeBase64(`cd '${escaped}'\n`));
-                      }}
-                      onDetach={() =>
-                        openDetachedSftp(
-                          {
-                            sessionId: `attached-${tab.id}`,
-                            host: tab.ssh!.host,
-                            port: tab.ssh!.port,
-                            username: tab.ssh!.username,
-                            authMethod: tab.ssh!.authMethod,
-                            authData: tab.ssh!.authData,
-                            initialPath: terminalCwds[tab.id],
-                            attachedToTerminal: true,
-                          },
-                          `${tab.title} — SFTP`,
-                        )
-                      }
+                {/* All terminal tabs stay mounted. Single-tab mode hides
+                    inactive panes; split mode only changes the pane wrappers. */}
+                <div
+                  data-testid="terminal-split-stage"
+                  data-active={terminalSplitVisible || undefined}
+                  data-split-layout={terminalSplitVisible ? terminalSplitLayout : undefined}
+                  className={terminalSplitVisible ? "absolute inset-0 z-10 flex flex-col" : "contents"}
+                >
+                  <div style={{ display: terminalSplitVisible ? "block" : "none" }}>
+                    <TerminalSplitToolbar
+                      layout={terminalSplitLayout}
+                      lockedCount={terminalSplitInputLockedTabIds.size}
+                      onLayoutChange={setTerminalSplitLayout}
+                      onClearLocks={clearTerminalSplitInputLocks}
+                      onClose={toggleTerminalSplit}
                     />
-                  ) : null;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      {/* Always render the PanelGroup so the terminal Panel
-                          stays mounted across sidebar open/close. Without
-                          this, toggling the sidebar would unmount and rebuild
-                          the xterm instance, dropping scrollback/state. */}
-                      <PanelGroup
-                        direction="horizontal"
-                        autoSaveId={`terminal-sftp-${tab.id}`}
-                      >
-                        <Panel defaultSize={62} minSize={25} className="min-w-0">
-                          <div className="h-full">{terminalNode}</div>
-                        </Panel>
-                        {sftpSidebarNode && (
-                          <>
-                            <PanelResizeHandle className="w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize" />
-                            <Panel
-                              defaultSize={38}
-                              minSize={20}
-                              maxSize={70}
-                              className="min-w-0"
+                  </div>
+                  <div
+                    ref={splitPanesRef}
+                    data-testid="terminal-split-panes"
+                    data-layout={terminalSplitVisible ? terminalSplitLayout : undefined}
+                    className={terminalPanesClass}
+                    style={terminalSplitVisible && terminalSplitLayout === "grid"
+                      ? {
+                        gridTemplateColumns: splitGridColumnTemplate,
+                        gridTemplateRows: splitGridRowTemplate,
+                      }
+                      : undefined}
+                  >
+                    {terminalTabs.map((tab, index) => {
+                      const isActive = activeTabId === tab.id;
+                      const inputLocked = terminalSplitVisible && terminalSplitInputLockedTabIds.has(tab.id);
+                      const sidebarOpen = !terminalSplitVisible && !!attachedSidebars[tab.id] && !!tab.ssh;
+                      const liveTerminalProfile = tab.sessionId
+                        ? terminalProfilesBySessionId.get(tab.sessionId) ?? tab.terminalProfile
+                        : tab.terminalProfile;
+                      const terminalNode = (
+                        <div className="h-full w-full relative">
+                          <TerminalPanel
+                            tabId={tab.id}
+                            tabTitle={tab.title}
+                            ssh={tab.ssh}
+                            localShell={tab.localShell}
+                            terminalProfile={liveTerminalProfile}
+                            visible={terminalSplitVisible || isActive}
+                            activeForShortcuts={isActive}
+                            inputLocked={inputLocked}
+                            onCwdChange={tab.ssh ? (cwd) => handleTerminalCwd(tab.id, cwd) : undefined}
+                            cwdRequestToken={terminalCwdRequestTokens[tab.id] ?? 0}
+                            onSessionReady={(sid) => { terminalSessionIds.current[tab.id] = sid; }}
+                            onOutput={() => handleTerminalOutput(tab.id)}
+                            multiExecActive={multiExecActive}
+                            isMultiExecTarget={
+                              multiExecActive &&
+                              multiExecSelectedTabIds.has(tab.id) &&
+                              !inputLocked
+                            }
+                            onInputBroadcast={
+                              multiExecActive && !inputLocked && (terminalSplitVisible || isActive)
+                                ? (data) => broadcastToSelectedTerminals(data, tab.id)
+                                : undefined
+                            }
+                            sftpToggle={!terminalSplitVisible && tab.ssh ? { open: sidebarOpen, onToggle: () => toggleAttachedSidebar(tab.id) } : undefined}
+                          />
+                        </div>
+                      );
+                      const sftpSidebarNode = sidebarOpen && tab.ssh ? (
+                        <SftpSidebar
+                          sessionId={`attached-${tab.id}`}
+                          host={tab.ssh.host}
+                          port={tab.ssh.port}
+                          username={tab.ssh.username}
+                          authMethod={tab.ssh.authMethod}
+                          authData={tab.ssh.authData}
+                          cwdHint={terminalCwds[tab.id] ?? null}
+                          cwdHintVersion={terminalCwdVersions[tab.id] ?? 0}
+                          title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
+                          onClose={() => toggleAttachedSidebar(tab.id)}
+                          onRequestTerminalCwd={() => requestTerminalCwd(tab.id)}
+                          onOpenTerminalHere={(p) => {
+                            const sid = terminalSessionIds.current[tab.id];
+                            if (!sid) return;
+                            const escaped = p.replace(/'/g, "'\\''");
+                            void writeTerminal(sid, encodeBase64(`cd '${escaped}'\n`));
+                          }}
+                          onDetach={() =>
+                            openDetachedSftp(
+                              {
+                                sessionId: `attached-${tab.id}`,
+                                host: tab.ssh!.host,
+                                port: tab.ssh!.port,
+                                username: tab.ssh!.username,
+                                authMethod: tab.ssh!.authMethod,
+                                authData: tab.ssh!.authData,
+                                initialPath: terminalCwds[tab.id],
+                                attachedToTerminal: true,
+                              },
+                              `${tab.title} — SFTP`,
+                            )
+                          }
+                        />
+                      ) : null;
+                      const gridColumn = index % splitGridColumns + 1;
+                      const gridRow = Math.floor(index / splitGridColumns) + 1;
+                      return (
+                        <Fragment key={tab.id}>
+                        <div
+                          data-testid="terminal-split-pane"
+                          data-tab-id={tab.id}
+                          data-active={isActive || undefined}
+                          data-input-locked={inputLocked || undefined}
+                          className={
+                            terminalSplitVisible
+                              ? "relative min-w-0 min-h-0 flex flex-col overflow-hidden border-r border-b border-[var(--moba-divider)]"
+                              : "absolute inset-0"
+                          }
+                          style={terminalSplitVisible
+                            ? terminalSplitLayout === "grid"
+                              ? { gridColumn, gridRow }
+                              : {
+                                flexGrow: splitPaneWeightsForTabs[index],
+                                flexShrink: 1,
+                                flexBasis: 0,
+                              }
+                            : { display: isActive ? "block" : "none" }}
+                          onMouseDownCapture={() => {
+                            if (terminalSplitVisible && activeTabId !== tab.id) {
+                              setActiveTab(tab.id);
+                            }
+                          }}
+                        >
+                          <div
+                            className="h-7 shrink-0 items-center gap-2 px-2 text-[11px]"
+                            style={{
+                              display: terminalSplitVisible ? "flex" : "none",
+                              background: isActive ? "var(--moba-selected)" : "var(--moba-chrome-bg)",
+                              borderBottom: "1px solid var(--moba-divider)",
+                              color: "var(--moba-text)",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="min-w-0 flex-1 truncate text-left"
+                              onClick={() => setActiveTab(tab.id)}
+                              title={tab.title}
                             >
-                              <div
-                                className="h-full"
-                                style={{
-                                  borderLeft: "1px solid var(--moba-divider)",
-                                  background: "var(--moba-bg)",
-                                }}
-                              >
-                                {sftpSidebarNode}
-                              </div>
-                            </Panel>
-                          </>
+                              {tab.title}
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`terminal-split-lock-${tab.id}`}
+                              aria-label={inputLocked ? `Unlock input for ${tab.title}` : `Lock input for ${tab.title}`}
+                              title={inputLocked ? "Unlock input" : "Lock input"}
+                              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+                              style={inputLocked ? { color: "var(--moba-accent)" } : undefined}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleTerminalSplitInputLock(tab.id);
+                              }}
+                            >
+                              {inputLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                            </button>
+                          </div>
+                          {/* Always render the PanelGroup so the terminal Panel
+                              stays mounted across sidebar open/close. */}
+                          <div className={terminalSplitVisible ? "flex-1 min-h-0" : "h-full"}>
+                            <PanelGroup
+                              direction="horizontal"
+                              autoSaveId={`terminal-sftp-${tab.id}`}
+                            >
+                              <Panel defaultSize={62} minSize={25} className="min-w-0">
+                                <div className="h-full">{terminalNode}</div>
+                              </Panel>
+                              {sftpSidebarNode && (
+                                <>
+                                  <PanelResizeHandle className="w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize" />
+                                  <Panel
+                                    defaultSize={38}
+                                    minSize={20}
+                                    maxSize={70}
+                                    className="min-w-0"
+                                  >
+                                    <div
+                                      className="h-full"
+                                      style={{
+                                        borderLeft: "1px solid var(--moba-divider)",
+                                        background: "var(--moba-bg)",
+                                      }}
+                                    >
+                                      {sftpSidebarNode}
+                                    </div>
+                                  </Panel>
+                                </>
+                              )}
+                            </PanelGroup>
+                          </div>
+                        </div>
+                        {terminalSplitVisible && terminalSplitLayout !== "grid" && index < terminalTabs.length - 1 && (
+                          <div
+                            data-testid="terminal-split-resize-handle"
+                            data-orientation={terminalSplitLayout}
+                            className={
+                              terminalSplitLayout === "horizontal"
+                                ? "w-1.5 shrink-0 cursor-col-resize bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors"
+                                : "h-1.5 shrink-0 cursor-row-resize bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors"
+                            }
+                            onPointerDown={(event) => startLinearSplitResize(index, event)}
+                            role="separator"
+                            aria-orientation={terminalSplitLayout === "horizontal" ? "vertical" : "horizontal"}
+                            title="Resize split panes"
+                          />
                         )}
-                      </PanelGroup>
-                    </div>
-                  );
-                })}
+                        </Fragment>
+                      );
+                    })}
+                    {terminalSplitVisible && terminalSplitLayout === "grid" && (
+                      <>
+                        {splitGridColumnWeightsForLayout.slice(0, -1).map((_, index) => (
+                          <div
+                            key={`grid-col-${index}`}
+                            data-testid="terminal-split-grid-column-resize-handle"
+                            className="absolute top-0 bottom-0 z-30 w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--moba-accent)]/70"
+                            style={{ left: `${cumulativeWeightPercent(splitGridColumnWeightsForLayout, index)}%` }}
+                            onPointerDown={(event) => startGridSplitResize("column", index, event)}
+                            role="separator"
+                            aria-orientation="vertical"
+                            title="Resize split column"
+                          />
+                        ))}
+                        {splitGridRowWeightsForLayout.slice(0, -1).map((_, index) => (
+                          <div
+                            key={`grid-row-${index}`}
+                            data-testid="terminal-split-grid-row-resize-handle"
+                            className="absolute left-0 right-0 z-30 h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--moba-accent)]/70"
+                            style={{ top: `${cumulativeWeightPercent(splitGridRowWeightsForLayout, index)}%` }}
+                            onPointerDown={(event) => startGridSplitResize("row", index, event)}
+                            role="separator"
+                            aria-orientation="horizontal"
+                            title="Resize split row"
+                          />
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
 
                 {/* SFTP standalone tabs stay mounted so transfers can finish
                     even when the user switches to another tab. */}
@@ -1124,6 +1416,115 @@ export function MainLayout() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+    </div>
+  );
+}
+
+function positiveWeight(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : 1;
+}
+
+function axisWeights(weights: number[], count: number): number[] {
+  return Array.from({ length: count }, (_, index) => positiveWeight(weights[index]));
+}
+
+function sumWeights(weights: number[]): number {
+  return weights.reduce((sum, weight) => sum + positiveWeight(weight), 0) || 1;
+}
+
+function resizeAdjacentWeights(weights: number[], index: number, deltaWeight: number): number[] {
+  const next = weights.map(positiveWeight);
+  if (index < 0 || index >= next.length - 1) return next;
+
+  const left = next[index];
+  const right = next[index + 1];
+  const minDelta = MIN_SPLIT_WEIGHT - left;
+  const maxDelta = right - MIN_SPLIT_WEIGHT;
+  const clampedDelta = Math.max(minDelta, Math.min(maxDelta, deltaWeight));
+  next[index] = left + clampedDelta;
+  next[index + 1] = right - clampedDelta;
+  return next;
+}
+
+function weightsToGridTemplate(weights: number[]): string {
+  return weights.map((weight) => `minmax(0, ${positiveWeight(weight)}fr)`).join(" ");
+}
+
+function cumulativeWeightPercent(weights: number[], index: number): number {
+  const total = sumWeights(weights);
+  const before = weights
+    .slice(0, index + 1)
+    .reduce((sum, weight) => sum + positiveWeight(weight), 0);
+  return total > 0 ? (before / total) * 100 : 0;
+}
+
+function TerminalSplitToolbar({
+  layout,
+  lockedCount,
+  onLayoutChange,
+  onClearLocks,
+  onClose,
+}: {
+  layout: TerminalSplitLayout;
+  lockedCount: number;
+  onLayoutChange: (layout: TerminalSplitLayout) => void;
+  onClearLocks: () => void;
+  onClose: () => void;
+}) {
+  const options: Array<{ id: TerminalSplitLayout; label: string; icon: ReactNode }> = [
+    { id: "horizontal", label: "Horizontal split", icon: <Columns2 className="w-3.5 h-3.5" /> },
+    { id: "vertical", label: "Vertical split", icon: <Rows3 className="w-3.5 h-3.5" /> },
+    { id: "grid", label: "Grid split", icon: <Grid2X2 className="w-3.5 h-3.5" /> },
+  ];
+
+  return (
+    <div
+      data-testid="terminal-split-toolbar"
+      className="h-8 shrink-0 flex items-center gap-1 px-2"
+      style={{
+        background: "var(--moba-chrome-bg)",
+        borderBottom: "1px solid var(--moba-divider)",
+      }}
+    >
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          data-testid={`terminal-split-layout-${option.id}`}
+          aria-label={option.label}
+          title={option.label}
+          data-active={layout === option.id || undefined}
+          className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+          style={layout === option.id ? { background: "var(--moba-selected)", color: "var(--moba-accent)" } : undefined}
+          onClick={() => onLayoutChange(option.id)}
+        >
+          {option.icon}
+        </button>
+      ))}
+      <span className="moba-pill ml-1" style={{ fontSize: 11 }}>
+        {lockedCount} locked
+      </span>
+      <button
+        type="button"
+        className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--moba-hover)] disabled:opacity-40"
+        style={{ color: "var(--moba-text-muted)" }}
+        disabled={lockedCount === 0}
+        onClick={onClearLocks}
+      >
+        Clear locks
+      </button>
+      <div className="flex-1" />
+      <button
+        type="button"
+        aria-label="Close split view"
+        title="Close split view"
+        className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+        onClick={onClose}
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }

@@ -1,0 +1,42 @@
+id: TC-108
+title: Terminal split view supports layouts, input locks, and MultiExec target count
+covers: [F4.11]
+tags: [smoke, p1, terminal, split, multiexec]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-open-local-terminal"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 20
+  - click: '[data-testid="new-local-terminal"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 20
+  - click: '[data-testid="tab-split-view"]'
+  - wait_for:
+      selector: '[data-testid="terminal-split-toolbar"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="terminal-split-panes"]'
+  - assert_visible: '[data-testid="terminal-split-resize-handle"]'
+  - click: '[data-testid="terminal-split-layout-vertical"]'
+  - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: vertical}
+  - assert_visible: '[data-testid="terminal-split-resize-handle"]'
+  - click: '[data-testid="terminal-split-layout-grid"]'
+  - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: grid}
+  - assert_visible: '[data-testid="terminal-split-grid-column-resize-handle"]'
+  - assert_visible: '[data-testid="terminal-split-grid-row-resize-handle"]'
+  - click: '[data-testid="terminal-split-layout-horizontal"]'
+  - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: horizontal}
+  - click: '[data-testid^="terminal-split-lock-"]'
+  - assert_visible: '[data-testid="terminal-input-locked"]'
+  - click: '[data-testid="tab-multiexec-toggle"]'
+  - wait_for:
+      selector: '[data-testid="multiexec-bar"]'
+      timeout_sec: 5
+  - click: 'text="All"'
+  - assert_visible: 'text="1 / 2"'
+  - screenshot: 108-terminal-split-smoke.png
