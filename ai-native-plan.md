@@ -25,51 +25,54 @@ NewMob 已有四份相邻文档：
 
 ## 总体架构
 
+ASR 与 LLM 是两个完全独立的能力，分别走两条独立路径：**ASR 必须本地**（音频是高敏感数据，永不出端），**LLM 默认云端**（文本意图是低敏感数据，云端 1s 内回包远好于 CPU 本地 3s+；用户可一键切到纯本地）。
+
 ```
-┌────────────────────────────────────────────────────────────────┐
-│ Voice input ─────┐                  ┌───── Keyboard input      │
-│                  ▼                  ▼                          │
-│  Tauri frontend (React / TypeScript)                           │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ Terminal UI · Voice waveform · Provider config panel ·    │  │
-│  │ Command preview/confirm card · Ghost-text overlay ·       │  │
-│  │ Agent action cards (dry-run / execute / cancel)           │  │
-│  └──────────────────────┬───────────────────────────────────┘  │
-├─────────────────────────┼──────────────────────────────────────┤
-│  Rust core              ▼                                       │
-│  ┌──────────────┐ ┌───────────────┐ ┌──────────────────────┐   │
-│  │  reedline    │ │ voice::*      │ │  ai::*               │   │
-│  │ Tab 硬补全 + │ │ (whisper-rs / │ │  - Provider trait    │   │
-│  │ history +    │ │  sensevoice / │ │    (OpenAI compat)   │   │
-│  │ fish hints   │ │  funasr +     │ │  - rig-core Agent    │   │
-│  │              │ │  cloud STT)   │ │  - Tool registry     │   │
-│  │ + LLM /infill│ │               │ │  - Timeout fallback  │   │
-│  └──────┬───────┘ └───────┬───────┘ └──────────┬───────────┘   │
-│         │                 │                    │                │
-└─────────┼─────────────────┼────────────────────┼────────────────┘
-          │ FIM 补全调用    │ 转写文本           │ chat / tool_calls
-          ▼                 ▼                    ▼
-   ┌──────────────────────────────────┐  ┌──────────────────────┐
-   │  Local sidecar (externalBin)     │  │  Cloud API backends  │
-   │  ┌────────────────────────────┐  │  │  (OpenAI compatible) │
-   │  │ Ollama  127.0.0.1:11434    │  │  │  ┌────────────────┐  │
-   │  │  - Qwen2.5-Coder 1.5B      │  │  │  │ DeepSeek       │  │
-   │  │  - Qwen2.5-Coder 0.5B FIM  │  │  │  │ SiliconFlow    │  │
-   │  └────────────────────────────┘  │  │  │ Groq           │  │
-   │  ┌────────────────────────────┐  │  │  │ GLM-4-Flash    │  │
-   │  │ whisper-cpp / sherpa-onnx  │  │  │  │ Claude/OpenAI  │  │
-   │  └────────────────────────────┘  │  │  └────────────────┘  │
-   └──────────────────────────────────┘  └──────────────────────┘
-                ▲                                  ▲
-                │  本地优先，8 s 超时 → 云端 fallback │
-                └──────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Voice input ─────┐                  ┌───── Keyboard input        │
+│                  ▼                  ▼                            │
+│  Tauri frontend (React / TypeScript)                             │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Terminal UI · Voice waveform · Provider config panel ·      │  │
+│  │ Command preview/confirm card · Ghost-text overlay ·         │  │
+│  │ Agent action cards (dry-run / execute / cancel)             │  │
+│  └────────────────────────┬───────────────────────────────────┘  │
+├───────────────────────────┼──────────────────────────────────────┤
+│  Rust core                ▼                                       │
+│  ┌──────────────────┐  ┌────────────────────┐  ┌──────────────┐  │
+│  │  asr::* (本地)    │  │  llm::* (本/云)     │  │  tab::*      │  │
+│  │  trait Asr        │  │  trait Llm          │  │  reedline    │  │
+│  │  ─ SherpaOnnxAsr  │  │  ─ LlamaServerLlm   │  │  硬补全      │  │
+│  │  ─ WhisperRsAsr   │  │  ─ OpenAiCompat     │  │  + history   │  │
+│  │  ─ VoskAsr        │  │  ─ AnthropicLlm     │  │  + fish hint │  │
+│  │  常驻内存 ~200 MB │  │  按需加载，60 s 后卸 │  │              │  │
+│  └────────┬──────────┘  └──────────┬─────────┘  └──────┬───────┘  │
+│           │ 转写文本               │ chat/tool_calls    │ FIM     │
+└───────────┼────────────────────────┼────────────────────┼─────────┘
+            │                        │                    │
+            ▼                        ▼                    ▼
+  ┌──────────────────┐    ┌──────────────────┐  ┌────────────────────┐
+  │  In-process ASR  │    │ llama-server     │  │ llama-cpp-2 (in-   │
+  │  ─ sherpa-onnx   │    │ sidecar (~10 MB) │  │ process, 共享 ggml)│
+  │  ─ whisper-rs    │    │ 127.0.0.1:8080   │  │ /infill FIM        │
+  │  (共享 ggml)      │    │ /v1 /infill      │  │ Qwen3-0.6B Q4_K_M  │
+  └──────────────────┘    └─────────┬────────┘  └────────────────────┘
+                                    │ 或 ▼
+                          ┌──────────────────────────┐
+                          │  Cloud API (OpenAI 兼容) │
+                          │  DeepSeek · GLM-4-Flash · │
+                          │  SiliconFlow · Groq ·     │
+                          │  Claude · Gemini · ...    │
+                          └──────────────────────────┘
 ```
 
 铁律：
 
+- **ASR 永不联网**。音频字节、PCM 数据、波形帧绝不通过任何 HTTP/WebSocket 出端
+- **ASR 与 LLM 必须分离**：ASR Provider 与 LLM Provider 是两套配置、两条数据通路、两份模型库；任一方升级、替换、关闭都不影响另一方
 - 终端回滚字节、文件内容、SSH 密钥材料、vault 数据 **永不进入** 任何 AI 上下文
 - 一切"写动作"（执行命令、上传/删除文件、创建会话）必须 dry-run + 确认卡，且在审计日志留痕
-- 云端 Provider 仅在用户显式开启 + 填好 vault Key 时才工作；状态栏全程黄点提示
+- 云端 LLM Provider 仅在用户显式开启 + 填好 vault Key 时才工作；状态栏全程黄点提示
 
 ---
 
@@ -84,64 +87,85 @@ NewMob 已有四份相邻文档：
                                                     │
   ────────────────────────── 边界 ──────────────────┤
                                                     │
-                                                    │  v2.0  本地 LLM runtime + Provider 抽象
+                                                    │  v2.0  ASR Trait + LLM Trait（双解耦） + Provider
                                                     │  v2.1  语音 → Shell 命令 / 脚本生成
-                                                    │  v2.2  Tab 补全（reedline + ghost-text）
+                                                    │  v2.2  Tab 补全（reedline + in-process FIM）
                                                     │  v2.3  rig-core Agent + 工具执行
 ```
 
 - v1.x 完成后，AI 模块（`src-tauri/src/ai/mod.rs`）已经存在，工具调用 schema、Vault key 类型、确认卡组件、审计日志表都就绪
 - v2.x 在 v1.x 的基础设施上扩展，不重新发明：
-  - **复用** `voice::*`（按 PTT 录音、本地 + 云 STT、模型库）
+  - **拆分** `voice::*` 中的 STT 部分到独立 `asr::*` 模块；语音录音/PTT/波形保留在 voice
   - **复用** v1.2 的确认卡机制 + 审计日志表（schema 不变，新增 `outcome` 子类型）
-  - **扩展** `ai::*`：Provider trait 增加 OpenAI-compatible 通用实现，工具集从 6 个只读工具扩到含写动作的工具集
-  - **新增** `tab::*`（reedline 集成）、`agent::*`（rig-core）
+  - **拆分 + 扩展** `ai::*`：原 `AiBackend` 一分为二 —— ASR 实现迁 `asr::*`，LLM 部分迁 `llm::*`；`ai::*` 仅保留高层协调（调度 ASR → LLM、工具集、shell 安全）
+  - **新增** `tab::*`（reedline + in-process FIM）、`agent::*`（rig-core）
 
 ---
 
 ## 一、模型与 Runtime 选型矩阵
 
+> **核心原则**：ASR 与 LLM 是两条独立选型链。ASR 必须本地（音频敏感），LLM 默认云端、可切本地（文本意图低敏感、云端响应快）。任一升级不牵动另一方。
+
 ### 1.1 本地 LLM（中英文 + Shell 场景）
 
-| 模型 | 参数 | Q4_K_M 体积 | 用途 | 许可 |
-|------|------|-------------|------|------|
-| **Qwen2.5-Coder-1.5B-Instruct** ⭐ | 1.5B | ~1.0 GB | 主力：语音→命令、解释报错 | Apache-2.0 |
-| **Qwen2.5-Coder-0.5B-Base** ⭐ | 0.5B | ~400 MB | Tab 补全（FIM 填充） | Apache-2.0 |
-| Qwen2.5-Coder-3B-Instruct | 3B | ~2.0 GB | "标准"档，复杂脚本生成 | Apache-2.0 |
-| Qwen3-1.7B / 4B | 1.7B / 4B | ~1.1 / 2.4 GB | 通用对话备选（含 thinking 模式） | Apache-2.0 |
-| Gemma 3-1B / 4B | 1B / 4B | ~0.8 / 2.5 GB | 多语备选 | Gemma 条款 |
+| 模型 | 参数 | Q4_K_M 体积 | 运行时 RAM | 用途 | 许可 |
+|------|------|-------------|-----------|------|------|
+| **Qwen3-0.6B** ⭐ | 0.6B | ~400 MB | ~600 MB | Tab 补全（FIM）默认 —— 同体积下质量优于 Qwen2.5-0.5B | Apache-2.0 |
+| Qwen2.5-Coder-0.5B-Base | 0.5B | ~400 MB | ~600 MB | Tab 补全备选（FIM 训练更专门） | Apache-2.0 |
+| **Qwen2.5-Coder-1.5B-Instruct** ⭐ | 1.5B | ~1.0 GB | ~2 GB | 主力：语音→命令、解释报错；亦可作 FIM 二用 | Apache-2.0 |
+| Qwen2.5-Coder-3B-Instruct | 3B | ~2.0 GB | ~3.5 GB | "标准"档，复杂脚本生成 | Apache-2.0 |
+| Qwen3-1.7B / 4B | 1.7B / 4B | ~1.1 / 2.4 GB | ~2 / 4 GB | 通用对话备选（含 thinking 模式） | Apache-2.0 |
+| Gemma 3-1B / 4B | 1B / 4B | ~0.8 / 2.5 GB | ~1.5 / 4 GB | 多语备选 | Gemma 条款 |
 
-**默认选择**：Qwen2.5-Coder 1.5B（chat）+ 0.5B（FIM）。中文 shell 上下文（中文报错、中文目录名、中文注释）Qwen 系明显优于 Llama 3.2 / Phi。
+**默认选择**：FIM 用 Qwen3-0.6B（400 MB / RAM 600 MB），chat 用 Qwen2.5-Coder 1.5B（1 GB / RAM 2 GB）。中文 shell 上下文（中文报错、中文目录名、中文注释）Qwen 系明显优于 Llama 3.2 / Phi。
 
-### 1.2 本地 ASR（中英双语）
+CPU-only 现实：Qwen2.5-Coder 1.5B 在 i5/Ryzen 5 上意图解析 ~1–3 s，已逼近 2 s 端到端预算上限；语音→Shell 默认应走云端（DeepSeek ~400–900 ms），用户偏执隐私时一键切回本地。详见 §1.5。
 
-`voice-input-plan.md` 已确定：**v1 用 whisper-rs + AudioWorklet PCM 采集**（不引入 cpal，采集留在 webview）。本文档新增的"中文优势档"：
+### 1.2 本地 ASR（中英双语，必须本地）
 
-| 模型 | 体积 | 中文 | 英文 | runtime | 备注 |
-|------|------|------|------|---------|------|
-| ggml-tiny multi（默认捆绑） | ~75 MB | 一般 | 一般 | whisper-rs | v1 默认 |
-| Whisper base / small | 150 / 466 MB | 良 / 优 | 良 / 优 | whisper-rs | 按需下载 |
-| **SenseVoice-Small** ⭐（zh-pro 档） | ~234 MB | 极佳 | 良好 | sherpa-onnx (`ort`) | 比 Whisper-large 快 ~15×，自动语种识别 |
-| Paraformer-zh-small | ~220 MB | 极佳 | 弱 | sherpa-onnx (`ort`) | 纯中文场景 |
+短命令（1–10 s 音频）的 PTT 场景，**Whisper-tiny 在中文上 CER 约 65–71%（Common Voice / Fleurs），不可用**。下表为实测数据：
 
-### 1.3 本地 LLM Runtime
+| 模型 | 体积 | 运行时 RAM | 中文 CER | 英文 | CPU 5s 推理 | 流式 | 用途 |
+|------|------|-----------|---------|------|------------|------|------|
+| **sherpa-onnx 流式 Zipformer zh-en small** ⭐ 默认 | **~80 MB** | ~200 MB | ~10–15% | 良 | RTF ~0.14 | ✅ 真流式 | PTT 短命令首选 |
+| ggml-tiny multi | ~75 MB | ~270 MB | **~65–71%（不可用）** | 一般 | 800–1500 ms | 窗口式 | ❌ 不再作为默认 |
+| Whisper base | ~150 MB | ~390 MB | ~30%（边缘） | 良 | 400–800 ms | 窗口式 | 仅作低端机降级 |
+| Whisper small | ~466 MB | ~850 MB | ~12–20% | 优 | 1.5–3 s | 窗口式 | 高质量备选 |
+| **SenseVoice-Small** ⭐ zh-pro 档 | ~234 MB | ~500 MB | **~5–8%（超 Whisper-large）** | 良 | ~70–300 ms | 一次性 | 中文重度档默认 |
+| Paraformer-zh-small | ~220 MB | ~450 MB | ~6–10% | 弱 | ~100 ms | 一次性 | 纯中文 |
+| Vosk-small-cn 0.22 | ~42 MB | ~80 MB | ~25–40%（自由文本） | 同小 | 实时 | ✅ | 仅适合"固定语法命令面板" |
+| Moonshine-tiny-zh + tiny-en | ~70 MB | ~150 MB | ~29%（zh）/ — | 优（en） | 5–15× 快于 Whisper-tiny | ✗ | 双模型路径，备选 |
+
+**关键决策**：
+
+- 默认 ASR 从 ggml-tiny multi 切换为 **sherpa-onnx 流式 Zipformer zh-en small**：体积仅大 5 MB，但中文 CER 从不可用变为 ~10–15%，且支持真流式 partial。
+- whisper-rs 仍作 feature flag 保留，给用户"高质量小语种"和"原生 ggml 共享 runtime"两条备用路径。
+- zh-pro 档保持 SenseVoice-Small（注：部分权重为 CC-NC 限商用，需在 manifest 标注，参考 §十二注 a）。
+
+### 1.3 LLM Runtime 选型
 
 排序（推荐 → 备选）：
 
-1. **Ollama sidecar（v2 主选）** ⭐
-   - 通过 Tauri `bundle.externalBin` 打包 `ollama` 二进制
-   - 监听 `127.0.0.1:11434`，OpenAI 兼容 + `/api/generate` 的 `suffix` 字段做 FIM
-   - 自带模型管理（`ollama pull qwen2.5-coder:1.5b`），用户可在设置里看进度
-   - 缺点：单平台二进制 ~150 MB，但是 sidecar 路径，不进主程序包
+1. **llama.cpp `llama-server` sidecar（v2.0 主选）** ⭐
+   - 通过 Tauri `bundle.externalBin` 打包 `llama-server` 二进制：CPU-only 版本 **~8–15 MB / 平台**（vs Ollama 的 macOS 127 MB / Linux 1.12 GB）
+   - OpenAI 兼容（`/v1/chat/completions`、`/v1/completions`），并提供原生 `/infill` 端点（含 `--fim-qwen-*` 预设）做 FIM
+   - 模型管理需自实现：从 HF / ModelScope 下载 GGUF + SHA-256 校验（与 ASR 模型库共用基础设施）
 
-2. **llama.cpp `llama-server` sidecar（备选）**
-   - 二进制 ~5–10 MB，控制更细，`/infill` 端点专门给 FIM 用
-   - 模型管理需自己实现（HF / ModelScope 双源 + SHA-256）
+2. **`llama-cpp-2` crate（v2.2 in-process FIM 用）** ⭐
+   - 把 llama.cpp 直接静态链接进 Tauri Rust 二进制，省去 sidecar 进程与 HTTP 往返
+   - Tab 补全 FIM 延迟敏感（目标 <300 ms 端到端），in-process 比 sidecar HTTP 快 30–80 ms
+   - 与 `whisper-rs` / `sherpa-onnx`（如启用 ggml backend）可通过构建脚本共用 system ggml，避免符号冲突
+   - 缺点：构建依赖 clang，Windows CI 需配置；API 是 unsafe 的低层接口，外覆 wrapper
 
-3. **mistral.rs / candle（纯 Rust，远期）**
-   - 完全 in-process，无 sidecar，但首启动加载更重
+3. **Ollama sidecar（已安装则可接入，不再默认捆绑）**
+   - 体积过大（macOS 127 MB / Linux 1.12 GB）不适合作为 Tauri sidecar 默认捆绑
+   - 但用户本机已装 Ollama 时，可作为 OpenAI 兼容 Provider 的 base_url 之一接入（设置 → AI → 添加 Provider → Ollama 模板，自动探测 `127.0.0.1:11434`）
 
-**v2.0 锁定 Ollama**；llama.cpp 留作"高级用户"可选后端（同一 Provider trait，只换 `base_url`）。
+4. **mistral.rs / candle（纯 Rust，远期备选）**
+   - 完全 in-process，无 sidecar，但 GGUF 加载性能弱于 llama.cpp，FIM 需手动构造 prompt
+   - 留作 v2.4+ 评估，不进 v2.x 默认路径
+
+**v2.0 锁定 `llama-server` sidecar**；v2.2 Tab 补全切到 `llama-cpp-2` in-process；Ollama 降级为"已安装时可接入"。所有路径走同一 Provider trait（仅 base_url / 进程模型不同），UX 上对用户透明。
 
 ### 1.4 云端 LLM Provider 矩阵
 
@@ -158,48 +182,72 @@ NewMob 已有四份相邻文档：
 | **Mistral Codestral** | `codestral-latest` | 个人/研究免费 | 一般 | Tab 补全云端档 |
 | **Claude / OpenAI** | `claude-sonnet` / `gpt-4o-mini` | 按量付费 | 良 | 已有 Key 用户 |
 | **OpenRouter** | 路由所有 free 模型 | 一 Key 路由 | 视模型 | 试新模型 |
-| **Ollama**（local） | `qwen2.5-coder:1.5b` | 本地零成本 | 优 | 默认本地档 |
+| **llama-server**（local） | `qwen2.5-coder:1.5b` 等 GGUF | 本地零成本 | 优 | 默认本地档（Ollama 已装时亦可接入） |
 
-**默认预置**（用户开箱可见，无需自己抄 base_url）：`Ollama (local)` + `DeepSeek` + `GLM-4-Flash` + `SiliconFlow` + `Groq`，外加"自定义 OpenAI 兼容端点"。
+**默认预置**（用户开箱可见，无需自己抄 base_url）：`Local (llama-server)` + `DeepSeek` + `GLM-4-Flash` + `SiliconFlow` + `Groq`，外加"自定义 OpenAI 兼容端点"和"Ollama（自动探测）"。
 
-### 1.5 Provider 配置 UX（极简三字段）
+### 1.5 ASR + LLM 配置 UX（双独立 Provider）
+
+ASR 与 LLM 是两块独立面板，分别选模型、分别测试连接、分别看运行状态。配置文件示例：
 
 ```jsonc
 // ~/.config/newmob/ai.json
 {
-  "active": "local",
-  "providers": {
-    "local":       { "base_url": "http://127.0.0.1:11434/v1", "api_key": "ollama", "model": "qwen2.5-coder:1.5b" },
-    "deepseek":    { "base_url": "https://api.deepseek.com/v1", "api_key": "<vault:ai_api_key:deepseek>", "model": "deepseek-chat" },
-    "glm":         { "base_url": "https://open.bigmodel.cn/api/paas/v4", "api_key": "<vault:ai_api_key:glm>", "model": "glm-4-flash" },
-    "siliconflow": { "base_url": "https://api.siliconflow.cn/v1", "api_key": "<vault:ai_api_key:siliconflow>", "model": "Qwen/Qwen2.5-Coder-7B-Instruct" },
-    "groq":        { "base_url": "https://api.groq.com/openai/v1", "api_key": "<vault:ai_api_key:groq>", "model": "llama-3.3-70b-versatile" }
+  // —— ASR：必本地，无 api_key 概念 ——
+  "asr": {
+    "active": "sherpa-zipformer-zh-en",
+    "providers": {
+      "sherpa-zipformer-zh-en": { "engine": "sherpa-onnx", "model": "streaming-zipformer-bilingual-zh-en-small" },
+      "sensevoice-small":       { "engine": "sherpa-onnx", "model": "sense-voice-small" },
+      "whisper-base":           { "engine": "whisper-rs", "model": "ggml-base-q5_1" },
+      "vosk-small-cn":          { "engine": "vosk",       "model": "vosk-model-small-cn-0.22" }
+    },
+    "warm_on_startup": true,    // 应用启动即预热（避免每次 PTT 冷加载 200–400 ms）
+    "vad": "silero"             // 静音检测器，PTT 自动停止
   },
-  "fallback": { "enabled": true, "primary": "local", "secondary": "deepseek", "timeout_ms": 8000 },
-  "task_routing": {
-    "voice_intent":    "local",        // v1.1 已有
-    "voice_to_shell":  "local",        // v2.1
-    "tab_completion":  "local",        // v2.2，固定走 0.5B FIM
-    "agent_default":   "local"         // v2.3
+
+  // —— LLM：本/云独立，OpenAI 兼容 Provider 抽象 ——
+  "llm": {
+    "active": "deepseek",       // 默认云端，开箱即用更快
+    "providers": {
+      "local":       { "base_url": "http://127.0.0.1:8080/v1",        "api_key": "local",     "model": "qwen2.5-coder-1.5b-q4_k_m", "runtime": "llama-server" },
+      "local-fim":   { "base_url": "in-process",                       "api_key": "local",     "model": "qwen3-0.6b-q4_k_m",         "runtime": "llama-cpp-2" },
+      "ollama":      { "base_url": "http://127.0.0.1:11434/v1",        "api_key": "ollama",    "model": "qwen2.5-coder:1.5b",        "runtime": "ollama" },
+      "deepseek":    { "base_url": "https://api.deepseek.com/v1",     "api_key": "<vault:ai_api_key:deepseek>",    "model": "deepseek-chat" },
+      "glm":         { "base_url": "https://open.bigmodel.cn/api/paas/v4", "api_key": "<vault:ai_api_key:glm>",     "model": "glm-4-flash" },
+      "siliconflow": { "base_url": "https://api.siliconflow.cn/v1",   "api_key": "<vault:ai_api_key:siliconflow>", "model": "Qwen/Qwen2.5-Coder-7B-Instruct" },
+      "groq":        { "base_url": "https://api.groq.com/openai/v1",  "api_key": "<vault:ai_api_key:groq>",        "model": "llama-3.3-70b-versatile" }
+    },
+    "fallback": { "enabled": true, "primary": "deepseek", "secondary": "local", "timeout_ms": 8000 },
+    "task_routing": {
+      "voice_intent":    "deepseek",   // v1.1 已有 → 默认走云端，~400–900 ms 优于本地 CPU ~1–3 s
+      "voice_to_shell":  "deepseek",   // v2.1 → 同上；CPU-only 用户本地易超 2 s 预算
+      "tab_completion":  "local-fim",  // v2.2 → FIM 必须本地（in-process llama-cpp-2，<300 ms）
+      "agent_default":   "deepseek"    // v2.3 → 多步 tool calling 本地 1.5B 不稳，云端更可靠
+    }
   }
 }
 ```
 
 UI 上每个 Provider 暴露恰好三个控件：**provider 下拉 / api_key 输入 / model_name 输入**。其余字段在 preset 里写死，避免用户在 base_url 上踩坑。
 
-API Key 通过 vault `kind=ai_api_key:<provider>` 存储，复用 v1.1 已建立的机制。
+> **隐私一键开关**：设置顶部提供"全本地模式"开关。打开后 `llm.task_routing` 全部强制写为 `local`，并禁用所有云端 Provider 的网络请求（Tauri allowlist 动态收紧）。配合本地模型库下载完成后，整个应用可断网工作。
 
-### 1.6 超时回退（本地 8 s → 云端）
+API Key 通过 vault `kind=ai_api_key:<provider>` 存储，复用 v1.1 已建立的机制。ASR 无 api_key 概念，故不入 vault。
+
+### 1.6 超时回退（云端 8 s → 本地）
+
+注意**方向反转**：默认云端为 primary，本地为 secondary。用户网络异常或 API Key 失效时自动切回本地（前提：本地档位已下载）。
 
 ```rust
-// src-tauri/src/ai/router.rs（v2.0 新增）
-pub async fn complete(req: ChatRequest, cfg: &AiConfig, task: TaskKind) -> Result<ChatResponse> {
-    let primary = cfg.task_routing.get(task).unwrap_or(&cfg.active);
-    let provider = &cfg.providers[primary];
+// src-tauri/src/llm/router.rs（v2.0 新增）
+pub async fn complete(req: ChatRequest, cfg: &LlmConfig, task: TaskKind) -> Result<ChatResponse> {
+    let primary_id = cfg.task_routing.get(task).unwrap_or(&cfg.active);
+    let primary = &cfg.providers[primary_id];
 
-    if cfg.fallback.enabled && primary == &cfg.fallback.primary {
+    if cfg.fallback.enabled && primary_id == &cfg.fallback.primary {
         match timeout(Duration::from_millis(cfg.fallback.timeout_ms),
-                      providers::call(provider, &req)).await {
+                      providers::call(primary, &req)).await {
             Ok(Ok(out)) => return Ok(out),
             Ok(Err(e))  => tracing::warn!(?e, "primary failed, falling back"),
             Err(_)      => tracing::warn!("primary timeout, falling back"),
@@ -207,24 +255,51 @@ pub async fn complete(req: ChatRequest, cfg: &AiConfig, task: TaskKind) -> Resul
         let secondary = &cfg.providers[&cfg.fallback.secondary];
         return providers::call(secondary, &req).await;
     }
-    providers::call(provider, &req).await
+    providers::call(primary, &req).await
 }
 ```
 
-前端无感，体感是"本地能秒回就秒回，本地卡了云端立刻顶上"。Tab 补全任务 **不参与** 超时回退（补全延迟敏感，云端往返 >150 ms 就不如不出）。
+前端无感，体感是"网络好云端秒回，断网/超时本地兜底"。Tab 补全任务 **不参与** 超时回退（FIM 已固定走 in-process，本身就是本地）。
+
+### 1.7 ASR / LLM 解耦原则
+
+| 维度 | ASR | LLM |
+|------|-----|-----|
+| 必本地？ | ✅ 强制（音频不出端） | ❌ 用户选 |
+| 默认 | sherpa-onnx Zipformer zh-en | DeepSeek（云） |
+| 配置位置 | `ai.json::asr.*` | `ai.json::llm.*` |
+| 模型库管理器 | 共用同一 manifest + 下载/校验/卸载逻辑 | 同左 |
+| Trait | `trait Asr` | `trait Llm` |
+| 进程模型 | 始终 in-process（cpal 音频帧不跨进程） | sidecar (llama-server) 或 in-process (llama-cpp-2) 或 HTTPS（云） |
+| 加载策略 | 启动即预热，常驻（小，~200 MB） | 懒加载，60–120 s idle 卸载（大，0.4–4 GB） |
+| 数据流 | 音频字节 → 文本 | 文本 → 文本 |
+| 升级影响面 | 仅替换 ASR provider，不动 LLM | 仅替换 LLM provider，不动 ASR |
+| 失败降级 | 降级到 Vosk-small 或固定语法（≥42 MB 即可） | 云端 → 本地 fallback；或反之 |
+
+实现层强约束：**`asr::*` 模块不允许 `import llm::*`，反之亦然**。两侧只通过纯文本（转写结果 / chat 输出）在 dispatcher 层汇合，由后者负责把转写文本喂给 LLM Provider。这样未来替换任一边都是机械替换，不牵动另一边。
 
 ---
 
 ## 二、模型档位（按需下载）
 
-| 档位 | LLM | ASR | 总下载量 | 适用 |
-|------|-----|-----|---------|------|
-| **cloud-only**（最轻） | — | ggml-tiny multi（已捆绑） | 0 增量 | 只用云 API |
-| **mini** ⭐ 默认 | Qwen2.5-Coder 1.5B + 0.5B FIM | + Whisper-base | ~1.6 GB | 主流笔电 CPU |
-| **standard** | Qwen2.5-Coder 3B + 0.5B FIM | + Whisper-small | ~2.9 GB | M 系 / 独显 |
-| **zh-pro** | Qwen2.5-Coder 3B + 0.5B FIM | + SenseVoice-Small | ~2.6 GB | 中文为主 |
+档位 = ASR 选择 × LLM 选择。**绝大多数用户的最佳起点是 cloud-only**：80 MB 即可完整使用语音 + AI，云端 Provider 提供文本智能。
 
-档位切换在 设置 → AI → 模型库 中提供"一键预设"，背后逐项调用模型库的下载/卸载。
+| 档位 | ASR | LLM（chat） | LLM（FIM） | 总下载 | 待机 RAM | 推理峰值 RAM | 适用 |
+|------|-----|-------------|------------|--------|---------|-------------|------|
+| **cloud-only** ⭐ 默认 | sherpa Zipformer 80 MB | 云端 | — | **~80 MB** | ~200 MB | ~250 MB | 全部用户初始体验；Tab 补全用云端 codestral 或不开启 |
+| **mini** | sherpa Zipformer 80 MB | 云端 | Qwen3-0.6B 400 MB | ~480 MB | ~600 MB | ~1.1 GB | 想离线 FIM 但仍用云 chat |
+| **standard** | SenseVoice-Small 234 MB | Qwen2.5-Coder 1.5B 1 GB | Qwen3-0.6B 400 MB | ~1.6 GB | ~700 MB | ~2.5 GB | M 系 / 16 GB 笔电 / 中文重度 |
+| **zh-pro** | SenseVoice-Small 234 MB | Qwen2.5-Coder 3B 2 GB | Qwen3-0.6B 400 MB | ~2.6 GB | ~700 MB | ~4.5 GB | 中文为主、追求离线质量 |
+| **air-gapped**（断网工作） | SenseVoice-Small 234 MB | Qwen2.5-Coder 3B 2 GB | Qwen3-0.6B 400 MB | ~2.6 GB | ~700 MB | ~4.5 GB | 同 zh-pro，但 Tauri allowlist 收紧、禁所有云 base_url |
+
+档位切换在 设置 → AI → 模型库 中提供"一键预设"，背后逐项调用模型库的下载/卸载（ASR 与 LLM 共用同一下载基础设施，但 manifest 分开）。
+
+资源管理策略：
+
+- **ASR 模型常驻**（启动即预热）：避免 PTT 释放时 200–400 ms 冷加载，且小模型 RAM 代价低（~200 MB）
+- **LLM 模型懒加载**：首次推理时加载，60–120 s idle 后卸载；用户切到云端 LLM 时完全不分配本地 LLM 内存
+- **运行时 RAM ≠ 下载体积**：Q4_K_M GGUF 加载后还要分配 KV cache（~1× 模型大小）+ 推理缓冲，故峰值 RAM 约为体积 1.5–2.5 倍
+- **CPU-only 现实**：Windows i5/Ryzen5 上跑 Qwen2.5-Coder 1.5B 意图解析 ~1–3 s，已逼近端到端 2 s 预算上限。这就是为什么默认推荐 cloud-only：80 MB ASR 本地保隐私 + 云端 LLM 保速度，是 90% 用户的最佳组合
 
 ---
 
@@ -234,19 +309,23 @@ pub async fn complete(req: ChatRequest, cfg: &AiConfig, task: TaskKind) -> Resul
 
 ```toml
 # v1.x 已规划 (来自 voice-input-plan.md)
-whisper-rs  = "0.12"
-ort         = { version = "2", features = ["load-dynamic"] }
+whisper-rs  = { version = "0.16", optional = true }   # 改为 feature flag，不再默认
 reqwest     = { version = "0.12", features = ["rustls-tls", "json", "stream"] }
 hound       = "3.5"
 byteorder   = "1.5"
 rubato      = "0.15"
 
-# —— v2.0 新增 ——
+# —— v2.0 新增：ASR ——
+sherpa-onnx = "1.13"   # 默认 ASR runtime，自带 onnxruntime 静态链接
+# vosk     = { version = "0.3", optional = true }   # 低端机/固定语法降级用，feature flag
+
+# —— v2.0 新增：LLM 通用 ——
 async-trait = "0.1"
 thiserror   = "1"          # AI 错误分层
 tracing     = "0.1"        # 结构化日志（已在主项目则复用）
 
-# —— v2.2 Tab 补全 ——
+# —— v2.2 Tab 补全（in-process FIM）——
+llama-cpp-2 = "0.1"        # 静态链接 llama.cpp，FIM 直接 in-process 调用
 reedline    = "0.38"
 
 # —— v2.3 Agent harness ——
@@ -258,12 +337,21 @@ which       = "6"          # 遍历 $PATH 可执行文件
 heck        = "0.5"        # 字符串命名风格转换
 sha2        = "0.10"       # 模型完整性校验
 
+[features]
+default       = ["asr-sherpa"]
+asr-sherpa    = []                                  # 默认启用
+asr-whisper   = ["dep:whisper-rs"]                  # 用户在设置里切到 Whisper 时启用
+asr-vosk      = ["dep:vosk"]
+local-llm-fim = ["dep:llama-cpp-2"]                 # v2.2 启用
+
 [profile.release]
 opt-level     = 3
 lto           = "thin"
 codegen-units = 1
 strip         = true
 ```
+
+> `whisper-rs` 与 `llama-cpp-2` 都依赖 ggml。若同时启用，build script 需通过 `WHISPER_USE_SYSTEM_GGML=1` / `LLAMA_USE_SYSTEM_GGML=1` 强制共享同一 ggml 实现，避免符号冲突 + 二进制膨胀（详见 §四 4.6）。
 
 ### 3.2 `src-tauri/tauri.conf.json`
 
@@ -272,16 +360,16 @@ strip         = true
   "tauri": {
     "bundle": {
       "externalBin": [
-        "binaries/ollama",
-        "binaries/whisper-cpp"
+        "binaries/llama-server"          // ~10 MB / 平台，CPU-only build
       ],
       "resources": [
-        "models/ggml-tiny-multi.bin"
+        // 不再捆绑任何模型；首次启动按档位下载
       ]
     },
     "allowlist": {
       "process": { "execute": true, "relaunch": true },
       "http":    { "request": true, "scope": [
+        // —— LLM Provider 端点 ——
         "https://api.deepseek.com/*",
         "https://api.siliconflow.cn/*",
         "https://api.groq.com/openai/*",
@@ -290,49 +378,123 @@ strip         = true
         "https://api.anthropic.com/*",
         "https://api.mistral.ai/*",
         "https://generativelanguage.googleapis.com/*",
+        // —— 模型仓库（ASR + LLM 共用）——
         "https://huggingface.co/*",
+        "https://hf-mirror.com/*",        // 国内镜像
         "https://modelscope.cn/*",
-        "https://ollama.com/*"
+        // —— Ollama（用户已装时探测）——
+        "http://127.0.0.1:11434/*"
       ]}
     }
   }
 }
 ```
 
-sidecar 二进制按 `{name}-{target-triple}` 命名后放入 `src-tauri/binaries/`，Tauri 打包时自动包含并签名。
+> "全本地模式"开关打开后，运行时动态把 `http.scope` 收紧到只允许 `127.0.0.1:*`（llama-server 自身）和 `localhost`，其余云端域名拒绝，从而实现真正的 air-gapped 操作。
+
+sidecar 二进制按 `{name}-{target-triple}` 命名后放入 `src-tauri/binaries/`，Tauri 打包时自动包含并签名。`llama-server` 从 [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) 选 CPU-only 包提取，CI 脚本中固定版本 + SHA-256 校验。
 
 ---
 
-## 四、Voice v2.0 —— 本地 LLM runtime + 统一 Provider 抽象
+## 四、Voice v2.0 —— ASR Trait + LLM Provider 抽象（双解耦）
 
-**目标**：把 `voice-input-plan.md` v1.1 的 `AiBackend`（Ollama/Claude/OpenAI 三个独立实现）重构为 OpenAI-compatible 统一 Provider，预置 5 家国内外免费/性价比厂商，支持任务级路由 + 超时回退。**这是 v2.x 一切其他工作的基础**。
+**目标**：把 `voice-input-plan.md` v1.1 的 `AiBackend`（Ollama/Claude/OpenAI 三个独立实现）一分为二：
+- **`trait Asr`**：本地强制，多 engine 实现（sherpa-onnx 默认 / whisper-rs 备用 / vosk 低端机）
+- **`trait Llm`**：本地或云端，OpenAI-compatible 统一 Provider，预置 5 家国内外免费/性价比厂商，支持任务级路由 + 超时回退
+
+**这是 v2.x 一切其他工作的基础**。
 
 ### 4.1 用户流程
-1. 首次启动 → 设置 → AI 看到默认配置：active = `local (ollama)`，但显示"Ollama 未运行 / 模型未下载"
-2. 点击"一键安装本地 AI"：下载 Ollama sidecar 模型 → 启动 → `ollama pull qwen2.5-coder:1.5b`（带进度条）
-3. 或者跳过本地，直接配置任一云端 Provider（粘贴 API Key）
-4. v1.x 已有的语音意图自动切到新 Provider，零额外配置
+1. 首次启动 → 设置 → AI 看到默认配置：
+   - **ASR**：sherpa Zipformer zh-en（**未下载**，提示一键下载 80 MB）
+   - **LLM**：DeepSeek（提示填 API Key 或选 GLM-4-Flash 完全免费）
+2. 点击"一键下载语音模型"：80 MB，进度条，~10s 完成
+3. 粘贴 DeepSeek API Key 或选 GLM 免费档 → 完成。**总下载 80 MB，立刻可用语音 + AI**
+4. 高级用户可在"模型库"切换档位（mini/standard/zh-pro/air-gapped），对应不同 ASR + LLM 组合
+5. v1.x 已有的语音意图自动用新 ASR + 新 LLM Provider，零额外配置
 
 ### 4.2 新增 / 重构文件
-- `src-tauri/src/ai/provider.rs` —— `trait Provider { async fn chat(req) -> Resp; async fn completion_fim(prefix, suffix) -> String; }`
-- `src-tauri/src/ai/openai_compat.rs` —— 通用 OpenAI 兼容实现，覆盖 90% 的 Provider
-- `src-tauri/src/ai/anthropic.rs` —— Claude 单独实现（Messages API 略不同）
-- `src-tauri/src/ai/ollama_sidecar.rs` —— sidecar 启动 / 健康检查 / 模型 pull
-- `src-tauri/src/ai/router.rs` —— 任务级路由 + 超时回退（见 §1.6 代码）
-- `src/components/settings/AiProvidersPanel.tsx` —— 三字段配置 UI + 默认 5 家 preset + "测试连接"
-- `src/components/settings/LocalAiInstaller.tsx` —— Ollama sidecar 状态卡（未安装/安装中/运行中/异常）
+
+**ASR 侧**（新模块 `src-tauri/src/asr/`，与 `voice/` 平级）：
+- `src-tauri/src/asr/mod.rs` —— `trait Asr { async fn transcribe(&self, pcm: &[f32]) -> Result<String>; fn warm(&self) -> bool; async fn unload(&self); }`
+- `src-tauri/src/asr/sherpa_onnx.rs` —— 默认实现，wraps `sherpa-onnx` crate
+- `src-tauri/src/asr/whisper_rs.rs` —— feature-gated 备用实现
+- `src-tauri/src/asr/vosk.rs` —— feature-gated 低端机实现
+- `src-tauri/src/asr/manager.rs` —— 启动预热、idle 卸载、模型库下载
+
+**LLM 侧**（新模块 `src-tauri/src/llm/`）：
+- `src-tauri/src/llm/mod.rs` —— `trait Llm { async fn chat(req) -> Resp; async fn completion_fim(prefix, suffix) -> String; }`
+- `src-tauri/src/llm/openai_compat.rs` —— 通用 OpenAI 兼容实现，覆盖 90% 的云端 Provider
+- `src-tauri/src/llm/anthropic.rs` —— Claude 单独实现（Messages API 略不同）
+- `src-tauri/src/llm/llama_server.rs` —— 启动 / 健康检查 / 模型 pull 的 sidecar wrapper
+- `src-tauri/src/llm/llama_cpp_in_proc.rs` —— v2.2 用，wraps `llama-cpp-2`，给 FIM 走 in-process
+- `src-tauri/src/llm/router.rs` —— 任务级路由 + 超时回退（见 §1.6 代码）
+
+**前端**：
+- `src/components/settings/AsrPanel.tsx` —— ASR engine + 模型选择 + 模型库下载状态
+- `src/components/settings/LlmProvidersPanel.tsx` —— 三字段 Provider 配置 UI + 默认 5 家 preset + "测试连接"
+- `src/components/settings/LocalLlmInstaller.tsx` —— llama-server sidecar 状态卡（未下载/下载中/运行中/异常）+ 模型库管理
+- `src/components/settings/PrivacyToggle.tsx` —— "全本地模式"一键开关，开启时把 `task_routing` 全部强制写为本地 + 收紧 Tauri http allowlist
 
 ### 4.3 修改既有文件
-- `src-tauri/src/ai/mod.rs`（v1.1 已建）→ 把原来的 `AiBackend` enum 替换为 `Box<dyn Provider>` + `Router`
-- `src-tauri/src/voice/intent_dispatcher.rs` → 通过 `router.complete(req, TaskKind::VoiceIntent)` 调用，不再直连具体 backend
-- `src-tauri/src/vault/mod.rs` → `kind=ai_api_key:*` 增加 `deepseek | glm | siliconflow | groq | cerebras | gemini | mistral | openrouter` 子类型
-- `src/stores/aiStore.ts`（新）→ providers 配置 + 路由 + 测试结果
+- `src-tauri/src/ai/mod.rs`（v1.1 已建）→ 拆分：原 `AiBackend` 中的 ASR 部分迁到 `asr::*`，LLM 部分迁到 `llm::*`；保留 `ai::*` 作为协调层（调度 ASR → LLM）
+- `src-tauri/src/voice/intent_dispatcher.rs` → 改为 `asr::transcribe()` → `llm::router.complete(req, TaskKind::VoiceIntent)`，不再直连具体 backend
+- `src-tauri/src/vault/mod.rs` → `kind=ai_api_key:*` 增加 `deepseek | glm | siliconflow | groq | cerebras | gemini | mistral | openrouter` 子类型；ASR 不入 vault
+- `src/stores/aiStore.ts`（新）→ ASR 配置 + LLM Provider 配置 + 路由 + 测试结果（两个 sub-store：asrStore、llmStore，避免日后耦合）
 
-### 4.4 风险 + 缓解
-- *Ollama sidecar 体积大（~150 MB）* → 不打进默认包；首次开启 AI 时按需下载（与模型一并走"一键安装"）
-- *国内访问 Ollama 模型仓库慢* → 镜像源（ModelScope）+ 用户自填 base_url
+### 4.4 ASR/LLM 解耦的代码强约束
+
+```rust
+// src-tauri/src/asr/mod.rs
+// ⚠️ 这个模块禁止 use crate::llm::* 或 use crate::providers::*
+// ASR 永远不应该知道 LLM 的存在，它只产出 String
+pub trait Asr: Send + Sync { /* ... */ }
+
+// src-tauri/src/llm/mod.rs
+// ⚠️ 这个模块禁止 use crate::asr::*
+// LLM 收到的永远是 String（来自 ASR、来自键盘、或来自 stub），不关心来源
+pub trait Llm: Send + Sync { /* ... */ }
+
+// src-tauri/src/voice/intent_dispatcher.rs
+// 唯一允许同时持有 asr 和 llm 引用的地方
+pub async fn dispatch(audio: AudioFrame, ctx: &AppCtx) -> Result<Intent> {
+    let text = ctx.asr.transcribe(&audio.pcm).await?;
+    let intent = ctx.llm_router.complete(text.into(), TaskKind::VoiceIntent).await?;
+    Ok(intent)
+}
+```
+
+CI 加 lint：`cargo deny` / `clippy` 自定义规则禁止 `asr::*` 与 `llm::*` 互相 use。
+
+### 4.5 资源生命周期
+
+| 阶段 | ASR | LLM |
+|------|-----|-----|
+| 应用启动 | 立即从磁盘加载到内存（warm_on_startup=true）| 不加载 |
+| 用户 PTT 按下 | 已 warm，直接接收音频帧 | 不加载 |
+| PTT 释放，转写完成 | 继续 warm | 此刻才加载（若是本地 LLM）|
+| 推理完成 | 继续 warm | 启动 60–120 s idle 计时器 |
+| idle 超时 | 不卸载（小） | 卸载，释放 RAM |
+| 用户切到云端 LLM | 不变 | 永不加载本地 LLM |
+
+实现：tokio task + `Arc<Mutex<Option<Box<dyn Llm>>>>`，idle 超时由后台 task 检查并 set None。
+
+### 4.6 ggml 共享构建
+
+`whisper-rs`（feature-gated）、`sherpa-onnx`（其 ggml backend，可选）、`llama-cpp-2` 三者都可能链接 ggml。如不处理会导致：
+- 二进制膨胀 ~15–25 MB（三份 ggml 副本）
+- 符号冲突（链接器报错或运行时未定义行为）
+- GPU context 互相争用（如启用 Metal/CUDA backend）
+
+解决：build.rs 中设置 `WHISPER_USE_SYSTEM_GGML=1`、`LLAMA_USE_SYSTEM_GGML=1`，并显式提供一份 system ggml（通过 `ggml-sys` 或自构建）。**v2.0 落地前需做 1 天 spike 验证**（见 §十二 验证 e）。
+
+### 4.7 风险 + 缓解
+- *llama-server 模型管理需自实现* → 与 ASR 模型库共用同一 manifest schema + 下载/校验/卸载基础设施，开发成本可摊销
+- *国内访问 HuggingFace 慢* → 默认 `hf-mirror.com` + ModelScope 双源 + 用户自填镜像
 - *Provider preset 价格 / 端点变化* → preset 与 manifest 同源（`ai-providers.manifest.json`），可远程更新
 - *某 Provider 返回 OpenAI 不兼容字段（如 `tool_choice`）* → 在 `openai_compat.rs` 里按 host 做小补丁
+- *ggml 多版本符号冲突* → 见 §4.6，必须前置 spike
+- *llama-server 子进程崩溃影响主程* → tokio watchdog + 自动重启 + 失败 3 次后降级到云端 + 状态栏报错
 
 ---
 
@@ -439,13 +601,16 @@ sidecar 二进制按 `{name}-{target-triple}` 命名后放入 `src-tauri/binarie
    │
    └── 暂停 120 ms 且无新键 → 异步触发
             ▼
-[第二层] Ollama /api/generate (Qwen2.5-Coder-0.5B FIM)
+[第二层] llama-cpp-2 in-process（Qwen3-0.6B FIM Q4_K_M）
    - prefix = 当前命令行 + 最近 5 条 history
    - suffix = 空（行尾）
    - max_tokens = 24, stop = ["\n"]
+   - 直接调用 llm::llama_cpp_in_proc，零 HTTP 往返
    →  灰色 ghost-text 铺在光标后
    →  → 接受单词，Tab 接受全部，Esc 拒绝
 ```
+
+**为什么 FIM 不走 llama-server sidecar？** Tab 补全延迟敏感（目标 <300 ms 端到端），sidecar HTTP 往返会增加 30–80 ms（loopback + JSON 编解码 + tokio 跨进程调度），加上 120 ms debounce 之后预算就紧了。in-process 直接 FFI 调用 llama.cpp，省去整个 HTTP 栈。
 
 ### 6.2 集成位置
 
@@ -456,28 +621,32 @@ sidecar 二进制按 `{name}-{target-triple}` 命名后放入 `src-tauri/binarie
 - 后续 v2.4+ 如果稳定，再讨论"原生终端行内 ghost-text"（这要解决 ANSI 注入 + cursor 同步两个硬问题）
 
 ### 6.3 新增文件
-- `src-tauri/src/tab/mod.rs` —— Tauri 命令 `tab_suggest_local`（reedline 硬补全）+ `tab_suggest_llm`（FIM）
+- `src-tauri/src/tab/mod.rs` —— Tauri 命令 `tab_suggest_local`（reedline 硬补全）+ `tab_suggest_llm`（FIM via llama-cpp-2）
 - `src-tauri/src/tab/reedline_engine.rs` —— 实现 `Completer` trait
 - `src-tauri/src/tab/path_scanner.rs` —— `which` 扫 PATH，启动时 + 10 s TTL
+- `src-tauri/src/tab/fim_engine.rs` —— wraps `llm::llama_cpp_in_proc`，专门 FIM 调用，复用 v2.0 的 ggml 共享 runtime
 - `src/components/terminal/CommandEditorOverlay.tsx` —— `Ctrl+K` 唤起的覆盖层；接管按键、显示候选 + ghost-text
 - `src/lib/tab/fimClient.ts` —— 调用 `tab_suggest_llm`，带 120 ms debounce + AbortController
 
 ### 6.4 修改既有文件
 - `src/components/terminal/TerminalView.tsx` → 监听 `Ctrl+K` 唤起覆盖层；覆盖层 commit 时把命令文本注入到 xterm 输入
-- `src/components/settings/AiProvidersPanel.tsx` → "Tab 补全"区块：硬补全开关、LLM ghost-text 开关、模型选择（默认 Qwen2.5-Coder-0.5B-Base）
+- `src/components/settings/LlmProvidersPanel.tsx` → "Tab 补全"区块：硬补全开关、LLM ghost-text 开关、模型选择（默认 Qwen3-0.6B）；FIM 路由固定 `local-fim`，不允许走云端（延迟原因）
 - `src-tauri/src/lib.rs` → 注册 `tab_*` 命令
 
 ### 6.5 性能预算
 - 第一层（reedline）：同步触发，候选生成 <1 ms（PATH 缓存命中）
-- 第二层（FIM LLM）：120 ms debounce + 50–150 ms 推理；总延迟 <300 ms
+- 第二层（FIM in-process llama-cpp-2 / Qwen3-0.6B Q4_K_M）：120 ms debounce + 50–150 ms 推理；总延迟 <300 ms
+- 对照：sidecar HTTP 路径需多 30–80 ms（这就是不走 llama-server 的原因）
 - ghost-text 在等待时 **不显示骨架**，结果到达再淡入；避免抖动
-- 新键入立即 abort 旧 FIM 请求（reqwest CancellationToken）
+- 新键入立即 abort 旧 FIM 请求（llama-cpp-2 cancellation token + tokio AbortHandle）
 
 ### 6.6 风险 + 缓解
-- *本地 0.5B 偶尔吐空字符串* → 空结果不显示，不打扰用户
+- *本地 0.6B 偶尔吐空字符串* → 空结果不显示，不打扰用户
 - *PATH 扫描在 WSL / Windows 路径分隔符上踩坑* → `which` crate 已处理；额外测试 fixture 覆盖
 - *用户 shell 自带补全（fish、zsh 的 zsh-autosuggestions）冲突* → 覆盖层方案不涉及 shell 内置补全，无冲突
 - *FIM 模型把"敏感"字符串补出来* → 输入历史按行做过滤，不把含 `password=` `token=` `Bearer ` 的行送给 FIM
+- *`llama-cpp-2` 构建依赖 clang* → CI 在三平台预装 clang/LLVM；提供 pre-built `.rlib` 缓存加速 CI；用户本地构建有 fallback 提示
+- *FIM 模型未下载时 Ctrl+K 仍可用* → 第一层硬补全独立工作，UI 标注"未启用 AI 补全"
 
 ---
 
@@ -535,14 +704,14 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 - `src/components/agent/QuickActions.tsx` —— "解释报错 / 改成脚本 / 找历史" 三个固定入口
 
 ### 7.4 修改既有文件
-- `src-tauri/src/ai/router.rs` → 增加 Agent 任务路径：`router.run_agent(req, TaskKind::AgentDefault)`
+- `src-tauri/src/llm/router.rs` → 增加 Agent 任务路径：`router.run_agent(req, TaskKind::AgentDefault)`
 - `src-tauri/src/voice/intent_dispatcher.rs` → 把 v1.1 的工具调用迁移到 rig-core Agent（保持向下兼容，工具 schema 不变）
 - `src/stores/voiceStore.ts` → `lastIntent` 类型扩展为 `ActionCard[]`（多步编排时的多张卡）
 
 ### 7.5 风险 + 缓解
 - *Agent 多步规划失控（无限调用工具）* → 单次会话最多 5 步工具调用；超出强制结束 + 错误提示
 - *Agent 读终端输出泄漏密码* → `read_terminal_tail` 默认对结果做 `password|token|secret|key=` 行级 redaction
-- *本地 1.5B 模型 tool calling 不稳* → Agent 路径默认路由到云端（`agent_default = "deepseek"` 推荐）；本地档位仅推单工具模式
+- *本地 1.5B 模型 tool calling 不稳* → Agent 路径默认路由到云端（`agent_default = "deepseek"`）；本地档位仅推单工具模式
 - *rig-core API 还在演进* → 锁版本 `0.9`；agent.rs 内做一层薄 wrapper，便于将来切换到其他 harness（smolagents、PydanticAI sidecar）
 
 ---
@@ -551,18 +720,19 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 
 | 周 | 阶段 | 交付 |
 |----|------|------|
-| W1 | **v2.0a** | Cargo + Tauri sidecar + Ollama 安装器 + Provider trait + OpenAI-compat 通用实现 |
-| W1–W2 | **v2.0b** | DeepSeek / GLM / SiliconFlow / Groq preset + 三字段 UI + 超时回退 + Vault key 类型扩展 |
-| W2 | **v2.0c** | v1.1 现有 `AiBackend` 重构到 Provider trait（行为不变，回归测试） |
+| W0 | **spike** | ggml 共享构建验证（whisper-rs + sherpa-onnx + llama-cpp-2 链接同一份 ggml 不冲突）；llama-server 三平台 sidecar 体积、签名、启动可行性确认 |
+| W1 | **v2.0a** | Cargo + Tauri sidecar（llama-server）+ ASR Trait + sherpa-onnx 默认实现 + LLM Trait + OpenAI-compat 通用实现 |
+| W1–W2 | **v2.0b** | DeepSeek / GLM / SiliconFlow / Groq preset + 双面板 UI（AsrPanel + LlmProvidersPanel）+ 超时回退（云→本地）+ Vault key 类型扩展 |
+| W2 | **v2.0c** | v1.1 现有 `AiBackend` 拆分到 `asr::*` + `llm::*`（行为不变，回归测试）+ 全本地模式开关（PrivacyToggle）+ ggml 共享构建落地 |
 | W3 | **v2.1a** | `generate_shell_command` 工具 + 命令预览卡 + 黑名单评估器（100% 单测） |
 | W3 | **v2.1b** | 风险等级闸门 + high 风险二次确认 + 会话级"禁用 AI 写动作"标记 + 审计日志扩展 |
 | W4 | **v2.2a** | reedline 硬补全 + Ctrl+K 覆盖层（无 LLM 也能用） |
-| W4 | **v2.2b** | Qwen2.5-Coder-0.5B FIM ghost-text + 120 ms debounce + 输入历史脱敏 |
+| W4 | **v2.2b** | Qwen3-0.6B FIM ghost-text via llama-cpp-2 in-process + 120 ms debounce + 输入历史脱敏 |
 | W5 | **v2.3a** | rig-core 装配 + 9 个工具实现 + safety 中间件 + 单步模式（替换 v1.1 实现） |
 | W5–W6 | **v2.3b** | 多步编排（opt-in）+ "解释报错" / "改成脚本" 快速动作 + ActionCard 通用化 |
 | W6 | **打磨** | zh-pro 档位（SenseVoice）+ 端到端 e2e（qa-ui-auto）+ 文档 |
 
-时间表前置假设：v1.0 / v1.1 / v1.2 已完成（按 `voice-input-plan.md` 推进）。如 v1.x 仍在进行，v2.0a/b 可与 v1.1 并行（Provider 抽象本身在 v1.1 就用得上）。
+时间表前置假设：v1.0 / v1.1 / v1.2 已完成（按 `voice-input-plan.md` 推进）。如 v1.x 仍在进行，v2.0a/b 可与 v1.1 并行（ASR/LLM Trait 抽象本身在 v1.1 就用得上）。
 
 ---
 
@@ -570,10 +740,10 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 
 | App 版本 | Voice 阶段 | AI 原生阶段 |
 |---------|-----------|-------------|
-| v0.3.x  | v1.0 / v1.1 | v2.0 Provider 抽象（提前到 v0.3.x，v1.1 直接用） |
-| v0.4.x  | v1.2 | v2.1 语音→Shell + v2.2 Tab 补全 |
+| v0.3.x  | v1.0 / v1.1 | v2.0 ASR + LLM Trait 抽象（提前到 v0.3.x，v1.1 直接用） |
+| v0.4.x  | v1.2 | v2.1 语音→Shell + v2.2 Tab 补全（in-process FIM）|
 | v0.5.x  | —    | v2.3 Agent harness + 多步编排 |
-| v1.0    | 收口审计 | 默认档位锁定（mini）+ Runbook 联动 |
+| v1.0    | 收口审计 | 默认档位锁定（**cloud-only** 80 MB 入门）+ Runbook 联动 |
 
 ---
 
@@ -587,6 +757,8 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 18. **替换 xterm.js 输入栈** —— Tab 补全只在覆盖层，不破坏原生终端
 19. **GPU 加速默认开启** —— v2 默认 CPU 推理；CUDA / Metal / Vulkan 需用户在设置里手动开
 20. **Plugin 市场 / 第三方 tool 插件** —— rig-core tool 列表硬编码在 Rust 侧，避免任意代码注入
+21. **ASR 走云端** —— 任何情况下都不允许；Web Speech API（Chrome/Safari 会上传音频到云）也不接入
+22. **ASR/LLM 互相 import** —— 编译期 lint 强制隔离；语音 dispatcher 是唯一汇合点
 
 ---
 
@@ -594,32 +766,46 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 
 | 文件 | 关联点 |
 |------|--------|
-| `src-tauri/src/ai/provider.rs`（新） | Provider trait + 任务路由 + 超时回退 |
-| `src-tauri/src/ai/openai_compat.rs`（新） | 覆盖 90% Provider 的统一实现 |
-| `src-tauri/src/ai/ollama_sidecar.rs`（新） | sidecar 启动 + 模型 pull |
+| `src-tauri/src/asr/mod.rs`（新） | `trait Asr` + 模型管理 + 启动预热 |
+| `src-tauri/src/asr/sherpa_onnx.rs`（新） | 默认 ASR engine（流式 Zipformer / SenseVoice） |
+| `src-tauri/src/asr/whisper_rs.rs`（新，feature） | 备用 ASR engine |
+| `src-tauri/src/asr/manager.rs`（新） | warm/unload + 模型库下载（与 LLM 共用 manifest） |
+| `src-tauri/src/llm/mod.rs`（新） | `trait Llm` + 任务路由 + 超时回退 |
+| `src-tauri/src/llm/openai_compat.rs`（新） | 覆盖 90% Provider 的统一实现 |
+| `src-tauri/src/llm/anthropic.rs`（新） | Claude Messages API 实现 |
+| `src-tauri/src/llm/llama_server.rs`（新） | llama-server sidecar wrapper |
+| `src-tauri/src/llm/llama_cpp_in_proc.rs`（新） | v2.2 in-process FIM via `llama-cpp-2` |
+| `src-tauri/src/llm/router.rs`（新） | 任务路由 + 超时回退（云→本地） |
 | `src-tauri/src/ai/tools_shell.rs`（新） | `generate_shell_command` schema |
 | `src-tauri/src/ai/shell_safety.rs`（新） | 黑名单 + 风险等级评估 |
 | `src-tauri/src/tab/mod.rs`（新） | reedline 硬补全 + FIM 端点 |
+| `src-tauri/src/tab/fim_engine.rs`（新） | 桥接 `llm::llama_cpp_in_proc` |
 | `src-tauri/src/agent/mod.rs`（新） | rig-core Agent 装配 |
 | `src-tauri/src/agent/tools/*.rs`（新） | 9 个工具的实现 |
-| `src-tauri/binaries/`（新目录） | `ollama-{target-triple}` 等 sidecar |
+| `src-tauri/binaries/`（新目录） | `llama-server-{target-triple}` sidecar（CPU-only ~10 MB） |
 | `src/components/voice/CommandPreviewCard.tsx`（新） | 语音→Shell 的预览/确认卡 |
 | `src/components/terminal/CommandEditorOverlay.tsx`（新） | Ctrl+K 覆盖层 |
 | `src/components/agent/ActionCard.tsx`（新） | Agent 通用动作卡 |
-| `src/components/settings/AiProvidersPanel.tsx`（新） | 三字段 Provider 配置 |
-| `src/components/settings/LocalAiInstaller.tsx`（新） | Ollama 一键安装 |
-| `src/stores/aiStore.ts`（新） | Provider 配置 + 路由 + 测试结果 |
+| `src/components/settings/AsrPanel.tsx`（新） | ASR engine + 模型选择 |
+| `src/components/settings/LlmProvidersPanel.tsx`（新） | 三字段 LLM Provider 配置 |
+| `src/components/settings/LocalLlmInstaller.tsx`（新） | llama-server 状态 + 模型库管理 |
+| `src/components/settings/PrivacyToggle.tsx`（新） | "全本地模式"一键开关 |
+| `src/stores/aiStore.ts`（新） | 拆为 asrStore + llmStore，避免耦合 |
 
 ---
 
 ## 十二、验证方式（v2 增量）
 
 ### v2.0
-- 默认配置下断网启动，Ollama 未安装 → AI 面板显示"未安装"，点击"一键安装"完成 sidecar + 模型下载，语音意图（v1.1 流程）从此走 local
-- 配置 DeepSeek + 粘贴 key + 点"测试连接" → 200 OK
-- 把 active 切到 DeepSeek 后断 Ollama → 语音意图仍工作；再断网 → 给出可执行错误
-- 把 fallback 设为 local→deepseek，本地推理延迟 >8 s（用 stress 模拟）→ 自动走云端
-- 跑 `cargo test -p newmob_ai provider_compat` —— 同一 prompt 对 5 家 Provider 输出 schema 一致
+- 默认配置下首启动：仅看到"下载语音模型 80 MB"提示 + LLM Provider 选择列表（DeepSeek / GLM / 其他）。下载 ASR + 填 GLM-4-Flash key（免费）→ 立即可用语音 + AI，**总下载 80 MB**
+- 切换 LLM 到 `local`（llama-server）：触发模型库下载 Qwen2.5-Coder 1.5B（1 GB）→ 启动 sidecar → 语音意图改走本地，行为一致
+- 配置 DeepSeek + 粘贴 key + 点"测试连接" → 200 OK；ASR 面板显示"sherpa-zipformer-zh-en 已就绪，常驻 ~200 MB RAM"
+- 把 active 切到 DeepSeek 后断 sidecar → 语音意图仍工作；再断网 → 给出可执行错误并提示开启全本地模式
+- 把 fallback 设为 deepseek→local，模拟 DeepSeek 8 s 超时 → 自动走本地 sidecar
+- "全本地模式"开关：开启后 Tauri http allowlist 收紧到仅 `127.0.0.1:*`，DeepSeek 调用网络层即被拒绝
+- 跑 `cargo test -p newmob_llm provider_compat` —— 同一 prompt 对 5 家 Provider 输出 schema 一致
+- **(e) ggml 共享构建 spike**：`cargo build --features asr-whisper,local-llm-fim --release`，验证产物中只有一份 ggml 符号表（`nm` / `dumpbin` 检查），二进制大小相对单 feature 增量 <2 MB
+- **解耦 lint**：`cargo clippy -- -W newmob::asr_llm_isolation` 检查 `asr/` 与 `llm/` 之间无 use 引用
 
 ### v2.1
 - 开启实验性开关，按住 PTT 说"列出当前目录所有大于 100 MB 的文件" → 命令预览卡显示 `find . -size +100M`，风险 low，1.5 s 后自动执行（注入到当前终端）
@@ -630,9 +816,9 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 
 ### v2.2
 - 断网，按 Ctrl+K 唤起覆盖层，输入 `gi` → 立刻显示 `git`、`gimp` 等候选（reedline 硬补全可用）
-- 接通 Ollama 模型，输入 `git che` 暂停 200 ms → 灰色 ghost-text 显示 `ckout main`，按 → 接受到第一个 token
+- 加载 Qwen3-0.6B FIM 模型，输入 `git che` 暂停 200 ms → 灰色 ghost-text 显示 `ckout main`，按 → 接受到第一个 token
 - 输入 `mysql -ppassword=` 历史中存在含敏感字段的行 → 验证该行没被送入 FIM 上下文（log 中 prefix 字段做断言）
-- 测延迟：从最后键入到 ghost-text 显示 P95 < 300 ms（本地 0.5B Q4_K_M）
+- 测延迟：从最后键入到 ghost-text 显示 P95 < 300 ms（本地 0.6B Q4_K_M，in-process）；对照 sidecar HTTP 路径 P95 应高出 30–80 ms
 
 ### v2.3
 - 终端运行报错命令（如 `git push origin main` 提示需要 force），状态栏出现 "AI 解释" → 点击 → action card "Agent 想读终端最后 50 行" → 允许 → 流式输出解释 + 建议修复命令按钮 → 点按钮触发 v2.1 命令预览卡
@@ -646,15 +832,23 @@ fn save_as_runbook(session_id: String, last_n_commands: u32, name: String) -> Re
 
 - 上游模型 / runtime
   - [Qwen2.5-Coder](https://github.com/QwenLM/Qwen2.5-Coder)（Apache-2.0）
-  - [SenseVoice](https://github.com/FunAudioLLM/SenseVoice)（Apache-2.0）
-  - [Ollama](https://ollama.com/) / [llama.cpp](https://github.com/ggml-org/llama.cpp)
+  - [Qwen3](https://github.com/QwenLM/Qwen3)（Apache-2.0）
+  - [SenseVoice](https://github.com/FunAudioLLM/SenseVoice)（部分权重 CC-NC，需在 manifest 标商用注意事项 — 注 a）
+  - [llama.cpp](https://github.com/ggml-org/llama.cpp)（CPU-only release ~8–15 MB / 平台）
   - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) / [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+  - [Ollama](https://ollama.com/)（仅作"用户已装时"接入，不再默认捆绑）
 - Rust 生态
   - [reedline](https://github.com/nushell/reedline)（Nushell 的核心编辑器，Fish 风格 ghost-text）
   - [rig](https://github.com/0xPlaygrounds/rig) / [swiftide](https://github.com/bosun-ai/swiftide)
-  - [whisper-rs](https://github.com/tazz4843/whisper-rs) / [ort](https://github.com/pykeio/ort)
+  - [sherpa-onnx](https://docs.rs/sherpa-onnx) v1.13+（官方 Rust API，Apache-2.0）
+  - [whisper-rs](https://github.com/tazz4843/whisper-rs)（Unlicense，备用 ASR）
+  - [llama-cpp-2](https://lib.rs/crates/llama-cpp-2)（in-process llama.cpp 绑定，FIM 用）
+- 参考实现
+  - [MumbleFlow](https://dev.to/auratech/i-built-a-local-voice-to-text-app-with-rust-tauri-20-whispercpp-and-llamacpp-heres-how-32h5)（Tauri 2 + whisper.cpp + llama.cpp，最贴近的工程参考）
 - Provider 参考
   - DeepSeek / SiliconFlow / GLM (Zhipu) / Groq / Cerebras / Mistral / Gemini —— 均提供 OpenAI 兼容端点
+
+注 a：SenseVoice-Small 的部分权重为 CC-BY-NC-4.0（非商用），如需商用请改用 Paraformer-zh-small（Apache-2.0）或 Whisper-small（MIT）。模型 manifest 中按权重标注许可，下载前 UI 提示。
 
 ---
 
