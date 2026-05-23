@@ -62,6 +62,10 @@ const fitMocks = vi.hoisted(() => ({
   fit: vi.fn(),
 }));
 
+const webglMocks = vi.hoisted(() => ({
+  ctor: vi.fn().mockImplementation(() => ({})),
+}));
+
 const ipcMocks = vi.hoisted(() => ({
   closeTerminal: vi.fn(async () => undefined),
   createLocalTerminal: vi.fn(async (sessionId: string) => ({ sessionId, shellId: "default" })),
@@ -112,7 +116,7 @@ vi.mock("@xterm/addon-web-links", () => ({
 }));
 
 vi.mock("@xterm/addon-webgl", () => ({
-  WebglAddon: vi.fn().mockImplementation(() => ({})),
+  WebglAddon: webglMocks.ctor,
 }));
 
 vi.mock("../../lib/ipc", () => ipcMocks);
@@ -149,6 +153,7 @@ describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
+    webglMocks.ctor.mockClear();
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       return window.setTimeout(() => callback(performance.now()), 0);
@@ -170,6 +175,29 @@ describe("TerminalPanel focus behavior", () => {
     await waitFor(() => {
       expect(terminalMocks.focus).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("does not load the WebGL renderer inside the macOS Tauri webview", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+
+    try {
+      render(<TerminalPanel visible />);
+
+      await waitFor(() => {
+        expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+      });
+      expect(webglMocks.ctor).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
   });
 
   it("focuses the terminal when a hidden tab becomes active", async () => {
