@@ -63,6 +63,8 @@ import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 import type { LocalShellSelection } from "../types";
+import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { useChatStore } from "../stores/chatStore";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 
@@ -132,6 +134,8 @@ export function MainLayout() {
   const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
+  const toggleChatDrawer = useChatStore((s) => s.toggleDrawer);
+  const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
 
   // Run `action` only after the vault is known to be unlocked. If it's
   // already unlocked we run inline; otherwise we surface the unlock
@@ -301,11 +305,16 @@ export function MainLayout() {
         event.preventDefault();
         toggleCompactMode();
       }
+      // Ctrl+L: toggle AI Chat Drawer
+      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "l") {
+        event.preventDefault();
+        toggleChatDrawer();
+      }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCompactMode]);
+  }, [toggleCompactMode, toggleChatDrawer]);
 
   const confirmExitWithOpenTabs = useCallback(() => {
     const currentTabs = tabsRef.current;
@@ -999,8 +1008,7 @@ export function MainLayout() {
 
           <Panel>
             <div className="h-full flex flex-col min-w-0">
-              {!compactMode && <TabBar />}
-              {multiExecActive && (
+              {!compactMode && <TabBar />}              {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}
@@ -1358,6 +1366,7 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
+        {chatDrawerOpen && <ChatDrawer />}
       </div>
 
       {!compactMode && <StatusBar />}

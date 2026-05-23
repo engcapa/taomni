@@ -15,6 +15,7 @@ mod asr;
 mod llm;
 mod tab;
 mod agent;
+mod chat;
 
 use state::AppState;
 use std::sync::Arc;
@@ -167,6 +168,11 @@ pub fn run() {
             agent::commands::agent_plan_tool,
             agent::commands::agent_execute_tool,
             agent::commands::agent_run,
+            chat::chat_new_thread,
+            chat::chat_list_threads,
+            chat::chat_list_messages,
+            chat::chat_delete_thread,
+            chat::chat_send,
             exit_app,
         ])
         .run(tauri::generate_context!())

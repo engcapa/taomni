@@ -1,4 +1,5 @@
 import {
+  Bot,
   Monitor,
   Wifi,
   KeyRound,
@@ -10,6 +11,8 @@ import { useEffect, useState } from "react";
 import { appThemeModeLabel, useAppTheme } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useChatStore } from "../../stores/chatStore";
+import { useAiStore } from "../../stores/aiStore";
 
 export function StatusBar() {
   const { tabs, activeTabId, xServerEnabled, statusMessage } = useAppStore();
@@ -18,6 +21,10 @@ export function StatusBar() {
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const selected = sessions.find((session) => session.id === selectedSessionId);
+  const toggleDrawer = useChatStore((s) => s.toggleDrawer);
+  const drawerOpen = useChatStore((s) => s.drawerOpen);
+  const aiConfig = useAiStore((s) => s.config);
+  const activeProvider = aiConfig?.llm.active ?? "—";
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -44,6 +51,17 @@ export function StatusBar() {
       <span className="flex items-center gap-1">
         <KeyRound className="w-3 h-3 text-slate-500" /> auth: password/key prompt
       </span>
+      <span className="moba-divider-v h-3" />
+      <button
+        type="button"
+        className={`flex items-center gap-1 text-[11px] hover:text-[var(--moba-accent)] transition-colors ${drawerOpen ? "text-[var(--moba-accent)]" : ""}`}
+        onClick={toggleDrawer}
+        title="AI Chat Drawer (Ctrl+L)"
+      >
+        <Bot className="w-3 h-3" />
+        <span className={`w-1.5 h-1.5 rounded-full ${aiConfig ? "bg-green-400" : "bg-gray-400"}`} />
+        LLM: {activeProvider}
+      </button>
       <div className="flex-1" />
       <span className="truncate max-w-[260px]">{statusMessage}</span>
       <span className="moba-divider-v h-3" />

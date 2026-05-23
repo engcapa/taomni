@@ -55,7 +55,12 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
 
         CREATE INDEX IF NOT EXISTS idx_voice_audit_time
             ON voice_audit(created_at DESC);",
-    )
+    )?;
+
+    // Chat tables (v2.4).
+    crate::chat::store::init_chat_tables(conn)?;
+
+    Ok(())
 }
 
 pub fn list_sessions(conn: &Connection, group: Option<&str>) -> SqlResult<Vec<SessionConfig>> {
