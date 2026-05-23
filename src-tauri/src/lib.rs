@@ -13,6 +13,7 @@ mod vault;
 mod ai;
 mod asr;
 mod llm;
+mod tab;
 
 use state::AppState;
 use std::sync::Arc;
@@ -160,6 +161,7 @@ pub fn run() {
             ai::commands::test_llm_connection,
             ai::commands::generate_shell_command,
             ai::commands::update_shell_audit_outcome,
+            tab::tab_suggest_path,
             exit_app,
         ])
         .run(tauri::generate_context!())

@@ -92,6 +92,8 @@ import {
 } from "../../lib/zmodem";
 import { ZmodemConflictDialog } from "./ZmodemConflictDialog";
 import { CommonCommandsPalette } from "./CommonCommandsPalette";
+import { AiRewriteOverlay } from "./AiRewriteOverlay";
+import { useSuggestionSource } from "../../lib/terminal/aiSuggestionSource";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -246,6 +248,9 @@ export function TerminalPanel({
   const [multilinePasteConfirm, setMultilinePasteConfirm] = useState(initialProfile.multilinePasteConfirm);
   const [inlineSuggestionsEnabled, setInlineSuggestionsEnabled] = useState(initialProfile.inlineSuggestions);
   const [inlineSuggestionsMax, setInlineSuggestionsMax] = useState(initialProfile.inlineSuggestionsMax);
+  const [inlineSuggestionsSource, setInlineSuggestionsSource] = useState(initialProfile.inlineSuggestionsSource);
+  const [aiCommandRewriteEnabled, setAiCommandRewriteEnabled] = useState(initialProfile.aiCommandRewriteEnabled);
+  const [aiRewriteOpen, setAiRewriteOpen] = useState(false);
   const [commonCommands, setCommonCommands] = useState<UserCommonCommand[]>(initialProfile.commonCommands);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -347,10 +352,18 @@ export function TerminalPanel({
   // captures the empty prewarm cache and never sees later state changes.
   const historyRef = useRef(history);
   const suggestionsActiveRef = useRef(suggestionsActive);
+  const inlineSuggestionsSourceRef = useRef(inlineSuggestionsSource);
   useEffect(() => {
     historyRef.current = history;
     suggestionsActiveRef.current = suggestionsActive;
-  }, [history, suggestionsActive]);
+    inlineSuggestionsSourceRef.current = inlineSuggestionsSource;
+  }, [history, suggestionsActive, inlineSuggestionsSource]);
+
+  // AI suggestion source resolver (data sources 2 + 3).
+  const resolveSuggestion = useSuggestionSource({
+    source: inlineSuggestionsSource,
+    isLocal,
+  });
 
   // State shared between onData tracking and the ghost renderer.
   const pendingRef = useRef("");
@@ -371,10 +384,30 @@ export function TerminalPanel({
     }
     const prefix = pendingRef.current;
     const matches = historyRef.current.match(prefix, 1);
-    const next = matches[0] && matches[0].length > prefix.length ? matches[0] : null;
-    suggestionRef.current = next;
-    bumpGhost();
-  }, [bumpGhost]);
+    const historyMatch = matches[0] && matches[0].length > prefix.length ? matches[0] : null;
+
+    if (historyMatch !== null) {
+      // Source 1 hit — use immediately.
+      suggestionRef.current = historyMatch;
+      bumpGhost();
+      return;
+    }
+
+    // Source 1 miss — try sources 2/3 asynchronously.
+    const source = inlineSuggestionsSourceRef.current;
+    if (source === "history+path" || source === "history+path+ai") {
+      void resolveSuggestion(prefix, null, (result) => {
+        // Only apply if the prefix hasn't changed since we started.
+        if (pendingRef.current === prefix && !invalidatedRef.current) {
+          suggestionRef.current = result;
+          bumpGhost();
+        }
+      });
+    } else {
+      suggestionRef.current = null;
+      bumpGhost();
+    }
+  }, [bumpGhost, resolveSuggestion]);
 
   const invalidatePending = useCallback(() => {
     if (invalidatedRef.current && suggestionRef.current === null) return;
@@ -925,6 +958,18 @@ export function TerminalPanel({
       setPaletteOpen(true);
       return false;
     }
+    // Ctrl+K: AI command rewrite overlay (v2.2)
+    if (
+      aiCommandRewriteEnabled && !isLocalPowerShell &&
+      event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey &&
+      event.key.toLowerCase() === "k"
+    ) {
+      if (readOnlyRef.current) return false;
+      if (termRef.current?.buffer.active.type === "alternate") return false;
+      event.preventDefault();
+      setAiRewriteOpen(true);
+      return false;
+    }
     // Cross-platform copy/paste shortcuts
     if (isMac) {
       if (event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "c") {
@@ -1252,6 +1297,8 @@ export function TerminalPanel({
     setMultilinePasteConfirm(terminalProfile.multilinePasteConfirm);
     setInlineSuggestionsEnabled(terminalProfile.inlineSuggestions);
     setInlineSuggestionsMax(terminalProfile.inlineSuggestionsMax);
+    setInlineSuggestionsSource(terminalProfile.inlineSuggestionsSource);
+    setAiCommandRewriteEnabled(terminalProfile.aiCommandRewriteEnabled);
     setCommonCommands(terminalProfile.commonCommands);
   }, [terminalProfile, theme]);
 
@@ -2084,6 +2131,27 @@ export function TerminalPanel({
           }}
           onClose={() => {
             setPaletteOpen(false);
+            focusTerminal();
+          }}
+        />
+      )}
+
+      {aiRewriteOpen && !isLocalPowerShell && (
+        <AiRewriteOverlay
+          currentCommand={pendingRef.current}
+          onAccept={(newCmd) => {
+            setAiRewriteOpen(false);
+            // Clear the current pending input and inject the rewritten command.
+            // Send backspaces to clear the line, then inject the new command.
+            const clearLine = "\x15"; // Ctrl+U clears the line in most shells
+            sendTerminalInput(clearLine + newCmd);
+            pendingRef.current = newCmd;
+            invalidatedRef.current = false;
+            refreshSuggestion();
+            focusTerminal();
+          }}
+          onDismiss={() => {
+            setAiRewriteOpen(false);
             focusTerminal();
           }}
         />

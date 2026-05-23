@@ -483,6 +483,52 @@ export function TerminalAppearanceSettings({
       </section>
 
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+        <div className="text-[12px] font-semibold mb-2">AI input assistance</div>
+        <div className="space-y-3">
+          <div>
+            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">Suggestion source</div>
+            <div className="flex flex-col gap-1.5">
+              {(
+                [
+                  { value: "history",          label: "History only",              desc: "Fast prefix match from command history (default)" },
+                  { value: "history+path",     label: "History + PATH / files",    desc: "Also suggests executables from $PATH and current directory files" },
+                  { value: "history+path+ai",  label: "History + PATH + AI (FIM)", desc: "Adds AI fill-in-the-middle completions — requires downloading the FIM model (~400 MB)" },
+                ] as const
+              ).map(({ value, label, desc }) => (
+                <label key={value} className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="inlineSuggestionsSource"
+                    value={value}
+                    checked={profile.inlineSuggestionsSource === value}
+                    disabled={!profile.inlineSuggestions}
+                    onChange={() => updateProfile({ inlineSuggestionsSource: value })}
+                    className="mt-0.5 accent-[var(--moba-accent)]"
+                  />
+                  <div>
+                    <div className="text-[12px]">{label}</div>
+                    <div className="text-[11px] text-[var(--moba-text-muted)]">{desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-[var(--moba-divider)]">
+            <CheckControl
+              label="Enable AI command rewrite (Ctrl+K)"
+              checked={profile.aiCommandRewriteEnabled}
+              onChange={(checked) => updateProfile({ aiCommandRewriteEnabled: checked })}
+            />
+            <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
+              Press Ctrl+K to open an AI rewrite overlay for the current command line.
+              Ignored for local PowerShell.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">Common commands (Ctrl+Shift+P)</div>
         <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug mb-2">
           Local terminals only. Press Ctrl+Shift+P to open a searchable command list; the selected command is inserted into the current input line (without Enter). These entries are merged with command history and preset commands.
