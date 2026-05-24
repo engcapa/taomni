@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useEffect, useRef, useState, type CSSProperties } from "react";
+import { forwardRef, useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
 export interface MenuItem {
@@ -102,6 +102,29 @@ const MenuSurface = forwardRef<HTMLDivElement, {
 
 MenuSurface.displayName = "MenuSurface";
 
+function SubMenuContainer({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [openLeft, setOpenLeft] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 6) {
+      setOpenLeft(true);
+    }
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`absolute ${openLeft ? "right-full pr-1" : "left-full pl-1"} top-[-4px] z-10`}
+    >
+      {children}
+    </div>
+  );
+}
+
 function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -141,13 +164,13 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
           {content}
         </button>
         {!item.disabled && isVisible && (
-          <div className="absolute left-full top-[-4px] pl-1 z-10 block">
+          <SubMenuContainer>
             {item.customPanel ? (
               item.customPanel
             ) : (
               <MenuSurface items={item.children ?? []} onClose={onClose} />
             )}
-          </div>
+          </SubMenuContainer>
         )}
       </div>
     );
