@@ -3234,6 +3234,7 @@ dependencies = [
  "uuid",
  "which",
  "winapi",
+ "winreg 0.55.0",
  "x509-cert",
  "zeroize",
 ]

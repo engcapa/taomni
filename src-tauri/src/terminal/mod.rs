@@ -64,13 +64,14 @@ pub async fn create_local_terminal(
     cols: u16,
     rows: u16,
     shell: Option<String>,
+    shell_args: Option<Vec<String>>,
     cwd: Option<String>,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<LocalTerminalCreated, String> {
     validate_session_id(&session_id)?;
-    let (handle, reader, shell_id) = pty::create_pty(cols, rows, shell, cwd)?;
+    let (handle, reader, shell_id) = pty::create_pty(cols, rows, shell, shell_args, cwd)?;
 
     let terminal = ActiveTerminal::Local {
         writer: Mutex::new(handle.writer),
