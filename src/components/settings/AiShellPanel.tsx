@@ -37,14 +37,14 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
     }
   };
 
-  const handleExecute = async (command: string, auditId: number) => {
+  const handleExecute = async (command: string, auditId: number, edited: boolean) => {
     // In v2.1 we inject into the active terminal via write_terminal.
     // The active tab ID is the terminal session ID.
     if (activeTabId) {
       const withNewline = command.endsWith("\n") ? command : command + "\n";
       const encoded = btoa(unescape(encodeURIComponent(withNewline)));
       await invoke("write_terminal", { id: activeTabId, data: encoded });
-      await updateAuditOutcome(auditId, "executed");
+      await updateAuditOutcome(auditId, edited ? "edited" : "executed");
     }
     setPreview(null);
     setDescription("");

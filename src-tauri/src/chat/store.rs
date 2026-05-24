@@ -146,3 +146,22 @@ pub fn update_thread_title(conn: &Connection, id: &str, title: &str) -> SqlResul
     )?;
     Ok(())
 }
+
+pub fn update_thread_provider(conn: &Connection, id: &str, provider_id: &str) -> SqlResult<()> {
+    conn.execute(
+        "UPDATE ai_chat_threads SET provider_id = ?1 WHERE id = ?2",
+        params![provider_id, id],
+    )?;
+    Ok(())
+}
+
+/// Delete every thread whose `updated_at` is older than `cutoff_ts` (Unix
+/// seconds). Returns the number of threads deleted; messages are removed via
+/// the FK cascade. Used by the retention sweeper.
+pub fn delete_threads_older_than(conn: &Connection, cutoff_ts: i64) -> SqlResult<usize> {
+    let count = conn.execute(
+        "DELETE FROM ai_chat_threads WHERE updated_at < ?1",
+        params![cutoff_ts],
+    )?;
+    Ok(count)
+}

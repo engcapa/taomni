@@ -1,0 +1,41 @@
+id: TC-AI-001
+title: AI Chat Drawer opens, lists threads, and shows provider switcher
+description: |
+  Verifies the v2.4 AI Chat Drawer surface: Ctrl+L toggles it, the title bar
+  PTT button is mounted, history pane lists existing threads (or empty
+  state), provider badge dropdown is populated when AI providers are
+  configured, and the @reference syntax preview chip appears for
+  `@terminal:last-50`. Does not exercise streaming or send (those need a
+  real LLM key); the assertion target is UI plumbing only.
+covers: [F-AI-2.4]
+tags: [ai, drawer, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  # PTT button mounted in title bar
+  - assert_visible: '[data-testid="ptt-button"]'
+  # Open drawer via Ctrl+L
+  - press_key: 'Control+l'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  - assert_visible: '[data-testid="ai-chat-drawer"]'
+  # Drawer header shows New / History / Close buttons
+  - assert_visible: 'button[title="新对话"]'
+  - assert_visible: 'button[title="历史对话"]'
+  - assert_visible: 'button[title^="关闭"]'
+  # Composer placeholder advertises @reference syntax
+  - assert_text:
+      selector: '[data-testid="ai-chat-drawer"] textarea'
+      contains: '@terminal:last-50'
+  # Type a message with an attachment ref → chip should appear
+  - type:
+      selector: '[data-testid="ai-chat-drawer"] textarea'
+      text: 'show me what failed @terminal:last-30'
+  - wait_for: '[data-testid="attachment-chip"]'
+  - assert_visible: '[data-testid="attachment-chip"]'
+  - screenshot: ai-001-drawer.png
+  # Closing via Ctrl+L should hide drawer
+  - press_key: 'Control+l'
+  - assert_hidden: '[data-testid="ai-chat-drawer"]'

@@ -675,3 +675,24 @@ html[data-app-theme="dark"] .hover\:bg-white\/20:hover,
 html[data-app-theme="dark"] .hover\:bg-white\/70:hover {
   background-color: var(--moba-control-hover) !important;
 }
+
+
+/* AI z-index hierarchy (ai-native-plan §10.1)
+ *   100: MainLayout main area (terminal / SFTP / VNC)
+ *   200: AI Chat Drawer (right side)
+ *   300: Ctrl+K AiRewriteOverlay (small input + diff)
+ *   400: ActionCard / CommandPreview / WebSearch confirm (modal-like)
+ *   500: PrivacyToggle "全本地模式" confirm
+ *   900: Toast / errors
+ *
+ * Rule of thumb: at most one z=400 card visible at a time; multiple cards
+ * queue in FIFO order. Components opt in by adding the matching `.ai-z-*`
+ * class — the explicit values keep stacking contexts predictable and let
+ * automated tests (qa-ui-auto) assert the layering.
+ */
+.ai-z-main    { z-index: 100; }
+.ai-z-drawer  { z-index: 200; }
+.ai-z-overlay { z-index: 300; }
+.ai-z-card    { z-index: 400; }
+.ai-z-privacy { z-index: 500; }
+.ai-z-toast   { z-index: 900; }

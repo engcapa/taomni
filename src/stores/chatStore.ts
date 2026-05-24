@@ -44,6 +44,7 @@ interface ChatStore {
   loadThreads: () => Promise<void>;
   newThread: (providerId?: string, linkedSessionId?: string) => Promise<ChatThread>;
   deleteThread: (threadId: string) => Promise<void>;
+  setThreadProvider: (threadId: string, providerId: string) => Promise<void>;
   setActiveThread: (threadId: string | null) => void;
   loadMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
@@ -54,6 +55,10 @@ interface ChatStore {
   /// Open the drawer, create a fresh thread, and auto-send "请解释这段输出".
   /// Used by the Selection toolbar's "Explain" action.
   explainSelection: (text: string) => Promise<void>;
+  /// Sweep threads older than `keepDays`. Returns the number deleted.
+  purgeOldThreads: (keepDays: number) => Promise<number>;
+  /// Export every thread + message to `outPath` as JSON.
+  exportArchive: (outPath: string) => Promise<number>;
   toggleDrawer: () => void;
   setDrawerOpen: (open: boolean) => void;
   setDrawerWidth: (w: number) => void;
@@ -93,6 +98,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       threads: s.threads.filter((t) => t.id !== threadId),
       activeThreadId: s.activeThreadId === threadId ? null : s.activeThreadId,
       messages: Object.fromEntries(Object.entries(s.messages).filter(([k]) => k !== threadId)),
+    }));
+  },
+
+  setThreadProvider: async (threadId: string, providerId: string) => {
+    await invoke("chat_set_thread_provider", { threadId, providerId });
+    set((s) => ({
+      threads: s.threads.map((t) =>
+        t.id === threadId ? { ...t, provider_id: providerId } : t
+      ),
     }));
   },
 
@@ -210,7 +224,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
   setDrawerOpen: (open) => set({ drawerOpen: open }),
-  setDrawerWidth: (w) => set({ drawerWidth: Math.max(280, Math.min(600, w)) }),
+  setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
 
   attachToComposer: async (text: string) => {
     // Ensure drawer is open and a thread exists.
@@ -240,5 +254,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ drawerOpen: true });
     // Fire-and-forget — sendMessage owns its own loading state.
     void get().sendMessage(thread.id, `请解释下面这段终端输出：\n\n\`\`\`\n${text}\n\`\`\``);
+  },
+
+  purgeOldThreads: async (keepDays: number) => {
+    try {
+      const deleted = await invoke<number>("chat_purge_old", { keepDays });
+      if (deleted > 0) {
+        await get().loadThreads();
+      }
+      return deleted;
+    } catch (e) {
+      console.error("chat_purge_old failed:", e);
+      return 0;
+    }
+  },
+
+  exportArchive: async (outPath: string) => {
+    return await invoke<number>("chat_export_archive", { outPath });
   },
 }));

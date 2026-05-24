@@ -35,6 +35,10 @@ export interface TerminalProfile {
   inlineSuggestionsSource: InlineSuggestionsSource;
   aiCommandRewriteEnabled: boolean;
   aiCommandRewriteShortcut: string;
+  /// Experimental: render `?? <q>` inline in the terminal (ANSI-styled) when
+  /// true, instead of routing the question to the AI Chat Drawer. Off by
+  /// default — see plan §8.4 for the safety considerations.
+  aiInlineQqRender: boolean;
   commonCommands: UserCommonCommand[];
   commonCommandsShortcut: string;
 }
@@ -61,6 +65,7 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   inlineSuggestionsSource: "history",
   aiCommandRewriteEnabled: false,
   aiCommandRewriteShortcut: "Ctrl+K",
+  aiInlineQqRender: false,
   commonCommands: [],
   commonCommandsShortcut: "Ctrl+Shift+P",
 };
@@ -156,6 +161,7 @@ export function normalizeTerminalProfile(input: unknown): TerminalProfile {
     ),
     aiCommandRewriteEnabled: readBoolean(source.aiCommandRewriteEnabled, DEFAULT_TERMINAL_PROFILE.aiCommandRewriteEnabled),
     aiCommandRewriteShortcut: readString(source.aiCommandRewriteShortcut, DEFAULT_TERMINAL_PROFILE.aiCommandRewriteShortcut),
+    aiInlineQqRender: readBoolean(source.aiInlineQqRender, DEFAULT_TERMINAL_PROFILE.aiInlineQqRender),
     commonCommands: readCommonCommands(source.commonCommands),
     commonCommandsShortcut: readString(
       source.commonCommandsShortcut,

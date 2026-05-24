@@ -1,6 +1,7 @@
 import { Monitor, Moon, Sun, PanelTopClose, PanelTopOpen } from "lucide-react";
 import { appThemeModeLabel, useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
+import { PttButton } from "./PttButton";
 
 const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
   { mode: "light", icon: <Sun className="w-[16px] h-[16px]" /> },
@@ -19,6 +20,7 @@ export function TitleBarTrayControls() {
 
   return (
     <div className="moba-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
+      <PttButton />
       <TrayButton
         testId="theme-cycle"
         title={`Theme: ${appThemeModeLabel(mode)} (${resolvedTheme}). Click for ${appThemeModeLabel(next.mode)}.`}

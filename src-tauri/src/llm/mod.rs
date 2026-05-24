@@ -1,6 +1,7 @@
 // ⚠️ This module must NOT use crate::asr::*
 // LLM receives plain text; it does not know about audio or ASR.
 
+pub mod anthropic;
 pub mod gpu_detect;
 pub mod llama_server;
 pub mod openai_compat;

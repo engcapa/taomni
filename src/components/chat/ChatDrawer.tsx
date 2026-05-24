@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, History, Plus, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
+import { useAiStore } from "../../stores/aiStore";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { ChatThreadList } from "./ChatThreadList";
@@ -14,7 +15,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const {
     threads, activeThreadId, messages, sending, drawerOpen, drawerWidth,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
-    sendMessage, toggleDrawer, setDrawerWidth,
+    sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -26,10 +27,44 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
   const activeThread = threads.find((t) => t.id === activeThreadId);
 
-  // Load threads on mount.
+  // Provider switcher dropdown — pulls the live provider list from aiStore.
+  const aiProviders = useAiStore((s) => s.config?.llm.providers);
+  const loadAiConfig = useAiStore((s) => s.loadConfig);
+  const providerIds = Object.keys(aiProviders ?? {});
+  const setThreadProvider = useChatStore((s) => s.setThreadProvider);
+
+  // Load threads on mount + sweep stale (30-day retention).
   useEffect(() => {
     loadThreads();
+    void purgeOldThreads(30);
+    void loadAiConfig().catch(() => undefined);
   }, []);
+
+  // Responsive behaviour (ai-native-plan §10.3):
+  //   ≥1280px → expanded (default 380px)
+  //   960–1280px → collapse to 50px floating handle
+  //   <960px → close + hint
+  const setDrawerOpen = useChatStore((s) => s.setDrawerOpen);
+  useEffect(() => {
+    const handle = () => {
+      const w = window.innerWidth;
+      if (w < 960) {
+        setDrawerOpen(false);
+      } else if (w < 1280) {
+        // Collapse: keep open but shrink to handle width.
+        setDrawerWidth(50);
+      } else if (drawerWidth < 280) {
+        // User just resized larger — restore a sensible default.
+        setDrawerWidth(380);
+      }
+    };
+    window.addEventListener("resize", handle);
+    handle();
+    return () => window.removeEventListener("resize", handle);
+    // We intentionally exclude drawerWidth from deps so the resize callback
+    // only restores defaults on viewport changes, not on user drags.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setDrawerWidth, setDrawerOpen]);
 
   // Load messages when active thread changes.
   useEffect(() => {
@@ -48,12 +83,16 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     await newThread();
   };
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachedTerminalCtx?: string) => {
+    // Composer can override the prop's `terminalContext` when the user
+    // types `@terminal:last-N`. The override takes precedence; otherwise we
+    // fall back to whatever the host (TerminalPanel) staged.
+    const ctx = attachedTerminalCtx ?? terminalContext;
     if (!activeThreadId) {
       const thread = await newThread();
       setError(null);
       try {
-        await sendMessage(thread.id, content, terminalContext);
+        await sendMessage(thread.id, content, ctx);
       } catch (e) {
         setError(String(e));
       }
@@ -61,7 +100,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     }
     setError(null);
     try {
-      await sendMessage(activeThreadId, content, terminalContext);
+      await sendMessage(activeThreadId, content, ctx);
     } catch (e) {
       setError(String(e));
     }
@@ -89,8 +128,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   return (
     <div
-      className="flex h-full shrink-0 relative"
+      className="flex h-full shrink-0 relative ai-z-drawer"
       style={{ width: drawerWidth }}
+      data-testid="ai-chat-drawer"
     >
       {/* Resize handle */}
       <div
@@ -150,10 +190,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </div>
         )}
 
-        {/* Provider badge */}
+        {/* Provider badge / switcher */}
         {activeThread && (
-          <div className="px-2 py-1 text-[10px] text-[var(--moba-text-muted)] border-b border-[var(--moba-divider)] shrink-0">
-            Provider: <span className="text-[var(--moba-accent)]">{activeThread.provider_id}</span>
+          <div className="px-2 py-1 text-[10px] text-[var(--moba-text-muted)] border-b border-[var(--moba-divider)] shrink-0 flex items-center gap-1.5">
+            <span>Provider:</span>
+            {providerIds.length > 0 ? (
+              <select
+                className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
+                value={activeThread.provider_id}
+                aria-label="Thread LLM provider"
+                onChange={(e) => {
+                  void setThreadProvider(activeThread.id, e.target.value);
+                }}
+              >
+                {providerIds.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[var(--moba-accent)]">{activeThread.provider_id}</span>
+            )}
           </div>
         )}
 
@@ -195,6 +251,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           onSend={handleSend}
           sending={sending}
           disabled={false}
+          // When the user types `@terminal:last-N`, slice off the most recent N
+          // lines from whatever terminal context was staged into the drawer.
+          // We slice from the bottom so it matches the user's intent.
+          resolveTerminalContext={(lines) => {
+            if (!terminalContext) return undefined;
+            const all = terminalContext.split("\n");
+            const slice = all.slice(Math.max(0, all.length - lines));
+            return slice.join("\n");
+          }}
         />
       </div>
     </div>

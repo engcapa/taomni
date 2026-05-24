@@ -138,6 +138,12 @@ impl Default for LlmConfig {
             model: "qwen3-1.7b-q4_k_m".into(),
             runtime: "llama-server".into(),
         });
+        providers.insert("anthropic".into(), LlmProviderConfig {
+            base_url: "https://api.anthropic.com/v1".into(),
+            api_key: String::new(),
+            model: "claude-sonnet-4-5".into(),
+            runtime: "anthropic".into(),
+        });
 
         let mut task_routing = HashMap::new();
         task_routing.insert("voice_intent".into(),    "deepseek".into());

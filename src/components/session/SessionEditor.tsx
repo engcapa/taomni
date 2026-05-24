@@ -736,6 +736,7 @@ function BookmarkSettings({
   onNewFolder,
   fileEmbedInTab, setFileEmbedInTab,
   fileExtraArgs, setFileExtraArgs,
+  disableAiWrite, setDisableAiWrite,
 }: {
   name: string; setName: (v: string) => void;
   groupPath: string; setGroupPath: (v: string) => void;
@@ -746,6 +747,7 @@ function BookmarkSettings({
   onNewFolder: () => void;
   fileEmbedInTab: boolean; setFileEmbedInTab: (v: boolean) => void;
   fileExtraArgs: string; setFileExtraArgs: (v: string) => void;
+  disableAiWrite: boolean; setDisableAiWrite: (v: boolean) => void;
 }) {
   const [bgImage, setBgImage] = useState("");
   const [bgOpacity, setBgOpacity] = useState("35%");
@@ -827,6 +829,16 @@ function BookmarkSettings({
           onChange={(e) => setTags(e.target.value)}
           placeholder="prod, web, on-call"
         />
+      </Field>
+
+      <Field label="AI safety">
+        <label className="flex items-center gap-1.5" data-testid="disable-ai-write-toggle">
+          <Checkbox checked={disableAiWrite} onChange={setDisableAiWrite} />
+          禁用 AI 写动作（命令注入 / SFTP 上传）
+        </label>
+        <span className="ml-2 text-[var(--moba-text-muted)]">
+          仅显示预览卡，按 Enter 不直接执行（仍可复制到剪贴板）。
+        </span>
       </Field>
 
       {proto === "File" && (
@@ -962,6 +974,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   /* --- bookmark --- */
   const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
   const [tags, setTags] = useState(() => optionString(initialOptions, "tags", ""));
+  /* --- AI safety --- */
+  const [disableAiWrite, setDisableAiWrite] = useState(() => optionBoolean(initialOptions, "disableAiWrite", false));
 
   /* --- vault refresh on mount so the Save in vault checkbox state is correct --- */
   const refreshVault = useVaultStore((s) => s.refresh);
@@ -1068,7 +1082,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       options_json: JSON.stringify({
         ...previousOptions,
         x11, compression, startupCmd, jumpHost: jumpHost || "",
-        jumpUser, jumpPort, description, tags, doNotExit,
+        jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
         remoteEnv, sshBrowser, usePrivKey, useJump,
         fileEmbedInTab, fileExtraArgs,
         terminalProfile,
@@ -1169,7 +1183,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       options_json: JSON.stringify({
         ...stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
         x11, compression, startupCmd, jumpHost: jumpHost || "",
-        jumpUser, jumpPort, description, tags, doNotExit,
+        jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
         remoteEnv, sshBrowser, usePrivKey, useJump,
         fileEmbedInTab, fileExtraArgs,
         terminalProfile,
@@ -1228,6 +1242,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setCompression(optionBoolean(nextOptions, "compression", false));
     setStartupCmd(optionString(nextOptions, "startupCmd", ""));
     setDoNotExit(optionBoolean(nextOptions, "doNotExit", false));
+    setDisableAiWrite(optionBoolean(nextOptions, "disableAiWrite", false));
     setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
     setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
     setUsePrivKey(nextAuth === "PrivateKey");
@@ -1629,6 +1644,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               onNewFolder={handleNewFolder}
               fileEmbedInTab={fileEmbedInTab} setFileEmbedInTab={setFileEmbedInTab}
               fileExtraArgs={fileExtraArgs} setFileExtraArgs={setFileExtraArgs}
+              disableAiWrite={disableAiWrite} setDisableAiWrite={setDisableAiWrite}
             />
           )}
         </div>

@@ -19,6 +19,8 @@ import { AiMasterSwitch } from "./AiMasterSwitch";
 import { AiShellPanel } from "./AiShellPanel";
 import { WebSearchPanel } from "./WebSearchPanel";
 import { ClaudeCodePanel } from "./ClaudeCodePanel";
+import { ChatHistoryPanel } from "./ChatHistoryPanel";
+import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
 import { useAiStore } from "../../stores/aiStore";
 
 const UI_FONTS = [
@@ -221,6 +223,14 @@ export function SettingsPanel() {
 
           <div className="pt-3 border-t border-[var(--moba-divider)]">
             <ClaudeCodePanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ChatHistoryPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ModelsAdvancedPanel />
           </div>
         </section>
       </div>

@@ -1,0 +1,30 @@
+id: TC-AI-003
+title: Web Search panel exposes native vs client provider matrix
+description: |
+  v2.5 ProviderCaps + WebSearchPanel UI surface: the settings panel must let
+  the user pick from at least 6 search providers (SearXNG / Tavily / Serper
+  / Brave / Exa / Google CSE) and offer the four-tier confirmation modes
+  (per_call / per_thread / always / disabled). Smoke check only — no actual
+  network calls.
+covers: [F-AI-2.5]
+tags: [ai, web-search, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: 'text=Web Search'
+  - assert_text: {selector: 'body', contains: 'SearXNG'}
+  - assert_text: {selector: 'body', contains: 'Tavily'}
+  - assert_text: {selector: 'body', contains: 'Serper'}
+  - assert_text: {selector: 'body', contains: 'Brave Search'}
+  - assert_text: {selector: 'body', contains: 'Exa'}
+  - assert_text: {selector: 'body', contains: 'Google CSE'}
+  # Confirmation modes (when enabled)
+  - assert_text: {selector: 'body', contains: '每次确认'}
+  - assert_text: {selector: 'body', contains: '本 thread 静默'}
+  - assert_text: {selector: 'body', contains: '总是允许'}
+  - assert_text: {selector: 'body', contains: '完全禁用'}
+  - screenshot: ai-003-web-search.png

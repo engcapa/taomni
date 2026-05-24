@@ -8,6 +8,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   siliconflow: "SiliconFlow",
   groq:        "Groq",
   local:       "本地 (llama-server)",
+  anthropic:   "Anthropic (Claude)",
 };
 
 const PROVIDER_NOTES: Record<string, string> = {
@@ -16,6 +17,7 @@ const PROVIDER_NOTES: Record<string, string> = {
   siliconflow: "一 Key 多模型，大量小模型免费",
   groq:        "极速推理 ~500 tok/s，免费层",
   local:       "零成本，需下载模型 (~1.4 GB)",
+  anthropic:   "claude-sonnet-4-5，按量付费",
 };
 
 interface ProviderRowProps {

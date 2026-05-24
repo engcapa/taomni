@@ -3,6 +3,7 @@
 
 pub mod manager;
 pub mod sherpa_onnx;
+pub mod sherpa_onnx_real;
 
 use async_trait::async_trait;
 use thiserror::Error;

@@ -3,8 +3,10 @@
 
 pub mod commands;
 pub mod config;
+pub mod permissions_mcp;
 pub mod process;
 pub mod protocol;
+pub mod tools_mcp;
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

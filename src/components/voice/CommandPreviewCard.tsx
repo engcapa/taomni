@@ -15,7 +15,7 @@ export interface CommandPreviewData {
 
 interface CommandPreviewCardProps {
   preview: CommandPreviewData;
-  onExecute: (command: string, auditId: number) => void;
+  onExecute: (command: string, auditId: number, edited: boolean) => void;
   onCancel: (auditId: number) => void;
   onCopy: (command: string) => void;
 }
@@ -31,6 +31,7 @@ const HIGH_RISK_DELAY_MS = 800;
 
 export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: CommandPreviewCardProps) {
   const [editing, setEditing] = useState(false);
+  const [edited, setEdited] = useState(false);
   const [editedCommand, setEditedCommand] = useState(preview.command);
   const [executeReady, setExecuteReady] = useState(preview.risk !== "high");
   const [copied, setCopied] = useState(false);
@@ -38,7 +39,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const risk = RISK_CONFIG[preview.risk];
-  const command = editing ? editedCommand : preview.command;
+  const command = editing || edited ? editedCommand : preview.command;
 
   // Start the anti-misclick timer for high-risk commands.
   useEffect(() => {
@@ -59,7 +60,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
       if (e.key === "Escape") { onCancel(preview.audit_id); return; }
       if (e.key === "Enter" && !editing && executeReady && !preview.blocked) {
         e.preventDefault();
-        onExecute(command, preview.audit_id);
+        onExecute(command, preview.audit_id, edited);
       }
       if ((e.key === "e" || e.key === "E") && !editing) {
         e.preventDefault();
@@ -114,7 +115,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
             ref={textareaRef}
             className="moba-input w-full font-mono text-[12px] p-2 resize-none min-h-[80px]"
             value={editedCommand}
-            onChange={(e) => setEditedCommand(e.target.value)}
+            onChange={(e) => { setEditedCommand(e.target.value); setEdited(true); }}
             spellCheck={false}
           />
         ) : (
@@ -161,7 +162,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
             className={`moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 transition-opacity ${
               executeReady ? "" : "opacity-40 cursor-not-allowed"
             }`}
-            onClick={() => executeReady && onExecute(command, preview.audit_id)}
+            onClick={() => executeReady && onExecute(command, preview.audit_id, edited)}
             disabled={!executeReady}
             title={executeReady ? "执行 (Enter)" : `等待 ${HIGH_RISK_DELAY_MS}ms...`}
           >

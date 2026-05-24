@@ -14,9 +14,10 @@ pub mod ai;
 mod asr;
 pub mod llm;
 mod tab;
-mod agent;
+pub mod agent;
 mod chat;
 pub mod models;
+pub mod perf;
 mod voice;
 
 use state::AppState;
@@ -173,6 +174,7 @@ pub fn run() {
             ai::commands::test_llm_connection,
             ai::commands::generate_shell_command,
             ai::commands::update_shell_audit_outcome,
+            ai::session_safety::is_session_ai_write_disabled,
             tab::tab_suggest_path,
             tab::tab_suggest_fim,
             tab::tab_rewrite_command,
@@ -181,6 +183,8 @@ pub fn run() {
             agent::commands::agent_execute_tool,
             agent::commands::agent_run,
             agent::search::commands::web_search_execute,
+            agent::search::commands::deep_search_execute,
+            agent::search::commands::searxng_availability,
             agent::search::commands::web_fetch_execute,
             agent::search::commands::probe_searxng_instances,
             agent::search::commands::provider_caps,
@@ -189,20 +193,34 @@ pub fn run() {
             agent::search::key_storage::keyring_delete,
             agent::cc_bridge::commands::cc_detect,
             agent::cc_bridge::commands::cc_send_message,
+            agent::cc_bridge::commands::cc_stream_message,
             agent::cc_bridge::commands::cc_stop_session,
+            agent::mcp_server::mcp_server_start,
+            agent::mcp_server::mcp_server_stop,
+            agent::mcp_server::mcp_server_status,
             chat::chat_new_thread,
             chat::chat_list_threads,
             chat::chat_list_messages,
             chat::chat_delete_thread,
+            chat::chat_set_thread_provider,
+            chat::chat_purge_old,
+            chat::chat_export_archive,
             chat::chat_send,
             chat::chat_stream,
+            chat::inline_qq::inline_qq_stream,
             models::models_list,
             models::models_download,
             models::models_delete,
             models::models_verify,
+            models::cuda_pack_status,
+            models::cuda_pack_install,
+            models::cuda_pack_uninstall,
+            models::mirror_get_config,
+            models::mirror_set_config,
             llm::llama_server::sidecar_start,
             llm::llama_server::sidecar_stop,
             llm::llama_server::sidecar_status,
+            perf::perf_baseline_recent,
             voice::commands::voice_capture_supported,
             voice::commands::voice_start_capture,
             voice::commands::voice_stop_capture,

@@ -52,14 +52,44 @@ pub fn write_temp_settings(
     std::fs::write(out_path, serde_json::to_string_pretty(&settings).unwrap())
 }
 
-/// Generate a temporary .mcp.json for CC (empty for now — NewMob tools MCP is future work).
+/// Generate a temporary `.mcp.json` for CC. Wires up two stdio MCP servers
+/// that re-invoke the NewMob binary with `--mcp-server <name>`:
+///
+///   - `newmob_permissions` — exposes `permission_prompt`, used via
+///     `--permission-prompt-tool mcp__newmob_permissions__permission_prompt`
+///     so every tool call CC wants to make routes through NewMob's safety
+///     pipeline (blacklist + per-session disable).
+///   - `newmob_tools` — exposes the four stateless NewMob tools so CC can
+///     call them as if they were native (`web_search`, `web_fetch`,
+///     `explain_error`, `redact_text`).
 pub fn write_temp_mcp_config(out_path: &PathBuf) -> std::io::Result<()> {
-    let mcp = serde_json::json!({ "mcpServers": {} });
+    // Resolve the current binary path so the spawned subprocess is always
+    // the same NewMob version that wrote the config.
+    let exe = std::env::current_exe()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "newmob".to_string());
+
+    let mcp = serde_json::json!({
+        "mcpServers": {
+            "newmob_permissions": {
+                "command": exe,
+                "args": ["--mcp-server", "permissions"]
+            },
+            "newmob_tools": {
+                "command": exe,
+                "args": ["--mcp-server", "tools"]
+            }
+        }
+    });
     if let Some(parent) = out_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(out_path, serde_json::to_string_pretty(&mcp).unwrap())
 }
+
+/// Permission prompt tool name CC needs via `--permission-prompt-tool`.
+/// Format follows MCP convention: `mcp__<server-name>__<tool-name>`.
+pub const PERMISSION_PROMPT_TOOL: &str = "mcp__newmob_permissions__permission_prompt";
 
 /// Directories that CC must never access.
 pub fn sensitive_deny_dirs() -> Vec<PathBuf> {

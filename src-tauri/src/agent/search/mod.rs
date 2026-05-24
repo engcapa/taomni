@@ -1,4 +1,7 @@
+pub mod brave;
 pub mod commands;
+pub mod exa;
+pub mod google_cse;
 pub mod instances;
 pub mod key_storage;
 pub mod searxng;

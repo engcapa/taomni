@@ -1,5 +1,6 @@
 pub mod cc_bridge;
 pub mod commands;
+pub mod mcp_server;
 pub mod safety;
 pub mod search;
 pub mod tools;

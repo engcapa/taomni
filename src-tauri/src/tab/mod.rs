@@ -1,4 +1,5 @@
 pub mod fim_engine;
+pub mod fim_engine_real;
 pub mod path_scanner;
 
 use path_scanner::PathScanner;
@@ -90,8 +91,43 @@ pub async fn tab_suggest_fim(
     let history_section = if recent_history.is_empty() {
         String::new()
     } else {
-        format!("\n\n最近命令:\n{}", recent_history.join("\n"))
+        // Redact sensitive fields (password=, token=, Bearer ...) before
+        // sending the history to the LLM. Lines that change after redaction
+        // are dropped entirely — the model sees fewer signals, but the user
+        // never leaks plaintext credentials. Lines without sensitive markers
+        // pass through untouched.
+        let mut clean: Vec<String> = Vec::new();
+        for h in &recent_history {
+            let (redacted, hits) = crate::chat::redact::redact(h);
+            if hits == 0 {
+                clean.push(redacted);
+            } else {
+                tracing::debug!(line = %h, hits, "tab_suggest_fim: dropped history line with sensitive content");
+            }
+        }
+        if clean.is_empty() {
+            String::new()
+        } else {
+            format!("\n\n最近命令:\n{}", clean.join("\n"))
+        }
     };
+
+    // Also redact the live prefix in case the user just typed something like
+    // `mysql -ppassword=`. Keep going even if redaction triggers — the user is
+    // typing this *now*, so we still want a completion, just with the secret
+    // masked.
+    let (prefix_redacted, _hits) = crate::chat::redact::redact(&prefix);
+
+    // First try the in-process FIM engine (zero IPC, lowest latency). Falls
+    // through to the LlmRouter if the local model isn't installed.
+    if let Some(engine) = fim_engine::resolve().await {
+        if let Some(text) = engine.complete_fim(&prefix_redacted, "", 24).await {
+            let trimmed = text.trim_matches(|c: char| c.is_whitespace() || c == '`');
+            if !trimmed.is_empty() && trimmed.len() <= 80 {
+                return Ok(Some(trimmed.to_string()));
+            }
+        }
+    }
 
     let req = ChatRequest {
         messages: vec![
@@ -99,7 +135,7 @@ pub async fn tab_suggest_fim(
                 "你是 shell 命令补全助手。用户正在输入一行命令，请只返回最合理的下一段，\
                  不要换行、不要解释、不要重复用户已输入的部分。如果没有把握，返回空字符串。",
             ),
-            ChatMessage::user(format!("用户已输入: {prefix}{history_section}")),
+            ChatMessage::user(format!("用户已输入: {prefix_redacted}{history_section}")),
         ],
         max_tokens: Some(24),
         temperature: Some(0.1),

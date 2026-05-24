@@ -11,9 +11,12 @@ const CONFIRM_MODE_OPTIONS = [
 ] as const;
 
 const PROVIDER_OPTIONS = [
-  { value: "searxng", label: "SearXNG（默认，无需 API Key）" },
-  { value: "tavily",  label: "Tavily（1k/月免费，英文优秀）" },
-  { value: "serper",  label: "Serper（Google 索引，中文优秀）" },
+  { value: "searxng",    label: "SearXNG（默认，无需 API Key）" },
+  { value: "tavily",     label: "Tavily（1k/月免费，英文优秀）" },
+  { value: "serper",     label: "Serper（Google 索引，中文优秀）" },
+  { value: "brave",      label: "Brave Search（独立索引，月 ~1k 免费）" },
+  { value: "exa",        label: "Exa（神经索引，学术 / 长尾英文）" },
+  { value: "google_cse", label: "Google CSE（API_KEY:CX，每天 100 免费）" },
 ] as const;
 
 export function WebSearchPanel() {
@@ -126,16 +129,28 @@ export function WebSearchPanel() {
             </div>
           )}
 
-          {/* BYOK key for Tavily/Serper */}
-          {(ws.client_provider === "tavily" || ws.client_provider === "serper") && (
+          {/* BYOK key for Tavily/Serper/Brave/Exa/Google CSE */}
+          {(ws.client_provider === "tavily" ||
+            ws.client_provider === "serper" ||
+            ws.client_provider === "brave" ||
+            ws.client_provider === "exa" ||
+            ws.client_provider === "google_cse") && (
             <div>
               <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">
-                {ws.client_provider === "tavily" ? "Tavily" : "Serper"} API Key
+                {ws.client_provider === "tavily" && "Tavily API Key"}
+                {ws.client_provider === "serper" && "Serper API Key"}
+                {ws.client_provider === "brave" && "Brave Search API Key"}
+                {ws.client_provider === "exa" && "Exa API Key"}
+                {ws.client_provider === "google_cse" && "Google CSE Key (API_KEY:CX)"}
               </div>
               <input
                 type="password"
                 className="moba-input h-7 w-full text-[12px]"
-                placeholder="粘贴 API Key..."
+                placeholder={
+                  ws.client_provider === "google_cse"
+                    ? "AIza...:abc123:xyz"
+                    : "粘贴 API Key..."
+                }
                 value={ws.byok_key}
                 onChange={(e) => update({ byok_key: e.target.value })}
               />

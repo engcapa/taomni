@@ -117,6 +117,7 @@ impl LlmRouter {
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 use crate::ai::config::{AiConfig, LlmConfig};
+use super::anthropic::AnthropicProvider;
 use super::openai_compat::OpenAiCompatProvider;
 
 fn task_kind_from_str(s: &str) -> Option<TaskKind> {
@@ -178,6 +179,21 @@ pub fn build_router(
                 let provider = Arc::new(OpenAiCompatProvider::new(
                     id.as_str(),
                     p.base_url.clone(),
+                    resolved_key,
+                    p.model.clone(),
+                ));
+                router.add_provider(id, provider);
+            }
+            "anthropic" => {
+                let resolved_key = resolve_api_key(&p.api_key, vault);
+                let base_url = if p.base_url.is_empty() {
+                    "https://api.anthropic.com/v1".to_string()
+                } else {
+                    p.base_url.clone()
+                };
+                let provider = Arc::new(AnthropicProvider::new(
+                    id.as_str(),
+                    base_url,
                     resolved_key,
                     p.model.clone(),
                 ));

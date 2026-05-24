@@ -1,3 +1,4 @@
+pub mod inline_qq;
 pub mod redact;
 pub mod store;
 
@@ -65,6 +66,56 @@ pub async fn chat_delete_thread(
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())
+}
+
+/// Change the provider (LLM) bound to an existing thread. Subsequent
+/// chat_send / chat_stream calls on this thread will use the new provider.
+#[tauri::command]
+pub async fn chat_set_thread_provider(
+    thread_id: String,
+    provider_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    store::update_thread_provider(&db, &thread_id, &provider_id).map_err(|e| e.to_string())
+}
+
+/// Sweep retention: delete threads older than `keep_days`. Returns the number
+/// of threads deleted. Frontend invokes this at startup and on a 24h timer.
+#[tauri::command]
+pub async fn chat_purge_old(
+    keep_days: u32,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    let cutoff = chrono::Utc::now().timestamp() - (keep_days as i64) * 86_400;
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    store::delete_threads_older_than(&db, cutoff).map_err(|e| e.to_string())
+}
+
+/// Export every thread + message into a single JSON file at `out_path`.
+/// We write JSON (not zip) for portability — the user can compress externally.
+/// Sensitive content already passed through `redact::redact` before persistence.
+#[tauri::command]
+pub async fn chat_export_archive(
+    out_path: String,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    use serde_json::json;
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let threads = store::list_threads(&db, 100_000).map_err(|e| e.to_string())?;
+    let mut total = 0;
+    let mut payload = Vec::with_capacity(threads.len());
+    for t in &threads {
+        let messages = store::list_messages(&db, &t.id).map_err(|e| e.to_string())?;
+        total += messages.len();
+        payload.push(json!({
+            "thread": t,
+            "messages": messages,
+        }));
+    }
+    let json_text = serde_json::to_string_pretty(&payload).map_err(|e| e.to_string())?;
+    std::fs::write(&out_path, json_text).map_err(|e| e.to_string())?;
+    Ok(total)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

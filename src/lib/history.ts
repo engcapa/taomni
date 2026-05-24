@@ -10,6 +10,8 @@ const PREWARM_LIMIT = 500;
 export interface CommandHistory {
   /** Returns up to `limit` items whose prefix matches `prefix`, most-recent first. */
   match: (prefix: string, limit?: number) => string[];
+  /** Returns up to `limit` most-recent commands, regardless of prefix. */
+  recent: (limit?: number) => string[];
   /** Records the command as "just used". Updates cache + DB async. */
   commit: (command: string) => void;
   /** Drops the history for the current host only. */
@@ -75,6 +77,11 @@ export function useCommandHistory(hostKey: string, maxEntries: number): CommandH
     return out;
   }, []);
 
+  const recent = useCallback((limit = 5): string[] => {
+    const cache = cacheRef.current;
+    return cache.slice(0, Math.max(0, limit));
+  }, []);
+
   const commit = useCallback((command: string) => {
     const trimmed = command.replace(/[\r\n]+$/, "");
     if (!trimmed) return;
@@ -103,8 +110,8 @@ export function useCommandHistory(hostKey: string, maxEntries: number): CommandH
   }, [bumpCache]);
 
   return useMemo(
-    () => ({ match, commit, clearHost, clearAll }),
-    [match, commit, clearHost, clearAll],
+    () => ({ match, recent, commit, clearHost, clearAll }),
+    [match, recent, commit, clearHost, clearAll],
   );
 }
 

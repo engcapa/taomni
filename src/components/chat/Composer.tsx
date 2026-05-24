@@ -1,14 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
+import { parseComposerInput, type AttachmentRef } from "../../lib/chat/composerRefs";
+import { AttachmentChip } from "./AttachmentChip";
 
 interface ComposerProps {
   onSend: (content: string, terminalContext?: string) => Promise<void>;
   sending: boolean;
   disabled?: boolean;
+  /**
+   * Optional resolver: turns AttachmentRefs into LLM-ready text before send.
+   * Currently only `terminal` refs surface to the existing terminal_context
+   * field — file/session refs are previewed as chips but not resolved on
+   * the client (this PR keeps the round-trip surface small).
+   */
+  resolveTerminalContext?: (lines: number) => string | undefined;
 }
 
-export function Composer({ onSend, sending, disabled }: ComposerProps) {
+export function Composer({ onSend, sending, disabled, resolveTerminalContext }: ComposerProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pending = useChatStore((s) => s.pendingComposerText);
@@ -23,11 +32,37 @@ export function Composer({ onSend, sending, disabled }: ComposerProps) {
     }
   }, [pending, consumePending]);
 
+  // Live parse @-references so we can show chips and remove them.
+  const parsed = useMemo(() => parseComposerInput(text), [text]);
+  const attachments: AttachmentRef[] = parsed.attachments;
+
+  const handleRemove = (index: number) => {
+    // Reconstruct text by stripping the n-th @-token. Simple: re-build from
+    // the parsed message + remaining attachments rendered as their original
+    // tokens. We don't try to preserve exact whitespace.
+    const remaining = attachments.filter((_, i) => i !== index);
+    const tokens = remaining.map(refToToken).join(" ");
+    setText(tokens ? `${parsed.message} ${tokens}`.trim() : parsed.message);
+  };
+
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
+
+    // Resolve terminal references to terminal_context. Multiple @terminal
+    // refs are merged; we take the largest line count.
+    let terminalCtx: string | undefined;
+    if (resolveTerminalContext) {
+      const maxLines = attachments
+        .filter((a) => a.kind === "terminal")
+        .reduce((m, a) => (a.kind === "terminal" ? Math.max(m, a.lines) : m), 0);
+      if (maxLines > 0) {
+        terminalCtx = resolveTerminalContext(maxLines);
+      }
+    }
+
     setText("");
-    await onSend(trimmed);
+    await onSend(trimmed, terminalCtx);
     textareaRef.current?.focus();
   };
 
@@ -36,11 +71,18 @@ export function Composer({ onSend, sending, disabled }: ComposerProps) {
       className="border-t border-[var(--moba-divider)] p-2"
       style={{ background: "var(--moba-panel-bg)" }}
     >
+      {attachments.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          {attachments.map((ref, i) => (
+            <AttachmentChip key={i} ref={ref} onRemove={() => handleRemove(i)} />
+          ))}
+        </div>
+      )}
       <div className="flex gap-2 items-end">
         <textarea
           ref={textareaRef}
           className="moba-input flex-1 text-[12px] resize-none min-h-[56px] max-h-[120px] py-1.5"
-          placeholder="输入消息... (Ctrl+Enter 发送)"
+          placeholder="输入消息... (Ctrl+Enter 发送 · 支持 @terminal:last-50 / @file:./error.log)"
           value={text}
           disabled={disabled || sending}
           onChange={(e) => setText(e.target.value)}
@@ -67,4 +109,10 @@ export function Composer({ onSend, sending, disabled }: ComposerProps) {
       </div>
     </div>
   );
+}
+
+function refToToken(ref: AttachmentRef): string {
+  if (ref.kind === "terminal") return `@terminal:last-${ref.lines}`;
+  if (ref.kind === "file") return `@file:${ref.path}`;
+  return `@session:${ref.query}`;
 }

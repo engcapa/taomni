@@ -108,8 +108,10 @@ pub async fn agent_execute_tool(
     use crate::agent::tools::ToolCall;
     let call = ToolCall { tool: tool.clone(), args };
 
-    // Safety check.
+    // Blacklist + read-tail user-invoked safety.
     crate::agent::safety::check_tool_call(&call)?;
+    // Per-session "禁用 AI 写动作" enforcement.
+    crate::agent::safety::check_session_disable(&state, &call)?;
 
     let registry = build_registry(&state, app);
     let result = registry.execute(&call).await;

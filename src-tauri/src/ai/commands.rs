@@ -2,6 +2,7 @@ use crate::ai::config::{AiConfig, LlmProviderConfig, default_ai_config_path};
 use crate::ai::shell_safety::{check_blacklist, RiskLevel};
 use crate::ai::shell_prompt::SHELL_COMMAND_SYSTEM_PROMPT;
 use crate::ai::tools_shell::GeneratedCommand;
+use crate::llm::anthropic::AnthropicProvider;
 use crate::llm::openai_compat::OpenAiCompatProvider;
 use crate::llm::{ChatMessage, ChatRequest, Llm};
 use crate::state::AppState;
@@ -80,12 +81,27 @@ pub async fn test_llm_connection(
         _ => provider.api_key.clone(),
     };
 
-    let llm: Arc<dyn Llm> = Arc::new(OpenAiCompatProvider::new(
-        "test",
-        &provider.base_url,
-        &api_key,
-        &provider.model,
-    ));
+    let llm: Arc<dyn Llm> = match provider.runtime.as_str() {
+        "anthropic" => {
+            let base_url = if provider.base_url.is_empty() {
+                "https://api.anthropic.com/v1".to_string()
+            } else {
+                provider.base_url.clone()
+            };
+            Arc::new(AnthropicProvider::new(
+                "test",
+                base_url,
+                &api_key,
+                &provider.model,
+            ))
+        }
+        _ => Arc::new(OpenAiCompatProvider::new(
+            "test",
+            &provider.base_url,
+            &api_key,
+            &provider.model,
+        )),
+    };
 
     let start = std::time::Instant::now();
     let req = ChatRequest::simple("You are a test assistant.", "Reply with exactly: pong");
@@ -118,6 +134,14 @@ pub async fn generate_shell_command(
         "当前工作目录：{}\n\n用户请求：{}",
         cwd_str, description
     );
+
+    // Per-session "AI write actions disabled" flag — when set, we still
+    // generate the preview but mark it blocked so the frontend disables
+    // execution and only allows clipboard copy.
+    let session_disabled = match session_id.as_deref() {
+        Some(id) => crate::ai::session_safety::is_ai_write_disabled(state.inner(), id),
+        None => false,
+    };
 
     // Build a request that instructs the LLM to respond with JSON matching GeneratedCommand.
     // We use a structured prompt since we can't rely on tool_calls being available on all providers.
@@ -161,7 +185,21 @@ pub async fn generate_shell_command(
 
     // Run blacklist check.
     let safety = check_blacklist(&generated.command);
-    let outcome = if safety.blocked { "blocked_blacklist" } else { "generated" };
+    let final_blocked = safety.blocked || session_disabled;
+    let blocked_reason = if safety.blocked {
+        safety.reason.clone()
+    } else if session_disabled {
+        Some("会话级 AI 写动作已禁用：仅可复制到剪贴板，不会注入终端。".to_string())
+    } else {
+        None
+    };
+    let outcome = if safety.blocked {
+        "blocked_blacklist"
+    } else if session_disabled {
+        "blocked_session"
+    } else {
+        "generated"
+    };
 
     // Write audit log entry.
     let audit_id = {
@@ -188,8 +226,8 @@ pub async fn generate_shell_command(
         explanation: generated.explanation,
         risk: generated.risk,
         needs_inputs: generated.needs_inputs,
-        blocked: safety.blocked,
-        blocked_reason: safety.reason,
+        blocked: final_blocked,
+        blocked_reason,
         audit_id,
     })
 }

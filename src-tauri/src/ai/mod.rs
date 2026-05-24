@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod config;
 pub mod network_policy;
+pub mod session_safety;
 pub mod shell_safety;
 pub mod shell_prompt;
 pub mod tools_shell;

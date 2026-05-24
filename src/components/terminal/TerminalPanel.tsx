@@ -108,7 +108,7 @@ import {
   isOsFileDrag,
   shellQuoteStyleForTerminalDrop,
 } from "../../lib/osFileDrop";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 
 export interface SshConnectInfo {
@@ -369,9 +369,19 @@ export function TerminalPanel({
   }, [history, suggestionsActive, inlineSuggestionsSource]);
 
   // AI suggestion source resolver (data sources 2 + 3).
+  // The resolver caches its options on every render; passing a thunk for
+  // recent history keeps it invalidation-free without triggering rerenders.
+  const recentHistoryForSuggestion = useMemo(
+    () => history.recent(5),
+    // The history hook bumps a cache version internally on commit, but we
+    // only want to pull a fresh snapshot for new keystrokes — depending on
+    // history alone here is fine because match() is the keystroke trigger.
+    [history],
+  );
   const resolveSuggestion = useSuggestionSource({
     source: inlineSuggestionsSource,
     isLocal,
+    recentHistory: recentHistoryForSuggestion,
   });
 
   // State shared between onData tracking and the ghost renderer.
@@ -563,8 +573,19 @@ export function TerminalPanel({
         pendingRef.current = "";
         invalidatedRef.current = false;
         refreshSuggestion();
-        // Route to the AI Drawer.
-        void useChatStore.getState().attachToComposer(`?? ${question}`);
+
+        if (terminalProfile?.aiInlineQqRender) {
+          // Plan §8.4 inline path: render AI response directly into the
+          // terminal as ANSI-styled lines. We write a header, kick the
+          // backend stream, and pipe each token straight into xterm.write.
+          const term = termRef.current;
+          if (term) {
+            void streamInlineAi(term, question);
+          }
+        } else {
+          // Default safe path: route to AI Chat Drawer.
+          void useChatStore.getState().attachToComposer(`?? ${question}`);
+        }
         return;
       }
     }
@@ -574,7 +595,7 @@ export function TerminalPanel({
       onInputBroadcastRef.current?.(filtered);
     }
     sendTerminalInput(filtered);
-  }, [sendTerminalInput, trackPending, refreshSuggestion, isLocalPowerShell]);
+  }, [sendTerminalInput, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
@@ -1203,6 +1224,26 @@ export function TerminalPanel({
         ],
       },
       { label: "Event Log", onClick: () => setEventLogOpen(true) },
+      { label: "", separator: true },
+      {
+        label: "AI: 解释最近的终端输出",
+        onClick: () => {
+          const term = termRef.current;
+          if (!term) return;
+          // Pull the last 50 lines from the buffer; if there's a selection,
+          // prefer that. Both paths route to a fresh AI thread via
+          // explainSelection (already redacts via chat::redact server-side).
+          const selected = term.getSelection();
+          const text = selected && selected.trim()
+            ? selected
+            : getLastBufferLines(term, 50);
+          if (text.trim().length === 0) {
+            setStatusMessage("Terminal buffer is empty");
+            return;
+          }
+          void useChatStore.getState().explainSelection(text);
+        },
+      },
     ];
   }, [
     clearScrollback,
@@ -2296,6 +2337,27 @@ function getBufferText(term: Terminal): string {
   return lines.join("\n");
 }
 
+function getLastBufferLines(term: Terminal, lineCount: number): string {
+  const buffer = term.buffer.active;
+  const total = buffer.length;
+  const start = Math.max(0, total - lineCount);
+  const lines: string[] = [];
+  for (let i = start; i < total; i++) {
+    const line = buffer.getLine(i);
+    if (!line) continue;
+    const text = line.translateToString(true);
+    if (line.isWrapped && lines.length > 0) {
+      lines[lines.length - 1] += text;
+    } else {
+      lines.push(text);
+    }
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop();
+  }
+  return lines.join("\n");
+}
+
 function findAndSelectBufferText(
   term: Terminal,
   query: string,
@@ -2693,4 +2755,44 @@ function formatZmodemBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+
+// AI inline `??` rendering: stream LLM tokens directly into the terminal as
+// gray-styled ANSI text. The rendering is purely visual (xterm.write); it
+// never reaches the underlying PTY, so a real `cat`/`grep`/`vim` can run on
+// the next prompt without any ghost characters left behind. Each request
+// uses a fresh `inline-qq:<request_id>` event channel so concurrent calls
+// from different tabs do not cross-contaminate.
+async function streamInlineAi(term: Terminal, question: string): Promise<void> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  const requestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const event = `inline-qq:${requestId}`;
+
+  // ANSI: dim gray foreground, bold prefix.
+  const PREFIX = "\\x1b[38;5;244m\\x1b[1m[AI]\\x1b[0m\\x1b[38;5;244m ";
+  const SUFFIX = "\\x1b[0m";
+
+  // Header line so the user sees the question echoed back.
+  term.write(`\\r\\n\\x1b[38;5;244m?? ${question}\\x1b[0m\\r\\n`);
+  term.write(PREFIX);
+
+  let unlisten: UnlistenFn | null = null;
+  try {
+    unlisten = await listen<{ kind: string; content?: string; message?: string }>(event, (e) => {
+      const payload = e.payload;
+      if (payload.kind === "token" && payload.content) {
+        term.write(payload.content.replace(/\\n/g, "\\r\\n" + PREFIX));
+      } else if (payload.kind === "error") {
+        term.write(`${SUFFIX}\\r\\n\\x1b[31m[AI error] ${payload.message ?? "unknown"}${SUFFIX}\\r\\n`);
+      } else if (payload.kind === "end") {
+        term.write(`${SUFFIX}\\r\\n`);
+      }
+    });
+    await invoke("inline_qq_stream", { requestId, question });
+  } catch (e) {
+    term.write(`${SUFFIX}\\r\\n\\x1b[31m[AI error] ${String(e)}${SUFFIX}\\r\\n`);
+  } finally {
+    if (unlisten) unlisten();
+  }
 }

@@ -521,8 +521,35 @@ export function TerminalAppearanceSettings({
               onChange={(checked) => updateProfile({ aiCommandRewriteEnabled: checked })}
             />
             <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
-              Press Ctrl+K to open an AI rewrite overlay for the current command line.
-              Ignored for local PowerShell.
+              Press the configured shortcut to open an AI rewrite overlay for the current
+              command line. Ignored for local PowerShell.
+            </p>
+            <label className="mt-2 flex items-center gap-2 text-[11px]">
+              <span className="text-[var(--moba-text-muted)]">Shortcut</span>
+              <input
+                className="moba-input h-7 w-32 text-[12px]"
+                value={profile.aiCommandRewriteShortcut}
+                aria-label="AI command rewrite shortcut"
+                disabled={!profile.aiCommandRewriteEnabled}
+                onChange={(event) =>
+                  updateProfile({ aiCommandRewriteShortcut: event.target.value })
+                }
+                placeholder="Ctrl+K"
+              />
+            </label>
+          </div>
+
+          <div className="pt-2 border-t border-[var(--moba-divider)]">
+            <CheckControl
+              label='Render `?? <question>` answers inline in the terminal (experimental)'
+              checked={profile.aiInlineQqRender}
+              onChange={(checked) => updateProfile({ aiInlineQqRender: checked })}
+            />
+            <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
+              When off (default), `?? &lt;q&gt;` is staged into the AI Chat Drawer so you can review
+              and edit before sending. When on, the answer streams directly into the terminal
+              as gray ANSI text — fastest path, but breaks if you happen to have an interactive
+              `read` prompt running. Auto-disabled in alt-screen mode (vim, less, top, …).
             </p>
           </div>
         </div>
