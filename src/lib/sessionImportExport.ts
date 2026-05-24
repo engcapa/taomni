@@ -328,12 +328,13 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
 
   const warnings: string[] = [];
   const now = resolveNow(options.now);
-  const profiles = parseTabbyProfiles(text, warnings);
+  const { profiles, groupNames } = parseTabbyConfig(text, warnings);
   const profileLookup = tabbyProfileLookup(profiles);
   const includeSecrets = options.includeSecrets === true;
   const sessions: SessionConfig[] = [];
   const secrets: SessionImportSecret[] = [];
   let skipped = 0;
+  let externalPasswordCount = 0;
 
   for (const profile of profiles) {
     const type = cleanText(firstString(profile.type), 32).toLowerCase();
@@ -349,15 +350,17 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
     }
     const sessionType = type === "telnet" ? "Telnet" : "SSH";
     const name = cleanText(firstNonEmptyString(profile.name, host), MAX_NAME_LENGTH);
-    const auth = tabbyAuthMethod(name || host, sessionType, optionsRecord, includeSecrets, warnings);
-    const importedOptions = tabbyOptions(name || host, profile, optionsRecord, profileLookup, warnings);
+    const profileLabel = name || host;
+    const auth = tabbyAuthMethod(profileLabel, sessionType, optionsRecord, includeSecrets, warnings);
+    if (auth.passwordHeldExternally) externalPasswordCount += 1;
+    const importedOptions = tabbyOptions(profileLabel, profile, optionsRecord, profileLookup, warnings);
     const session = importedSession({
       name,
       sessionType,
       host,
       port: firstKnown(optionsRecord.port, DEFAULT_PORTS[sessionType]),
       username: optionalCleanText(firstNonEmptyString(optionsRecord.user, optionsRecord.username), MAX_NAME_LENGTH),
-      groupPath: combineImportFolder(options.targetFolder ?? null, tabbyProfileFolder(profile)),
+      groupPath: combineImportFolder(options.targetFolder ?? null, tabbyProfileFolder(profile, groupNames, profileLabel, warnings)),
       authMethod: auth.authMethod,
       options: importedOptions,
       now,
@@ -376,6 +379,12 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
     } else {
       skipped += 1;
     }
+  }
+
+  if (externalPasswordCount > 0) {
+    warnings.push(
+      `Tabby keeps remembered passwords in its OS keychain entry or encrypted vault, not in config.yaml. ${externalPasswordCount} profile(s) using password auth were imported without a saved password — re-enter the password on first connect.`,
+    );
   }
 
   return finalizeImportResult(sessions, skipped, warnings, options.existingSessions, secrets);
@@ -710,8 +719,13 @@ function getIni(section: Map<string, string>, key: string): string {
   return section.get(key.toLowerCase()) ?? "";
 }
 
-function tabbyProfileFolder(profile: Record<string, unknown>): string | null {
-  return normalizeGroupPath(firstNonEmptyString(
+function tabbyProfileFolder(
+  profile: Record<string, unknown>,
+  groupNames: Map<string, string>,
+  profileLabel: string,
+  warnings: string[],
+): string | null {
+  const raw = firstNonEmptyString(
     profile.group,
     profile.groupPath,
     profile.group_path,
@@ -719,8 +733,20 @@ function tabbyProfileFolder(profile: Record<string, unknown>): string | null {
     profile.folderPath,
     profile.folder_path,
     profile.category,
-  ));
+  );
+  const cleaned = cleanText(raw, MAX_OPTION_LENGTH);
+  if (!cleaned) return null;
+
+  const resolved = groupNames.get(cleaned);
+  if (resolved) return normalizeGroupPath(resolved);
+
+  if (TABBY_UUID_PATTERN.test(cleaned)) {
+    warnings.push(`Tabby profile "${profileLabel}" references group "${cleaned}" but no matching entry was found under groups: — imported under the raw id.`);
+  }
+  return normalizeGroupPath(cleaned);
 }
+
+const TABBY_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function tabbyProfileLookup(profiles: readonly Record<string, unknown>[]): Map<string, Record<string, unknown>> {
   const lookup = new Map<string, Record<string, unknown>>();
@@ -782,7 +808,7 @@ function tabbyAuthMethod(
   optionsRecord: Record<string, unknown>,
   includeSecrets: boolean,
   warnings: string[],
-): { authMethod?: AuthMethod; password?: string } {
+): { authMethod?: AuthMethod; password?: string; passwordHeldExternally?: boolean } {
   if (sessionType !== "SSH") return {};
 
   const auth = cleanText(firstString(optionsRecord.auth), 64).toLowerCase();
@@ -798,8 +824,9 @@ function tabbyAuthMethod(
     if (password && includeSecrets) return { authMethod: "Password", password };
     if (password && !includeSecrets) {
       warnings.push(`Skipped Tabby saved password for "${profileName}" because secret import was not enabled.`);
+      return { authMethod: "Password" };
     }
-    return { authMethod: "Password" };
+    return { authMethod: "Password", passwordHeldExternally: includeSecrets };
   }
 
   if (keyPath) {
@@ -919,29 +946,65 @@ function parseJumpTarget(value: string): { host: string; port: number; username:
   return host ? { host, port, username } : null;
 }
 
-function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<string, unknown>> {
+function parseTabbyConfig(
+  text: string,
+  warnings: string[],
+): { profiles: Array<Record<string, unknown>>; groupNames: Map<string, string> } {
   try {
     const parsed = JSON.parse(text) as unknown;
-    const profiles = isRecord(parsed) && Array.isArray(parsed.profiles) ? parsed.profiles : [];
-    return profiles.filter(isRecord);
+    if (isRecord(parsed)) {
+      const rawProfiles = Array.isArray(parsed.profiles) ? parsed.profiles : [];
+      const profiles = rawProfiles.filter(isRecord);
+      const groupNames = new Map<string, string>();
+      if (Array.isArray(parsed.groups)) {
+        for (const group of parsed.groups) {
+          if (!isRecord(group)) continue;
+          const id = cleanText(firstString(group.id), MAX_OPTION_LENGTH);
+          const groupName = cleanText(firstString(group.name), MAX_OPTION_LENGTH);
+          if (id && groupName) groupNames.set(id, groupName);
+        }
+      }
+      if (profiles.length === 0) warnings.push("No Tabby profiles were found in the selected config.");
+      return { profiles, groupNames };
+    }
   } catch {
     // Tabby normally uses YAML; JSON imports are accepted as a convenience.
   }
 
+  return parseTabbyYaml(text, warnings);
+}
+
+function parseTabbyYaml(
+  text: string,
+  warnings: string[],
+): { profiles: Array<Record<string, unknown>>; groupNames: Map<string, string> } {
   const profiles: Array<Record<string, unknown>> = [];
-  let inProfiles = false;
+  const groupNames = new Map<string, string>();
+  let section: "none" | "profiles" | "groups" = "none";
   let current: Record<string, unknown> | null = null;
   let currentOptions: Record<string, unknown> | null = null;
   let profileIndent = -1;
   let optionsIndent = -1;
   let arrayTarget: unknown[] | null = null;
   let arrayIndent = -1;
+  let currentGroup: { id: string; name: string } | null = null;
+  let groupIndent = -1;
 
-  const pushCurrent = () => {
+  const flushProfile = () => {
     if (current) profiles.push(current);
     current = null;
     currentOptions = null;
     arrayTarget = null;
+    profileIndent = -1;
+    optionsIndent = -1;
+  };
+
+  const flushGroup = () => {
+    if (currentGroup && currentGroup.id && currentGroup.name) {
+      groupNames.set(currentGroup.id, currentGroup.name);
+    }
+    currentGroup = null;
+    groupIndent = -1;
   };
 
   for (const rawLine of text.split(/\r?\n/)) {
@@ -949,62 +1012,97 @@ function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<stri
     if (!withoutComment.trim()) continue;
     const indent = withoutComment.match(/^\s*/)?.[0].length ?? 0;
     const line = withoutComment.trim();
-    if (arrayTarget && indent <= arrayIndent) arrayTarget = null;
 
-    if (!inProfiles) {
-      if (line === "profiles:" || line.startsWith("profiles:")) inProfiles = true;
+    // Detect a top-level section change (indent === 0, "key:" form).
+    if (indent === 0 && /^[A-Za-z][\w-]*:\s*(.*)$/.test(line)) {
+      flushProfile();
+      flushGroup();
+      const key = line.split(":", 1)[0]?.trim() ?? "";
+      if (key === "profiles") section = "profiles";
+      else if (key === "groups") section = "groups";
+      else section = "none";
       continue;
     }
 
-    if (arrayTarget && line.startsWith("- ") && indent > arrayIndent) {
-      arrayTarget.push(parseSimpleScalar(line.slice(2).trim()));
-      continue;
-    }
+    if (section === "profiles") {
+      if (arrayTarget && indent <= arrayIndent) arrayTarget = null;
 
-    if (line.startsWith("- ") && (!current || indent <= profileIndent)) {
-      pushCurrent();
-      current = { options: {} };
-      currentOptions = current.options as Record<string, unknown>;
-      profileIndent = indent;
-      optionsIndent = -1;
-      const rest = line.slice(2).trim();
-      if (rest) assignSimpleYamlPair(current, rest);
-      continue;
-    }
+      if (arrayTarget && line.startsWith("- ") && indent > arrayIndent) {
+        arrayTarget.push(parseSimpleScalar(line.slice(2).trim()));
+        continue;
+      }
 
-    if (!current || indent <= profileIndent) continue;
-    if (currentOptions && optionsIndent >= 0 && indent <= optionsIndent) {
-      currentOptions = current.options as Record<string, unknown>;
-    }
-    if (line === "options:" || line.startsWith("options:")) {
-      currentOptions = {};
-      current.options = currentOptions;
-      optionsIndent = indent;
-      continue;
-    }
+      if (line.startsWith("- ") && (!current || indent <= profileIndent)) {
+        flushProfile();
+        current = { options: {} };
+        currentOptions = current.options as Record<string, unknown>;
+        profileIndent = indent;
+        optionsIndent = -1;
+        const rest = line.slice(2).trim();
+        if (rest) assignSimpleYamlPair(current, rest);
+        continue;
+      }
 
-    const target = optionsIndent >= 0 && indent > optionsIndent && currentOptions ? currentOptions : current;
-    const emptyKey = yamlEmptyKey(line);
-    if (emptyKey) {
-      const container = yamlEmptyContainer(emptyKey);
-      target[emptyKey] = container;
-      if (Array.isArray(container)) {
-        arrayTarget = container;
-        arrayIndent = indent;
+      if (!current || indent <= profileIndent) continue;
+      if (currentOptions && optionsIndent >= 0 && indent <= optionsIndent) {
+        currentOptions = current.options as Record<string, unknown>;
+      }
+      if (line === "options:" || line.startsWith("options:")) {
+        currentOptions = {};
+        current.options = currentOptions;
+        optionsIndent = indent;
+        continue;
+      }
+
+      const target = optionsIndent >= 0 && indent > optionsIndent && currentOptions ? currentOptions : current;
+      const emptyKey = yamlEmptyKey(line);
+      if (emptyKey) {
+        const container = yamlEmptyContainer(emptyKey);
+        target[emptyKey] = container;
+        if (Array.isArray(container)) {
+          arrayTarget = container;
+          arrayIndent = indent;
+        }
+        continue;
+      }
+
+      if (optionsIndent >= 0 && indent > optionsIndent && currentOptions) {
+        assignSimpleYamlPair(currentOptions, line);
+      } else {
+        assignSimpleYamlPair(current, line);
       }
       continue;
     }
 
-    if (optionsIndent >= 0 && indent > optionsIndent && currentOptions) {
-      assignSimpleYamlPair(currentOptions, line);
-    } else {
-      assignSimpleYamlPair(current, line);
+    if (section === "groups") {
+      if (line.startsWith("- ") && (!currentGroup || indent <= groupIndent)) {
+        flushGroup();
+        currentGroup = { id: "", name: "" };
+        groupIndent = indent;
+        const rest = line.slice(2).trim();
+        if (rest) collectTabbyGroupField(currentGroup, rest);
+        continue;
+      }
+      if (currentGroup && indent > groupIndent) {
+        collectTabbyGroupField(currentGroup, line);
+      }
     }
   }
 
-  pushCurrent();
+  flushProfile();
+  flushGroup();
+
   if (profiles.length === 0) warnings.push("No Tabby profiles were found in the selected config.");
-  return profiles;
+  return { profiles, groupNames };
+}
+
+function collectTabbyGroupField(group: { id: string; name: string }, line: string) {
+  const separator = line.indexOf(":");
+  if (separator <= 0) return;
+  const key = line.slice(0, separator).trim();
+  const value = line.slice(separator + 1).trim();
+  if (key === "id") group.id = String(parseSimpleScalar(value));
+  else if (key === "name") group.name = String(parseSimpleScalar(value));
 }
 
 function stripYamlComment(line: string): string {

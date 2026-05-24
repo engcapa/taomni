@@ -133,7 +133,14 @@ export function MessageBubble({ message, format = "md" }: MessageBubbleProps) {
         </div>
       ))}
       {message.redacted && (
-        <div className="flex items-center gap-1 text-[10px] text-yellow-500">
+        <div
+          className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 self-start"
+          style={{
+            background: "var(--moba-badge-warning-bg)",
+            color: "var(--moba-badge-warning-text)",
+            border: "1px solid var(--moba-badge-warning-border)",
+          }}
+        >
           <ShieldAlert className="w-3 h-3" />
           已脱敏敏感字段
         </div>

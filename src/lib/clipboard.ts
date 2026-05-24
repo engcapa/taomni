@@ -39,15 +39,25 @@ function fallbackCopyText(text: string): boolean {
 }
 
 export async function readText(): Promise<string> {
+  // Prefer the webview clipboard API. On Linux/X11, arboard's get_text() must
+  // round-trip a SelectionRequest to whichever process owns the CLIPBOARD
+  // selection. When that owner is our own webview (e.g. the user copied text
+  // from the AI chat panel), the request has to be answered on webkit's GTK
+  // main thread — which can stall for seconds while chat is streaming, and
+  // arboard then logs a 4s timeout. The webview API resolves the same read
+  // against webkit's internal selection state without leaving the process.
+  if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
+    try {
+      return await navigator.clipboard.readText();
+    } catch {
+      // Permissions denied / no user gesture / unfocused — fall back to Rust.
+    }
+  }
   try {
     return await invoke<string>("clipboard_read_text");
   } catch {
-    // Fallback to browser API (e.g. in dev mode without Tauri runtime).
-  }
-  if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
     return "";
   }
-  return navigator.clipboard.readText();
 }
 
 export async function writeText(text: string): Promise<void> {
