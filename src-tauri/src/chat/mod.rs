@@ -14,6 +14,44 @@ fn now() -> i64 {
     chrono::Utc::now().timestamp()
 }
 
+/// Resolve the effective output format for a thread, falling back to the
+/// global default. Returns one of "md" | "html" | "plain".
+fn resolve_output_format(thread: &store::ChatThread, config: &AiConfig) -> String {
+    let candidate = thread
+        .output_format
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| config.chat_output_format.clone());
+    match candidate.as_str() {
+        "md" | "html" | "plain" => candidate,
+        _ => "md".into(),
+    }
+}
+
+/// Build the assistant system prompt. The base prompt explains the role; an
+/// extra paragraph instructs the assistant to format its replies as Markdown,
+/// raw HTML, or plain text — matching what the renderer is expecting.
+fn build_system_prompt(format: &str) -> String {
+    let base = "You are the AI assistant inside the NewMob terminal manager. \
+                Help the user manage SSH sessions, analyse terminal output, and craft shell commands. \
+                Reply in the same language the user writes in (default Chinese), and stay concise.";
+    let format_clause = match format {
+        "html" => "Render your reply as a self-contained HTML fragment. \
+                   Use semantic tags such as <p>, <ul>/<ol>, <li>, <h2>/<h3>, <code>, and <pre><code class=\"language-…\"> for code blocks. \
+                   Do NOT wrap the answer in <html>, <body>, <head>, <script>, <style>, or include event handlers — the host sanitises everything else.",
+        "plain" => "Reply in plain text only — no Markdown syntax, no HTML tags. \
+                    Keep paragraphs short and use blank lines for separation.",
+        // "md" is the default.
+        _ => "Format your reply as GitHub-flavoured Markdown. \
+              Use ```language fenced blocks for code, `inline code` for symbols/commands, \
+              tables / bullet lists / headings (##, ###) when they help readability. \
+              Do NOT wrap the entire answer in a single fenced block.",
+    };
+    format!("{}\n\n{}", base, format_clause)
+}
+
 /// Create a new chat thread.
 #[tauri::command]
 pub async fn chat_new_thread(
@@ -25,13 +63,15 @@ pub async fn chat_new_thread(
     let pid = provider_id.unwrap_or_else(|| config.llm.active.clone());
     let thread = store::ChatThread {
         id: Uuid::new_v4().to_string(),
-        title: "新对话".into(),
+        title: "New chat".into(),
         provider_id: pid,
         created_at: now(),
         updated_at: now(),
         linked_session_id,
         source: "drawer".into(),
         cc_session_id: None,
+        // New threads inherit the global default; the user can override per-thread later.
+        output_format: None,
     };
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::create_thread(&db, &thread).map_err(|e| e.to_string())?;
@@ -78,6 +118,30 @@ pub async fn chat_set_thread_provider(
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::update_thread_provider(&db, &thread_id, &provider_id).map_err(|e| e.to_string())
+}
+
+/// Set or clear the per-thread output-format override ("md" | "html" | "plain").
+/// Pass `None` (or an empty string) to clear and inherit `AiConfig.chat_output_format`.
+#[tauri::command]
+pub async fn chat_set_thread_output_format(
+    thread_id: String,
+    output_format: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let normalized = output_format
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    if let Some(fmt) = normalized {
+        if !matches!(fmt, "md" | "html" | "plain") {
+            return Err(format!(
+                "Invalid output_format '{}': expected 'md', 'html', or 'plain'.",
+                fmt
+            ));
+        }
+    }
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    store::update_thread_output_format(&db, &thread_id, normalized).map_err(|e| e.to_string())
 }
 
 /// Sweep retention: delete threads older than `keep_days`. Returns the number
@@ -159,16 +223,21 @@ pub async fn chat_send(
     // Redact user content.
     let (clean_content, redacted_count) = redact::redact(&req.content);
 
+    // Resolve the effective output format and build the system prompt around it.
+    let ai_config = AiConfig::load(&default_ai_config_path());
+    let output_format = resolve_output_format(&thread, &ai_config);
+    let system_prompt = build_system_prompt(&output_format);
+
     // Build LLM messages from history + new user message.
     let mut llm_messages: Vec<LlmMessage> = vec![
-        LlmMessage::system("你是 NewMob 终端管理器的 AI 助手。帮助用户管理 SSH 会话、分析终端输出、生成 shell 命令。用中文回答，简洁清晰。"),
+        LlmMessage::system(system_prompt),
     ];
 
     // Add terminal context if provided.
     if let Some(ctx) = &req.terminal_context {
         let (clean_ctx, _) = redact::redact(ctx);
-        llm_messages.push(LlmMessage::user(format!("[终端上下文]\n```\n{}\n```", clean_ctx)));
-        llm_messages.push(LlmMessage::assistant("好的，我已看到终端内容。"));
+        llm_messages.push(LlmMessage::user(format!("[Terminal context]\n```\n{}\n```", clean_ctx)));
+        llm_messages.push(LlmMessage::assistant("Acknowledged — I have read the terminal output."));
     }
 
     // Add conversation history.
@@ -301,13 +370,16 @@ pub async fn chat_stream(
     emit(&StreamEventOut::UserMessage { message: user_msg.clone() });
 
     // Build the LLM request.
+    let ai_config = AiConfig::load(&default_ai_config_path());
+    let output_format = resolve_output_format(&thread, &ai_config);
+    let system_prompt = build_system_prompt(&output_format);
     let mut llm_messages: Vec<LlmMessage> = vec![
-        LlmMessage::system("你是 NewMob 终端管理器的 AI 助手。帮助用户管理 SSH 会话、分析终端输出、生成 shell 命令。用中文回答，简洁清晰。"),
+        LlmMessage::system(system_prompt),
     ];
     if let Some(ctx) = &req.terminal_context {
         let (clean_ctx, _) = redact::redact(ctx);
-        llm_messages.push(LlmMessage::user(format!("[终端上下文]\n```\n{}\n```", clean_ctx)));
-        llm_messages.push(LlmMessage::assistant("好的，我已看到终端内容。"));
+        llm_messages.push(LlmMessage::user(format!("[Terminal context]\n```\n{}\n```", clean_ctx)));
+        llm_messages.push(LlmMessage::assistant("Acknowledged — I have read the terminal output."));
     }
     for msg in &history {
         llm_messages.push(LlmMessage { role: msg.role.clone(), content: msg.content.clone() });

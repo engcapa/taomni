@@ -203,6 +203,7 @@ pub fn run() {
             chat::chat_list_messages,
             chat::chat_delete_thread,
             chat::chat_set_thread_provider,
+            chat::chat_set_thread_output_format,
             chat::chat_purge_old,
             chat::chat_export_archive,
             chat::chat_send,

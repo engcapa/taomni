@@ -13,6 +13,10 @@ pub struct ChatThread {
     /// Claude Code session ID for --resume (v2.6).
     #[serde(default)]
     pub cc_session_id: Option<String>,
+    /// Per-thread output format override: "md" | "html" | "plain".
+    /// `None` means "inherit AiConfig.chat_output_format".
+    #[serde(default)]
+    pub output_format: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,17 +62,23 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
         "ALTER TABLE ai_chat_threads ADD COLUMN cc_session_id TEXT",
         [],
     );
+    // Idempotent column add for the per-thread chat output-format override.
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_threads ADD COLUMN output_format TEXT",
+        [],
+    );
     Ok(())
 }
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
+            thread.output_format,
         ],
     )?;
     Ok(())
@@ -76,7 +86,7 @@ pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -89,6 +99,7 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             linked_session_id: row.get(5)?,
             source: row.get(6)?,
             cc_session_id: row.get(7).ok(),
+            output_format: row.get(8).ok(),
         })
     })?;
     rows.collect()
@@ -151,6 +162,21 @@ pub fn update_thread_provider(conn: &Connection, id: &str, provider_id: &str) ->
     conn.execute(
         "UPDATE ai_chat_threads SET provider_id = ?1 WHERE id = ?2",
         params![provider_id, id],
+    )?;
+    Ok(())
+}
+
+/// Set or clear the per-thread output-format override.
+/// `None` (or `Some("")`) clears it so the thread inherits AiConfig.chat_output_format.
+pub fn update_thread_output_format(
+    conn: &Connection,
+    id: &str,
+    output_format: Option<&str>,
+) -> SqlResult<()> {
+    let normalized = output_format.filter(|s| !s.is_empty());
+    conn.execute(
+        "UPDATE ai_chat_threads SET output_format = ?1 WHERE id = ?2",
+        params![normalized, id],
     )?;
     Ok(())
 }

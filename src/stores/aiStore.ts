@@ -41,6 +41,8 @@ export interface AiConfig {
   cc_bridge: CcBridgeConfig;
   full_local_mode?: boolean;
   fully_disabled?: boolean;
+  /** Default output format for chat replies: "md" | "html" | "plain". */
+  chat_output_format?: string;
 }
 
 export interface CcBridgeConfig {
@@ -128,6 +130,7 @@ const DEFAULT_CONFIG: AiConfig = {
   },
   full_local_mode: false,
   fully_disabled: false,
+  chat_output_format: "md",
 };
 
 export const useAiStore = create<AiStore>((set, get) => ({

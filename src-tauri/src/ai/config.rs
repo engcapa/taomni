@@ -19,6 +19,15 @@ pub struct AiConfig {
     /// (no buttons, no status, no calls). Independent of full_local_mode.
     #[serde(default)]
     pub fully_disabled: bool,
+    /// Default chat output format the assistant is asked to produce.
+    /// One of "md" (Markdown, default), "html", or "plain".
+    /// Per-thread overrides live on `ai_chat_threads.output_format`.
+    #[serde(default = "default_chat_output_format")]
+    pub chat_output_format: String,
+}
+
+fn default_chat_output_format() -> String {
+    "md".into()
 }
 
 impl Default for AiConfig {
@@ -30,6 +39,7 @@ impl Default for AiConfig {
             cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig::default(),
             full_local_mode: false,
             fully_disabled: false,
+            chat_output_format: default_chat_output_format(),
         }
     }
 }

@@ -10,6 +10,8 @@ export interface ChatThread {
   updated_at: number;
   linked_session_id: string | null;
   source: string;
+  /** Per-thread output format override ("md" | "html" | "plain"). null = inherit AiConfig. */
+  output_format?: string | null;
 }
 
 export interface ChatMessage {
@@ -45,6 +47,9 @@ interface ChatStore {
   newThread: (providerId?: string, linkedSessionId?: string) => Promise<ChatThread>;
   deleteThread: (threadId: string) => Promise<void>;
   setThreadProvider: (threadId: string, providerId: string) => Promise<void>;
+  /// Set or clear the per-thread output-format override.
+  /// Pass `null` (or omit) to clear so the thread inherits the global setting.
+  setThreadOutputFormat: (threadId: string, format: string | null) => Promise<void>;
   setActiveThread: (threadId: string | null) => void;
   loadMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
@@ -106,6 +111,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((s) => ({
       threads: s.threads.map((t) =>
         t.id === threadId ? { ...t, provider_id: providerId } : t
+      ),
+    }));
+  },
+
+  setThreadOutputFormat: async (threadId: string, format: string | null) => {
+    // Backend treats empty/null the same — clears the override.
+    await invoke("chat_set_thread_output_format", {
+      threadId,
+      outputFormat: format ?? null,
+    });
+    set((s) => ({
+      threads: s.threads.map((t) =>
+        t.id === threadId ? { ...t, output_format: format } : t
       ),
     }));
   },

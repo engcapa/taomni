@@ -2,10 +2,13 @@ import type { ChatMessage } from "../../stores/chatStore";
 import { ShieldAlert } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "../agent/ActionCard";
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { renderFormatted, type ChatOutputFormat } from "../../lib/chat/renderFormatted";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  /** Resolved output format for this thread; defaults to "md" when omitted. */
+  format?: ChatOutputFormat;
 }
 
 interface InlineToolCall {
@@ -54,13 +57,27 @@ function parseInlineToolCalls(text: string): { stripped: string; toolCalls: Inli
   return { stripped, toolCalls };
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, format = "md" }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [executed, setExecuted] = useState<Record<number, "approved" | "denied">>({});
 
   const { stripped, toolCalls } = isUser
     ? { stripped: message.content, toolCalls: [] as InlineToolCall[] }
     : parseInlineToolCalls(message.content);
+
+  // Only assistant messages get markdown / HTML rendering. User input stays
+  // verbatim — what the user typed is what the user sees.
+  const renderedHtml = useMemo(() => {
+    if (isUser || format === "plain") return null;
+    try {
+      return renderFormatted(stripped, format);
+    } catch (e) {
+      // If anything blows up (malformed markdown, sanitizer edge case…),
+      // fall back to plain text rather than swallowing the message.
+      console.warn("renderFormatted failed:", e);
+      return null;
+    }
+  }, [isUser, stripped, format]);
 
   const handleDecide = async (idx: number, call: InlineToolCall, decision: ActionCardDecision) => {
     if (decision === "deny") {
@@ -80,13 +97,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <div className={`flex flex-col gap-0.5 ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed whitespace-pre-wrap break-words ${
+        className={`max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed break-words ${
           isUser
-            ? "bg-[var(--moba-accent)] text-white rounded-br-sm"
-            : "bg-[var(--moba-panel-bg)] border border-[var(--moba-divider)] rounded-bl-sm"
+            ? "bg-[var(--moba-accent)] text-white rounded-br-sm whitespace-pre-wrap"
+            : `bg-[var(--moba-panel-bg)] border border-[var(--moba-divider)] rounded-bl-sm ${
+                renderedHtml ? "moba-chat-md" : "whitespace-pre-wrap"
+              }`
         }`}
       >
-        {stripped}
+        {renderedHtml ? (
+          <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+        ) : (
+          stripped
+        )}
       </div>
       {toolCalls.map((call, i) => (
         <div key={i} className="max-w-[90%] mt-1">

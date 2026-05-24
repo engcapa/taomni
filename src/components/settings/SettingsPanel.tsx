@@ -20,6 +20,7 @@ import { AiShellPanel } from "./AiShellPanel";
 import { WebSearchPanel } from "./WebSearchPanel";
 import { ClaudeCodePanel } from "./ClaudeCodePanel";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
+import { ChatOutputFormatPanel } from "./ChatOutputFormatPanel";
 import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
 import { useAiStore } from "../../stores/aiStore";
 
@@ -193,9 +194,9 @@ export function SettingsPanel() {
           <div className="mb-3 flex items-center gap-2">
             <Bot className="w-4 h-4 text-[var(--moba-accent)]" />
             <div>
-              <div className="text-[14px] font-semibold">AI 设置</div>
+              <div className="text-[14px] font-semibold">AI Settings</div>
               <div className="text-[11px] text-[var(--moba-text-muted)]">
-                语音识别 (ASR) · LLM Provider · 隐私模式
+                Speech recognition (ASR) · LLM Provider · Privacy mode
               </div>
             </div>
           </div>
@@ -223,6 +224,10 @@ export function SettingsPanel() {
 
           <div className="pt-3 border-t border-[var(--moba-divider)]">
             <ClaudeCodePanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ChatOutputFormatPanel />
           </div>
 
           <div className="pt-3 border-t border-[var(--moba-divider)]">

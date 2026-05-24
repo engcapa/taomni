@@ -5,6 +5,7 @@ import { useAiStore } from "../../stores/aiStore";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { ChatThreadList } from "./ChatThreadList";
+import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 
 interface ChatDrawerProps {
   /** Optional terminal content to attach as context. */
@@ -29,9 +30,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiProviders = useAiStore((s) => s.config?.llm.providers);
+  const globalOutputFormat = useAiStore((s) => s.config?.chat_output_format) ?? "md";
   const loadAiConfig = useAiStore((s) => s.loadConfig);
   const providerIds = Object.keys(aiProviders ?? {});
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
+  const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
+
+  // Effective format for rendering this thread's messages: per-thread override
+  // takes precedence over the global default. Mirrors backend resolve_output_format.
+  const effectiveFormat: ChatOutputFormat = (() => {
+    const candidate = activeThread?.output_format ?? globalOutputFormat;
+    return candidate === "html" || candidate === "plain" ? candidate : "md";
+  })();
 
   // Load threads on mount + sweep stale (30-day retention).
   useEffect(() => {
@@ -192,7 +202,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
         {/* Provider badge / switcher */}
         {activeThread && (
-          <div className="px-2 py-1 text-[10px] text-[var(--moba-text-muted)] border-b border-[var(--moba-divider)] shrink-0 flex items-center gap-1.5">
+          <div className="px-2 py-1 text-[10px] text-[var(--moba-text-muted)] border-b border-[var(--moba-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
             <span>Provider:</span>
             {providerIds.length > 0 ? (
               <select
@@ -210,6 +220,22 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             ) : (
               <span className="text-[var(--moba-accent)]">{activeThread.provider_id}</span>
             )}
+            <span className="ml-2">Format:</span>
+            <select
+              className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
+              value={activeThread.output_format ?? ""}
+              aria-label="Thread output format"
+              title={`Effective: ${effectiveFormat} (global default: ${globalOutputFormat})`}
+              onChange={(e) => {
+                const v = e.target.value;
+                void setThreadOutputFormat(activeThread.id, v === "" ? null : v);
+              }}
+            >
+              <option value="">Inherit ({globalOutputFormat})</option>
+              <option value="md">Markdown</option>
+              <option value="html">HTML</option>
+              <option value="plain">Plain text</option>
+            </select>
           </div>
         )}
 
@@ -222,7 +248,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             </div>
           )}
           {activeMessages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+            <MessageBubble key={msg.id} message={msg} format={effectiveFormat} />
           ))}
           {sending && (
             <div className="flex items-center gap-2 text-[11px] text-[var(--moba-text-muted)]">
