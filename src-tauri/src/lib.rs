@@ -9,7 +9,7 @@ mod config;
 mod appearance;
 mod vnc;
 mod history;
-mod vault;
+pub mod vault;
 pub mod ai;
 mod asr;
 pub mod llm;

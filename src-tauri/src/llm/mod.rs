@@ -21,6 +21,12 @@ pub enum LlmError {
     Timeout { ms: u64 },
     #[error("No provider configured for task {0:?}")]
     NoProvider(TaskKind),
+    /// The provider's API key is stored as a `vault:<id>` reference but the
+    /// vault is currently locked (or the entry could not be resolved). The
+    /// frontend matches on the literal `VAULT_LOCKED` substring to surface
+    /// the unlock dialog — keep it stable.
+    #[error("VAULT_LOCKED: provider '{provider}' needs the vault unlocked to load its API key")]
+    VaultLocked { provider: String },
     #[error("Serialization error: {0}")]
     Serde(#[from] serde_json::Error),
 }

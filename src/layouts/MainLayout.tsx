@@ -169,10 +169,12 @@ export function MainLayout() {
   // locked). Surface the unlock dialog so the user can resolve it without
   // hunting through settings.
   useEffect(() => {
-    const handler = () => {
-      setVaultUnlockReason((prev) =>
-        prev ?? "This connection uses a saved password — unlock the vault to continue.",
-      );
+    const handler = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ reason?: string }>).detail;
+      const reason =
+        detail?.reason ??
+        "This connection uses a saved password — unlock the vault to continue.";
+      setVaultUnlockReason((prev) => prev ?? reason);
     };
     window.addEventListener(VAULT_LOCKED_EVENT, handler);
     return () => window.removeEventListener(VAULT_LOCKED_EVENT, handler);

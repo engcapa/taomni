@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { useAiStore, type LlmProviderConfig } from "../../stores/aiStore";
+import { isVaultLockedError } from "../../lib/ipc";
 
 const PROVIDER_LABELS: Record<string, string> = {
   deepseek:    "DeepSeek",
@@ -139,6 +140,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 export function LlmProvidersPanel() {
   const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, setActiveLlmProvider, testConnection } = useAiStore();
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!config) loadConfig();
@@ -157,10 +159,21 @@ export function LlmProvidersPanel() {
   };
 
   const handleSave = async () => {
+    setSaveError(null);
     try {
       await saveConfig(config);
     } catch (e) {
-      console.error("Failed to save AI config:", e);
+      if (isVaultLockedError(e)) {
+        // The aiStore already dispatched VAULT_LOCKED_EVENT so MainLayout's
+        // unlock dialog opens. Show a small inline hint so the user knows to
+        // re-click Save after unlocking.
+        setSaveError(
+          "Vault is locked — unlock it in the dialog above, then click Save again.",
+        );
+      } else {
+        setSaveError(String(e));
+        console.error("Failed to save AI config:", e);
+      }
     }
   };
 
@@ -182,6 +195,12 @@ export function LlmProvidersPanel() {
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
+
+      {saveError && (
+        <div className="text-[11px] text-yellow-300 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+          {saveError}
+        </div>
+      )}
 
       {Object.entries(config.llm.providers).map(([id, provider]) => (
         <ProviderRow

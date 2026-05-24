@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  vaultStatus,
+  VAULT_LOCKED_EVENT,
+  VAULT_LOCKED_ERROR,
+} from "../lib/ipc";
 
 export interface AsrProviderConfig {
   engine: string;
@@ -155,10 +160,44 @@ export const useAiStore = create<AiStore>((set, get) => ({
   saveConfig: async (config: AiConfig) => {
     set({ saving: true });
     try {
+      // Identify providers carrying a fresh plaintext API key — those are the
+      // ones we want to push into the vault. (Providers with an existing
+      // `vault:<id>` ref or the local sidecar's literal "local" are skipped.)
+      const providersNeedingVault = Object.entries(config.llm.providers).filter(
+        ([, p]) =>
+          p.api_key &&
+          p.api_key.length > 0 &&
+          !p.api_key.startsWith("vault:") &&
+          p.runtime !== "llama-server" &&
+          p.api_key !== "local",
+      );
+
+      // If we have plaintext keys to encrypt but the vault is locked or
+      // uninitialized, we MUST NOT fall back to writing plaintext to ai.json
+      // — the user thought they were saving into the encrypted vault, and a
+      // future restart would silently use a plaintext key. Instead, surface
+      // the unlock dialog and abort the save so the user can retry.
+      if (providersNeedingVault.length > 0) {
+        const status = await vaultStatus().catch(() => null);
+        if (status && status.state !== "unlocked") {
+          set({ saving: false });
+          window.dispatchEvent(
+            new CustomEvent(VAULT_LOCKED_EVENT, {
+              detail: {
+                reason:
+                  "Unlock the credential vault so the AI provider's API key can be encrypted before saving.",
+              },
+            }),
+          );
+          throw new Error(
+            `${VAULT_LOCKED_ERROR}: unlock the credential vault before saving the AI provider's API key.`,
+          );
+        }
+      }
+
       // For each provider whose api_key is plaintext (not already a vault: ref),
       // store it in the vault and replace the field with the returned `vault:<id>`
-      // reference. This is best-effort — if the vault is locked or empty, we
-      // fall back to saving the plaintext as-is so the existing flow still works.
+      // reference.
       const providers: Record<string, LlmProviderConfig> = {};
       for (const [id, p] of Object.entries(config.llm.providers)) {
         if (
@@ -175,8 +214,23 @@ export const useAiStore = create<AiStore>((set, get) => ({
               plaintext: p.api_key,
             });
             providers[id] = { ...p, api_key: ref };
-          } catch {
-            providers[id] = p; // vault locked / empty — keep plaintext
+          } catch (err) {
+            // Should be unreachable — we guarded above. But if the vault
+            // got re-locked between the check and the put, surface it.
+            const msg = String(err);
+            if (msg.includes(VAULT_LOCKED_ERROR)) {
+              set({ saving: false });
+              window.dispatchEvent(
+                new CustomEvent(VAULT_LOCKED_EVENT, {
+                  detail: {
+                    reason:
+                      "Unlock the credential vault so the AI provider's API key can be encrypted before saving.",
+                  },
+                }),
+              );
+              throw err;
+            }
+            providers[id] = p;
           }
         } else {
           providers[id] = p;

@@ -63,10 +63,24 @@ pub async fn inline_qq_stream(
             .or_else(|| ai_ctx.llm.provider(ai_ctx.llm.active()));
         match provider {
             Some(p) => p.chat_stream(req).await,
-            None => Err(crate::llm::LlmError::Provider {
-                status: 0,
-                message: "No provider available".into(),
-            }),
+            None => {
+                // Surface VAULT_LOCKED if the routed provider is just locked,
+                // so the frontend can prompt for unlock.
+                let locked_id = if ai_ctx.llm.needs_vault_unlock(&provider_id) {
+                    Some(provider_id.clone())
+                } else if ai_ctx.llm.needs_vault_unlock(ai_ctx.llm.active()) {
+                    Some(ai_ctx.llm.active().to_string())
+                } else {
+                    None
+                };
+                match locked_id {
+                    Some(id) => Err(crate::llm::LlmError::VaultLocked { provider: id }),
+                    None => Err(crate::llm::LlmError::Provider {
+                        status: 0,
+                        message: "No provider available".into(),
+                    }),
+                }
+            }
         }
     };
 

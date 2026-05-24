@@ -74,6 +74,14 @@ impl AppAiCtx {
         self.llm = build_router_from_ai(&cfg, Some(self.vault.as_ref()));
         self.config = cfg;
     }
+
+    /// Rebuild the LlmRouter against the current vault state without touching
+    /// the persisted config. Called after `vault_unlock` / `vault_change_master`
+    /// so providers whose api_key is `vault:<id>` start working as soon as the
+    /// vault is unlocked — no Save click required.
+    pub fn rebuild_router(&mut self) {
+        self.llm = build_router_from_ai(&self.config, Some(self.vault.as_ref()));
+    }
 }
 
 
