@@ -471,27 +471,30 @@ body {
 .moba-divider-h { height: 1px; background: var(--moba-divider); }
 .moba-divider-v { width: 1px; background: var(--moba-divider); }
 
-.moba-btn {
-  height: 26px;
-  padding: 0 14px;
-  font-size: var(--moba-ui-font-size);
-  background: linear-gradient(to bottom, var(--moba-button-from), var(--moba-button-to));
-  border: 1px solid var(--moba-input-border);
-  border-radius: 3px;
-  cursor: pointer;
-  color: var(--moba-text);
-  transition: var(--moba-transition);
-}
-.moba-btn:hover { background: linear-gradient(to bottom, var(--moba-button-hover-from), var(--moba-button-hover-to)); }
-.moba-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-  background: var(--moba-button-disabled);
-}
-.moba-btn:disabled:hover { background: var(--moba-button-disabled); }
-.moba-btn[data-primary="true"] {
-  background: linear-gradient(to bottom, var(--moba-accent-soft), var(--moba-accent));
-  border-color: var(--moba-accent); color: #fff; font-weight: 600;
+@layer components {
+  .moba-btn {
+    height: 26px;
+    padding: 0 14px;
+    font-size: var(--moba-ui-font-size);
+    background: linear-gradient(to bottom, var(--moba-button-from), var(--moba-button-to));
+    border: 1px solid var(--moba-input-border);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--moba-text);
+    transition: var(--moba-transition);
+  }
+  .moba-btn:hover { background: linear-gradient(to bottom, var(--moba-button-hover-from), var(--moba-button-hover-to)); }
+  .moba-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    background: var(--moba-button-disabled);
+  }
+  .moba-btn:disabled:hover { background: var(--moba-button-disabled); }
+  .moba-btn[data-primary="true"] {
+    background: linear-gradient(to bottom, var(--moba-accent-soft), var(--moba-accent));
+    border-color: var(--moba-accent); color: #fff; font-weight: 600;
+  }
+  .moba-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--moba-accent-soft) 85%, #fff), color-mix(in srgb, var(--moba-accent) 85%, #fff)); }
 }
 
 /* Card Hover Environment Shadow Depth Effect */
@@ -503,7 +506,93 @@ body {
   box-shadow: var(--moba-shadow-md);
   border-color: var(--moba-accent-soft);
 }
-.moba-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--moba-accent-soft) 85%, #fff), color-mix(in srgb, var(--moba-accent) 85%, #fff)); }
+
+/* Chat assistant rendered markdown / HTML.
+   Tight defaults so MD/HTML output reads well inside a 380px-wide drawer. */
+.moba-chat-md > div > *:first-child { margin-top: 0; }
+.moba-chat-md > div > *:last-child { margin-bottom: 0; }
+.moba-chat-md p { margin: 0.4em 0; }
+.moba-chat-md h1,
+.moba-chat-md h2,
+.moba-chat-md h3,
+.moba-chat-md h4,
+.moba-chat-md h5,
+.moba-chat-md h6 {
+  margin: 0.6em 0 0.3em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.moba-chat-md h1 { font-size: 1.2em; }
+.moba-chat-md h2 { font-size: 1.12em; }
+.moba-chat-md h3 { font-size: 1.05em; }
+.moba-chat-md h4,
+.moba-chat-md h5,
+.moba-chat-md h6 { font-size: 1em; color: var(--moba-text-muted); }
+.moba-chat-md ul,
+.moba-chat-md ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+.moba-chat-md li { margin: 0.15em 0; }
+.moba-chat-md ul { list-style: disc; }
+.moba-chat-md ol { list-style: decimal; }
+.moba-chat-md a {
+  color: var(--moba-link);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--moba-link) 50%, transparent);
+}
+.moba-chat-md a:hover { text-decoration-color: var(--moba-link); }
+.moba-chat-md code {
+  font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
+  font-size: 0.92em;
+  background: color-mix(in srgb, var(--moba-divider) 60%, transparent);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+}
+.moba-chat-md pre {
+  margin: 0.5em 0;
+  padding: 0.6em 0.75em;
+  background: var(--moba-bg);
+  border: 1px solid var(--moba-divider);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.9em;
+  line-height: 1.45;
+}
+.moba-chat-md pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.moba-chat-md blockquote {
+  margin: 0.4em 0;
+  padding: 0.1em 0.75em;
+  border-left: 3px solid var(--moba-accent-soft);
+  color: var(--moba-text-muted);
+}
+.moba-chat-md table {
+  margin: 0.5em 0;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95em;
+}
+.moba-chat-md th,
+.moba-chat-md td {
+  border: 1px solid var(--moba-divider);
+  padding: 0.25em 0.5em;
+  text-align: left;
+}
+.moba-chat-md th {
+  background: color-mix(in srgb, var(--moba-divider) 50%, transparent);
+  font-weight: 600;
+}
+.moba-chat-md hr {
+  margin: 0.7em 0;
+  border: none;
+  border-top: 1px solid var(--moba-divider);
+}
+.moba-chat-md img { max-width: 100%; height: auto; border-radius: 3px; }
 
 .moba-proto-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;

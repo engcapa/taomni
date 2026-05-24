@@ -45,12 +45,12 @@ export function PrivacyToggle() {
       )}
       <div className="flex-1">
         <div className="text-[13px] font-semibold">
-          全本地模式 {isLocalMode ? "· 已开启" : ""}
+          Full local mode {isLocalMode ? "· Enabled" : ""}
         </div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
           {isLocalMode
-            ? "云端 LLM、Web 搜索、Claude Code 全部被拒绝；仅本地 sidecar / Ollama 可用"
-            : "开启后强制本地，需先下载本地模型 + 启动 llama-server sidecar"}
+            ? "Cloud LLMs, web search, and Claude Code are all blocked; only the local sidecar / Ollama remain available"
+            : "When enabled, forces local-only routing — requires a local model and a running llama-server sidecar"}
         </div>
       </div>
       <div

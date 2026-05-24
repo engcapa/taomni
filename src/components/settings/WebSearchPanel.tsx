@@ -4,19 +4,19 @@ import { Globe, Loader2 } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 
 const CONFIRM_MODE_OPTIONS = [
-  { value: "per_call",    label: "每次确认（默认）",          desc: "每次搜索都弹确认卡" },
-  { value: "per_thread",  label: "首次确认 + 本 thread 静默", desc: "同 thread 后续搜索不再弹卡" },
-  { value: "always",      label: "总是允许",                  desc: "不弹卡，但 Drawer 中仍显示搜索提示" },
-  { value: "disabled",    label: "完全禁用",                  desc: "Agent 看不到搜索工具" },
+  { value: "per_call",    label: "Confirm every time (default)", desc: "Show a confirmation card for every search" },
+  { value: "per_thread",  label: "Confirm once per thread",      desc: "Subsequent searches in the same thread skip the card" },
+  { value: "always",      label: "Always allow",                 desc: "No confirmation card, but the drawer still shows search activity" },
+  { value: "disabled",    label: "Disabled",                     desc: "Agents cannot see the search tool" },
 ] as const;
 
 const PROVIDER_OPTIONS = [
-  { value: "searxng",    label: "SearXNG（默认，无需 API Key）" },
-  { value: "tavily",     label: "Tavily（1k/月免费，英文优秀）" },
-  { value: "serper",     label: "Serper（Google 索引，中文优秀）" },
-  { value: "brave",      label: "Brave Search（独立索引，月 ~1k 免费）" },
-  { value: "exa",        label: "Exa（神经索引，学术 / 长尾英文）" },
-  { value: "google_cse", label: "Google CSE（API_KEY:CX，每天 100 免费）" },
+  { value: "searxng",    label: "SearXNG (default, no API key required)" },
+  { value: "tavily",     label: "Tavily (1k/month free, strong English)" },
+  { value: "serper",     label: "Serper (Google index, strong Chinese)" },
+  { value: "brave",      label: "Brave Search (independent index, ~1k/month free)" },
+  { value: "exa",        label: "Exa (neural index, academic / long-tail English)" },
+  { value: "google_cse", label: "Google CSE (API_KEY:CX, 100/day free)" },
 ] as const;
 
 export function WebSearchPanel() {
@@ -28,7 +28,7 @@ export function WebSearchPanel() {
     if (!config) loadConfig();
   }, []);
 
-  if (!config) return <div className="text-[12px] text-[var(--moba-text-muted)]">加载中...</div>;
+  if (!config) return <div className="text-[12px] text-[var(--moba-text-muted)]">Loading...</div>;
 
   const ws = config.web_search;
 
@@ -42,9 +42,9 @@ export function WebSearchPanel() {
     setProbeResult(null);
     try {
       const best = await invoke<string | null>("probe_searxng_instances");
-      setProbeResult(best ?? "所有公共实例均不可达，请自填 URL");
+      setProbeResult(best ?? "All public instances are unreachable; please enter a custom URL");
     } catch (e) {
-      setProbeResult(`探测失败: ${String(e)}`);
+      setProbeResult(`Probe failed: ${String(e)}`);
     } finally {
       setProbing(false);
     }
@@ -55,7 +55,7 @@ export function WebSearchPanel() {
       <div>
         <div className="text-[13px] font-semibold">Web Search</div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
-          Agent 联网搜索能力 · 默认关闭 · 每次搜索必须用户确认
+          Agent web search · Off by default · Each search requires user confirmation
         </div>
       </div>
 
@@ -70,9 +70,9 @@ export function WebSearchPanel() {
       >
         <Globe className={`w-4 h-4 shrink-0 ${ws.client_enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">启用客户端 Web Search</div>
+          <div className="text-[13px] font-semibold">Enable client web search</div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            开启后 Agent 可搜索网络（每次需用户确认）
+            When enabled, agents can search the web (each call requires user confirmation)
           </div>
         </div>
         <div className={`w-9 h-5 rounded-full transition-colors relative ${ws.client_enabled ? "bg-[var(--moba-accent)]" : "bg-[var(--moba-divider)]"}`}>
@@ -84,7 +84,7 @@ export function WebSearchPanel() {
         <>
           {/* Provider selection */}
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">搜索提供方</div>
+            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">Search provider</div>
             <div className="space-y-1">
               {PROVIDER_OPTIONS.map(({ value, label }) => (
                 <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -105,7 +105,7 @@ export function WebSearchPanel() {
           {/* SearXNG URL */}
           {ws.client_provider === "searxng" && (
             <div>
-              <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">SearXNG 实例 URL（留空自动探测）</div>
+              <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">SearXNG instance URL (leave blank to auto-probe)</div>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -120,7 +120,7 @@ export function WebSearchPanel() {
                   onClick={handleProbe}
                   disabled={probing}
                 >
-                  {probing ? <Loader2 className="w-3 h-3 animate-spin" /> : "探测最快实例"}
+                  {probing ? <Loader2 className="w-3 h-3 animate-spin" /> : "Probe fastest"}
                 </button>
               </div>
               {probeResult && (
@@ -149,7 +149,7 @@ export function WebSearchPanel() {
                 placeholder={
                   ws.client_provider === "google_cse"
                     ? "AIza...:abc123:xyz"
-                    : "粘贴 API Key..."
+                    : "Paste API Key..."
                 }
                 value={ws.byok_key}
                 onChange={(e) => update({ byok_key: e.target.value })}
@@ -159,7 +159,7 @@ export function WebSearchPanel() {
 
           {/* Confirmation mode */}
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">确认模式</div>
+            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">Confirmation mode</div>
             <div className="space-y-1">
               {CONFIRM_MODE_OPTIONS.map(({ value, label, desc }) => (
                 <label key={value} className="flex items-start gap-2 cursor-pointer">

@@ -30,7 +30,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      title="复制"
+      title="Copy"
     >
       <Copy className={`w-3 h-3 ${copied ? "text-green-400" : ""}`} />
     </button>
@@ -80,9 +80,9 @@ export function ClaudeCodePanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">Claude Code 集成</div>
+        <div className="text-[13px] font-semibold">Claude Code Integration</div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
-          用户自带 CLI · NewMob 不打包二进制 · 不存 Anthropic 凭证
+          Bring your own CLI · NewMob does not bundle the binary · No Anthropic credentials are stored
         </div>
       </div>
 
@@ -98,10 +98,10 @@ export function ClaudeCodePanel() {
         <StatusIcon />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">
-            Claude Code 集成 {cc.enabled ? "· 已开启" : ""}
+            Claude Code Integration {cc.enabled ? "· Enabled" : ""}
           </div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            {status?.message ?? "开启后在 Chat Drawer 中可选 Claude Code 作为 Provider"}
+            {status?.message ?? "When enabled, Claude Code becomes a selectable provider in the Chat Drawer"}
           </div>
         </div>
         <div className={`w-9 h-5 rounded-full transition-colors relative ${cc.enabled ? "bg-[var(--moba-accent)]" : "bg-[var(--moba-divider)]"}`}>
@@ -117,13 +117,13 @@ export function ClaudeCodePanel() {
         disabled={detecting}
       >
         {detecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Terminal className="w-3.5 h-3.5" />}
-        检测 Claude Code
+        Detect Claude Code
       </button>
 
       {/* Install instructions (shown when not found) */}
       {isNotFound && (
         <div className="rounded border border-[var(--moba-divider)] p-3 space-y-2">
-          <div className="text-[12px] font-semibold">安装 Claude Code CLI</div>
+          <div className="text-[12px] font-semibold">Install Claude Code CLI</div>
           {INSTALL_COMMANDS.map(({ platform, cmd }) => (
             <div key={platform}>
               <div className="text-[10px] text-[var(--moba-text-muted)] mb-0.5">{platform}</div>
@@ -141,8 +141,8 @@ export function ClaudeCodePanel() {
       {/* Version too low */}
       {isVersionLow && status?.status.type === "version_too_low" && (
         <div className="text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
-          找到 v{status.status.found}，需要 v{status.status.required} 或更高版本。
-          请运行 <code className="font-mono">npm update -g @anthropic-ai/claude-code</code> 升级。
+          Found v{status.status.found}, but v{status.status.required} or higher is required.
+          Run <code className="font-mono">npm update -g @anthropic-ai/claude-code</code> to upgrade.
         </div>
       )}
 
@@ -150,7 +150,7 @@ export function ClaudeCodePanel() {
       {isNotAuth && (
         <div className="flex items-center gap-2 text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          <span>未认证。请在终端运行 <code className="font-mono">claude login</code> 完成登录。</span>
+          <span>Not authenticated. Run <code className="font-mono">claude login</code> in a terminal to sign in.</span>
         </div>
       )}
 
@@ -159,19 +159,19 @@ export function ClaudeCodePanel() {
         <div className="space-y-2 pt-2 border-t border-[var(--moba-divider)]">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">默认模型</label>
+              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Default model</label>
               <select
                 className="moba-input h-7 w-full text-[12px]"
                 value={cc.default_model}
                 onChange={(e) => saveConfig({ ...config, cc_bridge: { ...cc, default_model: e.target.value } })}
               >
-                <option value="sonnet">claude-sonnet (推荐)</option>
-                <option value="opus">claude-opus (最强)</option>
-                <option value="haiku">claude-haiku (最快)</option>
+                <option value="sonnet">claude-sonnet (recommended)</option>
+                <option value="opus">claude-opus (most capable)</option>
+                <option value="haiku">claude-haiku (fastest)</option>
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">最大轮次</label>
+              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Max turns</label>
               <input
                 type="number"
                 className="moba-input h-7 w-full text-[12px]"
@@ -183,7 +183,7 @@ export function ClaudeCodePanel() {
             </div>
           </div>
           <div className="text-[10px] text-[var(--moba-text-muted)]">
-            ⚠ 全本地模式开启时 Claude Code 集成自动隐藏（CC 必须联网调用 Anthropic）
+            ⚠ Claude Code is hidden automatically when full-local mode is on (CC must call Anthropic over the network)
           </div>
         </div>
       )}

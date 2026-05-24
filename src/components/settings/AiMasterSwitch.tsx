@@ -34,12 +34,12 @@ export function AiMasterSwitch() {
       />
       <div className="flex-1">
         <div className="text-[13px] font-semibold">
-          完全禁用 AI {disabled ? "· 已开启" : ""}
+          Disable AI completely {disabled ? "· Enabled" : ""}
         </div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
           {disabled
-            ? "所有 AI 入口隐藏；无网络调用、无模型加载、零额外内存"
-            : "保留 AI 功能。打开后恢复纯终端形态，作为离线/合规场景的总开关。"}
+            ? "All AI entry points hidden; no network calls, no model loading, zero extra memory"
+            : "Keep AI features. When enabled, restores plain terminal mode — useful as a master switch for offline / compliance scenarios."}
         </div>
       </div>
       <div

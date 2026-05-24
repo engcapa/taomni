@@ -26,9 +26,9 @@ export function ChatHistoryPanel() {
     setStatus(null);
     try {
       const deleted = await purge(keepDays);
-      setStatus(deleted > 0 ? `已删除 ${deleted} 条过期对话` : "没有需要清理的对话");
+      setStatus(deleted > 0 ? `Deleted ${deleted} expired thread${deleted === 1 ? "" : "s"}` : "No threads needed cleanup");
     } catch (e) {
-      setStatus(`清理失败：${String(e)}`);
+      setStatus(`Cleanup failed: ${String(e)}`);
     } finally {
       setPurging(false);
     }
@@ -47,9 +47,9 @@ export function ChatHistoryPanel() {
         return;
       }
       const total = await exportArchive(path);
-      setStatus(`已导出 ${total} 条消息到 ${path}`);
+      setStatus(`Exported ${total} message${total === 1 ? "" : "s"} to ${path}`);
     } catch (e) {
-      setStatus(`导出失败：${String(e)}`);
+      setStatus(`Export failed: ${String(e)}`);
     } finally {
       setExporting(false);
     }
@@ -59,12 +59,12 @@ export function ChatHistoryPanel() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <History className="w-4 h-4 text-[var(--moba-accent)]" />
-        <div className="text-[13px] font-semibold flex-1">对话历史管理</div>
+        <div className="text-[13px] font-semibold flex-1">Chat history management</div>
       </div>
 
       <div className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px] items-end">
         <label className="col-span-6">
-          <span className="block mb-1 text-[var(--moba-text-muted)]">保留天数</span>
+          <span className="block mb-1 text-[var(--moba-text-muted)]">Retention (days)</span>
           <input
             className="moba-input h-7 w-24"
             type="number"
@@ -87,7 +87,7 @@ export function ChatHistoryPanel() {
             disabled={purging}
           >
             {purging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            清理过期对话
+            Purge expired
           </button>
 
           <button
@@ -97,13 +97,13 @@ export function ChatHistoryPanel() {
             disabled={exporting}
           >
             {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-            导出全部对话
+            Export all
           </button>
         </div>
       </div>
 
       <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug">
-        默认 30 天自动清理，仅删除超过保留期的对话；导出生成 JSON 文件，可手动压缩归档。
+        By default threads older than the retention window are auto-purged; export writes a JSON file that you can compress and archive manually.
       </p>
 
       {status && (

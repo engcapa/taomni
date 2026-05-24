@@ -73,10 +73,10 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
         <Terminal className={`w-4 h-4 shrink-0 ${enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">
-            语音生成命令 <span className="text-[10px] text-yellow-400 ml-1">实验性</span>
+            Voice-to-Command <span className="text-[10px] text-yellow-400 ml-1">Experimental</span>
           </div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            用自然语言描述命令，AI 生成 shell 脚本并显示确认卡
+            Describe a command in natural language; AI generates a shell script and shows a confirmation card
           </div>
         </div>
         <div
@@ -96,13 +96,13 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       {enabled && (
         <div className="space-y-2">
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            测试：输入自然语言描述，生成命令预览卡
+            Test: type a natural-language description to generate a command preview card
           </div>
           <div className="flex gap-2">
             <input
               type="text"
               className="moba-input h-8 flex-1 text-[12px]"
-              placeholder="例：列出当前目录所有大于 100MB 的文件"
+              placeholder="e.g. List all files larger than 100MB in the current directory"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
@@ -113,7 +113,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
               onClick={handleGenerate}
               disabled={loading || !description.trim()}
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "生成"}
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Generate"}
             </button>
           </div>
 

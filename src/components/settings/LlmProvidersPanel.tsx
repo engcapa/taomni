@@ -4,20 +4,20 @@ import { useAiStore, type LlmProviderConfig } from "../../stores/aiStore";
 
 const PROVIDER_LABELS: Record<string, string> = {
   deepseek:    "DeepSeek",
-  glm:         "GLM-4-Flash (免费)",
+  glm:         "GLM-4-Flash (Free)",
   siliconflow: "SiliconFlow",
   groq:        "Groq",
-  local:       "本地 (llama-server)",
+  local:       "Local (llama-server)",
   anthropic:   "Anthropic (Claude)",
 };
 
 const PROVIDER_NOTES: Record<string, string> = {
-  deepseek:    "~¥1/百万输入，中文优秀",
-  glm:         "完全免费，国内首选",
-  siliconflow: "一 Key 多模型，大量小模型免费",
-  groq:        "极速推理 ~500 tok/s，免费层",
-  local:       "零成本，需下载模型 (~1.4 GB)",
-  anthropic:   "claude-sonnet-4-5，按量付费",
+  deepseek:    "~¥1 per million input tokens, strong Chinese support",
+  glm:         "Completely free, top pick in China",
+  siliconflow: "One key, many models; many small models free",
+  groq:        "Ultra-fast inference ~500 tok/s, free tier",
+  local:       "Zero cost, requires downloading a model (~1.4 GB)",
+  anthropic:   "claude-sonnet-4-5, pay-as-you-go",
 };
 
 interface ProviderRowProps {
@@ -61,7 +61,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 
         {testResult && (
           <span className={`text-[11px] ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
-            {testResult.ok ? `✓ ${testResult.latency_ms}ms` : "✗ 失败"}
+            {testResult.ok ? `✓ ${testResult.latency_ms}ms` : "✗ Failed"}
           </span>
         )}
 
@@ -71,7 +71,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
           onClick={(e) => { e.stopPropagation(); if (!isActive) onActivate(); }}
           disabled={isActive}
         >
-          {isActive ? "当前" : "使用"}
+          {isActive ? "Active" : "Use"}
         </button>
       </div>
 
@@ -83,14 +83,14 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               <input
                 type="password"
                 className="moba-input h-7 w-full text-[12px]"
-                placeholder="粘贴 API Key..."
+                placeholder="Paste API Key..."
                 value={provider.api_key}
                 onChange={(e) => onChange({ ...provider, api_key: e.target.value })}
               />
             </div>
           )}
           <div>
-            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">模型</label>
+            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Model</label>
             <input
               type="text"
               className="moba-input h-7 w-full text-[12px]"
@@ -117,13 +117,13 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               {testing ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                "测试连接"
+                "Test connection"
               )}
             </button>
             {testResult && (
               <span className={`text-[12px] flex items-center gap-1 ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
                 {testResult.ok ? (
-                  <><CheckCircle className="w-3.5 h-3.5" /> 连接成功 ({testResult.latency_ms}ms)</>
+                  <><CheckCircle className="w-3.5 h-3.5" /> Connected ({testResult.latency_ms}ms)</>
                 ) : (
                   <><XCircle className="w-3.5 h-3.5" /> {testResult.message.slice(0, 60)}</>
                 )}
@@ -145,7 +145,7 @@ export function LlmProvidersPanel() {
   }, []);
 
   if (loading || !config) {
-    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">加载中...</div>;
+    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">Loading...</div>;
   }
 
   const handleTest = async (id: string) => {
@@ -170,7 +170,7 @@ export function LlmProvidersPanel() {
         <div>
           <div className="text-[13px] font-semibold">LLM Provider</div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            当前: {config.llm.active} · 超时回退: {config.llm.fallback.enabled ? `${config.llm.fallback.timeout_ms}ms → ${config.llm.fallback.secondary}` : "关闭"}
+            Active: {config.llm.active} · Timeout fallback: {config.llm.fallback.enabled ? `${config.llm.fallback.timeout_ms}ms → ${config.llm.fallback.secondary}` : "Off"}
           </div>
         </div>
         <button
@@ -179,7 +179,7 @@ export function LlmProvidersPanel() {
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? "保存中..." : "保存"}
+          {saving ? "Saving..." : "Save"}
         </button>
       </div>
 
