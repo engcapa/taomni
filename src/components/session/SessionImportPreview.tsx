@@ -19,7 +19,12 @@ export function SessionImportPreview({
   const previewRows = result.sessions.slice(0, 80);
   const remaining = result.sessions.length - previewRows.length;
   const target = folderOptionLabel(targetFolder);
-  const passwordCount = result.secrets.filter((secret) => secret.kind === "password").length;
+  const sessionPasswordCount = result.secrets.filter(
+    (secret) => secret.kind === "password" && secret.attachment !== "standalone",
+  ).length;
+  const standaloneSecretCount = result.secrets.filter(
+    (secret) => secret.attachment === "standalone",
+  ).length;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -53,9 +58,14 @@ export function SessionImportPreview({
             {result.sessions.length} session{result.sessions.length === 1 ? "" : "s"} will be imported into {target}
             {result.skipped ? `, ${result.skipped} skipped` : ""}.
           </div>
-          {passwordCount > 0 && (
+          {sessionPasswordCount > 0 && (
             <div className="text-[12px] text-[var(--moba-text-muted)] mt-1">
-              {passwordCount} saved password{passwordCount === 1 ? "" : "s"} will be stored in the NewMob credential vault.
+              {sessionPasswordCount} saved password{sessionPasswordCount === 1 ? "" : "s"} will be stored in the NewMob credential vault.
+            </div>
+          )}
+          {standaloneSecretCount > 0 && (
+            <div className="text-[12px] text-[var(--moba-text-muted)] mt-1">
+              + {standaloneSecretCount} standalone secret{standaloneSecretCount === 1 ? "" : "s"} (e.g. private-key passphrases) will be saved as separate vault entries.
             </div>
           )}
         </div>
