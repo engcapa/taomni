@@ -155,6 +155,38 @@ export function parseCsvSessions(text: string, options: SessionImportOptions = {
   return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
 }
 
+export function serializeCsvSessions(
+  sessions: readonly SessionConfig[],
+  scopeFolder: string | null,
+): SessionExportResult {
+  const warnings: string[] = [];
+  const rows = [
+    ["name", "session_type", "host", "port", "username", "group_path"],
+  ];
+
+  for (const session of sessions) {
+    const sessionType = sanitizeSessionType(session.session_type, warnings);
+    if (!sessionType) continue;
+    rows.push([
+      cleanText(session.name, MAX_NAME_LENGTH),
+      sessionType,
+      cleanText(session.host, MAX_HOST_LENGTH),
+      String(sanitizePort(session.port, DEFAULT_PORTS[sessionType] ?? 0)),
+      optionalCleanText(session.username, MAX_NAME_LENGTH) ?? "",
+      relativeFolderPath(session.group_path, scopeFolder) ?? "",
+    ]);
+  }
+
+  const skipped = sessions.length - (rows.length - 1);
+  return {
+    filename: `${slugify(normalizeGroupPath(scopeFolder) ?? "user-sessions")}.csv`,
+    text: `${rows.map((row) => row.map(csvEscape).join(",")).join("\r\n")}\r\n`,
+    mimeType: "text/csv",
+    warnings: uniqueWarnings(warnings),
+    skipped,
+  };
+}
+
 export function parseMobaXtermSessions(
   input: string | ArrayBuffer | Uint8Array,
   options: SessionImportOptions = {},
@@ -189,6 +221,22 @@ export function parseMobaXtermSessions(
   }
 
   return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+}
+
+export function createSessionImportResult(
+  sessions: readonly SessionConfig[],
+  options: {
+    existingSessions?: readonly SessionConfig[];
+    warnings?: readonly string[];
+    skipped?: number;
+  } = {},
+): SessionImportResult {
+  return finalizeImportResult(
+    sessions.map((session) => ({ ...session })),
+    options.skipped ?? 0,
+    [...(options.warnings ?? [])],
+    options.existingSessions,
+  );
 }
 
 export function serializeMobaXtermSessions(
@@ -391,12 +439,14 @@ function csvRowToSession(
 
   const name = cleanText(get("name", 0), MAX_NAME_LENGTH) || host || sessionType;
   const username = optionalCleanText(get("username", 4) || get("user", 4), MAX_NAME_LENGTH);
+  const importedFolder = normalizeGroupPath(get("group_path", 5) || get("folder_path", 5) || get("folder", 5));
+  const groupPath = combineImportFolder(targetFolder, importedFolder);
 
   return {
     id: createSessionId(),
     name,
     session_type: sessionType,
-    group_path: toStoredGroupPath(targetFolder),
+    group_path: toStoredGroupPath(groupPath),
     host,
     port: sanitizePort(get("port", 3), DEFAULT_PORTS[sessionType] ?? 0),
     username,
@@ -803,6 +853,7 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyBoolean(source, output, "x11");
   copyBoolean(source, output, "compression");
   copyBoolean(source, output, "doNotExit");
+  copyBoolean(source, output, "disableAiWrite");
   copyString(source, output, "startupCmd", MAX_OPTION_LENGTH);
   copyString(source, output, "jumpHost", MAX_HOST_LENGTH);
   copyString(source, output, "jumpUser", MAX_NAME_LENGTH);
@@ -916,6 +967,13 @@ function parseCsv(text: string): string[][] {
   row.push(cell);
   if (row.some((value) => value.length > 0)) rows.push(row);
   return rows;
+}
+
+function csvEscape(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, "\"\"")}"`;
+  }
+  return value;
 }
 
 function combineImportFolder(targetFolder: string | null, importedFolder: string | null): string | null {

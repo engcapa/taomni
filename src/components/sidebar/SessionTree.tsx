@@ -33,11 +33,14 @@ import {
   parseCsvSessions,
   parseMobaXtermSessions,
   parseNewMobSessions,
+  serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
   type SessionExportResult,
   type SessionImportResult,
 } from "../../lib/sessionImportExport";
+import { openBinaryFile, openTextFile, downloadTextFile } from "../../lib/fileHelpers";
+import { serializeHtmlSessions } from "../../lib/sessionExportHtml";
 import {
   SESSION_ROOT_LABEL,
   ancestorGroupPaths,
@@ -47,9 +50,9 @@ import {
   leafGroupName,
   normalizeGroupPath,
   parentGroupPath,
-  splitGroupPath,
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
+import { SessionImportPreview } from "../session/SessionImportPreview";
 
 const SESSION_DRAG_MIME = "newmob/session";
 
@@ -95,6 +98,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     | { mode: "rename"; parentPath: string | null; folderPath: string; initialName: string }
     | null
   >(null);
+  const [pendingImport, setPendingImport] = useState<{
+    result: SessionImportResult;
+    folderPath: string | null;
+    source: string;
+  } | null>(null);
   const ctx = useContextMenu();
 
   useEffect(() => {
@@ -214,92 +222,92 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     reportExportResult("MobaXterm", result, folderSessions.length - result.skipped, label);
   };
 
+  const exportCsvFolder = (folderPath: string | null) => {
+    const folderSessions = sessionsInFolder(sessions, folderPath);
+    const label = folderOptionLabel(folderPath);
+    const result = serializeCsvSessions(folderSessions, folderPath);
+    downloadTextFile(result.filename, result.text, result.mimeType);
+    reportExportResult("CSV", result, folderSessions.length - result.skipped, label);
+  };
+
   const generateHtml = (folderPath: string | null) => {
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const label = folderOptionLabel(folderPath);
-    const rows = folderSessions.map((session) => `
-      <tr>
-        <td>${escapeHtml(session.name)}</td>
-        <td>${escapeHtml(session.session_type)}</td>
-        <td>${escapeHtml(session.host)}</td>
-        <td>${session.port}</td>
-        <td>${escapeHtml(session.username ?? "")}</td>
-      </tr>`).join("");
-    const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(label)}</title>
-  <style>
-    body { font: 13px system-ui, sans-serif; margin: 24px; color: #1d2330; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #c8cdd4; padding: 6px 8px; text-align: left; }
-    th { background: #eaf1fa; }
-  </style>
-</head>
-<body>
-  <h1>${escapeHtml(label)}</h1>
-  <table>
-    <thead><tr><th>Name</th><th>Type</th><th>Host</th><th>Port</th><th>User</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-</body>
-</html>`;
-
-    downloadTextFile(`${slugify(label)}.html`, html, "text/html");
-    setStatusMessage(`Generated HTML page for ${label}`);
+    const result = serializeHtmlSessions(folderSessions, folderPath);
+    downloadTextFile(result.filename, result.text, result.mimeType);
+    reportExportResult("HTML", result, folderSessions.length, label);
   };
 
   const importJson = (folderPath: string | null) => {
-    openTextFile(".json,.newmob-sessions.json,application/json", async (text) => {
+    openTextFile(".json,.newmob-sessions.json,application/json").then((text) => {
+      if (!text) return;
       const result = parseNewMobSessions(text, { targetFolder: folderPath, existingSessions: sessions });
-      await applyImportResult(result, folderPath, "NewMob");
+      queueImportPreview(result, folderPath, "NewMob");
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));
     });
   };
 
   const importMoba = (folderPath: string | null) => {
-    openBinaryFile(".mxtsessions,.moba,text/plain,application/octet-stream", async (bytes) => {
+    openBinaryFile(".mxtsessions,.moba,text/plain,application/octet-stream").then((bytes) => {
+      if (!bytes) return;
       const result = parseMobaXtermSessions(bytes, { targetFolder: folderPath, existingSessions: sessions });
-      await applyImportResult(result, folderPath, "MobaXterm");
+      queueImportPreview(result, folderPath, "MobaXterm");
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));
     });
   };
 
   const importCsv = (folderPath: string | null) => {
-    openTextFile(".csv,text/csv", async (text) => {
+    openTextFile(".csv,text/csv").then((text) => {
+      if (!text) return;
       const result = parseCsvSessions(text, { targetFolder: folderPath, existingSessions: sessions });
-      await applyImportResult(result, folderPath, "CSV");
+      queueImportPreview(result, folderPath, "CSV");
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));
     });
+  };
+
+  const queueImportPreview = (
+    result: SessionImportResult,
+    folderPath: string | null,
+    source: string,
+  ) => {
+    setPendingImport({ result, folderPath, source });
+  };
+
+  const confirmPendingImport = async () => {
+    const pending = pendingImport;
+    if (!pending) return;
+    await applyImportResult(pending.result, pending.folderPath, pending.source, { alertWarnings: false });
+    setPendingImport(null);
   };
 
   const applyImportResult = async (
     result: SessionImportResult,
     folderPath: string | null,
     source: string,
+    options: { alertWarnings?: boolean } = {},
   ) => {
     if (result.sessions.length > 0) {
       await importSessions(result.sessions);
       expandPath(folderPath);
     }
-    reportImportResult(source, result, folderPath);
+    reportImportResult(source, result, folderPath, options.alertWarnings !== false);
   };
 
   const reportImportResult = (
     source: string,
     result: SessionImportResult,
     folderPath: string | null,
+    alertWarnings = true,
   ) => {
     const target = folderOptionLabel(folderPath);
     const count = result.sessions.length;
     const skipped = result.skipped ? `, skipped ${result.skipped}` : "";
     const warningSuffix = result.warnings.length ? `, ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}` : "";
     setStatusMessage(`Imported ${count} ${source} session${count === 1 ? "" : "s"} into ${target}${skipped}${warningSuffix}`);
-    reportWarnings(result.warnings);
+    if (alertWarnings) reportWarnings(result.warnings);
   };
 
   const reportExportResult = (
@@ -375,6 +383,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       { label: "Import NewMob sessions", icon: <Upload className="w-3 h-3" />, onClick: () => importJson(folderPath) },
       { label: "Export NewMob sessions", icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportFolder(folderPath) },
       { label: "Export MobaXterm sessions", icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportMobaFolder(folderPath) },
+      { label: "Export sessions as CSV", icon: <FileText className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportCsvFolder(folderPath) },
       { label: "Import sessions from third-party programs", icon: <Upload className="w-3 h-3" />, children: importChildren },
       { label: "Generate HTML web page", icon: <FileText className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => generateHtml(folderPath) },
       { label: "", separator: true },
@@ -417,6 +426,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           title={folderDialog.mode === "rename" ? "Edit folder" : "New folder"}
           onCancel={() => setFolderDialog(null)}
           onSubmit={handleFolderDialogSubmit}
+        />
+      )}
+      {pendingImport && (
+        <SessionImportPreview
+          source={pendingImport.source}
+          result={pendingImport.result}
+          targetFolder={pendingImport.folderPath}
+          onCancel={() => setPendingImport(null)}
+          onConfirm={() => void confirmPendingImport()}
         />
       )}
       <div
@@ -776,69 +794,4 @@ function filterSessions(sessions: SessionConfig[], query: string): SessionConfig
     ].join(" ").toLowerCase();
     return haystack.includes(q);
   });
-}
-
-function openTextFile(accept: string, onText: (text: string) => Promise<void>): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = accept;
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) {
-        resolve();
-        return;
-      }
-
-      file.text()
-        .then(onText)
-        .then(resolve)
-        .catch(reject);
-    };
-    input.click();
-  });
-}
-
-function openBinaryFile(accept: string, onBytes: (bytes: ArrayBuffer) => Promise<void>): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = accept;
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) {
-        resolve();
-        return;
-      }
-
-      file.arrayBuffer()
-        .then(onBytes)
-        .then(resolve)
-        .catch(reject);
-    };
-    input.click();
-  });
-}
-
-function downloadTextFile(filename: string, text: string, type: string) {
-  const blob = new Blob([text], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function slugify(value: string): string {
-  return splitGroupPath(value).join("-").toLowerCase().replace(/[^a-z0-9._-]+/g, "-") || "user-sessions";
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SessionConfig } from "./ipc";
 import {
+  parseCsvSessions,
   parseMobaXtermSessions,
   parseNewMobSessions,
+  serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
 } from "./sessionImportExport";
@@ -42,6 +44,7 @@ function session(overrides: Partial<SessionConfig> = {}): SessionConfig {
         loggingEnabled: false,
         logPath: "C:\\secret\\terminal.log",
       },
+      disableAiWrite: true,
     }),
     created_at: 100,
     updated_at: 100,
@@ -58,6 +61,7 @@ describe("NewMob session import/export", () => {
 
     expect(parsed.sessions[0].folder_path).toBeNull();
     expect(JSON.stringify(parsed.sessions[0].options)).not.toContain("terminal.log");
+    expect(parsed.sessions[0].options.disableAiWrite).toBe(true);
 
     const result = parseNewMobSessions(exported.text, {
       targetFolder: "Imported",
@@ -77,6 +81,7 @@ describe("NewMob session import/export", () => {
       last_connected_at: null,
     });
     expect(result.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "C:\\keys\\deploy.ppk" } });
+    expect(JSON.parse(result.sessions[0].options_json).disableAiWrite).toBe(true);
   });
 
   it("imports legacy JSON safely and creates duplicate names instead of overwriting", () => {
@@ -117,6 +122,36 @@ describe("NewMob session import/export", () => {
     expect(result.sessions[0].options_json).toContain("compression");
     expect(result.sessions[0].options_json).not.toContain("proxyPass");
     expect(result.sessions[0].options_json).not.toContain("secret");
+  });
+});
+
+describe("CSV session import/export", () => {
+  it("exports CSV with escaped fields and imports group paths relative to the target folder", () => {
+    const result = serializeCsvSessions([
+      session({
+        name: "Prod, primary",
+        group_path: "User sessions / Production / Web",
+        username: "deploy\"ops",
+      }),
+    ], "Production");
+
+    expect(result.filename).toBe("production.csv");
+    expect(result.text).toContain('"Prod, primary",SSH,prod.example.com,22,"deploy""ops",Web');
+
+    const imported = parseCsvSessions(result.text, {
+      targetFolder: "Imported",
+      now: 5555,
+    });
+
+    expect(imported.sessions).toHaveLength(1);
+    expect(imported.sessions[0]).toMatchObject({
+      name: "Prod, primary",
+      session_type: "SSH",
+      group_path: "User sessions / Imported / Web",
+      username: "deploy\"ops",
+      created_at: 5555,
+      updated_at: 5555,
+    });
   });
 });
 

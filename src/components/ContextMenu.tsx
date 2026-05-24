@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 
 export interface MenuItem {
   label: string;
+  testId?: string;
   icon?: React.ReactNode;
   shortcut?: string;
   checked?: boolean;
@@ -130,7 +131,7 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
         onMouseLeave={item.openOnClick ? () => setIsOpen(false) : () => setIsHovered(false)}
       >
         <button
-          data-testid={`context-menu-item-${slugForTestId(item.label)}`}
+          data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
           className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] disabled:opacity-40"
           style={item.danger ? { color: "#b22222" } : undefined}
           disabled={item.disabled}
@@ -154,7 +155,7 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
 
   return (
     <button
-      data-testid={`context-menu-item-${slugForTestId(item.label)}`}
+      data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
       className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] disabled:opacity-40"
       style={item.danger ? { color: "#b22222" } : undefined}
       onClick={() => {
