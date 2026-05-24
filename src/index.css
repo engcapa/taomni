@@ -364,8 +364,13 @@ body {
   border-left: 1px solid color-mix(in srgb, var(--moba-divider) 80%, transparent);
 }
 
-.moba-titlebar-tray-btn + .moba-titlebar-tray-btn {
-  border-left: 1px solid color-mix(in srgb, var(--moba-divider) 80%, transparent);
+/* Visually separate tray groups (voice / view / terminal layout / AI). The
+   separator is a thin vertical hairline with breathing room so adjacent
+   icons inside a group sit flush, while groups read as distinct clusters. */
+.moba-titlebar-tray-group-sep {
+  width: 1px;
+  margin: 4px 4px;
+  background: color-mix(in srgb, var(--moba-divider) 80%, transparent);
 }
 
 .moba-titlebar-tray-btn[data-active="true"] {

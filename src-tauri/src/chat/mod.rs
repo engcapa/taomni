@@ -265,6 +265,15 @@ pub async fn chat_send(
         // Prefer the thread's pinned provider when available.
         if let Some(provider) = ai_ctx.llm.provider(&thread.provider_id) {
             provider.chat(llm_req).await.map_err(|e| e.to_string())?
+        } else if ai_ctx.llm.needs_vault_unlock(&thread.provider_id) {
+            // Pinned provider is blocked on a locked vault. Fail closed with
+            // a VAULT_LOCKED error so the frontend can prompt for unlock
+            // instead of routing the request through some other provider the
+            // user did not intend to use.
+            return Err(format!(
+                "VAULT_LOCKED: provider '{}' needs the vault unlocked to load its API key",
+                thread.provider_id
+            ));
         } else {
             // Fall back to the task-routed provider with timeout/fallback.
             ai_ctx.llm.complete(llm_req, TaskKind::ChatDrawer).await.map_err(|e| e.to_string())?
@@ -406,16 +415,34 @@ pub async fn chat_stream(
     // the long stream lifetime.
     let stream_result = {
         let ai_ctx = state.ai_ctx.read().await;
-        let provider = ai_ctx
-            .llm
-            .provider(&thread.provider_id)
-            .or_else(|| ai_ctx.llm.provider(&ai_ctx.llm.provider_for_task(TaskKind::ChatDrawer)));
+        let pinned = ai_ctx.llm.provider(&thread.provider_id);
+        let pinned_blocked = pinned.is_none()
+            && ai_ctx.llm.needs_vault_unlock(&thread.provider_id);
+
+        let provider = pinned.or_else(|| {
+            // Don't fall back when the pinned provider is just locked — the
+            // user wants that specific provider, and we should prompt for
+            // unlock rather than silently rerouting.
+            if pinned_blocked {
+                None
+            } else {
+                ai_ctx.llm.provider(&ai_ctx.llm.provider_for_task(TaskKind::ChatDrawer))
+            }
+        });
         match provider {
             Some(p) => p.chat_stream(llm_req).await,
-            None => Err(crate::llm::LlmError::Provider {
-                status: 0,
-                message: "No provider available".into(),
-            }),
+            None => {
+                if pinned_blocked {
+                    Err(crate::llm::LlmError::VaultLocked {
+                        provider: thread.provider_id.clone(),
+                    })
+                } else {
+                    Err(crate::llm::LlmError::Provider {
+                        status: 0,
+                        message: "No provider available".into(),
+                    })
+                }
+            }
         }
     };
 

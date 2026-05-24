@@ -4,6 +4,7 @@ import { Terminal, Loader2 } from "lucide-react";
 import { CommandPreviewCard, type CommandPreviewData } from "../voice/CommandPreviewCard";
 import { copyCommandToClipboard, updateAuditOutcome } from "../../lib/voice/commandExecutor";
 import { useAppStore } from "../../stores/appStore";
+import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../../lib/ipc";
 
 interface AiShellPanelProps {
   /** Whether the "voice→shell" experimental feature is enabled. */
@@ -31,7 +32,19 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       });
       setPreview(result);
     } catch (e) {
-      setError(String(e));
+      if (isVaultLockedError(e)) {
+        window.dispatchEvent(
+          new CustomEvent(VAULT_LOCKED_EVENT, {
+            detail: {
+              reason:
+                "This AI provider's API key is in the credential vault — unlock it to continue.",
+            },
+          }),
+        );
+        setError("Vault is locked — unlock it to use this AI provider, then try again.");
+      } else {
+        setError(String(e));
+      }
     } finally {
       setLoading(false);
     }

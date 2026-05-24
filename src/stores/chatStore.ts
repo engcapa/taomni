@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
 
 export interface ChatThread {
   id: string;
@@ -197,6 +198,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             break;
           }
           case "error": {
+            if (isVaultLockedError(e.message)) {
+              window.dispatchEvent(
+                new CustomEvent(VAULT_LOCKED_EVENT, {
+                  detail: {
+                    reason:
+                      "This AI provider's API key is in the credential vault — unlock it to continue.",
+                  },
+                }),
+              );
+            }
             const list = get().messages[threadId] ?? [];
             const idx = list.findIndex((m) => m.id === e.id);
             if (idx >= 0) {
@@ -216,6 +227,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         req: { thread_id: threadId, content, terminal_context: terminalContext ?? null },
       });
     } catch (e) {
+      if (isVaultLockedError(e)) {
+        // Surface the unlock dialog, then bail out — the user re-presses Send
+        // after unlocking. Don't fall back to chat_send since that would hit
+        // the same locked vault.
+        window.dispatchEvent(
+          new CustomEvent(VAULT_LOCKED_EVENT, {
+            detail: {
+              reason:
+                "This AI provider's API key is in the credential vault — unlock it to continue.",
+            },
+          }),
+        );
+        throw e;
+      }
       console.error("chat_stream failed, falling back to chat_send:", e);
       try {
         const resp = await invoke<{
@@ -232,6 +257,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           },
         }));
       } catch (e2) {
+        if (isVaultLockedError(e2)) {
+          window.dispatchEvent(
+            new CustomEvent(VAULT_LOCKED_EVENT, {
+              detail: {
+                reason:
+                  "This AI provider's API key is in the credential vault — unlock it to continue.",
+              },
+            }),
+          );
+        }
         throw e2;
       }
     } finally {

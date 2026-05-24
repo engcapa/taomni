@@ -71,3 +71,44 @@ async fn provider_for_task_falls_back_to_active() {
     let r = LlmRouter::new("default-active");
     assert_eq!(r.provider_for_task(TaskKind::ChatDrawer), "default-active");
 }
+
+#[tokio::test]
+async fn complete_returns_vault_locked_when_active_provider_unresolved() {
+    // Simulates the post-restart state: the active provider's API key is a
+    // `vault:<id>` ref but the vault is locked, so build_router skipped
+    // registration and marked it unresolved. complete() must surface
+    // LlmError::VaultLocked, not LlmError::NoProvider — that's how the
+    // frontend knows to pop the unlock dialog.
+    let mut r = LlmRouter::new("anthropic");
+    r.mark_unresolved("anthropic");
+
+    let err = r.complete(req(), TaskKind::ChatDrawer).await.unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("VAULT_LOCKED"),
+        "expected VAULT_LOCKED in error, got: {msg}"
+    );
+    assert!(r.needs_vault_unlock("anthropic"));
+    assert!(!r.has_provider("anthropic"));
+}
+
+#[tokio::test]
+async fn complete_returns_vault_locked_when_fallback_secondary_unresolved() {
+    // Primary fails, secondary is the unresolved one — the user should still
+    // see VAULT_LOCKED so they understand which provider needs an unlock.
+    let mut r = LlmRouter::new("primary");
+    r.add_provider("primary", Arc::new(MockLlm::new(vec![MockEvent::Error("503".into())])));
+    r.mark_unresolved("secondary");
+    r.set_fallback(FallbackConfig {
+        primary: "primary".into(),
+        secondary: "secondary".into(),
+        timeout_ms: 5_000,
+    });
+
+    let err = r.complete(req(), TaskKind::ChatDrawer).await.unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("VAULT_LOCKED"),
+        "expected VAULT_LOCKED in error, got: {msg}"
+    );
+}

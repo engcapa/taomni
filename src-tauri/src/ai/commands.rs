@@ -76,9 +76,22 @@ pub async fn test_llm_connection(
     state: State<'_, AppState>,
 ) -> Result<TestConnectionResult, String> {
     // Resolve `vault:<id>` references into plaintext for the test call.
-    let api_key = match state.vault.resolve(&provider.api_key) {
-        Ok(Some(plaintext)) => plaintext.to_string(),
-        _ => provider.api_key.clone(),
+    // If the vault is locked we surface VAULT_LOCKED so the frontend can
+    // prompt for unlock instead of sending the literal `vault:<uuid>` as the
+    // bearer token (which would always 401).
+    let api_key = if provider.api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
+        match state.vault.resolve(&provider.api_key) {
+            Ok(Some(plaintext)) => plaintext.to_string(),
+            Ok(None) => provider.api_key.clone(),
+            Err(e) => {
+                if e.contains(crate::vault::ERR_VAULT_LOCKED) {
+                    return Err(format!("VAULT_LOCKED: {e}"));
+                }
+                return Err(e);
+            }
+        }
+    } else {
+        provider.api_key.clone()
     };
 
     let llm: Arc<dyn Llm> = match provider.runtime.as_str() {

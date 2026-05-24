@@ -81,6 +81,8 @@ import {
   writeStreamClose,
   writeStreamAbort,
   checkFileExists,
+  VAULT_LOCKED_EVENT,
+  isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import {
@@ -2786,6 +2788,16 @@ async function streamInlineAi(term: Terminal, question: string): Promise<void> {
       if (payload.kind === "token" && payload.content) {
         term.write(payload.content.replace(/\\n/g, "\\r\\n" + PREFIX));
       } else if (payload.kind === "error") {
+        if (isVaultLockedError(payload.message ?? "")) {
+          window.dispatchEvent(
+            new CustomEvent(VAULT_LOCKED_EVENT, {
+              detail: {
+                reason:
+                  "This AI provider's API key is in the credential vault — unlock it to continue.",
+              },
+            }),
+          );
+        }
         term.write(`${SUFFIX}\\r\\n\\x1b[31m[AI error] ${payload.message ?? "unknown"}${SUFFIX}\\r\\n`);
       } else if (payload.kind === "end") {
         term.write(`${SUFFIX}\\r\\n`);
@@ -2793,6 +2805,16 @@ async function streamInlineAi(term: Terminal, question: string): Promise<void> {
     });
     await invoke("inline_qq_stream", { requestId, question });
   } catch (e) {
+    if (isVaultLockedError(e)) {
+      window.dispatchEvent(
+        new CustomEvent(VAULT_LOCKED_EVENT, {
+          detail: {
+            reason:
+              "This AI provider's API key is in the credential vault — unlock it to continue.",
+          },
+        }),
+      );
+    }
     term.write(`${SUFFIX}\\r\\n\\x1b[31m[AI error] ${String(e)}${SUFFIX}\\r\\n`);
   } finally {
     if (unlisten) unlisten();

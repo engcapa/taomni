@@ -393,12 +393,24 @@ pub async fn vault_unlock(
     master_password: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.vault.unlock(&master_password)
+    state.vault.unlock(&master_password)?;
+    // Vault transitioned to unlocked — rebuild the LLM router so providers
+    // whose api_key is `vault:<id>` start working immediately. Without this
+    // the user has to click Save in AI Settings to trigger a rebuild.
+    let mut ai_ctx = state.ai_ctx.write().await;
+    ai_ctx.rebuild_router();
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn vault_lock(state: State<'_, AppState>) -> Result<(), String> {
-    state.vault.lock()
+    state.vault.lock()?;
+    // After lock, providers backed by vault refs can no longer authenticate;
+    // rebuild so calls fail closed with VAULT_LOCKED instead of using stale
+    // plaintext that was decrypted earlier.
+    let mut ai_ctx = state.ai_ctx.write().await;
+    ai_ctx.rebuild_router();
+    Ok(())
 }
 
 #[tauri::command]
@@ -407,7 +419,10 @@ pub async fn vault_change_master(
     new_password: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.vault.change_master(&old_password, &new_password)
+    state.vault.change_master(&old_password, &new_password)?;
+    let mut ai_ctx = state.ai_ctx.write().await;
+    ai_ctx.rebuild_router();
+    Ok(())
 }
 
 #[tauri::command]

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Loader2, Wand2 } from "lucide-react";
+import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../../lib/ipc";
 
 interface AiRewriteOverlayProps {
   currentCommand: string;
@@ -45,7 +46,19 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
       });
       setRewritten(newCmd);
     } catch (e) {
-      setError(String(e));
+      if (isVaultLockedError(e)) {
+        window.dispatchEvent(
+          new CustomEvent(VAULT_LOCKED_EVENT, {
+            detail: {
+              reason:
+                "This AI provider's API key is in the credential vault — unlock it to continue.",
+            },
+          }),
+        );
+        setError("Vault is locked — unlock it to use this AI provider, then try again.");
+      } else {
+        setError(String(e));
+      }
     } finally {
       setLoading(false);
     }

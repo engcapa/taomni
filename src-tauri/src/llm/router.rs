@@ -1,5 +1,5 @@
 use super::{ChatRequest, ChatResponse, Llm, LlmError, LlmResult, TaskKind};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -11,6 +11,12 @@ pub struct LlmRouter {
     task_routing: HashMap<TaskKind, String>,
     active: String,
     fallback: Option<FallbackConfig>,
+    /// Provider ids whose api_key is a `vault:<id>` reference that could not
+    /// be resolved when the router was built (vault locked / entry missing).
+    /// They are intentionally NOT registered in `providers` so calls fail
+    /// closed with [`LlmError::VaultLocked`] instead of silently sending the
+    /// literal `vault:<uuid>` string as the bearer token (which produced 401s).
+    unresolved: HashSet<String>,
 }
 
 pub struct FallbackConfig {
@@ -26,11 +32,19 @@ impl LlmRouter {
             task_routing: HashMap::new(),
             active: active.into(),
             fallback: None,
+            unresolved: HashSet::new(),
         }
     }
 
     pub fn add_provider(&mut self, id: impl Into<String>, provider: Arc<dyn Llm>) {
         self.providers.insert(id.into(), provider);
+    }
+
+    /// Mark a provider id as blocked on a locked vault. The frontend can call
+    /// `needs_vault_unlock(id)` to decide whether to surface the unlock
+    /// dialog before invoking a chat command.
+    pub fn mark_unresolved(&mut self, id: impl Into<String>) {
+        self.unresolved.insert(id.into());
     }
 
     pub fn set_task_route(&mut self, task: TaskKind, provider_id: impl Into<String>) {
@@ -44,6 +58,11 @@ impl LlmRouter {
     /// True if a provider with this id is registered.
     pub fn has_provider(&self, id: &str) -> bool {
         self.providers.contains_key(id)
+    }
+
+    /// True if this provider is known to need a vault unlock to be usable.
+    pub fn needs_vault_unlock(&self, id: &str) -> bool {
+        self.unresolved.contains(id)
     }
 
     /// Returns the active default provider id.
@@ -70,8 +89,15 @@ impl LlmRouter {
             .unwrap_or(&self.active)
             .clone();
 
-        let primary = self.providers.get(&primary_id)
-            .ok_or_else(|| LlmError::NoProvider(task))?;
+        let primary = match self.providers.get(&primary_id) {
+            Some(p) => p,
+            None => {
+                if self.unresolved.contains(&primary_id) {
+                    return Err(LlmError::VaultLocked { provider: primary_id });
+                }
+                return Err(LlmError::NoProvider(task));
+            }
+        };
 
         // If fallback is configured and primary matches the fallback primary, apply timeout.
         if let Some(fb) = &self.fallback {
@@ -91,8 +117,17 @@ impl LlmRouter {
                     }
                 }
 
-                let secondary = self.providers.get(&fb.secondary)
-                    .ok_or_else(|| LlmError::NoProvider(task))?;
+                let secondary = match self.providers.get(&fb.secondary) {
+                    Some(p) => p,
+                    None => {
+                        if self.unresolved.contains(&fb.secondary) {
+                            return Err(LlmError::VaultLocked {
+                                provider: fb.secondary.clone(),
+                            });
+                        }
+                        return Err(LlmError::NoProvider(task));
+                    }
+                };
                 return secondary.chat(req).await;
             }
         }
@@ -136,17 +171,34 @@ fn task_kind_from_str(s: &str) -> Option<TaskKind> {
 }
 
 /// Resolve a possibly `vault:<id>`-prefixed value to plaintext.
-/// Returns the original value unchanged when no vault is provided or the
-/// value is already plaintext.
-fn resolve_api_key(value: &str, vault: Option<&crate::vault::Vault>) -> String {
-    if let Some(v) = vault {
-        match v.resolve(value) {
-            Ok(Some(plaintext)) => return plaintext.to_string(),
-            Ok(None) => {}                // not a vault ref, treat as plaintext
-            Err(_) => {}                  // locked / missing — return value as-is and let caller see the auth error
-        }
+///
+/// Returns:
+/// - `Ok(plaintext)` when the value is plaintext, or a vault ref that
+///   resolves cleanly.
+/// - `Err(())` when the value IS a vault ref but the vault is locked, the
+///   entry is missing, or decryption failed. The caller must NOT fall back
+///   to using the literal `vault:<id>` string as a credential — that's how
+///   we end up with bogus 401s on app start.
+fn resolve_api_key(
+    value: &str,
+    vault: Option<&crate::vault::Vault>,
+) -> Result<String, ()> {
+    let is_ref = value.starts_with(crate::vault::VAULT_REF_PREFIX);
+    if !is_ref {
+        return Ok(value.to_string());
     }
-    value.to_string()
+    let v = match vault {
+        Some(v) => v,
+        // We have a vault ref but no Vault handle — treat as unresolved.
+        None => return Err(()),
+    };
+    match v.resolve(value) {
+        Ok(Some(plaintext)) => Ok(plaintext.to_string()),
+        // Plaintext path — `resolve` returns Ok(None) only when the input is
+        // not a vault ref, which we already excluded above. Belt-and-braces.
+        Ok(None) => Ok(value.to_string()),
+        Err(_) => Err(()),
+    }
 }
 
 /// Build an `LlmRouter` from the persisted `LlmConfig`.
@@ -175,7 +227,17 @@ pub fn build_router(
         }
         match p.runtime.as_str() {
             "openai-compat" | "llama-server" | "ollama" => {
-                let resolved_key = resolve_api_key(&p.api_key, vault);
+                let resolved_key = match resolve_api_key(&p.api_key, vault) {
+                    Ok(k) => k,
+                    Err(()) => {
+                        tracing::warn!(
+                            provider = %id,
+                            "api key vault reference could not be resolved (vault locked?) — provider not registered"
+                        );
+                        router.mark_unresolved(id);
+                        continue;
+                    }
+                };
                 let provider = Arc::new(OpenAiCompatProvider::new(
                     id.as_str(),
                     p.base_url.clone(),
@@ -185,7 +247,17 @@ pub fn build_router(
                 router.add_provider(id, provider);
             }
             "anthropic" => {
-                let resolved_key = resolve_api_key(&p.api_key, vault);
+                let resolved_key = match resolve_api_key(&p.api_key, vault) {
+                    Ok(k) => k,
+                    Err(()) => {
+                        tracing::warn!(
+                            provider = %id,
+                            "api key vault reference could not be resolved (vault locked?) — provider not registered"
+                        );
+                        router.mark_unresolved(id);
+                        continue;
+                    }
+                };
                 let base_url = if p.base_url.is_empty() {
                     "https://api.anthropic.com/v1".to_string()
                 } else {
