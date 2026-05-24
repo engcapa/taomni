@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SessionConfig } from "./ipc";
 import {
   parseCsvSessions,
+  parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
   parseNewMobSessions,
@@ -10,6 +11,7 @@ import {
   parseWindTermSessions,
   parseXmlConnectionSessions,
   parseXshellSessions,
+  parseXshellZipSessions,
   serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
@@ -58,6 +60,65 @@ function session(overrides: Partial<SessionConfig> = {}): SessionConfig {
     sort_order: 0,
     ...overrides,
   };
+}
+
+function makeStoredZip(entries: Record<string, string>): Uint8Array {
+  const encoder = new TextEncoder();
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const [name, text] of Object.entries(entries)) {
+    const nameBytes = encoder.encode(name);
+    const data = encoder.encode(text);
+    const local = new Uint8Array(30 + nameBytes.length + data.length);
+    const localView = new DataView(local.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 0x0800, true);
+    localView.setUint16(8, 0, true);
+    localView.setUint32(18, data.length, true);
+    localView.setUint32(22, data.length, true);
+    localView.setUint16(26, nameBytes.length, true);
+    local.set(nameBytes, 30);
+    local.set(data, 30 + nameBytes.length);
+    localParts.push(local);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(central.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 0x0800, true);
+    centralView.setUint16(10, 0, true);
+    centralView.setUint32(20, data.length, true);
+    centralView.setUint32(24, data.length, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    centralParts.push(central);
+
+    offset += local.length;
+  }
+
+  const centralOffset = offset;
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const eocd = new Uint8Array(22);
+  const eocdView = new DataView(eocd.buffer);
+  eocdView.setUint32(0, 0x06054b50, true);
+  eocdView.setUint16(8, centralParts.length, true);
+  eocdView.setUint16(10, centralParts.length, true);
+  eocdView.setUint32(12, centralSize, true);
+  eocdView.setUint32(16, centralOffset, true);
+
+  const all = [...localParts, ...centralParts, eocd];
+  const out = new Uint8Array(all.reduce((sum, part) => sum + part.length, 0));
+  let cursor = 0;
+  for (const part of all) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
 }
 
 describe("NewMob session import/export", () => {
@@ -311,6 +372,45 @@ describe("third-party session import parsers", () => {
     });
   });
 
+  it("imports multiple Xshell .xsh sessions from a ZIP archive", async () => {
+    const zip = makeStoredZip({
+      "Prod/Web.xsh": [
+        "[Connection]",
+        "Host=web.example.com",
+        "Port=22",
+        "Protocol=SSH",
+        "UserName=deploy",
+      ].join("\n"),
+      "Prod/DB.xsh": [
+        "[Connection]",
+        "Host=db.example.com",
+        "Port=2202",
+        "Protocol=SSH",
+        "[Terminal]",
+        "UserName=dba",
+      ].join("\n"),
+      "notes.txt": "ignored",
+    });
+
+    const result = await parseXshellZipSessions(zip, {
+      targetFolder: "Imported",
+      now: 6007,
+    });
+
+    expect(result.sessions).toHaveLength(2);
+    expect(result.sessions.map((item) => item.name)).toEqual(["Web", "DB"]);
+    expect(result.sessions[0]).toMatchObject({
+      group_path: "User sessions / Imported / Prod",
+      host: "web.example.com",
+      username: "deploy",
+    });
+    expect(result.sessions[1]).toMatchObject({
+      host: "db.example.com",
+      port: 2202,
+      username: "dba",
+    });
+  });
+
   it("imports Tabby SSH profiles from config.yaml", () => {
     const result = parseTabbySessions([
       "profiles:",
@@ -402,6 +502,26 @@ describe("third-party session import parsers", () => {
       host: "rdm.example.com",
       port: 2201,
       username: "admin",
+    });
+  });
+
+  it("imports Exceed key-value session exports with SSH commands", () => {
+    const result = parseExceedSessions([
+      "[Xstart]",
+      "Name=Exceed Xterm",
+      "Command=ssh -p 2203 exceed@example.com xterm",
+    ].join("\n"), {
+      targetFolder: "Exceed",
+      sourcePath: "xstart/Exceed Xterm.xs",
+      now: 6008,
+    });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Exceed Xterm",
+      group_path: "User sessions / Exceed / xstart",
+      host: "example.com",
+      port: 2203,
+      username: "exceed",
     });
   });
 

@@ -256,6 +256,10 @@ export async function scanLocalSessionFiles(source: string): Promise<LocalSessio
   return invoke<LocalSessionFile[]>("scan_local_session_files", { source });
 }
 
+export async function readPlistSessionFile(path: string): Promise<LocalSessionFile> {
+  return invoke<LocalSessionFile>("read_plist_session_file", { path });
+}
+
 export async function exitApp(): Promise<void> {
   return invoke("exit_app", {});
 }

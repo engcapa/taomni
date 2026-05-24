@@ -52,6 +52,41 @@ pub fn scan_local_session_files(source: String) -> Result<Vec<LocalSessionFile>,
     Ok(files)
 }
 
+#[tauri::command]
+pub fn read_plist_session_file(path: String) -> Result<LocalSessionFile, String> {
+    let expanded = shellexpand::tilde(&path).to_string();
+    let path_buf = PathBuf::from(&expanded);
+    let meta = fs::metadata(&path_buf)
+        .map_err(|e| format!("Failed to read plist metadata: {}", e))?;
+    if !meta.is_file() {
+        return Err("The selected path is not a file.".to_string());
+    }
+    if meta.len() > MAX_LOCAL_SESSION_FILE_BYTES {
+        return Err("The selected plist file is too large to import safely.".to_string());
+    }
+
+    let value = plist::Value::from_file(&path_buf)
+        .map_err(|e| format!("Failed to parse plist file: {}", e))?;
+    let mut bytes = Vec::new();
+    value
+        .to_writer_xml(&mut bytes)
+        .map_err(|e| format!("Failed to convert plist file to XML: {}", e))?;
+    let text = String::from_utf8(bytes)
+        .map_err(|e| format!("Converted plist XML was not UTF-8: {}", e))?;
+    let relative_path = path_buf
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("session.plist")
+        .to_string();
+
+    Ok(LocalSessionFile {
+        source: "plist".to_string(),
+        path: path_buf.to_string_lossy().into_owned(),
+        relative_path,
+        text,
+    })
+}
+
 #[cfg(windows)]
 fn platform_putty_sessions() -> Result<Vec<SessionConfig>, String> {
     use winreg::enums::HKEY_CURRENT_USER;

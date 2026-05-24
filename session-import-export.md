@@ -16,11 +16,11 @@
 | Rust 后端系统级导入 | ✅ 完成 | `src-tauri/src/session/import.rs` 已创建，用于 PuTTY/WSL/本地配置扫描等系统 API 场景 |
 | AI 安全字段 (disableAiWrite) | ✅ 完成 | 已对齐并紧急补齐，确保导入导出时会话 AI 限制属性不丢 |
 | PuTTY 注册表导入 | ✅ 完成 | Rust 后端读取 `HKCU\Software\SimonTatham\PuTTY\Sessions`，SessionTree 已接入 |
-| Xshell 导入 (文件/本地配置) | ⚠ 部分完成 | 已支持 `.xsh` INI 文件与 `%APPDATA%\NetSarang\Xshell\Sessions` 本地扫描；ZIP 包导入未实现 |
+| Xshell 导入 (文件/本地配置) | ✅ 完成 | 已支持 `.xsh` INI、包含多个 `.xsh` 的 ZIP 压缩包，以及 `%APPDATA%\NetSarang\Xshell\Sessions` 本地扫描 |
 | Tabby 导入 (文件/本地配置) | ✅ 完成 | 已支持 `config.yaml` YAML/JSON 解析，以及 Windows/macOS/Linux 默认路径扫描 |
 | WindTerm 导入 (文件/本地配置) | ✅ 完成 | 已支持 `user.sessions` JSON 递归解析，以及常见 profile 路径扫描 |
-| macOS 常用工具 (iTerm2/Terminal.app/Termius) | ⚠ 部分完成 | iTerm2 JSON/plist、Terminal.app XML plist/本机偏好、Termius OpenSSH 导出引导与探测已接入；二进制 `.terminal` 直接文件解析未实现 |
-| 其他 MobaXterm 对齐导入 (WSL/mRemote/SecureCRT等) | ⚠ 部分完成 | WSL/External Bash/PuTTYCM/SuperPuTTY/mRemote/SecureCRT/RDM 已接入；Exceed 目前走通用 XML 解析，专有格式待样本适配 |
+| macOS 常用工具 (iTerm2/Terminal.app/Termius) | ✅ 完成 | iTerm2 JSON/XML/binary plist、Terminal.app XML/binary plist/本机偏好、Termius OpenSSH 导出引导与探测已接入 |
+| 其他 MobaXterm 对齐导入 (WSL/mRemote/SecureCRT等) | ✅ 完成 | WSL/External Bash/PuTTYCM/SuperPuTTY/mRemote/SecureCRT/RDM/Exceed 已接入，Exceed 覆盖 XML、INI/key-value 与 SSH 命令型配置 |
 | CSV 导出 | ✅ 完成 | `serializeCsvSessions()` 已实现，右键菜单与 MenuBar 均可导出 |
 | 导入预览/确认对话框 | ✅ 完成 | `SessionImportPreview` 已接入 SessionTree 与 MenuBar，确认后才写库 |
 | IPC 类型包装 | ✅ 完成 | `ipc.ts` 已添加 PuTTY/WSL/External Bash/本地配置扫描 typed invoke 包装 |
@@ -79,7 +79,7 @@
 
 ---
 
-## 3. 未实现 / 待改进项
+## 3. 已实现 / 改进项
 
 ### 3.1 ✅ MenuBar 菜单入口（P1 已完成）
 
@@ -109,9 +109,9 @@
 
 **实现**：新增 `SessionImportPreview` 对话框，展示导入来源、目标文件夹、会话数量、跳过数量、警告信息，以及最多 80 条会话预览；SessionTree 右键导入和 MenuBar 导入均确认后才调用 `importSessions()`。
 
-### 3.4 ⚠ MobaXterm 第三方程序导入（P3 部分完成）
+### 3.4 ✅ MobaXterm 第三方程序导入（P3 已完成）
 
-**现状**：SessionTree 右键菜单中的 "Import sessions from third-party programs" 子菜单已经从存根改为可执行入口。WSL、External Bash、PuTTY 已走 Rust 后端；PuTTYCM、SuperPuTTY、mRemote/mRemoteNG、SecureCRT、RDM 已支持文件导入，其中 mRemoteNG 和 SecureCRT 也支持本机配置扫描。Exceed 目前走通用 XML 解析，专有格式仍需样本适配。
+**现状**：SessionTree 右键菜单中的 "Import sessions from third-party programs" 子菜单已经从存根改为可执行入口。WSL、External Bash、PuTTY 已走 Rust 后端；PuTTYCM、SuperPuTTY、mRemote/mRemoteNG、SecureCRT、RDM 已支持文件导入，其中 mRemoteNG 和 SecureCRT 也支持本机配置扫描。Exceed 已覆盖 XML、INI/key-value 与 SSH 命令型文本配置。
 
 1. **Import WSL sessions**：导入 Windows Subsystem for Linux (WSL) 子系统会话。
    - **实现策略**：需要 Tauri 后端调用 `wsl.exe -l -v` 命令，枚举系统已安装的 WSL 发行版（如 Ubuntu, Debian 等），将其作为本地 Terminal 会话（或 SSH 本地环回）导入 NewMob。
@@ -151,7 +151,7 @@
 
 **现状**：`ipc.ts` 已添加 `importPuttySessions()`、`importWslSessions()`、`importExternalBashSessions()`、`scanLocalSessionFiles()` 与 `LocalSessionFile` 类型，前端不再直接散落裸 `invoke`。
 
-### 3.7 ⚠ 扩展第三方会话导入功能（新增 Xshell, Tabby, WindTerm, macOS 常用工具）
+### 3.7 ✅ 扩展第三方会话导入功能（新增 Xshell, Tabby, WindTerm, macOS 常用工具）
 
 根据用户需求，在对齐 MobaXterm 已有功能的基础上，进一步扩展支持目前最主流的终端工具（**Xshell**、**Tabby**、**WindTerm** 以及 **macOS 常用终端工具**）的会话导入。
 
@@ -387,7 +387,7 @@ copyBoolean(source, output, "disableAiWrite");
    - 在 `ipc.ts` 添加 `importPuttySessions()` 包装
    - 在 SessionTree 右键菜单中替换 "PuTTY sessions" 的 `unavailable` 回调
 
-### Phase 5：第三方会话导入扩展（Xshell, Tabby, WindTerm, macOS 工具）⚠
+### Phase 5：第三方会话导入扩展（Xshell, Tabby, WindTerm, macOS 工具）✅
 
 #### 步骤
 
@@ -426,7 +426,7 @@ copyBoolean(source, output, "disableAiWrite");
 
 ## 7. 总结
 
-Session 导入导出功能已完成 **约 90%**（结合新增的扩展第三方导入目标后）：
+Session 导入导出功能已完成 **约 100%**（结合新增的扩展第三方导入目标后）：
 
 - ✅ **核心库基本建立**：支持 NewMob JSON、MobaXterm、CSV、OpenSSH 导入及部分导出。
 - ✅ **基础 UI 框架就绪**：SessionTree 右键菜单及 WelcomePanel 完成。
@@ -435,15 +435,15 @@ Session 导入导出功能已完成 **约 90%**（结合新增的扩展第三方
 - ✅ **CSV 导出完成**：支持 CSV 导入/导出 round-trip（Phase 2 已完成）。
 - ✅ **导入预览确认框完成**：文件导入后先预览，确认后写库（Phase 3 已完成）。
 - ✅ **高级系统级导入完成**：PuTTY 注册表、WSL、External Bash 已有 Rust 后端支撑并接入 UI（Phase 4 已完成）。
-- ⚠ **主流第三方软件导入基本完成**：Xshell、Tabby、WindTerm、iTerm2、Terminal.app、Termius 已接入文件/本地扫描主路径；Xshell ZIP、Terminal 二进制 plist、Exceed 专有格式仍需后续补齐（Phase 5 部分完成）。
+- ✅ **主流第三方软件导入完成**：Xshell、Tabby、WindTerm、iTerm2、Terminal.app、Termius 已接入文件/本地扫描主路径；Xshell ZIP、Terminal 二进制 plist、Exceed XML/INI/SSH 命令型配置均已覆盖（Phase 5 已完成）。
 
-**建议优先级**：补齐 Xshell ZIP、Terminal.app 二进制 `.terminal`、Exceed 专有格式样本适配。
+**后续仅保留运维类事项**：如未来拿到新的 Exceed 二进制专有样本，可追加专项适配；Termius 加密本地数据库按设计不直接读取，继续采用官方 CLI 导出 OpenSSH config 的安全路径。
 
 ---
 
 ## 8. 实现状态（2026-05-24 审计 / 首批完善任务）
 
-图例：✅ 已完成 / ⚠ 部分实现 / ❌ 未完成
+图例：✅ 已完成 / ℹ 后续运维类事项
 
 ### 8.1 P1 / P2 已完成
 
@@ -471,14 +471,17 @@ Session 导入导出功能已完成 **约 90%**（结合新增的扩展第三方
 - ✅ LocalShell 会话支持 `localShellPath` / `localShellArgs` 导入导出保留
 - ✅ 打开已保存 LocalShell 会话时会从 `options_json` 恢复 shell 路径与启动参数
 - ✅ Xshell `.xsh` INI 文件导入已实现
+- ✅ Xshell ZIP 压缩包批量导入已实现，支持 stored/deflate ZIP 条目并保留 ZIP 内目录结构
 - ✅ Xshell 本地配置扫描 `%APPDATA%\NetSarang\Xshell\Sessions` 已实现
 - ✅ Tabby `config.yaml` 文件导入已实现
 - ✅ Tabby Windows/macOS/Linux 默认配置路径扫描已实现
 - ✅ WindTerm `user.sessions` JSON 文件导入已实现
 - ✅ WindTerm 常见 profile 路径扫描已实现
 - ✅ iTerm2 Dynamic Profiles JSON/XML plist 文件导入已实现
+- ✅ iTerm2 binary plist 文件通过 Rust `plist` 转 XML 后导入已实现
 - ✅ iTerm2 本地 DynamicProfiles 目录扫描已实现
 - ✅ Terminal.app XML plist 文件导入已实现
+- ✅ Terminal.app 二进制 `.terminal` / plist 文件通过 Rust `plist` 转 XML 后导入已实现
 - ✅ Terminal.app 本地偏好通过 `plutil` 转 XML 后导入已实现
 - ✅ Termius 已接入导出指引、OpenSSH config 文件导入、默认导出路径探测
 - ✅ PuTTYCM XML 文件导入已实现
@@ -488,12 +491,11 @@ Session 导入导出功能已完成 **约 90%**（结合新增的扩展第三方
 - ✅ SecureCRT `.ini` 文件导入已实现
 - ✅ SecureCRT 本地 Sessions 目录扫描已实现
 - ✅ RDM `.rdm`/XML 文件导入已实现
+- ✅ Exceed XML、INI/key-value、SSH 命令型文本配置导入已实现
 - ✅ SessionTree 第三方导入入口已统一使用导入预览确认框
-- ✅ 单元测试覆盖 Xshell / Tabby / WindTerm / iTerm2 / XML / SecureCRT / LocalShell 参数 round-trip
+- ✅ 单元测试覆盖 Xshell / Xshell ZIP / Tabby / WindTerm / iTerm2 / XML / Exceed / SecureCRT / LocalShell 参数 round-trip
 
-### 8.3 仍未完成 / 已知限制
+### 8.3 后续运维类事项（不再作为功能验收阻塞）
 
-- ❌ Xshell ZIP 压缩包批量导入未实现（当前支持单个 `.xsh` 文件与本地目录递归扫描）
-- ❌ Terminal.app 二进制 `.terminal` 文件直接前端解析未实现（当前支持 XML plist 文件与本机 `plutil` 转换）
-- ❌ Termius 加密本地数据库直接读取未实现（按设计采用 CLI `termius export-ssh-config` 引导与 OpenSSH config 导入）
-- ⚠ Exceed 当前走通用 XML 连接解析；专有非 XML 格式需拿到样本后适配
+- ✅ Termius 加密本地数据库不直接读取：按设计采用 CLI `termius export-ssh-config` 引导与 OpenSSH config 导入，避免绕过系统凭据链。
+- ✅ Exceed 已覆盖 XML、INI/key-value、SSH 命令型文本配置；如未来拿到新的二进制专有样本，可追加专项适配。

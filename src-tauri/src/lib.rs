@@ -102,6 +102,7 @@ pub fn run() {
             session::import::import_wsl_sessions,
             session::import::import_external_bash_sessions,
             session::import::scan_local_session_files,
+            session::import::read_plist_session_file,
             filebrowser::sftp_attach,
             filebrowser::sftp_detach,
             filebrowser::sftp_list_remote,

@@ -28,7 +28,9 @@ import {
   importExternalBashSessions,
   importPuttySessions,
   importWslSessions,
+  readPlistSessionFile,
   scanLocalSessionFiles,
+  selectFilePath,
 } from "../../lib/ipc";
 import {
   startCustomDrag,
@@ -37,6 +39,7 @@ import {
 } from "../../lib/customDnD";
 import {
   parseCsvSessions,
+  parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
   parseNewMobSessions,
@@ -46,6 +49,7 @@ import {
   parseWindTermSessions,
   parseXmlConnectionSessions,
   parseXshellSessions,
+  parseXshellZipSessions,
   createSessionImportResult,
   serializeCsvSessions,
   serializeMobaXtermSessions,
@@ -424,6 +428,19 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     });
   };
 
+  const importXshellZip = (folderPath: string | null) => {
+    openBinaryFile(".zip,application/zip,application/x-zip-compressed").then(async (bytes) => {
+      if (!bytes) return;
+      const result = await parseXshellZipSessions(bytes, {
+        targetFolder: folderPath,
+        existingSessions: sessions,
+      });
+      queueImportPreview(result, folderPath, "Xshell ZIP");
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
   const importScannedTextSessions = (
     folderPath: string | null,
     scanKey: string,
@@ -442,6 +459,25 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         }),
       ));
       queueImportPreview(result, folderPath, `${source} local config`);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const importPlistSessions = (
+    folderPath: string | null,
+    source: string,
+    parser: TextSessionParser,
+  ) => {
+    selectFilePath().then(async (path) => {
+      if (!path) return;
+      const file = await readPlistSessionFile(path);
+      const result = parser(file.text, {
+        targetFolder: folderPath,
+        existingSessions: sessions,
+        sourcePath: file.relativePath || file.path,
+      });
+      queueImportPreview(result, folderPath, source);
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));
     });
@@ -525,6 +561,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
             onClick: () => importTextSessions(folderPath, "Xshell", ".xsh,text/plain", parseXshellSessions),
           },
           {
+            label: "From ZIP archive",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importXshellZip(folderPath),
+          },
+          {
             label: "From local Xshell config",
             icon: <FolderOpen className="w-3 h-3" />,
             onClick: () => importScannedTextSessions(folderPath, "xshell", "Xshell", parseXshellSessions),
@@ -574,6 +615,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
             onClick: () => importTextSessions(folderPath, "iTerm2", ".json,.plist,application/json,text/xml", parseItermDynamicProfiles),
           },
           {
+            label: "From binary plist file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importPlistSessions(folderPath, "iTerm2 plist", parseItermDynamicProfiles),
+          },
+          {
             label: "From local iTerm2 DynamicProfiles",
             icon: <FolderOpen className="w-3 h-3" />,
             onClick: () => importScannedTextSessions(folderPath, "iterm2", "iTerm2", parseItermDynamicProfiles),
@@ -588,6 +634,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
             label: "From .terminal/plist file",
             icon: <FileText className="w-3 h-3" />,
             onClick: () => importTextSessions(folderPath, "Terminal.app", ".terminal,.plist,text/xml", parseTerminalAppProfiles),
+          },
+          {
+            label: "From binary .terminal/plist file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importPlistSessions(folderPath, "Terminal.app plist", parseTerminalAppProfiles),
           },
           {
             label: "From local Terminal.app preferences",
@@ -647,7 +698,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       {
         label: "Import Exceed sessions",
         icon: <Upload className="w-3 h-3" />,
-        onClick: () => importTextSessions(folderPath, "Exceed", ".xml,.xs,text/xml,application/xml,text/plain", parseXmlConnectionSessions),
+        onClick: () => importTextSessions(folderPath, "Exceed", ".xml,.xs,.txt,text/xml,application/xml,text/plain", parseExceedSessions),
       },
       {
         label: "Import SCRT sessions",
