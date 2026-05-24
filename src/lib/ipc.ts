@@ -41,6 +41,7 @@ export async function createLocalTerminal(
   cols: number,
   rows: number,
   shell?: string,
+  shellArgs?: string[],
   cwd?: string,
   onOutput?: (data: Uint8Array) => void,
 ): Promise<LocalTerminalCreated> {
@@ -49,6 +50,7 @@ export async function createLocalTerminal(
     cols,
     rows,
     shell,
+    shellArgs,
     cwd,
     onOutput: createBinaryOutputChannel(onOutput ?? (() => undefined)),
   });
@@ -229,6 +231,29 @@ export async function saveSessionGroup(group: SessionGroup): Promise<void> {
 
 export async function deleteSessionGroup(id: string): Promise<void> {
   return invoke("delete_session_group", { id });
+}
+
+export interface LocalSessionFile {
+  source: string;
+  path: string;
+  relativePath: string;
+  text: string;
+}
+
+export async function importPuttySessions(): Promise<SessionConfig[]> {
+  return invoke<SessionConfig[]>("import_putty_sessions", {});
+}
+
+export async function importWslSessions(): Promise<SessionConfig[]> {
+  return invoke<SessionConfig[]>("import_wsl_sessions", {});
+}
+
+export async function importExternalBashSessions(): Promise<SessionConfig[]> {
+  return invoke<SessionConfig[]>("import_external_bash_sessions", {});
+}
+
+export async function scanLocalSessionFiles(source: string): Promise<LocalSessionFile[]> {
+  return invoke<LocalSessionFile[]>("scan_local_session_files", { source });
 }
 
 export async function exitApp(): Promise<void> {

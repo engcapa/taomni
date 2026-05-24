@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { SessionConfig } from "./ipc";
 import {
   parseCsvSessions,
+  parseItermDynamicProfiles,
   parseMobaXtermSessions,
   parseNewMobSessions,
+  parseSecureCrtSessions,
+  parseTabbySessions,
+  parseWindTermSessions,
+  parseXmlConnectionSessions,
+  parseXshellSessions,
   serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
@@ -275,5 +281,173 @@ describe("MobaXterm session import/export", () => {
     expect(result.text).toContain("Desktop=#91#4%rdp.example.com%3389%admin");
     expect(result.text).not.toContain("Local=");
     expect(result.skipped).toBe(1);
+  });
+});
+
+describe("third-party session import parsers", () => {
+  it("imports Xshell .xsh INI sessions with source folder hierarchy", () => {
+    const result = parseXshellSessions([
+      "[Connection]",
+      "Host=192.168.1.100",
+      "Port=22",
+      "Protocol=SSH",
+      "[Terminal]",
+      "UserName=root",
+    ].join("\n"), {
+      targetFolder: "Imported",
+      sourcePath: "NetSarang/Prod/Web.xsh",
+      now: 6001,
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Web",
+      session_type: "SSH",
+      group_path: "User sessions / Imported / NetSarang / Prod",
+      host: "192.168.1.100",
+      port: 22,
+      username: "root",
+      created_at: 6001,
+    });
+  });
+
+  it("imports Tabby SSH profiles from config.yaml", () => {
+    const result = parseTabbySessions([
+      "profiles:",
+      "  - name: My Server",
+      "    type: ssh",
+      "    options:",
+      "      host: 10.0.0.5",
+      "      port: 2222",
+      "      user: ubuntu",
+    ].join("\n"), { targetFolder: "Tabby", now: 6002 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "My Server",
+      session_type: "SSH",
+      group_path: "User sessions / Tabby",
+      host: "10.0.0.5",
+      port: 2222,
+      username: "ubuntu",
+    });
+  });
+
+  it("imports WindTerm JSON sessions recursively", () => {
+    const result = parseWindTermSessions(JSON.stringify({
+      groups: [
+        {
+          name: "Prod",
+          children: [
+            { name: "DB", protocol: "ssh", host: "db.example.com", port: 22, username: "dba" },
+          ],
+        },
+      ],
+    }), { targetFolder: "WindTerm", now: 6003 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "DB",
+      group_path: "User sessions / WindTerm / Prod",
+      host: "db.example.com",
+      username: "dba",
+    });
+  });
+
+  it("imports iTerm2 profiles by parsing SSH commands", () => {
+    const result = parseItermDynamicProfiles(JSON.stringify({
+      Profiles: [
+        { Name: "Jumpbox", Command: "ssh -p 2200 -l deploy jump.example.com" },
+      ],
+    }), { targetFolder: "iTerm2", now: 6004 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Jumpbox",
+      group_path: "User sessions / iTerm2",
+      host: "jump.example.com",
+      port: 2200,
+      username: "deploy",
+    });
+  });
+
+  it("imports common XML connection exports", () => {
+    const result = parseXmlConnectionSessions(
+      '<Node Name="Prod SSH" Type="Connection" Protocol="SSH2" Hostname="prod.example.com" Port="2222" Username="root" Folder="mRemote" />',
+      { targetFolder: "Imported", now: 6005 },
+    );
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Prod SSH",
+      session_type: "SSH",
+      group_path: "User sessions / Imported / mRemote",
+      host: "prod.example.com",
+      port: 2222,
+      username: "root",
+    });
+  });
+
+  it("imports XML connection exports that use child elements", () => {
+    const result = parseXmlConnectionSessions([
+      "<Connection>",
+      "<Name>RDM SSH</Name>",
+      "<Protocol>SSH</Protocol>",
+      "<Host>rdm.example.com</Host>",
+      "<Port>2201</Port>",
+      "<Username>admin</Username>",
+      "<Folder>Remote Desktop Manager</Folder>",
+      "</Connection>",
+    ].join(""), { targetFolder: "Imported", now: 6005 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "RDM SSH",
+      group_path: "User sessions / Imported / Remote Desktop Manager",
+      host: "rdm.example.com",
+      port: 2201,
+      username: "admin",
+    });
+  });
+
+  it("imports SecureCRT .ini sessions and decodes hex ports", () => {
+    const result = parseSecureCrtSessions([
+      'S:"Hostname"=secure.example.com',
+      'S:"Username"=ops',
+      'S:"Protocol Name"=SSH2',
+      'D:"[SSH2] Port"=000008AE',
+      'S:"Identity Filename"=C:\\keys\\ops.pem',
+    ].join("\n"), {
+      targetFolder: "SecureCRT",
+      sourcePath: "Linux/secure.ini",
+      now: 6006,
+    });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "secure",
+      group_path: "User sessions / SecureCRT / Linux",
+      host: "secure.example.com",
+      port: 2222,
+      username: "ops",
+      auth_method: { PrivateKey: { key_path: "C:\\keys\\ops.pem" } },
+    });
+  });
+
+  it("preserves LocalShell launch arguments in NewMob round trips", () => {
+    const exported = serializeNewMobSessions([
+      session({
+        name: "Ubuntu",
+        session_type: "LocalShell",
+        host: "",
+        port: 0,
+        username: null,
+        auth_method: "None",
+        options_json: JSON.stringify({
+          localShellPath: "wsl.exe",
+          localShellArgs: ["-d", "Ubuntu"],
+        }),
+      }),
+    ], null);
+
+    const imported = parseNewMobSessions(exported.text);
+    expect(JSON.parse(imported.sessions[0].options_json)).toMatchObject({
+      localShellPath: "wsl.exe",
+      localShellArgs: ["-d", "Ubuntu"],
+    });
   });
 });

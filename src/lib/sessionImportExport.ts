@@ -45,6 +45,7 @@ export interface SessionImportOptions {
   targetFolder?: string | null;
   existingSessions?: readonly SessionConfig[];
   now?: number;
+  sourcePath?: string | null;
 }
 
 export interface SessionImportResult {
@@ -239,6 +240,213 @@ export function createSessionImportResult(
   );
 }
 
+export function parseXshellSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const now = resolveNow(options.now);
+  const sections = parseIniSections(text);
+  const connection = sections.get("connection") ?? new Map<string, string>();
+  const terminal = sections.get("terminal") ?? new Map<string, string>();
+  const host = cleanText(firstNonEmptyString(getIni(connection, "host"), getIni(connection, "hostname")), MAX_HOST_LENGTH);
+  const sessionType = protocolToSessionType(getIni(connection, "protocol"), warnings);
+  const folder = folderFromSourcePath(options.sourcePath);
+  const name = cleanText(
+    firstNonEmptyString(getIni(connection, "name"), nameFromSourcePath(options.sourcePath), host),
+    MAX_NAME_LENGTH,
+  );
+  const username = optionalCleanText(
+    firstNonEmptyString(getIni(connection, "username"), getIni(terminal, "username"), getIni(connection, "user")),
+    MAX_NAME_LENGTH,
+  );
+  const session = host
+    ? importedSession({
+      name,
+      sessionType,
+      host,
+      port: getIni(connection, "port"),
+      username,
+      groupPath: combineImportFolder(options.targetFolder ?? null, folder),
+      now,
+      warnings,
+    })
+    : null;
+
+  return finalizeImportResult(
+    session ? [session] : [],
+    session ? 0 : 1,
+    session ? warnings : [...warnings, "Skipped an Xshell session because host is empty."],
+    options.existingSessions,
+  );
+}
+
+export function parseTabbySessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const now = resolveNow(options.now);
+  const profiles = parseTabbyProfiles(text, warnings);
+  const sessions: SessionConfig[] = [];
+  let skipped = 0;
+
+  for (const profile of profiles) {
+    const type = cleanText(firstString(profile.type), 32).toLowerCase();
+    if (type && type !== "ssh" && type !== "telnet") {
+      skipped += 1;
+      continue;
+    }
+    const optionsRecord = isRecord(profile.options) ? profile.options : {};
+    const host = cleanText(firstNonEmptyString(optionsRecord.host, optionsRecord.hostname), MAX_HOST_LENGTH);
+    if (!host) {
+      skipped += 1;
+      continue;
+    }
+    const sessionType = type === "telnet" ? "Telnet" : "SSH";
+    const session = importedSession({
+      name: cleanText(firstNonEmptyString(profile.name, host), MAX_NAME_LENGTH),
+      sessionType,
+      host,
+      port: firstKnown(optionsRecord.port, DEFAULT_PORTS[sessionType]),
+      username: optionalCleanText(firstNonEmptyString(optionsRecord.user, optionsRecord.username), MAX_NAME_LENGTH),
+      groupPath: options.targetFolder ?? null,
+      now,
+      warnings,
+    });
+    if (session) sessions.push(session);
+    else skipped += 1;
+  }
+
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+}
+
+export function parseWindTermSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("The selected WindTerm session file is not valid JSON.");
+  }
+
+  const rows: WindTermRow[] = [];
+  collectWindTermRows(parsed, [], rows, 0);
+  const now = resolveNow(options.now);
+  const sessions: SessionConfig[] = [];
+  let skipped = 0;
+
+  for (const row of rows.slice(0, MAX_SESSIONS)) {
+    const sessionType = protocolToSessionType(row.protocol, warnings);
+    const session = importedSession({
+      name: row.name || row.host,
+      sessionType,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      groupPath: combineImportFolder(options.targetFolder ?? null, normalizeGroupPath(row.folder.join(" / "))),
+      now,
+      warnings,
+    });
+    if (session) sessions.push(session);
+    else skipped += 1;
+  }
+  skipped += Math.max(0, rows.length - MAX_SESSIONS);
+  if (rows.length > MAX_SESSIONS) warnings.push(`Only the first ${MAX_SESSIONS} sessions were imported.`);
+
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+}
+
+export function parseItermDynamicProfiles(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const profiles = parseJsonOrPlistProfiles(text, ["Profiles", "profiles"], warnings);
+  return sshCommandProfilesToImportResult(profiles, options, warnings, "iTerm2");
+}
+
+export function parseTerminalAppProfiles(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const profiles = parsePlistDicts(text);
+  return sshCommandProfilesToImportResult(profiles, options, warnings, "Terminal.app");
+}
+
+export function parseXmlConnectionSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const now = resolveNow(options.now);
+  const sessions: SessionConfig[] = [];
+  const seen = new Set<string>();
+  let skipped = 0;
+
+  for (const attrs of [...parseXmlElementAttributes(text), ...parseXmlChildElementRecords(text)]) {
+    const host = cleanText(firstXmlAttr(attrs, ["hostname", "host", "server", "address", "ipaddress"]), MAX_HOST_LENGTH);
+    if (!host) continue;
+    const protocol = firstXmlAttr(attrs, ["protocol", "proto", "connectiontype", "type"]);
+    if (/^(folder|container|group)$/i.test(protocol)) continue;
+    const dedupeKey = [
+      host.toLowerCase(),
+      firstXmlAttr(attrs, ["port"]),
+      firstXmlAttr(attrs, ["username", "user", "login"]).toLowerCase(),
+      firstXmlAttr(attrs, ["name", "sessionname", "sessionid", "title"]).toLowerCase(),
+    ].join("\u0000");
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    const sessionType = protocolToSessionType(protocol, warnings);
+    const session = importedSession({
+      name: cleanText(firstXmlAttr(attrs, ["name", "sessionname", "sessionid", "title"]) || host, MAX_NAME_LENGTH),
+      sessionType,
+      host,
+      port: firstXmlAttr(attrs, ["port"]),
+      username: optionalCleanText(firstXmlAttr(attrs, ["username", "user", "login"]), MAX_NAME_LENGTH),
+      groupPath: combineImportFolder(
+        options.targetFolder ?? null,
+        normalizeGroupPath(firstXmlAttr(attrs, ["folder", "group", "parent"])),
+      ),
+      authMethod: privateKeyAuth(firstXmlAttr(attrs, ["keyfile", "privatekey", "identityfile"])),
+      now,
+      warnings,
+    });
+    if (session) sessions.push(session);
+    else skipped += 1;
+  }
+
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+}
+
+export function parseSecureCrtSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const values = parseSecureCrtIni(text);
+  const host = cleanText(firstNonEmptyString(values.hostname, values.host), MAX_HOST_LENGTH);
+  const keyPath = cleanText(firstNonEmptyString(values["identity filename"], values.identityfile), MAX_PATH_LENGTH);
+  const folder = folderFromSourcePath(options.sourcePath);
+  const session = host
+    ? importedSession({
+      name: cleanText(firstNonEmptyString(values.name, nameFromSourcePath(options.sourcePath), host), MAX_NAME_LENGTH),
+      sessionType: protocolToSessionType(firstNonEmptyString(values["protocol name"], values.protocol), warnings),
+      host,
+      port: firstKnown(values["[ssh2] port"], values.port),
+      username: optionalCleanText(firstNonEmptyString(values.username), MAX_NAME_LENGTH),
+      groupPath: combineImportFolder(options.targetFolder ?? null, folder),
+      authMethod: privateKeyAuth(keyPath),
+      now: resolveNow(options.now),
+      warnings,
+    })
+    : null;
+
+  return finalizeImportResult(
+    session ? [session] : [],
+    session ? 0 : 1,
+    session ? warnings : [...warnings, "Skipped a SecureCRT session because host is empty."],
+    options.existingSessions,
+  );
+}
+
 export function serializeMobaXtermSessions(
   sessions: readonly SessionConfig[],
   scopeFolder: string | null,
@@ -295,6 +503,443 @@ export function serializeMobaXtermSessions(
     warnings,
     skipped,
   };
+}
+
+interface ImportedSessionInput {
+  name: string;
+  sessionType: string;
+  host: string;
+  port: unknown;
+  username?: string | null;
+  groupPath?: string | null;
+  authMethod?: AuthMethod;
+  options?: Record<string, unknown>;
+  now: number;
+  warnings: string[];
+}
+
+interface WindTermRow {
+  name: string;
+  protocol: string;
+  host: string;
+  port: unknown;
+  username: string | null;
+  folder: string[];
+}
+
+function importedSession(input: ImportedSessionInput): SessionConfig | null {
+  const sessionType = sanitizeSessionType(input.sessionType, input.warnings);
+  if (!sessionType) return null;
+  const host = cleanText(input.host, MAX_HOST_LENGTH);
+  if (sessionType !== "LocalShell" && sessionType !== "Serial" && !host) return null;
+
+  return {
+    id: createSessionId(),
+    name: cleanText(input.name, MAX_NAME_LENGTH) || host || sessionType,
+    session_type: sessionType,
+    group_path: toStoredGroupPath(input.groupPath ?? null),
+    host,
+    port: sanitizePort(input.port, DEFAULT_PORTS[sessionType] ?? 0),
+    username: input.username ?? null,
+    auth_method: input.authMethod ?? (sessionType === "SSH" || sessionType === "SFTP" ? "Password" : "None"),
+    options_json: JSON.stringify(sanitizeOptions(input.options ?? {})),
+    created_at: input.now,
+    updated_at: input.now,
+    last_connected_at: null,
+    sort_order: 0,
+  };
+}
+
+function protocolToSessionType(value: unknown, warnings: string[]): string {
+  const protocol = cleanText(value, 32).toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!protocol || protocol === "ssh" || protocol === "ssh2") return "SSH";
+  if (protocol === "sftp") return "SFTP";
+  if (protocol === "telnet") return "Telnet";
+  if (protocol === "rdp" || protocol === "rdpfile") return "RDP";
+  if (protocol === "vnc") return "VNC";
+  if (protocol === "ftp") return "FTP";
+  if (protocol === "serial") return "Serial";
+  warnings.push(`Imported unsupported protocol "${String(value)}" as SSH.`);
+  return "SSH";
+}
+
+function privateKeyAuth(keyPath: string): AuthMethod | undefined {
+  const cleaned = cleanText(keyPath, MAX_PATH_LENGTH);
+  return cleaned ? { PrivateKey: { key_path: cleaned } } : undefined;
+}
+
+function parseIniSections(text: string): Map<string, Map<string, string>> {
+  const sections = new Map<string, Map<string, string>>();
+  let current = "";
+  sections.set(current, new Map());
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith(";") || line.startsWith("#")) continue;
+    const sectionMatch = /^\[([^\]]+)]$/.exec(line);
+    if (sectionMatch) {
+      current = sectionMatch[1].trim().toLowerCase();
+      if (!sections.has(current)) sections.set(current, new Map());
+      continue;
+    }
+    const equalsIndex = line.indexOf("=");
+    if (equalsIndex <= 0) continue;
+    sections.get(current)?.set(line.slice(0, equalsIndex).trim().toLowerCase(), line.slice(equalsIndex + 1).trim());
+  }
+
+  return sections;
+}
+
+function getIni(section: Map<string, string>, key: string): string {
+  return section.get(key.toLowerCase()) ?? "";
+}
+
+function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    const profiles = isRecord(parsed) && Array.isArray(parsed.profiles) ? parsed.profiles : [];
+    return profiles.filter(isRecord);
+  } catch {
+    // Tabby normally uses YAML; JSON imports are accepted as a convenience.
+  }
+
+  const profiles: Array<Record<string, unknown>> = [];
+  let inProfiles = false;
+  let current: Record<string, unknown> | null = null;
+  let currentOptions: Record<string, unknown> | null = null;
+  let profileIndent = -1;
+  let optionsIndent = -1;
+
+  const pushCurrent = () => {
+    if (current) profiles.push(current);
+    current = null;
+    currentOptions = null;
+  };
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const withoutComment = rawLine.replace(/\s+#.*$/, "");
+    if (!withoutComment.trim()) continue;
+    const indent = withoutComment.match(/^\s*/)?.[0].length ?? 0;
+    const line = withoutComment.trim();
+
+    if (!inProfiles) {
+      if (line === "profiles:" || line.startsWith("profiles:")) inProfiles = true;
+      continue;
+    }
+
+    if (line.startsWith("- ")) {
+      pushCurrent();
+      current = { options: {} };
+      currentOptions = current.options as Record<string, unknown>;
+      profileIndent = indent;
+      optionsIndent = -1;
+      const rest = line.slice(2).trim();
+      if (rest) assignSimpleYamlPair(current, rest);
+      continue;
+    }
+
+    if (!current || indent <= profileIndent) continue;
+    if (line === "options:" || line.startsWith("options:")) {
+      currentOptions = {};
+      current.options = currentOptions;
+      optionsIndent = indent;
+      continue;
+    }
+
+    if (optionsIndent >= 0 && indent > optionsIndent && currentOptions) {
+      assignSimpleYamlPair(currentOptions, line);
+    } else {
+      assignSimpleYamlPair(current, line);
+    }
+  }
+
+  pushCurrent();
+  if (profiles.length === 0) warnings.push("No Tabby profiles were found in the selected config.");
+  return profiles;
+}
+
+function assignSimpleYamlPair(target: Record<string, unknown>, line: string) {
+  const separator = line.indexOf(":");
+  if (separator <= 0) return;
+  const key = line.slice(0, separator).trim();
+  const value = line.slice(separator + 1).trim();
+  target[key] = parseSimpleScalar(value);
+}
+
+function parseSimpleScalar(value: string): string | number | boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  if (/^-?\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10);
+  return trimmed;
+}
+
+function collectWindTermRows(value: unknown, folders: string[], rows: WindTermRow[], depth: number) {
+  if (depth > 32) return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectWindTermRows(item, folders, rows, depth + 1);
+    return;
+  }
+  if (!isRecord(value)) return;
+
+  const host = cleanText(firstNonEmptyString(value.host, value.hostname, value.address, value.ip), MAX_HOST_LENGTH);
+  const name = cleanText(firstNonEmptyString(value.name, value.title, value.label), MAX_NAME_LENGTH);
+  const explicitFolder = cleanText(firstNonEmptyString(value.folder, value.group, value.groupName, value.group_name), MAX_NAME_LENGTH);
+  const ownFolder = !host && name ? name : explicitFolder;
+  const nextFolders = ownFolder ? [...folders, ownFolder] : folders;
+
+  if (host) {
+    rows.push({
+      name: name || host,
+      protocol: firstNonEmptyString(value.protocol, value.type, value.sessionType, value.session_type),
+      host,
+      port: firstKnown(value.port, value.sshPort, value.ssh_port),
+      username: optionalCleanText(firstNonEmptyString(value.username, value.user, value.login), MAX_NAME_LENGTH),
+      folder: explicitFolder ? [...folders, explicitFolder] : folders,
+    });
+  }
+
+  for (const key of ["children", "sessions", "items", "nodes", "data", "groups"]) {
+    if (key in value) collectWindTermRows(value[key], nextFolders, rows, depth + 1);
+  }
+}
+
+function parseJsonOrPlistProfiles(
+  text: string,
+  arrayKeys: string[],
+  warnings: string[],
+): Array<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter(isRecord);
+    if (isRecord(parsed)) {
+      for (const key of arrayKeys) {
+        const value = parsed[key];
+        if (Array.isArray(value)) return value.filter(isRecord);
+      }
+    }
+  } catch {
+    // XML plist fallback below.
+  }
+
+  const plistProfiles = parsePlistDicts(text);
+  if (plistProfiles.length === 0) warnings.push("No profiles were found in the selected file.");
+  return plistProfiles;
+}
+
+function sshCommandProfilesToImportResult(
+  profiles: Array<Record<string, unknown>>,
+  options: SessionImportOptions,
+  warnings: string[],
+  sourceLabel: string,
+): SessionImportResult {
+  const now = resolveNow(options.now);
+  const sessions: SessionConfig[] = [];
+  let skipped = 0;
+
+  for (const profile of profiles) {
+    const command = firstString(
+      profile.Command,
+      profile.command,
+      profile.CommandString,
+      profile.commandString,
+      profile["Custom Command"],
+      profile["custom command"],
+    );
+    const parsed = parseSshCommand(command);
+    if (!parsed) {
+      skipped += 1;
+      continue;
+    }
+    const session = importedSession({
+      name: cleanText(firstNonEmptyString(profile.Name, profile.name, profile.ProfileName, parsed.host), MAX_NAME_LENGTH),
+      sessionType: "SSH",
+      host: parsed.host,
+      port: parsed.port,
+      username: parsed.username,
+      groupPath: options.targetFolder ?? null,
+      options: { description: `Imported from ${sourceLabel}` },
+      now,
+      warnings,
+    });
+    if (session) sessions.push(session);
+    else skipped += 1;
+  }
+
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+}
+
+function parseSshCommand(command: string): { host: string; port: number; username: string | null } | null {
+  const tokens = shellSplit(command);
+  const sshIndex = tokens.findIndex((token) => token === "ssh" || token.endsWith("/ssh") || token.endsWith("\\ssh.exe"));
+  if (sshIndex < 0) return null;
+
+  let port = 22;
+  let username: string | null = null;
+  let host = "";
+  for (let i = sshIndex + 1; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (!token) continue;
+    if (token === "-p" && tokens[i + 1]) {
+      port = sanitizePort(tokens[i + 1], 22);
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("-p") && token.length > 2) {
+      port = sanitizePort(token.slice(2), 22);
+      continue;
+    }
+    if (token === "-l" && tokens[i + 1]) {
+      username = cleanText(tokens[i + 1], MAX_NAME_LENGTH) || null;
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("-")) {
+      if (/^-[bcDeFIiJmOoQSRSWw]$/.test(token) && tokens[i + 1]) i += 1;
+      continue;
+    }
+    host = token;
+    break;
+  }
+
+  if (!host) return null;
+  if (host.includes("@")) {
+    const [user, rawHost] = host.split("@");
+    username = cleanText(user, MAX_NAME_LENGTH) || username;
+    host = rawHost;
+  }
+  host = cleanText(host, MAX_HOST_LENGTH);
+  return host ? { host, port, username } : null;
+}
+
+function shellSplit(command: string): string[] {
+  const tokens: string[] = [];
+  let token = "";
+  let quote: string | null = null;
+  let escaped = false;
+  for (const char of command.trim()) {
+    if (escaped) {
+      token += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      else token += char;
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (token) {
+        tokens.push(token);
+        token = "";
+      }
+      continue;
+    }
+    token += char;
+  }
+  if (token) tokens.push(token);
+  return tokens;
+}
+
+function parsePlistDicts(text: string): Array<Record<string, unknown>> {
+  const dicts: Array<Record<string, unknown>> = [];
+  for (const dictMatch of text.matchAll(/<dict\b[^>]*>([\s\S]*?)<\/dict>/gi)) {
+    const dictText = dictMatch[1];
+    const dict: Record<string, unknown> = {};
+    const pairPattern = /<key>([\s\S]*?)<\/key>\s*<(string|integer|real|true|false)\b[^>]*>(?:([\s\S]*?)<\/\2>)?/gi;
+    for (const pair of dictText.matchAll(pairPattern)) {
+      const key = decodeXml(pair[1]);
+      const kind = pair[2].toLowerCase();
+      const rawValue = decodeXml(pair[3] ?? "");
+      dict[key] = kind === "true" ? true : kind === "false" ? false : parseSimpleScalar(rawValue);
+    }
+    if (Object.keys(dict).length > 0) dicts.push(dict);
+  }
+  return dicts;
+}
+
+function parseXmlElementAttributes(text: string): Array<Record<string, string>> {
+  const out: Array<Record<string, string>> = [];
+  for (const match of text.matchAll(/<([A-Za-z_][\w:.-]*)(\s+[^<>]*?)\/?>/g)) {
+    const tag = match[1].toLowerCase();
+    if (tag.startsWith("?") || tag === "plist" || tag === "key" || tag === "string") continue;
+    const attrs: Record<string, string> = {};
+    for (const attr of match[2].matchAll(/([A-Za-z_][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+      attrs[attr[1].toLowerCase()] = decodeXml(attr[2] ?? attr[3] ?? "");
+    }
+    if (Object.keys(attrs).length > 0) out.push(attrs);
+  }
+  return out;
+}
+
+function parseXmlChildElementRecords(text: string): Array<Record<string, string>> {
+  const out: Array<Record<string, string>> = [];
+  for (const block of text.matchAll(/<([A-Za-z_][\w:.-]*)\b[^>]*>([\s\S]*?)<\/\1>/g)) {
+    const body = block[2];
+    if (!/<(?:Host|Hostname|Server|Address|IPAddress)\b/i.test(body)) continue;
+    const attrs: Record<string, string> = {};
+    for (const child of body.matchAll(/<([A-Za-z_][\w:.-]*)\b[^>]*>([^<>]*)<\/\1>/g)) {
+      const key = child[1].toLowerCase();
+      const value = decodeXml(child[2].trim());
+      if (value) attrs[key] = value;
+    }
+    if (Object.keys(attrs).length > 0) out.push(attrs);
+  }
+  return out;
+}
+
+function firstXmlAttr(attrs: Record<string, string>, keys: string[]): string {
+  for (const key of keys) {
+    const value = attrs[key.toLowerCase()];
+    if (value) return value;
+  }
+  return "";
+}
+
+function parseSecureCrtIni(text: string): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  for (const rawLine of text.split(/\r?\n/)) {
+    const match = /^[A-Z]:"([^"]+)"=(.*)$/.exec(rawLine.trim());
+    if (!match) continue;
+    const key = match[1].trim().toLowerCase();
+    const value = match[2].trim();
+    values[key] = /^[0-9a-f]{8}$/i.test(value) ? Number.parseInt(value, 16) : value;
+  }
+  return values;
+}
+
+function folderFromSourcePath(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
+  parts.pop();
+  return normalizeGroupPath(parts.join(" / "));
+}
+
+function nameFromSourcePath(path: string | null | undefined): string {
+  if (!path) return "";
+  const name = path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+  return name.replace(/\.[^.]+$/, "");
+}
+
+function decodeXml(value: string): string {
+  return value
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 function extractNewMobRows(
@@ -860,6 +1505,8 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyString(source, output, "jumpPort", 16);
   copyString(source, output, "description", MAX_OPTION_LENGTH);
   copyString(source, output, "tags", MAX_OPTION_LENGTH);
+  copyString(source, output, "localShellPath", MAX_PATH_LENGTH);
+  copyStringArray(source, output, "localShellArgs", 64, MAX_OPTION_LENGTH);
 
   if ("terminalProfile" in source) {
     const profile = normalizeTerminalProfile(source.terminalProfile);
@@ -891,6 +1538,22 @@ function copyString(
 ) {
   const value = cleanText(firstString(source[key]), maxLength);
   if (value) output[key] = value;
+}
+
+function copyStringArray(
+  source: Record<string, unknown>,
+  output: Record<string, unknown>,
+  key: string,
+  maxItems: number,
+  maxItemLength: number,
+) {
+  const value = source[key];
+  if (!Array.isArray(value)) return;
+  const strings = value
+    .map((item) => cleanText(firstString(item), maxItemLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+  if (strings.length > 0) output[key] = strings;
 }
 
 function sanitizeSessionType(value: unknown, warnings: string[]): string | null {
@@ -927,6 +1590,14 @@ function firstString(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string") return value;
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function firstNonEmptyString(...values: unknown[]): string {
+  for (const value of values) {
+    const text = firstString(value).trim();
+    if (text) return text;
   }
   return "";
 }

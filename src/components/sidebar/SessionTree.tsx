@@ -25,21 +25,37 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { FolderNameDialog } from "./FolderNameDialog";
 import type { SessionConfig, SessionGroup } from "../../lib/ipc";
 import {
+  importExternalBashSessions,
+  importPuttySessions,
+  importWslSessions,
+  scanLocalSessionFiles,
+} from "../../lib/ipc";
+import {
   startCustomDrag,
   useCustomDropTarget,
   type CustomDragData,
 } from "../../lib/customDnD";
 import {
   parseCsvSessions,
+  parseItermDynamicProfiles,
   parseMobaXtermSessions,
   parseNewMobSessions,
+  parseSecureCrtSessions,
+  parseTabbySessions,
+  parseTerminalAppProfiles,
+  parseWindTermSessions,
+  parseXmlConnectionSessions,
+  parseXshellSessions,
+  createSessionImportResult,
   serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
   type SessionExportResult,
+  type SessionImportOptions,
   type SessionImportResult,
 } from "../../lib/sessionImportExport";
-import { openBinaryFile, openTextFile, downloadTextFile } from "../../lib/fileHelpers";
+import { parseOpenSshConfig } from "../../lib/quickConnect";
+import { openBinaryFile, openTextFile, openTextFileWithName, downloadTextFile } from "../../lib/fileHelpers";
 import { serializeHtmlSessions } from "../../lib/sessionExportHtml";
 import {
   SESSION_ROOT_LABEL,
@@ -72,6 +88,8 @@ interface FolderNode {
   folders: FolderNode[];
   sessions: SessionConfig[];
 }
+
+type TextSessionParser = (text: string, options?: SessionImportOptions) => SessionImportResult;
 
 export function SessionTree({ onNewSession, onConnectSession, onEditSession }: SessionTreeProps) {
   const {
@@ -337,6 +355,136 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     setStatusMessage(`Started ${folderSessions.length} session${folderSessions.length === 1 ? "" : "s"} from ${folderOptionLabel(folderPath)}`);
   };
 
+  const mergeImportResults = (results: SessionImportResult[]): SessionImportResult =>
+    createSessionImportResult(results.flatMap((result) => result.sessions), {
+      existingSessions: sessions,
+      warnings: results.flatMap((result) => result.warnings),
+      skipped: results.reduce((sum, result) => sum + result.skipped, 0),
+    });
+
+  const retargetImportedSessions = (
+    imported: readonly SessionConfig[],
+    folderPath: string | null,
+    defaultSubfolder: string | null,
+  ): SessionConfig[] => imported.map((session) => {
+    const target = normalizeGroupPath(folderPath);
+    const importedFolder = normalizeGroupPath(session.group_path) ?? normalizeGroupPath(defaultSubfolder);
+    const groupPath = target && importedFolder
+      ? `${target} / ${importedFolder}`
+      : target ?? importedFolder;
+    return { ...session, group_path: toStoredGroupPath(groupPath) };
+  });
+
+  const queueSessionListImport = (
+    imported: readonly SessionConfig[],
+    folderPath: string | null,
+    source: string,
+    defaultSubfolder: string | null,
+  ) => {
+    const result = createSessionImportResult(
+      retargetImportedSessions(imported, folderPath, defaultSubfolder),
+      { existingSessions: sessions },
+    );
+    queueImportPreview(result, folderPath, source);
+  };
+
+  const importBackendSessions = (
+    folderPath: string | null,
+    source: string,
+    load: () => Promise<SessionConfig[]>,
+    defaultSubfolder: string,
+  ) => {
+    load().then((imported) => {
+      if (imported.length === 0) {
+        setStatusMessage(`No ${source} sessions were found on this system.`);
+        return;
+      }
+      queueSessionListImport(imported, folderPath, source, defaultSubfolder);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const importTextSessions = (
+    folderPath: string | null,
+    source: string,
+    accept: string,
+    parser: TextSessionParser,
+  ) => {
+    openTextFileWithName(accept).then((file) => {
+      if (!file) return;
+      const result = parser(file.text, {
+        targetFolder: folderPath,
+        existingSessions: sessions,
+        sourcePath: file.name,
+      });
+      queueImportPreview(result, folderPath, source);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const importScannedTextSessions = (
+    folderPath: string | null,
+    scanKey: string,
+    source: string,
+    parser: TextSessionParser,
+  ) => {
+    scanLocalSessionFiles(scanKey).then((files) => {
+      if (files.length === 0) {
+        setStatusMessage(`No ${source} local configuration files were found.`);
+        return;
+      }
+      const result = mergeImportResults(files.map((file) =>
+        parser(file.text, {
+          targetFolder: folderPath,
+          sourcePath: file.relativePath || file.path,
+        }),
+      ));
+      queueImportPreview(result, folderPath, `${source} local config`);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const importOpenSshText = (folderPath: string | null, source: string, defaultSubfolder: string) => {
+    openTextFileWithName(".ssh_config,.conf,.config,.txt,text/plain").then((file) => {
+      if (!file) return;
+      const imported = parseOpenSshConfig(file.text).map((session) => ({
+        ...session,
+        group_path: defaultSubfolder,
+      }));
+      queueSessionListImport(imported, folderPath, source, defaultSubfolder);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const importScannedOpenSsh = (folderPath: string | null, scanKey: string, source: string, defaultSubfolder: string) => {
+    scanLocalSessionFiles(scanKey).then((files) => {
+      if (files.length === 0) {
+        setStatusMessage(`No ${source} exported SSH config files were found.`);
+        return;
+      }
+      const imported = files.flatMap((file) => parseOpenSshConfig(file.text)).map((session) => ({
+        ...session,
+        group_path: defaultSubfolder,
+      }));
+      queueSessionListImport(imported, folderPath, `${source} local export`, defaultSubfolder);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const showTermiusGuide = () => {
+    window.alert([
+      "Termius local databases are encrypted by the OS keychain and cannot be imported directly.",
+      "",
+      "Run this in your terminal, then import the generated OpenSSH config:",
+      "termius export-ssh-config",
+    ].join("\n"));
+  };
+
   const unavailable = (label: string) => {
     setStatusMessage(`${label} is not implemented yet`);
   };
@@ -346,32 +494,189 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     const isRoot = !normalized;
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const importChildren: MenuItem[] = [
-      "WSL sessions",
-      "External Bash sessions",
-      "PuTTY sessions",
-      "PuTTYCM sessions",
-      "SuperPuTTY sessions",
-      "MRemote sessions",
-      "Exceed sessions",
-      "SCRT sessions",
-      "RDM sessions",
-    ].map((label) => ({
-      label: `Import ${label}`,
-      icon: <TerminalIcon className="w-3 h-3" />,
-      onClick: () => unavailable(`Import ${label}`),
-    }));
-    importChildren.unshift({
-      label: "Import MobaXterm sessions",
-      icon: <Upload className="w-3 h-3" />,
-      onClick: () => importMoba(folderPath),
-    });
-    importChildren.push(
+      {
+        label: "Import MobaXterm sessions",
+        icon: <Upload className="w-3 h-3" />,
+        onClick: () => importMoba(folderPath),
+      },
+      {
+        label: "Import WSL sessions",
+        icon: <TerminalIcon className="w-3 h-3" />,
+        onClick: () => importBackendSessions(folderPath, "WSL", importWslSessions, "Imported / WSL"),
+      },
+      {
+        label: "Import External Bash sessions",
+        icon: <TerminalIcon className="w-3 h-3" />,
+        onClick: () => importBackendSessions(folderPath, "External Bash", importExternalBashSessions, "Imported / External Bash"),
+      },
+      {
+        label: "Import PuTTY sessions",
+        icon: <TerminalIcon className="w-3 h-3" />,
+        onClick: () => importBackendSessions(folderPath, "PuTTY", importPuttySessions, "Imported / PuTTY"),
+      },
+      { label: "", separator: true },
+      {
+        label: "Import Xshell sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From .xsh file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "Xshell", ".xsh,text/plain", parseXshellSessions),
+          },
+          {
+            label: "From local Xshell config",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "xshell", "Xshell", parseXshellSessions),
+          },
+        ],
+      },
+      {
+        label: "Import Tabby sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From config.yaml",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "Tabby", ".yaml,.yml,text/yaml,text/plain", parseTabbySessions),
+          },
+          {
+            label: "From local Tabby config",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "tabby", "Tabby", parseTabbySessions),
+          },
+        ],
+      },
+      {
+        label: "Import WindTerm sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From user.sessions file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "WindTerm", ".sessions,.json,user.sessions,application/json,text/plain", parseWindTermSessions),
+          },
+          {
+            label: "From local WindTerm config",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "windterm", "WindTerm", parseWindTermSessions),
+          },
+        ],
+      },
+      { label: "", separator: true },
+      {
+        label: "Import iTerm2 profiles",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From JSON/plist file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "iTerm2", ".json,.plist,application/json,text/xml", parseItermDynamicProfiles),
+          },
+          {
+            label: "From local iTerm2 DynamicProfiles",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "iterm2", "iTerm2", parseItermDynamicProfiles),
+          },
+        ],
+      },
+      {
+        label: "Import Terminal.app profiles",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From .terminal/plist file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "Terminal.app", ".terminal,.plist,text/xml", parseTerminalAppProfiles),
+          },
+          {
+            label: "From local Terminal.app preferences",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "terminal", "Terminal.app", parseTerminalAppProfiles),
+          },
+        ],
+      },
+      {
+        label: "Import Termius sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "Show export guide",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: showTermiusGuide,
+          },
+          {
+            label: "From exported OpenSSH config",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importOpenSshText(folderPath, "Termius", "Imported / Termius"),
+          },
+          {
+            label: "Detect local Termius export",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedOpenSsh(folderPath, "termius", "Termius", "Imported / Termius"),
+          },
+        ],
+      },
+      { label: "", separator: true },
+      {
+        label: "Import PuTTYCM sessions",
+        icon: <Upload className="w-3 h-3" />,
+        onClick: () => importTextSessions(folderPath, "PuTTYCM", ".xml,text/xml,application/xml", parseXmlConnectionSessions),
+      },
+      {
+        label: "Import SuperPuTTY sessions",
+        icon: <Upload className="w-3 h-3" />,
+        onClick: () => importTextSessions(folderPath, "SuperPuTTY", ".xml,.settings,text/xml,application/xml", parseXmlConnectionSessions),
+      },
+      {
+        label: "Import MRemote sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From XML file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "mRemote", ".xml,text/xml,application/xml", parseXmlConnectionSessions),
+          },
+          {
+            label: "From local mRemoteNG config",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "mremote", "mRemote", parseXmlConnectionSessions),
+          },
+        ],
+      },
+      {
+        label: "Import Exceed sessions",
+        icon: <Upload className="w-3 h-3" />,
+        onClick: () => importTextSessions(folderPath, "Exceed", ".xml,.xs,text/xml,application/xml,text/plain", parseXmlConnectionSessions),
+      },
+      {
+        label: "Import SCRT sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          {
+            label: "From SecureCRT .ini file",
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "SecureCRT", ".ini,text/plain", parseSecureCrtSessions),
+          },
+          {
+            label: "From local SecureCRT config",
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "securecrt", "SecureCRT", parseSecureCrtSessions),
+          },
+        ],
+      },
+      {
+        label: "Import RDM sessions",
+        icon: <Upload className="w-3 h-3" />,
+        onClick: () => importTextSessions(folderPath, "Remote Desktop Manager", ".rdm,.xml,text/xml,application/xml", parseXmlConnectionSessions),
+      },
+      { label: "", separator: true },
       {
         label: "Import sessions from a CSV file",
         icon: <FileText className="w-3 h-3" />,
         onClick: () => importCsv(folderPath),
       },
-    );
+    ];
 
     ctx.show(e, [
       { label: "New session", icon: <Plus className="w-3 h-3" />, onClick: () => onNewSession?.(toStoredGroupPath(folderPath)) },

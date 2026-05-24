@@ -46,6 +46,7 @@ export interface SftpTabInfo {
 export interface LocalShellSelection {
   id: string;
   name: string;
+  args?: string[];
 }
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";

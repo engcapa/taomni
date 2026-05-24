@@ -13,17 +13,17 @@
 | 右键菜单导入导出 | ✅ 完成 | `SessionTree.tsx` 文件夹右键菜单 |
 | WelcomePanel OpenSSH 导入 | ✅ 完成 | `WelcomePanel.tsx` "Import OpenSSH config" 卡片 |
 | MenuBar 菜单导入导出 | ✅ 完成 | Sessions 菜单已增加 Import/Export 子菜单与稳定 test-id |
-| Rust 后端导入导出 | ❌ 未实现 | 设计文档规划了 `import.rs`，但实际未创建；所有逻辑在前端 |
+| Rust 后端系统级导入 | ✅ 完成 | `src-tauri/src/session/import.rs` 已创建，用于 PuTTY/WSL/本地配置扫描等系统 API 场景 |
 | AI 安全字段 (disableAiWrite) | ✅ 完成 | 已对齐并紧急补齐，确保导入导出时会话 AI 限制属性不丢 |
-| PuTTY 注册表导入 | ❌ 规划中 | MobaXterm 对齐项，需要 Rust 后端读取 Windows 注册表 |
-| Xshell 导入 (文件/本地配置) | ❌ 规划中 | 需支持 `.xsh` INI 解析，以及自动扫描 `%APPDATA%\NetSarang` |
-| Tabby 导入 (文件/本地配置) | ❌ 规划中 | 需支持 `config.yaml` YAML 解析，以及跨平台默认路径扫描 |
-| WindTerm 导入 (文件/本地配置) | ❌ 规划中 | 需支持 `user.sessions` JSON 解析，以及 profiles 路径探测 |
-| macOS 常用工具 (iTerm2/Terminal.app/Termius) | ❌ 规划中 | iTerm2 动态 JSON、Terminal `.terminal` Plist、Termius CLI SSH 导出 |
-| 其他 MobaXterm 对齐导入 (WSL/mRemote/SecureCRT等) | ❌ 存根状态 | WSL/External Bash/PuTTYCM/SuperPuTTY/MRemote/Exceed/SCRT/RDM 待实现 |
+| PuTTY 注册表导入 | ✅ 完成 | Rust 后端读取 `HKCU\Software\SimonTatham\PuTTY\Sessions`，SessionTree 已接入 |
+| Xshell 导入 (文件/本地配置) | ⚠ 部分完成 | 已支持 `.xsh` INI 文件与 `%APPDATA%\NetSarang\Xshell\Sessions` 本地扫描；ZIP 包导入未实现 |
+| Tabby 导入 (文件/本地配置) | ✅ 完成 | 已支持 `config.yaml` YAML/JSON 解析，以及 Windows/macOS/Linux 默认路径扫描 |
+| WindTerm 导入 (文件/本地配置) | ✅ 完成 | 已支持 `user.sessions` JSON 递归解析，以及常见 profile 路径扫描 |
+| macOS 常用工具 (iTerm2/Terminal.app/Termius) | ⚠ 部分完成 | iTerm2 JSON/plist、Terminal.app XML plist/本机偏好、Termius OpenSSH 导出引导与探测已接入；二进制 `.terminal` 直接文件解析未实现 |
+| 其他 MobaXterm 对齐导入 (WSL/mRemote/SecureCRT等) | ⚠ 部分完成 | WSL/External Bash/PuTTYCM/SuperPuTTY/mRemote/SecureCRT/RDM 已接入；Exceed 目前走通用 XML 解析，专有格式待样本适配 |
 | CSV 导出 | ✅ 完成 | `serializeCsvSessions()` 已实现，右键菜单与 MenuBar 均可导出 |
 | 导入预览/确认对话框 | ✅ 完成 | `SessionImportPreview` 已接入 SessionTree 与 MenuBar，确认后才写库 |
-| IPC 类型包装 | ❌ 缺失 | `ipc.ts` 中没有导入导出相关的类型包装函数 |
+| IPC 类型包装 | ✅ 完成 | `ipc.ts` 已添加 PuTTY/WSL/External Bash/本地配置扫描 typed invoke 包装 |
 
 ---
 
@@ -109,9 +109,9 @@
 
 **实现**：新增 `SessionImportPreview` 对话框，展示导入来源、目标文件夹、会话数量、跳过数量、警告信息，以及最多 80 条会话预览；SessionTree 右键导入和 MenuBar 导入均确认后才调用 `importSessions()`。
 
-### 3.4 🟡 MobaXterm 第三方程序导入存根（P3）
+### 3.4 ⚠ MobaXterm 第三方程序导入（P3 部分完成）
 
-**现状**：SessionTree 右键菜单中的 "Import sessions from third-party programs" 子菜单包含 9 个导入项，与 MobaXterm 官方功能对齐。目前全部为 "not implemented yet" 存根状态。根据 MobaXterm 的设计与本机环境，这 9 项具体需求如下：
+**现状**：SessionTree 右键菜单中的 "Import sessions from third-party programs" 子菜单已经从存根改为可执行入口。WSL、External Bash、PuTTY 已走 Rust 后端；PuTTYCM、SuperPuTTY、mRemote/mRemoteNG、SecureCRT、RDM 已支持文件导入，其中 mRemoteNG 和 SecureCRT 也支持本机配置扫描。Exceed 目前走通用 XML 解析，专有格式仍需样本适配。
 
 1. **Import WSL sessions**：导入 Windows Subsystem for Linux (WSL) 子系统会话。
    - **实现策略**：需要 Tauri 后端调用 `wsl.exe -l -v` 命令，枚举系统已安装的 WSL 发行版（如 Ubuntu, Debian 等），将其作为本地 Terminal 会话（或 SSH 本地环回）导入 NewMob。
@@ -136,21 +136,22 @@
 9. **Import RDM sessions**：导入 Remote Desktop Manager 会话。
    - **实现策略**：解析 RDM 导出的 `.rdm` 或 `.xml` 格式文件，转换 SSH/SFTP/Telnet 连接。
 
-### 3.5 🟢 Rust 后端导入模块未创建（P3/架构决策）
+### 3.5 ✅ Rust 后端导入模块（P3/架构决策）
 
-**现状**：DESIGN.md 规划了 `src-tauri/src/session/import.rs`，但实际所有逻辑都在前端 TypeScript 实现。当前架构可行，但：
+**现状**：`src-tauri/src/session/import.rs` 已创建，系统级访问逻辑在 Rust 后端实现，通用文件解析仍保留在前端 TypeScript：
 
 - 前端解析对于大文件（2MB 限制内）性能足够
-- PuTTY 注册表读取**必须**在后端完成
-- WSL 枚举**必须**在后端完成
+- PuTTY 注册表读取已在后端完成
+- WSL / External Bash 枚举已在后端完成
+- 本机配置路径扫描已在后端完成，返回文本后由前端解析器转换
 
-**建议**：保持现有前端解析架构（NewMob JSON / MobaXterm / CSV / OpenSSH），仅在需要系统 API 访问时（PuTTY / WSL）才在 Rust 后端添加命令。
+**决策**：保持现有前端解析架构（NewMob JSON / MobaXterm / CSV / OpenSSH / 第三方导出文件），仅在需要系统 API 或跨目录读取时通过 Rust 后端命令提供扫描能力。
 
-### 3.6 🟢 IPC 类型包装缺失（P3）
+### 3.6 ✅ IPC 类型包装（P3）
 
-**现状**：`ipc.ts` 没有导入导出相关的 typed invoke 包装。由于当前架构全在前端，这不是阻塞问题。未来如果有后端导入命令，需要添加。
+**现状**：`ipc.ts` 已添加 `importPuttySessions()`、`importWslSessions()`、`importExternalBashSessions()`、`scanLocalSessionFiles()` 与 `LocalSessionFile` 类型，前端不再直接散落裸 `invoke`。
 
-### 3.7 🔴 扩展第三方会话导入功能（新增 Xshell, Tabby, WindTerm, macOS 常用工具）
+### 3.7 ⚠ 扩展第三方会话导入功能（新增 Xshell, Tabby, WindTerm, macOS 常用工具）
 
 根据用户需求，在对齐 MobaXterm 已有功能的基础上，进一步扩展支持目前最主流的终端工具（**Xshell**、**Tabby**、**WindTerm** 以及 **macOS 常用终端工具**）的会话导入。
 
@@ -292,8 +293,9 @@ copyBoolean(source, output, "disableAiWrite");
 | [WelcomePanel.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/WelcomePanel.tsx) | UI：Welcome 页面 OpenSSH 导入 | 399 |
 | [MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/menubar/MenuBar.tsx) | UI：菜单栏（缺少导入导出） | 101 |
 | [sessionStore.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/stores/sessionStore.ts) | Zustand store，含 `importSessions()` | 283 |
-| [ipc.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/ipc.ts) | Tauri IPC 类型定义（无导入导出包装） | 488 |
-| [session/mod.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/mod.rs) | Rust 后端会话 CRUD（无导入导出） | 66 |
+| [ipc.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/ipc.ts) | Tauri IPC 类型定义（含导入扫描包装） | 488 |
+| [session/mod.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/mod.rs) | Rust 后端会话 CRUD + import 模块导出 | 66 |
+| [session/import.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/import.rs) | Rust 后端系统级会话导入与本地配置扫描 | 604 |
 | [session/models.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/models.rs) | Rust 数据模型 | 110 |
 | [session/db.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/db.rs) | SQLite 数据库操作 | 174 |
 
@@ -367,35 +369,35 @@ copyBoolean(source, output, "disableAiWrite");
    - 文件解析后，先展示预览对话框
    - 用户确认后再调用 `importSessions()`
 
-### Phase 4：PuTTY 注册表导入 ❌
+### Phase 4：PuTTY 注册表导入 ✅
 
 > **注意**：此功能需要 Rust 后端支持，因为需要读取 Windows 注册表。
 
 #### 步骤
 
-1. **创建 `src-tauri/src/session/import.rs`**
+1. ✅ **创建 `src-tauri/src/session/import.rs`**
    - 添加 `read_putty_sessions()` 函数
    - 读取 `HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions` 注册表键
    - 解析每个 session 的 HostName, PortNumber, UserName, Protocol, PublicKeyFile
 
-2. **注册 Tauri 命令**
+2. ✅ **注册 Tauri 命令**
    - `import_putty_sessions` → 返回 `Vec<SessionConfig>`
 
-3. **前端调用**
+3. ✅ **前端调用**
    - 在 `ipc.ts` 添加 `importPuttySessions()` 包装
    - 在 SessionTree 右键菜单中替换 "PuTTY sessions" 的 `unavailable` 回调
 
-### Phase 5：第三方会话导入扩展（Xshell, Tabby, WindTerm, macOS 工具）❌
+### Phase 5：第三方会话导入扩展（Xshell, Tabby, WindTerm, macOS 工具）⚠
 
 #### 步骤
 
-1. **扩展前端解析库 (`src/lib/sessionImportExport.ts`)**
+1. ✅ **扩展前端解析库 (`src/lib/sessionImportExport.ts`)**
    - 添加 `parseXshellSessions(content: string): SessionConfig[]` (INI 解析)
    - 添加 `parseTabbySessions(content: string): SessionConfig[]` (YAML 解析)
    - 添加 `parseWindTermSessions(content: string): SessionConfig[]` (JSON 解析)
    - 添加 `parseItermDynamicProfiles(content: string): SessionConfig[]` (JSON Profiles)
 
-2. **添加 Tauri 系统级别文件扫描指令**
+2. ✅ **添加 Tauri 系统级别文件扫描指令**
    - 在 `src-tauri/src/session/import.rs` 中：
      - 添加 `scan_local_sessions(app_name: String)` 指令。
      - 实现针对 Windows/macOS 的路径定位逻辑：
@@ -404,7 +406,7 @@ copyBoolean(source, output, "disableAiWrite");
        - `macOS Terminal/iTerm`: 读取 Plist 配置文件或 DynamicProfiles 目录文件。
      - 前端通过 Tauri IPC 调用 `scan_local_sessions(appName)`，并由前端库进行反序列化和格式转换。
 
-3. **UI 增强与用户引导**
+3. ✅ **UI 增强与用户引导**
    - 在导入界面中设计“本机自动导入”卡片，通过一键点击触发自动扫描。
    - 针对 Termius，展示引导式弹窗提示：
      > *“由于 Termius 本地配置采用系统级加密，请点击 [查看指引] 在您的终端执行 `termius export-ssh-config`。NewMob 将自动探测导出路径并为您完美导入会话。”*
@@ -424,7 +426,7 @@ copyBoolean(source, output, "disableAiWrite");
 
 ## 7. 总结
 
-Session 导入导出功能已完成 **约 75%**（结合新增的扩展第三方导入目标后）：
+Session 导入导出功能已完成 **约 90%**（结合新增的扩展第三方导入目标后）：
 
 - ✅ **核心库基本建立**：支持 NewMob JSON、MobaXterm、CSV、OpenSSH 导入及部分导出。
 - ✅ **基础 UI 框架就绪**：SessionTree 右键菜单及 WelcomePanel 完成。
@@ -432,10 +434,10 @@ Session 导入导出功能已完成 **约 75%**（结合新增的扩展第三方
 - ✅ **MenuBar 入口完成**：Sessions 菜单已有 Import/Export 子菜单（Phase 1 已完成）。
 - ✅ **CSV 导出完成**：支持 CSV 导入/导出 round-trip（Phase 2 已完成）。
 - ✅ **导入预览确认框完成**：文件导入后先预览，确认后写库（Phase 3 已完成）。
-- ❌ **高级系统级导入缺失**：WSL、PuTTY 注册表读取待后端 Rust 支撑（Phase 4 待办）。
-- ❌ **主流第三方软件导入缺失**：Xshell, Tabby, WindTerm 和 macOS 工具的双轨（导出文件+本地配置）导入待实现（Phase 5 待办）。
+- ✅ **高级系统级导入完成**：PuTTY 注册表、WSL、External Bash 已有 Rust 后端支撑并接入 UI（Phase 4 已完成）。
+- ⚠ **主流第三方软件导入基本完成**：Xshell、Tabby、WindTerm、iTerm2、Terminal.app、Termius 已接入文件/本地扫描主路径；Xshell ZIP、Terminal 二进制 plist、Exceed 专有格式仍需后续补齐（Phase 5 部分完成）。
 
-**建议优先级**：Phase 4 (PuTTY & WSL) > Phase 5 (Xshell/Tabby/WindTerm/macOS 扩展)
+**建议优先级**：补齐 Xshell ZIP、Terminal.app 二进制 `.terminal`、Exceed 专有格式样本适配。
 
 ---
 
@@ -458,10 +460,40 @@ Session 导入导出功能已完成 **约 75%**（结合新增的扩展第三方
 - ✅ 单元测试新增 CSV 导出/导入 round-trip 覆盖
 - ✅ 单元测试补充 `disableAiWrite` 导入导出保留校验
 
-### 8.2 仍未完成
+### 8.2 P3/P4 本轮已完成（2026-05-24）
 
-- ❌ PuTTY 注册表导入
-- ❌ WSL / External Bash 系统扫描导入
-- ❌ PuTTYCM / SuperPuTTY / mRemote / SecureCRT / RDM / Exceed 导入
-- ❌ Xshell / Tabby / WindTerm 双轨导入
-- ❌ macOS iTerm2 / Terminal.app / Termius 引导式导入
+- ✅ Rust 后端新增 `src-tauri/src/session/import.rs`
+- ✅ Tauri 注册 `import_putty_sessions` / `import_wsl_sessions` / `import_external_bash_sessions` / `scan_local_session_files`
+- ✅ `ipc.ts` 新增 typed invoke 包装与 `LocalSessionFile` 类型
+- ✅ PuTTY 注册表导入已接入 SessionTree 第三方导入菜单
+- ✅ WSL sessions 系统扫描导入已接入 SessionTree 第三方导入菜单
+- ✅ External Bash sessions 系统扫描导入已接入 SessionTree 第三方导入菜单
+- ✅ LocalShell 会话支持 `localShellPath` / `localShellArgs` 导入导出保留
+- ✅ 打开已保存 LocalShell 会话时会从 `options_json` 恢复 shell 路径与启动参数
+- ✅ Xshell `.xsh` INI 文件导入已实现
+- ✅ Xshell 本地配置扫描 `%APPDATA%\NetSarang\Xshell\Sessions` 已实现
+- ✅ Tabby `config.yaml` 文件导入已实现
+- ✅ Tabby Windows/macOS/Linux 默认配置路径扫描已实现
+- ✅ WindTerm `user.sessions` JSON 文件导入已实现
+- ✅ WindTerm 常见 profile 路径扫描已实现
+- ✅ iTerm2 Dynamic Profiles JSON/XML plist 文件导入已实现
+- ✅ iTerm2 本地 DynamicProfiles 目录扫描已实现
+- ✅ Terminal.app XML plist 文件导入已实现
+- ✅ Terminal.app 本地偏好通过 `plutil` 转 XML 后导入已实现
+- ✅ Termius 已接入导出指引、OpenSSH config 文件导入、默认导出路径探测
+- ✅ PuTTYCM XML 文件导入已实现
+- ✅ SuperPuTTY XML/settings 文件导入已实现
+- ✅ mRemote/mRemoteNG XML 文件导入已实现
+- ✅ mRemoteNG 本地 `confCons.xml` 扫描已实现
+- ✅ SecureCRT `.ini` 文件导入已实现
+- ✅ SecureCRT 本地 Sessions 目录扫描已实现
+- ✅ RDM `.rdm`/XML 文件导入已实现
+- ✅ SessionTree 第三方导入入口已统一使用导入预览确认框
+- ✅ 单元测试覆盖 Xshell / Tabby / WindTerm / iTerm2 / XML / SecureCRT / LocalShell 参数 round-trip
+
+### 8.3 仍未完成 / 已知限制
+
+- ❌ Xshell ZIP 压缩包批量导入未实现（当前支持单个 `.xsh` 文件与本地目录递归扫描）
+- ❌ Terminal.app 二进制 `.terminal` 文件直接前端解析未实现（当前支持 XML plist 文件与本机 `plutil` 转换）
+- ❌ Termius 加密本地数据库直接读取未实现（按设计采用 CLI `termius export-ssh-config` 引导与 OpenSSH config 导入）
+- ⚠ Exceed 当前走通用 XML 连接解析；专有非 XML 格式需拿到样本后适配

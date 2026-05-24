@@ -75,6 +75,20 @@ interface PendingAuth {
 
 const MIN_SPLIT_WEIGHT = 0.35;
 
+function localShellSelectionFromSession(session: SessionConfig): LocalShellSelection | undefined {
+  const options = parseSessionOptions(session.options_json);
+  const path = typeof options.localShellPath === "string" ? options.localShellPath.trim() : "";
+  if (!path) return undefined;
+  const args = Array.isArray(options.localShellArgs)
+    ? options.localShellArgs.filter((value): value is string => typeof value === "string")
+    : undefined;
+  return {
+    id: path,
+    name: session.name || path,
+    ...(args && args.length > 0 ? { args } : {}),
+  };
+}
+
 export function MainLayout() {
   const {
     tabs,
@@ -554,7 +568,12 @@ export function MainLayout() {
         openSftpTab(session, method, data);
       }
     } else if (session.session_type === "LocalShell") {
-      openLocalTab(session.name || "Local terminal", session.id, getSessionTerminalProfile(session.options_json));
+      openLocalTab(
+        session.name || "Local terminal",
+        session.id,
+        getSessionTerminalProfile(session.options_json),
+        localShellSelectionFromSession(session),
+      );
     } else if (session.session_type === "VNC") {
       const { method, data } = resolveAuth();
       if (method === "Password") {

@@ -16,6 +16,29 @@ export function openTextFile(accept: string): Promise<string | null> {
   });
 }
 
+export interface OpenedTextFile {
+  name: string;
+  text: string;
+}
+
+export function openTextFileWithName(accept: string): Promise<OpenedTextFile | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+
+      file.text().then((text) => resolve({ name: file.name, text })).catch(reject);
+    };
+    input.click();
+  });
+}
+
 export function openBinaryFile(accept: string): Promise<ArrayBuffer | null> {
   return new Promise((resolve, reject) => {
     const input = document.createElement("input");

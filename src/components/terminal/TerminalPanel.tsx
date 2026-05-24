@@ -132,6 +132,7 @@ interface TerminalPanelProps {
   localShell?: {
     id: string;
     name: string;
+    args?: string[];
   };
   terminalProfile?: TerminalProfile;
   visible?: boolean;
@@ -1647,6 +1648,7 @@ export function TerminalPanel({
           cols,
           rows,
           localShell?.id,
+          localShell?.args,
           undefined,
           (raw) => zmodem.consume(raw),
         ).then(({ sessionId, shellId }) => ({ sessionId, shellId }));
