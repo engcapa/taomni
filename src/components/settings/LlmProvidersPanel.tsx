@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import { useAiStore, type LlmProviderConfig } from "../../stores/aiStore";
-import { isVaultLockedError } from "../../lib/ipc";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { useAiStore, type AiConfig, type LlmProviderConfig } from "../../stores/aiStore";
+import { useVaultStore } from "../../stores/vaultStore";
+import { isVaultLockedError, VAULT_LOCKED_EVENT } from "../../lib/ipc";
 
 const PROVIDER_LABELS: Record<string, string> = {
   deepseek:    "DeepSeek",
@@ -139,18 +140,30 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 
 export function LlmProvidersPanel() {
   const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, setActiveLlmProvider, testConnection } = useAiStore();
+  const vaultState = useVaultStore((s) => s.state);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState(false);
+  // True while we're holding a save that bailed out because the vault was
+  // locked. We retry the save automatically once the vault transitions to
+  // unlocked, so the user doesn't need to click Save a second time.
+  const pendingVaultSaveRef = useRef<AiConfig | null>(null);
+  // Auto-dismiss timer for the success banner.
+  const saveOkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!config) loadConfig();
   }, []);
 
-  if (loading || !config) {
-    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">Loading...</div>;
-  }
+  // Clear the dismissal timer if the panel unmounts mid-fade.
+  useEffect(() => {
+    return () => {
+      if (saveOkTimerRef.current) clearTimeout(saveOkTimerRef.current);
+    };
+  }, []);
 
   const handleTest = async (id: string) => {
+    if (!config) return;
     const provider = config.llm.providers[id];
     if (!provider) return;
     setTestingId(id);
@@ -158,23 +171,80 @@ export function LlmProvidersPanel() {
     setTestingId(null);
   };
 
-  const handleSave = async () => {
+  const runSave = async (cfg: AiConfig) => {
     setSaveError(null);
+    setSaveOk(false);
+    if (saveOkTimerRef.current) {
+      clearTimeout(saveOkTimerRef.current);
+      saveOkTimerRef.current = null;
+    }
     try {
-      await saveConfig(config);
+      await saveConfig(cfg);
+      pendingVaultSaveRef.current = null;
+      setSaveOk(true);
+      // Auto-dismiss the success banner so it doesn't linger if the user
+      // tweaks settings later.
+      saveOkTimerRef.current = setTimeout(() => {
+        setSaveOk(false);
+        saveOkTimerRef.current = null;
+      }, 3000);
     } catch (e) {
       if (isVaultLockedError(e)) {
-        // The aiStore already dispatched VAULT_LOCKED_EVENT so MainLayout's
-        // unlock dialog opens. Show a small inline hint so the user knows to
-        // re-click Save after unlocking.
+        // aiStore already dispatched VAULT_LOCKED_EVENT so MainLayout's
+        // unlock dialog opens. Stash the config and let the vault-state
+        // effect retry the save once the user unlocks.
+        pendingVaultSaveRef.current = cfg;
         setSaveError(
-          "Vault is locked — unlock it in the dialog above, then click Save again.",
+          "Unlock the vault in the dialog to encrypt the API key — saving will resume automatically.",
         );
       } else {
+        pendingVaultSaveRef.current = null;
         setSaveError(String(e));
         console.error("Failed to save AI config:", e);
       }
     }
+  };
+
+  // When the vault becomes unlocked (or empty) and we have a save pending
+  // because of a previous lock, replay it. This is what makes the warning
+  // disappear on its own once the unlock dialog succeeds.
+  useEffect(() => {
+    if (vaultState !== "unlocked" && vaultState !== "empty") return;
+    const pending = pendingVaultSaveRef.current;
+    if (!pending) return;
+    pendingVaultSaveRef.current = null;
+    void runSave(pending);
+  }, [vaultState]);
+
+  if (loading || !config) {
+    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">Loading...</div>;
+  }
+
+  const handleSave = () => {
+    // The aiStore only triggers the unlock dialog when it spots a *plaintext*
+    // API key that needs encrypting. But the user may have already saved
+    // every key as a `vault:<id>` reference — in that case saving silently
+    // succeeds even with a locked vault, which is correct (no secrets are
+    // touched), yet feels broken because the user expected to be prompted.
+    // To match the user's mental model, if the vault is locked when Save is
+    // clicked, surface the unlock dialog and queue the save for after.
+    if (vaultState === "locked") {
+      pendingVaultSaveRef.current = config;
+      setSaveOk(false);
+      setSaveError(
+        "Unlock the vault in the dialog to save the LLM provider settings — saving will resume automatically.",
+      );
+      window.dispatchEvent(
+        new CustomEvent(VAULT_LOCKED_EVENT, {
+          detail: {
+            reason:
+              "Unlock the credential vault to save the LLM provider settings.",
+          },
+        }),
+      );
+      return;
+    }
+    void runSave(config);
   };
 
   return (
@@ -197,8 +267,38 @@ export function LlmProvidersPanel() {
       </div>
 
       {saveError && (
-        <div className="text-[11px] text-yellow-300 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
-          {saveError}
+        <div
+          role="alert"
+          className="flex items-start gap-2 text-[12px] rounded px-2.5 py-2"
+          style={{
+            background: "var(--moba-warning-bg)",
+            border: "1px solid var(--moba-warning-border)",
+            color: "var(--moba-warning-text)",
+          }}
+        >
+          <AlertTriangle
+            className="w-3.5 h-3.5 shrink-0 mt-0.5"
+            style={{ color: "var(--moba-warning-icon)" }}
+          />
+          <span className="leading-relaxed">{saveError}</span>
+        </div>
+      )}
+
+      {saveOk && !saveError && (
+        <div
+          role="status"
+          className="flex items-center gap-2 text-[12px] rounded px-2.5 py-2"
+          style={{
+            background: "var(--moba-success-bg)",
+            border: "1px solid var(--moba-success-border)",
+            color: "var(--moba-success-text)",
+          }}
+        >
+          <CheckCircle
+            className="w-3.5 h-3.5 shrink-0"
+            style={{ color: "var(--moba-success-icon)" }}
+          />
+          <span>Saved.</span>
         </div>
       )}
 

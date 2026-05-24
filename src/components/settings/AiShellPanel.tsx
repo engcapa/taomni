@@ -86,7 +86,17 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
         <Terminal className={`w-4 h-4 shrink-0 ${enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">
-            Voice-to-Command <span className="text-[10px] text-yellow-400 ml-1">Experimental</span>
+            Voice-to-Command{" "}
+            <span
+              className="text-[10px] ml-1 rounded px-1.5 py-0.5 align-middle"
+              style={{
+                background: "var(--moba-badge-warning-bg)",
+                color: "var(--moba-badge-warning-text)",
+                border: "1px solid var(--moba-badge-warning-border)",
+              }}
+            >
+              Experimental
+            </span>
           </div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
             Describe a command in natural language; AI generates a shell script and shows a confirmation card
