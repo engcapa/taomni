@@ -52,9 +52,25 @@ export interface SessionImportOptions {
 
 export interface SessionImportSecret {
   sessionId: string;
-  kind: "password";
+  kind: "password" | "key-passphrase";
   label: string;
   value: string;
+  /**
+   * `"session"` (default) attaches to the parent session via `passwordRef`;
+   * `"standalone"` writes a plain vault entry the user manages by hand
+   * (used for Tabby private-key passphrases that don't map to a NewMob
+   * private-key path).
+   */
+  attachment?: "session" | "standalone";
+}
+
+export interface ExternalVaultPrompt {
+  /** Tool name, e.g. "Tabby". Drives dialog title. */
+  tool: string;
+  /** Original config text (passed back to the per-tool decryptor). */
+  rawText: string;
+  /** Body copy shown above the password field. */
+  description: string;
 }
 
 export interface SessionImportResult {
@@ -62,6 +78,20 @@ export interface SessionImportResult {
   warnings: string[];
   skipped: number;
   secrets: SessionImportSecret[];
+  /**
+   * Set when the imported config carries an encrypted secret blob the user
+   * must unlock with the source tool's master password. The orchestrator
+   * (SessionTree) drives the unlock + decrypt flow.
+   */
+  externalVault?: ExternalVaultPrompt;
+  /**
+   * Set on results whose sessions may have remembered passwords stored in
+   * the source tool's OS keychain entries (Credential Manager / Keychain /
+   * Secret Service). The orchestrator runs `keychainLookupBatch` for the
+   * tool's naming convention. Independent of `externalVault` because some
+   * Tabby installs use only the keychain, with no encrypted vault block.
+   */
+  externalSecretsTool?: "tabby";
 }
 
 export interface SessionExportResult {
@@ -241,6 +271,8 @@ export function createSessionImportResult(
     warnings?: readonly string[];
     skipped?: number;
     secrets?: readonly SessionImportSecret[];
+    externalVault?: ExternalVaultPrompt;
+    externalSecretsTool?: SessionImportResult["externalSecretsTool"];
   } = {},
 ): SessionImportResult {
   return finalizeImportResult(
@@ -249,6 +281,8 @@ export function createSessionImportResult(
     [...(options.warnings ?? [])],
     options.existingSessions,
     options.secrets ?? [],
+    options.externalVault,
+    options.externalSecretsTool,
   );
 }
 
@@ -329,6 +363,7 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
   const warnings: string[] = [];
   const now = resolveNow(options.now);
   const { profiles, groupNames } = parseTabbyConfig(text, warnings);
+  const vaultDetected = detectTabbyVault(text);
   const profileLookup = tabbyProfileLookup(profiles);
   const includeSecrets = options.includeSecrets === true;
   const sessions: SessionConfig[] = [];
@@ -382,12 +417,80 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
   }
 
   if (externalPasswordCount > 0) {
-    warnings.push(
-      `Tabby keeps remembered passwords in its OS keychain entry or encrypted vault, not in config.yaml. ${externalPasswordCount} profile(s) using password auth were imported without a saved password — re-enter the password on first connect.`,
-    );
+    if (vaultDetected) {
+      warnings.push(
+        `Tabby vault detected. Enter your Tabby master password when prompted to recover ${externalPasswordCount} saved password(s); the rest will be looked up in the OS keychain automatically.`,
+      );
+    } else {
+      warnings.push(
+        `Tabby keeps remembered passwords in the OS keychain (Credential Manager / Keychain / Secret Service). NewMob will read them automatically; ${externalPasswordCount} profile(s) using password auth still need an entry there.`,
+      );
+    }
   }
 
-  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions, secrets);
+  const externalVault: ExternalVaultPrompt | undefined = vaultDetected
+    ? {
+        tool: "Tabby",
+        rawText: text,
+        description:
+          "Enter your Tabby master password to unlock saved SSH credentials. Leave blank to skip — passwords stored only in the vault will need to be re-entered on first connect.",
+      }
+    : undefined;
+
+  return finalizeImportResult(
+    sessions,
+    skipped,
+    warnings,
+    options.existingSessions,
+    secrets,
+    externalVault,
+    "tabby",
+  );
+}
+
+/**
+ * Targeted scanner for the Tabby `vault:` block in `config.yaml`. The general
+ * Tabby YAML parser ignores top-level keys other than `profiles`/`groups`,
+ * so we run a small pass here just to detect whether the file contains an
+ * encrypted secret blob worth prompting the user for.
+ *
+ * Detects: top-level `vault:` mapping with at least `contents:` and
+ * `version: 1`. Returns true if both are present.
+ */
+export function detectTabbyVault(text: string): boolean {
+  let inVault = false;
+  let vaultIndent = -1;
+  let hasContents = false;
+  let hasVersion1 = false;
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const stripped = stripYamlComment(rawLine);
+    if (!stripped.trim()) continue;
+    const indent = stripped.match(/^\s*/)?.[0].length ?? 0;
+    const line = stripped.trim();
+
+    if (indent === 0) {
+      // Leaving the vault block (or never entered one).
+      if (inVault) break;
+      if (/^vault:\s*$/.test(line) || /^vault:\s*\{?\s*$/.test(line)) {
+        inVault = true;
+        vaultIndent = indent;
+      }
+      continue;
+    }
+
+    if (!inVault) continue;
+    if (indent <= vaultIndent) break;
+
+    const match = /^([A-Za-z][\w-]*)\s*:\s*(.*)$/.exec(line);
+    if (!match) continue;
+    const key = match[1];
+    const value = match[2].trim();
+    if (key === "contents" && value.length > 0) hasContents = true;
+    if (key === "version" && value === "1") hasVersion1 = true;
+  }
+
+  return inVault && hasContents && hasVersion1;
 }
 
 export function parseWindTermSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
@@ -2331,12 +2434,16 @@ function finalizeImportResult(
   warnings: string[],
   existingSessions: readonly SessionConfig[] | undefined,
   secrets: readonly SessionImportSecret[] = [],
+  externalVault?: ExternalVaultPrompt,
+  externalSecretsTool?: SessionImportResult["externalSecretsTool"],
 ): SessionImportResult {
   return {
     sessions: makeUniqueImportedSessions(sessions, existingSessions ?? []),
     warnings: uniqueWarnings(warnings),
     skipped,
     secrets: [...secrets],
+    externalVault,
+    externalSecretsTool,
   };
 }
 

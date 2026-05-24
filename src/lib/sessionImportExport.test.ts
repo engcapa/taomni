@@ -610,7 +610,29 @@ describe("third-party session import parsers", () => {
 
     expect(result.sessions[0].auth_method).toBe("Password");
     expect(result.secrets).toHaveLength(0);
-    expect(result.warnings.join("\n")).toContain("OS keychain entry or encrypted vault");
+    expect(result.warnings.join("\n")).toContain("OS keychain");
+    expect(result.externalVault).toBeUndefined();
+  });
+
+  it("flags an externalVault prompt when Tabby config carries an encrypted vault", () => {
+    const result = parseTabbySessions([
+      "vault:",
+      "  version: 1",
+      "  contents: AAA=",
+      "  keySalt: 0102030405060708",
+      "  iv: 01020304050607080102030405060708",
+      "profiles:",
+      "  - name: db",
+      "    type: ssh",
+      "    options:",
+      "      host: db.example.com",
+      "      port: 22",
+      "      user: dba",
+      "      auth: password",
+    ].join("\n"), { includeSecrets: true, now: 6023 });
+
+    expect(result.externalVault).toMatchObject({ tool: "Tabby" });
+    expect(result.warnings.join("\n")).toContain("Tabby vault detected");
   });
 
   it("imports WindTerm JSON sessions recursively", () => {

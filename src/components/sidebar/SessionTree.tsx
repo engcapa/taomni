@@ -29,10 +29,15 @@ import {
   importPuttySessions,
   importWslSessions,
   isVaultLockedError,
+  keychainLookupBatch,
   readPlistSessionFile,
   scanLocalSessionFiles,
   selectFilePath,
+  tabbyDecryptVault,
   vaultPut,
+  type KeychainHit,
+  type KeychainQuery,
+  type TabbySecret,
 } from "../../lib/ipc";
 import {
   startCustomDrag,
@@ -76,6 +81,7 @@ import {
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
 import { SessionImportPreview } from "../session/SessionImportPreview";
+import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog";
 
 const SESSION_DRAG_MIME = "newmob/session";
 
@@ -127,6 +133,13 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     result: SessionImportResult;
     folderPath: string | null;
     source: string;
+  } | null>(null);
+  const [externalVaultPrompt, setExternalVaultPrompt] = useState<{
+    toolName: string;
+    description: string;
+    errorMessage: string | null;
+    onSubmit: (password: string) => Promise<void>;
+    onSkip: () => void;
   } | null>(null);
   const ctx = useContextMenu();
 
@@ -298,8 +311,220 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     folderPath: string | null,
     source: string,
   ) => {
+    if (result.externalSecretsTool === "tabby") {
+      void enrichTabbyResult(result)
+        .then((enriched) => setPendingImport({ result: enriched, folderPath, source }))
+        .catch((error) => {
+          window.alert(error instanceof Error ? error.message : String(error));
+        });
+      return;
+    }
     setPendingImport({ result, folderPath, source });
   };
+
+  /**
+   * Recover passwords from third-party tools' OS keychain entries and (when
+   * the user enters a master password) their encrypted vault. Returns a new
+   * result with extra entries folded into `secrets`. Tool-specific copy comes
+   * from `result.externalVault`.
+   *
+   * For Tabby:
+   *   - vault unlock prompt opens if `externalVault.tool === "Tabby"`
+   *   - regardless of vault path, the OS keychain is queried for every
+   *     password-auth session under `ssh@<host>[:<port>]` / `<user>`
+   */
+  const enrichTabbyResult = async (
+    result: SessionImportResult,
+  ): Promise<SessionImportResult> => {
+    if (result.externalSecretsTool !== "tabby") return result;
+
+    let vaultSecrets: TabbySecret[] = [];
+    if (result.externalVault) {
+      vaultSecrets = await promptTabbyVaultUnlock(
+        result.externalVault.rawText,
+        result.externalVault.description,
+      );
+    }
+
+    const keychainHits = await lookupTabbyKeychain(result.sessions, vaultSecrets);
+
+    return mergeTabbySecrets(result, vaultSecrets, keychainHits);
+  };
+
+  const promptTabbyVaultUnlock = (rawText: string, description: string): Promise<TabbySecret[]> =>
+    new Promise((resolve) => {
+      const close = (secrets: TabbySecret[]) => {
+        setExternalVaultPrompt(null);
+        resolve(secrets);
+      };
+      let attempts = 0;
+      setExternalVaultPrompt({
+        toolName: "Tabby",
+        description,
+        errorMessage: null,
+        onSkip: () => close([]),
+        onSubmit: async (password) => {
+          attempts += 1;
+          try {
+            const response = await tabbyDecryptVault(rawText, password);
+            close(response.secrets);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            const friendly = msg.includes("tabby_vault_bad_password")
+              ? `Incorrect Tabby master password (attempt ${attempts}).`
+              : msg.includes("tabby_vault_missing")
+                ? "No vault block found in this Tabby config."
+                : msg;
+            // Throwing keeps the dialog open and surfaces the error inline.
+            throw new Error(friendly);
+          }
+        },
+      });
+    });
+
+  const lookupTabbyKeychain = async (
+    importedSessions: readonly SessionConfig[],
+    vaultSecrets: readonly TabbySecret[],
+  ): Promise<KeychainHit[]> => {
+    const queries: KeychainQuery[] = [];
+    const seen = new Set<string>();
+    const addQuery = (service: string, account: string) => {
+      const key = `${service} ${account}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      queries.push({ service, account });
+    };
+
+    for (const session of importedSessions) {
+      if (session.auth_method !== "Password") continue;
+      const account = session.username?.trim();
+      if (!account) continue;
+      const host = session.host.trim();
+      if (!host) continue;
+      addQuery(`ssh@${host}:${session.port}`, account);
+      addQuery(`ssh@${host}`, account);
+    }
+
+    for (const secret of vaultSecrets) {
+      if (secret.kind === "key-passphrase" && secret.id) {
+        addQuery(`ssh-private-key:${secret.id}`, "user");
+      }
+    }
+
+    if (queries.length === 0) return [];
+    try {
+      return await keychainLookupBatch(queries);
+    } catch (error) {
+      // Don't fail the whole import on a missing keyring daemon; degrade
+      // gracefully and let the user re-enter passwords manually.
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn("Keychain lookup failed:", msg);
+      return [];
+    }
+  };
+
+  const mergeTabbySecrets = (
+    result: SessionImportResult,
+    vaultSecrets: readonly TabbySecret[],
+    keychainHits: readonly KeychainHit[],
+  ): SessionImportResult => {
+    const newSecrets = [...result.secrets];
+    const warnings = [...result.warnings];
+    const matched = new Set<string>(); // session ids that now have a recovered password
+    let recoveredFromVault = 0;
+    let recoveredFromKeychain = 0;
+    const standalonePassphrases: TabbySecret[] = [];
+
+    for (const session of result.sessions) {
+      if (session.auth_method !== "Password") continue;
+      // Already had a plaintext password from config.yaml — skip.
+      if (newSecrets.some((s) => s.sessionId === session.id && s.kind === "password")) continue;
+
+      const sessionUser = session.username?.trim();
+      if (!sessionUser) continue;
+
+      // Try vault first (more authoritative).
+      const vaultMatch = vaultSecrets.find((s) =>
+        s.kind === "password" &&
+        s.host.toLowerCase() === session.host.toLowerCase() &&
+        (s.user ?? "").toLowerCase() === sessionUser.toLowerCase() &&
+        (s.port == null || s.port === session.port),
+      );
+      if (vaultMatch && vaultMatch.kind === "password") {
+        newSecrets.push({
+          sessionId: session.id,
+          kind: "password",
+          label: `${sessionUser}@${session.host}:${session.port}`,
+          value: vaultMatch.value,
+          attachment: "session",
+        });
+        matched.add(session.id);
+        recoveredFromVault += 1;
+        continue;
+      }
+
+      // Fall back to keychain hits.
+      const hostKey = session.host.toLowerCase();
+      const candidates = [
+        `ssh@${hostKey}:${session.port}`,
+        `ssh@${hostKey}`,
+      ];
+      const hit = keychainHits.find((h) =>
+        candidates.includes(h.service.toLowerCase()) &&
+        h.account.toLowerCase() === sessionUser.toLowerCase() &&
+        h.found && h.value,
+      );
+      if (hit?.value) {
+        newSecrets.push({
+          sessionId: session.id,
+          kind: "password",
+          label: `${sessionUser}@${session.host}:${session.port}`,
+          value: hit.value,
+          attachment: "session",
+        });
+        matched.add(session.id);
+        recoveredFromKeychain += 1;
+      }
+    }
+
+    for (const secret of vaultSecrets) {
+      if (secret.kind === "key-passphrase") standalonePassphrases.push(secret);
+    }
+
+    for (const passphrase of standalonePassphrases) {
+      if (passphrase.kind !== "key-passphrase") continue;
+      const shortId = passphrase.id.slice(0, 8);
+      newSecrets.push({
+        sessionId: "", // standalone — no session
+        kind: "key-passphrase",
+        label: `Tabby private-key passphrase (id: ${shortId})`,
+        value: passphrase.value,
+        attachment: "standalone",
+      });
+    }
+
+    if (recoveredFromVault > 0 || recoveredFromKeychain > 0) {
+      warnings.push(
+        `Recovered ${recoveredFromVault + recoveredFromKeychain} saved password(s) from Tabby` +
+          ` (${recoveredFromVault} from vault, ${recoveredFromKeychain} from OS keychain).`,
+      );
+    }
+    if (standalonePassphrases.length > 0) {
+      warnings.push(
+        `${standalonePassphrases.length} Tabby private-key passphrase(s) will be saved as standalone vault entries — assign them manually under Settings → Vault.`,
+      );
+    }
+
+    return {
+      ...result,
+      secrets: newSecrets,
+      warnings,
+      // Clear the prompt — the unlock pass has happened.
+      externalVault: undefined,
+      externalSecretsTool: undefined,
+    };
+  };
+
 
   const confirmPendingImport = async () => {
     const pending = pendingImport;
@@ -328,7 +553,27 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
 
     const sessionsById = new Map(result.sessions.map((session) => [session.id, { ...session }]));
     const warnings = [...result.warnings];
+    let standaloneSaved = 0;
+    let standaloneSkipped = 0;
+
     for (const secret of result.secrets) {
+      const isStandalone = secret.attachment === "standalone" || !secret.sessionId;
+      if (isStandalone) {
+        const kind = secret.kind === "key-passphrase" ? "ssh-key-passphrase" : "ssh-password";
+        try {
+          await vaultPut(kind, secret.label, secret.value);
+          standaloneSaved += 1;
+        } catch (error) {
+          standaloneSkipped += 1;
+          if (isVaultLockedError(error)) {
+            warnings.push(
+              "Skipped standalone Tabby secrets because the credential vault is locked or has not been initialized.",
+            );
+          }
+        }
+        continue;
+      }
+
       const session = sessionsById.get(secret.sessionId);
       if (!session) continue;
       try {
@@ -344,6 +589,17 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           : error instanceof Error ? error.message : String(error);
         warnings.push(`Skipped saved password for "${session.name}" because ${reason}.`);
       }
+    }
+
+    if (standaloneSaved > 0) {
+      warnings.push(
+        `Saved ${standaloneSaved} standalone secret(s) to the credential vault — assign them under Settings → Vault.`,
+      );
+    }
+    if (standaloneSkipped > 0) {
+      warnings.push(
+        `Skipped ${standaloneSkipped} standalone secret(s) because the credential vault rejected the write.`,
+      );
     }
 
     return {
@@ -854,6 +1110,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           targetFolder={pendingImport.folderPath}
           onCancel={() => setPendingImport(null)}
           onConfirm={() => void confirmPendingImport()}
+        />
+      )}
+      {externalVaultPrompt && (
+        <ExternalVaultUnlockDialog
+          toolName={externalVaultPrompt.toolName}
+          description={externalVaultPrompt.description}
+          errorMessage={externalVaultPrompt.errorMessage}
+          onSubmit={externalVaultPrompt.onSubmit}
+          onSkip={externalVaultPrompt.onSkip}
         />
       )}
       <div

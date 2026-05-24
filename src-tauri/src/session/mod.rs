@@ -1,5 +1,6 @@
 pub mod db;
 pub mod import;
+pub mod import_secrets;
 pub mod models;
 
 use crate::state::AppState;

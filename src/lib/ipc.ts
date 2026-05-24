@@ -514,3 +514,50 @@ export async function vaultDelete(id: string): Promise<void> {
 export async function vaultList(): Promise<VaultEntrySummary[]> {
   return invoke<VaultEntrySummary[]>("vault_list");
 }
+
+// --- Third-party importer secret recovery ---
+
+export interface KeychainQuery {
+  service: string;
+  account: string;
+}
+
+export interface KeychainHit {
+  service: string;
+  account: string;
+  found: boolean;
+  value?: string;
+  error?: string;
+}
+
+export async function keychainLookupBatch(
+  entries: KeychainQuery[],
+): Promise<KeychainHit[]> {
+  return invoke<KeychainHit[]>("keychain_lookup_batch", { entries });
+}
+
+export type TabbySecret =
+  | { kind: "password"; host: string; port?: number; user?: string; value: string }
+  | { kind: "key-passphrase"; id: string; value: string };
+
+export interface TabbyDecryptVaultResponse {
+  secrets: TabbySecret[];
+}
+
+export const TABBY_VAULT_BAD_PASSWORD = "tabby_vault_bad_password";
+export const TABBY_VAULT_MISSING = "tabby_vault_missing";
+
+export function isTabbyBadPasswordError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = typeof err === "string" ? err : (err as Error).message ?? String(err);
+  return msg.includes(TABBY_VAULT_BAD_PASSWORD);
+}
+
+export async function tabbyDecryptVault(
+  yamlText: string,
+  masterPassword: string,
+): Promise<TabbyDecryptVaultResponse> {
+  return invoke<TabbyDecryptVaultResponse>("tabby_decrypt_vault", {
+    args: { yamlText, masterPassword },
+  });
+}
