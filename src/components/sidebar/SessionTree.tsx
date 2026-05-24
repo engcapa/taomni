@@ -543,11 +543,35 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
 
-  const confirmPendingImport = async () => {
+  const confirmPendingImport = async (selectedIds: ReadonlySet<string>) => {
     const pending = pendingImport;
     if (!pending) return;
-    await applyImportResult(pending.result, pending.folderPath, pending.source, { alertWarnings: false });
+    const filtered = filterImportResultBySelection(pending.result, selectedIds);
+    await applyImportResult(filtered, pending.folderPath, pending.source, { alertWarnings: false });
     setPendingImport(null);
+  };
+
+  const filterImportResultBySelection = (
+    result: SessionImportResult,
+    selectedIds: ReadonlySet<string>,
+  ): SessionImportResult => {
+    const selectedSessions = result.sessions.filter((session) => selectedIds.has(session.id));
+    if (selectedSessions.length === result.sessions.length) return result;
+    const selectedSecrets = result.secrets.filter((secret) => {
+      // Standalone secrets (e.g. Tabby private-key passphrases without an
+      // attached session) live independently of the imported session list,
+      // so user-level row selection does not affect them.
+      const isStandalone = secret.attachment === "standalone" || !secret.sessionId;
+      if (isStandalone) return true;
+      return selectedIds.has(secret.sessionId);
+    });
+    const droppedCount = result.sessions.length - selectedSessions.length;
+    return {
+      ...result,
+      sessions: selectedSessions,
+      secrets: selectedSecrets,
+      skipped: result.skipped + droppedCount,
+    };
   };
 
   const applyImportResult = async (
@@ -1127,7 +1151,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           result={pendingImport.result}
           targetFolder={pendingImport.folderPath}
           onCancel={() => setPendingImport(null)}
-          onConfirm={() => void confirmPendingImport()}
+          onConfirm={(selectedIds) => void confirmPendingImport(selectedIds)}
         />
       )}
       {externalVaultPrompt && (

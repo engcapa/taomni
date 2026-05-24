@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionImportResult } from "../../lib/sessionImportExport";
 import { folderOptionLabel } from "../../lib/sessionPaths";
 
@@ -6,7 +7,7 @@ export interface SessionImportPreviewProps {
   result: SessionImportResult;
   targetFolder: string | null;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (selectedIds: ReadonlySet<string>) => void;
 }
 
 export function SessionImportPreview({
@@ -16,21 +17,75 @@ export function SessionImportPreview({
   onCancel,
   onConfirm,
 }: SessionImportPreviewProps) {
+  const total = result.sessions.length;
   const previewRows = result.sessions.slice(0, 80);
-  const remaining = result.sessions.length - previewRows.length;
+  const remaining = total - previewRows.length;
   const target = folderOptionLabel(targetFolder);
-  const sessionPasswordCount = result.secrets.filter(
-    (secret) => secret.kind === "password" && secret.attachment !== "standalone",
-  ).length;
-  const standaloneSecretCount = result.secrets.filter(
-    (secret) => secret.attachment === "standalone",
-  ).length;
+
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(result.sessions.map((session) => session.id)),
+  );
+
+  // Reset selection when a fresh result comes in (e.g. user re-opens the
+  // dialog with a different file). Identity comparison on `result` is the
+  // signal — SessionTree always allocates a new object per import.
+  useEffect(() => {
+    setSelected(new Set(result.sessions.map((session) => session.id)));
+  }, [result]);
+
+  const selectedCount = selected.size;
+  const allSelected = total > 0 && selectedCount === total;
+  const noneSelected = selectedCount === 0;
+
+  const masterRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (masterRef.current) {
+      masterRef.current.indeterminate = !allSelected && !noneSelected;
+    }
+  }, [allSelected, noneSelected]);
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(result.sessions.map((session) => session.id)));
+    }
+  };
+
+  const toggleRow = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const { sessionPasswordCount, standaloneSecretCount } = useMemo(() => {
+    let passwords = 0;
+    let standalone = 0;
+    for (const secret of result.secrets) {
+      const isStandalone = secret.attachment === "standalone" || !secret.sessionId;
+      if (isStandalone) {
+        standalone += 1;
+        continue;
+      }
+      if (secret.kind !== "password") continue;
+      if (selected.has(secret.sessionId)) passwords += 1;
+    }
+    return { sessionPasswordCount: passwords, standaloneSecretCount: standalone };
+  }, [result.secrets, selected]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.stopPropagation();
       onCancel();
     }
+  };
+
+  const handleConfirm = () => {
+    if (noneSelected) return;
+    onConfirm(selected);
   };
 
   return (
@@ -54,8 +109,11 @@ export function SessionImportPreview({
           style={{ borderColor: "var(--moba-divider)" }}
         >
           <div className="text-sm font-semibold">Import {source} sessions</div>
-          <div className="text-[12px] text-[var(--moba-text-muted)] mt-1">
-            {result.sessions.length} session{result.sessions.length === 1 ? "" : "s"} will be imported into {target}
+          <div
+            className="text-[12px] text-[var(--moba-text-muted)] mt-1"
+            data-testid="session-import-preview-summary"
+          >
+            {selectedCount} of {total} session{total === 1 ? "" : "s"} will be imported into {target}
             {result.skipped ? `, ${result.skipped} skipped` : ""}.
           </div>
           {sessionPasswordCount > 0 && (
@@ -98,6 +156,17 @@ export function SessionImportPreview({
             >
               <thead>
                 <tr style={{ background: "var(--moba-hover)" }}>
+                  <th className="px-2 py-1 border w-8" style={{ borderColor: "var(--moba-divider)" }}>
+                    <input
+                      ref={masterRef}
+                      type="checkbox"
+                      className="moba-checkbox"
+                      data-testid="session-import-preview-select-all"
+                      aria-label={allSelected ? "Deselect all" : "Select all"}
+                      checked={allSelected}
+                      onChange={toggleAll}
+                    />
+                  </th>
                   <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Name</th>
                   <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Type</th>
                   <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Host</th>
@@ -106,21 +175,35 @@ export function SessionImportPreview({
                 </tr>
               </thead>
               <tbody>
-                {previewRows.map((session) => (
-                  <tr key={session.id}>
-                    <td className="px-2 py-1 border max-w-[180px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.name}>
-                      {session.name}
-                    </td>
-                    <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{session.session_type}</td>
-                    <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.host}>
-                      {session.host || "-"}
-                    </td>
-                    <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{session.port}</td>
-                    <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={folderOptionLabel(session.group_path)}>
-                      {folderOptionLabel(session.group_path)}
-                    </td>
-                  </tr>
-                ))}
+                {previewRows.map((session) => {
+                  const checked = selected.has(session.id);
+                  return (
+                    <tr key={session.id}>
+                      <td className="px-2 py-1 border text-center" style={{ borderColor: "var(--moba-divider)" }}>
+                        <input
+                          type="checkbox"
+                          className="moba-checkbox"
+                          data-testid={`session-import-preview-row-select-${session.id}`}
+                          data-checked={checked}
+                          aria-label={`Toggle ${session.name}`}
+                          checked={checked}
+                          onChange={() => toggleRow(session.id)}
+                        />
+                      </td>
+                      <td className="px-2 py-1 border max-w-[180px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.name}>
+                        {session.name}
+                      </td>
+                      <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{session.session_type}</td>
+                      <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.host}>
+                        {session.host || "-"}
+                      </td>
+                      <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{session.port}</td>
+                      <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={folderOptionLabel(session.group_path)}>
+                        {folderOptionLabel(session.group_path)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           ) : (
@@ -130,7 +213,7 @@ export function SessionImportPreview({
           )}
           {remaining > 0 && (
             <div className="mt-2 text-[12px] text-[var(--moba-text-muted)]">
-              {remaining} more session{remaining === 1 ? "" : "s"} not shown in preview.
+              {remaining} more session{remaining === 1 ? "" : "s"} not shown in preview (still imported if selected via Select all).
             </div>
           )}
         </div>
@@ -152,8 +235,8 @@ export function SessionImportPreview({
             data-testid="session-import-preview-confirm"
             className="moba-btn h-8 px-3"
             data-primary="true"
-            disabled={result.sessions.length === 0}
-            onClick={onConfirm}
+            disabled={noneSelected}
+            onClick={handleConfirm}
           >
             Import
           </button>
