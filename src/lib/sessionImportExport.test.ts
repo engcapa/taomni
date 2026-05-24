@@ -541,6 +541,78 @@ describe("third-party session import parsers", () => {
     expect(result.warnings.join("\n")).toContain("jump-host settings");
   });
 
+  it("resolves Tabby group ids to names from the top-level groups: section", () => {
+    const result = parseTabbySessions([
+      "version: 7",
+      "profiles:",
+      "  - name: ubuntu@163.228.82.80:22",
+      "    type: ssh",
+      "    options:",
+      "      host: 163.228.82.80",
+      "      user: ubuntu",
+      "    group: 6ebfea0f-e7d9-4fdc-ac16-6c80f12b3593",
+      "    id: ssh:custom:ubuntu:aee12abe-792f-4868-865a-207344b6ca87",
+      "  - name: pi-tpddns",
+      "    type: ssh",
+      "    options:",
+      "      host: yanghuangshi.keepworld.link",
+      "      port: 65522",
+      "      user: pi",
+      "    group: 5fbf8925-ed36-4e55-a221-41a777458587",
+      "groups:",
+      "  - id: 5fbf8925-ed36-4e55-a221-41a777458587",
+      "    name: pi",
+      "  - id: 6ebfea0f-e7d9-4fdc-ac16-6c80f12b3593",
+      "    name: azure",
+      "ssh:",
+      "  knownHosts: []",
+    ].join("\n"), { targetFolder: "tabby-from", now: 6020 });
+
+    expect(result.sessions).toHaveLength(2);
+    expect(result.sessions[0]).toMatchObject({
+      name: "ubuntu@163.228.82.80:22",
+      group_path: "User sessions / tabby-from / azure",
+    });
+    expect(result.sessions[1]).toMatchObject({
+      name: "pi-tpddns",
+      group_path: "User sessions / tabby-from / pi",
+    });
+  });
+
+  it("warns and falls back to the raw id when a Tabby group id has no matching entry", () => {
+    const result = parseTabbySessions([
+      "profiles:",
+      "  - name: orphan",
+      "    type: ssh",
+      "    options:",
+      "      host: orphan.example.com",
+      "    group: 11111111-2222-3333-4444-555555555555",
+      "groups:",
+      "  - id: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "    name: pi",
+    ].join("\n"), { now: 6021 });
+
+    expect(result.sessions[0].group_path).toBe("User sessions / 11111111-2222-3333-4444-555555555555");
+    expect(result.warnings.join("\n")).toContain("no matching entry was found under groups:");
+  });
+
+  it("warns when Tabby password auth has no plaintext password to import", () => {
+    const result = parseTabbySessions([
+      "profiles:",
+      "  - name: pi-tpddns",
+      "    type: ssh",
+      "    options:",
+      "      host: yanghuangshi.keepworld.link",
+      "      port: 65522",
+      "      user: pi",
+      "      auth: password",
+    ].join("\n"), { includeSecrets: true, now: 6022 });
+
+    expect(result.sessions[0].auth_method).toBe("Password");
+    expect(result.secrets).toHaveLength(0);
+    expect(result.warnings.join("\n")).toContain("OS keychain entry or encrypted vault");
+  });
+
   it("imports WindTerm JSON sessions recursively", () => {
     const result = parseWindTermSessions(JSON.stringify({
       groups: [
