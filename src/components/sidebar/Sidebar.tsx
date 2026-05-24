@@ -13,7 +13,9 @@ import {
   Bot,
   FolderTree,
 } from "lucide-react";
+import { useState } from "react";
 import { SessionTree } from "./SessionTree";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useAppStore, type SideTab } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { SessionConfig } from "../../lib/ipc";
@@ -48,11 +50,11 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
     .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
     .slice(0, 6);
 
+  const [deleteConfirm, setDeleteConfirm] = useState<SessionConfig | null>(null);
+
   const handleDelete = () => {
     if (!selectedSession) return;
-    if (window.confirm(`Delete session "${selectedSession.name}"?`)) {
-      void removeSession(selectedSession.id);
-    }
+    setDeleteConfirm(selectedSession);
   };
 
   const handleFavorite = () => {
@@ -89,6 +91,7 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
   };
 
   return (
+    <>
     <div data-testid="sidebar" className="h-full flex">
       <div
         className="w-[26px] flex flex-col shrink-0"
@@ -188,6 +191,21 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
       </div>
       )}
     </div>
+    {deleteConfirm && (
+      <ConfirmDialog
+        title="Delete session"
+        message={`Delete session "${deleteConfirm.name}"?`}
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          const id = deleteConfirm.id;
+          setDeleteConfirm(null);
+          void removeSession(id);
+        }}
+      />
+    )}
+    </>
   );
 }
 

@@ -82,6 +82,7 @@ import {
 } from "../../lib/sessionPaths";
 import { SessionImportPreview } from "../session/SessionImportPreview";
 import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 const SESSION_DRAG_MIME = "newmob/session";
 
@@ -140,6 +141,13 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     errorMessage: string | null;
     onSubmit: (password: string) => Promise<void>;
     onSkip: () => void;
+  } | null>(null);
+  const [confirmPrompt, setConfirmPrompt] = useState<{
+    title?: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
   } | null>(null);
   const ctx = useContextMenu();
 
@@ -233,15 +241,24 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     }
   };
 
-  const deleteFolder = async (folderPath: string) => {
+  const deleteFolder = (folderPath: string) => {
     const affected = sessionsInFolder(sessions, folderPath);
     const suffix = affected.length > 0
       ? ` and ${affected.length} session${affected.length === 1 ? "" : "s"} inside it`
       : "";
-    if (!window.confirm(`Delete folder "${folderOptionLabel(folderPath)}"${suffix}?`)) return;
-
-    await deleteFolderPath(folderPath);
-    setStatusMessage(`Deleted folder ${folderOptionLabel(folderPath)}`);
+    setConfirmPrompt({
+      title: "Delete folder",
+      message: `Delete folder "${folderOptionLabel(folderPath)}"${suffix}?`,
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: () => {
+        setConfirmPrompt(null);
+        void (async () => {
+          await deleteFolderPath(folderPath);
+          setStatusMessage(`Deleted folder ${folderOptionLabel(folderPath)}`);
+        })();
+      },
+    });
   };
 
   const exportFolder = (folderPath: string | null) => {
@@ -1052,14 +1069,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       { label: "New session", icon: <Plus className="w-3 h-3" />, onClick: () => onNewSession?.(toStoredGroupPath(folderPath)) },
       { label: "New folder", icon: <FolderPlus className="w-3 h-3" />, onClick: () => createFolder(folderPath) },
       { label: "Edit folder", icon: <Edit3 className="w-3 h-3" />, disabled: isRoot, onClick: () => { if (normalized) renameFolder(normalized); } },
-      { label: "Delete folder", icon: <Trash2 className="w-3 h-3" />, danger: true, disabled: isRoot, onClick: () => normalized && void deleteFolder(normalized) },
+      { label: "Delete folder", icon: <Trash2 className="w-3 h-3" />, danger: true, disabled: isRoot, onClick: () => { if (normalized) deleteFolder(normalized); } },
       { label: "Create a desktop shortcut", icon: <Star className="w-3 h-3" />, onClick: () => unavailable("Create a desktop shortcut") },
       { label: "", separator: true },
       { label: "Import NewMob sessions", icon: <Upload className="w-3 h-3" />, onClick: () => importJson(folderPath) },
+      { label: "Import sessions from third-party programs", icon: <Upload className="w-3 h-3" />, children: importChildren },
+      { label: "", separator: true },
       { label: "Export NewMob sessions", icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportFolder(folderPath) },
       { label: "Export MobaXterm sessions", icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportMobaFolder(folderPath) },
       { label: "Export sessions as CSV", icon: <FileText className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportCsvFolder(folderPath) },
-      { label: "Import sessions from third-party programs", icon: <Upload className="w-3 h-3" />, children: importChildren },
       { label: "Generate HTML web page", icon: <FileText className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => generateHtml(folderPath) },
       { label: "", separator: true },
       { label: "Execute all sessions from this folder", icon: <Play className="w-3 h-3" />, disabled: folderSessions.length === 0 || !onConnectSession, onClick: () => executeFolder(folderPath) },
@@ -1119,6 +1137,16 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           errorMessage={externalVaultPrompt.errorMessage}
           onSubmit={externalVaultPrompt.onSubmit}
           onSkip={externalVaultPrompt.onSkip}
+        />
+      )}
+      {confirmPrompt && (
+        <ConfirmDialog
+          title={confirmPrompt.title}
+          message={confirmPrompt.message}
+          confirmLabel={confirmPrompt.confirmLabel}
+          danger={confirmPrompt.danger}
+          onCancel={() => setConfirmPrompt(null)}
+          onConfirm={confirmPrompt.onConfirm}
         />
       )}
       <div
