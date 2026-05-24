@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { RotateCcw, Type, Undo } from "lucide-react";
+import { Bot, RotateCcw, Type, Undo } from "lucide-react";
 import { appThemeModeLabel, useAppTheme } from "../../lib/appTheme";
 import {
   DEFAULT_TERMINAL_PROFILE,
@@ -12,6 +12,17 @@ import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { VaultSettings } from "../vault/VaultSettings";
 import { useAppStore } from "../../stores/appStore";
 import { useSystemFonts } from "../../lib/systemFonts";
+import { LlmProvidersPanel } from "./LlmProvidersPanel";
+import { AsrPanel } from "./AsrPanel";
+import { PrivacyToggle } from "./PrivacyToggle";
+import { AiMasterSwitch } from "./AiMasterSwitch";
+import { AiShellPanel } from "./AiShellPanel";
+import { WebSearchPanel } from "./WebSearchPanel";
+import { ClaudeCodePanel } from "./ClaudeCodePanel";
+import { ChatHistoryPanel } from "./ChatHistoryPanel";
+import { ChatOutputFormatPanel } from "./ChatOutputFormatPanel";
+import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
+import { useAiStore } from "../../stores/aiStore";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -30,6 +41,8 @@ export function SettingsPanel() {
   const setUiFontFamily = useAppStore((s) => s.setUiFontFamily);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const systemFonts = useSystemFonts();
+  const voiceShellEnabled = useAiStore((s) => s.voiceShellEnabled);
+  const toggleVoiceShell = useAiStore((s) => s.toggleVoiceShell);
 
   const currentSelectValue = useMemo(() => {
     if (UI_FONTS.some((f) => f.value === uiFontFamily)) {
@@ -175,6 +188,55 @@ export function SettingsPanel() {
 
         <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]">
           <VaultSettings />
+        </section>
+
+        <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+          <div className="mb-3 flex items-center gap-2">
+            <Bot className="w-4 h-4 text-[var(--moba-accent)]" />
+            <div>
+              <div className="text-[14px] font-semibold">AI Settings</div>
+              <div className="text-[11px] text-[var(--moba-text-muted)]">
+                Speech recognition (ASR) · LLM Provider · Privacy mode
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <AiMasterSwitch />
+          </div>
+
+          <div className="mb-3">
+            <PrivacyToggle />
+          </div>
+
+          <div className="mb-3 pt-3 border-t border-[var(--moba-divider)]">
+            <AiShellPanel enabled={voiceShellEnabled} onToggle={toggleVoiceShell} />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--moba-divider)]">
+            <AsrPanel />
+            <LlmProvidersPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <WebSearchPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ClaudeCodePanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ChatOutputFormatPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ChatHistoryPanel />
+          </div>
+
+          <div className="pt-3 border-t border-[var(--moba-divider)]">
+            <ModelsAdvancedPanel />
+          </div>
         </section>
       </div>
     </div>

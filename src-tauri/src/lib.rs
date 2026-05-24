@@ -9,7 +9,16 @@ mod config;
 mod appearance;
 mod vnc;
 mod history;
-mod vault;
+pub mod vault;
+pub mod ai;
+mod asr;
+pub mod llm;
+mod tab;
+pub mod agent;
+mod chat;
+pub mod models;
+pub mod perf;
+mod voice;
 
 use state::AppState;
 use std::sync::Arc;
@@ -39,7 +48,14 @@ pub fn run() {
             let v = vault::Vault::open(&vault_path).expect("failed to open vault");
             let vault_arc = Arc::new(v);
 
-            app.manage(AppState::new(conn, vault_arc));
+            // Load AI config and build the AppAiCtx (AsrManager + LlmRouter).
+            // Vault is passed so api_key fields stored as `vault:<id>` get
+            // transparently resolved by the LLM router.
+            let ai_config_path = ai::config::default_ai_config_path();
+            let ai_config = ai::config::AiConfig::load(&ai_config_path);
+            let ai_ctx = ai::AppAiCtx::from_config(ai_config, vault_arc.clone());
+
+            app.manage(AppState::new(conn, vault_arc, ai_ctx));
 
             // Auto-start any tunnels with autostart=true.
             let app_for_autostart = app.handle().clone();
@@ -82,6 +98,11 @@ pub fn run() {
             session::list_session_groups,
             session::save_session_group,
             session::delete_session_group,
+            session::import::import_putty_sessions,
+            session::import::import_wsl_sessions,
+            session::import::import_external_bash_sessions,
+            session::import::scan_local_session_files,
+            session::import::read_plist_session_file,
             filebrowser::sftp_attach,
             filebrowser::sftp_detach,
             filebrowser::sftp_list_remote,
@@ -152,6 +173,64 @@ pub fn run() {
             vault::vault_update,
             vault::vault_delete,
             vault::vault_list,
+            ai::commands::get_ai_config,
+            ai::commands::save_ai_config,
+            ai::commands::save_ai_api_key,
+            ai::commands::test_llm_connection,
+            ai::commands::generate_shell_command,
+            ai::commands::update_shell_audit_outcome,
+            ai::session_safety::is_session_ai_write_disabled,
+            tab::tab_suggest_path,
+            tab::tab_suggest_fim,
+            tab::tab_rewrite_command,
+            agent::commands::agent_explain_error,
+            agent::commands::agent_plan_tool,
+            agent::commands::agent_execute_tool,
+            agent::commands::agent_run,
+            agent::search::commands::web_search_execute,
+            agent::search::commands::deep_search_execute,
+            agent::search::commands::searxng_availability,
+            agent::search::commands::web_fetch_execute,
+            agent::search::commands::probe_searxng_instances,
+            agent::search::commands::provider_caps,
+            agent::search::key_storage::keyring_put,
+            agent::search::key_storage::keyring_get,
+            agent::search::key_storage::keyring_delete,
+            agent::cc_bridge::commands::cc_detect,
+            agent::cc_bridge::commands::cc_send_message,
+            agent::cc_bridge::commands::cc_stream_message,
+            agent::cc_bridge::commands::cc_stop_session,
+            agent::mcp_server::mcp_server_start,
+            agent::mcp_server::mcp_server_stop,
+            agent::mcp_server::mcp_server_status,
+            chat::chat_new_thread,
+            chat::chat_list_threads,
+            chat::chat_list_messages,
+            chat::chat_delete_thread,
+            chat::chat_set_thread_provider,
+            chat::chat_set_thread_output_format,
+            chat::chat_purge_old,
+            chat::chat_export_archive,
+            chat::chat_send,
+            chat::chat_stream,
+            chat::inline_qq::inline_qq_stream,
+            models::models_list,
+            models::models_download,
+            models::models_delete,
+            models::models_verify,
+            models::cuda_pack_status,
+            models::cuda_pack_install,
+            models::cuda_pack_uninstall,
+            models::mirror_get_config,
+            models::mirror_set_config,
+            llm::llama_server::sidecar_start,
+            llm::llama_server::sidecar_stop,
+            llm::llama_server::sidecar_status,
+            perf::perf_baseline_recent,
+            voice::commands::voice_capture_supported,
+            voice::commands::voice_start_capture,
+            voice::commands::voice_stop_capture,
+            voice::commands::voice_stop_and_transcribe,
             exit_app,
         ])
         .run(tauri::generate_context!())

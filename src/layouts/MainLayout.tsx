@@ -63,6 +63,9 @@ import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 import type { LocalShellSelection } from "../types";
+import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { useChatStore } from "../stores/chatStore";
+import { useAiStore } from "../stores/aiStore";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 
@@ -71,6 +74,20 @@ interface PendingAuth {
 }
 
 const MIN_SPLIT_WEIGHT = 0.35;
+
+function localShellSelectionFromSession(session: SessionConfig): LocalShellSelection | undefined {
+  const options = parseSessionOptions(session.options_json);
+  const path = typeof options.localShellPath === "string" ? options.localShellPath.trim() : "";
+  if (!path) return undefined;
+  const args = Array.isArray(options.localShellArgs)
+    ? options.localShellArgs.filter((value): value is string => typeof value === "string")
+    : undefined;
+  return {
+    id: path,
+    name: session.name || path,
+    ...(args && args.length > 0 ? { args } : {}),
+  };
+}
 
 export function MainLayout() {
   const {
@@ -132,6 +149,9 @@ export function MainLayout() {
   const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
+  const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const toggleChatDrawer = useChatStore((s) => s.toggleDrawer);
+  const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
 
   // Run `action` only after the vault is known to be unlocked. If it's
   // already unlocked we run inline; otherwise we surface the unlock
@@ -163,10 +183,12 @@ export function MainLayout() {
   // locked). Surface the unlock dialog so the user can resolve it without
   // hunting through settings.
   useEffect(() => {
-    const handler = () => {
-      setVaultUnlockReason((prev) =>
-        prev ?? "This connection uses a saved password — unlock the vault to continue.",
-      );
+    const handler = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ reason?: string }>).detail;
+      const reason =
+        detail?.reason ??
+        "This connection uses a saved password — unlock the vault to continue.";
+      setVaultUnlockReason((prev) => prev ?? reason);
     };
     window.addEventListener(VAULT_LOCKED_EVENT, handler);
     return () => window.removeEventListener(VAULT_LOCKED_EVENT, handler);
@@ -301,11 +323,17 @@ export function MainLayout() {
         event.preventDefault();
         toggleCompactMode();
       }
+      // Ctrl+L: toggle AI Chat Drawer (no-op when fully_disabled)
+      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "l") {
+        event.preventDefault();
+        const aiOff = useAiStore.getState().config?.fully_disabled === true;
+        if (!aiOff) toggleChatDrawer();
+      }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCompactMode]);
+  }, [toggleCompactMode, toggleChatDrawer]);
 
   const confirmExitWithOpenTabs = useCallback(() => {
     const currentTabs = tabsRef.current;
@@ -542,7 +570,12 @@ export function MainLayout() {
         openSftpTab(session, method, data);
       }
     } else if (session.session_type === "LocalShell") {
-      openLocalTab(session.name || "Local terminal", session.id, getSessionTerminalProfile(session.options_json));
+      openLocalTab(
+        session.name || "Local terminal",
+        session.id,
+        getSessionTerminalProfile(session.options_json),
+        localShellSelectionFromSession(session),
+      );
     } else if (session.session_type === "VNC") {
       const { method, data } = resolveAuth();
       if (method === "Password") {
@@ -999,8 +1032,7 @@ export function MainLayout() {
 
           <Panel>
             <div className="h-full flex flex-col min-w-0">
-              {!compactMode && <TabBar />}
-              {multiExecActive && (
+              {!compactMode && <TabBar />}              {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}
@@ -1358,6 +1390,7 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
+        {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
       </div>
 
       {!compactMode && <StatusBar />}

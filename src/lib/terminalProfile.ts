@@ -5,6 +5,7 @@ import { makeTerminalFontFamily, SOURCE_CODE_PRO } from "./systemFonts";
 export type TerminalCursorStyle = "block" | "underline" | "bar";
 export type TerminalRightClickBehavior = "menu" | "paste" | "copy-or-paste";
 export type TerminalSyntaxMode = "default" | "keywords" | "shell" | "cisco" | "perl" | "sql";
+export type InlineSuggestionsSource = "history" | "history+path" | "history+path+ai";
 
 export interface UserCommonCommand {
   command: string;
@@ -31,6 +32,13 @@ export interface TerminalProfile {
   logPath?: string;
   inlineSuggestions: boolean;
   inlineSuggestionsMax: number;
+  inlineSuggestionsSource: InlineSuggestionsSource;
+  aiCommandRewriteEnabled: boolean;
+  aiCommandRewriteShortcut: string;
+  /// Experimental: render `?? <q>` inline in the terminal (ANSI-styled) when
+  /// true, instead of routing the question to the AI Chat Drawer. Off by
+  /// default — see plan §8.4 for the safety considerations.
+  aiInlineQqRender: boolean;
   commonCommands: UserCommonCommand[];
   commonCommandsShortcut: string;
 }
@@ -54,6 +62,10 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   loggingEnabled: false,
   inlineSuggestions: true,
   inlineSuggestionsMax: 2000,
+  inlineSuggestionsSource: "history",
+  aiCommandRewriteEnabled: false,
+  aiCommandRewriteShortcut: "Ctrl+K",
+  aiInlineQqRender: false,
   commonCommands: [],
   commonCommandsShortcut: "Ctrl+Shift+P",
 };
@@ -142,6 +154,14 @@ export function normalizeTerminalProfile(input: unknown): TerminalProfile {
       100,
       50000,
     ),
+    inlineSuggestionsSource: readEnum(
+      source.inlineSuggestionsSource,
+      ["history", "history+path", "history+path+ai"] as const,
+      DEFAULT_TERMINAL_PROFILE.inlineSuggestionsSource,
+    ),
+    aiCommandRewriteEnabled: readBoolean(source.aiCommandRewriteEnabled, DEFAULT_TERMINAL_PROFILE.aiCommandRewriteEnabled),
+    aiCommandRewriteShortcut: readString(source.aiCommandRewriteShortcut, DEFAULT_TERMINAL_PROFILE.aiCommandRewriteShortcut),
+    aiInlineQqRender: readBoolean(source.aiInlineQqRender, DEFAULT_TERMINAL_PROFILE.aiInlineQqRender),
     commonCommands: readCommonCommands(source.commonCommands),
     commonCommandsShortcut: readString(
       source.commonCommandsShortcut,

@@ -40,8 +40,27 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
         CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_path);
         CREATE INDEX IF NOT EXISTS idx_sessions_type ON sessions(session_type);
         CREATE INDEX IF NOT EXISTS idx_history_host_time
-            ON command_history(host_key, last_used_at DESC);",
-    )
+            ON command_history(host_key, last_used_at DESC);
+
+        CREATE TABLE IF NOT EXISTS voice_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at INTEGER NOT NULL,
+            session_id TEXT,
+            transcript TEXT,
+            intent_json TEXT,
+            outcome TEXT NOT NULL,
+            command TEXT,
+            risk TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_voice_audit_time
+            ON voice_audit(created_at DESC);",
+    )?;
+
+    // Chat tables (v2.4).
+    crate::chat::store::init_chat_tables(conn)?;
+
+    Ok(())
 }
 
 pub fn list_sessions(conn: &Connection, group: Option<&str>) -> SqlResult<Vec<SessionConfig>> {

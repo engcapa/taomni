@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { SessionConfig } from "./ipc";
 import {
+  parseCsvSessions,
+  parseExceedSessions,
+  parseItermDynamicProfiles,
   parseMobaXtermSessions,
   parseNewMobSessions,
+  parseSecureCrtSessions,
+  parseTabbySessions,
+  parseWindTermSessions,
+  parseXmlConnectionSessions,
+  parseXshellSessions,
+  parseXshellZipSessions,
+  serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
 } from "./sessionImportExport";
@@ -42,6 +52,7 @@ function session(overrides: Partial<SessionConfig> = {}): SessionConfig {
         loggingEnabled: false,
         logPath: "C:\\secret\\terminal.log",
       },
+      disableAiWrite: true,
     }),
     created_at: 100,
     updated_at: 100,
@@ -51,6 +62,65 @@ function session(overrides: Partial<SessionConfig> = {}): SessionConfig {
   };
 }
 
+function makeStoredZip(entries: Record<string, string>): Uint8Array {
+  const encoder = new TextEncoder();
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const [name, text] of Object.entries(entries)) {
+    const nameBytes = encoder.encode(name);
+    const data = encoder.encode(text);
+    const local = new Uint8Array(30 + nameBytes.length + data.length);
+    const localView = new DataView(local.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 0x0800, true);
+    localView.setUint16(8, 0, true);
+    localView.setUint32(18, data.length, true);
+    localView.setUint32(22, data.length, true);
+    localView.setUint16(26, nameBytes.length, true);
+    local.set(nameBytes, 30);
+    local.set(data, 30 + nameBytes.length);
+    localParts.push(local);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(central.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 0x0800, true);
+    centralView.setUint16(10, 0, true);
+    centralView.setUint32(20, data.length, true);
+    centralView.setUint32(24, data.length, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    centralParts.push(central);
+
+    offset += local.length;
+  }
+
+  const centralOffset = offset;
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const eocd = new Uint8Array(22);
+  const eocdView = new DataView(eocd.buffer);
+  eocdView.setUint32(0, 0x06054b50, true);
+  eocdView.setUint16(8, centralParts.length, true);
+  eocdView.setUint16(10, centralParts.length, true);
+  eocdView.setUint32(12, centralSize, true);
+  eocdView.setUint32(16, centralOffset, true);
+
+  const all = [...localParts, ...centralParts, eocd];
+  const out = new Uint8Array(all.reduce((sum, part) => sum + part.length, 0));
+  let cursor = 0;
+  for (const part of all) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
+}
+
 describe("NewMob session import/export", () => {
   it("round trips safe session fields and strips local log paths", () => {
     const exported = serializeNewMobSessions([session()], "Production");
@@ -58,6 +128,7 @@ describe("NewMob session import/export", () => {
 
     expect(parsed.sessions[0].folder_path).toBeNull();
     expect(JSON.stringify(parsed.sessions[0].options)).not.toContain("terminal.log");
+    expect(parsed.sessions[0].options.disableAiWrite).toBe(true);
 
     const result = parseNewMobSessions(exported.text, {
       targetFolder: "Imported",
@@ -77,6 +148,7 @@ describe("NewMob session import/export", () => {
       last_connected_at: null,
     });
     expect(result.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "C:\\keys\\deploy.ppk" } });
+    expect(JSON.parse(result.sessions[0].options_json).disableAiWrite).toBe(true);
   });
 
   it("imports legacy JSON safely and creates duplicate names instead of overwriting", () => {
@@ -117,6 +189,36 @@ describe("NewMob session import/export", () => {
     expect(result.sessions[0].options_json).toContain("compression");
     expect(result.sessions[0].options_json).not.toContain("proxyPass");
     expect(result.sessions[0].options_json).not.toContain("secret");
+  });
+});
+
+describe("CSV session import/export", () => {
+  it("exports CSV with escaped fields and imports group paths relative to the target folder", () => {
+    const result = serializeCsvSessions([
+      session({
+        name: "Prod, primary",
+        group_path: "User sessions / Production / Web",
+        username: "deploy\"ops",
+      }),
+    ], "Production");
+
+    expect(result.filename).toBe("production.csv");
+    expect(result.text).toContain('"Prod, primary",SSH,prod.example.com,22,"deploy""ops",Web');
+
+    const imported = parseCsvSessions(result.text, {
+      targetFolder: "Imported",
+      now: 5555,
+    });
+
+    expect(imported.sessions).toHaveLength(1);
+    expect(imported.sessions[0]).toMatchObject({
+      name: "Prod, primary",
+      session_type: "SSH",
+      group_path: "User sessions / Imported / Web",
+      username: "deploy\"ops",
+      created_at: 5555,
+      updated_at: 5555,
+    });
   });
 });
 
@@ -240,5 +342,341 @@ describe("MobaXterm session import/export", () => {
     expect(result.text).toContain("Desktop=#91#4%rdp.example.com%3389%admin");
     expect(result.text).not.toContain("Local=");
     expect(result.skipped).toBe(1);
+  });
+});
+
+describe("third-party session import parsers", () => {
+  it("imports Xshell .xsh INI sessions with source folder hierarchy", () => {
+    const result = parseXshellSessions([
+      "[Connection]",
+      "Host=192.168.1.100",
+      "Port=22",
+      "Protocol=SSH",
+      "[Terminal]",
+      "UserName=root",
+    ].join("\n"), {
+      targetFolder: "Imported",
+      sourcePath: "NetSarang/Prod/Web.xsh",
+      now: 6001,
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Web",
+      session_type: "SSH",
+      group_path: "User sessions / Imported / NetSarang / Prod",
+      host: "192.168.1.100",
+      port: 22,
+      username: "root",
+      created_at: 6001,
+    });
+  });
+
+  it("imports multiple Xshell .xsh sessions from a ZIP archive", async () => {
+    const zip = makeStoredZip({
+      "Prod/Web.xsh": [
+        "[Connection]",
+        "Host=web.example.com",
+        "Port=22",
+        "Protocol=SSH",
+        "UserName=deploy",
+      ].join("\n"),
+      "Prod/DB.xsh": [
+        "[Connection]",
+        "Host=db.example.com",
+        "Port=2202",
+        "Protocol=SSH",
+        "[Terminal]",
+        "UserName=dba",
+      ].join("\n"),
+      "notes.txt": "ignored",
+    });
+
+    const result = await parseXshellZipSessions(zip, {
+      targetFolder: "Imported",
+      now: 6007,
+    });
+
+    expect(result.sessions).toHaveLength(2);
+    expect(result.sessions.map((item) => item.name)).toEqual(["Web", "DB"]);
+    expect(result.sessions[0]).toMatchObject({
+      group_path: "User sessions / Imported / Prod",
+      host: "web.example.com",
+      username: "deploy",
+    });
+    expect(result.sessions[1]).toMatchObject({
+      host: "db.example.com",
+      port: 2202,
+      username: "dba",
+    });
+  });
+
+  it("imports Tabby SSH profiles from config.yaml", () => {
+    const result = parseTabbySessions([
+      "profiles:",
+      "  - name: My Server",
+      "    type: ssh",
+      "    group: Prod / Web",
+      "    options:",
+      "      host: 10.0.0.5",
+      "      port: 2222",
+      "      user: ubuntu",
+    ].join("\n"), { targetFolder: "Tabby", now: 6002 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "My Server",
+      session_type: "SSH",
+      group_path: "User sessions / Tabby / Prod / Web",
+      host: "10.0.0.5",
+      port: 2222,
+      username: "ubuntu",
+    });
+  });
+
+  it("imports Tabby groups under User sessions when no target folder is selected", () => {
+    const result = parseTabbySessions([
+      "profiles:",
+      "  - name: Ungrouped target",
+      "    type: ssh",
+      "    group: Lab/Edge",
+      "    options:",
+      "      host: edge.example.com",
+      "      user: admin",
+    ].join("\n"), { now: 6010 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Ungrouped target",
+      group_path: "User sessions / Lab / Edge",
+      host: "edge.example.com",
+    });
+  });
+
+  it("imports Tabby private key paths and password secrets only when enabled", () => {
+    const text = [
+      "profiles:",
+      "  - name: Key Server",
+      "    type: ssh",
+      "    options:",
+      "      host: key.example.com",
+      "      user: deploy",
+      "      auth: publicKey",
+      "      privateKeys:",
+      "        - ~/.ssh/deploy_key",
+      "  - name: Password Server",
+      "    type: ssh",
+      "    options:",
+      "      host: password.example.com",
+      "      user: ops",
+      "      auth: password",
+      "      password: s3cret",
+    ].join("\n");
+
+    const withoutSecrets = parseTabbySessions(text, { targetFolder: "Tabby", now: 6011 });
+    expect(withoutSecrets.sessions[0].auth_method).toBe("Password");
+    expect(withoutSecrets.secrets).toHaveLength(0);
+    expect(withoutSecrets.warnings.join("\n")).toContain("secret import was not enabled");
+
+    const withSecrets = parseTabbySessions(text, {
+      targetFolder: "Tabby",
+      includeSecrets: true,
+      now: 6011,
+    });
+
+    expect(withSecrets.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "~/.ssh/deploy_key" } });
+    expect(withSecrets.sessions[1].auth_method).toBe("Password");
+    expect(withSecrets.secrets).toEqual([
+      {
+        sessionId: withSecrets.sessions[1].id,
+        kind: "password",
+        label: "ops@password.example.com:22",
+        value: "s3cret",
+      },
+    ]);
+  });
+
+  it("imports Tabby agent auth, agent forwarding metadata, and jump-host references", () => {
+    const result = parseTabbySessions(JSON.stringify({
+      profiles: [
+        {
+          id: "ssh:bastion",
+          type: "ssh",
+          name: "Bastion",
+          options: {
+            host: "bastion.example.com",
+            port: 2200,
+            user: "jump",
+          },
+        },
+        {
+          id: "ssh:target",
+          type: "ssh",
+          name: "Target",
+          group: "Prod",
+          options: {
+            host: "target.internal",
+            port: 22,
+            user: "app",
+            auth: "agent",
+            agentForward: true,
+            jumpHost: "ssh:bastion",
+          },
+        },
+      ],
+    }), { targetFolder: "Imported", now: 6012 });
+
+    expect(result.sessions[1]).toMatchObject({
+      name: "Target",
+      auth_method: "Agent",
+      group_path: "User sessions / Imported / Prod",
+    });
+    expect(JSON.parse(result.sessions[1].options_json)).toMatchObject({
+      agentForward: true,
+      useJump: true,
+      jumpHost: "bastion.example.com",
+      jumpUser: "jump",
+      jumpPort: "2200",
+    });
+    expect(result.warnings.join("\n")).toContain("agent authentication is not implemented");
+    expect(result.warnings.join("\n")).toContain("agent forwarding");
+    expect(result.warnings.join("\n")).toContain("jump-host settings");
+  });
+
+  it("imports WindTerm JSON sessions recursively", () => {
+    const result = parseWindTermSessions(JSON.stringify({
+      groups: [
+        {
+          name: "Prod",
+          children: [
+            { name: "DB", protocol: "ssh", host: "db.example.com", port: 22, username: "dba" },
+          ],
+        },
+      ],
+    }), { targetFolder: "WindTerm", now: 6003 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "DB",
+      group_path: "User sessions / WindTerm / Prod",
+      host: "db.example.com",
+      username: "dba",
+    });
+  });
+
+  it("imports iTerm2 profiles by parsing SSH commands", () => {
+    const result = parseItermDynamicProfiles(JSON.stringify({
+      Profiles: [
+        { Name: "Jumpbox", Command: "ssh -p 2200 -l deploy jump.example.com" },
+      ],
+    }), { targetFolder: "iTerm2", now: 6004 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Jumpbox",
+      group_path: "User sessions / iTerm2",
+      host: "jump.example.com",
+      port: 2200,
+      username: "deploy",
+    });
+  });
+
+  it("imports common XML connection exports", () => {
+    const result = parseXmlConnectionSessions(
+      '<Node Name="Prod SSH" Type="Connection" Protocol="SSH2" Hostname="prod.example.com" Port="2222" Username="root" Folder="mRemote" />',
+      { targetFolder: "Imported", now: 6005 },
+    );
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Prod SSH",
+      session_type: "SSH",
+      group_path: "User sessions / Imported / mRemote",
+      host: "prod.example.com",
+      port: 2222,
+      username: "root",
+    });
+  });
+
+  it("imports XML connection exports that use child elements", () => {
+    const result = parseXmlConnectionSessions([
+      "<Connection>",
+      "<Name>RDM SSH</Name>",
+      "<Protocol>SSH</Protocol>",
+      "<Host>rdm.example.com</Host>",
+      "<Port>2201</Port>",
+      "<Username>admin</Username>",
+      "<Folder>Remote Desktop Manager</Folder>",
+      "</Connection>",
+    ].join(""), { targetFolder: "Imported", now: 6005 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "RDM SSH",
+      group_path: "User sessions / Imported / Remote Desktop Manager",
+      host: "rdm.example.com",
+      port: 2201,
+      username: "admin",
+    });
+  });
+
+  it("imports Exceed key-value session exports with SSH commands", () => {
+    const result = parseExceedSessions([
+      "[Xstart]",
+      "Name=Exceed Xterm",
+      "Command=ssh -p 2203 exceed@example.com xterm",
+    ].join("\n"), {
+      targetFolder: "Exceed",
+      sourcePath: "xstart/Exceed Xterm.xs",
+      now: 6008,
+    });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Exceed Xterm",
+      group_path: "User sessions / Exceed / xstart",
+      host: "example.com",
+      port: 2203,
+      username: "exceed",
+    });
+  });
+
+  it("imports SecureCRT .ini sessions and decodes hex ports", () => {
+    const result = parseSecureCrtSessions([
+      'S:"Hostname"=secure.example.com',
+      'S:"Username"=ops',
+      'S:"Protocol Name"=SSH2',
+      'D:"[SSH2] Port"=000008AE',
+      'S:"Identity Filename"=C:\\keys\\ops.pem',
+    ].join("\n"), {
+      targetFolder: "SecureCRT",
+      sourcePath: "Linux/secure.ini",
+      now: 6006,
+    });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "secure",
+      group_path: "User sessions / SecureCRT / Linux",
+      host: "secure.example.com",
+      port: 2222,
+      username: "ops",
+      auth_method: { PrivateKey: { key_path: "C:\\keys\\ops.pem" } },
+    });
+  });
+
+  it("preserves LocalShell launch arguments in NewMob round trips", () => {
+    const exported = serializeNewMobSessions([
+      session({
+        name: "Ubuntu",
+        session_type: "LocalShell",
+        host: "",
+        port: 0,
+        username: null,
+        auth_method: "None",
+        options_json: JSON.stringify({
+          localShellPath: "wsl.exe",
+          localShellArgs: ["-d", "Ubuntu"],
+        }),
+      }),
+    ], null);
+
+    const imported = parseNewMobSessions(exported.text);
+    expect(JSON.parse(imported.sessions[0].options_json)).toMatchObject({
+      localShellPath: "wsl.exe",
+      localShellArgs: ["-d", "Ubuntu"],
+    });
   });
 });

@@ -56,35 +56,40 @@ pub fn list_local_shells() -> Vec<LocalShellOption> {
 }
 
 pub fn resolve_shell(shell: Option<String>) -> ShellLaunch {
-    resolve_shell_with_id(shell).0
+    resolve_shell_with_id(shell, None).0
 }
 
 /// Same as `resolve_shell`, but also reports the `LocalShellOption.id` that was
 /// matched. Returns `"custom"` when the caller passed an explicit shell path
 /// that didn't correspond to any enumerated option, and `"default"` when we
 /// fell back to the platform fallback because no shells were detected.
-pub fn resolve_shell_with_id(shell: Option<String>) -> (ShellLaunch, String) {
+pub fn resolve_shell_with_id(
+    shell: Option<String>,
+    shell_args: Option<Vec<String>>,
+) -> (ShellLaunch, String) {
     if let Some(raw) = shell {
         let requested = raw.trim();
         if !requested.is_empty() {
-            if let Some(option) = list_local_shells()
-                .into_iter()
-                .find(|option| option.id == requested)
-            {
-                let id = option.id;
-                return (
-                    ShellLaunch {
-                        program: option.path,
-                        args: option.args,
-                    },
-                    id,
-                );
+            if shell_args.is_none() {
+                if let Some(option) = list_local_shells()
+                    .into_iter()
+                    .find(|option| option.id == requested)
+                {
+                    let id = option.id;
+                    return (
+                        ShellLaunch {
+                            program: option.path,
+                            args: option.args,
+                        },
+                        id,
+                    );
+                }
             }
 
             return (
                 ShellLaunch {
                     program: requested.to_string(),
-                    args: Vec::new(),
+                    args: shell_args.unwrap_or_default(),
                 },
                 "custom".to_string(),
             );
@@ -434,6 +439,7 @@ pub fn create_pty(
     cols: u16,
     rows: u16,
     shell: Option<String>,
+    shell_args: Option<Vec<String>>,
     cwd: Option<String>,
 ) -> Result<(PtyHandle, Box<dyn Read + Send>, String), String> {
     let pty_system = native_pty_system();
@@ -449,7 +455,7 @@ pub fn create_pty(
         .openpty(size)
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    let (shell_launch, shell_id) = resolve_shell_with_id(shell);
+    let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
     let mut cmd = CommandBuilder::new(&shell_launch.program);
     for arg in &shell_launch.args {
         cmd.arg(arg);

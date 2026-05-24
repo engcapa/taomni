@@ -73,6 +73,16 @@ controls:
   - id: compact-toggle
     selector: '[data-testid="compact-toggle"]'
     kind: interactive
+  - id: split-view             # toggles terminal split view (lives in title bar tray)
+    selector: '[data-testid="tab-split-view"]'
+    kind: interactive
+  - id: multiexec-toggle       # toggles MultiExec (lives in title bar tray)
+    selector: '[data-testid="tab-multiexec-toggle"]'
+    kind: interactive
+  - id: ai-chat-drawer-toggle  # toggles AI Chat Drawer (hidden when AI fully disabled)
+    selector: '[data-testid="ai-chat-drawer-toggle"]'
+    kind: interactive
+    optional: true             # absent in fully_disabled mode
   - id: window-controls
     selector: '[data-testid="window-controls"]'
     kind: display
@@ -88,7 +98,7 @@ controls:
 -->
 
 - 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
-- 标题栏托盘 `TitleBarTrayControls`：主题循环按钮（Light / Dark / Follow system）+ 紧凑模式开关
+- 标题栏托盘 `TitleBarTrayControls`：分组排列 — Voice (PTT) | View (主题循环 + 紧凑模式) | Terminal (Split + MultiExec) | AI (Chat Drawer)
 - `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
 
@@ -149,10 +159,10 @@ controls:
   - id: new-local-terminal     # the "+" plus tab button
     selector: '[data-testid="new-local-terminal"]'
     kind: interactive
-  - id: split-view             # toggles terminal split view
+  - id: split-view             # MOVED to F1.3 title-bar tray; selector still resolves
     selector: '[data-testid="tab-split-view"]'
     kind: interactive
-  - id: multiexec-toggle
+  - id: multiexec-toggle       # MOVED to F1.3 title-bar tray; selector still resolves
     selector: '[data-testid="tab-multiexec-toggle"]'
     kind: interactive
   - id: tabs-more

@@ -34,6 +34,15 @@ russh-sftp = "2"
 tokio-util = { version = "0.7", features = ["compat", "io"] }
 futures = "0.3"
 async-trait = "0.1"
+async-stream = "0.3"
+thiserror = "1"
+reqwest = { version = "0.12", features = ["rustls-tls", "json", "stream"], default-features = false }
+heck = "0.5"
+regex = "1"
+rig-core = { version = "=0.37.0", default-features = false, features = ["derive"] }
+urlencoding = "2"
+url = "2"
+which = "6"
 shellexpand = "3"
 libc = "0.2"
 font-kit = "0.14"
@@ -53,9 +62,23 @@ arboard = "3"
 argon2 = "0.5"
 aes-gcm = "0.10"
 zeroize = { version = "1", features = ["zeroize_derive"] }
+keyring = "3"
+hound = "3.5"
+cpal = { version = "0.15", optional = true }
+ash = { version = "0.38", optional = true }
+llama-cpp-2 = { version = "0.1", optional = true }
+plist = "1.9"
+
+[features]
+default = []
+voice-capture = ["dep:cpal"]
+asr-sherpa-onnx = []
+vulkan-detect = ["dep:ash"]
+local-llm-fim = ["dep:llama-cpp-2"]
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["fileapi", "commdlg"] }
+winreg = "0.55"
 
 [dev-dependencies]
 tempfile = "3"

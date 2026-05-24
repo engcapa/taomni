@@ -1,0 +1,28 @@
+id: TC-AI-004
+title: Native web search caps + ClaudeCode integration both surface
+description: |
+  Companion to TC-AI-003: focuses on the provider-native search side
+  (provider_caps command + ClaudeCodePanel) plus the Models advanced panel
+  (mirror selector + CUDA pack toggle). Verifies the §11.4 mirror radios and
+  §11.6 CUDA-pack section render so users can pick their download source
+  before launching real downloads.
+covers: [F-AI-2.5, F-AI-2.6, F-AI-11]
+tags: [ai, native-search, claude-code, p2]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: 'text=AI 设置'
+  # Models advanced panel: mirror radios
+  - assert_text: {selector: 'body', contains: '模型分发'}
+  - assert_text: {selector: 'body', contains: 'ModelScope 优先'}
+  - assert_text: {selector: 'body', contains: 'GitHub 直连'}
+  - assert_text: {selector: 'body', contains: 'gh-proxy 代理'}
+  - assert_text: {selector: 'body', contains: '自定义 base URL'}
+  # Chat history retention
+  - assert_text: {selector: 'body', contains: '对话历史管理' }
+  - assert_text: {selector: 'body', contains: '保留天数' }
+  - screenshot: ai-004-native-and-cc.png

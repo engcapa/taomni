@@ -81,6 +81,8 @@ import {
   writeStreamClose,
   writeStreamAbort,
   checkFileExists,
+  VAULT_LOCKED_EVENT,
+  isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import {
@@ -93,6 +95,10 @@ import {
 } from "../../lib/zmodem";
 import { ZmodemConflictDialog } from "./ZmodemConflictDialog";
 import { CommonCommandsPalette } from "./CommonCommandsPalette";
+import { AiRewriteOverlay } from "./AiRewriteOverlay";
+import { SelectionToolbar } from "./SelectionToolbar";
+import { useChatStore } from "../../stores/chatStore";
+import { useSuggestionSource } from "../../lib/terminal/aiSuggestionSource";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -104,7 +110,7 @@ import {
   isOsFileDrag,
   shellQuoteStyleForTerminalDrop,
 } from "../../lib/osFileDrop";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 
 export interface SshConnectInfo {
@@ -128,6 +134,7 @@ interface TerminalPanelProps {
   localShell?: {
     id: string;
     name: string;
+    args?: string[];
   };
   terminalProfile?: TerminalProfile;
   visible?: boolean;
@@ -221,6 +228,8 @@ export function TerminalPanel({
   const fontState = useSystemFonts();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
+  const attachToComposer = useChatStore((s) => s.attachToComposer);
+  const explainSelection = useChatStore((s) => s.explainSelection);
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
     initialProfileRef.current = terminalProfile ?? loadGlobalTerminalProfile();
@@ -247,6 +256,13 @@ export function TerminalPanel({
   const [multilinePasteConfirm, setMultilinePasteConfirm] = useState(initialProfile.multilinePasteConfirm);
   const [inlineSuggestionsEnabled, setInlineSuggestionsEnabled] = useState(initialProfile.inlineSuggestions);
   const [inlineSuggestionsMax, setInlineSuggestionsMax] = useState(initialProfile.inlineSuggestionsMax);
+  const [inlineSuggestionsSource, setInlineSuggestionsSource] = useState(initialProfile.inlineSuggestionsSource);
+  const [aiCommandRewriteEnabled, setAiCommandRewriteEnabled] = useState(initialProfile.aiCommandRewriteEnabled);
+  const [aiRewriteOpen, setAiRewriteOpen] = useState(false);
+  const [selectionToolbar, setSelectionToolbar] = useState<{
+    rect: { top: number; left: number; right: number; bottom: number };
+    text: string;
+  } | null>(null);
   const [commonCommands, setCommonCommands] = useState<UserCommonCommand[]>(initialProfile.commonCommands);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -348,10 +364,28 @@ export function TerminalPanel({
   // captures the empty prewarm cache and never sees later state changes.
   const historyRef = useRef(history);
   const suggestionsActiveRef = useRef(suggestionsActive);
+  const inlineSuggestionsSourceRef = useRef(inlineSuggestionsSource);
   useEffect(() => {
     historyRef.current = history;
     suggestionsActiveRef.current = suggestionsActive;
-  }, [history, suggestionsActive]);
+    inlineSuggestionsSourceRef.current = inlineSuggestionsSource;
+  }, [history, suggestionsActive, inlineSuggestionsSource]);
+
+  // AI suggestion source resolver (data sources 2 + 3).
+  // The resolver caches its options on every render; passing a thunk for
+  // recent history keeps it invalidation-free without triggering rerenders.
+  const recentHistoryForSuggestion = useMemo(
+    () => history.recent(5),
+    // The history hook bumps a cache version internally on commit, but we
+    // only want to pull a fresh snapshot for new keystrokes — depending on
+    // history alone here is fine because match() is the keystroke trigger.
+    [history],
+  );
+  const resolveSuggestion = useSuggestionSource({
+    source: inlineSuggestionsSource,
+    isLocal,
+    recentHistory: recentHistoryForSuggestion,
+  });
 
   // State shared between onData tracking and the ghost renderer.
   const pendingRef = useRef("");
@@ -372,10 +406,30 @@ export function TerminalPanel({
     }
     const prefix = pendingRef.current;
     const matches = historyRef.current.match(prefix, 1);
-    const next = matches[0] && matches[0].length > prefix.length ? matches[0] : null;
-    suggestionRef.current = next;
-    bumpGhost();
-  }, [bumpGhost]);
+    const historyMatch = matches[0] && matches[0].length > prefix.length ? matches[0] : null;
+
+    if (historyMatch !== null) {
+      // Source 1 hit — use immediately.
+      suggestionRef.current = historyMatch;
+      bumpGhost();
+      return;
+    }
+
+    // Source 1 miss — try sources 2/3 asynchronously.
+    const source = inlineSuggestionsSourceRef.current;
+    if (source === "history+path" || source === "history+path+ai") {
+      void resolveSuggestion(prefix, null, (result) => {
+        // Only apply if the prefix hasn't changed since we started.
+        if (pendingRef.current === prefix && !invalidatedRef.current) {
+          suggestionRef.current = result;
+          bumpGhost();
+        }
+      });
+    } else {
+      suggestionRef.current = null;
+      bumpGhost();
+    }
+  }, [bumpGhost, resolveSuggestion]);
 
   const invalidatePending = useCallback(() => {
     if (invalidatedRef.current && suggestionRef.current === null) return;
@@ -499,12 +553,52 @@ export function TerminalPanel({
     if (filtered === null) {
       return;
     }
+
+    // `??` inline interceptor: when the user has typed `?? <question>` and
+    // presses Enter on a normal-screen prompt, capture the question and
+    // route it to the AI Chat Drawer instead of forwarding to the shell.
+    // Disabled in alt-screen mode (vim/less/top), in PowerShell, and during
+    // multi-exec broadcast.
+    const endsWithEnter = filtered.endsWith("\r") || filtered.endsWith("\n");
+    if (endsWithEnter && !multiExecActiveRef.current) {
+      const term = termRef.current;
+      const altScreen = term?.buffer.active.type === "alternate";
+      const candidate = pendingRef.current + filtered.slice(0, filtered.length - 1);
+      if (
+        !altScreen
+        && !isLocalPowerShell
+        && candidate.startsWith("?? ")
+        && candidate.length > 3
+      ) {
+        const question = candidate.slice(3).trim();
+        // Clear the line on the shell (Ctrl+U wipes back to start in bash/zsh).
+        sendTerminalInput("\x15");
+        pendingRef.current = "";
+        invalidatedRef.current = false;
+        refreshSuggestion();
+
+        if (terminalProfile?.aiInlineQqRender) {
+          // Plan §8.4 inline path: render AI response directly into the
+          // terminal as ANSI-styled lines. We write a header, kick the
+          // backend stream, and pipe each token straight into xterm.write.
+          const term = termRef.current;
+          if (term) {
+            void streamInlineAi(term, question);
+          }
+        } else {
+          // Default safe path: route to AI Chat Drawer.
+          void useChatStore.getState().attachToComposer(`?? ${question}`);
+        }
+        return;
+      }
+    }
+
     trackPending(filtered);
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(filtered);
     }
     sendTerminalInput(filtered);
-  }, [sendTerminalInput, trackPending]);
+  }, [sendTerminalInput, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
@@ -926,6 +1020,18 @@ export function TerminalPanel({
       setPaletteOpen(true);
       return false;
     }
+    // Ctrl+K: AI command rewrite overlay (v2.2)
+    if (
+      aiCommandRewriteEnabled && !isLocalPowerShell &&
+      event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey &&
+      event.key.toLowerCase() === "k"
+    ) {
+      if (readOnlyRef.current) return false;
+      if (termRef.current?.buffer.active.type === "alternate") return false;
+      event.preventDefault();
+      setAiRewriteOpen(true);
+      return false;
+    }
     // Cross-platform copy/paste shortcuts
     if (isMac) {
       if (event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "c") {
@@ -1121,6 +1227,26 @@ export function TerminalPanel({
         ],
       },
       { label: "Event Log", onClick: () => setEventLogOpen(true) },
+      { label: "", separator: true },
+      {
+        label: "AI: 解释最近的终端输出",
+        onClick: () => {
+          const term = termRef.current;
+          if (!term) return;
+          // Pull the last 50 lines from the buffer; if there's a selection,
+          // prefer that. Both paths route to a fresh AI thread via
+          // explainSelection (already redacts via chat::redact server-side).
+          const selected = term.getSelection();
+          const text = selected && selected.trim()
+            ? selected
+            : getLastBufferLines(term, 50);
+          if (text.trim().length === 0) {
+            setStatusMessage("Terminal buffer is empty");
+            return;
+          }
+          void useChatStore.getState().explainSelection(text);
+        },
+      },
     ];
   }, [
     clearScrollback,
@@ -1253,6 +1379,8 @@ export function TerminalPanel({
     setMultilinePasteConfirm(terminalProfile.multilinePasteConfirm);
     setInlineSuggestionsEnabled(terminalProfile.inlineSuggestions);
     setInlineSuggestionsMax(terminalProfile.inlineSuggestionsMax);
+    setInlineSuggestionsSource(terminalProfile.inlineSuggestionsSource);
+    setAiCommandRewriteEnabled(terminalProfile.aiCommandRewriteEnabled);
     setCommonCommands(terminalProfile.commonCommands);
   }, [terminalProfile, theme]);
 
@@ -1365,6 +1493,34 @@ export function TerminalPanel({
     const selectionDisposable = term.onSelectionChange(() => {
       if (copyOnSelectRef.current && term.hasSelection()) {
         void writeClipboardText(term.getSelection(), "");
+      }
+
+      // SelectionToolbar: show when there is a non-empty selection that
+      // contains useful content (ignore single-char accidental drags).
+      if (term.hasSelection()) {
+        const text = term.getSelection();
+        if (text && text.trim().length >= 2) {
+          // The xterm.js `core` API isn't public; pick the bounding rect of
+          // the visible terminal element and pin the toolbar to its top-right.
+          const container = containerRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            // Place above the visible terminal, anchored ~1/3 across.
+            setSelectionToolbar({
+              text,
+              rect: {
+                top: rect.top + 24,
+                left: rect.left + rect.width / 3,
+                right: rect.right,
+                bottom: rect.bottom,
+              },
+            });
+          }
+        } else {
+          setSelectionToolbar(null);
+        }
+      } else {
+        setSelectionToolbar(null);
       }
     });
     const scrollDisposable = term.onScroll(() => setViewportVersion((v) => v + 1));
@@ -1494,6 +1650,7 @@ export function TerminalPanel({
           cols,
           rows,
           localShell?.id,
+          localShell?.args,
           undefined,
           (raw) => zmodem.consume(raw),
         ).then(({ sessionId, shellId }) => ({ sessionId, shellId }));
@@ -2091,6 +2248,46 @@ export function TerminalPanel({
           }}
         />
       )}
+
+      {aiRewriteOpen && !isLocalPowerShell && (
+        <AiRewriteOverlay
+          currentCommand={pendingRef.current}
+          onAccept={(newCmd) => {
+            setAiRewriteOpen(false);
+            // Clear the current pending input and inject the rewritten command.
+            // Send backspaces to clear the line, then inject the new command.
+            const clearLine = "\x15"; // Ctrl+U clears the line in most shells
+            sendTerminalInput(clearLine + newCmd);
+            pendingRef.current = newCmd;
+            invalidatedRef.current = false;
+            refreshSuggestion();
+            focusTerminal();
+          }}
+          onDismiss={() => {
+            setAiRewriteOpen(false);
+            focusTerminal();
+          }}
+        />
+      )}
+
+      <SelectionToolbar
+        visible={!!selectionToolbar}
+        rect={selectionToolbar?.rect ?? null}
+        selectionText={selectionToolbar?.text ?? ""}
+        onCopy={(text) => {
+          void writeClipboardText(text, "");
+          setSelectionToolbar(null);
+        }}
+        onSendToAi={(text) => {
+          void attachToComposer(text);
+          setSelectionToolbar(null);
+        }}
+        onExplain={(text) => {
+          void explainSelection(text);
+          setSelectionToolbar(null);
+        }}
+        onDismiss={() => setSelectionToolbar(null)}
+      />
     </div>
   );
 }
@@ -2141,6 +2338,27 @@ function getBufferText(term: Terminal): string {
     lines.pop();
   }
 
+  return lines.join("\n");
+}
+
+function getLastBufferLines(term: Terminal, lineCount: number): string {
+  const buffer = term.buffer.active;
+  const total = buffer.length;
+  const start = Math.max(0, total - lineCount);
+  const lines: string[] = [];
+  for (let i = start; i < total; i++) {
+    const line = buffer.getLine(i);
+    if (!line) continue;
+    const text = line.translateToString(true);
+    if (line.isWrapped && lines.length > 0) {
+      lines[lines.length - 1] += text;
+    } else {
+      lines.push(text);
+    }
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop();
+  }
   return lines.join("\n");
 }
 
@@ -2541,4 +2759,64 @@ function formatZmodemBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+
+// AI inline `??` rendering: stream LLM tokens directly into the terminal as
+// gray-styled ANSI text. The rendering is purely visual (xterm.write); it
+// never reaches the underlying PTY, so a real `cat`/`grep`/`vim` can run on
+// the next prompt without any ghost characters left behind. Each request
+// uses a fresh `inline-qq:<request_id>` event channel so concurrent calls
+// from different tabs do not cross-contaminate.
+async function streamInlineAi(term: Terminal, question: string): Promise<void> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  const requestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const event = `inline-qq:${requestId}`;
+
+  // ANSI: dim gray foreground, bold prefix.
+  const PREFIX = "\\x1b[38;5;244m\\x1b[1m[AI]\\x1b[0m\\x1b[38;5;244m ";
+  const SUFFIX = "\\x1b[0m";
+
+  // Header line so the user sees the question echoed back.
+  term.write(`\\r\\n\\x1b[38;5;244m?? ${question}\\x1b[0m\\r\\n`);
+  term.write(PREFIX);
+
+  let unlisten: UnlistenFn | null = null;
+  try {
+    unlisten = await listen<{ kind: string; content?: string; message?: string }>(event, (e) => {
+      const payload = e.payload;
+      if (payload.kind === "token" && payload.content) {
+        term.write(payload.content.replace(/\\n/g, "\\r\\n" + PREFIX));
+      } else if (payload.kind === "error") {
+        if (isVaultLockedError(payload.message ?? "")) {
+          window.dispatchEvent(
+            new CustomEvent(VAULT_LOCKED_EVENT, {
+              detail: {
+                reason:
+                  "This AI provider's API key is in the credential vault — unlock it to continue.",
+              },
+            }),
+          );
+        }
+        term.write(`${SUFFIX}\\r\\n\\x1b[31m[AI error] ${payload.message ?? "unknown"}${SUFFIX}\\r\\n`);
+      } else if (payload.kind === "end") {
+        term.write(`${SUFFIX}\\r\\n`);
+      }
+    });
+    await invoke("inline_qq_stream", { requestId, question });
+  } catch (e) {
+    if (isVaultLockedError(e)) {
+      window.dispatchEvent(
+        new CustomEvent(VAULT_LOCKED_EVENT, {
+          detail: {
+            reason:
+              "This AI provider's API key is in the credential vault — unlock it to continue.",
+          },
+        }),
+      );
+    }
+    term.write(`${SUFFIX}\\r\\n\\x1b[31m[AI error] ${String(e)}${SUFFIX}\\r\\n`);
+  } finally {
+    if (unlisten) unlisten();
+  }
 }

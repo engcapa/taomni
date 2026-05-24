@@ -1,0 +1,127 @@
+{
+  "version": "2026-05-23",
+  "models": {
+    "asr_sherpa_zipformer_zh_en_small": {
+      "kind": "asr",
+      "engine": "sherpa-onnx",
+      "display_name": "Streaming Zipformer (zh-en, small)",
+      "version": "20231129",
+      "size_mb": 80,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "Apache-2.0",
+      "license_note": "Apache-2.0; safe for commercial use.",
+      "filename": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-small.tar.bz2",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/newmob/asr-models/repo?Revision=master&FilePath=sherpa-zipformer-zh-en-small-2023-11-29.tar.bz2",
+        "https://gh-proxy.com/https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2"
+      ]
+    },
+    "asr_sense_voice_small": {
+      "kind": "asr",
+      "engine": "sherpa-onnx",
+      "display_name": "SenseVoice Small (zh-pro)",
+      "version": "20240711",
+      "size_mb": 234,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "CC-BY-NC-4.0",
+      "license_note": "Non-commercial use only. Use Paraformer-zh-small or Whisper-small for commercial.",
+      "filename": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/newmob/asr-models/repo?Revision=master&FilePath=sense-voice-small-2024-07-17.tar.bz2",
+        "https://gh-proxy.com/https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2"
+      ]
+    },
+    "llm_qwen3_0_6b_q4_k_m": {
+      "kind": "llm",
+      "engine": "llama-cpp",
+      "display_name": "Qwen3-0.6B-Instruct (FIM default)",
+      "version": "2025-04-29",
+      "size_mb": 400,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "Apache-2.0",
+      "filename": "Qwen3-0.6B-Instruct-Q4_K_M.gguf",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/Qwen/Qwen3-0.6B-Instruct-GGUF/repo?Revision=master&FilePath=Qwen3-0.6B-Instruct-Q4_K_M.gguf",
+        "https://hf-mirror.com/Qwen/Qwen3-0.6B-Instruct-GGUF/resolve/main/Qwen3-0.6B-Instruct-Q4_K_M.gguf",
+        "https://huggingface.co/Qwen/Qwen3-0.6B-Instruct-GGUF/resolve/main/Qwen3-0.6B-Instruct-Q4_K_M.gguf"
+      ]
+    },
+    "llm_qwen3_1_7b_q4_k_m": {
+      "kind": "llm",
+      "engine": "llama-cpp",
+      "display_name": "Qwen3-1.7B-Instruct-2507 (default chat)",
+      "version": "2025-07",
+      "size_mb": 1400,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "Apache-2.0",
+      "filename": "Qwen3-1.7B-Instruct-2507-Q4_K_M.gguf",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/Qwen/Qwen3-1.7B-Instruct-2507-GGUF/repo?Revision=master&FilePath=Qwen3-1.7B-Instruct-2507-Q4_K_M.gguf",
+        "https://hf-mirror.com/Qwen/Qwen3-1.7B-Instruct-2507-GGUF/resolve/main/Qwen3-1.7B-Instruct-2507-Q4_K_M.gguf",
+        "https://huggingface.co/Qwen/Qwen3-1.7B-Instruct-2507-GGUF/resolve/main/Qwen3-1.7B-Instruct-2507-Q4_K_M.gguf"
+      ]
+    },
+    "llm_qwen3_4b_q4_k_m": {
+      "kind": "llm",
+      "engine": "llama-cpp",
+      "display_name": "Qwen3-4B-Instruct-2507 (quality)",
+      "version": "2025-07",
+      "size_mb": 2400,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "Apache-2.0",
+      "filename": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/Qwen/Qwen3-4B-Instruct-2507-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        "https://hf-mirror.com/Qwen/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+      ]
+    },
+    "sidecar_llama_server_x86_64_pc_windows_msvc": {
+      "kind": "binary",
+      "engine": "llama.cpp",
+      "display_name": "llama-server (Windows x86_64, CPU+Vulkan)",
+      "version": "b5180",
+      "size_mb": 25,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "MIT",
+      "filename": "llama-server.exe",
+      "urls": [
+        "https://gh-proxy.com/https://github.com/ggml-org/llama.cpp/releases/download/b5180/llama-b5180-bin-win-vulkan-x64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b5180/llama-b5180-bin-win-vulkan-x64.zip"
+      ],
+      "extract_member": "llama-server.exe"
+    },
+    "sidecar_llama_server_x86_64_unknown_linux_gnu": {
+      "kind": "binary",
+      "engine": "llama.cpp",
+      "display_name": "llama-server (Linux x86_64, CPU+Vulkan)",
+      "version": "b5180",
+      "size_mb": 25,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "MIT",
+      "filename": "llama-server",
+      "urls": [
+        "https://gh-proxy.com/https://github.com/ggml-org/llama.cpp/releases/download/b5180/llama-b5180-bin-ubuntu-vulkan-x64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b5180/llama-b5180-bin-ubuntu-vulkan-x64.zip"
+      ],
+      "extract_member": "llama-server"
+    },
+    "sidecar_llama_server_aarch64_apple_darwin": {
+      "kind": "binary",
+      "engine": "llama.cpp",
+      "display_name": "llama-server (macOS arm64, Metal)",
+      "version": "b5180",
+      "size_mb": 25,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "license": "MIT",
+      "filename": "llama-server",
+      "urls": [
+        "https://gh-proxy.com/https://github.com/ggml-org/llama.cpp/releases/download/b5180/llama-b5180-bin-macos-arm64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b5180/llama-b5180-bin-macos-arm64.zip"
+      ],
+      "extract_member": "llama-server"
+    }
+  }
+}

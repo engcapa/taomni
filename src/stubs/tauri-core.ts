@@ -290,6 +290,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "read_file_bytes": {
       return (await vfsReadBytes((args as InvokeArgs)?.path as string)) as T;
     }
+    case "read_plist_session_file": {
+      const path = (args as InvokeArgs)?.path as string;
+      return {
+        source: "plist",
+        path,
+        relativePath: basename(path),
+        text: await vfsReadText(path),
+      } as T;
+    }
     case "read_stream_open": {
       const path = (args as InvokeArgs)?.path as string;
       const stat = await vfsStat(path);

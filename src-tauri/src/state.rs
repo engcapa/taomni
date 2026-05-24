@@ -10,6 +10,8 @@ use crate::terminal::ActiveTerminal;
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
+use crate::agent::cc_bridge::process::CcProcess;
+use crate::ai::AppAiCtx;
 
 pub struct WriteStreamHandle {
     pub path: PathBuf,
@@ -31,10 +33,15 @@ pub struct AppState {
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
     pub vault: Arc<Vault>,
+    /// Per-thread Claude Code process registry (v2.6).
+    pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
+    /// Top-level AI context — holds AsrManager + LlmRouter.
+    /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
+    pub ai_ctx: Arc<RwLock<AppAiCtx>>,
 }
 
 impl AppState {
-    pub fn new(db: rusqlite::Connection, vault: Arc<Vault>) -> Self {
+    pub fn new(db: rusqlite::Connection, vault: Arc<Vault>, ai_ctx: AppAiCtx) -> Self {
         Self {
             terminals: Arc::new(RwLock::new(HashMap::new())),
             sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -46,6 +53,9 @@ impl AppState {
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
             vault,
+            cc_processes: tokio::sync::Mutex::new(HashMap::new()),
+            ai_ctx: Arc::new(RwLock::new(ai_ctx)),
         }
     }
 }
+

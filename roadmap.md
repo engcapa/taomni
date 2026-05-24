@@ -1,8 +1,10 @@
 # NewMob Roadmap
 
-> **Status:** Living document. Last updated 2026-05-22.
+> **Status:** Living document. Last updated 2026-05-24.
 > **Current version:** v0.1.22
 > **Target v1.0:** Q1 2027 (estimated)
+>
+> **AI-native scope:** the detailed plan lives in `ai-native-plan.md`. Per its §十九 audit (2026-05-24), v2.0–v2.6 of that plan are all ✅ landed on `feature/ai-native-1`. The Theme 2 subsections below are the **original roadmap commitments** (written before `ai-native-plan.md`); they are now annotated with status markers describing where the plan landed differently or where work remains. See **§ "Status vs ai-native-plan and Original Roadmap"** at the end of Theme 2 for the consolidated diff.
 
 ## TL;DR
 
@@ -326,13 +328,15 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 
 ### v0.2.x — AI Foundation: Smart History (no external API)
 
+> **Status: ❌ Not implemented.** Superseded in spirit by `ai-native-plan.md` v2.2 (Tab Suggestion Source = `history | history+path | history+path+ai`), but the **CWD-aware ranking** + **fuzzy match** + **promote-to-snippet** features below were never built. Current `command_history` schema (`src-tauri/src/session/db.rs:31`) still has no `cwd_context` column; ghost-text is still pure prefix match. Tracking as carryover.
+
 **Goal:** Command history feels like memory — fuzzy, context-aware, instant.
 
 **Features:**
-- Fuzzy match for inline ghost suggestions (replaces current prefix-only)
-- CWD-aware ranking: commands run in the current directory bubble to top
-- One-click "promote to snippet" from history palette
-- "Recently in this directory" view in `CommonCommandsPalette`
+- Fuzzy match for inline ghost suggestions (replaces current prefix-only) — ❌
+- CWD-aware ranking: commands run in the current directory bubble to top — ❌ (OSC 7 CWD is tracked at runtime, but never persisted to history rows)
+- One-click "promote to snippet" from history palette — ❌
+- "Recently in this directory" view in `CommonCommandsPalette` — ❌
 
 **Technical approach:**
 - Schema: `ALTER TABLE command_history ADD COLUMN cwd_context TEXT`
@@ -352,6 +356,8 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 ---
 
 ### v0.2.x — Security Fix: Known-Hosts Verification
+
+> **Status: ❌ Not implemented.** `src-tauri/src/terminal/ssh.rs:22` `check_server_key()` still returns `Ok(true)` unconditionally — TOFU is not enforced. The `ai-native-plan.md` work explicitly carved this out as a non-AI security gap and did not address it. **Highest-priority carryover** for the next release: AI features now sit on top of an SSH stack that accepts any host key.
 
 > ⚠ **This is a security gap, not a feature.** Pulled into v0.2.x to ship before any cloud-sync-related expansion of attack surface.
 
@@ -392,6 +398,16 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 ---
 
 ### v0.3.x — AI Terminal: Error Explanation + NL→Command
+
+> **Status: ✅ Delivered, with deviations.** Implemented under `ai-native-plan.md` v2.0–v2.5 with a substantially expanded scope. Headline differences from the original spec:
+>
+> - **Backends:** original spec said "Ollama / Claude / OpenAI"; actual implementation supports **8+ providers** via OpenAI-compatible abstraction (DeepSeek, GLM, SiliconFlow, Groq, Cerebras, Gemini, Mistral, OpenRouter, plus a dedicated `anthropic.rs` for Claude Messages API and a `claude-cli` runtime for Claude Code). Default is **DeepSeek** (cloud) with local llama-server fallback, not Ollama.
+> - **NL→Command trigger:** original spec was `//` prefix; **shipped as `?? ` prefix** plus `Ctrl+L` Chat Drawer + `Ctrl+K` AI rewrite + voice PTT, all routed through the same `LlmRouter` task-routing layer.
+> - **Privacy scrubber:** shipped as `src-tauri/src/chat/redact.rs` (regex-based, shared between FIM/voice/`??`/selection paths), per the spec.
+> - **Per-session privacy mode:** shipped as `Session.disableAiWrite` flag (blocks AI write actions, enforced in `agent::safety` middleware).
+> - **Plus** (out of original scope): full local mode toggle, Privacy Toggle UI, per-thread provider switching, three-tier confirmation state machine for web search, OS-keyring BYOK storage, ProviderCaps for native web search routing.
+>
+> See `ai-native-plan.md` §四 (v2.0), §五 (v2.1), §七 (v2.3), §八 (v2.4) and §十九 audit for the full landed surface.
 
 **Goal:** When something fails, the user can ask "why?". When the user knows what but not how, they can ask in English.
 
@@ -441,14 +457,16 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 
 ### v0.4.x — AI-Assisted SFTP + Runbooks
 
+> **Status: ⚠ Partially scaffolded, mostly not implemented.** A `save_as_runbook` tool exists in the `agent` tool registry (`src-tauri/src/agent/tools/`) and the `runbooks` table can be created on demand, but the **end-to-end recorder/player UX, AI rename plan generator, bulk SFTP plan UI, and AI session-naming flow were never built**. This whole section remains as carryover work for the v0.4.x window.
+
 **Goal:** Bulk file operations and repeatable procedures become natural-language tasks.
 
 **Features:**
-- **Smart SFTP rename:** select files → "rename .log files to add today's date" → preview diff → confirm
-- **Bulk operations:** "move files older than 30 days to archive/" → AI generates shell or SFTP plan → user reviews → execute step-by-step
-- **Runbook recorder:** click record → execute terminal/SFTP steps → click stop → AI annotates each step → save as named runbook
-- **Runbook player:** select runbook → choose target session → variable substitution prompt → step-by-step execution with pause/retry/abort
-- **AI session naming:** when saving new session, AI suggests name + group based on host/user/options
+- **Smart SFTP rename:** select files → "rename .log files to add today's date" → preview diff → confirm — ❌
+- **Bulk operations:** "move files older than 30 days to archive/" → AI generates shell or SFTP plan → user reviews → execute step-by-step — ❌
+- **Runbook recorder:** click record → execute terminal/SFTP steps → click stop → AI annotates each step → save as named runbook — ❌
+- **Runbook player:** select runbook → choose target session → variable substitution prompt → step-by-step execution with pause/retry/abort — ❌
+- **AI session naming:** when saving new session, AI suggests name + group based on host/user/options — ❌
 
 **Technical approach:**
 - SFTP rename: file list → AI → JSON `[{from, to}]` → diff preview → batch `sftp_rename`
@@ -488,6 +506,8 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 
 ### v0.4.x — Session Health Dashboard
 
+> **Status: ❌ Not implemented.** No `session_health` table, no latency probe, no anomaly detection. Optional AI session summary on disconnect — also not built. Carryover for v0.4.x.
+
 **Goal:** Visibility into connection reliability; early warning for degraded sessions.
 
 **Features:**
@@ -521,6 +541,64 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 
 **Risks & mitigations:**
 - 🟢 Low — additive feature, easy to disable
+
+---
+
+## Status vs `ai-native-plan.md` and Original Roadmap
+
+This section consolidates the diff between (a) the original Theme 2 commitments above and (b) the v2.0–v2.6 work landed under `ai-native-plan.md` § 十九 (audited 2026-05-24, all marked ✅ on `feature/ai-native-1`).
+
+### A. Delivered — but with material deviations from the original spec
+
+| Original commitment | What actually shipped | Why it differs |
+|--------------------|----------------------|----------------|
+| Backends: Ollama / Claude / OpenAI | OpenAI-compatible abstraction with **8+ providers** preset (DeepSeek, GLM-4-Flash, SiliconFlow, Groq, Cerebras, Gemini, Mistral, OpenRouter), plus dedicated Anthropic Messages API (`llm/anthropic.rs`), local llama-server sidecar, in-process llama-cpp-2 for FIM, Ollama auto-detected if installed, and Claude Code CLI as opt-in advanced backend (v2.6). Default = DeepSeek (cloud) with 8s timeout fallback to local. | Free-tier / Chinese-friendly providers (GLM, DeepSeek, SiliconFlow) hit "open-the-box" UX better than Ollama-only. |
+| NL→Command via `//` prefix | Shipped as **`?? ` prefix** (terminal inline), plus four other entry points: `Ctrl+L` Chat Drawer, `Ctrl+K` AI rewrite overlay, voice PTT, selection toolbar. All routed through `LlmRouter` with task-level provider routing. | `//` collides with comment syntax in many shells; `?? ` is unambiguous and matches the "ask a question" mental model. |
+| Privacy scrubber (regex; default API-key/PEM/IP patterns) | Shipped as `src-tauri/src/chat/redact.rs`, **shared** between FIM, voice, `?? ` inline, and selection paths. | Spec-aligned; widened to FIM prefix and selection redaction. |
+| Per-session privacy mode | Shipped as `Session.disableAiWrite` boolean, enforced in `agent::safety` middleware (blocks `run_in_terminal`, `sftp_upload`, `save_as_runbook` write actions on flagged sessions). | Spec-aligned in spirit; finer-grained than the original "never send to cloud AI" framing — flag is *write-action* gate rather than *cloud-send* gate. |
+| Streaming UX in side panel | Shipped as **AI Chat Drawer** (right side, 380 px default, three responsive breakpoints) with multi-thread history, `@terminal/@file/@session` attachments, ToolCall ActionCard inline cards, 30-day auto-purge + JSON archive export. | Substantially expanded beyond "side panel + inline preview bubbles". |
+| Confirmation before executing AI commands | Shipped as `CommandPreviewCard` + risk tier gate (low → 1.5s autorun, medium → manual Enter, high → 800ms anti-misclick + checkbox), plus a hardcoded `shell_safety` blacklist (`rm -rf /`, `mkfs.*`, `dd of=/dev/*`, `chmod -R 777 /`, etc.), and CC permission_prompt MCP server reusing the same gate. | Spec-aligned; full four-state audit machine (`generated | executed | edited | cancelled | blocked_blacklist`). |
+
+### B. Out-of-scope additions (not in original roadmap, but landed)
+
+These came from `ai-native-plan.md` and have no analogue in the original Theme 2 spec.
+
+- **Voice input system** (PTT button, cpal recorder, sherpa-onnx ASR with feature-gated real bridge, Whisper-rs / Vosk fallback feature flags, voice_audit table, intent dispatcher) — `ai-native-plan.md` v2.0 + v2.1.
+- **Local llama-server sidecar** (CPU+Vulkan single binary, GPU detection via `ash` Vulkan loader, Metal on macOS, optional CUDA pack download, watchdog + auto-restart) — § 十一.
+- **In-process FIM** via `llama-cpp-2` (`local-llm-fim` feature, OnceLock single instance, optional ggml shared build) for `Tab` ghost-text — v2.2.
+- **Three-tier model distribution** (ModelScope primary / gh-proxy.com secondary / GitHub canonical, per-model SHA-256, Range-resume, concurrent HEAD probe, user-controllable mirror selection) — § 十一.
+- **MCP-style JSON-RPC bridge** (`agent/mcp_server.rs`, 127.0.0.1 random port + bearer token, default off) plus Claude Code `permissions_mcp` + `tools_mcp` reverse exposure — v2.3 + v2.6.
+- **Web Search dual-track**: ProviderCaps-aware native passthrough (OpenAI / Anthropic / Gemini / Grok / Mistral / GLM / Qwen / Perplexity native search) + client-side `deep_search` (SearXNG default with 30-day public-instance availability rotation, plus BYOK Tavily / Serper / Brave / Exa / Google CSE stored in OS keyring). Three-tier per-call confirmation state machine. SSRF defense in `web_fetch`. — v2.5.
+- **Claude Code CLI integration** (detection + version probe + workspace `--add-dir` whitelist + deny list for `~/.ssh` + `~/.config/newmob`, `--resume <session_id>`, NDJSON streaming with `--include-partial-messages`, watchdog with 3-strike circuit breaker) — v2.6.
+- **Full-local mode toggle** (Tauri http allowlist tightened to `127.0.0.1:*` at runtime, hides Claude Code provider, blocks all cloud calls) — § 1.5.
+- **Master AI off switch** (`fully_disabled` flag hides Drawer / suppresses Ctrl+L / collapses StatusBar to "AI: off") — § 十.
+- **30-day chat retention + JSON archive export, per-thread provider switching, ToolCall ActionCard inline rendering** — v2.4.
+- **Compile-time isolation lint** (`build.rs` enforces `asr/` ↔ `llm/` no cross-imports; `cc_bridge::*` cannot `use crate::vault::*`) — § 4.4.
+- **MockProvider test framework** + perf-baseline JSONL persistence + qa-ui-auto YAML cases (`TC-AI-001..004`) — § 十六.
+
+### C. Original commitments NOT yet implemented
+
+These are still owed against the original roadmap and are unaffected by `ai-native-plan.md`.
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Known-Hosts Verification (TOFU)** — `src-tauri/src/terminal/ssh.rs:22` `check_server_key()` | ❌ Still returns `Ok(true)` unconditionally | **Highest-priority security carryover.** AI features now sit on top of an SSH stack that accepts any host key. Schema (`known_hosts` table), HostKeyDialog, `~/.ssh/known_hosts` import — all unbuilt. |
+| **Smart History (CWD-aware ranking + fuzzy match)** | ❌ Schema unchanged | `command_history` has no `cwd_context` column; ghost-text is still pure prefix match. The `ai-native-plan.md` v2.2 work added PATH/files + LLM FIM as additional ghost-text data sources but did not implement CWD-aware ranking on the existing history source. |
+| **"Promote to snippet" + "Recently in this directory"** | ❌ | Belongs with Smart History. |
+| **AI-Assisted SFTP rename / bulk plan UI** | ❌ | No SFTP-side AI plan generator. `save_as_runbook` tool exists in registry but no recorder UX. |
+| **Runbook recorder + player** | ❌ | Schema (`runbooks` table) defined in spec but not migrated; no recorder UI, no player UI, no variable-substitution flow. |
+| **AI session naming on save** | ❌ | No code path. |
+| **Session Health Dashboard** | ❌ | No `session_health` table, no latency probe piggybacking on SSH keepalive, no anomaly detection, no AI summary on disconnect. |
+| **Per-day AI token budget UI + 80%/100% warnings** | ❌ | Original v0.3.x risk mitigation; no implementation. ProviderCaps tracks model metadata but no spend accounting. |
+
+### D. Pre-v1.0 work tracking
+
+For v1.0 (Q1 2027), the AI surface needs:
+
+1. **Land §C carryovers**, prioritising Known-Hosts Verification first (security gate before any further surface area) and Runbook recorder/player second (only large user-facing AI item still missing).
+2. **Real-model nightly perf baseline** (Layer 3 in `ai-native-plan.md` § 十六) on a self-hosted GPU runner — currently only Layer 1 + Layer 2 (MockProvider) gate PRs.
+3. **Documentation site BYO storage guides + AI privacy guide** (data flow per feature, including where redaction happens).
+4. **Decide on `rmcp` SDK migration** — current `mcp_server` / `permissions_mcp` / `tools_mcp` are hand-rolled JSON-RPC; the `rmcp` crate is in `Cargo.toml` but unused. Migration is optional (current implementation is interop-tested with Claude Desktop / Goose / Cursor) but would reduce maintenance.
 
 ---
 
