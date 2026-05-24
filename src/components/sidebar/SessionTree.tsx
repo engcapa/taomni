@@ -28,9 +28,11 @@ import {
   importExternalBashSessions,
   importPuttySessions,
   importWslSessions,
+  isVaultLockedError,
   readPlistSessionFile,
   scanLocalSessionFiles,
   selectFilePath,
+  vaultPut,
 } from "../../lib/ipc";
 import {
   startCustomDrag,
@@ -58,6 +60,7 @@ import {
   type SessionImportOptions,
   type SessionImportResult,
 } from "../../lib/sessionImportExport";
+import { parseSessionOptions } from "../../lib/terminalProfile";
 import { parseOpenSshConfig } from "../../lib/quickConnect";
 import { openBinaryFile, openTextFile, openTextFileWithName, downloadTextFile } from "../../lib/fileHelpers";
 import { serializeHtmlSessions } from "../../lib/sessionExportHtml";
@@ -311,11 +314,44 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     source: string,
     options: { alertWarnings?: boolean } = {},
   ) => {
-    if (result.sessions.length > 0) {
-      await importSessions(result.sessions);
+    const prepared = await prepareImportResultForSave(result);
+    if (prepared.sessions.length > 0) {
+      await importSessions(prepared.sessions);
       expandPath(folderPath);
     }
-    reportImportResult(source, result, folderPath, options.alertWarnings !== false);
+    const hasNewWarnings = prepared.warnings.length > result.warnings.length;
+    reportImportResult(source, prepared, folderPath, options.alertWarnings !== false || hasNewWarnings);
+  };
+
+  const prepareImportResultForSave = async (result: SessionImportResult): Promise<SessionImportResult> => {
+    if (result.secrets.length === 0) return result;
+
+    const sessionsById = new Map(result.sessions.map((session) => [session.id, { ...session }]));
+    const warnings = [...result.warnings];
+    for (const secret of result.secrets) {
+      const session = sessionsById.get(secret.sessionId);
+      if (!session) continue;
+      try {
+        const saved = await vaultPut("ssh-password", secret.label, secret.value);
+        const parsedOptions = parseSessionOptions(session.options_json);
+        session.options_json = JSON.stringify({
+          ...parsedOptions,
+          passwordRef: saved.reference,
+        });
+      } catch (error) {
+        const reason = isVaultLockedError(error)
+          ? "the credential vault is locked or has not been initialized"
+          : error instanceof Error ? error.message : String(error);
+        warnings.push(`Skipped saved password for "${session.name}" because ${reason}.`);
+      }
+    }
+
+    return {
+      ...result,
+      sessions: result.sessions.map((session) => sessionsById.get(session.id) ?? session),
+      warnings: [...new Set(warnings)],
+      secrets: [],
+    };
   };
 
   const reportImportResult = (
@@ -364,6 +400,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       existingSessions: sessions,
       warnings: results.flatMap((result) => result.warnings),
       skipped: results.reduce((sum, result) => sum + result.skipped, 0),
+      secrets: results.flatMap((result) => result.secrets),
     });
 
   const retargetImportedSessions = (
@@ -414,6 +451,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     source: string,
     accept: string,
     parser: TextSessionParser,
+    extraOptions?: () => Partial<SessionImportOptions>,
   ) => {
     openTextFileWithName(accept).then((file) => {
       if (!file) return;
@@ -421,6 +459,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         targetFolder: folderPath,
         existingSessions: sessions,
         sourcePath: file.name,
+        ...(extraOptions?.() ?? {}),
       });
       queueImportPreview(result, folderPath, source);
     }).catch((error) => {
@@ -446,16 +485,19 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     scanKey: string,
     source: string,
     parser: TextSessionParser,
+    extraOptions?: () => Partial<SessionImportOptions>,
   ) => {
     scanLocalSessionFiles(scanKey).then((files) => {
       if (files.length === 0) {
         setStatusMessage(`No ${source} local configuration files were found.`);
         return;
       }
+      const extra = extraOptions?.() ?? {};
       const result = mergeImportResults(files.map((file) =>
         parser(file.text, {
           targetFolder: folderPath,
           sourcePath: file.relativePath || file.path,
+          ...extra,
         }),
       ));
       queueImportPreview(result, folderPath, `${source} local config`);
@@ -521,6 +563,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     ].join("\n"));
   };
 
+  const tabbySecretImportOptions = (): Partial<SessionImportOptions> => ({
+    includeSecrets: window.confirm([
+      "Import Tabby private key paths and saved passwords?",
+      "",
+      "OK imports private key paths and stores any saved passwords in the NewMob credential vault.",
+      "Cancel imports the sessions without Tabby keys or passwords.",
+    ].join("\n")),
+  });
+
   const unavailable = (label: string) => {
     setStatusMessage(`${label} is not implemented yet`);
   };
@@ -579,12 +630,24 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           {
             label: "From config.yaml",
             icon: <FileText className="w-3 h-3" />,
-            onClick: () => importTextSessions(folderPath, "Tabby", ".yaml,.yml,text/yaml,text/plain", parseTabbySessions),
+            onClick: () => importTextSessions(
+              folderPath,
+              "Tabby",
+              ".yaml,.yml,text/yaml,text/plain",
+              parseTabbySessions,
+              tabbySecretImportOptions,
+            ),
           },
           {
             label: "From local Tabby config",
             icon: <FolderOpen className="w-3 h-3" />,
-            onClick: () => importScannedTextSessions(folderPath, "tabby", "Tabby", parseTabbySessions),
+            onClick: () => importScannedTextSessions(
+              folderPath,
+              "tabby",
+              "Tabby",
+              parseTabbySessions,
+              tabbySecretImportOptions,
+            ),
           },
         ],
       },

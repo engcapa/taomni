@@ -47,12 +47,21 @@ export interface SessionImportOptions {
   existingSessions?: readonly SessionConfig[];
   now?: number;
   sourcePath?: string | null;
+  includeSecrets?: boolean;
+}
+
+export interface SessionImportSecret {
+  sessionId: string;
+  kind: "password";
+  label: string;
+  value: string;
 }
 
 export interface SessionImportResult {
   sessions: SessionConfig[];
   warnings: string[];
   skipped: number;
+  secrets: SessionImportSecret[];
 }
 
 export interface SessionExportResult {
@@ -231,6 +240,7 @@ export function createSessionImportResult(
     existingSessions?: readonly SessionConfig[];
     warnings?: readonly string[];
     skipped?: number;
+    secrets?: readonly SessionImportSecret[];
   } = {},
 ): SessionImportResult {
   return finalizeImportResult(
@@ -238,6 +248,7 @@ export function createSessionImportResult(
     options.skipped ?? 0,
     [...(options.warnings ?? [])],
     options.existingSessions,
+    options.secrets ?? [],
   );
 }
 
@@ -318,7 +329,10 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
   const warnings: string[] = [];
   const now = resolveNow(options.now);
   const profiles = parseTabbyProfiles(text, warnings);
+  const profileLookup = tabbyProfileLookup(profiles);
+  const includeSecrets = options.includeSecrets === true;
   const sessions: SessionConfig[] = [];
+  const secrets: SessionImportSecret[] = [];
   let skipped = 0;
 
   for (const profile of profiles) {
@@ -334,21 +348,37 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
       continue;
     }
     const sessionType = type === "telnet" ? "Telnet" : "SSH";
+    const name = cleanText(firstNonEmptyString(profile.name, host), MAX_NAME_LENGTH);
+    const auth = tabbyAuthMethod(name || host, sessionType, optionsRecord, includeSecrets, warnings);
+    const importedOptions = tabbyOptions(name || host, profile, optionsRecord, profileLookup, warnings);
     const session = importedSession({
-      name: cleanText(firstNonEmptyString(profile.name, host), MAX_NAME_LENGTH),
+      name,
       sessionType,
       host,
       port: firstKnown(optionsRecord.port, DEFAULT_PORTS[sessionType]),
       username: optionalCleanText(firstNonEmptyString(optionsRecord.user, optionsRecord.username), MAX_NAME_LENGTH),
-      groupPath: options.targetFolder ?? null,
+      groupPath: combineImportFolder(options.targetFolder ?? null, tabbyProfileFolder(profile)),
+      authMethod: auth.authMethod,
+      options: importedOptions,
       now,
       warnings,
     });
-    if (session) sessions.push(session);
-    else skipped += 1;
+    if (session) {
+      sessions.push(session);
+      if (auth.password) {
+        secrets.push({
+          sessionId: session.id,
+          kind: "password",
+          label: `${session.username ?? "user"}@${session.host}:${session.port}`,
+          value: auth.password,
+        });
+      }
+    } else {
+      skipped += 1;
+    }
   }
 
-  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions, secrets);
 }
 
 export function parseWindTermSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
@@ -680,6 +710,215 @@ function getIni(section: Map<string, string>, key: string): string {
   return section.get(key.toLowerCase()) ?? "";
 }
 
+function tabbyProfileFolder(profile: Record<string, unknown>): string | null {
+  return normalizeGroupPath(firstNonEmptyString(
+    profile.group,
+    profile.groupPath,
+    profile.group_path,
+    profile.folder,
+    profile.folderPath,
+    profile.folder_path,
+    profile.category,
+  ));
+}
+
+function tabbyProfileLookup(profiles: readonly Record<string, unknown>[]): Map<string, Record<string, unknown>> {
+  const lookup = new Map<string, Record<string, unknown>>();
+  for (const profile of profiles) {
+    for (const key of [
+      firstString(profile.id),
+      firstString(profile.name),
+      firstString(profile.title),
+    ]) {
+      const normalized = key.trim();
+      if (normalized && !lookup.has(normalized)) lookup.set(normalized, profile);
+    }
+  }
+  return lookup;
+}
+
+function tabbyOptions(
+  profileName: string,
+  profile: Record<string, unknown>,
+  optionsRecord: Record<string, unknown>,
+  profileLookup: Map<string, Record<string, unknown>>,
+  warnings: string[],
+): Record<string, unknown> {
+  const imported: Record<string, unknown> = {
+    description: "Imported from Tabby",
+  };
+
+  const x11 = firstKnown(optionsRecord.x11, optionsRecord.x11Forwarding, optionsRecord.x11_forwarding);
+  if (typeof x11 === "boolean") imported.x11 = x11;
+
+  if (optionsRecord.agentForward === true || optionsRecord.agentForwarding === true) {
+    imported.agentForward = true;
+    warnings.push("Imported Tabby agent forwarding as metadata; NewMob does not enable SSH agent forwarding at runtime yet.");
+  }
+
+  const jump = resolveTabbyJumpHost(profileName, optionsRecord.jumpHost, profileLookup, warnings);
+  if (jump) {
+    imported.useJump = true;
+    imported.jumpHost = jump.host;
+    imported.jumpPort = String(jump.port);
+    if (jump.username) imported.jumpUser = jump.username;
+    warnings.push("Imported Tabby jump-host settings as metadata; NewMob does not use jump hosts at runtime yet.");
+  }
+
+  const proxyCommand = cleanText(firstNonEmptyString(optionsRecord.proxyCommand), MAX_OPTION_LENGTH);
+  if (proxyCommand) {
+    warnings.push(`Skipped Tabby proxy command for "${profileName}" because NewMob session import cannot map proxy commands yet.`);
+  }
+
+  const tags = cleanText(firstNonEmptyString(profile.tags, profile.tag), MAX_OPTION_LENGTH);
+  if (tags) imported.tags = tags;
+
+  return imported;
+}
+
+function tabbyAuthMethod(
+  profileName: string,
+  sessionType: string,
+  optionsRecord: Record<string, unknown>,
+  includeSecrets: boolean,
+  warnings: string[],
+): { authMethod?: AuthMethod; password?: string } {
+  if (sessionType !== "SSH") return {};
+
+  const auth = cleanText(firstString(optionsRecord.auth), 64).toLowerCase();
+  const keyPath = firstTabbyPrivateKeyPath(optionsRecord);
+  const password = cleanText(firstNonEmptyString(optionsRecord.password), MAX_OPTION_LENGTH);
+
+  if (auth === "agent") {
+    warnings.push("Imported Tabby SSH agent authentication, but NewMob SSH agent authentication is not implemented at runtime yet.");
+    return { authMethod: "Agent" };
+  }
+
+  if (auth === "password" || auth === "keyboardinteractive" || auth === "keyboard-interactive") {
+    if (password && includeSecrets) return { authMethod: "Password", password };
+    if (password && !includeSecrets) {
+      warnings.push(`Skipped Tabby saved password for "${profileName}" because secret import was not enabled.`);
+    }
+    return { authMethod: "Password" };
+  }
+
+  if (keyPath) {
+    if (includeSecrets) return { authMethod: { PrivateKey: { key_path: keyPath } } };
+    warnings.push(`Skipped Tabby private key path for "${profileName}" because secret import was not enabled.`);
+  } else if (auth === "publickey" || auth === "public-key") {
+    warnings.push(`Tabby profile "${profileName}" uses public-key auth but has no importable private key path.`);
+  }
+
+  if (password) {
+    if (includeSecrets) return { authMethod: "Password", password };
+    warnings.push(`Skipped Tabby saved password for "${profileName}" because secret import was not enabled.`);
+  }
+
+  return { authMethod: "Password" };
+}
+
+function firstTabbyPrivateKeyPath(optionsRecord: Record<string, unknown>): string {
+  const candidates = [
+    optionsRecord.privateKeys,
+    optionsRecord.privateKey,
+    optionsRecord.private_key,
+    optionsRecord.keyFile,
+    optionsRecord.identityFile,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      for (const item of candidate) {
+        const path = normalizeImportPath(firstString(item));
+        if (path) return path;
+      }
+    } else {
+      const path = normalizeImportPath(firstString(candidate));
+      if (path) return path;
+    }
+  }
+
+  return "";
+}
+
+function normalizeImportPath(value: string): string {
+  let path = cleanText(value, MAX_PATH_LENGTH);
+  if (!path) return "";
+  if (/^file:\/\//i.test(path)) {
+    try {
+      path = decodeURIComponent(path.replace(/^file:\/\/\/?/i, ""));
+    } catch {
+      path = path.replace(/^file:\/\/\/?/i, "");
+    }
+    if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
+  }
+  return path;
+}
+
+function resolveTabbyJumpHost(
+  profileName: string,
+  value: unknown,
+  profileLookup: Map<string, Record<string, unknown>>,
+  warnings: string[],
+): { host: string; port: number; username: string | null } | null {
+  if (isRecord(value)) {
+    const direct = tabbyProfileConnection(value);
+    if (direct) return direct;
+  }
+
+  const ref = cleanText(firstString(value), MAX_HOST_LENGTH);
+  if (!ref) return null;
+
+  const referenced = profileLookup.get(ref);
+  if (referenced) {
+    const optionsRecord = isRecord(referenced.options) ? referenced.options : {};
+    const connection = tabbyProfileConnection(optionsRecord);
+    if (connection) return connection;
+    warnings.push(`Could not import Tabby jump host "${ref}" for "${profileName}" because the referenced profile has no host.`);
+    return null;
+  }
+
+  if (ref.toLowerCase().startsWith("ssh:")) {
+    warnings.push(`Could not resolve Tabby jump host profile "${ref}" for "${profileName}".`);
+    return null;
+  }
+
+  const direct = parseJumpTarget(ref);
+  if (direct) return direct;
+  warnings.push(`Could not import Tabby jump host "${ref}" for "${profileName}".`);
+  return null;
+}
+
+function tabbyProfileConnection(value: Record<string, unknown>): { host: string; port: number; username: string | null } | null {
+  const host = cleanText(firstNonEmptyString(value.host, value.hostname), MAX_HOST_LENGTH);
+  if (!host) return null;
+  return {
+    host,
+    port: sanitizePort(firstKnown(value.port), DEFAULT_PORTS.SSH),
+    username: optionalCleanText(firstNonEmptyString(value.user, value.username), MAX_NAME_LENGTH),
+  };
+}
+
+function parseJumpTarget(value: string): { host: string; port: number; username: string | null } | null {
+  let target = value.trim();
+  let username: string | null = null;
+  if (target.includes("@")) {
+    const parts = target.split("@");
+    username = optionalCleanText(parts.slice(0, -1).join("@"), MAX_NAME_LENGTH);
+    target = parts[parts.length - 1] ?? "";
+  }
+
+  let host = target;
+  let port = DEFAULT_PORTS.SSH;
+  const portMatch = /^(.+):(\d+)$/.exec(target);
+  if (portMatch && !target.includes("]:")) {
+    host = portMatch[1];
+    port = sanitizePort(portMatch[2], DEFAULT_PORTS.SSH);
+  }
+  host = cleanText(host.replace(/^\[|\]$/g, ""), MAX_HOST_LENGTH);
+  return host ? { host, port, username } : null;
+}
+
 function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<string, unknown>> {
   try {
     const parsed = JSON.parse(text) as unknown;
@@ -695,25 +934,34 @@ function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<stri
   let currentOptions: Record<string, unknown> | null = null;
   let profileIndent = -1;
   let optionsIndent = -1;
+  let arrayTarget: unknown[] | null = null;
+  let arrayIndent = -1;
 
   const pushCurrent = () => {
     if (current) profiles.push(current);
     current = null;
     currentOptions = null;
+    arrayTarget = null;
   };
 
   for (const rawLine of text.split(/\r?\n/)) {
-    const withoutComment = rawLine.replace(/\s+#.*$/, "");
+    const withoutComment = stripYamlComment(rawLine);
     if (!withoutComment.trim()) continue;
     const indent = withoutComment.match(/^\s*/)?.[0].length ?? 0;
     const line = withoutComment.trim();
+    if (arrayTarget && indent <= arrayIndent) arrayTarget = null;
 
     if (!inProfiles) {
       if (line === "profiles:" || line.startsWith("profiles:")) inProfiles = true;
       continue;
     }
 
-    if (line.startsWith("- ")) {
+    if (arrayTarget && line.startsWith("- ") && indent > arrayIndent) {
+      arrayTarget.push(parseSimpleScalar(line.slice(2).trim()));
+      continue;
+    }
+
+    if (line.startsWith("- ") && (!current || indent <= profileIndent)) {
       pushCurrent();
       current = { options: {} };
       currentOptions = current.options as Record<string, unknown>;
@@ -725,10 +973,25 @@ function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<stri
     }
 
     if (!current || indent <= profileIndent) continue;
+    if (currentOptions && optionsIndent >= 0 && indent <= optionsIndent) {
+      currentOptions = current.options as Record<string, unknown>;
+    }
     if (line === "options:" || line.startsWith("options:")) {
       currentOptions = {};
       current.options = currentOptions;
       optionsIndent = indent;
+      continue;
+    }
+
+    const target = optionsIndent >= 0 && indent > optionsIndent && currentOptions ? currentOptions : current;
+    const emptyKey = yamlEmptyKey(line);
+    if (emptyKey) {
+      const container = yamlEmptyContainer(emptyKey);
+      target[emptyKey] = container;
+      if (Array.isArray(container)) {
+        arrayTarget = container;
+        arrayIndent = indent;
+      }
       continue;
     }
 
@@ -744,6 +1007,36 @@ function parseTabbyProfiles(text: string, warnings: string[]): Array<Record<stri
   return profiles;
 }
 
+function stripYamlComment(line: string): string {
+  let quote: string | null = null;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (quote) {
+      if (char === quote && line[i - 1] !== "\\") quote = null;
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === "#" && (i === 0 || /\s/.test(line[i - 1] ?? ""))) {
+      return line.slice(0, i).trimEnd();
+    }
+  }
+  return line;
+}
+
+function yamlEmptyKey(line: string): string | null {
+  const separator = line.indexOf(":");
+  if (separator <= 0) return null;
+  const value = line.slice(separator + 1).trim();
+  return value ? null : line.slice(0, separator).trim();
+}
+
+function yamlEmptyContainer(key: string): Record<string, unknown> | unknown[] {
+  return /^(privateKeys|forwardedPorts|scripts)$/i.test(key) ? [] : {};
+}
+
 function assignSimpleYamlPair(target: Record<string, unknown>, line: string) {
   const separator = line.indexOf(":");
   if (separator <= 0) return;
@@ -752,16 +1045,46 @@ function assignSimpleYamlPair(target: Record<string, unknown>, line: string) {
   target[key] = parseSimpleScalar(value);
 }
 
-function parseSimpleScalar(value: string): string | number | boolean {
+function parseSimpleScalar(value: string): string | number | boolean | unknown[] {
   const trimmed = value.trim();
   if (!trimmed) return "";
+  if (trimmed === "null" || trimmed === "~") return "";
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return splitFlowItems(trimmed.slice(1, -1)).map(parseSimpleScalar).filter((item) => item !== "");
+  }
   if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
     return trimmed.slice(1, -1);
   }
-  if (trimmed === "true") return true;
-  if (trimmed === "false") return false;
+  if (trimmed.toLowerCase() === "true") return true;
+  if (trimmed.toLowerCase() === "false") return false;
   if (/^-?\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10);
   return trimmed;
+}
+
+function splitFlowItems(value: string): string[] {
+  const items: string[] = [];
+  let current = "";
+  let quote: string | null = null;
+  for (const char of value) {
+    if (quote) {
+      current += char;
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      current += char;
+      quote = char;
+      continue;
+    }
+    if (char === ",") {
+      items.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) items.push(current.trim());
+  return items;
 }
 
 function collectWindTermRows(value: unknown, folders: string[], rows: WindTermRow[], depth: number) {
@@ -1476,6 +1799,7 @@ function addMobaJumpOptions(
 ) {
   const jumpHost = firstPipeValue(hostList);
   if (!jumpHost) return;
+  options.useJump = true;
   options.jumpHost = jumpHost;
   options.jumpPort = firstPipeValue(portList) || "22";
   options.jumpUser = firstPipeValue(userList);
@@ -1736,6 +2060,8 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyBoolean(source, output, "compression");
   copyBoolean(source, output, "doNotExit");
   copyBoolean(source, output, "disableAiWrite");
+  copyBoolean(source, output, "useJump");
+  copyBoolean(source, output, "agentForward");
   copyString(source, output, "startupCmd", MAX_OPTION_LENGTH);
   copyString(source, output, "jumpHost", MAX_HOST_LENGTH);
   copyString(source, output, "jumpUser", MAX_NAME_LENGTH);
@@ -1906,11 +2232,13 @@ function finalizeImportResult(
   skipped: number,
   warnings: string[],
   existingSessions: readonly SessionConfig[] | undefined,
+  secrets: readonly SessionImportSecret[] = [],
 ): SessionImportResult {
   return {
     sessions: makeUniqueImportedSessions(sessions, existingSessions ?? []),
     warnings: uniqueWarnings(warnings),
     skipped,
+    secrets: [...secrets],
   };
 }
 

@@ -416,6 +416,7 @@ describe("third-party session import parsers", () => {
       "profiles:",
       "  - name: My Server",
       "    type: ssh",
+      "    group: Prod / Web",
       "    options:",
       "      host: 10.0.0.5",
       "      port: 2222",
@@ -425,11 +426,119 @@ describe("third-party session import parsers", () => {
     expect(result.sessions[0]).toMatchObject({
       name: "My Server",
       session_type: "SSH",
-      group_path: "User sessions / Tabby",
+      group_path: "User sessions / Tabby / Prod / Web",
       host: "10.0.0.5",
       port: 2222,
       username: "ubuntu",
     });
+  });
+
+  it("imports Tabby groups under User sessions when no target folder is selected", () => {
+    const result = parseTabbySessions([
+      "profiles:",
+      "  - name: Ungrouped target",
+      "    type: ssh",
+      "    group: Lab/Edge",
+      "    options:",
+      "      host: edge.example.com",
+      "      user: admin",
+    ].join("\n"), { now: 6010 });
+
+    expect(result.sessions[0]).toMatchObject({
+      name: "Ungrouped target",
+      group_path: "User sessions / Lab / Edge",
+      host: "edge.example.com",
+    });
+  });
+
+  it("imports Tabby private key paths and password secrets only when enabled", () => {
+    const text = [
+      "profiles:",
+      "  - name: Key Server",
+      "    type: ssh",
+      "    options:",
+      "      host: key.example.com",
+      "      user: deploy",
+      "      auth: publicKey",
+      "      privateKeys:",
+      "        - ~/.ssh/deploy_key",
+      "  - name: Password Server",
+      "    type: ssh",
+      "    options:",
+      "      host: password.example.com",
+      "      user: ops",
+      "      auth: password",
+      "      password: s3cret",
+    ].join("\n");
+
+    const withoutSecrets = parseTabbySessions(text, { targetFolder: "Tabby", now: 6011 });
+    expect(withoutSecrets.sessions[0].auth_method).toBe("Password");
+    expect(withoutSecrets.secrets).toHaveLength(0);
+    expect(withoutSecrets.warnings.join("\n")).toContain("secret import was not enabled");
+
+    const withSecrets = parseTabbySessions(text, {
+      targetFolder: "Tabby",
+      includeSecrets: true,
+      now: 6011,
+    });
+
+    expect(withSecrets.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "~/.ssh/deploy_key" } });
+    expect(withSecrets.sessions[1].auth_method).toBe("Password");
+    expect(withSecrets.secrets).toEqual([
+      {
+        sessionId: withSecrets.sessions[1].id,
+        kind: "password",
+        label: "ops@password.example.com:22",
+        value: "s3cret",
+      },
+    ]);
+  });
+
+  it("imports Tabby agent auth, agent forwarding metadata, and jump-host references", () => {
+    const result = parseTabbySessions(JSON.stringify({
+      profiles: [
+        {
+          id: "ssh:bastion",
+          type: "ssh",
+          name: "Bastion",
+          options: {
+            host: "bastion.example.com",
+            port: 2200,
+            user: "jump",
+          },
+        },
+        {
+          id: "ssh:target",
+          type: "ssh",
+          name: "Target",
+          group: "Prod",
+          options: {
+            host: "target.internal",
+            port: 22,
+            user: "app",
+            auth: "agent",
+            agentForward: true,
+            jumpHost: "ssh:bastion",
+          },
+        },
+      ],
+    }), { targetFolder: "Imported", now: 6012 });
+
+    expect(result.sessions[1]).toMatchObject({
+      name: "Target",
+      auth_method: "Agent",
+      group_path: "User sessions / Imported / Prod",
+    });
+    expect(JSON.parse(result.sessions[1].options_json)).toMatchObject({
+      agentForward: true,
+      useJump: true,
+      jumpHost: "bastion.example.com",
+      jumpUser: "jump",
+      jumpPort: "2200",
+    });
+    expect(result.warnings.join("\n")).toContain("agent authentication is not implemented");
+    expect(result.warnings.join("\n")).toContain("agent forwarding");
+    expect(result.warnings.join("\n")).toContain("jump-host settings");
   });
 
   it("imports WindTerm JSON sessions recursively", () => {
