@@ -7,8 +7,6 @@ import {
   Network as NetworkIcon,
   PanelTopClose,
   PanelTopOpen,
-  SplitSquareVertical,
-  Users,
   MoreHorizontal,
   Copy,
   Trash2,
@@ -48,10 +46,7 @@ export function TabBar() {
     toggleCompactMode,
     multiExecActive,
     multiExecSelectedTabIds,
-    terminalSplitActive,
-    toggleMultiExec,
     toggleMultiExecTab,
-    toggleTerminalSplit,
   } = useAppStore();
   const ctx = useContextMenu();
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -248,24 +243,6 @@ export function TabBar() {
 
       <div className="flex-1 self-stretch" data-window-drag />
       <div className="flex items-center gap-1 pr-1 pb-0.5">
-        {!compactMode && (
-          <>
-            <IconBtn
-              testId="tab-split-view"
-              title={terminalSplitActive ? "Disable terminal split view" : "Enable terminal split view"}
-              icon={<SplitSquareVertical className="w-3.5 h-3.5" />}
-              onClick={toggleTerminalSplit}
-              active={terminalSplitActive}
-            />
-            <IconBtn
-              testId="tab-multiexec-toggle"
-              title={multiExecActive ? "Disable MultiExec" : "Enable MultiExec"}
-              icon={<Users className="w-3.5 h-3.5" />}
-              onClick={toggleMultiExec}
-              active={multiExecActive}
-            />
-          </>
-        )}
         <IconBtn testId="tab-more" title="More" icon={<MoreHorizontal className="w-3.5 h-3.5" />} onClick={handleMore} />
       </div>
     </div>
