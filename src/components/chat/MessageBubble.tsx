@@ -1,10 +1,16 @@
 import type { ChatMessage } from "../../stores/chatStore";
 import { Check, Copy, Send, ShieldAlert } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "../agent/ActionCard";
+import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderFormatted, type ChatOutputFormat } from "../../lib/chat/renderFormatted";
-import { CodeBlockToolbar, splitFencedBlocks } from "./CodeBlockToolbar";
+import {
+  CodeBlockToolbar,
+  prepareTerminalInput,
+  splitFencedBlocks,
+  type PreparedTerminalInput,
+} from "./CodeBlockToolbar";
 import { useAppStore } from "../../stores/appStore";
 import {
   getTerminal,
@@ -74,6 +80,7 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
   const [executed, setExecuted] = useState<Record<number, "approved" | "denied">>({});
   const [copied, setCopied] = useState(false);
   const [sentAll, setSentAll] = useState(false);
+  const [pendingSendAll, setPendingSendAll] = useState<PendingMessageTerminalSend | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to the active tab so the inline-code send affordance below
@@ -164,9 +171,9 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
         e.stopPropagation();
         const text = codeEl.textContent ?? "";
         if (!text || !targetEntry) return;
-        // Inline snippets are almost always single-line commands; append CR
-        // so they read naturally as "type-and-run" in the terminal.
-        targetEntry.writeInput(text + "\r");
+        const payload = prepareTerminalInput(text);
+        if (!payload) return;
+        targetEntry.writeInput(payload.text);
         codeEl.classList.add("ai-chat-inline-code-sent");
         window.setTimeout(() => codeEl.classList.remove("ai-chat-inline-code-sent"), 800);
       };
@@ -188,18 +195,21 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
       .map((s) => s.value);
   }, [isUser, stripped]);
 
-  const handleSendAll = () => {
-    if (!targetEntry || codeBlocks.length === 0) return;
-    // Send each block separated by a CR, with each block's lines joined by CR
-    // (xterm interprets CR as newline). Trailing CR after the last block so
-    // the prompt is left at a fresh line.
-    const payload = codeBlocks
-      .map((block) => block.split(/\r?\n/).join("\r"))
-      .join("\r")
-      + "\r";
-    targetEntry.writeInput(payload);
+  const commitSendAll = (entry: TerminalRegistryEntry, payload: PreparedTerminalInput) => {
+    entry.writeInput(payload.text);
     setSentAll(true);
     window.setTimeout(() => setSentAll(false), 1200);
+  };
+
+  const handleSendAll = () => {
+    if (!targetEntry || codeBlocks.length === 0) return;
+    const payload = prepareTerminalInput(codeBlocks.join("\n"));
+    if (!payload) return;
+    if (payload.isMultiline) {
+      setPendingSendAll({ entry: targetEntry, payload });
+      return;
+    }
+    commitSendAll(targetEntry, payload);
   };
 
   return (
@@ -321,6 +331,24 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
           已脱敏敏感字段
         </div>
       )}
+      {pendingSendAll && (
+        <ConfirmDialog
+          title="确认发送多行内容"
+          message={`将向终端“${pendingSendAll.entry.title}”发送 ${pendingSendAll.payload.lineCount} 行内容。多行内容可能会触发终端执行，请确认后继续。`}
+          confirmLabel="发送"
+          cancelLabel="取消"
+          onCancel={() => setPendingSendAll(null)}
+          onConfirm={() => {
+            commitSendAll(pendingSendAll.entry, pendingSendAll.payload);
+            setPendingSendAll(null);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+interface PendingMessageTerminalSend {
+  entry: TerminalRegistryEntry;
+  payload: PreparedTerminalInput;
 }

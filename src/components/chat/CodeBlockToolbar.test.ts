@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { splitFencedBlocks } from "./CodeBlockToolbar";
+import {
+  isCommentLikeLine,
+  isSelectableTerminalLine,
+  prepareTerminalInput,
+  splitFencedBlocks,
+} from "./CodeBlockToolbar";
 
 describe("splitFencedBlocks", () => {
   it("returns a single text segment when there are no fences", () => {
@@ -36,5 +41,34 @@ describe("splitFencedBlocks", () => {
     const segs = splitFencedBlocks("```py\nprint('a')\nprint('b')\n```");
     const code = segs.find((s) => s.kind === "code");
     expect(code?.value).toBe("print('a')\nprint('b')");
+  });
+});
+
+describe("code block terminal helpers", () => {
+  it("classifies comment and blank lines as non-selectable", () => {
+    expect(isCommentLikeLine("# comment", "bash")).toBe(true);
+    expect(isCommentLikeLine("  // comment", "typescript")).toBe(true);
+    expect(isCommentLikeLine("-- sql comment", "sql")).toBe(true);
+    expect(isCommentLikeLine("--flag value", "bash")).toBe(false);
+
+    expect(isSelectableTerminalLine("", "bash")).toBe(false);
+    expect(isSelectableTerminalLine("  # comment", "bash")).toBe(false);
+    expect(isSelectableTerminalLine("ss -tlnp", "bash")).toBe(true);
+  });
+
+  it("does not append enter for a single line terminal send", () => {
+    expect(prepareTerminalInput("ss -tlnp")).toEqual({
+      text: "ss -tlnp",
+      isMultiline: false,
+      lineCount: 1,
+    });
+  });
+
+  it("marks multi-line terminal sends for confirmation and preserves line breaks", () => {
+    expect(prepareTerminalInput("lsof -p 1234\nlsof -i :8080")).toEqual({
+      text: "lsof -p 1234\rlsof -i :8080",
+      isMultiline: true,
+      lineCount: 2,
+    });
   });
 });

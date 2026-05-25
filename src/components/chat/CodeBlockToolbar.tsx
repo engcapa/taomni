@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Send, Check, Square, CheckSquare } from "lucide-react";
+import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
   getTerminal,
   listTerminals,
@@ -33,10 +34,18 @@ interface CodeBlockToolbarProps {
  */
 export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolbarProps) {
   const lines = useMemo(() => code.split("\n"), [code]);
+  const lineMeta = useMemo(
+    () => lines.map((line) => ({
+      text: line,
+      selectable: isSelectableTerminalLine(line, lang),
+    })),
+    [lang, lines],
+  );
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const [pendingSend, setPendingSend] = useState<PendingTerminalSend | null>(null);
   // Track the focused terminal tab through the appStore so this toolbar
   // re-targets the moment the user switches tabs (the registry itself is
   // a non-reactive global, so we can't subscribe to it directly).
@@ -49,15 +58,20 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
   // even though the registry isn't reactive.
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (!selecting) return;
-    setPicked(new Set(lines.map((_, i) => i)));
-  }, [selecting, lines]);
+    setPicked((previous) => {
+      const next = new Set(
+        [...previous].filter((index) => lineMeta[index]?.selectable),
+      );
+      return next.size === previous.size ? previous : next;
+    });
+  }, [lineMeta]);
   useEffect(() => {
     const id = window.setInterval(() => setTick((n) => n + 1), 1000);
     return () => window.clearInterval(id);
   }, []);
 
   const toggleLine = (i: number) => {
+    if (!lineMeta[i]?.selectable) return;
     setPicked((p) => {
       const next = new Set(p);
       if (next.has(i)) next.delete(i);
@@ -79,8 +93,10 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
   }, [preferredTabId, activeTabId, activeTabType, tick]);
 
   const buildPayload = (): string => {
-    if (!selecting || picked.size === lines.length) return code;
-    return lines.filter((_, i) => picked.has(i)).join("\n");
+    if (!selecting) return code;
+    return lines
+      .filter((_, i) => picked.has(i) && lineMeta[i]?.selectable)
+      .join("\n");
   };
 
   const handleCopy = async () => {
@@ -93,23 +109,29 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
     }
   };
 
-  const handleSendToTerminal = (entry: TerminalRegistryEntry | null = targetEntry) => {
-    if (!entry) return;
-    const payload = buildPayload();
-    if (!payload) return;
-    // Trim a trailing newline so we don't auto-execute multi-line snippets;
-    // the user presses Enter in the terminal to confirm. Single-line snippets
-    // get a trailing CR added so they read naturally as "type-and-run".
-    const isMultiline = payload.includes("\n");
-    const text = isMultiline
-      ? payload.replace(/\r?\n/g, "\r")
-      : payload + "\r";
-    entry.writeInput(text);
+  const commitTerminalSend = (entry: TerminalRegistryEntry, payload: PreparedTerminalInput) => {
+    entry.writeInput(payload.text);
     setSent(true);
     window.setTimeout(() => setSent(false), 1200);
   };
 
-  const allSelected = selecting && picked.size === lines.length;
+  const handleSendToTerminal = (entry: TerminalRegistryEntry | null = targetEntry) => {
+    if (!entry) return;
+    const payload = prepareTerminalInput(buildPayload());
+    if (!payload) return;
+    if (payload.isMultiline) {
+      setPendingSend({ entry, payload });
+      return;
+    }
+    commitTerminalSend(entry, payload);
+  };
+
+  const selectableCount = lineMeta.filter((line) => line.selectable).length;
+  const selectedSelectableCount = lineMeta.reduce(
+    (count, line, index) => count + (line.selectable && picked.has(index) ? 1 : 0),
+    0,
+  );
+  const allSelected = selecting && selectableCount > 0 && selectedSelectableCount === selectableCount;
 
   return (
     <div className="rounded border border-[var(--moba-divider)] my-2 overflow-hidden">
@@ -139,7 +161,7 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
         </button>
         <SendToTerminalButton
           targetEntry={targetEntry}
-          disabled={selecting && picked.size === 0}
+          disabled={selecting && selectedSelectableCount === 0}
           sent={sent}
           onSend={handleSendToTerminal}
         />
@@ -147,25 +169,168 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
       <pre className="m-0 p-2 text-[11px] leading-snug overflow-x-auto bg-[var(--moba-bg)]">
         <code>
           {selecting
-            ? lines.map((line, i) => (
-              <label
-                key={i}
-                className="flex items-start gap-2 cursor-pointer hover:bg-[var(--moba-selected)]/40 px-1 -mx-1 rounded"
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={picked.has(i)}
-                  onChange={() => toggleLine(i)}
-                />
-                <span className="font-mono whitespace-pre-wrap break-all">{line || " "}</span>
-              </label>
-            ))
+            ? lineMeta.map((line, i) => {
+              const content = (
+                <span className="font-mono whitespace-pre-wrap break-all">{line.text || " "}</span>
+              );
+              if (!line.selectable) {
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 px-1 -mx-1 rounded text-[var(--moba-text-muted)]"
+                  >
+                    <span className="mt-0.5 w-[13px] shrink-0" aria-hidden="true" />
+                    {content}
+                  </div>
+                );
+              }
+              return (
+                <label
+                  key={i}
+                  className="flex items-start gap-2 cursor-pointer hover:bg-[var(--moba-selected)]/40 px-1 -mx-1 rounded"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={picked.has(i)}
+                    onChange={() => toggleLine(i)}
+                  />
+                  {content}
+                </label>
+              );
+            })
             : code}
         </code>
       </pre>
+      {pendingSend && (
+        <ConfirmDialog
+          title="确认发送多行内容"
+          message={`将向终端“${pendingSend.entry.title}”发送 ${pendingSend.payload.lineCount} 行内容。多行内容可能会触发终端执行，请确认后继续。`}
+          confirmLabel="发送"
+          cancelLabel="取消"
+          onCancel={() => setPendingSend(null)}
+          onConfirm={() => {
+            commitTerminalSend(pendingSend.entry, pendingSend.payload);
+            setPendingSend(null);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+interface PendingTerminalSend {
+  entry: TerminalRegistryEntry;
+  payload: PreparedTerminalInput;
+}
+
+export interface PreparedTerminalInput {
+  text: string;
+  isMultiline: boolean;
+  lineCount: number;
+}
+
+const HASH_COMMENT_LANGS = new Set([
+  "",
+  "bash",
+  "sh",
+  "shell",
+  "zsh",
+  "fish",
+  "powershell",
+  "ps1",
+  "python",
+  "py",
+  "ruby",
+  "rb",
+  "perl",
+  "yaml",
+  "yml",
+  "toml",
+  "dockerfile",
+  "makefile",
+  "conf",
+  "ini",
+  "env",
+]);
+
+const SLASH_COMMENT_LANGS = new Set([
+  "",
+  "js",
+  "javascript",
+  "ts",
+  "typescript",
+  "java",
+  "c",
+  "cpp",
+  "c++",
+  "cs",
+  "csharp",
+  "go",
+  "rust",
+  "rs",
+  "swift",
+  "kotlin",
+  "kt",
+  "php",
+  "scala",
+  "css",
+  "scss",
+  "less",
+]);
+
+const SQL_COMMENT_LANGS = new Set(["sql", "mysql", "postgres", "postgresql", "sqlite", "lua", "haskell", "hs"]);
+const HTML_COMMENT_LANGS = new Set(["", "html", "xml", "md", "markdown"]);
+const BATCH_COMMENT_LANGS = new Set(["bat", "batch", "cmd"]);
+
+function normalizeLang(lang?: string | null): string {
+  return (lang ?? "").trim().toLowerCase();
+}
+
+export function isCommentLikeLine(line: string, lang?: string | null): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  const normalizedLang = normalizeLang(lang);
+  if (HASH_COMMENT_LANGS.has(normalizedLang) && trimmed.startsWith("#")) return true;
+  if (
+    SLASH_COMMENT_LANGS.has(normalizedLang) &&
+    (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*") || trimmed.startsWith("*/"))
+  ) {
+    return true;
+  }
+  if (SQL_COMMENT_LANGS.has(normalizedLang) && trimmed.startsWith("--")) return true;
+  if (
+    HTML_COMMENT_LANGS.has(normalizedLang) &&
+    (trimmed.startsWith("<!--") || trimmed.startsWith("-->"))
+  ) {
+    return true;
+  }
+  if (
+    BATCH_COMMENT_LANGS.has(normalizedLang) &&
+    (trimmed.startsWith("::") || /^rem(?:\s|$)/i.test(trimmed))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function isSelectableTerminalLine(line: string, lang?: string | null): boolean {
+  return line.trim().length > 0 && !isCommentLikeLine(line, lang);
+}
+
+export function prepareTerminalInput(payload: string): PreparedTerminalInput | null {
+  const normalized = payload
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n+$/g, "");
+  if (!normalized) return null;
+  const lines = normalized.split("\n");
+  return {
+    text: lines.join("\r"),
+    isMultiline: lines.length > 1,
+    lineCount: lines.length,
+  };
 }
 
 interface SendToTerminalButtonProps {
