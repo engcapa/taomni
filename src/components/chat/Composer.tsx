@@ -73,8 +73,8 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
     >
       {attachments.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1">
-          {attachments.map((ref, i) => (
-            <AttachmentChip key={i} ref={ref} onRemove={() => handleRemove(i)} />
+          {attachments.map((att, i) => (
+            <AttachmentChip key={i} attachment={att} onRemove={() => handleRemove(i)} />
           ))}
         </div>
       )}

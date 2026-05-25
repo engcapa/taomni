@@ -31,14 +31,25 @@ type StreamEvent =
   | { kind: "end"; id: string; thread_id: string; content: string; redacted_count: number }
   | { kind: "error"; id: string; message: string };
 
+type DrawerScope = "global" | "tab" | null;
+type ComposerAttachScope = "global" | "tab";
+
 interface ChatStore {
   threads: ChatThread[];
+  threadsLoaded: boolean;
   activeThreadId: string | null;
   messages: Record<string, ChatMessage[]>;
   /// Currently-streaming assistant message id per thread (for cursor display).
   streamingId: Record<string, string | null>;
   sending: boolean;
   drawerOpen: boolean;
+  /// "global" for title/status/shortcut entry points, "tab" for terminal-bound chat.
+  drawerScope: DrawerScope;
+  /// The terminal tab currently driving a tab-bound drawer, if any.
+  drawerTabId: string | null;
+  /// Mirrors attached SFTP state: each terminal tab remembers whether its
+  /// bound chat drawer should be visible when that tab is active.
+  tabDrawerOpenByTabId: Record<string, boolean>;
   drawerWidth: number;
   /// Text the Composer should pick up next render (e.g. `@selection ...`).
   /// Cleared by the Composer once consumed.
@@ -56,7 +67,7 @@ interface ChatStore {
   sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
   /// Open the drawer (creating a thread if needed) and stage `text` in the
   /// composer. Used by the Selection toolbar's "Send to AI" action.
-  attachToComposer: (text: string) => Promise<void>;
+  attachToComposer: (text: string, scope?: ComposerAttachScope) => Promise<void>;
   consumePendingComposerText: () => string;
   /// Open the drawer, create a fresh thread, and auto-send "请解释这段输出".
   /// Used by the Selection toolbar's "Explain" action.
@@ -67,25 +78,53 @@ interface ChatStore {
   exportArchive: (outPath: string) => Promise<number>;
   toggleDrawer: () => void;
   setDrawerOpen: (open: boolean) => void;
+  openGlobalChat: () => Promise<void>;
+  toggleGlobalChat: () => Promise<void>;
+  openTabChat: (tabId: string) => Promise<void>;
+  toggleTabChat: (tabId: string) => Promise<void>;
+  syncTabChatWithActiveTab: (tabId: string | null) => Promise<void>;
   setDrawerWidth: (w: number) => void;
+}
+
+function latestGlobalThread(threads: ChatThread[]): ChatThread | undefined {
+  return threads.find((thread) => !thread.linked_session_id);
+}
+
+function latestTabThread(threads: ChatThread[], tabId: string): ChatThread | undefined {
+  return threads.find((thread) => thread.linked_session_id === tabId);
+}
+
+function scopeForThread(thread: ChatThread | undefined | null): {
+  drawerScope: DrawerScope;
+  drawerTabId: string | null;
+} {
+  if (!thread) return { drawerScope: null, drawerTabId: null };
+  return thread.linked_session_id
+    ? { drawerScope: "tab", drawerTabId: thread.linked_session_id }
+    : { drawerScope: "global", drawerTabId: null };
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
   threads: [],
+  threadsLoaded: false,
   activeThreadId: null,
   messages: {},
   streamingId: {},
   sending: false,
   drawerOpen: false,
+  drawerScope: null,
+  drawerTabId: null,
+  tabDrawerOpenByTabId: {},
   drawerWidth: 380,
   pendingComposerText: "",
 
   loadThreads: async () => {
     try {
       const threads = await invoke<ChatThread[]>("chat_list_threads", { limit: 50 });
-      set({ threads });
+      set({ threads, threadsLoaded: true });
     } catch (e) {
       console.error("chat_list_threads failed:", e);
+      set({ threadsLoaded: true });
     }
   },
 
@@ -94,16 +133,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       providerId: providerId ?? null,
       linkedSessionId: linkedSessionId ?? null,
     });
-    set((s) => ({ threads: [thread, ...s.threads], activeThreadId: thread.id }));
+    const scope = scopeForThread(thread);
+    set((s) => ({
+      threads: [thread, ...s.threads],
+      activeThreadId: thread.id,
+      ...scope,
+      tabDrawerOpenByTabId: linkedSessionId
+        ? { ...s.tabDrawerOpenByTabId, [linkedSessionId]: true }
+        : s.tabDrawerOpenByTabId,
+    }));
     return thread;
   },
 
   deleteThread: async (threadId: string) => {
     await invoke("chat_delete_thread", { threadId });
+    const active = get().activeThreadId === threadId;
     set((s) => ({
       threads: s.threads.filter((t) => t.id !== threadId),
       activeThreadId: s.activeThreadId === threadId ? null : s.activeThreadId,
       messages: Object.fromEntries(Object.entries(s.messages).filter(([k]) => k !== threadId)),
+      ...(active ? { drawerScope: null, drawerTabId: null } : {}),
     }));
   },
 
@@ -129,7 +178,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }));
   },
 
-  setActiveThread: (threadId) => set({ activeThreadId: threadId }),
+  setActiveThread: (threadId) => {
+    const thread = get().threads.find((t) => t.id === threadId);
+    set({ activeThreadId: threadId, ...scopeForThread(thread) });
+  },
 
   loadMessages: async (threadId: string) => {
     try {
@@ -275,19 +327,109 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
+  toggleDrawer: () => set((s) => {
+    const closing = s.drawerOpen;
+    const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
+    return {
+      drawerOpen: !s.drawerOpen,
+      ...(closing && tabId
+        ? { tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false } }
+        : {}),
+    };
+  }),
   setDrawerOpen: (open) => set({ drawerOpen: open }),
   setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
 
-  attachToComposer: async (text: string) => {
-    // Ensure drawer is open and a thread exists.
-    if (!get().activeThreadId) {
-      // Either pick the most recent thread or create a fresh one.
-      const existing = get().threads[0];
-      if (existing) {
-        set({ activeThreadId: existing.id });
-      } else {
-        await get().newThread();
+  openGlobalChat: async () => {
+    if (!get().threadsLoaded) {
+      await get().loadThreads();
+    }
+    let thread = latestGlobalThread(get().threads);
+    if (!thread) {
+      thread = await get().newThread(undefined, undefined);
+    }
+    set({
+      activeThreadId: thread.id,
+      drawerOpen: true,
+      drawerScope: "global",
+      drawerTabId: null,
+    });
+  },
+
+  toggleGlobalChat: async () => {
+    const s = get();
+    if (s.drawerOpen && s.drawerScope === "global") {
+      set({ drawerOpen: false });
+      return;
+    }
+    await get().openGlobalChat();
+  },
+
+  openTabChat: async (tabId: string) => {
+    if (!tabId) return;
+    if (!get().threadsLoaded) {
+      await get().loadThreads();
+    }
+    let thread = latestTabThread(get().threads, tabId);
+    if (!thread) {
+      thread = await get().newThread(undefined, tabId);
+    }
+    set((s) => ({
+      activeThreadId: thread.id,
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: tabId,
+      tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: true },
+    }));
+  },
+
+  toggleTabChat: async (tabId: string) => {
+    if (!tabId) return;
+    const s = get();
+    if (s.drawerOpen && s.drawerScope === "tab" && s.drawerTabId === tabId) {
+      set({
+        drawerOpen: false,
+        tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false },
+      });
+      return;
+    }
+    await get().openTabChat(tabId);
+  },
+
+  syncTabChatWithActiveTab: async (tabId: string | null) => {
+    const s = get();
+    if (s.drawerScope === "global" && s.drawerOpen) return;
+
+    if (!tabId) {
+      if (s.drawerScope === "tab" && s.drawerOpen) {
+        set({ drawerOpen: false, drawerTabId: null });
+      }
+      return;
+    }
+
+    if (s.tabDrawerOpenByTabId[tabId]) {
+      await get().openTabChat(tabId);
+      return;
+    }
+
+    if (s.drawerScope === "tab" && s.drawerOpen) {
+      set({ drawerOpen: false, drawerTabId: tabId });
+    }
+  },
+
+  attachToComposer: async (text: string, scope: ComposerAttachScope = "tab") => {
+    if (scope === "global") {
+      await get().openGlobalChat();
+    } else {
+      // Selection-toolbar and `??` sends come from a terminal surface, so
+      // prefer the active terminal's bound chat over whichever global thread
+      // was last open.
+      const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
+      const tabId = getActiveTerminalTabId();
+      if (tabId) {
+        await get().openTabChat(tabId);
+      } else if (!get().activeThreadId) {
+        await get().openGlobalChat();
       }
     }
     set({
@@ -303,8 +445,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   explainSelection: async (text: string) => {
-    const thread = await get().newThread();
-    set({ drawerOpen: true });
+    // Bind the new thread to the current terminal so the user can keep
+    // chatting about the same pty without re-staging context.
+    const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
+    const tabId = getActiveTerminalTabId();
+    const thread = await get().newThread(undefined, tabId ?? undefined);
+    set((s) => ({
+      drawerOpen: true,
+      ...scopeForThread(thread),
+      tabDrawerOpenByTabId: tabId
+        ? { ...s.tabDrawerOpenByTabId, [tabId]: true }
+        : s.tabDrawerOpenByTabId,
+    }));
     // Fire-and-forget — sendMessage owns its own loading state.
     void get().sendMessage(thread.id, `请解释下面这段终端输出：\n\n\`\`\`\n${text}\n\`\`\``);
   },

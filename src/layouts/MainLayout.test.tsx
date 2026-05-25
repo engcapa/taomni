@@ -12,6 +12,22 @@ const terminalLifecycle = vi.hoisted(() => ({
   unmounted: vi.fn(),
 }));
 
+const sidebarMock = vi.hoisted(() => ({
+  props: [] as Array<{ onConnectSession?: (session: SessionConfig) => void }>,
+}));
+
+const vaultMock = vi.hoisted(() => {
+  const mock = {
+    state: "empty",
+    refresh: vi.fn(async () => undefined),
+    unlock: vi.fn(async () => undefined),
+  };
+  mock.unlock.mockImplementation(async () => {
+    mock.state = "unlocked";
+  });
+  return mock;
+});
+
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     onCloseRequested: vi.fn(async () => vi.fn()),
@@ -47,7 +63,10 @@ vi.mock("../components/quickconnect/QuickConnect", () => ({
 }));
 
 vi.mock("../components/sidebar/Sidebar", () => ({
-  Sidebar: () => <div data-testid="sidebar" />,
+  Sidebar: (props: { onConnectSession?: (session: SessionConfig) => void }) => {
+    sidebarMock.props.push(props);
+    return <div data-testid="sidebar" />;
+  },
 }));
 
 vi.mock("../components/statusbar/StatusBar", () => ({
@@ -59,6 +78,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     tabId,
     terminalProfile,
     sftpToggle,
+    chatToggle,
     visible,
     activeForShortcuts,
     inputLocked,
@@ -67,6 +87,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     tabId?: string;
     terminalProfile?: TerminalProfile;
     sftpToggle?: { open: boolean; onToggle: () => void };
+    chatToggle?: { open: boolean; onToggle: () => void };
     visible?: boolean;
     activeForShortcuts?: boolean;
     inputLocked?: boolean;
@@ -96,6 +117,15 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
             SFTP
           </button>
         )}
+        {chatToggle && (
+          <button
+            type="button"
+            data-testid="tab-chat-toggle"
+            onClick={chatToggle.onToggle}
+          >
+            Chat
+          </button>
+        )}
       </div>
     );
   },
@@ -122,11 +152,11 @@ vi.mock("../stores/vaultStore", () => ({
   useVaultStore: Object.assign(
     (selector: (s: { state: string; refresh: () => Promise<void>; unlock: () => Promise<void> }) => unknown) =>
       selector({
-        state: "empty",
-        refresh: async () => undefined,
-        unlock: async () => undefined,
+        state: vaultMock.state,
+        refresh: vaultMock.refresh,
+        unlock: vaultMock.unlock,
       }),
-    { getState: () => ({ state: "empty" }) },
+    { getState: () => ({ state: vaultMock.state }) },
   ),
 }));
 
@@ -134,6 +164,10 @@ describe("MainLayout attached SFTP sidebar", () => {
   beforeEach(() => {
     terminalLifecycle.mounted.mockClear();
     terminalLifecycle.unmounted.mockClear();
+    sidebarMock.props = [];
+    vaultMock.state = "empty";
+    vaultMock.refresh.mockClear();
+    vaultMock.unlock.mockClear();
     vi.mocked(listSessions).mockResolvedValue([]);
     useSessionStore.setState({
       sessions: [],
@@ -180,6 +214,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     render(<MainLayout />);
 
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-chat-toggle")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 
@@ -494,6 +529,70 @@ describe("MainLayout attached SFTP sidebar", () => {
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-theme", "termius-dark");
     });
   });
+
+  it("unlocks the vault once before opening queued saved-password sessions", async () => {
+    vaultMock.state = "locked";
+    const first = makePasswordSession("saved-1", "saved-one.test", "vault:first");
+    const second = makePasswordSession("saved-2", "saved-two.test", "vault:second");
+
+    render(<MainLayout />);
+    const sidebar = latestSidebarProps();
+
+    act(() => {
+      sidebar.onConnectSession?.(first);
+      sidebar.onConnectSession?.(second);
+    });
+
+    expect(screen.getByTestId("vault-unlock-dialog")).toBeInTheDocument();
+    expect(screen.getAllByTestId("vault-unlock-dialog")).toHaveLength(1);
+
+    fireEvent.change(screen.getByTestId("vault-unlock-pw"), { target: { value: "master" } });
+    fireEvent.click(screen.getByTestId("vault-unlock-confirm"));
+
+    await waitFor(() => {
+      expect(vaultMock.unlock).toHaveBeenCalledTimes(1);
+      const openedSessionIds = useAppStore.getState().tabs
+        .filter((tab) => tab.type === "terminal" && tab.sessionId?.startsWith("saved-"))
+        .map((tab) => tab.sessionId);
+      expect(openedSessionIds).toEqual(["saved-1", "saved-2"]);
+    });
+    expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
+  });
+
+  it("prompts for queued unsaved passwords one session at a time", async () => {
+    const first = makePasswordSession("manual-1", "manual-one.test");
+    const second = makePasswordSession("manual-2", "manual-two.test");
+
+    render(<MainLayout />);
+    const sidebar = latestSidebarProps();
+
+    act(() => {
+      sidebar.onConnectSession?.(first);
+      sidebar.onConnectSession?.(second);
+    });
+
+    expect(screen.getByTestId("auth-prompt")).toHaveTextContent("root@manual-one.test");
+    expect(screen.getAllByTestId("auth-prompt")).toHaveLength(1);
+
+    fireEvent.change(screen.getByTestId("auth-password"), { target: { value: "pw-one" } });
+    fireEvent.click(screen.getByTestId("auth-submit"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-prompt")).toHaveTextContent("root@manual-two.test");
+    });
+    expect(screen.getAllByTestId("auth-prompt")).toHaveLength(1);
+
+    fireEvent.change(screen.getByTestId("auth-password"), { target: { value: "pw-two" } });
+    fireEvent.click(screen.getByTestId("auth-submit"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("auth-prompt")).not.toBeInTheDocument();
+      const openedSessionIds = useAppStore.getState().tabs
+        .filter((tab) => tab.type === "terminal" && tab.sessionId?.startsWith("manual-"))
+        .map((tab) => tab.sessionId);
+      expect(openedSessionIds).toEqual(["manual-1", "manual-2"]);
+    });
+  });
 });
 
 function makeSessionWithProfile(profile: TerminalProfile): SessionConfig {
@@ -512,4 +611,28 @@ function makeSessionWithProfile(profile: TerminalProfile): SessionConfig {
     last_connected_at: null,
     sort_order: 0,
   };
+}
+
+function makePasswordSession(id: string, host: string, passwordRef?: string): SessionConfig {
+  return {
+    id,
+    name: id,
+    session_type: "SSH",
+    group_path: null,
+    host,
+    port: 22,
+    username: "root",
+    auth_method: "Password",
+    options_json: passwordRef ? JSON.stringify({ passwordRef }) : "{}",
+    created_at: 10,
+    updated_at: 10,
+    last_connected_at: null,
+    sort_order: 0,
+  };
+}
+
+function latestSidebarProps(): { onConnectSession?: (session: SessionConfig) => void } {
+  const props = sidebarMock.props.at(-1);
+  if (!props) throw new Error("Sidebar props were not captured");
+  return props;
 }

@@ -54,7 +54,7 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
-import { FolderOpen } from "lucide-react";
+import { Bot, FolderOpen } from "lucide-react";
 import {
   createInputEchoSuppressor,
   type InputEchoSuppressor,
@@ -85,6 +85,7 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { registerTerminal } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
   type ZmodemState,
@@ -159,6 +160,11 @@ interface TerminalPanelProps {
     open: boolean;
     onToggle: () => void;
   };
+  /** Floating-toolbar button for the AI chat thread bound to this tab. */
+  chatToggle?: {
+    open: boolean;
+    onToggle: () => void;
+  };
 }
 
 const DEFAULT_FONT_SIZE = 14;
@@ -201,6 +207,7 @@ export function TerminalPanel({
   isMultiExecTarget,
   onInputBroadcast,
   sftpToggle,
+  chatToggle,
 }: TerminalPanelProps) {
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
@@ -218,6 +225,9 @@ export function TerminalPanel({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  // Mirrors `sessionIdRef.current` as state so the registry-effect below
+  // re-runs whenever the backend session id changes.
+  const [registeredSessionId, setRegisteredSessionId] = useState<string | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
@@ -1670,6 +1680,7 @@ export function TerminalPanel({
           return;
         }
         sessionIdRef.current = connectedSid;
+        setRegisteredSessionId(connectedSid);
         zmodemRef.current = zmodem;
         if (shellId) setResolvedLocalShellId(shellId);
         onSessionReadyRef.current?.(connectedSid);
@@ -1737,6 +1748,7 @@ export function TerminalPanel({
       fitAddonRef.current = null;
       searchAddonRef.current = null;
       sessionIdRef.current = null;
+      setRegisteredSessionId(null);
       zmodemRef.current = null;
       imeGuardRef.current = null;
       initializedRef.current = false;
@@ -1931,6 +1943,33 @@ export function TerminalPanel({
     return () => window.clearInterval(id);
   }, []);
 
+  // Register this terminal in the global registry so the AI Chat Drawer can
+  // pull buffer context (`@terminal:last-N`) and push commands back into it
+  // (the assistant's "Send to terminal" button on rendered code blocks).
+  // Re-runs whenever the backend session id changes, since stale entries
+  // would point at a closed pty.
+  useEffect(() => {
+    if (!tabId || !registeredSessionId) return;
+    const unregister = registerTerminal({
+      tabId,
+      sessionId: registeredSessionId,
+      title: tabTitle,
+      getBufferText: () => {
+        const t = termRef.current;
+        return t ? getBufferText(t) : "";
+      },
+      getLastLines: (n: number) => {
+        const t = termRef.current;
+        return t ? getLastBufferLines(t, n) : "";
+      },
+      writeInput: (data: string) => {
+        if (readOnlyRef.current) return;
+        writeTerminal(registeredSessionId, encodeBase64(data)).catch(console.error);
+      },
+    });
+    return unregister;
+  }, [tabId, registeredSessionId, tabTitle]);
+
   return (
     <div
       ref={panelRef}
@@ -2043,6 +2082,30 @@ export function TerminalPanel({
           >
             <FolderOpen size={12} />
             SFTP
+          </button>
+        )}
+        {chatToggle && (
+          <button
+            type="button"
+            data-testid="tab-chat-toggle"
+            aria-label={chatToggle.open ? "Close tab AI chat" : "Open tab AI chat"}
+            onClick={chatToggle.onToggle}
+            title={chatToggle.open ? "Hide tab AI chat (Ctrl+Shift+L)" : "Open tab AI chat (Ctrl+Shift+L)"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "2px 8px",
+              fontSize: 11,
+              borderRadius: 4,
+              background: chatToggle.open ? "var(--moba-accent)" : "rgba(0,0,0,0.5)",
+              color: chatToggle.open ? "#fff" : "#ccc",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+            }}
+          >
+            <Bot size={12} />
+            Chat
           </button>
         )}
       </FloatingToolbar>

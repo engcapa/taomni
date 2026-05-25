@@ -604,6 +604,27 @@ body {
   border-radius: 0;
   font-size: inherit;
 }
+
+/* Inline code in assistant chat is click-to-send-to-terminal. The cursor +
+   accent border on hover make the affordance visible. */
+.ai-chat-inline-code {
+  cursor: pointer;
+  border: 1px dashed transparent;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.ai-chat-inline-code:hover {
+  border-color: color-mix(in srgb, var(--moba-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--moba-accent) 12%, transparent);
+}
+.ai-chat-inline-code:hover::after {
+  content: " ▶";
+  color: var(--moba-accent);
+  font-size: 0.85em;
+}
+.ai-chat-inline-code-sent {
+  border-color: #4ade80 !important;
+  background: color-mix(in srgb, #4ade80 18%, transparent) !important;
+}
 .moba-chat-md blockquote {
   margin: 0.4em 0;
   padding: 0.1em 0.75em;

@@ -26,8 +26,9 @@ export function StatusBar() {
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const selected = sessions.find((session) => session.id === selectedSessionId);
-  const toggleDrawer = useChatStore((s) => s.toggleDrawer);
+  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
   const drawerOpen = useChatStore((s) => s.drawerOpen);
+  const drawerScope = useChatStore((s) => s.drawerScope);
   const aiConfig = useAiStore((s) => s.config);
   const activeProvider = aiConfig?.llm.active ?? "—";
   const activeAsr = aiConfig?.asr.active ?? "—";
@@ -83,9 +84,9 @@ export function StatusBar() {
           {/* LLM segment */}
           <button
             type="button"
-            className={`flex items-center gap-1 text-[11px] hover:text-[var(--moba-accent)] transition-colors ${drawerOpen ? "text-[var(--moba-accent)]" : ""}`}
-            onClick={toggleDrawer}
-            title="AI Chat Drawer (Ctrl+L)"
+            className={`flex items-center gap-1 text-[11px] hover:text-[var(--moba-accent)] transition-colors ${drawerOpen && drawerScope === "global" ? "text-[var(--moba-accent)]" : ""}`}
+            onClick={() => void toggleGlobalChat()}
+            title="Global AI Chat (Ctrl+L). Current tab chat: Ctrl+Shift+L."
           >
             <Bot className="w-3 h-3" />
             {dot(aiConfig ? "bg-green-400" : "bg-gray-400")}

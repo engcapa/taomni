@@ -149,6 +149,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     danger?: boolean;
     onConfirm: () => void;
   } | null>(null);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const ctx = useContextMenu();
 
   useEffect(() => {
@@ -167,6 +168,18 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     () => collectFolderPaths(sessions, groups),
     [sessions, groups],
   );
+  const effectiveSelectedSessionIds = useMemo(() => {
+    if (selectedSessionIds.size > 0) return selectedSessionIds;
+    return selectedSessionId ? new Set([selectedSessionId]) : new Set<string>();
+  }, [selectedSessionIds, selectedSessionId]);
+
+  useEffect(() => {
+    const knownSessionIds = new Set(sessions.map((session) => session.id));
+    setSelectedSessionIds((current) => {
+      const next = new Set([...current].filter((id) => knownSessionIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [sessions]);
 
   const toggle = (key: string) =>
     setExpanded((e) => ({ ...e, [key]: !e[key] }));
@@ -543,11 +556,35 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
 
-  const confirmPendingImport = async () => {
+  const confirmPendingImport = async (selectedIds: ReadonlySet<string>) => {
     const pending = pendingImport;
     if (!pending) return;
-    await applyImportResult(pending.result, pending.folderPath, pending.source, { alertWarnings: false });
+    const filtered = filterImportResultBySelection(pending.result, selectedIds);
+    await applyImportResult(filtered, pending.folderPath, pending.source, { alertWarnings: false });
     setPendingImport(null);
+  };
+
+  const filterImportResultBySelection = (
+    result: SessionImportResult,
+    selectedIds: ReadonlySet<string>,
+  ): SessionImportResult => {
+    const selectedSessions = result.sessions.filter((session) => selectedIds.has(session.id));
+    if (selectedSessions.length === result.sessions.length) return result;
+    const selectedSecrets = result.secrets.filter((secret) => {
+      // Standalone secrets (e.g. Tabby private-key passphrases without an
+      // attached session) live independently of the imported session list,
+      // so user-level row selection does not affect them.
+      const isStandalone = secret.attachment === "standalone" || !secret.sessionId;
+      if (isStandalone) return true;
+      return selectedIds.has(secret.sessionId);
+    });
+    const droppedCount = result.sessions.length - selectedSessions.length;
+    return {
+      ...result,
+      sessions: selectedSessions,
+      secrets: selectedSecrets,
+      skipped: result.skipped + droppedCount,
+    };
   };
 
   const applyImportResult = async (
@@ -662,10 +699,44 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
 
   const executeFolder = (folderPath: string | null) => {
     const folderSessions = sessionsInFolder(sessions, folderPath);
-    for (const session of folderSessions) {
+    connectSessions(folderSessions, `from ${folderOptionLabel(folderPath)}`);
+  };
+
+  const connectSessions = (targetSessions: readonly SessionConfig[], sourceLabel: string) => {
+    const uniqueSessions = uniqueSessionsById(targetSessions);
+    for (const session of uniqueSessions) {
       onConnectSession?.(session);
     }
-    setStatusMessage(`Started ${folderSessions.length} session${folderSessions.length === 1 ? "" : "s"} from ${folderOptionLabel(folderPath)}`);
+    setStatusMessage(`Started ${uniqueSessions.length} session${uniqueSessions.length === 1 ? "" : "s"} ${sourceLabel}`);
+  };
+
+  const toggleSessionSelection = (session: SessionConfig) => {
+    const base = selectedSessionIds.size > 0
+      ? selectedSessionIds
+      : selectedSessionId ? new Set([selectedSessionId]) : new Set<string>();
+    const next = new Set(base);
+    if (next.has(session.id)) {
+      next.delete(session.id);
+      setSelectedSession(next.values().next().value ?? null);
+    } else {
+      next.add(session.id);
+      setSelectedSession(session.id);
+    }
+    setSelectedSessionIds(next);
+  };
+
+  const selectSingleSession = (session: SessionConfig) => {
+    setSelectedSession(session.id);
+    setSelectedSessionIds(new Set([session.id]));
+  };
+
+  const handleSessionClick = (event: React.MouseEvent, session: SessionConfig) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      toggleSessionSelection(session);
+      return;
+    }
+    selectSingleSession(session);
   };
 
   const mergeImportResults = (results: SessionImportResult[]): SessionImportResult =>
@@ -1087,7 +1158,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const sessionContextMenu = (e: React.MouseEvent, session: SessionConfig) => {
-    setSelectedSession(session.id);
+    const selectedContextSessions = effectiveSelectedSessionIds.has(session.id)
+      ? sessions.filter((candidate) => effectiveSelectedSessionIds.has(candidate.id))
+      : [session];
+    if (!effectiveSelectedSessionIds.has(session.id)) {
+      selectSingleSession(session);
+    } else {
+      setSelectedSession(session.id);
+    }
+    const hasMultiSelection = selectedContextSessions.length > 1;
     const moveChildren: MenuItem[] = [
       { label: SESSION_ROOT_LABEL, icon: <FolderOpen className="w-3 h-3" />, onClick: () => void moveSessionToGroup(session.id, null) },
       ...folderPaths.map((path) => ({
@@ -1100,14 +1179,24 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       })),
     ];
 
-    ctx.show(e, [
+    const items: MenuItem[] = [
+      ...(hasMultiSelection ? [
+        {
+          label: `Connect selected sessions (${selectedContextSessions.length})`,
+          icon: <Play className="w-3 h-3" />,
+          onClick: () => connectSessions(selectedContextSessions, "from selected sessions"),
+          disabled: !onConnectSession,
+        },
+        { label: "", separator: true },
+      ] satisfies MenuItem[] : []),
       { label: "Connect", icon: <Play className="w-3 h-3" />, onClick: () => onConnectSession?.(session), disabled: !onConnectSession },
       { label: "Edit...", icon: <Edit3 className="w-3 h-3" />, onClick: () => onEditSession?.(session), disabled: !onEditSession },
       { label: "Duplicate", icon: <Copy className="w-3 h-3" />, onClick: () => void duplicateSession(session.id) },
       { label: "Move to folder", icon: <Folder className="w-3 h-3" />, children: moveChildren },
       { label: "", separator: true },
       { label: "Delete", icon: <Trash2 className="w-3 h-3" />, danger: true, onClick: () => void removeSession(session.id) },
-    ]);
+    ];
+    ctx.show(e, items);
   };
 
   return (
@@ -1127,7 +1216,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           result={pendingImport.result}
           targetFolder={pendingImport.folderPath}
           onCancel={() => setPendingImport(null)}
-          onConfirm={() => void confirmPendingImport()}
+          onConfirm={(selectedIds) => void confirmPendingImport(selectedIds)}
         />
       )}
       {externalVaultPrompt && (
@@ -1156,37 +1245,37 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       >
         {ctx.render}
         <TreeFolder
-        node={tree}
-        count={countNodeSessions(tree)}
-        open={expanded.root !== false}
-        onToggle={() => toggle("root")}
-        onContextMenu={(event) => folderContextMenu(event, null)}
-        onDropSession={(sessionId) => handleDrop(null, sessionId)}
-        onDragOverFolder={() => handleDragOver(null)}
-        onDragLeave={() => setDragOverGroup(null)}
-        dragOver={dragOverGroup === "root"}
-      >
-        <FolderContents
           node={tree}
-          expanded={expanded}
-          searchQuery={searchQuery}
-          selectedSessionId={selectedSessionId}
-          dragOverGroup={dragOverGroup}
-          onToggle={toggle}
-          onFolderContextMenu={folderContextMenu}
-          onSessionContextMenu={sessionContextMenu}
-          onDropSession={handleDrop}
-          onDragOverFolder={handleDragOver}
+          count={countNodeSessions(tree)}
+          open={expanded.root !== false}
+          onToggle={() => toggle("root")}
+          onContextMenu={(event) => folderContextMenu(event, null)}
+          onDropSession={(sessionId) => handleDrop(null, sessionId)}
+          onDragOverFolder={() => handleDragOver(null)}
           onDragLeave={() => setDragOverGroup(null)}
-          onSelectSession={setSelectedSession}
-          onConnectSession={onConnectSession}
-        />
-        {filteredSessions.length === 0 && !loading && (
-          <div className="pl-6 py-2 text-[var(--moba-text-muted)]" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)" }}>
-            {searchQuery ? "No matching sessions." : "No sessions yet. Right-click User sessions to create one."}
-          </div>
-        )}
-      </TreeFolder>
+          dragOver={dragOverGroup === "root"}
+        >
+          <FolderContents
+            node={tree}
+            expanded={expanded}
+            searchQuery={searchQuery}
+            selectedSessionIds={effectiveSelectedSessionIds}
+            dragOverGroup={dragOverGroup}
+            onToggle={toggle}
+            onFolderContextMenu={folderContextMenu}
+            onSessionContextMenu={sessionContextMenu}
+            onDropSession={handleDrop}
+            onDragOverFolder={handleDragOver}
+            onDragLeave={() => setDragOverGroup(null)}
+            onSessionClick={handleSessionClick}
+            onConnectSession={onConnectSession}
+          />
+          {filteredSessions.length === 0 && !loading && (
+            <div className="pl-6 py-2 text-[var(--moba-text-muted)]" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)" }}>
+              {searchQuery ? "No matching sessions." : "No sessions yet. Right-click User sessions to create one."}
+            </div>
+          )}
+        </TreeFolder>
 
     </div>
     </>
@@ -1197,7 +1286,7 @@ function FolderContents({
   node,
   expanded,
   searchQuery,
-  selectedSessionId,
+  selectedSessionIds,
   dragOverGroup,
   onToggle,
   onFolderContextMenu,
@@ -1205,13 +1294,13 @@ function FolderContents({
   onDropSession,
   onDragOverFolder,
   onDragLeave,
-  onSelectSession,
+  onSessionClick,
   onConnectSession,
 }: {
   node: FolderNode;
   expanded: Record<string, boolean>;
   searchQuery: string;
-  selectedSessionId: string | null;
+  selectedSessionIds: ReadonlySet<string>;
   dragOverGroup: string | null;
   onToggle: (key: string) => void;
   onFolderContextMenu: (event: React.MouseEvent, path: string | null) => void;
@@ -1219,7 +1308,7 @@ function FolderContents({
   onDropSession: (groupPath: string | null, sessionId: string) => void;
   onDragOverFolder: (groupPath: string | null) => void;
   onDragLeave: () => void;
-  onSelectSession: (id: string | null) => void;
+  onSessionClick: (event: React.MouseEvent, session: SessionConfig) => void;
   onConnectSession?: (session: SessionConfig) => void;
 }) {
   return (
@@ -1245,7 +1334,7 @@ function FolderContents({
               node={folder}
               expanded={expanded}
               searchQuery={searchQuery}
-              selectedSessionId={selectedSessionId}
+              selectedSessionIds={selectedSessionIds}
               dragOverGroup={dragOverGroup}
               onToggle={onToggle}
               onFolderContextMenu={onFolderContextMenu}
@@ -1253,7 +1342,7 @@ function FolderContents({
               onDropSession={onDropSession}
               onDragOverFolder={onDragOverFolder}
               onDragLeave={onDragLeave}
-              onSelectSession={onSelectSession}
+              onSessionClick={onSessionClick}
               onConnectSession={onConnectSession}
             />
           </TreeFolder>
@@ -1264,8 +1353,8 @@ function FolderContents({
         <SessionItem
           key={session.id}
           session={session}
-          selected={selectedSessionId === session.id}
-          onClick={() => onSelectSession(session.id)}
+          selected={selectedSessionIds.has(session.id)}
+          onClick={(event) => onSessionClick(event, session)}
           onDoubleClick={() => onConnectSession?.(session)}
           onContextMenu={(event) => onSessionContextMenu(event, session)}
         />
@@ -1352,7 +1441,7 @@ function SessionItem({
 }: {
   session: SessionConfig;
   selected: boolean;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
@@ -1378,10 +1467,12 @@ function SessionItem({
     <div
       ref={ref}
       data-testid="session-tree-item"
+      data-session-id={session.id}
       data-session-name={session.name}
       data-session-type={session.session_type}
       className="moba-tree-row group"
       data-selected={selected}
+      aria-selected={selected}
       style={selected ? { background: "var(--moba-selected)" } : undefined}
       onPointerDown={handlePointerDown}
       onClick={onClick}
@@ -1491,6 +1582,17 @@ function sessionsInFolder(sessions: SessionConfig[], folderPath: string | null |
   const normalized = normalizeGroupPath(folderPath);
   if (!normalized) return sessions;
   return sessions.filter((session) => groupPathContains(normalized, session.group_path));
+}
+
+function uniqueSessionsById(sessions: readonly SessionConfig[]): SessionConfig[] {
+  const seen = new Set<string>();
+  const unique: SessionConfig[] = [];
+  for (const session of sessions) {
+    if (seen.has(session.id)) continue;
+    seen.add(session.id);
+    unique.push(session);
+  }
+  return unique;
 }
 
 function filterSessions(sessions: SessionConfig[], query: string): SessionConfig[] {

@@ -20,7 +20,8 @@ export function TitleBarTrayControls() {
   const toggleTerminalSplit = useAppStore((s) => s.toggleTerminalSplit);
   const toggleMultiExec = useAppStore((s) => s.toggleMultiExec);
   const drawerOpen = useChatStore((s) => s.drawerOpen);
-  const toggleChatDrawer = useChatStore((s) => s.toggleDrawer);
+  const drawerScope = useChatStore((s) => s.drawerScope);
+  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
 
   const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
@@ -88,10 +89,14 @@ export function TitleBarTrayControls() {
           <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
             <TrayButton
               testId="ai-chat-drawer-toggle"
-              title={drawerOpen ? "Close AI Chat (Ctrl+L)" : "Open AI Chat (Ctrl+L)"}
-              ariaLabel={drawerOpen ? "Close AI Chat" : "Open AI Chat"}
-              active={drawerOpen}
-              onClick={toggleChatDrawer}
+              title={
+                drawerOpen && drawerScope === "global"
+                  ? "Close global AI Chat (Ctrl+L)"
+                  : "Open global AI Chat (Ctrl+L)"
+              }
+              ariaLabel={drawerOpen && drawerScope === "global" ? "Close global AI Chat" : "Open global AI Chat"}
+              active={drawerOpen && drawerScope === "global"}
+              onClick={() => void toggleGlobalChat()}
             >
               <Bot className="w-[16px] h-[16px]" />
             </TrayButton>

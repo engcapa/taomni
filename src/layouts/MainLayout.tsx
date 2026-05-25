@@ -66,6 +66,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
+import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 
@@ -73,7 +74,10 @@ interface PendingAuth {
   session: SessionConfig;
 }
 
+type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
+
 const MIN_SPLIT_WEIGHT = 0.35;
+const SAVED_PASSWORD_VAULT_REASON = "This connection uses a saved password — unlock the vault to continue.";
 
 function localShellSelectionFromSession(session: SessionConfig): LocalShellSelection | undefined {
   const options = parseSessionOptions(session.options_json);
@@ -87,6 +91,22 @@ function localShellSelectionFromSession(session: SessionConfig): LocalShellSelec
     name: session.name || path,
     ...(args && args.length > 0 ? { args } : {}),
   };
+}
+
+function resolveSessionAuth(session: SessionConfig): { method: string; data: string | null } {
+  const method = typeof session.auth_method === "string"
+    ? session.auth_method
+    : "PrivateKey";
+  const data = typeof session.auth_method === "object" && "PrivateKey" in session.auth_method
+    ? session.auth_method.PrivateKey.key_path
+    : null;
+  return { method, data };
+}
+
+function passwordRefFromOptions(session: SessionConfig): string | null {
+  const opts = parseSessionOptions(session.options_json);
+  const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
+  return ref && ref.startsWith("vault:") ? ref : null;
 }
 
 export function MainLayout() {
@@ -146,31 +166,21 @@ export function MainLayout() {
   const [splitGridRowWeights, setSplitGridRowWeights] = useState<number[]>([]);
   const [vaultUnlockReason, setVaultUnlockReason] = useState<string | null>(null);
   const pendingVaultActionRef = useRef<(() => void) | null>(null);
+  const connectQueueRef = useRef<SessionConfig[]>([]);
+  const connectQueueRunningRef = useRef(false);
+  const awaitingManualAuthRef = useRef(false);
+  const awaitingVaultUnlockRef = useRef(false);
+  const continueConnectQueueRef = useRef<() => void>(() => undefined);
   const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
-  const toggleChatDrawer = useChatStore((s) => s.toggleDrawer);
+  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
+  const toggleTabChat = useChatStore((s) => s.toggleTabChat);
+  const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
-
-  // Run `action` only after the vault is known to be unlocked. If it's
-  // already unlocked we run inline; otherwise we surface the unlock
-  // dialog and queue the action to run on a successful unlock. This
-  // keeps a connect from racing past a locked vault and showing
-  // "Connection failed: VAULT_LOCKED" before the user has even seen
-  // the prompt.
-  const runWhenVaultUnlocked = useCallback(
-    (reason: string, action: () => void) => {
-      const state = useVaultStore.getState().state;
-      if (state === "unlocked" || state === "empty") {
-        action();
-        return;
-      }
-      pendingVaultActionRef.current = action;
-      setVaultUnlockReason(reason);
-    },
-    [],
-  );
+  const chatDrawerScope = useChatStore((s) => s.drawerScope);
+  const chatDrawerTabId = useChatStore((s) => s.drawerTabId);
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -292,6 +302,14 @@ export function MainLayout() {
     if (activeTabId) setTabHasNewOutput(activeTabId, false);
   }, [activeTabId, setTabHasNewOutput]);
 
+  // Track which tab the AI Chat Drawer should consider "active" when the user
+  // types `@terminal:last-N` or hits Send-to-Terminal on a code block.
+  useEffect(() => {
+    const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
+    setActiveTerminalTab(terminalTabId);
+    void syncTabChatWithActiveTab(terminalTabId);
+  }, [activeTabId, activeTab?.type, syncTabChatWithActiveTab]);
+
   useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
@@ -323,17 +341,29 @@ export function MainLayout() {
         event.preventDefault();
         toggleCompactMode();
       }
-      // Ctrl+L: toggle AI Chat Drawer (no-op when fully_disabled)
-      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "l") {
+      const primary = event.ctrlKey || event.metaKey;
+      if (!primary || event.altKey || event.key.toLowerCase() !== "l") return;
+
+      // Ctrl/Cmd+L: global AI Chat Drawer (no-op when fully_disabled).
+      if (!event.shiftKey) {
         event.preventDefault();
         const aiOff = useAiStore.getState().config?.fully_disabled === true;
-        if (!aiOff) toggleChatDrawer();
+        if (!aiOff) void toggleGlobalChat();
+        return;
+      }
+
+      // Ctrl/Cmd+Shift+L: current terminal tab's bound chat.
+      if (event.shiftKey) {
+        event.preventDefault();
+        const aiOff = useAiStore.getState().config?.fully_disabled === true;
+        const current = useAppStore.getState().tabs.find((tab) => tab.id === useAppStore.getState().activeTabId);
+        if (!aiOff && current?.type === "terminal") void toggleTabChat(current.id);
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCompactMode, toggleChatDrawer]);
+  }, [toggleCompactMode, toggleGlobalChat, toggleTabChat]);
 
   const confirmExitWithOpenTabs = useCallback(() => {
     const currentTabs = tabsRef.current;
@@ -519,86 +549,6 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [handleOpenLocalPath, markConnected, setStatusMessage]);
 
-  const handleConnectSession = useCallback((session: SessionConfig) => {
-    const resolveAuth = (): { method: string; data: string | null } => {
-      const method = typeof session.auth_method === "string"
-        ? session.auth_method
-        : "PrivateKey";
-      const data = typeof session.auth_method === "object" && "PrivateKey" in session.auth_method
-        ? session.auth_method.PrivateKey.key_path
-        : null;
-      return { method, data };
-    };
-
-    // For password auth, look for a saved vault reference first. The
-    // backend will resolve it; if the vault is locked, the IPC layer
-    // raises VAULT_LOCKED and our global listener pops the unlock dialog.
-    const passwordRefFromOptions = (): string | null => {
-      const opts = parseSessionOptions(session.options_json);
-      const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
-      return ref && ref.startsWith("vault:") ? ref : null;
-    };
-
-    if (session.session_type === "SSH") {
-      const { method, data } = resolveAuth();
-      if (method === "Password") {
-        const ref = passwordRefFromOptions();
-        if (ref) {
-          runWhenVaultUnlocked(
-            "This connection uses a saved password — unlock the vault to continue.",
-            () => openSshTab(session, "Password", ref),
-          );
-        } else {
-          setPendingAuth({ session });
-        }
-      } else {
-        openSshTab(session, method, data);
-      }
-    } else if (session.session_type === "SFTP") {
-      const { method, data } = resolveAuth();
-      if (method === "Password") {
-        const ref = passwordRefFromOptions();
-        if (ref) {
-          runWhenVaultUnlocked(
-            "This connection uses a saved password — unlock the vault to continue.",
-            () => openSftpTab(session, "Password", ref),
-          );
-        } else {
-          setPendingAuth({ session });
-        }
-      } else {
-        openSftpTab(session, method, data);
-      }
-    } else if (session.session_type === "LocalShell") {
-      openLocalTab(
-        session.name || "Local terminal",
-        session.id,
-        getSessionTerminalProfile(session.options_json),
-        localShellSelectionFromSession(session),
-      );
-    } else if (session.session_type === "VNC") {
-      const { method, data } = resolveAuth();
-      if (method === "Password") {
-        const ref = passwordRefFromOptions();
-        if (ref) {
-          runWhenVaultUnlocked(
-            "This connection uses a saved password — unlock the vault to continue.",
-            () => openVncTab(session, ref),
-          );
-        } else {
-          setPendingAuth({ session });
-        }
-      } else {
-        openVncTab(session, data ?? undefined);
-      }
-    } else if (session.session_type === "File") {
-      openFileSession(session);
-    } else {
-      openUnsupportedTab(session);
-      void markConnected(session.id);
-    }
-  }, [markConnected, openLocalTab, openSftpTab, openVncTab, openFileSession, runWhenVaultUnlocked]);
-
   const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const id = `ssh-${session.id}-${Date.now()}`;
     addTab({
@@ -636,6 +586,115 @@ export function MainLayout() {
     });
   }, [addTab]);
 
+  const queueVaultUnlock = useCallback((session: SessionConfig): ConnectQueueOutcome => {
+    connectQueueRef.current.unshift(session);
+    awaitingVaultUnlockRef.current = true;
+    pendingVaultActionRef.current = () => {
+      awaitingVaultUnlockRef.current = false;
+      continueConnectQueueRef.current();
+    };
+    setVaultUnlockReason((current) => current ?? SAVED_PASSWORD_VAULT_REASON);
+    return "awaiting-vault";
+  }, []);
+
+  const openQueuedSession = useCallback((session: SessionConfig): ConnectQueueOutcome => {
+    if (session.session_type === "SSH") {
+      const { method, data } = resolveSessionAuth(session);
+      if (method === "Password") {
+        const ref = passwordRefFromOptions(session);
+        if (ref) {
+          const vaultState = useVaultStore.getState().state;
+          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+          openSshTab(session, "Password", ref);
+        } else {
+          awaitingManualAuthRef.current = true;
+          setPendingAuth({ session });
+          return "awaiting-auth";
+        }
+      } else {
+        openSshTab(session, method, data);
+      }
+    } else if (session.session_type === "SFTP") {
+      const { method, data } = resolveSessionAuth(session);
+      if (method === "Password") {
+        const ref = passwordRefFromOptions(session);
+        if (ref) {
+          const vaultState = useVaultStore.getState().state;
+          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+          openSftpTab(session, "Password", ref);
+        } else {
+          awaitingManualAuthRef.current = true;
+          setPendingAuth({ session });
+          return "awaiting-auth";
+        }
+      } else {
+        openSftpTab(session, method, data);
+      }
+    } else if (session.session_type === "LocalShell") {
+      openLocalTab(
+        session.name || "Local terminal",
+        session.id,
+        getSessionTerminalProfile(session.options_json),
+        localShellSelectionFromSession(session),
+      );
+    } else if (session.session_type === "VNC") {
+      const { method, data } = resolveSessionAuth(session);
+      if (method === "Password") {
+        const ref = passwordRefFromOptions(session);
+        if (ref) {
+          const vaultState = useVaultStore.getState().state;
+          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+          openVncTab(session, ref);
+        } else {
+          awaitingManualAuthRef.current = true;
+          setPendingAuth({ session });
+          return "awaiting-auth";
+        }
+      } else {
+        openVncTab(session, data ?? undefined);
+      }
+    } else if (session.session_type === "File") {
+      openFileSession(session);
+    } else {
+      openUnsupportedTab(session);
+      void markConnected(session.id);
+    }
+    return "opened";
+  }, [
+    markConnected,
+    openFileSession,
+    openLocalTab,
+    openSftpTab,
+    openSshTab,
+    openUnsupportedTab,
+    openVncTab,
+    queueVaultUnlock,
+  ]);
+
+  const continueConnectQueue = useCallback(() => {
+    if (connectQueueRunningRef.current || awaitingManualAuthRef.current || awaitingVaultUnlockRef.current) return;
+    connectQueueRunningRef.current = true;
+    try {
+      while (connectQueueRef.current.length > 0) {
+        const session = connectQueueRef.current.shift();
+        if (!session) continue;
+        const outcome = openQueuedSession(session);
+        if (outcome !== "opened") return;
+      }
+    } finally {
+      connectQueueRunningRef.current = false;
+    }
+  }, [openQueuedSession]);
+
+  useEffect(() => {
+    continueConnectQueueRef.current = continueConnectQueue;
+  }, [continueConnectQueue]);
+
+  const handleConnectSession = useCallback((session: SessionConfig) => {
+    connectQueueRef.current.push(session);
+    continueConnectQueue();
+  }, [continueConnectQueue]);
+
   const handleAuthSubmit = useCallback(async (password: string, saveToVault: boolean) => {
     if (!pendingAuth) return;
     const session = pendingAuth.session;
@@ -656,6 +715,11 @@ export function MainLayout() {
         await updateSession({ ...session, options_json: updated });
       } catch (err) {
         if (isVaultLockedError(err)) {
+          awaitingVaultUnlockRef.current = true;
+          pendingVaultActionRef.current = () => {
+            awaitingVaultUnlockRef.current = false;
+            continueConnectQueueRef.current();
+          };
           setVaultUnlockReason("Unlock the vault to save this password.");
         }
         // On any vault error, fall back to one-shot connect with the typed
@@ -672,6 +736,8 @@ export function MainLayout() {
       openSshTab(session, "Password", credential);
     }
     setPendingAuth(null);
+    awaitingManualAuthRef.current = false;
+    continueConnectQueueRef.current();
   }, [pendingAuth, openSftpTab, openSshTab, openVncTab, updateSession]);
 
   const handleQuickConnect = useCallback((value: string) => {
@@ -682,6 +748,7 @@ export function MainLayout() {
         openLocalTab(session.name);
       } else if (session.session_type === "SSH" || session.session_type === "SFTP") {
         if (session.auth_method === "Password") {
+          awaitingManualAuthRef.current = true;
           setPendingAuth({ session });
         } else {
           const authMethod = typeof session.auth_method === "string" ? session.auth_method : "PrivateKey";
@@ -1115,6 +1182,10 @@ export function MainLayout() {
                                 : undefined
                             }
                             sftpToggle={!terminalSplitVisible && tab.ssh ? { open: sidebarOpen, onToggle: () => toggleAttachedSidebar(tab.id) } : undefined}
+                            chatToggle={!terminalSplitVisible ? {
+                              open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
+                              onToggle: () => void toggleTabChat(tab.id),
+                            } : undefined}
                           />
                         </div>
                       );
@@ -1427,7 +1498,11 @@ export function MainLayout() {
           host={pendingAuth.session.host}
           username={pendingAuth.session.username ?? "root"}
           onSubmit={handleAuthSubmit}
-          onCancel={() => setPendingAuth(null)}
+          onCancel={() => {
+            setPendingAuth(null);
+            awaitingManualAuthRef.current = false;
+            continueConnectQueueRef.current();
+          }}
         />
       )}
 
@@ -1436,6 +1511,8 @@ export function MainLayout() {
           reason={vaultUnlockReason}
           onCancel={() => {
             pendingVaultActionRef.current = null;
+            awaitingVaultUnlockRef.current = false;
+            connectQueueRef.current = [];
             setVaultUnlockReason(null);
           }}
           onSubmit={async (pw) => {
@@ -1443,6 +1520,7 @@ export function MainLayout() {
             const pending = pendingVaultActionRef.current;
             pendingVaultActionRef.current = null;
             setVaultUnlockReason(null);
+            awaitingVaultUnlockRef.current = false;
             if (pending) pending();
           }}
         />

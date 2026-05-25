@@ -1,12 +1,13 @@
 id: TC-AI-001
 title: AI Chat Drawer opens, lists threads, and shows provider switcher
 description: |
-  Verifies the v2.4 AI Chat Drawer surface: Ctrl+L toggles it, the title bar
-  PTT button is mounted, history pane lists existing threads (or empty
-  state), provider badge dropdown is populated when AI providers are
-  configured, and the @reference syntax preview chip appears for
-  `@terminal:last-50`. Does not exercise streaming or send (those need a
-  real LLM key); the assertion target is UI plumbing only.
+  Verifies the v2.4 AI Chat Drawer surface: Ctrl+L opens the global drawer,
+  the title bar PTT button is mounted, history pane lists existing threads
+  (or empty state), provider badge dropdown is populated when AI providers
+  are configured, and the @reference syntax preview chip appears for
+  `@terminal:last-50`. Tab-bound chat is opened separately from the terminal
+  floating toolbar or Ctrl+Shift+L. Does not exercise streaming or send
+  (those need a real LLM key); the assertion target is UI plumbing only.
 covers: [F-AI-2.4]
 tags: [ai, drawer, p1]
 modes: [browser]

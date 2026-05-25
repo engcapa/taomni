@@ -1,29 +1,63 @@
-import { useEffect, useRef, useState } from "react";
-import { Bot, History, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
+import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { ChatThreadList } from "./ChatThreadList";
+import { NewThreadFormatPicker } from "./NewThreadFormatPicker";
+import {
+  getTerminal,
+} from "../../lib/terminal/terminalRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 
 interface ChatDrawerProps {
-  /** Optional terminal content to attach as context. */
+  /**
+   * Optional fallback terminal scrollback. When omitted (the default in the
+   * production layout), the drawer pulls live buffer text from the terminal
+   * registry instead — that's what makes `@terminal:last-N` actually work.
+   */
   terminalContext?: string;
 }
 
 export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const {
-    threads, activeThreadId, messages, sending, drawerOpen, drawerWidth,
+    threads, activeThreadId, messages, sending, drawerOpen, drawerScope, drawerWidth,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
+  const [showNewThreadPicker, setShowNewThreadPicker] = useState(false);
+  const [pickerInitialScope, setPickerInitialScope] = useState<"terminal" | "global">("terminal");
   const [error, setError] = useState<string | null>(null);
+  // Per-thread render-format override applied client-side ONLY (the persisted
+  // `output_format` is locked once the thread has any messages — see issue
+  // #3). Setting this lets the user re-render the existing transcript in
+  // another format via the convert button without changing the prompt
+  // contract sent to the LLM for the next turn.
+  const [renderFormatOverride, setRenderFormatOverride] =
+    useState<Record<string, ChatOutputFormat>>({});
+  const [copiedAll, setCopiedAll] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
   const resizeStartRef = useRef({ x: 0, width: 0 });
+
+  // Subscribe to the active tab so the drawer re-renders (and the
+  // scope/picker logic re-evaluates) whenever the user switches tabs. We
+  // can't read this from terminalRegistry alone because the registry is a
+  // plain global and isn't reactive.
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const activeTabType = useAppStore((s) =>
+    s.tabs.find((t) => t.id === s.activeTabId)?.type ?? null,
+  );
+  const focusedTerminal = useMemo(() => {
+    if (activeTabType !== "terminal") return null;
+    return activeTabId ? getTerminal(activeTabId) : null;
+    // We deliberately depend on activeTabId/Type so the memo recomputes on
+    // tab switch even though terminalRegistry itself is non-reactive.
+  }, [activeTabId, activeTabType]);
 
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
   const activeThread = threads.find((t) => t.id === activeThreadId);
@@ -36,12 +70,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
   const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
 
-  // Effective format for rendering this thread's messages: per-thread override
-  // takes precedence over the global default. Mirrors backend resolve_output_format.
-  const effectiveFormat: ChatOutputFormat = (() => {
+  // Effective format for rendering this thread's messages. Resolution order:
+  //   1. Client-side render-only override (set by the convert button).
+  //   2. Persisted per-thread `output_format` (chosen at thread creation).
+  //   3. Global default from AiConfig.
+  // Mirrors the backend's resolve_output_format for #2 and #3.
+  const effectiveFormat: ChatOutputFormat = useMemo(() => {
+    const override = activeThreadId ? renderFormatOverride[activeThreadId] : undefined;
+    if (override) return override;
     const candidate = activeThread?.output_format ?? globalOutputFormat;
     return candidate === "html" || candidate === "plain" ? candidate : "md";
-  })();
+  }, [activeThreadId, renderFormatOverride, activeThread?.output_format, globalOutputFormat]);
+
+  // Once a thread has any messages, the persisted `output_format` is locked —
+  // re-rendering existing replies in another format would silently invalidate
+  // them (HTML rendered as Markdown is unreadable, plain text rendered as
+  // Markdown collides with `*` and `_`). The user can still convert the
+  // visible transcript via the render-only override.
+  const formatLocked = activeThreadId
+    ? (messages[activeThreadId]?.length ?? 0) > 0
+    : false;
 
   // Load threads on mount + sweep stale (30-day retention).
   useEffect(() => {
@@ -88,9 +136,79 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeMessages.length]);
 
-  const handleNewThread = async () => {
+  const openNewThreadPicker = (scope: "terminal" | "global") => {
     setShowHistory(false);
-    await newThread();
+    setPickerInitialScope(scope);
+    setShowNewThreadPicker(true);
+  };
+
+  const handleNewThread = async () => {
+    // Default to "terminal" when there's an active terminal, otherwise global.
+    openNewThreadPicker(focusedTerminal ? "terminal" : "global");
+  };
+
+  const handleNewGlobalThread = async () => {
+    openNewThreadPicker("global");
+  };
+
+  const createThreadWithFormat = async (
+    format: ChatOutputFormat | null,
+    scope: "terminal" | "global",
+  ) => {
+    setShowNewThreadPicker(false);
+    const linked = scope === "terminal" ? focusedTerminal?.tabId ?? null : null;
+    const thread = await newThread(undefined, linked ?? undefined);
+    if (format) {
+      try {
+        await useChatStore.getState().setThreadOutputFormat(thread.id, format);
+      } catch (e) {
+        console.warn("set initial output_format failed:", e);
+      }
+    }
+  };
+
+  const copyAllToClipboard = async () => {
+    if (!activeThreadId) return;
+    const list = messages[activeThreadId] ?? [];
+    if (list.length === 0) return;
+    const text = list
+      .map((m) => {
+        const role = m.role === "user" ? "用户" : m.role === "assistant" ? "AI" : "系统";
+        return `### ${role}\n\n${m.content}`;
+      })
+      .join("\n\n---\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAll(true);
+      window.setTimeout(() => setCopiedAll(false), 1500);
+    } catch (e) {
+      console.warn("copy all failed:", e);
+    }
+  };
+
+  const cycleRenderFormat = () => {
+    if (!activeThreadId) return;
+    const order: ChatOutputFormat[] = ["md", "html", "plain"];
+    const idx = order.indexOf(effectiveFormat);
+    const next = order[(idx + 1) % order.length];
+    setRenderFormatOverride((m) => ({ ...m, [activeThreadId]: next }));
+  };
+
+  const resolveTerminalText = (lines: number): string | undefined => {
+    // Prefer the terminal linked to the active thread; fall back to the
+    // currently focused terminal tab; final fallback is the legacy prop the
+    // caller passed (kept for tests / programmatic use).
+    const linked = activeThread?.linked_session_id ?? null;
+    const entry = getTerminal(linked) ?? focusedTerminal;
+    if (entry) {
+      return entry.getLastLines(lines);
+    }
+    if (terminalContext) {
+      const all = terminalContext.split("\n");
+      const slice = all.slice(Math.max(0, all.length - lines));
+      return slice.join("\n");
+    }
+    return undefined;
   };
 
   const handleSend = async (content: string, attachedTerminalCtx?: string) => {
@@ -99,13 +217,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     // fall back to whatever the host (TerminalPanel) staged.
     const ctx = attachedTerminalCtx ?? terminalContext;
     if (!activeThreadId) {
-      const thread = await newThread();
-      setError(null);
-      try {
-        await sendMessage(thread.id, content, ctx);
-      } catch (e) {
-        setError(String(e));
-      }
+      // No thread selected — open the format picker rather than silently
+      // creating one with the default format.
+      openNewThreadPicker(focusedTerminal ? "terminal" : "global");
       return;
     }
     setError(null);
@@ -164,8 +278,32 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           <button
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+            onClick={copyAllToClipboard}
+            disabled={!activeThreadId || activeMessages.length === 0}
+            title="复制全部对话"
+            aria-label="Copy entire conversation"
+          >
+            {copiedAll ? (
+              <Check className="w-3.5 h-3.5 text-green-400" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+            onClick={handleNewGlobalThread}
+            title="新建全局对话（不绑定终端）"
+            aria-label="New global chat"
+          >
+            <Globe className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={handleNewThread}
             title="新对话"
+            aria-label="New chat"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -181,7 +319,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={toggleDrawer}
-            title="关闭 (Ctrl+L)"
+            title={drawerScope === "tab" ? "关闭 (Ctrl+Shift+L)" : "关闭 (Ctrl+L)"}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -203,6 +341,28 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         {/* Provider badge / switcher */}
         {activeThread && (
           <div className="px-2 py-1 text-[10px] text-[var(--moba-text-muted)] border-b border-[var(--moba-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
+            {/* Scope badge: shows whether this thread is bound to a specific
+                terminal or is a global conversation. */}
+            {activeThread.linked_session_id ? (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-accent)]/10 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30"
+                title={`已绑定终端 tab: ${activeThread.linked_session_id}`}
+              >
+                <Link2 className="w-2.5 h-2.5" />
+                <span className="truncate max-w-[100px]">
+                  {getTerminal(activeThread.linked_session_id)?.title
+                    ?? activeThread.linked_session_id.slice(0, 8)}
+                </span>
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-divider)]/30 border border-[var(--moba-divider)]"
+                title="全局对话（不绑定特定终端）"
+              >
+                <Globe className="w-2.5 h-2.5" />
+                <span>Global</span>
+              </span>
+            )}
             <span>Provider:</span>
             {providerIds.length > 0 ? (
               <select
@@ -221,21 +381,41 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               <span className="text-[var(--moba-accent)]">{activeThread.provider_id}</span>
             )}
             <span className="ml-2">Format:</span>
-            <select
-              className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
-              value={activeThread.output_format ?? ""}
-              aria-label="Thread output format"
-              title={`Effective: ${effectiveFormat} (global default: ${globalOutputFormat})`}
-              onChange={(e) => {
-                const v = e.target.value;
-                void setThreadOutputFormat(activeThread.id, v === "" ? null : v);
-              }}
+            {formatLocked ? (
+              // Locked once the thread has any messages — issue #3.
+              <span
+                className="text-[var(--moba-accent)] px-1"
+                title="对话已开始，原始输出格式已锁定。点击右侧转换按钮可在 Markdown / HTML / 纯文本之间切换显示。"
+              >
+                {activeThread.output_format ?? `Inherit (${globalOutputFormat})`}
+              </span>
+            ) : (
+              <select
+                className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
+                value={activeThread.output_format ?? ""}
+                aria-label="Thread output format"
+                title={`Effective: ${effectiveFormat} (global default: ${globalOutputFormat})`}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  void setThreadOutputFormat(activeThread.id, v === "" ? null : v);
+                }}
+              >
+                <option value="">Inherit ({globalOutputFormat})</option>
+                <option value="md">Markdown</option>
+                <option value="html">HTML</option>
+                <option value="plain">Plain text</option>
+              </select>
+            )}
+            <button
+              type="button"
+              className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
+              onClick={cycleRenderFormat}
+              title={`显示为：${effectiveFormat}（点击循环切换 md → html → plain）`}
+              aria-label="Convert visible transcript to another format"
             >
-              <option value="">Inherit ({globalOutputFormat})</option>
-              <option value="md">Markdown</option>
-              <option value="html">HTML</option>
-              <option value="plain">Plain text</option>
-            </select>
+              <RefreshCw className="w-2.5 h-2.5" />
+              <span>显示 {effectiveFormat}</span>
+            </button>
           </div>
         )}
 
@@ -248,7 +428,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             </div>
           )}
           {activeMessages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} format={effectiveFormat} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              format={effectiveFormat}
+              preferredTerminalTabId={activeThread?.linked_session_id ?? null}
+            />
           ))}
           {sending && (
             <div className="flex items-center gap-2 text-[11px] text-[var(--moba-text-muted)]">
@@ -277,17 +462,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           onSend={handleSend}
           sending={sending}
           disabled={false}
-          // When the user types `@terminal:last-N`, slice off the most recent N
-          // lines from whatever terminal context was staged into the drawer.
-          // We slice from the bottom so it matches the user's intent.
-          resolveTerminalContext={(lines) => {
-            if (!terminalContext) return undefined;
-            const all = terminalContext.split("\n");
-            const slice = all.slice(Math.max(0, all.length - lines));
-            return slice.join("\n");
-          }}
+          // Use the active terminal registry when available — that's what
+          // makes `@terminal:last-N` work even when the drawer is rendered
+          // without a `terminalContext` prop (the production case).
+          resolveTerminalContext={resolveTerminalText}
         />
       </div>
+
+      {showNewThreadPicker && (
+        <NewThreadFormatPicker
+          defaultFormat={
+            (globalOutputFormat === "html" || globalOutputFormat === "plain")
+              ? globalOutputFormat
+              : "md"
+          }
+          defaultScope={pickerInitialScope}
+          activeTerminalTitle={focusedTerminal?.title ?? null}
+          onCancel={() => setShowNewThreadPicker(false)}
+          onConfirm={createThreadWithFormat}
+        />
+      )}
     </div>
   );
 }
