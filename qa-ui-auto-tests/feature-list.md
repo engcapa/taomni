@@ -42,7 +42,7 @@ controls:
 -->
 
 - 顶部菜单栏 `MenuBar`（File/Edit/View/Sessions/Tools/Help）
-- Ribbon 工具条 `Ribbon`（Session、Servers、Tools、Games、Sessions、View、Split、MultiExec、Tunneling、Packages、Settings、Help、X server、Exit）
+- Ribbon 工具条 `Ribbon`（Session、Servers、Tools、View、Split、MultiExec、Tunneling、Packages、Settings、Help、X server、Exit）
 - 地址栏式快速连接 `QuickConnect`
 - 左侧可拖拽/可折叠 Sidebar
 - 中间 Tab 栏 + 内容区
@@ -296,7 +296,7 @@ controls:
     kind: display
 -->
 
-- 顶级菜单：Terminal / Sessions / View / X server / Tools / Games / Settings / Macros / Help
+- 顶级菜单：Terminal / Sessions / View / X server / Tools / Settings / Macros / Help
 - 下拉项调用 ribbon 命令或在新标签内打开会话
 - 右键菜单兜底已被 ContextMenu 通用化
 
@@ -335,7 +335,7 @@ controls:
     optional: true
 -->
 
-- 大图标命令：Session / SFTP / Servers / Tools / Games / Sessions / View / Split / MultiExec / Tunneling / Packages / Settings / Help
+- 大图标命令：Session / SFTP / Servers / Tools / View / Split / MultiExec / Tunneling / Packages / Settings / Help
 - 每条命令通过 `data-testid={`ribbon-${slug(label)}`}` 暴露稳定锚点
 
 ---
@@ -2083,7 +2083,7 @@ controls:
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
-> - Ribbon `Packages`、`Games`、`Macros`
+> - Ribbon `Packages`、`Macros`
 > - 会话协议 RDP（仅保留会话存储与编辑表单，连接动作打开占位 tab）
 > - QuickConnect 的 VNC URL 入口（已保存 VNC 会话可连接，QuickConnect 尚未接入 VNC client）
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）

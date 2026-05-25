@@ -862,9 +862,8 @@ export function MainLayout() {
       case "settings":
         openSettingsTab();
         break;
-      case "games":
       case "macros":
-        openPlaceholderTab(command === "games" ? "Games" : "Macros", "This module is intentionally inactive in the MVP.");
+        openPlaceholderTab("Macros", "This module is intentionally inactive in the MVP.");
         break;
       case "help":
         setShowAbout(true);

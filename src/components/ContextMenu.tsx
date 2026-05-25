@@ -201,6 +201,9 @@ export function useContextMenu() {
     e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, items });
   };
+  const showAt = (x: number, y: number, items: MenuItem[]) => {
+    setMenu({ x, y, items });
+  };
 
   const close = () => setMenu(null);
 
@@ -208,7 +211,7 @@ export function useContextMenu() {
     <ContextMenu items={menu.items} x={menu.x} y={menu.y} onClose={close} />
   ) : null;
 
-  return { show, close, render };
+  return { show, showAt, close, render, isOpen: menu !== null };
 }
 
 function slugForTestId(value: string): string {
