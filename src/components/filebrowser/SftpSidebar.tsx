@@ -1,4 +1,5 @@
 import { FileBrowser } from "./FileBrowser";
+import { useT } from "../../lib/i18n";
 
 interface SftpSidebarProps {
   sessionId: string;
@@ -26,6 +27,7 @@ interface SftpSidebarProps {
  * the panel only asks the terminal for cwd when the explicit Sync button is clicked.
  */
 export function SftpSidebar(props: SftpSidebarProps) {
+  const t = useT();
   return (
     <FileBrowser
       sessionId={props.sessionId}
@@ -41,7 +43,7 @@ export function SftpSidebar(props: SftpSidebarProps) {
       onClose={props.onClose}
       onOpenTerminalHere={props.onOpenTerminalHere}
       showHeader
-      title={props.title ?? "SFTP"}
+      title={props.title ?? t("fileBrowser.sftpHeaderDefaultTitle")}
       defaultOrientation="vertical"
       orientationScope={`sidebar-${props.sessionId}`}
     />

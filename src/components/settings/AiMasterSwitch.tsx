@@ -1,5 +1,6 @@
 import { useAiStore } from "../../stores/aiStore";
 import { Power } from "lucide-react";
+import { useT } from "../../lib/i18n";
 
 /**
  * Top-level toggle that disables every AI surface (drawer button, voice
@@ -12,6 +13,7 @@ import { Power } from "lucide-react";
  */
 export function AiMasterSwitch() {
   const { config, saveConfig } = useAiStore();
+  const t = useT();
   if (!config) return null;
 
   const disabled = !!config.fully_disabled;
@@ -34,12 +36,12 @@ export function AiMasterSwitch() {
       />
       <div className="flex-1">
         <div className="text-[13px] font-semibold">
-          Disable AI completely {disabled ? "· Enabled" : ""}
+          {t("aiSettings.disableAi")} {disabled ? t("aiSettings.disabledSuffix") : ""}
         </div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
           {disabled
-            ? "All AI entry points hidden; no network calls, no model loading, zero extra memory"
-            : "Keep AI features. When enabled, restores plain terminal mode — useful as a master switch for offline / compliance scenarios."}
+            ? t("aiSettings.disabledOnDesc")
+            : t("aiSettings.disabledOffDesc")}
         </div>
       </div>
       <div

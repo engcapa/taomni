@@ -5,6 +5,7 @@ import { CommandPreviewCard, type CommandPreviewData } from "../voice/CommandPre
 import { copyCommandToClipboard, updateAuditOutcome } from "../../lib/voice/commandExecutor";
 import { useAppStore } from "../../stores/appStore";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../../lib/ipc";
+import { useT } from "../../lib/i18n";
 
 interface AiShellPanelProps {
   /** Whether the "voice→shell" experimental feature is enabled. */
@@ -13,6 +14,7 @@ interface AiShellPanelProps {
 }
 
 export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
+  const t = useT();
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<CommandPreviewData | null>(null);
@@ -36,12 +38,11 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
         window.dispatchEvent(
           new CustomEvent(VAULT_LOCKED_EVENT, {
             detail: {
-              reason:
-                "This AI provider's API key is in the credential vault — unlock it to continue.",
+              reason: t("aiSettings.aiShellVaultDetail"),
             },
           }),
         );
-        setError("Vault is locked — unlock it to use this AI provider, then try again.");
+        setError(t("aiSettings.aiShellVaultLocked"));
       } else {
         setError(String(e));
       }
@@ -86,7 +87,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
         <Terminal className={`w-4 h-4 shrink-0 ${enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">
-            Voice-to-Command{" "}
+            {t("aiSettings.aiShellTitle")}{" "}
             <span
               className="text-[10px] ml-1 rounded px-1.5 py-0.5 align-middle"
               style={{
@@ -95,11 +96,11 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
                 border: "1px solid var(--moba-badge-warning-border)",
               }}
             >
-              Experimental
+              {t("aiSettings.aiShellExperimental")}
             </span>
           </div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            Describe a command in natural language; AI generates a shell script and shows a confirmation card
+            {t("aiSettings.aiShellDescription")}
           </div>
         </div>
         <div
@@ -119,13 +120,13 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       {enabled && (
         <div className="space-y-2">
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            Test: type a natural-language description to generate a command preview card
+            {t("aiSettings.aiShellTest")}
           </div>
           <div className="flex gap-2">
             <input
               type="text"
               className="moba-input h-8 flex-1 text-[12px]"
-              placeholder="e.g. List all files larger than 100MB in the current directory"
+              placeholder={t("aiSettings.aiShellPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
@@ -136,7 +137,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
               onClick={handleGenerate}
               disabled={loading || !description.trim()}
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Generate"}
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t("aiSettings.aiShellGenerate")}
             </button>
           </div>
 

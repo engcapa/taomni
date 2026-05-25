@@ -28,7 +28,7 @@ describe("CodeBlockToolbar selection UI", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /选行/ }));
+    await user.click(screen.getByRole("button", { name: /Select lines/ }));
 
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes).toHaveLength(2);
@@ -57,7 +57,7 @@ describe("CodeBlockToolbar selection UI", () => {
 
     render(<CodeBlockToolbar code="ss -tlnp" lang="bash" />);
 
-    await user.click(screen.getByRole("button", { name: /发送到终端/ }));
+    await user.click(screen.getByRole("button", { name: /Send to terminal/ }));
 
     expect(writeInput).toHaveBeenCalledWith("ss -tlnp");
   });
@@ -80,12 +80,12 @@ describe("CodeBlockToolbar selection UI", () => {
 
     render(<CodeBlockToolbar code={"ss -tlnp\nlsof -i :8080"} lang="bash" />);
 
-    await user.click(screen.getByRole("button", { name: /发送到终端/ }));
+    await user.click(screen.getByRole("button", { name: /Send to terminal/ }));
 
     expect(writeInput).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "确认发送多行内容" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Confirm sending multi-line content" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^发送$/ }));
+    await user.click(screen.getByRole("button", { name: /^Send$/ }));
 
     expect(writeInput).toHaveBeenCalledWith("ss -tlnp\rlsof -i :8080");
   });

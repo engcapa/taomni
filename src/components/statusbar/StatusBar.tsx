@@ -13,11 +13,13 @@ import {
   Cpu,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { appThemeModeLabel, useAppTheme } from "../../lib/appTheme";
+import { useAppTheme } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
+import { useT } from "../../lib/i18n";
+import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
 export function StatusBar() {
   const { tabs, activeTabId, xServerEnabled, statusMessage } = useAppStore();
@@ -36,6 +38,8 @@ export function StatusBar() {
   const fullyDisabled = !!aiConfig?.fully_disabled;
   const ccEnabled = !!aiConfig?.cc_bridge.enabled;
   const searchEnabled = !!aiConfig?.web_search.client_enabled;
+  const t = useT();
+  const themeLabel = useAppThemeI18nLabel();
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -54,17 +58,17 @@ export function StatusBar() {
   return (
     <div data-testid="status-bar" className="moba-status h-6 flex items-center px-2 gap-3">
       <span className="flex items-center gap-1">
-        <Eye className="w-3 h-3" /> {sessions.length} sessions • {selected ? selected.name : "none selected"}
+        <Eye className="w-3 h-3" /> {t("statusBar.sessions", { count: sessions.length })} • {selected ? selected.name : t("statusBar.none")}
       </span>
       <span className="moba-divider-v h-3" />
       <span className="flex items-center gap-1">
-        <Wifi className={`w-3 h-3 ${online ? "text-emerald-600" : "text-red-600"}`} /> {online ? "Network online" : "Network offline"}
+        <Wifi className={`w-3 h-3 ${online ? "text-emerald-600" : "text-red-600"}`} /> {online ? t("statusBar.networkOnline") : t("statusBar.networkOffline")}
       </span>
       <span className="flex items-center gap-1">
-        <Monitor className={`w-3 h-3 ${xServerEnabled ? "text-emerald-600" : "text-slate-500"}`} /> X11: {xServerEnabled ? "127.0.0.1:0.0" : "off"}
+        <Monitor className={`w-3 h-3 ${xServerEnabled ? "text-emerald-600" : "text-slate-500"}`} /> X11: {xServerEnabled ? "127.0.0.1:0.0" : t("statusBar.x11Off")}
       </span>
       <span className="flex items-center gap-1">
-        <KeyRound className="w-3 h-3 text-slate-500" /> auth: password/key prompt
+        <KeyRound className="w-3 h-3 text-slate-500" /> {t("statusBar.auth")}
       </span>
 
       {!fullyDisabled && (
@@ -74,7 +78,7 @@ export function StatusBar() {
           {/* ASR segment */}
           <span
             className="flex items-center gap-1 text-[11px]"
-            title={`ASR: ${activeAsr}`}
+            title={t("statusBar.asrTooltip", { provider: activeAsr })}
           >
             <Mic className="w-3 h-3" />
             {dot(aiConfig ? "bg-green-400" : "bg-gray-400")}
@@ -86,17 +90,20 @@ export function StatusBar() {
             type="button"
             className={`flex items-center gap-1 text-[11px] hover:text-[var(--moba-accent)] transition-colors ${drawerOpen && drawerScope === "global" ? "text-[var(--moba-accent)]" : ""}`}
             onClick={() => void toggleGlobalChat()}
-            title="Global AI Chat (Ctrl+L). Current tab chat: Ctrl+Shift+L."
+            title={t("statusBar.globalChatTitle")}
           >
             <Bot className="w-3 h-3" />
             {dot(aiConfig ? "bg-green-400" : "bg-gray-400")}
-            LLM: {activeProvider}
+            {t("statusBar.llm", { provider: activeProvider })}
           </button>
 
           {/* Web search segment */}
           <span
             className="flex items-center gap-1 text-[11px]"
-            title={`Web Search: ${searchEnabled ? "已启用" : "未启用"} (${aiConfig?.web_search.client_provider ?? "—"})`}
+            title={t("statusBar.webSearchTooltip", {
+              state: searchEnabled ? t("common.enabled") : t("common.disabled"),
+              provider: aiConfig?.web_search.client_provider ?? "—",
+            })}
           >
             <Search className="w-3 h-3" />
             {dot(searchEnabled ? "bg-green-400" : "bg-gray-400")}
@@ -106,7 +113,7 @@ export function StatusBar() {
           {ccEnabled && (
             <span
               className="flex items-center gap-1 text-[11px]"
-              title="Claude Code 集成已启用"
+              title={t("statusBar.claudeCodeTooltip")}
             >
               <Cpu className="w-3 h-3" />
               {dot("bg-green-400")}
@@ -118,10 +125,10 @@ export function StatusBar() {
           {fullLocal && (
             <span
               className="flex items-center gap-1 text-[11px] text-purple-300"
-              title="全本地模式：所有云端调用被拒绝"
+              title={t("statusBar.fullLocalTooltip")}
             >
               <Shield className="w-3 h-3" />
-              全本地
+              {t("statusBar.fullLocalShort")}
             </span>
           )}
         </>
@@ -132,10 +139,10 @@ export function StatusBar() {
           <span className="moba-divider-v h-3" />
           <span
             className="flex items-center gap-1 text-[11px] text-yellow-300"
-            title="AI 完全禁用"
+            title={t("statusBar.aiOffTooltip")}
           >
             <Sparkles className="w-3 h-3" />
-            AI: 关闭
+            {t("statusBar.aiOff")}
           </span>
         </>
       )}
@@ -145,12 +152,14 @@ export function StatusBar() {
       <span className="moba-divider-v h-3" />
       <span className="flex items-center gap-1">
         {resolvedTheme === "dark" ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />}
-        Theme: {appThemeModeLabel(mode)}
+        {t("statusBar.themeLabel", { mode: themeLabel(mode) })}
       </span>
       <span className="moba-divider-v h-3" />
-      <span className="moba-mono">{activeTab?.type ?? "none"} • {tabs.filter((tab) => tab.type === "terminal").length} terminals</span>
+      <span className="moba-mono">
+        {activeTab?.type ?? t("statusBar.activeTabNone")} • {t("statusBar.terminalsCount", { count: tabs.filter((tab) => tab.type === "terminal").length })}
+      </span>
       <span className="moba-divider-v h-3" />
-      <span>v0.1.0 • MVP</span>
+      <span>{t("statusBar.versionTag", { version: "0.1.0" })}</span>
     </div>
   );
 }

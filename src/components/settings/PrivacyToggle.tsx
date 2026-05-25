@@ -1,8 +1,10 @@
 import { useAiStore } from "../../stores/aiStore";
 import { Shield, ShieldOff } from "lucide-react";
+import { useT } from "../../lib/i18n";
 
 export function PrivacyToggle() {
   const { config, saveConfig } = useAiStore();
+  const t = useT();
 
   if (!config) return null;
 
@@ -45,12 +47,12 @@ export function PrivacyToggle() {
       )}
       <div className="flex-1">
         <div className="text-[13px] font-semibold">
-          Full local mode {isLocalMode ? "· Enabled" : ""}
+          {t("aiSettings.fullLocal")} {isLocalMode ? t("aiSettings.disabledSuffix") : ""}
         </div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
           {isLocalMode
-            ? "Cloud LLMs, web search, and Claude Code are all blocked; only the local sidecar / Ollama remain available"
-            : "When enabled, forces local-only routing — requires a local model and a running llama-server sidecar"}
+            ? t("aiSettings.fullLocalEnabledDesc")
+            : t("aiSettings.fullLocalDisabledDesc")}
         </div>
       </div>
       <div

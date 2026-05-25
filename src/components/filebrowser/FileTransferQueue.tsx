@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Trash2, X, Eraser, Pause, Play, RotateCw } from "lucide-react";
 import { useTransferStore } from "../../stores/transferStore";
 import { formatBytes, formatRate, formatEta, type TransferState } from "../../lib/sftp";
+import { useT } from "../../lib/i18n";
 
 interface FileTransferQueueProps {
   sessionId?: string;
@@ -20,6 +21,7 @@ export function FileTransferQueue({
   onRetry,
   compact,
 }: FileTransferQueueProps) {
+  const t = useT();
   const items = useTransferStore((s) => s.items);
   const remove = useTransferStore((s) => s.remove);
   const clearCompleted = useTransferStore((s) => s.clearCompleted);
@@ -47,16 +49,16 @@ export function FileTransferQueue({
     <div data-testid="sftp-transfer-queue" className="border-t flex flex-col shrink-0" style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}>
       <div className="h-5 px-2 flex items-center text-[11px] font-semibold gap-2"
         style={{ borderBottom: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
-        <span>Transfers</span>
+        <span>{t("fileBrowser.transferTitle")}</span>
         <span className="text-[var(--moba-text-muted)]">{filtered.length}</span>
         <div className="flex-1" />
         <button
           type="button"
           className="px-1 py-0.5 hover:bg-[var(--moba-hover)] rounded inline-flex items-center gap-1"
-          title="Clear completed"
+          title={t("fileBrowser.transferClearTitle")}
           onClick={clearCompleted}
         >
-          <Eraser className="w-3 h-3" /> Clear
+          <Eraser className="w-3 h-3" /> {t("fileBrowser.transferClear")}
         </button>
       </div>
       <div
@@ -65,7 +67,7 @@ export function FileTransferQueue({
       >
         {filtered.length === 0 && (
           <div className="px-2 py-2 text-[var(--moba-text-muted)]">
-            No active or recent transfers.
+            {t("fileBrowser.transferEmptyText")}
           </div>
         )}
         {filtered.map((it) => {
@@ -105,7 +107,7 @@ export function FileTransferQueue({
                   <button
                     type="button"
                     className="px-1 hover:bg-[var(--moba-hover)] rounded"
-                    title="Pause"
+                    title={t("fileBrowser.transferPause")}
                     onClick={() => onPause!(it.id)}
                   >
                     <Pause className="w-3 h-3" />
@@ -115,7 +117,7 @@ export function FileTransferQueue({
                   <button
                     type="button"
                     className="px-1 hover:bg-[var(--moba-hover)] rounded"
-                    title="Resume"
+                    title={t("fileBrowser.transferResume")}
                     onClick={() => onResume!(it.id)}
                   >
                     <Play className="w-3 h-3" />
@@ -125,7 +127,7 @@ export function FileTransferQueue({
                   <button
                     type="button"
                     className="px-1 hover:bg-[var(--moba-hover)] rounded"
-                    title="Retry"
+                    title={t("fileBrowser.transferRetryTitle")}
                     onClick={() => onRetry!(it.id)}
                   >
                     <RotateCw className="w-3 h-3" />
@@ -135,7 +137,7 @@ export function FileTransferQueue({
                   <button
                     type="button"
                     className="px-1 hover:bg-[var(--moba-hover)] rounded"
-                    title="Cancel"
+                    title={t("fileBrowser.transferCancelTitle")}
                     onClick={() => onCancel(it.id)}
                   >
                     <X className="w-3 h-3" />
@@ -144,7 +146,7 @@ export function FileTransferQueue({
                   <button
                     type="button"
                     className="px-1 hover:bg-[var(--moba-hover)] rounded"
-                    title="Remove from list"
+                    title={t("fileBrowser.transferRemoveTitle")}
                     onClick={() => remove(it.id)}
                   >
                     <Trash2 className="w-3 h-3" />

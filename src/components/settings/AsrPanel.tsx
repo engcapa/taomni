@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAiStore } from "../../stores/aiStore";
+import { useT } from "../../lib/i18n";
 
 const ASR_ENGINE_LABELS: Record<string, string> = {
   "sherpa-onnx": "sherpa-onnx (Recommended)",
@@ -16,13 +17,14 @@ const ASR_MODEL_LABELS: Record<string, string> = {
 
 export function AsrPanel() {
   const { config, loading, loadConfig } = useAiStore();
+  const t = useT();
 
   useEffect(() => {
     if (!config) loadConfig();
   }, []);
 
   if (loading || !config) {
-    return <div className="text-[12px] text-[var(--moba-text-muted)]">Loading...</div>;
+    return <div className="text-[12px] text-[var(--moba-text-muted)]">{t("aiSettings.loading")}</div>;
   }
 
   const asr = config.asr;
@@ -30,24 +32,24 @@ export function AsrPanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">ASR Speech Recognition</div>
+        <div className="text-[13px] font-semibold">{t("aiSettings.asrTitle")}</div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
-          Audio never leaves the device · Must run locally
+          {t("aiSettings.asrSubtitle")}
         </div>
       </div>
 
       <div className="rounded border border-[var(--moba-divider)] bg-[var(--moba-bg)] p-3 space-y-2">
         <div>
-          <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Active engine</label>
+          <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.asrActiveEngine")}</label>
           <div className="text-[12px] font-medium">
             {ASR_ENGINE_LABELS[config.asr.providers[asr.active]?.engine ?? ""] ?? asr.active}
           </div>
         </div>
 
         <div>
-          <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Active model</label>
+          <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.asrActiveModel")}</label>
           <div className="text-[12px]">
-            {ASR_MODEL_LABELS[config.asr.providers[asr.active]?.model ?? ""] ?? config.asr.providers[asr.active]?.model ?? "Not configured"}
+            {ASR_MODEL_LABELS[config.asr.providers[asr.active]?.model ?? ""] ?? config.asr.providers[asr.active]?.model ?? t("aiSettings.asrNotConfigured")}
           </div>
         </div>
 
@@ -56,16 +58,16 @@ export function AsrPanel() {
             className={`w-2 h-2 rounded-full ${asr.warm_on_startup ? "bg-green-400" : "bg-gray-500"}`}
           />
           <span className="text-[11px] text-[var(--moba-text-muted)]">
-            {asr.warm_on_startup ? "Warm up at startup (recommended)" : "Load on demand"}
+            {asr.warm_on_startup ? t("aiSettings.asrWarmStart") : t("aiSettings.asrLoadOnDemand")}
           </span>
         </div>
       </div>
 
       <div className="rounded border border-[var(--moba-divider)] border-dashed p-3">
         <div className="text-[12px] text-[var(--moba-text-muted)] text-center">
-          Model library management · download / switch ASR models
+          {t("aiSettings.asrModelLibrary")}
           <br />
-          <span className="text-[11px]">(Coming soon — full v2.0 release)</span>
+          <span className="text-[11px]">{t("aiSettings.asrComingSoon")}</span>
         </div>
       </div>
     </div>

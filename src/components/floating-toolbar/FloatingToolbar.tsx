@@ -21,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronRight, EyeOff, GripVertical } from "lucide-react";
+import { useT } from "../../lib/i18n";
 
 interface StoredState {
   top: number;
@@ -110,11 +111,14 @@ export function FloatingToolbar({
   storageKey,
   defaultTop = DEFAULT_TOP,
   defaultRight = DEFAULT_RIGHT,
-  collapseLabel = "Hide toolbar",
-  restoreLabel = "Show toolbar",
+  collapseLabel,
+  restoreLabel,
   testId,
   children,
 }: FloatingToolbarProps) {
+  const t = useT();
+  const collapseLabelResolved = collapseLabel ?? t("floatingToolbar.hideTitle");
+  const restoreLabelResolved = restoreLabel ?? t("floatingToolbar.showTitle");
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [position, setPosition] = useState<{ top: number; right: number }>(() => {
@@ -238,8 +242,8 @@ export function FloatingToolbar({
       >
         <button
           type="button"
-          aria-label="Drag toolbar"
-          title="Drag"
+          aria-label={t("floatingToolbar.dragLabel")}
+          title={t("floatingToolbar.drag")}
           onPointerDown={handleDragStart}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
@@ -250,8 +254,8 @@ export function FloatingToolbar({
         </button>
         <button
           type="button"
-          aria-label={restoreLabel}
-          title={restoreLabel}
+          aria-label={restoreLabelResolved}
+          title={restoreLabelResolved}
           onClick={() => setCollapsed(false)}
           style={RESTORE_PILL_STYLE}
         >
@@ -283,8 +287,8 @@ export function FloatingToolbar({
     >
       <button
         type="button"
-        aria-label="Drag toolbar"
-        title="Drag toolbar"
+        aria-label={t("floatingToolbar.dragLabel")}
+        title={t("floatingToolbar.dragLabel")}
         onPointerDown={handleDragStart}
         onPointerMove={handleDragMove}
         onPointerUp={handleDragEnd}
@@ -296,8 +300,8 @@ export function FloatingToolbar({
       {children}
       <button
         type="button"
-        aria-label={collapseLabel}
-        title={collapseLabel}
+        aria-label={collapseLabelResolved}
+        title={collapseLabelResolved}
         onClick={() => setCollapsed(true)}
         style={ICON_BUTTON_STYLE}
       >

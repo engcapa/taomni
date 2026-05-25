@@ -16,6 +16,7 @@ import {
   getTerminal,
   type TerminalRegistryEntry,
 } from "../../lib/terminal/terminalRegistry";
+import { useT } from "../../lib/i18n";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -76,6 +77,7 @@ function parseInlineToolCalls(text: string): { stripped: string; toolCalls: Inli
 }
 
 export function MessageBubble({ message, format = "md", preferredTerminalTabId }: MessageBubbleProps) {
+  const t = useT();
   const isUser = message.role === "user";
   const [executed, setExecuted] = useState<Record<number, "approved" | "denied">>({});
   const [copied, setCopied] = useState(false);
@@ -165,7 +167,7 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
       // dedicated CodeBlockToolbar. We only target true inline code.
       if (codeEl.closest("pre")) return;
       codeEl.classList.add("ai-chat-inline-code");
-      codeEl.title = "点击发送到终端";
+      codeEl.title = t("chat.inlineCodeTitle");
       const onClick = (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -235,25 +237,25 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
               disabled={!targetEntry}
               title={
                 targetEntry
-                  ? `把全部 ${codeBlocks.length} 段命令依序发送到 ${targetEntry.title}`
-                  : "无可用终端 — 请先打开/聚焦一个终端 tab"
+                  ? t("chat.sendAllToTerminal", { count: codeBlocks.length, target: targetEntry.title })
+                  : t("chat.sendAllNoTerminal")
               }
-              aria-label="Send all code blocks to terminal"
+              aria-label={t("chat.sendAllAria")}
             >
               {sentAll ? (
                 <Check className="w-3 h-3 text-green-400" />
               ) : (
                 <Send className="w-3 h-3" />
               )}
-              <span>全部 →终端</span>
+              <span>{t("chat.sendAllLabel")}</span>
             </button>
           )}
           <button
             type="button"
             className="h-5 w-5 p-0 inline-flex items-center justify-center rounded border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]"
             onClick={handleCopyMessage}
-            title="复制此条消息"
-            aria-label="Copy this message"
+            title={t("chat.copyMessageTitle")}
+            aria-label={t("chat.copyMessageAria")}
           >
             {copied ? (
               <Check className="w-3 h-3 text-green-400" />
@@ -301,16 +303,16 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
         <div key={i} className="max-w-[90%] mt-1">
           {executed[i] === "denied" ? (
             <div className="text-[11px] text-[var(--moba-text-muted)] italic">
-              已拒绝 {call.tool}
+              {t("chat.toolDenied", { tool: call.tool })}
             </div>
           ) : executed[i] === "approved" ? (
             <div className="text-[11px] text-[var(--moba-accent)]">
-              已执行 {call.tool}
+              {t("chat.toolApproved", { tool: call.tool })}
             </div>
           ) : (
             <ActionCard
               tool={call.tool}
-              description={call.description ?? `Agent 想要执行：${call.tool}`}
+              description={call.description ?? t("chat.agentWantsExecute", { tool: call.tool })}
               preview={call.preview ?? null}
               requiresConfirmation={call.requiresConfirmation}
               onDecide={(d) => handleDecide(i, call, d)}
@@ -328,15 +330,15 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
           }}
         >
           <ShieldAlert className="w-3 h-3" />
-          已脱敏敏感字段
+          {t("chat.redactedBadge")}
         </div>
       )}
       {pendingSendAll && (
         <ConfirmDialog
-          title="确认发送多行内容"
-          message={`将向终端“${pendingSendAll.entry.title}”发送 ${pendingSendAll.payload.lineCount} 行内容。多行内容可能会触发终端执行，请确认后继续。`}
-          confirmLabel="发送"
-          cancelLabel="取消"
+          title={t("chat.confirmMultiTitle")}
+          message={t("chat.confirmMultiBody", { target: pendingSendAll.entry.title, count: pendingSendAll.payload.lineCount })}
+          confirmLabel={t("chat.confirmSend")}
+          cancelLabel={t("chat.confirmCancel")}
           onCancel={() => setPendingSendAll(null)}
           onConfirm={() => {
             commitSendAll(pendingSendAll.entry, pendingSendAll.payload);

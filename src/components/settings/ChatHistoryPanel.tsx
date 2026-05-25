@@ -2,6 +2,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { History, Download, Trash2, Loader2 } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
+import { useT } from "../../lib/i18n";
 
 /**
  * Chat history retention + export controls.
@@ -13,6 +14,7 @@ import { useChatStore } from "../../stores/chatStore";
  *   command so the dialog matches the rest of NewMob.
  */
 export function ChatHistoryPanel() {
+  const t = useT();
   const [keepDays, setKeepDays] = useState(30);
   const [purging, setPurging] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -26,9 +28,11 @@ export function ChatHistoryPanel() {
     setStatus(null);
     try {
       const deleted = await purge(keepDays);
-      setStatus(deleted > 0 ? `Deleted ${deleted} expired thread${deleted === 1 ? "" : "s"}` : "No threads needed cleanup");
+      setStatus(deleted > 0
+        ? t("aiSettings.chatHistoryDeleted", { count: deleted, plural: deleted === 1 ? "" : "s" })
+        : t("aiSettings.chatHistoryNothing"));
     } catch (e) {
-      setStatus(`Cleanup failed: ${String(e)}`);
+      setStatus(t("aiSettings.chatHistoryCleanupFailed", { error: String(e) }));
     } finally {
       setPurging(false);
     }
@@ -47,9 +51,9 @@ export function ChatHistoryPanel() {
         return;
       }
       const total = await exportArchive(path);
-      setStatus(`Exported ${total} message${total === 1 ? "" : "s"} to ${path}`);
+      setStatus(t("aiSettings.chatHistoryExported", { count: total, plural: total === 1 ? "" : "s", path }));
     } catch (e) {
-      setStatus(`Export failed: ${String(e)}`);
+      setStatus(t("aiSettings.chatHistoryExportFailed", { error: String(e) }));
     } finally {
       setExporting(false);
     }
@@ -59,19 +63,19 @@ export function ChatHistoryPanel() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <History className="w-4 h-4 text-[var(--moba-accent)]" />
-        <div className="text-[13px] font-semibold flex-1">Chat history management</div>
+        <div className="text-[13px] font-semibold flex-1">{t("aiSettings.chatHistoryTitle")}</div>
       </div>
 
       <div className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px] items-end">
         <label className="col-span-6">
-          <span className="block mb-1 text-[var(--moba-text-muted)]">Retention (days)</span>
+          <span className="block mb-1 text-[var(--moba-text-muted)]">{t("aiSettings.chatHistoryRetention")}</span>
           <input
             className="moba-input h-7 w-24"
             type="number"
             min={1}
             max={365}
             value={keepDays}
-            aria-label="Chat history retention days"
+            aria-label={t("aiSettings.chatHistoryRetentionAria")}
             onChange={(e) => {
               const next = Number(e.target.value);
               if (Number.isFinite(next) && next > 0) setKeepDays(Math.min(365, Math.round(next)));
@@ -87,7 +91,7 @@ export function ChatHistoryPanel() {
             disabled={purging}
           >
             {purging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            Purge expired
+            {t("aiSettings.chatHistoryPurge")}
           </button>
 
           <button
@@ -97,13 +101,13 @@ export function ChatHistoryPanel() {
             disabled={exporting}
           >
             {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-            Export all
+            {t("aiSettings.chatHistoryExport")}
           </button>
         </div>
       </div>
 
       <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug">
-        By default threads older than the retention window are auto-purged; export writes a JSON file that you can compress and archive manually.
+        {t("aiSettings.chatHistoryDescription")}
       </p>
 
       {status && (

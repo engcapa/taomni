@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight
 import { useAiStore, type AiConfig, type LlmProviderConfig } from "../../stores/aiStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { isVaultLockedError, VAULT_LOCKED_EVENT } from "../../lib/ipc";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 const PROVIDER_LABELS: Record<string, string> = {
   deepseek:    "DeepSeek",
@@ -31,9 +32,10 @@ interface ProviderRowProps {
   onTest: () => void;
   testResult: { ok: boolean; message: string; latency_ms: number } | null;
   testing: boolean;
+  t: TranslateFn;
 }
 
-function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing }: ProviderRowProps) {
+function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -63,7 +65,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 
         {testResult && (
           <span className={`text-[11px] ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
-            {testResult.ok ? `✓ ${testResult.latency_ms}ms` : "✗ Failed"}
+            {testResult.ok ? `✓ ${testResult.latency_ms}ms` : t("aiSettings.llmFailed")}
           </span>
         )}
 
@@ -73,7 +75,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
           onClick={(e) => { e.stopPropagation(); if (!isActive) onActivate(); }}
           disabled={isActive}
         >
-          {isActive ? "Active" : "Use"}
+          {isActive ? t("aiSettings.llmActive") : t("aiSettings.llmUse")}
         </button>
       </div>
 
@@ -81,18 +83,18 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
         <div className="px-3 pb-3 border-t border-[var(--moba-divider)] pt-2 space-y-2">
           {id !== "local" && (
             <div>
-              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">API Key</label>
+              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
               <input
                 type="password"
                 className="moba-input h-7 w-full text-[12px]"
-                placeholder="Paste API Key..."
+                placeholder={t("aiSettings.llmApiKeyPlaceholder")}
                 value={provider.api_key}
                 onChange={(e) => onChange({ ...provider, api_key: e.target.value })}
               />
             </div>
           )}
           <div>
-            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Model</label>
+            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
             <input
               type="text"
               className="moba-input h-7 w-full text-[12px]"
@@ -101,7 +103,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
             />
           </div>
           <div>
-            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Base URL</label>
+            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
             <input
               type="text"
               className="moba-input h-7 w-full text-[12px]"
@@ -119,13 +121,13 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               {testing ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                "Test connection"
+                t("aiSettings.llmTestConnection")
               )}
             </button>
             {testResult && (
               <span className={`text-[12px] flex items-center gap-1 ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
                 {testResult.ok ? (
-                  <><CheckCircle className="w-3.5 h-3.5" /> Connected ({testResult.latency_ms}ms)</>
+                  <><CheckCircle className="w-3.5 h-3.5" /> {t("aiSettings.llmConnected", { ms: testResult.latency_ms })}</>
                 ) : (
                   <><XCircle className="w-3.5 h-3.5" /> {testResult.message.slice(0, 60)}</>
                 )}
@@ -141,6 +143,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 export function LlmProvidersPanel() {
   const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, setActiveLlmProvider, testConnection } = useAiStore();
   const vaultState = useVaultStore((s) => s.state);
+  const t = useT();
   const [testingId, setTestingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
@@ -194,9 +197,7 @@ export function LlmProvidersPanel() {
         // unlock dialog opens. Stash the config and let the vault-state
         // effect retry the save once the user unlocks.
         pendingVaultSaveRef.current = cfg;
-        setSaveError(
-          "Unlock the vault in the dialog to encrypt the API key — saving will resume automatically.",
-        );
+        setSaveError(t("aiSettings.llmVaultLockedRetry"));
       } else {
         pendingVaultSaveRef.current = null;
         setSaveError(String(e));
@@ -217,7 +218,7 @@ export function LlmProvidersPanel() {
   }, [vaultState]);
 
   if (loading || !config) {
-    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">Loading...</div>;
+    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">{t("aiSettings.loading")}</div>;
   }
 
   const handleSave = () => {
@@ -231,14 +232,11 @@ export function LlmProvidersPanel() {
     if (vaultState === "locked") {
       pendingVaultSaveRef.current = config;
       setSaveOk(false);
-      setSaveError(
-        "Unlock the vault in the dialog to save the LLM provider settings — saving will resume automatically.",
-      );
+      setSaveError(t("aiSettings.llmVaultLockedSettings"));
       window.dispatchEvent(
         new CustomEvent(VAULT_LOCKED_EVENT, {
           detail: {
-            reason:
-              "Unlock the credential vault to save the LLM provider settings.",
+            reason: t("aiSettings.llmVaultLockedReason"),
           },
         }),
       );
@@ -251,9 +249,14 @@ export function LlmProvidersPanel() {
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <div className="text-[13px] font-semibold">LLM Provider</div>
+          <div className="text-[13px] font-semibold">{t("aiSettings.llmTitle")}</div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            Active: {config.llm.active} · Timeout fallback: {config.llm.fallback.enabled ? `${config.llm.fallback.timeout_ms}ms → ${config.llm.fallback.secondary}` : "Off"}
+            {t("aiSettings.llmActiveLine", {
+              active: config.llm.active,
+              fallback: config.llm.fallback.enabled
+                ? t("aiSettings.llmFallbackOn", { ms: config.llm.fallback.timeout_ms, secondary: config.llm.fallback.secondary })
+                : t("aiSettings.llmFallbackOff"),
+            })}
           </div>
         </div>
         <button
@@ -262,7 +265,7 @@ export function LlmProvidersPanel() {
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? t("aiSettings.llmSaving") : t("aiSettings.llmSave")}
         </button>
       </div>
 
@@ -298,7 +301,7 @@ export function LlmProvidersPanel() {
             className="w-3.5 h-3.5 shrink-0"
             style={{ color: "var(--moba-success-icon)" }}
           />
-          <span>Saved.</span>
+          <span>{t("aiSettings.llmSaved")}</span>
         </div>
       )}
 
@@ -313,6 +316,7 @@ export function LlmProvidersPanel() {
           onTest={() => handleTest(id)}
           testResult={testResults[id] ?? null}
           testing={testingId === id}
+          t={t}
         />
       ))}
     </div>

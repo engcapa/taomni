@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Home, RefreshCw } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
 import type { SessionConfig } from "../../lib/ipc";
+import { useT } from "../../lib/i18n";
 
 interface QuickConnectProps {
   onConnectInput: (value: string) => void;
@@ -15,6 +16,7 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
   const [refreshing, setRefreshing] = useState(false);
   const { sessions, loadSessions } = useSessionStore();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const t = useT();
 
   const recent = useMemo(
     () =>
@@ -36,10 +38,10 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
     if (refreshing) return;
 
     setRefreshing(true);
-    setStatusMessage("Refreshing sessions...");
+    setStatusMessage(t("quickConnect.refreshing"));
     try {
       await loadSessions();
-      setStatusMessage("Sessions refreshed");
+      setStatusMessage(t("quickConnect.refreshed"));
     } finally {
       setRefreshing(false);
     }
@@ -54,33 +56,33 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
         borderBottom: "1px solid var(--moba-divider)",
       }}
     >
-      <button data-testid="qc-back" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title="Back" onClick={() => window.history.back()} type="button">
+      <button data-testid="qc-back" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title={t("quickConnect.back")} onClick={() => window.history.back()} type="button">
         <ArrowLeft className="w-3.5 h-3.5" />
       </button>
-      <button data-testid="qc-forward" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title="Forward" onClick={() => window.history.forward()} type="button">
+      <button data-testid="qc-forward" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title={t("quickConnect.forward")} onClick={() => window.history.forward()} type="button">
         <ArrowRight className="w-3.5 h-3.5" />
       </button>
-      <button data-testid="qc-home" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title="Home" onClick={onHome} type="button">
+      <button data-testid="qc-home" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title={t("quickConnect.homeButton")} onClick={onHome} type="button">
         <Home className="w-3.5 h-3.5" />
       </button>
       <span className="moba-divider-v h-4 mx-1" />
-      <span className="text-[var(--moba-text-muted)]">Quick connect:</span>
+      <span className="text-[var(--moba-text-muted)]">{t("quickConnect.label")}:</span>
       <input
         data-testid="qc-input"
-        aria-label="Quick connect"
+        aria-label={t("quickConnect.label")}
         className="moba-input flex-1 max-w-md"
-        placeholder="ssh user@host  •  rdp://host  •  telnet host  •  paste session URL…"
+        placeholder={t("quickConnect.placeholderRich")}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") submit();
         }}
       />
-      <button data-testid="qc-submit" className="moba-btn" onClick={submit} type="button">Go</button>
+      <button data-testid="qc-submit" className="moba-btn" onClick={submit} type="button">{t("quickConnect.go")}</button>
       <span className="moba-divider-v h-4 mx-2" />
-      <span className="text-[var(--moba-text-muted)]">Recent:</span>
+      <span className="text-[var(--moba-text-muted)]">{t("quickConnect.recentLabel")}</span>
       {recent.length === 0 ? (
-        <span className="text-[var(--moba-text-muted)]">none</span>
+        <span className="text-[var(--moba-text-muted)]">{t("quickConnect.recentNone")}</span>
       ) : (
         recent.map((session) => (
           <button
@@ -101,14 +103,14 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
       <button
         data-testid="qc-refresh"
         className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded disabled:opacity-50"
-        title={refreshing ? "Refreshing sessions..." : "Refresh sessions"}
+        title={refreshing ? t("quickConnect.refreshingTitle") : t("quickConnect.refreshTitle")}
         onClick={() => void refreshSessions()}
         disabled={refreshing}
         type="button"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
       </button>
-      {refreshing && <span className="text-[var(--moba-text-muted)]">refreshing...</span>}
+      {refreshing && <span className="text-[var(--moba-text-muted)]">{t("quickConnect.refreshing")}</span>}
     </div>
   );
 }

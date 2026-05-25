@@ -11,6 +11,7 @@ import {
   getTerminal,
 } from "../../lib/terminal/terminalRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
+import { useT } from "../../lib/i18n";
 
 interface ChatDrawerProps {
   /**
@@ -22,6 +23,7 @@ interface ChatDrawerProps {
 }
 
 export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
+  const t = useT();
   const {
     threads, activeThreadId, messages, sending, drawerOpen, drawerScope, drawerWidth,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
@@ -173,7 +175,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     if (list.length === 0) return;
     const text = list
       .map((m) => {
-        const role = m.role === "user" ? "用户" : m.role === "assistant" ? "AI" : "系统";
+        const role = m.role === "user" ? t("chat.role_user") : m.role === "assistant" ? t("chat.role_assistant") : t("chat.role_system");
         return `### ${role}\n\n${m.content}`;
       })
       .join("\n\n---\n\n");
@@ -273,15 +275,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         >
           <Bot className="w-4 h-4 text-[var(--moba-accent)] shrink-0" />
           <span className="text-[13px] font-semibold flex-1 truncate">
-            {activeThread?.title ?? "AI Chat"}
+            {activeThread?.title ?? t("chat.drawerTitle")}
           </span>
           <button
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={copyAllToClipboard}
             disabled={!activeThreadId || activeMessages.length === 0}
-            title="复制全部对话"
-            aria-label="Copy entire conversation"
+            title={t("chat.copyAllTitle")}
+            aria-label={t("chat.copyAllAria")}
           >
             {copiedAll ? (
               <Check className="w-3.5 h-3.5 text-green-400" />
@@ -293,8 +295,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={handleNewGlobalThread}
-            title="新建全局对话（不绑定终端）"
-            aria-label="New global chat"
+            title={t("chat.newGlobalTitle")}
+            aria-label={t("chat.newGlobalAria")}
           >
             <Globe className="w-3.5 h-3.5" />
           </button>
@@ -302,8 +304,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={handleNewThread}
-            title="新对话"
-            aria-label="New chat"
+            title={t("chat.newChatTitle")}
+            aria-label={t("chat.newChatAria")}
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -311,7 +313,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             className={`moba-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--moba-selected)]" : ""}`}
             onClick={() => setShowHistory((v) => !v)}
-            title="历史对话"
+            title={t("chat.historyTitle")}
           >
             <History className="w-3.5 h-3.5" />
           </button>
@@ -319,7 +321,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={toggleDrawer}
-            title={drawerScope === "tab" ? "关闭 (Ctrl+Shift+L)" : "关闭 (Ctrl+L)"}
+            title={drawerScope === "tab" ? t("chat.closeShortcutTab") : t("chat.closeShortcutGlobal")}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -346,7 +348,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             {activeThread.linked_session_id ? (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-accent)]/10 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30"
-                title={`已绑定终端 tab: ${activeThread.linked_session_id}`}
+                title={t("chat.boundToTerminal", { id: activeThread.linked_session_id })}
               >
                 <Link2 className="w-2.5 h-2.5" />
                 <span className="truncate max-w-[100px]">
@@ -357,18 +359,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             ) : (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-divider)]/30 border border-[var(--moba-divider)]"
-                title="全局对话（不绑定特定终端）"
+                title={t("chat.globalScopeTooltip")}
               >
                 <Globe className="w-2.5 h-2.5" />
-                <span>Global</span>
+                <span>{t("chat.globalBadge")}</span>
               </span>
             )}
-            <span>Provider:</span>
+            <span>{t("chat.providerLabel")}</span>
             {providerIds.length > 0 ? (
               <select
                 className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
                 value={activeThread.provider_id}
-                aria-label="Thread LLM provider"
+                aria-label={t("chat.threadProviderAria")}
                 onChange={(e) => {
                   void setThreadProvider(activeThread.id, e.target.value);
                 }}
@@ -380,41 +382,41 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             ) : (
               <span className="text-[var(--moba-accent)]">{activeThread.provider_id}</span>
             )}
-            <span className="ml-2">Format:</span>
+            <span className="ml-2">{t("chat.formatLabel")}</span>
             {formatLocked ? (
               // Locked once the thread has any messages — issue #3.
               <span
                 className="text-[var(--moba-accent)] px-1"
-                title="对话已开始，原始输出格式已锁定。点击右侧转换按钮可在 Markdown / HTML / 纯文本之间切换显示。"
+                title={t("chat.formatLockedTooltip")}
               >
-                {activeThread.output_format ?? `Inherit (${globalOutputFormat})`}
+                {activeThread.output_format ?? t("chat.inheritFormat", { format: globalOutputFormat })}
               </span>
             ) : (
               <select
                 className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
                 value={activeThread.output_format ?? ""}
-                aria-label="Thread output format"
-                title={`Effective: ${effectiveFormat} (global default: ${globalOutputFormat})`}
+                aria-label={t("chat.formatAria")}
+                title={t("chat.formatEffectiveTooltip", { format: effectiveFormat, global: globalOutputFormat })}
                 onChange={(e) => {
                   const v = e.target.value;
                   void setThreadOutputFormat(activeThread.id, v === "" ? null : v);
                 }}
               >
-                <option value="">Inherit ({globalOutputFormat})</option>
-                <option value="md">Markdown</option>
-                <option value="html">HTML</option>
-                <option value="plain">Plain text</option>
+                <option value="">{t("chat.inheritFormat", { format: globalOutputFormat })}</option>
+                <option value="md">{t("chat.formatMd")}</option>
+                <option value="html">{t("chat.formatHtml")}</option>
+                <option value="plain">{t("chat.formatPlainOption")}</option>
               </select>
             )}
             <button
               type="button"
               className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
               onClick={cycleRenderFormat}
-              title={`显示为：${effectiveFormat}（点击循环切换 md → html → plain）`}
-              aria-label="Convert visible transcript to another format"
+              title={t("chat.convertCycleTitle", { format: effectiveFormat })}
+              aria-label={t("chat.convertVisibleAria")}
             >
               <RefreshCw className="w-2.5 h-2.5" />
-              <span>显示 {effectiveFormat}</span>
+              <span>{t("chat.convertLabel", { format: effectiveFormat })}</span>
             </button>
           </div>
         )}
@@ -424,7 +426,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           {activeMessages.length === 0 && !sending && (
             <div className="text-[11px] text-[var(--moba-text-muted)] text-center py-8">
               <Bot className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              开始对话...
+              {t("chat.emptyHint")}
             </div>
           )}
           {activeMessages.map((msg) => (
@@ -446,7 +448,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                   />
                 ))}
               </div>
-              AI 正在思考...
+              {t("chat.aiThinking")}
             </div>
           )}
           {error && (

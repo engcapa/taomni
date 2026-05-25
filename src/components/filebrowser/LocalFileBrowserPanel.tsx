@@ -6,6 +6,7 @@ import { useSftpController } from "../../lib/sftpController";
 import { sftpOpenPath, effectiveFileType, type FileEntry } from "../../lib/sftp";
 import { useAppStore } from "../../stores/appStore";
 import type { MenuItem } from "../ContextMenu";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   /** Stable id used to namespace this tab's pane state in `sftpStore`. */
@@ -20,6 +21,7 @@ interface Props {
  * a synthetic store entry that has no remote channel attached.
  */
 export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
+  const t = useT();
   const session = useSftpStore((s) => s.sessions[tabId]);
   const attachLocalOnly = useSftpStore((s) => s.attachLocalOnly);
   const detachLocalOnly = useSftpStore((s) => s.detachLocalOnly);
@@ -52,10 +54,10 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
       try {
         await sftpOpenPath(entry.path);
       } catch (err) {
-        setStatus(`Failed to open ${entry.name}: ${err}`);
+        setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
       }
     }
-  }, [navigate, setStatus, tabId]);
+  }, [navigate, setStatus, tabId, t]);
 
   const handleDoubleClick = useCallback(async (entry: FileEntry) => {
     if (effectiveFileType(entry) === "dir") {
@@ -65,9 +67,9 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
     try {
       await sftpOpenPath(entry.path);
     } catch (err) {
-      setStatus(`Failed to open ${entry.name}: ${err}`);
+      setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
     }
-  }, [navigate, setStatus, tabId]);
+  }, [navigate, setStatus, tabId, t]);
 
   const localContext = useCallback(
     (entry: FileEntry, _anchor: { x: number; y: number }, selectedEntries: FileEntry[]): MenuItem[] => {
@@ -78,26 +80,26 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
       const effective = effectiveFileType(entry);
       items.push({
         label: effective === "dir"
-          ? "Open folder"
+          ? t("fileBrowser.contextOpenFolder")
           : multi
-            ? `Open ${targets.length} files`
-            : "Open",
+            ? t("fileBrowser.contextOpenFiles", { count: targets.length })
+            : t("fileBrowser.contextOpen"),
         onClick: () => void handleOpen(targets),
       });
       if (!multi) {
         items.push({
-          label: "Reveal in OS file manager",
+          label: t("fileBrowser.contextRevealInOs"),
           onClick: () => {
             const path = effective === "dir" ? target.path : (session?.local.path ?? "");
-            void sftpOpenPath(path).catch((err) => setStatus(`Open failed: ${err}`));
+            void sftpOpenPath(path).catch((err) => setStatus(t("fileBrowser.statusOpenFailed", { error: String(err) })));
           },
         });
       }
       if (!multi) {
         items.push({
-          label: "Rename",
+          label: t("fileBrowser.contextRename"),
           onClick: () => {
-            const next = window.prompt("Rename to", target.name);
+            const next = window.prompt(t("fileBrowser.promptRenameTitle"), target.name);
             if (next && next !== target.name) {
               void controller.rename(target.path, next, "local");
             }
@@ -105,14 +107,14 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
         });
       }
       items.push({
-        label: multi ? `Permissions for ${targets.length} selected…` : "Permissions…",
+        label: multi ? t("fileBrowser.contextPermissionsCount", { count: targets.length }) : t("fileBrowser.contextPermissions"),
         onClick: () => setChmodPrompt({ entries: targets }),
       });
       items.push({
-        label: multi ? `Delete ${targets.length} selected` : "Delete",
+        label: multi ? t("fileBrowser.contextDeleteCount", { count: targets.length }) : t("fileBrowser.contextDelete"),
         onClick: () => {
-          const summary = multi ? `${targets.length} items` : target.name;
-          if (window.confirm(`Delete ${summary}?`)) {
+          const summary = multi ? t("fileBrowser.summaryItems", { count: targets.length }) : target.name;
+          if (window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) {
             for (const item of targets) {
               void controller.remove(item.path, "local", true);
             }
@@ -122,40 +124,40 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
       });
       return items;
     },
-    [controller, handleOpen, session?.local.path, setStatus],
+    [controller, handleOpen, session?.local.path, setStatus, t],
   );
 
   const localEmptyContext = useCallback(
     (): MenuItem[] => [
       {
-        label: "New folder…",
+        label: t("fileBrowser.contextNewFolder"),
         onClick: () => {
-          const name = window.prompt("New folder name", "new-folder");
+          const name = window.prompt(t("fileBrowser.promptNewFolderTitle"), t("fileBrowser.promptNewFolderDefault"));
           if (name) void controller.mkdir(session?.local.path ?? "", name, "local");
         },
       },
       {
-        label: "New file…",
+        label: t("fileBrowser.contextNewFile"),
         onClick: () => {
-          const name = window.prompt("New file name", "new-file.txt");
+          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
           if (name) void controller.createFile(session?.local.path ?? "", name, "local");
         },
       },
       {
-        label: "Refresh",
+        label: t("fileBrowser.contextRefresh"),
         onClick: () => {
           void useSftpStore.getState().refreshPane(tabId, "local");
         },
       },
       {
-        label: "Open current folder in OS",
+        label: t("fileBrowser.contextOpenCurrentInOs"),
         onClick: () => {
           void sftpOpenPath(session?.local.path ?? "")
-            .catch((err) => setStatus(`Open failed: ${err}`));
+            .catch((err) => setStatus(t("fileBrowser.statusOpenFailed", { error: String(err) })));
         },
       },
     ],
-    [controller, session?.local.path, setStatus, tabId],
+    [controller, session?.local.path, setStatus, tabId, t],
   );
 
   if (!session?.attached) {
@@ -164,7 +166,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
         className="w-full h-full flex items-center justify-center text-[12px]"
         style={{ background: "var(--moba-bg)", color: "var(--moba-text-muted)" }}
       >
-        Loading file browser…
+        {t("fileBrowser.localBrowserLoading")}
       </div>
     );
   }
@@ -180,7 +182,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
         onOpenLocalSelected={(entries) => void handleOpen(entries)}
         onRevealInOs={(path) => {
           if (!path) return;
-          void sftpOpenPath(path).catch((err) => setStatus(`Open failed: ${err}`));
+          void sftpOpenPath(path).catch((err) => setStatus(t("fileBrowser.statusOpenFailed", { error: String(err) })));
         }}
         filterText={filterText}
         onFilterTextChange={setFilterText}
@@ -188,8 +190,8 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
           if (entries.length === 0) return;
           const summary = entries.length === 1
             ? entries[0].name
-            : `${entries.length} items`;
-          if (!window.confirm(`Delete ${summary}?`)) return;
+            : t("fileBrowser.summaryItems", { count: entries.length });
+          if (!window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) return;
           for (const entry of entries) {
             void controller.remove(entry.path, "local", true);
           }
@@ -199,7 +201,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
           setChmodPrompt({ entries });
         }}
         onNewFile={() => {
-          const name = window.prompt("New file name", "new-file.txt");
+          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
           if (name) void controller.createFile(session?.local.path ?? "", name, "local");
         }}
       />

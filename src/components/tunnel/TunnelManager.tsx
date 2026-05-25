@@ -41,6 +41,7 @@ import {
 import { TunnelEditor } from "./TunnelEditor";
 import { useSessionStore } from "../../stores/sessionStore";
 import { isTauriRuntime } from "../../lib/runtime";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   onStatusMessage?: (msg: string) => void;
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export function TunnelManager({ onStatusMessage, onClose }: Props) {
+  const t = useT();
   const { sessions, loadSessions } = useSessionStore();
   const [tunnels, setTunnels] = useState<TunnelConfig[]>([]);
   const [statuses, setStatuses] = useState<Record<string, TunnelStatusInfo>>({});
@@ -70,7 +72,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       for (const s of st) map[s.id] = s;
       setStatuses(map);
     } catch (err) {
-      onStatusMessage?.(`Failed to load tunnels: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.loadFailed", { error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setLoading(false);
     }
@@ -107,71 +109,71 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     setShowEditor(true);
   };
 
-  const handleTest = async (t: TunnelConfig) => {
-    onStatusMessage?.(`Testing tunnel “${t.name}”…`);
+  const handleTest = async (t2: TunnelConfig) => {
+    onStatusMessage?.(t("tunnels.testing", { name: t2.name }));
     try {
-      const msg = await testTunnel(t.id);
+      const msg = await testTunnel(t2.id);
       onStatusMessage?.(msg);
     } catch (err) {
       onStatusMessage?.(
-        `Test failed for “${t.name}”: ${err instanceof Error ? err.message : err}`,
+        t("tunnels.testFailed", { name: t2.name, error: err instanceof Error ? err.message : String(err) }),
       );
     }
   };
 
-  const handleClone = async (t: TunnelConfig) => {
+  const handleClone = async (t2: TunnelConfig) => {
     const copy: TunnelConfig = {
-      ...t,
+      ...t2,
       id: newTunnelId(),
-      name: `${t.name} (copy)`,
+      name: `${t2.name} (copy)`,
       sortOrder: tunnels.length,
     };
     try {
       await upsertTunnel(copy);
       await refresh();
-      onStatusMessage?.(`Tunnel cloned: ${copy.name}`);
+      onStatusMessage?.(t("tunnels.cloned", { name: copy.name }));
     } catch (err) {
-      onStatusMessage?.(`Clone failed: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.cloneFailed", { error: err instanceof Error ? err.message : String(err) }));
     }
   };
 
-  const handleDelete = async (t: TunnelConfig) => {
-    if (!window.confirm(`Delete tunnel “${t.name}”?`)) return;
+  const handleDelete = async (t2: TunnelConfig) => {
+    if (!window.confirm(t("tunnels.confirmDeleteName", { name: t2.name }))) return;
     try {
-      await deleteTunnel(t.id);
+      await deleteTunnel(t2.id);
       await refresh();
-      onStatusMessage?.(`Tunnel deleted: ${t.name}`);
+      onStatusMessage?.(t("tunnels.deleted", { name: t2.name }));
     } catch (err) {
-      onStatusMessage?.(`Delete failed: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.deleteFailed", { error: err instanceof Error ? err.message : String(err) }));
     }
   };
 
-  const handleStart = async (t: TunnelConfig) => {
-    setStatus({ id: t.id, status: "starting" });
+  const handleStart = async (t2: TunnelConfig) => {
+    setStatus({ id: t2.id, status: "starting" });
     try {
-      const info = await startTunnel(t.id);
+      const info = await startTunnel(t2.id);
       setStatus(info);
       if (info.status === "error") {
-        onStatusMessage?.(`Tunnel “${t.name}” failed: ${info.error ?? "unknown error"}`);
+        onStatusMessage?.(t("tunnels.tunnelFailed", { name: t2.name, error: info.error ?? t("tunnels.unknownError") }));
       } else if (info.status === "running") {
-        onStatusMessage?.(`Tunnel “${t.name}” running on ${t.listenHost}:${t.listenPort}`);
+        onStatusMessage?.(t("tunnels.tunnelRunningOn", { name: t2.name, endpoint: `${t2.listenHost}:${t2.listenPort}` }));
       } else {
         // "starting" — final outcome will arrive on the tunnel-status event.
-        onStatusMessage?.(`Tunnel “${t.name}” starting…`);
+        onStatusMessage?.(t("tunnels.tunnelStarting", { name: t2.name }));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatus({ id: t.id, status: "error", error: msg });
-      onStatusMessage?.(`Tunnel “${t.name}” failed: ${msg}`);
+      setStatus({ id: t2.id, status: "error", error: msg });
+      onStatusMessage?.(t("tunnels.tunnelFailed", { name: t2.name, error: msg }));
     }
   };
 
-  const handleStop = async (t: TunnelConfig) => {
+  const handleStop = async (t2: TunnelConfig) => {
     try {
-      const info = await stopTunnel(t.id);
+      const info = await stopTunnel(t2.id);
       setStatus(info);
     } catch (err) {
-      onStatusMessage?.(`Stop failed: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.stopFailed", { error: err instanceof Error ? err.message : String(err) }));
     }
   };
 
@@ -183,9 +185,11 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       for (const s of list) map[s.id] = s;
       setStatuses(map);
       const failed = list.filter((s) => s.status === "error").length;
-      onStatusMessage?.(failed > 0 ? `Started tunnels with ${failed} error(s)` : "All tunnels started");
+      onStatusMessage?.(failed > 0
+        ? t("tunnels.startedAllWithErrors", { errors: failed })
+        : t("tunnels.startedAll"));
     } catch (err) {
-      onStatusMessage?.(`Start-all failed: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.startAllFailed", { error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setBusy(false);
     }
@@ -198,9 +202,9 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       const map = { ...statuses };
       for (const s of list) map[s.id] = s;
       setStatuses(map);
-      onStatusMessage?.("All tunnels stopped");
+      onStatusMessage?.(t("tunnels.stoppedAll"));
     } catch (err) {
-      onStatusMessage?.(`Stop-all failed: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.stopAllFailed", { error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setBusy(false);
     }
@@ -215,7 +219,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     await refresh();
     setShowEditor(false);
     setEditing(null);
-    onStatusMessage?.(`Tunnel saved: ${next.name}`);
+    onStatusMessage?.(t("tunnels.savedNamed", { name: next.name }));
   };
 
   const reorder = async (from: number, to: number) => {
@@ -225,9 +229,9 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     next.splice(to, 0, item);
     setTunnels(next);
     try {
-      await reorderTunnels(next.map((t) => t.id));
+      await reorderTunnels(next.map((tt) => tt.id));
     } catch (err) {
-      onStatusMessage?.(`Reorder failed: ${err instanceof Error ? err.message : err}`);
+      onStatusMessage?.(t("tunnels.reorderFailed", { error: err instanceof Error ? err.message : String(err) }));
       void refresh();
     }
   };
@@ -247,10 +251,10 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       >
         <NetworkIcon className="w-4 h-4" style={{ color: "var(--moba-accent)" }} />
         <div className="text-[13px] font-semibold" style={{ color: "var(--moba-accent)" }}>
-          Network tools — SSH tunnels
+          {t("tunnels.headerTitle")}
         </div>
         <div className="text-[11px] ml-2" style={{ color: "var(--moba-text-muted)" }}>
-          Graphical port forwarding
+          {t("tunnels.headerSubtitle")}
         </div>
       </div>
 
@@ -264,7 +268,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           }}
         >
           <AlertCircle className="w-3 h-3" />
-          Tunnels are saved locally for preview, but actually opening a forward requires the desktop build.
+          {t("tunnels.previewWarning")}
         </div>
       )}
 
@@ -277,58 +281,58 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           <table data-testid="tunnel-list" className="w-full text-[12px] border-collapse">
             <thead>
               <tr style={{ background: "var(--moba-quick-bg)", color: "var(--moba-text)" }}>
-                <Th>Order</Th>
-                <Th className="text-left">Name</Th>
-                <Th>Type</Th>
-                <Th>Status</Th>
-                <Th>Forward port</Th>
-                <Th className="text-left">Destination server</Th>
-                <Th className="text-left">SSH server</Th>
-                <Th>Settings</Th>
+                <Th>{t("tunnels.thOrder")}</Th>
+                <Th className="text-left">{t("tunnels.thName")}</Th>
+                <Th>{t("tunnels.thType")}</Th>
+                <Th>{t("tunnels.thStatus")}</Th>
+                <Th>{t("tunnels.thForwardPort")}</Th>
+                <Th className="text-left">{t("tunnels.thDestination")}</Th>
+                <Th className="text-left">{t("tunnels.thSshServer")}</Th>
+                <Th>{t("tunnels.thSettings")}</Th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
                   <td colSpan={8} className="text-center py-6" style={{ color: "var(--moba-text-muted)" }}>
-                    Loading tunnels…
+                    {t("tunnels.loadingList")}
                   </td>
                 </tr>
               )}
               {!loading && tunnels.length === 0 && (
                 <tr>
                   <td colSpan={8} className="text-center py-8" style={{ color: "var(--moba-text-muted)" }}>
-                    No tunnels yet — click <strong>New SSH tunnel</strong> below to add one.
+                    {t("tunnels.emptyHint")} <strong>{t("tunnels.emptyHintAction")}</strong> {t("tunnels.emptyHintSuffix")}
                   </td>
                 </tr>
               )}
               {!loading &&
-                tunnels.map((t, idx) => (
+                tunnels.map((tt, idx) => (
                   <TunnelRow
-                    key={t.id}
-                    tunnel={t}
+                    key={tt.id}
+                    tunnel={tt}
                     index={idx}
                     total={tunnels.length}
-                    status={statuses[t.id]}
-                    revealAuth={!!revealAuth[t.id]}
+                    status={statuses[tt.id]}
+                    revealAuth={!!revealAuth[tt.id]}
                     onToggleReveal={() =>
-                      setRevealAuth((prev) => ({ ...prev, [t.id]: !prev[t.id] }))
+                      setRevealAuth((prev) => ({ ...prev, [tt.id]: !prev[tt.id] }))
                     }
-                    onStart={() => handleStart(t)}
-                    onStop={() => handleStop(t)}
-                    onEdit={() => handleEdit(t)}
-                    onEditKey={() => handleEditKey(t)}
-                    onTest={() => handleTest(t)}
-                    onClone={() => handleClone(t)}
-                    onDelete={() => handleDelete(t)}
+                    onStart={() => handleStart(tt)}
+                    onStop={() => handleStop(tt)}
+                    onEdit={() => handleEdit(tt)}
+                    onEditKey={() => handleEditKey(tt)}
+                    onTest={() => handleTest(tt)}
+                    onClone={() => handleClone(tt)}
+                    onDelete={() => handleDelete(tt)}
                     onMoveUp={() => reorder(idx, idx - 1)}
                     onMoveDown={() => reorder(idx, idx + 1)}
                     onToggleAutostart={async () => {
                       try {
-                        await upsertTunnel({ ...t, autostart: !t.autostart });
+                        await upsertTunnel({ ...tt, autostart: !tt.autostart });
                         await refresh();
                       } catch (err) {
-                        onStatusMessage?.(`Toggle failed: ${err instanceof Error ? err.message : err}`);
+                        onStatusMessage?.(t("tunnels.toggleFailed", { error: err instanceof Error ? err.message : String(err) }));
                       }
                     }}
                   />
@@ -344,7 +348,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
         style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}
       >
         <button data-testid="tunnel-new" type="button" className="moba-btn flex items-center gap-1.5" onClick={handleNew}>
-          <Plus className="w-3.5 h-3.5" /> New SSH tunnel
+          <Plus className="w-3.5 h-3.5" /> {t("tunnels.newSshTunnel")}
         </button>
         <button
           data-testid="tunnel-start-all"
@@ -353,7 +357,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           onClick={handleStartAll}
           disabled={busy || tunnels.length === 0}
         >
-          <Play className="w-3.5 h-3.5" style={{ color: "#1f7a4a" }} /> Start all tunnels
+          <Play className="w-3.5 h-3.5" style={{ color: "#1f7a4a" }} /> {t("tunnels.startAllTunnels")}
         </button>
         <button
           data-testid="tunnel-stop-all"
@@ -362,7 +366,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           onClick={handleStopAll}
           disabled={busy || tunnels.length === 0}
         >
-          <Square className="w-3.5 h-3.5" style={{ color: "#b22222" }} /> Stop all tunnels
+          <Square className="w-3.5 h-3.5" style={{ color: "#b22222" }} /> {t("tunnels.stopAllTunnels")}
         </button>
         {onClose && (
           <button
@@ -370,15 +374,18 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
             type="button"
             className="moba-btn flex items-center gap-1.5"
             onClick={onClose}
-            title="Close the tunnels tab"
+            title={t("tunnels.exitTitle")}
           >
-            <LogOut className="w-3.5 h-3.5" /> Exit
+            <LogOut className="w-3.5 h-3.5" /> {t("tunnels.exit")}
           </button>
         )}
         <div className="flex-1" />
         <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
-          {tunnels.length} tunnel{tunnels.length === 1 ? "" : "s"} ·{" "}
-          {Object.values(statuses).filter((s) => s.status === "running").length} running
+          {t("tunnels.countSummary", {
+            count: tunnels.length,
+            plural: tunnels.length === 1 ? "" : "s",
+            running: Object.values(statuses).filter((s) => s.status === "running").length,
+          })}
         </span>
       </div>
 
@@ -411,21 +418,22 @@ function Th({ children, className = "" }: { children: React.ReactNode; className
 }
 
 function StatusBadge({ status, error }: { status?: TunnelStatus; error?: string }) {
+  const t = useT();
   const s = status ?? "stopped";
   let icon: React.ReactNode = <CircleDot className="w-3 h-3" style={{ color: "var(--moba-text-muted)" }} />;
-  let label = "Stopped";
+  let label = t("tunnels.statusStopped");
   let color = "var(--moba-text-muted)";
   if (s === "running") {
     icon = <CheckCircle2 className="w-3 h-3" style={{ color: "#1f7a4a" }} />;
-    label = "Running";
+    label = t("tunnels.statusRunning");
     color = "#1f7a4a";
   } else if (s === "starting") {
     icon = <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--moba-accent)" }} />;
-    label = "Starting…";
+    label = t("tunnels.statusStarting");
     color = "var(--moba-accent)";
   } else if (s === "error") {
     icon = <AlertCircle className="w-3 h-3" style={{ color: "#b22222" }} />;
-    label = "Error";
+    label = t("tunnels.statusError");
     color = "#b22222";
   }
   return (
@@ -475,10 +483,11 @@ function TunnelRow({
   onMoveDown: () => void;
   onToggleAutostart: () => void;
 }) {
+  const t = useT();
   const running = status?.status === "running" || status?.status === "starting";
   const dest =
     tunnel.kind === "Dynamic"
-      ? "(SOCKS5 dynamic)"
+      ? t("tunnels.dynamicSocks")
       : `${tunnel.destHost || "?"}:${tunnel.destPort || "?"}`;
   const sshLabel = `${tunnel.ssh.username || "?"}@${tunnel.ssh.host || "?"}:${tunnel.ssh.port || 22}`;
   const authPreview = useMemo(() => {
@@ -506,7 +515,7 @@ function TunnelRow({
             data-testid="tunnel-row-move-up"
             type="button"
             className="px-1 hover:text-[var(--moba-accent)] disabled:opacity-30"
-            title="Move up"
+            title={t("tunnels.rowMoveUp")}
             onClick={onMoveUp}
             disabled={index === 0}
           >
@@ -517,7 +526,7 @@ function TunnelRow({
             data-testid="tunnel-row-move-down"
             type="button"
             className="px-1 hover:text-[var(--moba-accent)] disabled:opacity-30"
-            title="Move down"
+            title={t("tunnels.rowMoveDown")}
             onClick={onMoveDown}
             disabled={index === total - 1}
           >
@@ -526,7 +535,7 @@ function TunnelRow({
         </div>
       </Td>
       <Td>
-        <div className="font-semibold text-[12px]">{tunnel.name || "(unnamed)"}</div>
+        <div className="font-semibold text-[12px]">{tunnel.name || t("tunnels.unnamed")}</div>
         {tunnel.description && (
           <div className="text-[10.5px]" style={{ color: "var(--moba-text-muted)" }}>
             {tunnel.description}
@@ -549,7 +558,7 @@ function TunnelRow({
           <button
             data-testid="tunnel-row-toggle"
             type="button"
-            title={running ? "Stop" : "Start"}
+            title={running ? t("tunnels.rowStop") : t("tunnels.rowStart")}
             className="p-1 rounded hover:bg-[var(--moba-hover)]"
             onClick={running ? onStop : onStart}
           >
@@ -584,7 +593,7 @@ function TunnelRow({
             data-testid="tunnel-row-toggle-reveal"
             type="button"
             className="p-0.5 hover:text-[var(--moba-accent)]"
-            title={revealAuth ? "Hide credentials" : "Show credentials"}
+            title={revealAuth ? t("tunnels.rowHide") : t("tunnels.rowShow")}
             onClick={onToggleReveal}
           >
             {revealAuth ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
@@ -593,21 +602,21 @@ function TunnelRow({
       </Td>
       <Td className="text-center">
         <div className="flex items-center justify-center gap-1">
-          <IconBtn testId="tunnel-row-edit" title="Edit" onClick={onEdit}>
+          <IconBtn testId="tunnel-row-edit" title={t("tunnels.rowEdit")} onClick={onEdit}>
             <Pencil className="w-3.5 h-3.5" style={{ color: "#2b5d8b" }} />
           </IconBtn>
-          <IconBtn testId="tunnel-row-edit-key" title="Manage SSH key / credentials" onClick={onEditKey}>
+          <IconBtn testId="tunnel-row-edit-key" title={t("tunnels.rowEditKey")} onClick={onEditKey}>
             <KeyIcon className="w-3.5 h-3.5" style={{ color: "#c97a23" }} />
           </IconBtn>
-          <IconBtn testId="tunnel-row-test" title="Test SSH connection" onClick={onTest}>
+          <IconBtn testId="tunnel-row-test" title={t("tunnels.rowTest")} onClick={onTest}>
             <TestTube2 className="w-3.5 h-3.5" style={{ color: "#1e6db8" }} />
           </IconBtn>
-          <IconBtn testId="tunnel-row-clone" title="Clone" onClick={onClone}>
+          <IconBtn testId="tunnel-row-clone" title={t("tunnels.rowClone")} onClick={onClone}>
             <Copy className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
           </IconBtn>
           <IconBtn
             testId="tunnel-row-autostart"
-            title={tunnel.autostart ? "Auto-start enabled (click to disable)" : "Enable auto-start"}
+            title={tunnel.autostart ? t("tunnels.rowAutostartOn") : t("tunnels.rowAutostartOff")}
             onClick={onToggleAutostart}
           >
             <Zap
@@ -615,10 +624,10 @@ function TunnelRow({
               style={{ color: tunnel.autostart ? "#c97a23" : "var(--moba-text-muted)" }}
             />
           </IconBtn>
-          <IconBtn testId="tunnel-row-delete" title="Delete" onClick={onDelete}>
+          <IconBtn testId="tunnel-row-delete" title={t("tunnels.rowDelete")} onClick={onDelete}>
             <Trash2 className="w-3.5 h-3.5" style={{ color: "#b22222" }} />
           </IconBtn>
-          <IconBtn testId="tunnel-row-power" title={running ? "Stop" : "Start"} onClick={running ? onStop : onStart}>
+          <IconBtn testId="tunnel-row-power" title={running ? t("tunnels.rowStop") : t("tunnels.rowStart")} onClick={running ? onStop : onStart}>
             <Power
               className="w-3.5 h-3.5"
               style={{ color: running ? "#1f7a4a" : "var(--moba-text-muted)" }}

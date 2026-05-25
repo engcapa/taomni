@@ -112,6 +112,7 @@ import {
   shellQuoteStyleForTerminalDrop,
 } from "../../lib/osFileDrop";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useT } from "../../lib/i18n";
 import "@xterm/xterm/css/xterm.css";
 
 export interface SshConnectInfo {
@@ -209,6 +210,7 @@ export function TerminalPanel({
   sftpToggle,
   chatToggle,
 }: TerminalPanelProps) {
+  const t = useT();
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
@@ -2066,7 +2068,7 @@ export function TerminalPanel({
             type="button"
             data-testid="attached-sftp-toggle"
             onClick={sftpToggle.onToggle}
-            title={sftpToggle.open ? "Hide SFTP browser" : "Open SFTP browser"}
+            title={sftpToggle.open ? t("terminal.sftpFloatingClose") : t("terminal.sftpFloatingOpen")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2088,9 +2090,9 @@ export function TerminalPanel({
           <button
             type="button"
             data-testid="tab-chat-toggle"
-            aria-label={chatToggle.open ? "Close tab AI chat" : "Open tab AI chat"}
+            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
             onClick={chatToggle.onToggle}
-            title={chatToggle.open ? "Hide tab AI chat (Ctrl+Shift+L)" : "Open tab AI chat (Ctrl+Shift+L)"}
+            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2115,7 +2117,7 @@ export function TerminalPanel({
           className="absolute top-1 left-1 z-40 px-1.5 py-0.5 rounded pointer-events-none"
           style={{ background: "var(--moba-accent)", color: "#fff", opacity: 0.85, fontSize: 10, fontWeight: 600 }}
         >
-          ⊕ MultiExec
+          ⊕ {t("terminal.multiExecBadge")}
         </div>
       )}
 
@@ -2177,7 +2179,7 @@ export function TerminalPanel({
           data-testid={inputLocked ? "terminal-input-locked" : "terminal-read-only"}
           className="absolute right-3 bottom-3 z-40 px-2 py-1 rounded border bg-white/90 text-[11px] text-slate-700 shadow-sm pointer-events-none"
         >
-          {inputLocked ? "Input locked" : "Read-only"}
+          {inputLocked ? t("terminal.inputLocked") : t("terminal.readOnlyBadge")}
         </div>
       )}
 
@@ -2192,7 +2194,7 @@ export function TerminalPanel({
             ref={searchInputRef}
             className="moba-input h-7 w-56"
             value={searchValue}
-            placeholder="Find"
+            placeholder={t("terminal.findPlaceholder")}
             onChange={(event) => {
               const next = event.target.value;
               setSearchValue(next);
@@ -2210,13 +2212,13 @@ export function TerminalPanel({
             }}
           />
           <button className="moba-btn h-7 px-2" type="button" onClick={() => runSearch("previous")}>
-            Prev
+            {t("terminal.findPrev")}
           </button>
           <button className="moba-btn h-7 px-2" type="button" onClick={() => runSearch("next")}>
-            Next
+            {t("terminal.findNext")}
           </button>
           <button className="moba-btn h-7 px-2" type="button" onClick={closeSearch}>
-            Close
+            {t("terminal.findClose")}
           </button>
           {searchStatus && <span className="px-1 text-[11px] text-[#b22222]">{searchStatus}</span>}
         </div>
@@ -2230,14 +2232,14 @@ export function TerminalPanel({
           onContextMenu={(event) => event.stopPropagation()}
         >
           <div className="h-8 flex items-center px-3 border-b bg-slate-100">
-            <span className="font-semibold">Event Log</span>
+            <span className="font-semibold">{t("terminal.eventLogTitle")}</span>
             <button className="moba-btn ml-auto h-6 px-2" type="button" onClick={() => setEventLogOpen(false)}>
-              Close
+              {t("terminal.eventLogClose")}
             </button>
           </div>
           <div className="max-h-[320px] overflow-auto">
             {eventLog.length === 0 ? (
-              <div className="p-3 text-slate-500">No terminal events yet.</div>
+              <div className="p-3 text-slate-500">{t("terminal.eventLogEmpty")}</div>
             ) : (
               <table className="w-full border-collapse">
                 <tbody>
@@ -2258,7 +2260,7 @@ export function TerminalPanel({
       {zmodemState !== "idle" && (
         <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 flex items-center gap-3 rounded border border-slate-400 bg-white px-4 py-2 shadow-lg text-[12px]">
           <span className="font-semibold">
-            {zmodemState === "receiving" ? "Receiving" : "Sending"} via Z-modem
+            {zmodemState === "receiving" ? t("terminal.zmodemReceiving") : t("terminal.zmodemSending")} {t("terminal.zmodemViaZmodem")}
           </span>
           {zmodemProgress && (
             <>

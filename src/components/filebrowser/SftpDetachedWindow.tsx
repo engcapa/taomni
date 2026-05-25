@@ -3,6 +3,7 @@ import { FileBrowser } from "./FileBrowser";
 import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
 import { getAppPlatform } from "../../lib/runtime";
+import { useT } from "../../lib/i18n";
 
 interface DetachedSftpParams {
   /**
@@ -180,6 +181,7 @@ export function detectDetachedSftpRoute(): string | null {
 }
 
 export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
+  const t = useT();
   const { mode, resolvedTheme } = useAppTheme();
   const [uiFontFamily, setUiFontFamily] = useState(() => {
     try {
@@ -301,13 +303,13 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   const title = useMemo(
-    () => `${params?.title ?? `SFTP ${sessionId}`}`,
-    [params?.title, sessionId],
+    () => `${params?.title ?? t("fileBrowser.detachedTitleDefault", { sessionId })}`,
+    [params?.title, sessionId, t],
   );
 
   useEffect(() => {
-    document.title = `${title} • newmob`;
-  }, [title]);
+    document.title = `${title} • ${t("fileBrowser.detachedDocTitleSuffix")}`;
+  }, [title, t]);
 
   if (!params) {
     // Use literal colours here (not CSS vars) so that even if the theme
@@ -322,18 +324,13 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
           {handoffTimedOut ? (
             <>
               <div className="text-base font-semibold mb-2">
-                Couldn't load SFTP connection
+                {t("fileBrowser.detachedTimedOutTitle")}
               </div>
               <p style={{ color: "#a0a0a0" }}>
-                The parent window didn't hand over the connection details for
-                <span className="font-mono"> {sessionId} </span>
-                within 5&nbsp;seconds. This usually means the popup was opened
-                directly (without going through the main window) or the main
-                window was closed.
+                {t("fileBrowser.detachedTimedOutBody", { sessionId })}
               </p>
               <p className="mt-3" style={{ color: "#a0a0a0" }}>
-                Close this tab and click the detach button on the SFTP panel
-                in the main window again.
+                {t("fileBrowser.detachedTimedOutHint")}
               </p>
               <button
                 type="button"
@@ -341,16 +338,16 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
                 style={{ background: "#3a3f4a", color: "#e6e6e6" }}
                 onClick={() => window.close()}
               >
-                Close window
+                {t("fileBrowser.detachedCloseWindow")}
               </button>
             </>
           ) : (
             <>
               <div className="text-base font-semibold mb-2">
-                Loading SFTP session…
+                {t("fileBrowser.detachedLoadingTitle")}
               </div>
               <p style={{ color: "#a0a0a0" }}>
-                Waiting for connection details from the parent window.
+                {t("fileBrowser.detachedLoadingBody")}
               </p>
             </>
           )}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
+import { useT } from "../../lib/i18n";
 
 type PttState = "idle" | "supported-check" | "recording" | "transcribing" | "unsupported" | "error";
 
@@ -24,6 +25,7 @@ interface VoiceTranscribeResult {
  * later — that lives in voice/intent_dispatcher and is out of UI scope).
  */
 export function PttButton() {
+  const t = useT();
   const [state, setState] = useState<PttState>("idle");
   const [error, setError] = useState<string | null>(null);
   const fullyDisabled = useAiStore((s) => !!s.config?.fully_disabled);
@@ -107,12 +109,12 @@ export function PttButton() {
     ? MicOff
     : Mic;
   const label = isUnsupported
-    ? "麦克风不可用"
+    ? t("ptt.micUnavailable")
     : state === "recording"
-    ? "录音中（松开停止）"
+    ? t("ptt.recording")
     : state === "transcribing"
-    ? "正在转写..."
-    : "按住说话（PTT）";
+    ? t("ptt.transcribing")
+    : t("ptt.holdToSpeak");
 
   return (
     <button

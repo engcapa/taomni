@@ -23,6 +23,7 @@ import {
   useCustomDropTarget,
   type CustomDragData,
 } from "../../lib/customDnD";
+import { useT } from "../../lib/i18n";
 
 const CROSS_PANE_DRAG_MIME = "newmob/sftp-files";
 
@@ -138,6 +139,7 @@ export function FilePanel({
   onOpenLocalSelected,
   onRevealInOs,
 }: FilePanelProps) {
+  const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const session = useSftpStore((s) => s.sessions[sessionId]);
@@ -303,7 +305,7 @@ export function FilePanel({
   if (!pane) {
     return (
       <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
-        Pane is not initialized.
+        {t("fileBrowser.paneNotInitialized")}
       </div>
     );
   }
@@ -443,7 +445,7 @@ export function FilePanel({
           <input
             type="search"
             value={filterText ?? ""}
-            placeholder="Filter…"
+            placeholder={t("fileBrowser.filterPlaceholder")}
             onChange={(e) => onFilterTextChange(e.target.value)}
             className="moba-input h-5 px-1.5 text-[11px] w-[140px] rounded shrink-0"
             style={{
@@ -578,7 +580,7 @@ export function FilePanel({
             style={{ borderColor: "var(--moba-accent)", background: "rgba(43,93,139,0.08)" }}
           >
             <span className="text-xs font-semibold text-[var(--moba-accent)]">
-              Drop to copy here
+              {t("fileBrowser.dropToCopy")}
             </span>
           </div>
         )}
@@ -603,38 +605,46 @@ export function FilePanel({
           <thead className="sticky top-0 z-10" style={{ background: "var(--moba-quick-bg)" }}>
             <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--moba-text-muted)" }}>
               <SortHeader
-                label="Name"
+                label={t("fileBrowser.sortName")}
                 active={sortKey === "name"}
                 dir={sortDir}
                 onClick={() => onHeaderClick("name")}
                 onResizeStart={(e) => startColResize("name", e)}
                 onResizeReset={() => resetCol("name")}
-                hint="Tip: drag the divider on a column's right edge to resize the next column. Double-click to reset."
+                hint={t("fileBrowser.sortNameHint")}
+                resizeTitle={t("fileBrowser.resizeHandleTitle")}
+                testKey="name"
               />
               <SortHeader
-                label="Size"
+                label={t("fileBrowser.sortSize")}
                 active={sortKey === "size"}
                 dir={sortDir}
                 onClick={() => onHeaderClick("size")}
                 className="text-right"
                 onResizeStart={(e) => startColResize("size", e)}
                 onResizeReset={() => resetCol("size")}
+                resizeTitle={t("fileBrowser.resizeHandleTitle")}
+                testKey="size"
               />
               <SortHeader
-                label="Modified"
+                label={t("fileBrowser.sortModified")}
                 active={sortKey === "mtime"}
                 dir={sortDir}
                 onClick={() => onHeaderClick("mtime")}
                 onResizeStart={(e) => startColResize("mtime", e)}
                 onResizeReset={() => resetCol("mtime")}
+                resizeTitle={t("fileBrowser.resizeHandleTitle")}
+                testKey="mtime"
               />
               <SortHeader
-                label="Type"
+                label={t("fileBrowser.sortType")}
                 active={sortKey === "type"}
                 dir={sortDir}
                 onClick={() => onHeaderClick("type")}
                 onResizeStart={(e) => startColResize("type", e)}
                 onResizeReset={() => resetCol("type")}
+                resizeTitle={t("fileBrowser.resizeHandleTitle")}
+                testKey="type"
               />
             </tr>
           </thead>
@@ -649,7 +659,7 @@ export function FilePanel({
             {sortedEntries.length === 0 && !pane.loading && !pane.error && (
               <tr>
                 <td colSpan={4} className="px-2 py-3 text-center text-[var(--moba-text-muted)]">
-                  Empty directory
+                  {t("fileBrowser.emptyDirectory")}
                 </td>
               </tr>
             )}
@@ -686,7 +696,7 @@ export function FilePanel({
                 </td>
                 <td className="px-1.5 py-0.5 text-[var(--moba-text-muted)] truncate">
                   {entry.fileType === "dir"
-                    ? "folder"
+                    ? t("fileBrowser.typeFolder")
                     : (entry.name.split(".").pop() ?? "").toLowerCase()}
                 </td>
               </tr>
@@ -697,9 +707,17 @@ export function FilePanel({
       <div className="h-5 px-2 text-[11px] flex items-center border-t shrink-0"
         style={{ borderColor: "var(--moba-divider)", background: "var(--moba-status-bg)", color: "var(--moba-status-text)" }}>
         {pane.loading
-          ? "Loading…"
-          : `${sortedEntries.length} item${sortedEntries.length === 1 ? "" : "s"}` +
-            (pane.selection.length > 0 ? ` • ${pane.selection.length} selected` : "")}
+          ? t("fileBrowser.statusLoading")
+          : pane.selection.length > 0
+            ? t("fileBrowser.statusItemsCountSelected", {
+                count: sortedEntries.length,
+                plural: sortedEntries.length === 1 ? "" : "s",
+                selected: pane.selection.length,
+              })
+            : t("fileBrowser.statusItemsCount", {
+                count: sortedEntries.length,
+                plural: sortedEntries.length === 1 ? "" : "s",
+              })}
       </div>
     </div>
   );
@@ -714,6 +732,8 @@ function SortHeader({
   onResizeStart,
   onResizeReset,
   hint,
+  resizeTitle,
+  testKey,
 }: {
   label: string;
   active: boolean;
@@ -727,10 +747,15 @@ function SortHeader({
   onResizeReset?: () => void;
   /** Optional help text shown via a small "?" icon next to the label. */
   hint?: string;
+  /** Tooltip shown on the resize handle. */
+  resizeTitle?: string;
+  /** Stable key used for data-testid attributes (independent of localized label). */
+  testKey?: string;
 }) {
+  const slug = (testKey ?? label).toLowerCase();
   return (
     <th
-      data-testid={`col-header-${label.toLowerCase()}`}
+      data-testid={`col-header-${slug}`}
       className={`text-left px-1.5 py-0.5 cursor-pointer select-none border-b relative ${className ?? ""}`}
       style={{ borderColor: "var(--moba-divider)" }}
       onClick={onClick}
@@ -741,7 +766,7 @@ function SortHeader({
       {hint && (
         <span
           aria-label={hint}
-          data-testid={`col-header-${label.toLowerCase()}-hint`}
+          data-testid={`col-header-${slug}-hint`}
           title={hint}
           onClick={(e) => e.stopPropagation()}
           className="inline-flex align-middle ml-1 opacity-60 hover:opacity-100 cursor-help"
@@ -753,8 +778,8 @@ function SortHeader({
         <span
           role="separator"
           aria-orientation="vertical"
-          data-testid={`col-resize-${label.toLowerCase()}`}
-          title="Drag to resize next column • double-click to reset"
+          data-testid={`col-resize-${slug}`}
+          title={resizeTitle ?? "Drag to resize next column • double-click to reset"}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={onResizeStart}
           onDoubleClick={(e) => {
@@ -770,6 +795,7 @@ function SortHeader({
 }
 
 function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [drives, setDrives] = useState<DriveEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -803,7 +829,7 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
     <div ref={wrapRef} className="relative shrink-0">
       <button
         type="button"
-        title="Switch drive"
+        title={t("fileBrowser.drivesSwitchTitle")}
         className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--moba-hover)] text-[11px]"
         onClick={() => setOpen((v) => !v)}
         style={{ color: "var(--moba-text-muted)" }}
@@ -821,11 +847,11 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
           }}
         >
           {loading && (
-            <div className="px-2 py-1 text-[var(--moba-text-muted)]">Loading…</div>
+            <div className="px-2 py-1 text-[var(--moba-text-muted)]">{t("fileBrowser.drivesLoading")}</div>
           )}
           {!loading && drives && drives.length === 0 && (
             <div className="px-2 py-1 text-[var(--moba-text-muted)]">
-              No drives reported
+              {t("fileBrowser.drivesNoneReported")}
             </div>
           )}
           {!loading &&

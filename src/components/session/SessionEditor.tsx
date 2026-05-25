@@ -59,6 +59,7 @@ import {
 } from "../../lib/terminalProfile";
 import { AppThemeSwitcher } from "../settings/AppThemeSwitcher";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 /* ------------------------------------------------------------------ */
 /*  Local types                                                        */
@@ -233,6 +234,7 @@ function Field({
 /* ------------------------------------------------------------------ */
 
 function AdvancedSshSettings({
+  t,
   x11, setX11,
   compression, setCompression,
   startupCmd, setStartupCmd,
@@ -254,6 +256,7 @@ function AdvancedSshSettings({
   jumpPort, setJumpPort,
   onBrowseKey,
 }: {
+  t: TranslateFn;
   x11: boolean; setX11: (v: boolean) => void;
   compression: boolean; setCompression: (v: boolean) => void;
   startupCmd: string; setStartupCmd: (v: string) => void;
@@ -277,68 +280,75 @@ function AdvancedSshSettings({
 }) {
   return (
     <div data-testid="advanced-ssh-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <Field label="X11-Forwarding">
+      <Field label={t("sessionEditor2.fieldX11")}>
         <label className="flex items-center gap-1.5">
           <Checkbox checked={x11} onChange={setX11} />
-          Enable
+          {t("sessionEditor2.enable")}
         </label>
         <span className="ml-3 text-[var(--moba-text-muted)]">
-          Display: <span className="moba-mono">localhost:0.0</span>
+          {t("sessionEditor2.x11DisplayLabel")} <span className="moba-mono">localhost:0.0</span>
         </span>
       </Field>
 
-      <Field label="Compression">
+      <Field label={t("sessionEditor2.fieldCompression")}>
         <label className="flex items-center gap-1.5">
           <Checkbox checked={compression} onChange={setCompression} />
-          Use SSH compression (slow links)
+          {t("sessionEditor2.compressionLabel")}
         </label>
       </Field>
 
-      <Field label="Remote environment">
+      <Field label={t("sessionEditor2.fieldRemoteEnvironment")}>
         <Select
           value={remoteEnv}
           options={[
-            "Interactive shell", "LXDE / LXQt desktop", "Xfce desktop",
-            "GNOME desktop", "KDE Plasma desktop", "Awesome WM", "Custom command…",
+            t("sessionEditor2.remoteEnvInteractive"),
+            t("sessionEditor2.remoteEnvLxde"),
+            t("sessionEditor2.remoteEnvXfce"),
+            t("sessionEditor2.remoteEnvGnome"),
+            t("sessionEditor2.remoteEnvKde"),
+            t("sessionEditor2.remoteEnvAwesome"),
+            t("sessionEditor2.remoteEnvCustom"),
           ]}
           onChange={setRemoteEnv}
         />
       </Field>
 
-      <Field label="Execute command">
+      <Field label={t("sessionEditor2.fieldExecuteCommand")}>
         <input
           className="moba-input flex-1"
-          placeholder="e.g.  tmux new -A -s main"
+          placeholder={t("sessionEditor2.executeCommandPlaceholder")}
           value={startupCmd}
-          aria-label="Execute command"
+          aria-label={t("sessionEditor2.executeCommandAria")}
           onChange={(e) => setStartupCmd(e.target.value)}
         />
         <label className="ml-2 flex items-center gap-1.5">
           <Checkbox checked={doNotExit} onChange={setDoNotExit} />
-          Do not exit after command ends
+          {t("sessionEditor2.doNotExit")}
         </label>
       </Field>
 
-      <Field label="SSH-browser type">
+      <Field label={t("sessionEditor2.fieldSshBrowserType")}>
         <Select
           value={sshBrowser}
           options={[
-            "SFTP protocol (recommended)", "SCP (enhanced speed)",
-            "SCP (compatibility)", "Disabled",
+            t("sessionEditor2.sshBrowserSftp"),
+            t("sessionEditor2.sshBrowserScpSpeed"),
+            t("sessionEditor2.sshBrowserScpCompat"),
+            t("sessionEditor2.sshBrowserDisabled"),
           ]}
           onChange={setSshBrowser}
         />
       </Field>
 
-      <Field label="Authentication">
+      <Field label={t("sessionEditor2.fieldAuthentication")}>
         <div className="flex flex-col gap-1.5 w-full">
           <div className="flex items-center gap-2 flex-wrap">
             {(
               [
-                ["password", "Password / keyboard-interactive"],
-                ["privatekey", "Use private key"],
-                ["agent", "ssh-agent / Pageant"],
-                ["gssapi", "GSSAPI (Kerberos)"],
+                ["password", t("sessionEditor2.authPasswordKbi")],
+                ["privatekey", t("sessionEditor2.authPrivateKey")],
+                ["agent", t("sessionEditor2.authAgent")],
+                ["gssapi", t("sessionEditor2.authGssapi")],
               ] as const
             ).map(([val, lbl]) => (
               <label key={val} className="flex items-center gap-1.5 cursor-pointer">
@@ -351,14 +361,14 @@ function AdvancedSshSettings({
             ))}
           </div>
           <div className="flex items-center gap-2 pl-1">
-            <span className="text-[var(--moba-text-muted)]">Password</span>
+            <span className="text-[var(--moba-text-muted)]">{t("sessionEditor2.passwordLabel")}</span>
             <div className="relative">
               <input
                 className="moba-input pr-7"
                 type={showPwd ? "text" : "password"}
                 value={password}
-                aria-label="SSH password"
-                placeholder={passwordRef ? "•••••• (saved in vault)" : ""}
+                aria-label={t("sessionEditor2.passwordAria")}
+                placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   if (passwordRef) clearPasswordRef();
@@ -367,7 +377,7 @@ function AdvancedSshSettings({
               <button
                 className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
                 onClick={() => setShowPwd(!showPwd)}
-                title="Show / hide"
+                title={t("sessionEditor2.passwordShowHide")}
                 type="button"
               >
                 {showPwd
@@ -379,8 +389,8 @@ function AdvancedSshSettings({
               className="flex items-center gap-1 text-[11px] cursor-pointer"
               title={
                 vaultState === "empty"
-                  ? "Set a master password in the vault settings first."
-                  : "When checked, the password is encrypted with your master password and stored in the credential vault."
+                  ? t("sessionEditor2.saveInVaultTitleEmpty")
+                  : t("sessionEditor2.saveInVaultTitleDefault")
               }
             >
               <input
@@ -391,77 +401,77 @@ function AdvancedSshSettings({
                 onChange={(e) => setSaveInVault(e.target.checked)}
                 disabled={vaultState === "empty"}
               />
-              Save in vault
+              {t("sessionEditor2.saveInVault")}
             </label>
             <span className="moba-pill">
-              <Shield className="w-3 h-3" /> Encrypted, master-password protected
+              <Shield className="w-3 h-3" /> {t("sessionEditor2.encryptedPill")}
             </span>
           </div>
         </div>
       </Field>
 
-      <Field label="Private key">
+      <Field label={t("sessionEditor2.fieldPrivateKey")}>
         <Checkbox checked={usePrivKey} onChange={setUsePrivKey} />
         <input
           className="moba-input flex-1 ml-2"
           value={keyPath}
           onChange={(e) => setKeyPath(e.target.value)}
           disabled={!usePrivKey}
-          aria-label="Private key path"
-          placeholder="~/.ssh/id_ed25519"
+          aria-label={t("sessionEditor2.privateKeyAria")}
+          placeholder={t("sessionEditor2.privateKeyPlaceholder")}
         />
         <button className="moba-btn ml-1" disabled={!usePrivKey} onClick={onBrowseKey} type="button">
-          Browse…
+          {t("sessionEditor2.browse")}
         </button>
-        <button className="moba-btn ml-1" disabled type="button" title="Key generation backend is not implemented yet">
-          Generate…
+        <button className="moba-btn ml-1" disabled type="button" title={t("sessionEditor2.generateTitle")}>
+          {t("sessionEditor2.generate")}
         </button>
       </Field>
 
-      <Field label="Connect through SSH gateway (jump host)">
+      <Field label={t("sessionEditor2.fieldJumpHost")}>
         <div className="flex flex-col gap-1.5 w-full">
           <label className="flex items-center gap-1.5">
-            <Checkbox checked={useJump} onChange={setUseJump} /> Enable jump host
+            <Checkbox checked={useJump} onChange={setUseJump} /> {t("sessionEditor2.enableJumpHost")}
           </label>
           <div
             className="flex items-center gap-2 pl-1"
             style={{ opacity: useJump ? 1 : 0.5 }}
           >
-            <span className="text-[var(--moba-text-muted)] w-16 text-right">Gateway</span>
+            <span className="text-[var(--moba-text-muted)] w-16 text-right">{t("sessionEditor2.jumpGateway")}</span>
             <input
               className="moba-input w-56"
               value={jumpHost}
               onChange={(e) => setJumpHost(e.target.value)}
               disabled={!useJump}
-              aria-label="Jump host"
+              aria-label={t("sessionEditor2.jumpHostAria")}
             />
-            <span className="text-[var(--moba-text-muted)]">User</span>
+            <span className="text-[var(--moba-text-muted)]">{t("sessionEditor2.jumpUserLabel")}</span>
             <input
               className="moba-input w-32"
               value={jumpUser}
               onChange={(e) => setJumpUser(e.target.value)}
               disabled={!useJump}
-              aria-label="Jump user"
+              aria-label={t("sessionEditor2.jumpUserAria")}
             />
-            <span className="text-[var(--moba-text-muted)]">Port</span>
+            <span className="text-[var(--moba-text-muted)]">{t("sessionEditor2.jumpPortLabel")}</span>
             <input
               className="moba-input w-16"
               value={jumpPort}
               onChange={(e) => setJumpPort(e.target.value)}
               disabled={!useJump}
-              aria-label="Jump port"
+              aria-label={t("sessionEditor2.jumpPortAria")}
             />
-            <button className="moba-btn" disabled type="button" title="Jump-host connection testing is not implemented yet">
-              Test chain…
+            <button className="moba-btn" disabled type="button" title={t("sessionEditor2.testChainTitle")}>
+              {t("sessionEditor2.testChain")}
             </button>
           </div>
         </div>
       </Field>
 
-      <Field label="Expert SSH settings">
-        <button className="moba-btn" type="button" disabled title="Expert SSH settings are not implemented yet">Open expert settings…</button>
+      <Field label={t("sessionEditor2.fieldExpertSsh")}>
+        <button className="moba-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
         <span className="ml-2 text-[var(--moba-text-muted)]">
-          SSH protocol version, ciphers, MACs, keep-alive, X11 trusted, agent forwarding…
+          {t("sessionEditor2.expertDesc")}
         </span>
       </Field>
     </div>
@@ -487,10 +497,12 @@ function TerminalSettings({
 }
 
 function NetworkSettings({
+  t,
   value,
   onChange,
   sessionConfigId,
 }: {
+  t: TranslateFn;
   value: NetworkSettingsValue;
   onChange: (next: NetworkSettingsValue) => void;
   /** When set, the Network tab subscribes to runtime forward errors
@@ -568,99 +580,103 @@ function NetworkSettings({
 
   return (
     <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <Field label="Proxy">
+      <Field label={t("sessionEditor2.fieldProxy")}>
         <Select
           value={proxy}
           options={[
-            "None — direct connection", "HTTP CONNECT", "SOCKS 4",
-            "SOCKS 5", "Local SSH tunnel", "System proxy",
+            t("sessionEditor2.proxyNone"),
+            t("sessionEditor2.proxyHttp"),
+            t("sessionEditor2.proxySocks4"),
+            t("sessionEditor2.proxySocks5"),
+            t("sessionEditor2.proxyLocalSshTunnel"),
+            t("sessionEditor2.proxySystem"),
           ]}
           onChange={setProxy}
         />
       </Field>
 
-      <Field label="Proxy host">
+      <Field label={t("sessionEditor2.fieldProxyHost")}>
         <input
           className="moba-input w-64"
-          placeholder="proxy.corp.lan"
+          placeholder={t("sessionEditor2.proxyHostPlaceholder")}
           value={proxyHost}
-          aria-label="Proxy host"
+          aria-label={t("sessionEditor2.proxyHostAria")}
           onChange={(e) => setProxyHost(e.target.value)}
         />
-        <span className="text-[var(--moba-text-muted)] ml-2">Port</span>
+        <span className="text-[var(--moba-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
         <input
           className="moba-input w-16 ml-1"
-          placeholder="3128"
+          placeholder={t("sessionEditor2.proxyPortPlaceholder")}
           value={proxyPort}
-          aria-label="Proxy port"
+          aria-label={t("sessionEditor2.proxyPortAria")}
           onChange={(e) => setProxyPort(e.target.value)}
         />
       </Field>
 
-      <Field label="Proxy auth">
+      <Field label={t("sessionEditor2.fieldProxyAuth")}>
         <input
           className="moba-input w-32"
-          placeholder="username"
+          placeholder={t("sessionEditor2.proxyUserPlaceholder")}
           value={proxyUser}
-          aria-label="Proxy username"
+          aria-label={t("sessionEditor2.proxyUserAria")}
           onChange={(e) => setProxyUser(e.target.value)}
         />
         <input
           className="moba-input w-40 ml-1"
           type="password"
-          placeholder="password"
+          placeholder={t("sessionEditor2.proxyPassPlaceholder")}
           value={proxyPass}
-          aria-label="Proxy password"
+          aria-label={t("sessionEditor2.proxyPassAria")}
           onChange={(e) => setProxyPass(e.target.value)}
         />
         <label className="ml-2 flex items-center gap-1.5">
-          <Checkbox checked={proxySave} onChange={setProxySave} /> Save in vault
+          <Checkbox checked={proxySave} onChange={setProxySave} /> {t("sessionEditor2.proxySaveInVault")}
         </label>
       </Field>
 
-      <Field label="Keep-alive">
+      <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
           <Checkbox checked={keepAlive} onChange={setKeepAlive} />
-          Send
+          {t("sessionEditor2.keepAliveSend")}
         </label>
         <input
           className="moba-input w-16 ml-1"
           value={keepAliveInterval}
-          aria-label="Keep-alive interval"
+          aria-label={t("sessionEditor2.keepAliveAria")}
           onChange={(e) => setKeepAliveInterval(e.target.value)}
         />
-        <span className="ml-1">s null packets</span>
+        <span className="ml-1">{t("sessionEditor2.keepAliveSuffix")}</span>
       </Field>
 
-      <Field label="TCP options">
+      <Field label={t("sessionEditor2.fieldTcpOptions")}>
         <label className="flex items-center gap-1.5">
           <Checkbox
             checked={tcpNodelay}
             onChange={(v) => patch({ tcpNodelay: v, disableNagle: v })}
-          /> TCP_NODELAY
+          /> {t("sessionEditor2.tcpNodelay")}
         </label>
         <label className="ml-3 flex items-center gap-1.5">
           <Checkbox
             checked={disableNagle}
             onChange={(v) => patch({ disableNagle: v, tcpNodelay: v })}
-          /> Disable Nagle algorithm
+          /> {t("sessionEditor2.disableNagle")}
         </label>
       </Field>
 
-      <Field label="IP version">
+      <Field label={t("sessionEditor2.fieldIpVersion")}>
         <Select
           value={ipVersion}
-          options={["Auto (prefer IPv4)", "Force IPv4", "Force IPv6"]}
+          options={[t("sessionEditor2.ipAuto"), t("sessionEditor2.ipForceIpv4"), t("sessionEditor2.ipForceIpv6")]}
           onChange={setIpVersion}
         />
       </Field>
 
-      <Field label="Local port forwarding">
+      <Field label={t("sessionEditor2.fieldLocalForwarding")}>
         <div className="flex flex-col gap-1 w-full">
           <div className="flex items-center gap-1.5 text-[var(--moba-text-muted)]">
-            <span className="w-32">Local address:port</span>
-            <span className="w-32">→ Remote address:port</span>
-            <span>Description</span>
+            <span className="w-32">{t("sessionEditor2.forwardLocalHeader")}</span>
+            <span className="w-32">{t("sessionEditor2.forwardRemoteHeader")}</span>
+            <span>{t("sessionEditor2.forwardDescHeader")}</span>
           </div>
           {forwards.map((forward) => {
             const errKey = `${forward.local.trim()}->${forward.remote.trim()}`;
@@ -671,7 +687,7 @@ function NetworkSettings({
                   <input
                     className="moba-input w-32"
                     value={forward.local}
-                    aria-label="Forward local address"
+                    aria-label={t("sessionEditor2.forwardLocalAria")}
                     onChange={(e) =>
                       setForwards((items) =>
                         items.map((item) => item.id === forward.id ? { ...item, local: e.target.value } : item),
@@ -681,7 +697,7 @@ function NetworkSettings({
                   <input
                     className="moba-input w-40"
                     value={forward.remote}
-                    aria-label="Forward remote address"
+                    aria-label={t("sessionEditor2.forwardRemoteAria")}
                     onChange={(e) =>
                       setForwards((items) =>
                         items.map((item) => item.id === forward.id ? { ...item, remote: e.target.value } : item),
@@ -691,7 +707,7 @@ function NetworkSettings({
                   <input
                     className="moba-input flex-1"
                     value={forward.desc}
-                    aria-label="Forward description"
+                    aria-label={t("sessionEditor2.forwardDescAria")}
                     onChange={(e) =>
                       setForwards((items) =>
                         items.map((item) => item.id === forward.id ? { ...item, desc: e.target.value } : item),
@@ -699,7 +715,7 @@ function NetworkSettings({
                     }
                   />
                   <button className="moba-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
-                    Remove
+                    {t("sessionEditor2.forwardRemove")}
                   </button>
                 </div>
                 {rowError && (
@@ -715,10 +731,10 @@ function NetworkSettings({
             );
           })}
           <div className="flex items-center gap-1.5">
-            <input className="moba-input w-32" placeholder="127.0.0.1:9090" value={newFwdLocal} aria-label="New forward local address" onChange={(e) => setNewFwdLocal(e.target.value)} />
-            <input className="moba-input w-40" placeholder="metrics.lan:9090" value={newFwdRemote} aria-label="New forward remote address" onChange={(e) => setNewFwdRemote(e.target.value)} />
-            <input className="moba-input flex-1" placeholder="Description" value={newFwdDesc} aria-label="New forward description" onChange={(e) => setNewFwdDesc(e.target.value)} />
-            <button className="moba-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>Add</button>
+            <input className="moba-input w-32" placeholder={t("sessionEditor2.forwardLocalPlaceholder")} value={newFwdLocal} aria-label={t("sessionEditor2.forwardLocalNewAria")} onChange={(e) => setNewFwdLocal(e.target.value)} />
+            <input className="moba-input w-40" placeholder={t("sessionEditor2.forwardRemotePlaceholder")} value={newFwdRemote} aria-label={t("sessionEditor2.forwardRemoteNewAria")} onChange={(e) => setNewFwdRemote(e.target.value)} />
+            <input className="moba-input flex-1" placeholder={t("sessionEditor2.forwardDescPlaceholder")} value={newFwdDesc} aria-label={t("sessionEditor2.forwardDescNewAria")} onChange={(e) => setNewFwdDesc(e.target.value)} />
+            <button className="moba-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>{t("sessionEditor2.forwardAdd")}</button>
           </div>
         </div>
       </Field>
@@ -727,6 +743,7 @@ function NetworkSettings({
 }
 
 function BookmarkSettings({
+  t,
   name, setName,
   groupPath, setGroupPath,
   folderOptions,
@@ -738,6 +755,7 @@ function BookmarkSettings({
   fileExtraArgs, setFileExtraArgs,
   disableAiWrite, setDisableAiWrite,
 }: {
+  t: TranslateFn;
   name: string; setName: (v: string) => void;
   groupPath: string; setGroupPath: (v: string) => void;
   folderOptions: string[];
@@ -758,18 +776,18 @@ function BookmarkSettings({
 
   return (
     <div data-testid="bookmark-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <Field label="Session name">
+      <Field label={t("sessionEditor2.fieldSessionName")}>
         <input
           data-testid="session-name"
           className="moba-input w-72"
           value={name}
-          aria-label="Session name"
+          aria-label={t("sessionEditor2.sessionNameAria")}
           onChange={(e) => setName(e.target.value)}
         />
-        <span className="ml-2 text-[var(--moba-text-muted)]">(shown in sidebar and tabs)</span>
+        <span className="ml-2 text-[var(--moba-text-muted)]">{t("sessionEditor2.sessionNameHint")}</span>
       </Field>
 
-      <Field label="Session folder">
+      <Field label={t("sessionEditor2.fieldSessionFolder")}>
         <Select
           value={groupPath || "User sessions"}
           className="w-[260px]"
@@ -777,11 +795,11 @@ function BookmarkSettings({
           onChange={(value) => setGroupPath(value === "User sessions" ? "" : value)}
         />
         <button className="moba-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
-          <FolderPlus className="w-3 h-3" /> New folder
+          <FolderPlus className="w-3 h-3" /> {t("sessionEditor2.newFolderBtn")}
         </button>
       </Field>
 
-      <Field label="Session icon">
+      <Field label={t("sessionEditor2.fieldSessionIcon")}>
         <span
           className="inline-flex items-center gap-1 px-2 py-1 rounded border"
           style={{ borderColor: "var(--moba-input-border)", background: "var(--moba-input-bg)" }}
@@ -789,105 +807,105 @@ function BookmarkSettings({
           <TerminalIcon className="w-4 h-4" style={{ color: "#2b5d8b" }} />
           {proto.toLowerCase()}
         </span>
-        <button className="moba-btn ml-2" type="button" disabled title="Custom icons are not implemented yet">Change…</button>
+        <button className="moba-btn ml-2" type="button" disabled title={t("sessionEditor2.customIconTitle")}>{t("sessionEditor2.customIconChange")}</button>
       </Field>
 
-      <Field label="Background image">
+      <Field label={t("sessionEditor2.fieldBackgroundImage")}>
         <input
           className="moba-input flex-1"
-          placeholder="(none)"
+          placeholder={t("sessionEditor2.backgroundImagePlaceholder")}
           value={bgImage}
-          aria-label="Background image"
+          aria-label={t("sessionEditor2.backgroundImageAria")}
           onChange={(e) => setBgImage(e.target.value)}
         />
-        <button className="moba-btn ml-1" type="button" disabled title="Background images are not implemented yet">Browse…</button>
-        <span className="ml-2 text-[var(--moba-text-muted)]">Opacity</span>
+        <button className="moba-btn ml-1" type="button" disabled title={t("sessionEditor2.backgroundImageTitle")}>{t("sessionEditor2.backgroundImageBrowse")}</button>
+        <span className="ml-2 text-[var(--moba-text-muted)]">{t("sessionEditor2.backgroundImageOpacity")}</span>
         <input
           className="moba-input w-16 ml-1"
           value={bgOpacity}
-          aria-label="Background opacity"
+          aria-label={t("sessionEditor2.backgroundOpacityAria")}
           onChange={(e) => setBgOpacity(e.target.value)}
         />
       </Field>
 
-      <Field label="Description / notes">
+      <Field label={t("sessionEditor2.fieldDescriptionNotes")}>
         <textarea
           className="moba-input flex-1"
           style={{ height: 56, padding: 6 }}
           value={description}
-          aria-label="Description notes"
+          aria-label={t("sessionEditor2.descriptionAria")}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Notes about this session…"
+          placeholder={t("sessionEditor2.descriptionPlaceholder")}
         />
       </Field>
 
-      <Field label="Tags">
+      <Field label={t("sessionEditor2.fieldTags")}>
         <input
           className="moba-input flex-1"
           value={tags}
-          aria-label="Tags"
+          aria-label={t("sessionEditor2.tagsAria")}
           onChange={(e) => setTags(e.target.value)}
-          placeholder="prod, web, on-call"
+          placeholder={t("sessionEditor2.tagsPlaceholder")}
         />
       </Field>
 
-      <Field label="AI safety">
+      <Field label={t("sessionEditor2.fieldAiSafety")}>
         <label className="flex items-center gap-1.5" data-testid="disable-ai-write-toggle">
           <Checkbox checked={disableAiWrite} onChange={setDisableAiWrite} />
-          禁用 AI 写动作（命令注入 / SFTP 上传）
+          {t("sessionEditor2.disableAiWriteLabel")}
         </label>
         <span className="ml-2 text-[var(--moba-text-muted)]">
-          仅显示预览卡，按 Enter 不直接执行（仍可复制到剪贴板）。
+          {t("sessionEditor2.disableAiWriteHint")}
         </span>
       </Field>
 
       {proto === "File" && (
         <>
-          <Field label="File options">
+          <Field label={t("sessionEditor2.fieldFileOptions")}>
             <label className="flex items-center gap-1.5">
               <Checkbox checked={fileEmbedInTab} onChange={setFileEmbedInTab} />
-              Try to open the folder in a NewMob tab (experimental)
+              {t("sessionEditor2.fileEmbedInTab")}
             </label>
           </Field>
-          <Field label="Additional parameters">
+          <Field label={t("sessionEditor2.fieldAdditionalParameters")}>
             <input
               className="moba-input flex-1"
               value={fileExtraArgs}
-              aria-label="Additional parameters"
+              aria-label={t("sessionEditor2.additionalParametersAria")}
               onChange={(e) => setFileExtraArgs(e.target.value)}
-              placeholder="(passed when launching files; ignored for folders/URLs)"
+              placeholder={t("sessionEditor2.additionalParametersPlaceholder")}
             />
           </Field>
         </>
       )}
 
       {proto !== "File" && (
-        <Field label="Behavior on startup">
+        <Field label={t("sessionEditor2.fieldStartupBehavior")}>
           <label className="flex items-center gap-1.5">
             <Checkbox checked={autoConnect} onChange={setAutoConnect} />
-            Auto-connect when MobaXterm starts
+            {t("sessionEditor2.autoConnect")}
           </label>
           <label className="ml-3 flex items-center gap-1.5">
             <Checkbox checked={openNewWindow} onChange={setOpenNewWindow} />
-            Open in new window
+            {t("sessionEditor2.openNewWindow")}
           </label>
           <label className="ml-3 flex items-center gap-1.5">
             <Checkbox checked={reconnect} onChange={setReconnect} />
-            Reconnect on disconnection
+            {t("sessionEditor2.reconnectOnDisconnect")}
           </label>
         </Field>
       )}
 
-      <Field label="Keyboard shortcut">
+      <Field label={t("sessionEditor2.fieldKeyboardShortcut")}>
         <input
           className="moba-input w-40"
           value={shortcut}
-          aria-label="Keyboard shortcut"
+          aria-label={t("sessionEditor2.keyboardShortcutAria")}
           onChange={(e) => setShortcut(e.target.value)}
-          placeholder="Ctrl+Alt+1"
+          placeholder={t("sessionEditor2.keyboardShortcutPlaceholder")}
         />
         <span className="ml-2 text-[var(--moba-text-muted)]">
-          Click then press a key combination
+          {t("sessionEditor2.keyboardShortcutHint")}
         </span>
       </Field>
     </div>
@@ -911,6 +929,7 @@ interface SessionEditorProps {
 }
 
 export function SessionEditor({ session, defaultGroupPath = null, initialProto, onClose }: SessionEditorProps) {
+  const t = useT();
   const { addSession, updateSession, removeSession, createFolderPath, sessions, groups } = useSessionStore();
   const isEdit = !!session;
 
@@ -1107,10 +1126,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   };
 
   const validate = () => {
-    if (needsHost && !host.trim()) return "Remote host is required.";
-    if (proto === "File" && !host.trim()) return "File or folder path (or URL) is required.";
-    if (isSSH && specifyUser && !username.trim()) return "Username is enabled but empty.";
-    if (authMethod === "PrivateKey" && !keyPath.trim()) return "Private key path is required.";
+    if (needsHost && !host.trim()) return t("sessionEditor2.errHostRequired");
+    if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");
+    if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
+    if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
     return null;
   };
 
@@ -1142,7 +1161,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         setPassword("");
       } catch (err) {
         if (isVaultLockedError(err)) {
-          setSaveError("Vault is locked — unlock it first to save the password.");
+          setSaveError(t("sessionEditor2.errVaultLockedSave"));
         } else {
           setSaveError(err instanceof Error ? err.message : String(err));
         }
@@ -1170,7 +1189,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         setNetworkSettings({ ...networkSettings, proxyPass: result.reference });
       } catch (err) {
         if (isVaultLockedError(err)) {
-          setSaveError("Vault is locked — unlock it first to save the proxy password.");
+          setSaveError(t("sessionEditor2.errVaultLockedProxy"));
         } else {
           setSaveError(err instanceof Error ? err.message : String(err));
         }
@@ -1210,12 +1229,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
     const config = buildConfig({
       id: crypto.randomUUID(),
-      name: `${name || host || proto} template`,
+      name: t("sessionEditor2.templateName", { base: name || host || proto }),
       group_path: "Templates",
       last_connected_at: null,
     });
     await addSession(config);
-    setTestResult({ ok: true, msg: "Template saved" });
+    setTestResult({ ok: true, msg: t("sessionEditor2.templateSaved") });
   };
 
   const handleReset = () => {
@@ -1285,7 +1304,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setUsePrivKey(true);
       handleAuthRadio("privatekey");
     } catch (err) {
-      setSaveError(`Could not open private key chooser: ${String(err)}`);
+      setSaveError(t("sessionEditor2.errKeyChooser", { error: String(err) }));
     }
   };
 
@@ -1295,7 +1314,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       const selected = await selectFilePath(host || undefined);
       if (selected) setHost(selected.trim());
     } catch (err) {
-      setSaveError(`Could not open file chooser: ${String(err)}`);
+      setSaveError(t("sessionEditor2.errFileChooser", { error: String(err) }));
     }
   };
 
@@ -1305,12 +1324,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       const selected = await selectFolderPath(host || undefined);
       if (selected) setHost(selected.trim());
     } catch (err) {
-      setSaveError(`Could not open folder chooser: ${String(err)}`);
+      setSaveError(t("sessionEditor2.errFolderChooser", { error: String(err) }));
     }
   };
 
   const handleNewFolder = () => {
-    const next = window.prompt("New session folder", groupPath || "User sessions / New folder");
+    const next = window.prompt(t("sessionEditor2.promptNewFolder"), groupPath || t("sessionEditor2.promptNewFolderDefault"));
     const normalized = normalizeGroupPath(next);
     if (!normalized) return;
     setGroupPath(toStoredGroupPath(normalized) ?? "");
@@ -1326,11 +1345,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const handleTestConnection = async () => {
     if (!host || !username) {
-      setTestResult({ ok: false, msg: "Host and username are required" });
+      setTestResult({ ok: false, msg: t("sessionEditor2.testHostUserRequired") });
       return;
     }
     if (authMethod === "Password" && !password) {
-      setTestResult({ ok: false, msg: "Enter password above to test" });
+      setTestResult({ ok: false, msg: t("sessionEditor2.testEnterPassword") });
       return;
     }
     setTesting(true);
@@ -1594,6 +1613,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         >
           {activeSection === "advanced" && isSSH && (
             <AdvancedSshSettings
+              t={t}
               x11={x11} setX11={setX11}
               compression={compression} setCompression={setCompression}
               startupCmd={startupCmd} setStartupCmd={setStartupCmd}
@@ -1628,6 +1648,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           )}
           {activeSection === "network" && (
             <NetworkSettings
+              t={t}
               value={networkSettings}
               onChange={setNetworkSettings}
               sessionConfigId={session?.id}
@@ -1635,6 +1656,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           )}
           {activeSection === "bookmark" && (
             <BookmarkSettings
+              t={t}
               name={name} setName={setName}
               groupPath={groupPath} setGroupPath={setGroupPath}
               folderOptions={folderOptions}

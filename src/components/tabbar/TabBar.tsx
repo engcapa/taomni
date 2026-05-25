@@ -26,6 +26,7 @@ import {
   type CustomDragData,
 } from "../../lib/customDnD";
 import type { Tab, TabKind } from "../../types";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 
@@ -49,6 +50,7 @@ export function TabBar() {
     toggleMultiExecTab,
   } = useAppStore();
   const ctx = useContextMenu();
+  const t = useT();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function TabBar() {
     addTab({
       id,
       type: "terminal",
-      title: `Terminal ${tabs.length}`,
+      title: t("tabs.defaultTitle", { index: tabs.length }),
       closable: true,
     });
   };
@@ -106,33 +108,33 @@ export function TabBar() {
     const isFirst = idx === 0;
     const isLast = idx === tabs.length - 1;
     ctx.show(e, [
-      { label: "Close", icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
-      { label: "Close others", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
-      { label: "Close all", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
+      { label: t("tabs.close"), icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
+      { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
+      { label: t("tabs.closeAll"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
       { label: "", separator: true, onClick: () => {} },
-      { label: "Rename tab", icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
-      { label: "Duplicate tab", icon: <Copy className="w-3 h-3" />, onClick: () => {
+      { label: t("tabs.rename"), icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
+      { label: t("tabs.duplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => {
         addTab({ ...tab, id: `dup-${Date.now()}`, closable: true });
       }, disabled: tab.type === "welcome" },
       { label: "", separator: true, onClick: () => {} },
-      { label: "Move to first", icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
-      { label: "Move left", icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
-      { label: "Move right", icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
-      { label: "Move to last", icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
+      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
+      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
+      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
+      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
     ]);
   };
 
   const handleMore = (event: React.MouseEvent) => {
     ctx.show(event, [
       {
-        label: compactMode ? "Exit compact mode" : "Enter compact mode",
+        label: compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact"),
         icon: compactMode ? <PanelTopOpen className="w-3 h-3" /> : <PanelTopClose className="w-3 h-3" />,
         shortcut: "Ctrl+Shift+M",
         onClick: toggleCompactMode,
       },
       { label: "", separator: true, onClick: () => {} },
-      { label: "New local terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: handleNewTab },
-      { label: "Close all terminals", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.type === "terminal" && t.closable).map((t) => t.id)) },
+      { label: t("tabs.newLocalTerminal"), icon: <TerminalIcon className="w-3 h-3" />, onClick: handleNewTab },
+      { label: t("tabs.closeAllTerminals"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.type === "terminal" && t.closable).map((t) => t.id)) },
     ]);
   };
 
@@ -184,6 +186,7 @@ export function TabBar() {
           <TabItem
             key={tab.id}
             tab={tab}
+            translate={t}
             active={activeTabId === tab.id}
             multiExecSelected={!!isSelected}
             multiExecActive={multiExecActive}
@@ -236,14 +239,14 @@ export function TabBar() {
         className="moba-tab"
         data-active={false}
         onClick={handleNewTab}
-        title="New tab"
+        title={t("tabs.newTab")}
       >
         <Plus className="w-3 h-3" />
       </button>
 
       <div className="flex-1 self-stretch" data-window-drag />
       <div className="flex items-center gap-1 pr-1 pb-0.5">
-        <IconBtn testId="tab-more" title="More" icon={<MoreHorizontal className="w-3.5 h-3.5" />} onClick={handleMore} />
+        <IconBtn testId="tab-more" title={t("tabs.more")} icon={<MoreHorizontal className="w-3.5 h-3.5" />} onClick={handleMore} />
       </div>
     </div>
   );
@@ -304,6 +307,7 @@ function IconBtn({
 
 interface TabItemProps {
   tab: Tab;
+  translate: TranslateFn;
   active: boolean;
   multiExecActive: boolean;
   multiExecSelected: boolean;
@@ -330,6 +334,7 @@ interface TabItemProps {
 function TabItem(props: TabItemProps) {
   const {
     tab,
+    translate: t,
     active,
     multiExecActive,
     multiExecSelected,
@@ -398,7 +403,7 @@ function TabItem(props: TabItemProps) {
       {multiExecActive && tab.type === "terminal" && (
         <button
           type="button"
-          title={multiExecSelected ? "Remove from MultiExec" : "Add to MultiExec"}
+          title={multiExecSelected ? t("tabs.multiExecRemove") : t("tabs.multiExecAdd")}
           className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full border flex items-center justify-center z-10 flex-shrink-0"
           style={{
             background: multiExecSelected ? "var(--moba-accent)" : "var(--moba-chrome-bg)",
@@ -420,7 +425,7 @@ function TabItem(props: TabItemProps) {
         {tab.hasNewOutput && (
           <span
             className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 pointer-events-none"
-            aria-label="New output"
+            aria-label={t("tabs.newOutput")}
           />
         )}
       </div>

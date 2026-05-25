@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionImportResult } from "../../lib/sessionImportExport";
 import { folderOptionLabel } from "../../lib/sessionPaths";
+import { useT } from "../../lib/i18n";
 
 export interface SessionImportPreviewProps {
   source: string;
@@ -17,6 +18,7 @@ export function SessionImportPreview({
   onCancel,
   onConfirm,
 }: SessionImportPreviewProps) {
+  const t = useT();
   const total = result.sessions.length;
   const previewRows = result.sessions.slice(0, 80);
   const remaining = total - previewRows.length;
@@ -97,7 +99,7 @@ export function SessionImportPreview({
     >
       <div
         role="dialog"
-        aria-label="Preview session import"
+        aria-label={t("importPreviewExt.ariaLabel")}
         aria-modal="true"
         data-testid="session-import-preview"
         className="w-[760px] max-w-[94vw] max-h-[86vh] flex flex-col rounded shadow-lg"
@@ -108,7 +110,7 @@ export function SessionImportPreview({
           className="px-4 py-3 border-b"
           style={{ borderColor: "var(--moba-divider)" }}
         >
-          <div className="text-sm font-semibold">Import {source} sessions</div>
+          <div className="text-sm font-semibold">{t("importPreviewExt.titleSource", { source })}</div>
           <div
             className="text-[12px] text-[var(--moba-text-muted)] mt-1"
             data-testid="session-import-preview-summary"
@@ -134,7 +136,7 @@ export function SessionImportPreview({
             className="mx-4 mt-3 rounded border p-2 text-[12px]"
             style={{ borderColor: "#c78b2d", background: "rgba(199,139,45,0.12)" }}
           >
-            <div className="font-semibold mb-1">Warnings</div>
+            <div className="font-semibold mb-1">{t("importPreviewExt.warningsHeading")}</div>
             <ul className="list-disc pl-5 space-y-0.5">
               {result.warnings.slice(0, 6).map((warning, index) => (
                 <li key={`${warning}-${index}`}>{warning}</li>
@@ -142,7 +144,7 @@ export function SessionImportPreview({
             </ul>
             {result.warnings.length > 6 && (
               <div className="mt-1 text-[var(--moba-text-muted)]">
-                {result.warnings.length - 6} more warning{result.warnings.length - 6 === 1 ? "" : "s"}.
+                {t("importPreviewExt.warningsMore", { count: result.warnings.length - 6, plural: result.warnings.length - 6 === 1 ? "" : "s" })}
               </div>
             )}
           </div>
@@ -162,16 +164,16 @@ export function SessionImportPreview({
                       type="checkbox"
                       className="moba-checkbox"
                       data-testid="session-import-preview-select-all"
-                      aria-label={allSelected ? "Deselect all" : "Select all"}
+                      aria-label={allSelected ? t("importPreviewExt.deselectAll") : t("importPreviewExt.selectAll")}
                       checked={allSelected}
                       onChange={toggleAll}
                     />
                   </th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Name</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Type</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Host</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Port</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>Folder</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnName")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnType")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnHost")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnPort")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnFolder")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,7 +187,7 @@ export function SessionImportPreview({
                           className="moba-checkbox"
                           data-testid={`session-import-preview-row-select-${session.id}`}
                           data-checked={checked}
-                          aria-label={`Toggle ${session.name}`}
+                          aria-label={t("importPreviewExt.toggleRow", { name: session.name })}
                           checked={checked}
                           onChange={() => toggleRow(session.id)}
                         />
@@ -208,12 +210,12 @@ export function SessionImportPreview({
             </table>
           ) : (
             <div className="text-[12px] text-[var(--moba-text-muted)]">
-              No importable sessions were found.
+              {t("importPreviewExt.noImportable")}
             </div>
           )}
           {remaining > 0 && (
             <div className="mt-2 text-[12px] text-[var(--moba-text-muted)]">
-              {remaining} more session{remaining === 1 ? "" : "s"} not shown in preview (still imported if selected via Select all).
+              {t("importPreviewExt.moreNotShown", { count: remaining, plural: remaining === 1 ? "" : "s" })}
             </div>
           )}
         </div>
@@ -228,7 +230,7 @@ export function SessionImportPreview({
             className="moba-btn h-8 px-3"
             onClick={onCancel}
           >
-            Cancel
+            {t("importPreview.cancel")}
           </button>
           <button
             type="button"
@@ -238,7 +240,7 @@ export function SessionImportPreview({
             disabled={noneSelected}
             onClick={handleConfirm}
           >
-            Import
+            {t("importPreview.confirmImport")}
           </button>
         </div>
       </div>
