@@ -9,7 +9,6 @@ import {
   Clock,
   Terminal as TerminalIcon,
   Wrench,
-  Gamepad2,
   Bot,
   FolderTree,
 } from "lucide-react";
@@ -97,7 +96,7 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
         className="w-[26px] flex flex-col shrink-0"
         style={{ background: "var(--moba-tab-inactive)", borderRight: "1px solid var(--moba-sidebar-border)" }}
       >
-        {(["sessions", "tools", "macros", "games"] as const).map((t) => (
+        {(["sessions", "tools", "macros"] as const).map((t) => (
           <div
             key={t}
             className="moba-side-tab"
@@ -213,7 +212,6 @@ function UtilityPanel({ tab }: { tab: Exclude<SideTab, "sessions"> }) {
   const meta = {
     tools: { icon: <Wrench className="w-4 h-4" />, title: "Tools", body: "Network tools are scheduled after terminal and session management." },
     macros: { icon: <Bot className="w-4 h-4" />, title: "Macros", body: "Macro recording is not active in this phase." },
-    games: { icon: <Gamepad2 className="w-4 h-4" />, title: "Games", body: "Game shortcuts are intentionally disabled in the MVP." },
   }[tab];
 
   return (

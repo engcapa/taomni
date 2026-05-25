@@ -12,7 +12,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useContextMenu } from "../ContextMenu";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
 import type { RibbonCommand } from "./Ribbon";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
@@ -46,7 +46,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     source: string;
   } | null>(null);
   const items = [
-    "Terminal", "Sessions", "View", "X server", "Tools", "Games", "Settings", "Macros", "Help",
+    "Terminal", "Sessions", "View", "X server", "Tools", "Settings", "Macros", "Help",
   ];
   const hasSessions = sessions.length > 0;
 
@@ -109,9 +109,15 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
   const exportCsv = () => exportResult("CSV", serializeCsvSessions(sessions, null));
   const exportHtml = () => exportResult("HTML", serializeHtmlSessions(sessions, null));
 
-  const openMenu = (event: React.MouseEvent, menu: string) => {
+  const openMenu = (event: React.MouseEvent<HTMLButtonElement>, menu: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const showMenu = (menuItems: MenuItem[]) => ctx.showAt(rect.left, rect.bottom, menuItems);
+
     if (menu === "Terminal") {
-      ctx.show(event, [
+      showMenu([
         { label: "New local terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
         { label: "New remote session…", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
         { label: "", separator: true, onClick: () => {} },
@@ -121,7 +127,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     }
 
     if (menu === "Sessions") {
-      ctx.show(event, [
+      showMenu([
         { label: "New session…", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
         { label: "Show sessions", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("sessions") },
         { label: "Reload sessions", icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
@@ -154,7 +160,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     }
 
     if (menu === "View") {
-      ctx.show(event, [
+      showMenu([
         { label: "Toggle sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("view") },
         { label: "Toggle compact mode", icon: <PanelTopClose className="w-3 h-3" />, shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
         { label: "Split active terminal", icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("split") },
@@ -163,21 +169,21 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     }
 
     if (menu === "X server") {
-      ctx.show(event, [
+      showMenu([
         { label: "Toggle X server status", onClick: () => onCommand("toggle-xserver") },
       ]);
       return;
     }
 
     if (menu === "Help") {
-      ctx.show(event, [
+      showMenu([
         { label: "About NewMob", icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
       ]);
       return;
     }
 
     const command = menu.toLowerCase() as RibbonCommand;
-    ctx.show(event, [
+    showMenu([
       { label: `Open ${menu}`, onClick: () => onCommand(command) },
     ]);
   };
@@ -208,6 +214,9 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
           data-testid={`menu-${m.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
           className="px-1 hover:bg-[var(--moba-hover)] rounded"
           onClick={(event) => openMenu(event, m)}
+          onMouseEnter={(event) => {
+            if (ctx.isOpen) openMenu(event, m);
+          }}
           type="button"
         >
           <span className="underline-offset-2">

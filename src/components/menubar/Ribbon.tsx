@@ -2,8 +2,6 @@ import {
   Terminal as TerminalIcon,
   Server,
   Wrench,
-  Gamepad2,
-  Bookmark,
   Layout,
   SplitSquareVertical,
   Users,
@@ -22,7 +20,6 @@ export type RibbonCommand =
   | "new-sftp"
   | "servers"
   | "tools"
-  | "games"
   | "sessions"
   | "view"
   | "split"
@@ -49,8 +46,6 @@ export function Ribbon({ xServerEnabled, splitActive, onCommand }: RibbonProps) 
       <RibbonBtn icon={<FolderTree className="w-6 h-6" style={{ color: "#1f7a4a" }} />} label="SFTP" onClick={() => onCommand("new-sftp")} />
       <RibbonBtn icon={<Server className="w-6 h-6" style={{ color: "#3b7ac2" }} />} label="Servers" onClick={() => onCommand("servers")} />
       <RibbonBtn icon={<Wrench className="w-6 h-6" style={{ color: "#5b8a4a" }} />} label="Tools" onClick={() => onCommand("tools")} />
-      <RibbonBtn icon={<Gamepad2 className="w-6 h-6" style={{ color: "#a04b9c" }} />} label="Games" onClick={() => onCommand("games")} />
-      <RibbonBtn icon={<Bookmark className="w-6 h-6" style={{ color: "#c97a23" }} />} label="Sessions" onClick={() => onCommand("sessions")} />
       <RibbonBtn icon={<Layout className="w-6 h-6" style={{ color: "#3b7ac2" }} />} label="View" onClick={() => onCommand("view")} />
       <RibbonBtn icon={<SplitSquareVertical className="w-6 h-6" style={{ color: "#2b5d8b" }} />} label="Split" active={splitActive} onClick={() => onCommand("split")} />
       <RibbonBtn icon={<Users className="w-6 h-6" style={{ color: "#7a3d9d" }} />} label="MultiExec" onClick={() => onCommand("multiexec")} />

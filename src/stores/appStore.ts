@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Tab } from "../types";
 
-export type SideTab = "sessions" | "tools" | "macros" | "games";
+export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
 const COMPACT_MODE_KEY = "newmob.compactMode";
