@@ -1,14 +1,21 @@
 import type { ChatMessage } from "../../stores/chatStore";
-import { ShieldAlert } from "lucide-react";
+import { Check, Copy, ShieldAlert } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "../agent/ActionCard";
 import { invoke } from "@tauri-apps/api/core";
 import { useMemo, useState } from "react";
 import { renderFormatted, type ChatOutputFormat } from "../../lib/chat/renderFormatted";
+import { CodeBlockToolbar, splitFencedBlocks } from "./CodeBlockToolbar";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   /** Resolved output format for this thread; defaults to "md" when omitted. */
   format?: ChatOutputFormat;
+  /**
+   * The terminal-tab the parent thread is bound to. Code-block toolbars on
+   * this message default their "send to terminal" action to it. Null for
+   * global threads — the toolbars fall back to the active terminal.
+   */
+  preferredTerminalTabId?: string | null;
 }
 
 interface InlineToolCall {
@@ -57,23 +64,30 @@ function parseInlineToolCalls(text: string): { stripped: string; toolCalls: Inli
   return { stripped, toolCalls };
 }
 
-export function MessageBubble({ message, format = "md" }: MessageBubbleProps) {
+export function MessageBubble({ message, format = "md", preferredTerminalTabId }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [executed, setExecuted] = useState<Record<number, "approved" | "denied">>({});
+  const [copied, setCopied] = useState(false);
 
   const { stripped, toolCalls } = isUser
     ? { stripped: message.content, toolCalls: [] as InlineToolCall[] }
     : parseInlineToolCalls(message.content);
 
-  // Only assistant messages get markdown / HTML rendering. User input stays
-  // verbatim — what the user typed is what the user sees.
+  // For assistant + Markdown, split fenced code blocks out of the rendered
+  // path so each block gets a CodeBlockToolbar (copy / select-lines / send
+  // to terminal). Non-code prose still goes through marked + DOMPurify.
+  const segments = useMemo(() => {
+    if (isUser || format !== "md") return null;
+    return splitFencedBlocks(stripped);
+  }, [isUser, format, stripped]);
+
+  // Single rendered block (used for "html" mode and as a fallback when
+  // there are no fenced code blocks in Markdown mode).
   const renderedHtml = useMemo(() => {
     if (isUser || format === "plain") return null;
     try {
       return renderFormatted(stripped, format);
     } catch (e) {
-      // If anything blows up (malformed markdown, sanitizer edge case…),
-      // fall back to plain text rather than swallowing the message.
       console.warn("renderFormatted failed:", e);
       return null;
     }
@@ -94,22 +108,73 @@ export function MessageBubble({ message, format = "md" }: MessageBubbleProps) {
     }
   };
 
+  const handleCopyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch (e) {
+      console.warn("copy message failed:", e);
+    }
+  };
+
   return (
-    <div className={`flex flex-col gap-0.5 ${isUser ? "items-end" : "items-start"}`}>
+    <div className={`flex flex-col gap-0.5 group ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed break-words ${
+        className={`relative max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed break-words ${
           isUser
             ? "bg-[var(--moba-accent)] text-white rounded-br-sm whitespace-pre-wrap"
             : `bg-[var(--moba-panel-bg)] border border-[var(--moba-divider)] rounded-bl-sm ${
-                renderedHtml ? "moba-chat-md" : "whitespace-pre-wrap"
+                renderedHtml || segments ? "moba-chat-md" : "whitespace-pre-wrap"
               }`
         }`}
       >
-        {renderedHtml ? (
-          <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
-        ) : (
-          stripped
-        )}
+        {/* Per-message copy button — visible on hover or focus. */}
+        <button
+          type="button"
+          className={`absolute -top-2 ${isUser ? "left-1" : "right-1"} h-5 w-5 p-0 inline-flex items-center justify-center rounded border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity`}
+          onClick={handleCopyMessage}
+          title="复制此条消息"
+          aria-label="Copy this message"
+        >
+          {copied ? (
+            <Check className="w-3 h-3 text-green-400" />
+          ) : (
+            <Copy className="w-3 h-3 text-[var(--moba-text-muted)]" />
+          )}
+        </button>
+
+        {/* Body — three rendering modes. */}
+        {segments
+          ? segments.map((seg, i) => {
+            if (seg.kind === "code") {
+              return (
+                <CodeBlockToolbar
+                  key={i}
+                  code={seg.value}
+                  lang={seg.lang}
+                  preferredTabId={preferredTerminalTabId}
+                />
+              );
+            }
+            // Render the prose chunk through marked+sanitize so inline
+            // formatting (bold, links, inline code) still works.
+            const html = (() => {
+              try {
+                return renderFormatted(seg.value, "md");
+              } catch (e) {
+                console.warn("renderFormatted segment failed:", e);
+                return null;
+              }
+            })();
+            if (!html) {
+              return <span key={i} className="whitespace-pre-wrap">{seg.value}</span>;
+            }
+            return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
+          })
+          : renderedHtml
+            ? <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+            : stripped}
       </div>
       {toolCalls.map((call, i) => (
         <div key={i} className="max-w-[90%] mt-1">

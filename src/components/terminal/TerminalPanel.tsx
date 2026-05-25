@@ -85,6 +85,7 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { registerTerminal } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
   type ZmodemState,
@@ -218,6 +219,9 @@ export function TerminalPanel({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  // Mirrors `sessionIdRef.current` as state so the registry-effect below
+  // re-runs whenever the backend session id changes.
+  const [registeredSessionId, setRegisteredSessionId] = useState<string | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
@@ -1670,6 +1674,7 @@ export function TerminalPanel({
           return;
         }
         sessionIdRef.current = connectedSid;
+        setRegisteredSessionId(connectedSid);
         zmodemRef.current = zmodem;
         if (shellId) setResolvedLocalShellId(shellId);
         onSessionReadyRef.current?.(connectedSid);
@@ -1737,6 +1742,7 @@ export function TerminalPanel({
       fitAddonRef.current = null;
       searchAddonRef.current = null;
       sessionIdRef.current = null;
+      setRegisteredSessionId(null);
       zmodemRef.current = null;
       imeGuardRef.current = null;
       initializedRef.current = false;
@@ -1930,6 +1936,33 @@ export function TerminalPanel({
     const id = window.setInterval(update, 500);
     return () => window.clearInterval(id);
   }, []);
+
+  // Register this terminal in the global registry so the AI Chat Drawer can
+  // pull buffer context (`@terminal:last-N`) and push commands back into it
+  // (the assistant's "Send to terminal" button on rendered code blocks).
+  // Re-runs whenever the backend session id changes, since stale entries
+  // would point at a closed pty.
+  useEffect(() => {
+    if (!tabId || !registeredSessionId) return;
+    const unregister = registerTerminal({
+      tabId,
+      sessionId: registeredSessionId,
+      title: tabTitle,
+      getBufferText: () => {
+        const t = termRef.current;
+        return t ? getBufferText(t) : "";
+      },
+      getLastLines: (n: number) => {
+        const t = termRef.current;
+        return t ? getLastBufferLines(t, n) : "";
+      },
+      writeInput: (data: string) => {
+        if (readOnlyRef.current) return;
+        writeTerminal(registeredSessionId, encodeBase64(data)).catch(console.error);
+      },
+    });
+    return unregister;
+  }, [tabId, registeredSessionId, tabTitle]);
 
   return (
     <div

@@ -280,14 +280,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
 
   attachToComposer: async (text: string) => {
-    // Ensure drawer is open and a thread exists.
+    // Ensure drawer is open and a thread exists. Bind a fresh thread to the
+    // currently focused terminal so subsequent `@terminal:last-N` and "Send
+    // to terminal" actions on this thread default to the right pty.
     if (!get().activeThreadId) {
-      // Either pick the most recent thread or create a fresh one.
       const existing = get().threads[0];
       if (existing) {
         set({ activeThreadId: existing.id });
       } else {
-        await get().newThread();
+        const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
+        const tabId = getActiveTerminalTabId();
+        await get().newThread(undefined, tabId ?? undefined);
       }
     }
     set({
@@ -303,7 +306,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   explainSelection: async (text: string) => {
-    const thread = await get().newThread();
+    // Bind the new thread to the current terminal so the user can keep
+    // chatting about the same pty without re-staging context.
+    const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
+    const tabId = getActiveTerminalTabId();
+    const thread = await get().newThread(undefined, tabId ?? undefined);
     set({ drawerOpen: true });
     // Fire-and-forget — sendMessage owns its own loading state.
     void get().sendMessage(thread.id, `请解释下面这段终端输出：\n\n\`\`\`\n${text}\n\`\`\``);

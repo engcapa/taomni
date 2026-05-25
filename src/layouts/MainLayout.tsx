@@ -66,6 +66,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
+import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 
@@ -291,6 +292,12 @@ export function MainLayout() {
   useEffect(() => {
     if (activeTabId) setTabHasNewOutput(activeTabId, false);
   }, [activeTabId, setTabHasNewOutput]);
+
+  // Track which tab the AI Chat Drawer should consider "active" when the user
+  // types `@terminal:last-N` or hits Send-to-Terminal on a code block.
+  useEffect(() => {
+    setActiveTerminalTab(activeTab?.type === "terminal" ? activeTabId : null);
+  }, [activeTabId, activeTab?.type]);
 
   useEffect(() => {
     tabsRef.current = tabs;
