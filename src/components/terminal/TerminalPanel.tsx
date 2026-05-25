@@ -54,7 +54,7 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
-import { FolderOpen } from "lucide-react";
+import { Bot, FolderOpen } from "lucide-react";
 import {
   createInputEchoSuppressor,
   type InputEchoSuppressor,
@@ -160,6 +160,11 @@ interface TerminalPanelProps {
     open: boolean;
     onToggle: () => void;
   };
+  /** Floating-toolbar button for the AI chat thread bound to this tab. */
+  chatToggle?: {
+    open: boolean;
+    onToggle: () => void;
+  };
 }
 
 const DEFAULT_FONT_SIZE = 14;
@@ -202,6 +207,7 @@ export function TerminalPanel({
   isMultiExecTarget,
   onInputBroadcast,
   sftpToggle,
+  chatToggle,
 }: TerminalPanelProps) {
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
@@ -2076,6 +2082,30 @@ export function TerminalPanel({
           >
             <FolderOpen size={12} />
             SFTP
+          </button>
+        )}
+        {chatToggle && (
+          <button
+            type="button"
+            data-testid="tab-chat-toggle"
+            aria-label={chatToggle.open ? "Close tab AI chat" : "Open tab AI chat"}
+            onClick={chatToggle.onToggle}
+            title={chatToggle.open ? "Hide tab AI chat (Ctrl+Shift+L)" : "Open tab AI chat (Ctrl+Shift+L)"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "2px 8px",
+              fontSize: 11,
+              borderRadius: 4,
+              background: chatToggle.open ? "var(--moba-accent)" : "rgba(0,0,0,0.5)",
+              color: chatToggle.open ? "#fff" : "#ccc",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+            }}
+          >
+            <Bot size={12} />
+            Chat
           </button>
         )}
       </FloatingToolbar>

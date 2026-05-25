@@ -59,6 +59,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     tabId,
     terminalProfile,
     sftpToggle,
+    chatToggle,
     visible,
     activeForShortcuts,
     inputLocked,
@@ -67,6 +68,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     tabId?: string;
     terminalProfile?: TerminalProfile;
     sftpToggle?: { open: boolean; onToggle: () => void };
+    chatToggle?: { open: boolean; onToggle: () => void };
     visible?: boolean;
     activeForShortcuts?: boolean;
     inputLocked?: boolean;
@@ -94,6 +96,15 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
             onClick={sftpToggle.onToggle}
           >
             SFTP
+          </button>
+        )}
+        {chatToggle && (
+          <button
+            type="button"
+            data-testid="tab-chat-toggle"
+            onClick={chatToggle.onToggle}
+          >
+            Chat
           </button>
         )}
       </div>
@@ -180,6 +191,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     render(<MainLayout />);
 
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-chat-toggle")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 

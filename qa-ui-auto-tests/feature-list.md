@@ -79,7 +79,7 @@ controls:
   - id: multiexec-toggle       # toggles MultiExec (lives in title bar tray)
     selector: '[data-testid="tab-multiexec-toggle"]'
     kind: interactive
-  - id: ai-chat-drawer-toggle  # toggles AI Chat Drawer (hidden when AI fully disabled)
+  - id: ai-chat-drawer-toggle  # toggles global AI Chat Drawer (hidden when AI fully disabled)
     selector: '[data-testid="ai-chat-drawer-toggle"]'
     kind: interactive
     optional: true             # absent in fully_disabled mode
@@ -378,6 +378,10 @@ controls:
     selector: '[data-testid="attached-sftp-toggle"]'
     kind: interactive
     optional: true          # only on SSH-backed terminals
+  - id: tab-chat-toggle
+    selector: '[data-testid="tab-chat-toggle"]'
+    kind: interactive
+    optional: true          # terminal floating toolbar; hidden in terminal split mode
   # Shared right-click menu surface (rendered by ContextMenu)
   - id: context-menu
     selector: '[data-testid="context-menu"]'
@@ -388,6 +392,7 @@ controls:
 - xterm.js + FitAddon + WebglAddon（失败回退 canvas）+ SearchAddon + WebLinksAddon
 - ResizeObserver + debounce 自动 fit
 - 容器卸载时正确 dispose 终端实例与监听器
+- 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；标题栏 AI 入口与 Ctrl+L 仅打开全局 Chat
 - 命令历史持久化：每条 host 维度记录到 SQLite (`command_history` 表)，支持 `history_append / history_match_prefix / history_list_recent / history_clear`
 - Inline ghost-text 自动补全：基于 host 命令历史的前缀匹配，按右箭头 / End / Tab 接受建议（PowerShell 本地终端关闭以避免与 PSReadLine 冲突）
 - Common commands 调色板（`CommonCommandsPalette`）：合并历史 + 用户自定义 + 平台预置命令（Windows / Unix），在本地终端中可调出

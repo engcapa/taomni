@@ -151,8 +151,12 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
-  const toggleChatDrawer = useChatStore((s) => s.toggleDrawer);
+  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
+  const toggleTabChat = useChatStore((s) => s.toggleTabChat);
+  const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
+  const chatDrawerScope = useChatStore((s) => s.drawerScope);
+  const chatDrawerTabId = useChatStore((s) => s.drawerTabId);
 
   // Run `action` only after the vault is known to be unlocked. If it's
   // already unlocked we run inline; otherwise we surface the unlock
@@ -296,8 +300,10 @@ export function MainLayout() {
   // Track which tab the AI Chat Drawer should consider "active" when the user
   // types `@terminal:last-N` or hits Send-to-Terminal on a code block.
   useEffect(() => {
-    setActiveTerminalTab(activeTab?.type === "terminal" ? activeTabId : null);
-  }, [activeTabId, activeTab?.type]);
+    const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
+    setActiveTerminalTab(terminalTabId);
+    void syncTabChatWithActiveTab(terminalTabId);
+  }, [activeTabId, activeTab?.type, syncTabChatWithActiveTab]);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -330,17 +336,29 @@ export function MainLayout() {
         event.preventDefault();
         toggleCompactMode();
       }
-      // Ctrl+L: toggle AI Chat Drawer (no-op when fully_disabled)
-      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "l") {
+      const primary = event.ctrlKey || event.metaKey;
+      if (!primary || event.altKey || event.key.toLowerCase() !== "l") return;
+
+      // Ctrl/Cmd+L: global AI Chat Drawer (no-op when fully_disabled).
+      if (!event.shiftKey) {
         event.preventDefault();
         const aiOff = useAiStore.getState().config?.fully_disabled === true;
-        if (!aiOff) toggleChatDrawer();
+        if (!aiOff) void toggleGlobalChat();
+        return;
+      }
+
+      // Ctrl/Cmd+Shift+L: current terminal tab's bound chat.
+      if (event.shiftKey) {
+        event.preventDefault();
+        const aiOff = useAiStore.getState().config?.fully_disabled === true;
+        const current = useAppStore.getState().tabs.find((tab) => tab.id === useAppStore.getState().activeTabId);
+        if (!aiOff && current?.type === "terminal") void toggleTabChat(current.id);
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCompactMode, toggleChatDrawer]);
+  }, [toggleCompactMode, toggleGlobalChat, toggleTabChat]);
 
   const confirmExitWithOpenTabs = useCallback(() => {
     const currentTabs = tabsRef.current;
@@ -1122,6 +1140,10 @@ export function MainLayout() {
                                 : undefined
                             }
                             sftpToggle={!terminalSplitVisible && tab.ssh ? { open: sidebarOpen, onToggle: () => toggleAttachedSidebar(tab.id) } : undefined}
+                            chatToggle={!terminalSplitVisible ? {
+                              open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
+                              onToggle: () => void toggleTabChat(tab.id),
+                            } : undefined}
                           />
                         </div>
                       );

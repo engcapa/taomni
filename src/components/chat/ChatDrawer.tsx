@@ -23,7 +23,7 @@ interface ChatDrawerProps {
 
 export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const {
-    threads, activeThreadId, messages, sending, drawerOpen, drawerWidth,
+    threads, activeThreadId, messages, sending, drawerOpen, drawerScope, drawerWidth,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads,
   } = useChatStore();
@@ -319,7 +319,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={toggleDrawer}
-            title="关闭 (Ctrl+L)"
+            title={drawerScope === "tab" ? "关闭 (Ctrl+Shift+L)" : "关闭 (Ctrl+L)"}
           >
             <X className="w-3.5 h-3.5" />
           </button>
