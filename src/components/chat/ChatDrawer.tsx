@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
+import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { ChatThreadList } from "./ChatThreadList";
 import { NewThreadFormatPicker } from "./NewThreadFormatPicker";
 import {
   getTerminal,
-  getActiveTerminal,
 } from "../../lib/terminal/terminalRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 
@@ -43,6 +43,21 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
   const resizeStartRef = useRef({ x: 0, width: 0 });
+
+  // Subscribe to the active tab so the drawer re-renders (and the
+  // scope/picker logic re-evaluates) whenever the user switches tabs. We
+  // can't read this from terminalRegistry alone because the registry is a
+  // plain global and isn't reactive.
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const activeTabType = useAppStore((s) =>
+    s.tabs.find((t) => t.id === s.activeTabId)?.type ?? null,
+  );
+  const focusedTerminal = useMemo(() => {
+    if (activeTabType !== "terminal") return null;
+    return activeTabId ? getTerminal(activeTabId) : null;
+    // We deliberately depend on activeTabId/Type so the memo recomputes on
+    // tab switch even though terminalRegistry itself is non-reactive.
+  }, [activeTabId, activeTabType]);
 
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
   const activeThread = threads.find((t) => t.id === activeThreadId);
@@ -129,7 +144,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   const handleNewThread = async () => {
     // Default to "terminal" when there's an active terminal, otherwise global.
-    openNewThreadPicker(getActiveTerminal() ? "terminal" : "global");
+    openNewThreadPicker(focusedTerminal ? "terminal" : "global");
   };
 
   const handleNewGlobalThread = async () => {
@@ -141,7 +156,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     scope: "terminal" | "global",
   ) => {
     setShowNewThreadPicker(false);
-    const linked = scope === "terminal" ? getActiveTerminal()?.tabId ?? null : null;
+    const linked = scope === "terminal" ? focusedTerminal?.tabId ?? null : null;
     const thread = await newThread(undefined, linked ?? undefined);
     if (format) {
       try {
@@ -184,7 +199,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     // currently focused terminal tab; final fallback is the legacy prop the
     // caller passed (kept for tests / programmatic use).
     const linked = activeThread?.linked_session_id ?? null;
-    const entry = getTerminal(linked) ?? getActiveTerminal();
+    const entry = getTerminal(linked) ?? focusedTerminal;
     if (entry) {
       return entry.getLastLines(lines);
     }
@@ -204,7 +219,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     if (!activeThreadId) {
       // No thread selected — open the format picker rather than silently
       // creating one with the default format.
-      openNewThreadPicker(getActiveTerminal() ? "terminal" : "global");
+      openNewThreadPicker(focusedTerminal ? "terminal" : "global");
       return;
     }
     setError(null);
@@ -462,7 +477,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               : "md"
           }
           defaultScope={pickerInitialScope}
-          activeTerminalTitle={getActiveTerminal()?.title ?? null}
+          activeTerminalTitle={focusedTerminal?.title ?? null}
           onCancel={() => setShowNewThreadPicker(false)}
           onConfirm={createThreadWithFormat}
         />

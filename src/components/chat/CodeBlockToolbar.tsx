@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Send, Check, Square, CheckSquare } from "lucide-react";
 import {
-  getActiveTerminal,
   getTerminal,
   listTerminals,
+  type TerminalRegistryEntry,
 } from "../../lib/terminal/terminalRegistry";
+import { useAppStore } from "../../stores/appStore";
 
 interface CodeBlockToolbarProps {
   /** Plain-text contents of the code block. */
@@ -36,9 +37,16 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
-  // Re-render toolbar when the registry changes so the disabled state of
-  // "发送到终端" tracks active-terminal lifecycle. We poll because the
-  // registry is intentionally not reactive (see terminalRegistry.ts).
+  // Track the focused terminal tab through the appStore so this toolbar
+  // re-targets the moment the user switches tabs (the registry itself is
+  // a non-reactive global, so we can't subscribe to it directly).
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const activeTabType = useAppStore((s) =>
+    s.tabs.find((t) => t.id === s.activeTabId)?.type ?? null,
+  );
+  // Re-render the toolbar periodically so registry mutations (a terminal
+  // appearing or disappearing while this message is on screen) flow through
+  // even though the registry isn't reactive.
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!selecting) return;
@@ -58,14 +66,17 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
     });
   };
 
-  const targetEntry = (() => {
-    void tick; // keep the linter happy and force re-evaluation each render
+  const targetEntry = useMemo<TerminalRegistryEntry | null>(() => {
+    void tick; // force re-evaluation when the registry is touched
     if (preferredTabId) {
       const e = getTerminal(preferredTabId);
       if (e) return e;
     }
-    return getActiveTerminal();
-  })();
+    if (activeTabType === "terminal" && activeTabId) {
+      return getTerminal(activeTabId);
+    }
+    return null;
+  }, [preferredTabId, activeTabId, activeTabType, tick]);
 
   const buildPayload = (): string => {
     if (!selecting || picked.size === lines.length) return code;
@@ -82,7 +93,7 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
     }
   };
 
-  const handleSendToTerminal = (entry = targetEntry) => {
+  const handleSendToTerminal = (entry: TerminalRegistryEntry | null = targetEntry) => {
     if (!entry) return;
     const payload = buildPayload();
     if (!payload) return;
@@ -158,10 +169,10 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
 }
 
 interface SendToTerminalButtonProps {
-  targetEntry: ReturnType<typeof getActiveTerminal>;
+  targetEntry: TerminalRegistryEntry | null;
   disabled: boolean;
   sent: boolean;
-  onSend: (entry: ReturnType<typeof getActiveTerminal>) => void;
+  onSend: (entry: TerminalRegistryEntry | null) => void;
 }
 
 /**
@@ -190,7 +201,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend }: SendToTer
     return (
       <button
         type="button"
-        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50"
+        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-accent)]/15 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30 hover:bg-[var(--moba-accent)]/25"
         onClick={() => onSend(targetEntry)}
         disabled={baseDisabled}
         title={
@@ -209,7 +220,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend }: SendToTer
     <div ref={ref} className="relative inline-block">
       <button
         type="button"
-        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50"
+        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-accent)]/15 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30 hover:bg-[var(--moba-accent)]/25"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled || allTerminals.length === 0}
         title="发送到指定终端"

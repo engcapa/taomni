@@ -2,7 +2,12 @@ import { Terminal as TerminalIcon, FileText, Server, X } from "lucide-react";
 import type { AttachmentRef } from "../../lib/chat/composerRefs";
 
 interface AttachmentChipProps {
-  ref: AttachmentRef;
+  /**
+   * The parsed `@…` reference. Named `attachment` (not `ref`) because `ref`
+   * is a reserved React prop — React 18 strips it before the component
+   * receives it, leaving the body to crash on `ref.kind`.
+   */
+  attachment: AttachmentRef;
   onRemove?: () => void;
 }
 
@@ -11,8 +16,8 @@ interface AttachmentChipProps {
  * Used by the Composer to show resolved attachments before sending, and by
  * MessageBubble to render references attached to past messages.
  */
-export function AttachmentChip({ ref, onRemove }: AttachmentChipProps) {
-  const { icon, label } = describe(ref);
+export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
+  const { icon, label } = describe(attachment);
   return (
     <span
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--moba-divider)] bg-[var(--moba-bg)] text-[10px] text-[var(--moba-text-muted)]"
@@ -35,21 +40,21 @@ export function AttachmentChip({ ref, onRemove }: AttachmentChipProps) {
   );
 }
 
-function describe(ref: AttachmentRef): { icon: JSX.Element; label: string } {
-  if (ref.kind === "terminal") {
+function describe(attachment: AttachmentRef): { icon: JSX.Element; label: string } {
+  if (attachment.kind === "terminal") {
     return {
       icon: <TerminalIcon className="w-2.5 h-2.5" />,
-      label: `terminal: last-${ref.lines}`,
+      label: `terminal: last-${attachment.lines}`,
     };
   }
-  if (ref.kind === "file") {
+  if (attachment.kind === "file") {
     return {
       icon: <FileText className="w-2.5 h-2.5" />,
-      label: ref.path,
+      label: attachment.path,
     };
   }
   return {
     icon: <Server className="w-2.5 h-2.5" />,
-    label: `session: ${ref.query}`,
+    label: `session: ${attachment.query}`,
   };
 }
