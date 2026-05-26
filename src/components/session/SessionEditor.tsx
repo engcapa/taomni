@@ -32,7 +32,10 @@ import {
   vaultPut,
   isVaultReference,
   isVaultLockedError,
+  listWslDistros,
+  type WslDistro,
 } from "../../lib/ipc";
+import { getAppPlatform } from "../../lib/runtime";
 import {
   getSessionNetworkSettings,
   ipKindToLabel,
@@ -57,6 +60,13 @@ import {
   parseSessionOptions,
   type TerminalProfile,
 } from "../../lib/terminalProfile";
+import {
+  buildWslLaunchArgs,
+  parseWslOptions,
+  serializeWslOptions,
+  type WslOptions,
+} from "../../types/wsl";
+import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { AppThemeSwitcher } from "../settings/AppThemeSwitcher";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
@@ -103,8 +113,13 @@ function protoToSessionType(p: Proto): string {
   return map[p] ?? p;
 }
 
-function sessionTypeToProto(type: string | undefined): Proto {
-  if (type === "LocalShell") return "Shell";
+function sessionTypeToProto(type: string | undefined, optionsJson?: string | null): Proto {
+  if (type === "LocalShell") {
+    const options = parseSessionOptions(optionsJson);
+    const path = typeof options.localShellPath === "string" ? options.localShellPath : "";
+    const basename = path.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+    return basename === "wsl.exe" ? "WSL" : "Shell";
+  }
   if (PROTOS.some((proto) => proto.id === type)) return type as Proto;
   return "SSH";
 }
@@ -937,7 +952,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   /* --- core fields --- */
   const [proto, setProto] = useState<Proto>(
-    session ? sessionTypeToProto(session.session_type) : sessionTypeToProto(initialProto),
+    session
+      ? sessionTypeToProto(session.session_type, session.options_json)
+      : sessionTypeToProto(initialProto),
   );
   const [section, setSection] = useState<SectionTab>("advanced");
   const [name, setName] = useState(session?.name ?? "");
@@ -1010,6 +1027,44 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
   );
+
+  /* --- WSL options --- */
+  const [wslOptions, setWslOptions] = useState<WslOptions>(() =>
+    parseWslOptions(session?.options_json),
+  );
+  const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
+  const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">(
+    () => (getAppPlatform() === "windows" ? "loading" : "unsupported"),
+  );
+
+  useEffect(() => {
+    if (proto !== "WSL") return;
+    if (getAppPlatform() !== "windows") {
+      setWslStatus("unsupported");
+      return;
+    }
+    let cancelled = false;
+    setWslStatus("loading");
+    listWslDistros()
+      .then((distros) => {
+        if (cancelled) return;
+        setWslDistros(distros);
+        setWslStatus("ready");
+        // If editing a brand-new session, default to the system's default distro.
+        if (!wslOptions.distro && distros.length > 0) {
+          const def = distros.find((d) => d.isDefault) ?? distros[0];
+          setWslOptions((prev) => ({ ...prev, distro: def.name }));
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWslStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proto]);
 
   /* --- network settings --- */
   const [networkSettings, setNetworkSettings] = useState<NetworkSettingsValue>(
@@ -1086,9 +1141,19 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     else if (authMethod === "None") auth = "None";
 
     const displayName = name
-      || (proto === "File" && host
-        ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
-        : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal"));
+      || (proto === "WSL"
+        ? t("sessionEditor2.wslDefaultName", { distro: wslOptions.distro || "Linux" })
+        : (proto === "File" && host
+          ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
+          : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal")));
+    const wslOverrides: Record<string, unknown> =
+      proto === "WSL"
+        ? {
+            ...serializeWslOptions(wslOptions),
+            localShellPath: "wsl.exe",
+            localShellArgs: buildWslLaunchArgs(wslOptions),
+          }
+        : {};
     return {
       id: session?.id ?? crypto.randomUUID(),
       name: displayName,
@@ -1116,6 +1181,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         networkSettings: networkSettings.proxySaveAuth
           ? networkSettings
           : { ...networkSettings, proxyPass: "" },
+        ...wslOverrides,
       }),
       created_at: session?.created_at ?? now,
       updated_at: now,
@@ -1128,6 +1194,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const validate = () => {
     if (needsHost && !host.trim()) return t("sessionEditor2.errHostRequired");
     if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");
+    if (proto === "WSL" && !wslOptions.distro.trim()) return t("sessionEditor2.errWslDistroRequired");
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
     if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
     return null;
@@ -1239,7 +1306,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const handleReset = () => {
     const nextOptions = parseSessionOptions(session?.options_json);
-    const nextProto = sessionTypeToProto(session?.session_type);
+    const nextProto = sessionTypeToProto(session?.session_type, session?.options_json);
     setProto(nextProto);
     setSection("advanced");
     setName(session?.name ?? "");
@@ -1275,6 +1342,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setFileExtraArgs(optionString(nextOptions, "fileExtraArgs", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
+    setWslOptions(parseWslOptions(session?.options_json));
     setSaveError(null);
     setTestResult(null);
   };
@@ -1592,6 +1660,29 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 {t("sessionEditor2.fileTargetHint")}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Basic WSL settings — appears for the WSL protocol only */}
+        {proto === "WSL" && (
+          <div
+            data-testid="session-wsl-section"
+            className="px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+          >
+            <div
+              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              style={{ color: "var(--moba-accent)" }}
+            >
+              <TerminalIcon className="w-3.5 h-3.5" />
+              {t("wsl.options.title")}
+            </div>
+            <WslOptionsForm
+              options={wslOptions}
+              distros={wslDistros}
+              status={wslStatus}
+              onChange={setWslOptions}
+            />
           </div>
         )}
 

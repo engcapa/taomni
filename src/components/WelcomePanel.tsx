@@ -10,7 +10,14 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseOpenSshConfig } from "../lib/quickConnect";
-import { listLocalShells, openLocalShellAsAdministrator, type LocalShellOption } from "../lib/ipc";
+import {
+  listLocalShells,
+  listWslDistros,
+  openLocalShellAsAdministrator,
+  type LocalShellOption,
+  type WslDistro,
+} from "../lib/ipc";
+import { getAppPlatform } from "../lib/runtime";
 import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -28,6 +35,9 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
+  const [selectedDistro, setSelectedDistro] = useState("");
+  const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">("loading");
   const { tabs, setStatusMessage } = useAppStore();
   const { sessions, addSession, loadSessions } = useSessionStore();
   const t = useT();
@@ -53,14 +63,44 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
         setStatusMessage(t("status.localShellDetectionFailed", { error: String(error) }));
       });
 
+    if (getAppPlatform() === "windows") {
+      listWslDistros()
+        .then((distros) => {
+          if (cancelled) return;
+          setWslDistros(distros);
+          setSelectedDistro(distros.find((d) => d.isDefault)?.name ?? distros[0]?.name ?? "");
+          setWslStatus("ready");
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setWslStatus("error");
+          setStatusMessage(t("welcome.wslDetectFailed", { error: String(error) }));
+        });
+    } else {
+      setWslStatus("unsupported");
+    }
+
     return () => {
       cancelled = true;
     };
   }, [setStatusMessage, t]);
 
+  const mergedShells = useMemo<LocalShellOption[]>(() => {
+    if (wslDistros.length === 0) return localShells;
+    const virtual: LocalShellOption[] = wslDistros.map((d) => ({
+      id: `wsl:${d.name}`,
+      name: `WSL: ${d.name}`,
+      path: "wsl.exe",
+      args: ["-d", d.name],
+      isDefault: false,
+      canElevate: true,
+    }));
+    return [...localShells, ...virtual];
+  }, [localShells, wslDistros]);
+
   const selectedShell = useMemo(
-    () => localShells.find((shell) => shell.id === selectedShellId),
-    [localShells, selectedShellId],
+    () => mergedShells.find((shell) => shell.id === selectedShellId),
+    [mergedShells, selectedShellId],
   );
 
   const handleStartAsAdministrator = async () => {
@@ -136,20 +176,46 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <LocalTerminalCard
               translate={t}
-              shells={localShells}
+              shells={mergedShells}
               selectedShell={selectedShell}
               selectedShellId={selectedShellId}
               shellStatus={shellStatus}
               onSelectShell={setSelectedShellId}
               kbd="Ctrl+Shift+T"
               onStart={() => {
-                onStartLocalTerminal(
-                  selectedShell ? { id: selectedShell.id, name: selectedShell.name } : undefined,
-                );
+                if (!selectedShell) {
+                  onStartLocalTerminal();
+                  return;
+                }
+                onStartLocalTerminal({
+                  // Real shells have id === path; virtual WSL entries map id="wsl:<distro>"
+                  // to path="wsl.exe" — pass the executable path so the backend can resolve it.
+                  id: selectedShell.path,
+                  name: selectedShell.name,
+                  ...(selectedShell.args && selectedShell.args.length > 0
+                    ? { args: selectedShell.args }
+                    : {}),
+                });
               }}
               onStartAsAdministrator={handleStartAsAdministrator}
               onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
             />
+            {wslStatus === "ready" && wslDistros.length > 0 && (
+              <WslCard
+                translate={t}
+                distros={wslDistros}
+                selectedDistro={selectedDistro}
+                onSelectDistro={setSelectedDistro}
+                onStart={() => {
+                  if (!selectedDistro) return;
+                  onStartLocalTerminal({
+                    id: "wsl.exe",
+                    name: `WSL: ${selectedDistro}`,
+                    args: ["-d", selectedDistro],
+                  });
+                }}
+              />
+            )}
             <ActionCard
               icon={<Plus className="w-5 h-5" />}
               title={t("welcome.newSessionTitle")}
@@ -342,6 +408,70 @@ function LocalTerminalCard({
               <span>{t("welcome.admin")}</span>
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WslCard({
+  translate: t,
+  distros,
+  selectedDistro,
+  onSelectDistro,
+  onStart,
+}: {
+  translate: TranslateFn;
+  distros: WslDistro[];
+  selectedDistro: string;
+  onSelectDistro: (name: string) => void;
+  onStart: () => void;
+}) {
+  const current = distros.find((d) => d.name === selectedDistro);
+  const detail = current
+    ? t("welcome.wslDetail", {
+        state: current.state,
+        version: current.version != null ? String(current.version) : "?",
+      })
+    : t("welcome.wslOpenDesc");
+
+  return (
+    <div
+      data-testid="welcome-wsl-card"
+      className="text-left p-3 rounded-md border moba-card-hover"
+      style={{ borderColor: "var(--moba-card-border)", background: "var(--moba-card-bg)" }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span style={{ color: "#0078d4" }}>
+          <TerminalIcon className="w-5 h-5" />
+        </span>
+        <span className="font-semibold">{t("welcome.openWsl")}</span>
+      </div>
+      <div className="text-[12px] text-[var(--moba-text-muted)]">{detail}</div>
+
+      <div className="mt-2 space-y-2">
+        <select
+          data-testid="welcome-wsl-distro"
+          className="moba-input h-8 w-full"
+          aria-label={t("welcome.wslDistroAria")}
+          value={selectedDistro}
+          onChange={(event) => onSelectDistro(event.target.value)}
+        >
+          {distros.map((d) => (
+            <option key={d.name} value={d.name}>
+              {d.name}{d.isDefault ? t("welcome.defaultLabel") : ""}
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center justify-end gap-2 flex-wrap">
+          <button
+            data-testid="welcome-wsl-open"
+            className="moba-btn h-8 px-3"
+            onClick={onStart}
+            type="button"
+          >
+            {t("welcome.openWslButton")}
+          </button>
         </div>
       </div>
     </div>

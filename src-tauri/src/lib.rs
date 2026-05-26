@@ -9,6 +9,7 @@ mod config;
 mod appearance;
 mod vnc;
 mod rdp;
+mod wsl;
 mod history;
 pub mod vault;
 pub mod ai;
@@ -83,6 +84,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             terminal::list_local_shells,
+            wsl::list_wsl_distros,
             terminal::open_local_shell_as_administrator,
             terminal::create_local_terminal,
             terminal::create_ssh_terminal,

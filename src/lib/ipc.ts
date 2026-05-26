@@ -18,6 +18,17 @@ export async function openLocalShellAsAdministrator(shell?: string): Promise<voi
   return invoke("open_local_shell_as_administrator", { shell });
 }
 
+export interface WslDistro {
+  name: string;
+  isDefault: boolean;
+  state: string;
+  version: number | null;
+}
+
+export async function listWslDistros(): Promise<WslDistro[]> {
+  return invoke<WslDistro[]>("list_wsl_distros", {});
+}
+
 export function createTerminalSessionId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `term-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
