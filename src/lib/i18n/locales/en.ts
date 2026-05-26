@@ -430,6 +430,7 @@ const dict = {
     moveRight: "Move right",
     moveToLast: "Move to last",
     newTab: "New tab",
+    newTabMenu: "Open new tab options",
     newLocalTerminal: "New local terminal",
     closeAllTerminals: "Close all terminals",
     more: "More",
@@ -438,6 +439,10 @@ const dict = {
     newOutput: "New output",
     defaultTitle: "Terminal {index}",
     localTerminal: "Local terminal",
+    recentSessions: "Recent sessions",
+    recentSessionsEmpty: "(no recent sessions)",
+    newSession: "New session…",
+    shellsLoading: "Detecting shells…",
   },
   multiExec: {
     title: "MultiExec",

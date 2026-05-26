@@ -1112,6 +1112,11 @@ export function MainLayout() {
           activeTabClosable={!!activeTab?.closable}
           onCommand={handleCommand}
           onToggleSidebarDrawer={() => setCompactSidebarOpen((open) => !open)}
+          onStartLocalTerminal={(localShell) =>
+            openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+          }
+          onConnectSession={handleConnectSession}
+          onOpenSessionEditor={() => handleNewSession()}
         />
       )}
 
@@ -1166,7 +1171,15 @@ export function MainLayout() {
 
           <Panel>
             <div className="h-full flex flex-col min-w-0">
-              {!compactMode && <TabBar />}              {multiExecActive && (
+              {!compactMode && (
+                <TabBar
+                  onStartLocalTerminal={(localShell) =>
+                    openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+                  }
+                  onConnectSession={handleConnectSession}
+                  onOpenSessionEditor={() => handleNewSession()}
+                />
+              )}              {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}

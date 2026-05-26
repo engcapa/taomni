@@ -429,6 +429,7 @@ export const zhCN: DeepPartial<typeof en> = {
     moveRight: "向右移动",
     moveToLast: "移到末位",
     newTab: "新建标签页",
+    newTabMenu: "新建标签选项",
     newLocalTerminal: "新建本地终端",
     closeAllTerminals: "关闭所有终端",
     more: "更多",
@@ -437,6 +438,10 @@ export const zhCN: DeepPartial<typeof en> = {
     newOutput: "有新输出",
     defaultTitle: "终端 {index}",
     localTerminal: "本地终端",
+    recentSessions: "最近会话",
+    recentSessionsEmpty: "（暂无最近会话）",
+    newSession: "新建会话…",
+    shellsLoading: "正在检测终端…",
   },
   multiExec: {
     title: "多终端同步执行",

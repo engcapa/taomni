@@ -16,23 +16,45 @@ import {
   ChevronLast,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Server,
+  History,
+  FilePlus,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { useContextMenu } from "../ContextMenu";
+import { useSessionStore } from "../../stores/sessionStore";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
   startCustomDrag,
   useCustomDropTarget,
   type CustomDragData,
 } from "../../lib/customDnD";
-import type { Tab, TabKind } from "../../types";
+import type { Tab, TabKind, LocalShellSelection } from "../../types";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import {
+  listLocalShells,
+  listWslDistros,
+  type LocalShellOption,
+  type SessionConfig,
+} from "../../lib/ipc";
+import { getAppPlatform } from "../../lib/runtime";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 
 const TAB_DRAG_MIME = "newmob/tab";
 
-export function TabBar() {
+interface TabBarProps {
+  onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
+  onConnectSession: (session: SessionConfig) => void;
+  onOpenSessionEditor: () => void;
+}
+
+export function TabBar({
+  onStartLocalTerminal,
+  onConnectSession,
+  onOpenSessionEditor,
+}: TabBarProps) {
   const {
     tabs,
     activeTabId,
@@ -49,12 +71,65 @@ export function TabBar() {
     multiExecSelectedTabIds,
     toggleMultiExecTab,
   } = useAppStore();
+  const sessions = useSessionStore((s) => s.sessions);
   const ctx = useContextMenu();
   const t = useT();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
+  const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
+  const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
+  const [shellsLoaded, setShellsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    listLocalShells()
+      .then((shells) => {
+        if (cancelled) return;
+        setLocalShells(shells);
+        setShellsLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setShellsLoaded(true);
+      });
+    if (getAppPlatform() === "windows") {
+      listWslDistros()
+        .then((distros) => {
+          if (cancelled) return;
+          setWslDistros(distros.map((d) => ({ name: d.name, isDefault: d.isDefault })));
+        })
+        .catch(() => {
+          /* WSL unavailable — ignore */
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mergedShells = useMemo<LocalShellOption[]>(() => {
+    if (wslDistros.length === 0) return localShells;
+    const virtual: LocalShellOption[] = wslDistros.map((d) => ({
+      id: `wsl:${d.name}`,
+      name: `WSL: ${d.name}`,
+      path: "wsl.exe",
+      args: ["-d", d.name],
+      isDefault: false,
+      canElevate: true,
+    }));
+    return [...localShells, ...virtual];
+  }, [localShells, wslDistros]);
+
+  const recentSessions = useMemo(
+    () =>
+      sessions
+        .filter((s) => s.last_connected_at)
+        .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
+        .slice(0, 10),
+    [sessions],
+  );
 
   useEffect(() => {
     if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
@@ -86,14 +161,75 @@ export function TabBar() {
     setDraftTitle("");
   };
 
-  const handleNewTab = () => {
-    const id = `terminal-${Date.now()}`;
-    addTab({
-      id,
-      type: "terminal",
-      title: t("tabs.defaultTitle", { index: tabs.length }),
-      closable: true,
-    });
+  const shellSelectionFor = (shell: LocalShellOption): LocalShellSelection => ({
+    id: shell.path,
+    name: shell.name,
+    ...(shell.args && shell.args.length > 0 ? { args: shell.args } : {}),
+  });
+
+  const handleQuickLaunch = () => {
+    if (!shellsLoaded || mergedShells.length === 0) {
+      onStartLocalTerminal();
+      return;
+    }
+    const shell = mergedShells.find((s) => s.isDefault) ?? mergedShells[0];
+    onStartLocalTerminal(shellSelectionFor(shell));
+  };
+
+  const handleOpenLaunchMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    const shellItems: MenuItem[] = mergedShells.length > 0
+      ? mergedShells.map((shell) => ({
+          label: shell.name,
+          testId: `launch-menu-shell-${shell.id}`,
+          icon: <TerminalIcon className="w-3 h-3" />,
+          checked: shell.isDefault,
+          onClick: () => onStartLocalTerminal(shellSelectionFor(shell)),
+        }))
+      : [
+          {
+            label: t("tabs.shellsLoading"),
+            disabled: true,
+            onClick: () => {},
+          },
+        ];
+
+    const recentChildren: MenuItem[] = recentSessions.length > 0
+      ? recentSessions.map((s) => ({
+          label: s.name || `${s.username ?? "user"}@${s.host}`,
+          testId: `launch-menu-recent-${s.id}`,
+          icon: <Server className="w-3 h-3" />,
+          onClick: () => onConnectSession(s),
+        }))
+      : [
+          {
+            label: t("tabs.recentSessionsEmpty"),
+            disabled: true,
+            onClick: () => {},
+          },
+        ];
+
+    const items: MenuItem[] = [
+      ...shellItems,
+      { label: "", separator: true, onClick: () => {} },
+      {
+        label: t("tabs.recentSessions"),
+        icon: <History className="w-3 h-3" />,
+        children: recentChildren,
+      },
+      { label: "", separator: true, onClick: () => {} },
+      {
+        label: t("tabs.newSession"),
+        testId: "launch-menu-new-session",
+        icon: <FilePlus className="w-3 h-3" />,
+        onClick: onOpenSessionEditor,
+      },
+    ];
+
+    ctx.showAt(rect.left, rect.bottom + 2, items);
   };
 
   const handleMouseDown = (e: React.MouseEvent, tab: Tab) => {
@@ -133,7 +269,6 @@ export function TabBar() {
         onClick: toggleCompactMode,
       },
       { label: "", separator: true, onClick: () => {} },
-      { label: t("tabs.newLocalTerminal"), icon: <TerminalIcon className="w-3 h-3" />, onClick: handleNewTab },
       { label: t("tabs.closeAllTerminals"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.type === "terminal" && t.closable).map((t) => t.id)) },
     ]);
   };
@@ -234,15 +369,29 @@ export function TabBar() {
         );
       })}
 
-      <button
-        data-testid="new-local-terminal"
-        className="moba-tab"
-        data-active={false}
-        onClick={handleNewTab}
-        title={t("tabs.newTab")}
-      >
-        <Plus className="w-3 h-3" />
-      </button>
+      <div className="flex items-end" data-testid="new-tab-split">
+        <button
+          data-testid="new-local-terminal"
+          className="moba-tab"
+          style={{ paddingRight: 4, borderTopRightRadius: 0 }}
+          data-active={false}
+          onClick={handleQuickLaunch}
+          title={t("tabs.newTab")}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+        <button
+          data-testid="new-tab-launch-menu"
+          className="moba-tab"
+          style={{ paddingLeft: 2, paddingRight: 4, borderTopLeftRadius: 0, marginLeft: -1 }}
+          data-active={false}
+          onClick={handleOpenLaunchMenu}
+          title={t("tabs.newTabMenu")}
+          aria-haspopup="menu"
+        >
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </div>
 
       <div className="flex-1 self-stretch" data-window-drag />
       <div className="flex items-center gap-1 pr-1 pb-0.5">
