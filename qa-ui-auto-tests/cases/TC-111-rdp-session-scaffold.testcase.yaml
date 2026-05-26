@@ -1,0 +1,52 @@
+id: TC-111
+title: Saved RDP session opens the RDP panel scaffolding
+description: |
+  Coverage smoke for the new RDP feature (Phase 1: transport + X.224 + RDP
+  Negotiation; canvas scaffolding mounted). Creates an RDP session
+  bookmark and double-clicks to open it. The panel mounts immediately
+  (the canvas inside is rendered until conn.status === "connected"),
+  so we assert the rdp-panel testid is present without requiring a
+  real RDP server.
+
+  Because the configured cfg.ssh.host is not necessarily an RDP server,
+  the test does NOT authenticate — it only confirms the protocol
+  selector + tab-mount path is wired up. Real connection testing
+  requires a configured RDP fixture (xrdp / Windows host).
+covers: [F9.7]
+tags: [smoke, p1, rdp, scaffolding-only]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="sidebar"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-rdp"]'
+  - fill:
+      selector: '[data-testid="session-host"]'
+      value: rdp-host.example.test
+  - fill:
+      selector: '[data-testid="session-port"]'
+      value: "3389"
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill:
+      selector: '[data-testid="session-name"]'
+      value: qa-ui-auto-rdp
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rdp"]'
+  # Open the RDP tab — the panel mounts immediately, regardless of dial state.
+  - open_session: { name: qa-ui-auto-rdp, double_click: true }
+  - wait_for:
+      selector: '[data-testid="rdp-panel"]'
+      timeout_sec: 10
+  - assert_visible: '[data-testid="rdp-panel"]'
+  # The canvas element is rendered — assert it's attached even before connect.
+  - wait_for:
+      selector: '[data-testid="rdp-canvas"]'
+      state: attached
+      timeout_sec: 5
+  # The status chip should be present and show "connecting" or "error" (no real server).
+  - assert_visible: '[data-testid="rdp-status"]'
+  - screenshot: 111-rdp-saved.png

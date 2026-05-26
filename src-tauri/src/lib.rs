@@ -8,6 +8,7 @@ mod serial;
 mod config;
 mod appearance;
 mod vnc;
+mod rdp;
 mod history;
 pub mod vault;
 pub mod ai;
@@ -162,6 +163,9 @@ pub fn run() {
             vnc::vnc_connect,
             vnc::vnc_disconnect,
             vnc::vnc_test_connection,
+            rdp::rdp_connect,
+            rdp::rdp_disconnect,
+            rdp::rdp_test_connection,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,
