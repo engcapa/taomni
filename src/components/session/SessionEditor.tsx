@@ -1377,15 +1377,15 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = proto === "File"
     ? [
-        { id: "bookmark", label: "Bookmark settings", icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : [
         ...(isSSH
-          ? [{ id: "advanced" as SectionTab, label: "Advanced SSH settings", icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+          ? [{ id: "advanced" as SectionTab, label: t("sessionEditor2.sectionAdvancedSsh"), icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
           : []),
-        { id: "terminal", label: "Terminal settings", icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> },
-        { id: "network",  label: "Network settings",  icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
-        { id: "bookmark", label: "Bookmark settings",  icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "terminal", label: t("sessionEditor2.sectionTerminal"), icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "network",  label: t("sessionEditor2.sectionNetwork"),  icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "bookmark", label: t("sessionEditor2.sectionBookmark"),  icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ];
 
   /* If we switched away from SSH and were on the advanced tab, fall back */
@@ -1414,20 +1414,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         >
           <Bookmark className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-[12px] font-semibold">
-            {isEdit ? "Edit session" : "Session settings"}
+            {isEdit ? t("sessionEditor2.titleEdit") : t("sessionEditor2.titleNew")}
           </div>
           <div className="ml-auto flex items-center gap-2 text-[11px] opacity-95">
             <AppThemeSwitcher compact />
             <button
-              title="Help"
+              title={t("sessionEditor2.helpTitle")}
               className="hover:bg-white/15 rounded p-0.5"
-              onClick={() => setTestResult({ ok: true, msg: "Fill required fields, then OK to save this session." })}
+              onClick={() => setTestResult({ ok: true, msg: t("sessionEditor2.helpMessage") })}
               type="button"
             >
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
             <button
-              title="Close"
+              title={t("sessionEditor2.closeTitle")}
               className="hover:bg-red-500 rounded p-0.5"
               onClick={onClose}
               type="button"
@@ -1476,11 +1476,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               style={{ color: "var(--moba-accent)" }}
             >
               <TerminalIcon className="w-3.5 h-3.5" />
-              Basic {proto} settings
+              {t("sessionEditor2.basicTitle", { proto })}
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
               <label className="col-span-2 text-[12px] text-right">
-                Remote host *
+                {t("sessionEditor2.remoteHost")}
               </label>
               <div className="col-span-5 flex items-center gap-1">
                 <input
@@ -1489,11 +1489,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
                   onBlur={handleHostLookup}
-                  aria-label="Remote host"
-                  placeholder="hostname or IP"
+                  aria-label={t("sessionEditor2.remoteHostAria")}
+                  placeholder={t("sessionEditor2.remoteHostPlaceholder")}
                 />
                 <button
-                  title="Lookup"
+                  title={t("sessionEditor2.lookup")}
                   className="moba-btn px-2"
                   onClick={handleHostLookup}
                   type="button"
@@ -1503,7 +1503,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               </div>
               <label className="col-span-3 text-[12px] flex items-center gap-1.5 justify-end">
                 <Checkbox checked={specifyUser} onChange={setSpecifyUser} />
-                <span>Specify username</span>
+                <span>{t("sessionEditor2.specifyUsername")}</span>
               </label>
               <input
                 data-testid="session-user"
@@ -1511,27 +1511,35 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 value={username}
                 disabled={!specifyUser}
                 onChange={(e) => setUsername(e.target.value)}
-                aria-label="Username"
-                placeholder="root"
+                aria-label={t("sessionEditor2.usernameAria")}
+                placeholder={t("sessionEditor2.usernamePlaceholder")}
               />
 
-              <label className="col-span-2 text-[12px] text-right">Port</label>
+              <label className="col-span-2 text-[12px] text-right">{t("sessionEditor2.portLabel")}</label>
               <input
                 data-testid="session-port"
                 className="moba-input col-span-2"
                 value={port}
-                aria-label="Port"
+                aria-label={t("sessionEditor2.portAria")}
                 onChange={(e) => setPort(e.target.value)}
               />
               <div className="col-span-8 text-[11px] text-[var(--moba-text-muted)]">
-                Tip: append{" "}
-                <span
-                  className="moba-mono px-1 border rounded"
-                  style={{ background: "var(--moba-input-bg)", borderColor: "var(--moba-divider)" }}
-                >
-                  user@host:port
-                </span>{" "}
-                to autofill these three fields.
+                {(() => {
+                  const tip = t("sessionEditor2.autofillTip", { snippet: "%SNIPPET%" });
+                  const [before, after] = tip.split("%SNIPPET%");
+                  return (
+                    <>
+                      {before}
+                      <span
+                        className="moba-mono px-1 border rounded"
+                        style={{ background: "var(--moba-input-bg)", borderColor: "var(--moba-divider)" }}
+                      >
+                        user@host:port
+                      </span>
+                      {after}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1548,11 +1556,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               style={{ color: "var(--moba-accent)" }}
             >
               <FileText className="w-3.5 h-3.5" />
-              Basic File/folder settings
+              {t("sessionEditor2.basicFileTitle")}
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
               <label className="col-span-2 text-[12px] text-right">
-                File / folder / URL *
+                {t("sessionEditor2.fileTargetLabel")}
               </label>
               <div className="col-span-10 flex items-center gap-1">
                 <input
@@ -1560,11 +1568,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   className="moba-input flex-1"
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
-                  aria-label="File or folder path or URL"
-                  placeholder="C:\\Users\\me\\notes  ·  /home/me/Downloads  ·  https://example.com"
+                  aria-label={t("sessionEditor2.fileTargetAria")}
+                  placeholder={t("sessionEditor2.fileTargetPlaceholder")}
                 />
                 <button
-                  title="Browse folder"
+                  title={t("sessionEditor2.browseFolder")}
                   className="moba-btn px-2"
                   onClick={() => void handleBrowseFolderTarget()}
                   type="button"
@@ -1572,7 +1580,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   <Folder className="w-3.5 h-3.5 inline -mt-0.5" />
                 </button>
                 <button
-                  title="Browse file"
+                  title={t("sessionEditor2.browseFile")}
                   className="moba-btn px-2"
                   onClick={() => void handleBrowseFileTarget()}
                   type="button"
@@ -1581,8 +1589,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 </button>
               </div>
               <div className="col-span-12 text-[11px] text-[var(--moba-text-muted)]">
-                Local path or http(s):// URL. Files and URLs open with the system default handler;
-                folders embed in a NewMob tab when the option is enabled (Bookmark settings).
+                {t("sessionEditor2.fileTargetHint")}
               </div>
             </div>
           </div>
@@ -1684,14 +1691,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               type="button"
             >
               <FlaskConical className="w-3.5 h-3.5" />
-              {testing ? "Testing…" : "Test connection"}
+              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
             </button>
           )}
           <button className="moba-btn flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>
-            <Save className="w-3.5 h-3.5" /> Save as template…
+            <Save className="w-3.5 h-3.5" /> {t("sessionEditor2.saveTemplate")}
           </button>
           <button className="moba-btn flex items-center gap-1.5" type="button" onClick={handleReset}>
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
+            <RotateCcw className="w-3.5 h-3.5" /> {t("sessionEditor2.reset")}
           </button>
 
           {(testResult || saveError) && (
@@ -1704,7 +1711,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           )}
 
           <span className="ml-2 text-[11px] text-[var(--moba-text-muted)]">
-            Will be saved to{" "}
+            {t("sessionEditor2.willBeSavedTo")}{" "}
             <span className="moba-mono">
               {groupPath ? folderOptionLabel(groupPath) : SESSION_ROOT_LABEL} / {name || host || "..."}
             </span>
@@ -1719,11 +1726,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               type="button"
               style={{ color: "#b22222" }}
             >
-              Delete
+              {t("sessionEditor2.delete")}
             </button>
           )}
           <button className="moba-btn" onClick={onClose} type="button">
-            Cancel
+            {t("sessionEditor2.cancel")}
           </button>
           <button
             className="moba-btn"
@@ -1732,7 +1739,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             onClick={handleSave}
             type="button"
           >
-            OK
+            {t("sessionEditor2.ok")}
           </button>
         </div>
       </div>

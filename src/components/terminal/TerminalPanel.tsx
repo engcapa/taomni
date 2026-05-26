@@ -2083,7 +2083,7 @@ export function TerminalPanel({
             }}
           >
             <FolderOpen size={12} />
-            SFTP
+            {t("terminal.sftpFloatingButtonLabel")}
           </button>
         )}
         {chatToggle && (
@@ -2107,7 +2107,7 @@ export function TerminalPanel({
             }}
           >
             <Bot size={12} />
-            Chat
+            {t("terminal.chatFloatingButtonLabel")}
           </button>
         )}
       </FloatingToolbar>

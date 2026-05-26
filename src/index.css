@@ -230,11 +230,21 @@ body {
   user-select: none;
   transition: var(--moba-transition);
 }
+/* CJK reads naturally top-to-bottom in vertical-rl; skip the 180° flip that
+   keeps Latin readable head-tilt-left so Chinese characters stay upright. */
+.moba-side-tab:lang(zh) {
+  transform: none;
+  letter-spacing: 0.08em;
+}
 .moba-side-tab[data-active="true"] {
   background: var(--moba-tab-active);
   color: var(--moba-accent);
   font-weight: 600;
   border-right: 2px solid var(--moba-accent);
+}
+.moba-side-tab[data-active="true"]:lang(zh) {
+  border-right: none;
+  border-left: 2px solid var(--moba-accent);
 }
 
 /* Pill badge */

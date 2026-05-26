@@ -138,9 +138,8 @@ function loadInitialLocale(): LocaleCode {
   } catch {
     // localStorage may be unavailable in restricted webviews.
   }
-  if (typeof navigator !== "undefined" && navigator.language) {
-    return normalizeLocale(navigator.language);
-  }
+  // Default to English until the user explicitly switches via the language
+  // picker; persisted choice is honored above.
   return FALLBACK_LOCALE;
 }
 
