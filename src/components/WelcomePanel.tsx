@@ -15,6 +15,7 @@ import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import type { LocalShellSelection } from "../types";
+import { useT, type TranslateFn } from "../lib/i18n";
 
 interface WelcomePanelProps {
   onStartLocalTerminal: (shell?: LocalShellSelection) => void;
@@ -29,6 +30,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
   const { tabs, setStatusMessage } = useAppStore();
   const { sessions, addSession, loadSessions } = useSessionStore();
+  const t = useT();
   const activeConnections = tabs.filter((tab) => tab.type === "terminal" && tab.closable);
   const recentEvents = sessions
     .slice()
@@ -48,13 +50,13 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
       .catch((error) => {
         if (cancelled) return;
         setShellStatus("error");
-        setStatusMessage(`Local shell detection failed: ${String(error)}`);
+        setStatusMessage(t("status.localShellDetectionFailed", { error: String(error) }));
       });
 
     return () => {
       cancelled = true;
     };
-  }, [setStatusMessage]);
+  }, [setStatusMessage, t]);
 
   const selectedShell = useMemo(
     () => localShells.find((shell) => shell.id === selectedShellId),
@@ -64,9 +66,11 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   const handleStartAsAdministrator = async () => {
     try {
       await openLocalShellAsAdministrator(selectedShell?.id);
-      setStatusMessage(`Requested administrator terminal for ${selectedShell?.name ?? "local shell"}`);
+      setStatusMessage(t("status.administratorRequested", {
+        shell: selectedShell?.name ?? t("welcome.defaultShell"),
+      }));
     } catch (error) {
-      setStatusMessage(`Administrator terminal failed: ${String(error)}`);
+      setStatusMessage(t("status.administratorFailed", { error: String(error) }));
     }
   };
 
@@ -80,7 +84,10 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
     for (const session of imported) {
       await addSession(session);
     }
-    setStatusMessage(`Imported ${imported.length} SSH session${imported.length === 1 ? "" : "s"}`);
+    setStatusMessage(t("status.importedSshSessions", {
+      count: imported.length,
+      plural: imported.length === 1 ? "" : "s",
+    }));
   };
 
   const handleOpenHomeFolder = async () => {
@@ -89,7 +96,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
       const home = await sftpLocalHome();
       if (home) onOpenLocalPath(home, { embedFolder: true });
     } catch (error) {
-      setStatusMessage(`Home lookup failed: ${String(error)}`);
+      setStatusMessage(t("status.homeLookupFailed", { error: String(error) }));
     }
   };
 
@@ -112,22 +119,23 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
               N
             </div>
             <div>
-              <div className="text-xl font-semibold">Welcome to NewMob</div>
+              <div className="text-xl font-semibold">{t("app.welcomeTitle")}</div>
               <div className="text-[12px] text-[var(--moba-text-muted)]">
-                A cross‑platform port of the MobaXterm experience — Linux • macOS • Windows
+                {t("app.tagline")}
               </div>
               <div
                 data-testid="welcome-version"
                 className="text-[11px] mt-0.5 moba-mono"
                 style={{ color: "var(--moba-text-muted)" }}
               >
-                Version {__APP_VERSION__}
+                {t("welcome.versionLabel", { version: __APP_VERSION__ })}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <LocalTerminalCard
+              translate={t}
               shells={localShells}
               selectedShell={selectedShell}
               selectedShellId={selectedShellId}
@@ -144,33 +152,39 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
             />
             <ActionCard
               icon={<Plus className="w-5 h-5" />}
-              title="New session…"
-              desc="SSH, RDP, VNC, SFTP, Telnet, Serial, Mosh, WSL, S3 — all in one dialog."
+              title={t("welcome.newSessionTitle")}
+              desc={t("welcome.newSessionDesc")}
               kbd="Ctrl+Shift+N"
               onClick={() => onNewSession()}
             />
             <ActionCard
               icon={<Upload className="w-5 h-5" />}
-              title="Import OpenSSH config"
-              desc="Read Host, HostName, User, Port and IdentityFile entries into saved sessions."
+              title={t("welcome.importTitle")}
+              desc={t("welcome.importDesc")}
               kbd=""
               onClick={() => fileInputRef.current?.click()}
             />
             <ActionCard
               icon={<RefreshCw className="w-5 h-5" />}
-              title="Refresh sessions"
-              desc="Reload saved sessions from the application database."
+              title={t("welcome.refreshTitle")}
+              desc={t("welcome.refreshDesc")}
               kbd=""
               onClick={() => void loadSessions()}
             />
           </div>
 
           <div className="mt-6 text-[12px] text-[var(--moba-text-muted)]">
-            <div className="font-semibold text-[var(--moba-text)] mb-1">Tips</div>
+            <div className="font-semibold text-[var(--moba-text)] mb-1">{t("welcome.tipsHeading")}</div>
             <ul className="list-disc pl-5 space-y-0.5">
-              <li>Use Quick connect for <span className="moba-mono px-1 border rounded" style={{ background: "var(--moba-input-bg)", borderColor: "var(--moba-divider)" }}>ssh user@host:22</span> or saved sessions.</li>
-              <li>Right‑click any session in the sidebar to connect, edit, duplicate, or delete it.</li>
-              <li>Drag a session onto a folder in the tree to update its group.</li>
+              <li
+                dangerouslySetInnerHTML={{
+                  __html: t("welcome.tipQuickConnect", {
+                    example: '<span class="moba-mono px-1 border rounded" style="background: var(--moba-input-bg); border-color: var(--moba-divider);">ssh user@host:22</span>',
+                  }),
+                }}
+              />
+              <li>{t("welcome.tipRightClick")}</li>
+              <li>{t("welcome.tipDrag")}</li>
             </ul>
           </div>
 
@@ -182,16 +196,16 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
               color: "var(--moba-text-muted)",
             }}
           >
-            <span>NewMob</span>
+            <span>{t("app.name")}</span>
             <span>v{__APP_VERSION__}</span>
           </div>
         </div>
       </div>
 
       <div className="w-[260px] border-l p-3 text-[12px]" style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}>
-        <div className="font-semibold mb-2 flex items-center gap-1"><Activity className="w-3.5 h-3.5" /> Active connections</div>
+        <div className="font-semibold mb-2 flex items-center gap-1"><Activity className="w-3.5 h-3.5" /> {t("welcome.activeConnections")}</div>
         {activeConnections.length === 0 ? (
-          <EmptyText>No active terminal tabs.</EmptyText>
+          <EmptyText>{t("welcome.noActiveConnections")}</EmptyText>
         ) : (
           activeConnections.slice(0, 5).map((tab) => (
             <ConnRow
@@ -202,15 +216,17 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
             />
           ))
         )}
-        <div className="mt-4 font-semibold mb-2 flex items-center gap-1"><ScrollText className="w-3.5 h-3.5" /> Last events</div>
+        <div className="mt-4 font-semibold mb-2 flex items-center gap-1"><ScrollText className="w-3.5 h-3.5" /> {t("welcome.lastEvents")}</div>
         {recentEvents.length === 0 ? (
-          <EmptyText>No saved session activity yet.</EmptyText>
+          <EmptyText>{t("welcome.noEvents")}</EmptyText>
         ) : (
           recentEvents.map((session) => (
             <EventRow
               key={session.id}
               icon={session.last_connected_at ? ">" : "+"}
-              text={`${session.last_connected_at ? "Connected to" : "Saved"} '${session.name}'`}
+              text={session.last_connected_at
+                ? t("welcome.eventConnected", { name: session.name })
+                : t("welcome.eventSaved", { name: session.name })}
               tone={session.last_connected_at ? "ok" : "info"}
             />
           ))
@@ -221,6 +237,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
 }
 
 function LocalTerminalCard({
+  translate: t,
   shells,
   selectedShell,
   selectedShellId,
@@ -231,6 +248,7 @@ function LocalTerminalCard({
   onStartAsAdministrator,
   onOpenHomeFolder,
 }: {
+  translate: TranslateFn;
   shells: LocalShellOption[];
   selectedShell?: LocalShellOption;
   selectedShellId: string;
@@ -244,7 +262,7 @@ function LocalTerminalCard({
   const hasChoices = shells.length > 1;
   const canElevate = selectedShell?.canElevate ?? false;
   const detail = selectedShell?.path ?? (
-    shellStatus === "loading" ? "Detecting available shells..." : "Use the system default shell."
+    shellStatus === "loading" ? t("welcome.detectingShells") : t("welcome.useDefault")
   );
 
   return (
@@ -254,7 +272,7 @@ function LocalTerminalCard({
     >
       <div className="flex items-center gap-2 mb-1">
         <span style={{ color: "var(--moba-accent)" }}><TerminalIcon className="w-5 h-5" /></span>
-        <span className="font-semibold">Start local terminal</span>
+        <span className="font-semibold">{t("welcome.localTerminal")}</span>
         {kbd && (
           <span
             className="ml-auto text-[10px] moba-mono px-1.5 py-0.5 rounded border"
@@ -269,21 +287,21 @@ function LocalTerminalCard({
         )}
       </div>
       <div className="text-[12px] text-[var(--moba-text-muted)]">
-        {selectedShell ? `Open ${selectedShell.name}.` : "Open a local shell."}
+        {selectedShell ? t("welcome.openShell", { shell: selectedShell.name }) : t("welcome.openLocalShell")}
       </div>
 
       <div className="mt-2 space-y-2">
         {hasChoices ? (
           <select
             className="moba-input h-8 w-full"
-            aria-label="Terminal shell"
+            aria-label={t("welcome.terminalShellAria")}
             value={selectedShellId}
             title={selectedShell?.path}
             onChange={(event) => onSelectShell(event.target.value)}
           >
             {shells.map((shell) => (
               <option key={shell.id} value={shell.id}>
-                {shell.name}{shell.isDefault ? " (default)" : ""}
+                {shell.name}{shell.isDefault ? t("welcome.defaultLabel") : ""}
               </option>
             ))}
           </select>
@@ -293,7 +311,7 @@ function LocalTerminalCard({
             title={detail}
             style={{ color: selectedShell ? "var(--moba-text)" : "var(--moba-text-muted)" }}
           >
-            {selectedShell?.name ?? (shellStatus === "loading" ? "Detecting shells..." : "Default shell")}
+            {selectedShell?.name ?? (shellStatus === "loading" ? t("welcome.detectingShellsShort") : t("welcome.defaultShell"))}
           </div>
         )}
         <div className="flex items-center justify-end gap-2 flex-wrap">
@@ -302,26 +320,26 @@ function LocalTerminalCard({
               data-testid="welcome-open-home-folder"
               className="moba-btn h-8 px-3 inline-flex items-center gap-1.5"
               onClick={onOpenHomeFolder}
-              title="Open home folder in a NewMob tab"
+              title={t("welcome.homeFolderTitle")}
               type="button"
             >
               <FolderOpen className="w-3.5 h-3.5" />
-              <span>Home folder</span>
+              <span>{t("welcome.homeFolder")}</span>
             </button>
           )}
           <button data-testid="welcome-open-local-terminal" className="moba-btn h-8 px-3" onClick={onStart} type="button">
-            Open
+            {t("welcome.open")}
           </button>
           {canElevate && (
             <button
               className="moba-btn h-8 px-3 inline-flex items-center gap-1.5"
               onClick={onStartAsAdministrator}
-              title="Open as administrator"
-              aria-label="Open as administrator"
+              title={t("welcome.adminTitle")}
+              aria-label={t("welcome.adminTitle")}
               type="button"
             >
               <Shield className="w-3.5 h-3.5" />
-              <span>Admin</span>
+              <span>{t("welcome.admin")}</span>
             </button>
           )}
         </div>

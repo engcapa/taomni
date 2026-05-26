@@ -22,6 +22,7 @@ import { useSftpController } from "../../lib/sftpController";
 import { joinPath, basename, sftpStat, effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
 import type { MenuItem } from "../ContextMenu";
 import { useAppStore } from "../../stores/appStore";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 type Orientation = "horizontal" | "vertical";
 
@@ -72,6 +73,7 @@ interface FileBrowserProps {
 }
 
 export function FileBrowser(props: FileBrowserProps) {
+  const t = useT();
   const session = useSftpStore((s) => s.sessions[props.sessionId]);
   const ensureSession = useSftpStore((s) => s.ensureSession);
   const attach = useSftpStore((s) => s.attach);
@@ -125,7 +127,7 @@ export function FileBrowser(props: FileBrowserProps) {
             void navigate(props.sessionId, "remote", props.initialPath);
           }
         })
-        .catch((err) => setStatus(`SFTP connection failed: ${err}`));
+        .catch((err) => setStatus(t("fileBrowser.statusSftpConnectFailed", { error: String(err) })));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.sessionId]);
@@ -162,18 +164,18 @@ export function FileBrowser(props: FileBrowserProps) {
         if (!pendingTerminalSyncRef.current) return;
         pendingTerminalSyncRef.current = false;
         terminalSyncTimeoutRef.current = null;
-        setStatus("Terminal cwd did not respond.");
+        setStatus(t("fileBrowser.statusTerminalCwdSilent"));
       }, 5000);
-      setStatus("Requesting terminal cwd...");
+      setStatus(t("fileBrowser.statusRequestingTerminalCwd"));
       return;
     }
     if (!props.cwdHint) {
-      setStatus("Terminal cwd is not known yet.");
+      setStatus(t("fileBrowser.statusTerminalCwdUnknown"));
       return;
     }
     if (!session?.attached) return;
     if (session.remote.path === props.cwdHint) {
-      setStatus(`Already at ${props.cwdHint}`);
+      setStatus(t("fileBrowser.statusAlreadyAt", { path: props.cwdHint }));
       return;
     }
     void navigate(props.sessionId, "remote", props.cwdHint);
@@ -199,7 +201,7 @@ export function FileBrowser(props: FileBrowserProps) {
     pendingTerminalSyncRef.current = false;
     clearTerminalSyncTimeout();
     if (session.remote.path === props.cwdHint) {
-      setStatus(`Already at ${props.cwdHint}`);
+      setStatus(t("fileBrowser.statusAlreadyAt", { path: props.cwdHint }));
       return;
     }
     void navigate(props.sessionId, "remote", props.cwdHint);
@@ -229,10 +231,10 @@ export function FileBrowser(props: FileBrowserProps) {
         const { sftpOpenPath } = await import("../../lib/sftp");
         await sftpOpenPath(entry.path);
       } catch (err) {
-        setStatus(`Failed to open ${entry.name}: ${err}`);
+        setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
       }
     },
-    [navigate, props.sessionId, props.onTerminalSync, setStatus],
+    [navigate, props.sessionId, props.onTerminalSync, setStatus, t],
   );
 
   const handleDownloadConfirmed = useCallback(
@@ -255,11 +257,11 @@ export function FileBrowser(props: FileBrowserProps) {
         try {
           await sftpOpenPath(entry.path);
         } catch (err) {
-          setStatus(`Failed to open ${entry.name}: ${err}`);
+          setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
         }
       }
     },
-    [navigate, props.sessionId, setStatus],
+    [navigate, props.sessionId, setStatus, t],
   );
 
   const localContext = useCallback(
@@ -270,14 +272,15 @@ export function FileBrowser(props: FileBrowserProps) {
       const items: MenuItem[] = [];
       items.push({
         label: effectiveFileType(entry) === "dir"
-          ? "Open folder"
+          ? t("fileBrowser.contextOpenFolder")
           : multi
-            ? `Open ${targets.length} files`
-            : "Open",
+            ? t("fileBrowser.contextOpenFiles", { count: targets.length })
+            : t("fileBrowser.contextOpen"),
         onClick: () => void handleOpenLocal(targets),
       });
       items.push({
-        label: multi ? `Upload ${targets.length} selected to remote` : "Upload to remote",
+        label: multi ? t("fileBrowser.contextUploadCountToRemote", { count: targets.length }) : t("fileBrowser.contextUploadToRemote"),
+        testId: multi ? `context-menu-item-upload-${targets.length}-selected-to-remote` : "context-menu-item-upload-to-remote",
         onClick: () => {
           const remoteDir = session?.remote.path ?? "/";
           for (const item of targets) {
@@ -287,9 +290,9 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       if (!multi) {
         items.push({
-          label: "Rename",
+          label: t("fileBrowser.contextRename"),
           onClick: () => {
-            const next = window.prompt("Rename to", target.name);
+            const next = window.prompt(t("fileBrowser.promptRenameTitle"), target.name);
             if (next && next !== target.name) {
               void controller.rename(target.path, next, "local");
             }
@@ -297,14 +300,14 @@ export function FileBrowser(props: FileBrowserProps) {
         });
       }
       items.push({
-        label: multi ? `Permissions for ${targets.length} selected...` : "Permissions…",
+        label: multi ? t("fileBrowser.contextPermissionsCount", { count: targets.length }) : t("fileBrowser.contextPermissions"),
         onClick: () => setChmodPrompt({ entries: targets, side: "local" }),
       });
       items.push({
-        label: multi ? `Delete ${targets.length} selected` : "Delete",
+        label: multi ? t("fileBrowser.contextDeleteCount", { count: targets.length }) : t("fileBrowser.contextDelete"),
         onClick: () => {
-          const summary = multi ? `${targets.length} items` : target.name;
-          if (window.confirm(`Delete ${summary}?`)) {
+          const summary = multi ? t("fileBrowser.summaryItems", { count: targets.length }) : target.name;
+          if (window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) {
             for (const item of targets) {
               void controller.remove(item.path, "local", true);
             }
@@ -314,7 +317,7 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       return items;
     },
-    [controller, handleOpenLocal, session?.remote.path],
+    [controller, handleOpenLocal, session?.remote.path, t],
   );
 
   const remoteContext = useCallback(
@@ -324,7 +327,8 @@ export function FileBrowser(props: FileBrowserProps) {
       const multi = targets.length > 1;
       const items: MenuItem[] = [];
       items.push({
-        label: multi ? `Download ${targets.length} selected to local` : "Download to local",
+        label: multi ? t("fileBrowser.contextDownloadCountToLocal", { count: targets.length }) : t("fileBrowser.contextDownloadToLocal"),
+        testId: multi ? `context-menu-item-download-${targets.length}-selected-to-local` : "context-menu-item-download-to-local",
         onClick: () => {
           const localDir = session?.local.path ?? "";
           for (const item of targets) {
@@ -334,7 +338,7 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       if (!multi && target.fileType === "file") {
         items.push({
-          label: "Download and open",
+          label: t("fileBrowser.contextDownloadAndOpen"),
           onClick: () => {
             const localDir = session?.local.path ?? "";
             void controller.download(target, localDir, { openAfter: true });
@@ -343,9 +347,9 @@ export function FileBrowser(props: FileBrowserProps) {
       }
       if (!multi) {
         items.push({
-          label: "Rename",
+          label: t("fileBrowser.contextRename"),
           onClick: () => {
-            const next = window.prompt("Rename to", target.name);
+            const next = window.prompt(t("fileBrowser.promptRenameTitle"), target.name);
             if (next && next !== target.name) {
               void controller.rename(target.path, next, "remote");
             }
@@ -353,14 +357,14 @@ export function FileBrowser(props: FileBrowserProps) {
         });
       }
       items.push({
-        label: multi ? `Permissions for ${targets.length} selected...` : "Permissions…",
+        label: multi ? t("fileBrowser.contextPermissionsCount", { count: targets.length }) : t("fileBrowser.contextPermissions"),
         onClick: () => setChmodPrompt({ entries: targets, side: "remote" }),
       });
       items.push({
-        label: multi ? `Delete ${targets.length} selected` : "Delete",
+        label: multi ? t("fileBrowser.contextDeleteCount", { count: targets.length }) : t("fileBrowser.contextDelete"),
         onClick: () => {
-          const summary = multi ? `${targets.length} items` : target.name;
-          if (window.confirm(`Delete remote: ${summary}?`)) {
+          const summary = multi ? t("fileBrowser.summaryItems", { count: targets.length }) : target.name;
+          if (window.confirm(t("fileBrowser.confirmDeleteRemoteSummary", { summary }))) {
             for (const item of targets) {
               void controller.remove(item.path, "remote", true);
             }
@@ -370,47 +374,47 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       return items;
     },
-    [controller, session?.local.path],
+    [controller, session?.local.path, t],
   );
 
   const localEmptyContext = useCallback(
     (): MenuItem[] => [
       {
-        label: "New folder…",
+        label: t("fileBrowser.contextNewFolder"),
         onClick: () => {
-          const name = window.prompt("New folder name", "new-folder");
+          const name = window.prompt(t("fileBrowser.promptNewFolderTitle"), t("fileBrowser.promptNewFolderDefault"));
           if (name) void controller.mkdir(session?.local.path ?? "", name, "local");
         },
       },
       {
-        label: "New file…",
+        label: t("fileBrowser.contextNewFile"),
         onClick: () => {
-          const name = window.prompt("New file name", "new-file.txt");
+          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
           if (name) void controller.createFile(session?.local.path ?? "", name, "local");
         },
       },
     ],
-    [controller, session?.local.path],
+    [controller, session?.local.path, t],
   );
 
   const remoteEmptyContext = useCallback(
     (): MenuItem[] => [
       {
-        label: "New folder…",
+        label: t("fileBrowser.contextNewFolder"),
         onClick: () => {
-          const name = window.prompt("New folder name", "new-folder");
+          const name = window.prompt(t("fileBrowser.promptNewFolderTitle"), t("fileBrowser.promptNewFolderDefault"));
           if (name) void controller.mkdir(session?.remote.path ?? "/", name, "remote");
         },
       },
       {
-        label: "New file…",
+        label: t("fileBrowser.contextNewFile"),
         onClick: () => {
-          const name = window.prompt("New file name", "new-file.txt");
+          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
           if (name) void controller.createFile(session?.remote.path ?? "/", name, "remote");
         },
       },
     ],
-    [controller, session?.remote.path],
+    [controller, session?.remote.path, t],
   );
 
   const handleLocalFiles = useCallback(
@@ -431,11 +435,11 @@ export function FileBrowser(props: FileBrowserProps) {
           const entry = await sftpStat(props.sessionId, path, "local");
           await controller.upload(entry, remoteDir);
         } catch (err) {
-          setStatus(`Upload failed: ${err instanceof Error ? err.message : err}`);
+          setStatus(t("fileBrowser.statusUploadFailed", { error: err instanceof Error ? err.message : String(err) }));
         }
       }
     },
-    [controller, props.sessionId, session?.remote.path, setStatus],
+    [controller, props.sessionId, session?.remote.path, setStatus, t],
   );
 
   const handleCrossPaneToLocal = useCallback(
@@ -460,11 +464,11 @@ export function FileBrowser(props: FileBrowserProps) {
 
   const banner = useMemo(() => {
     if (!session) return null;
-    if (session.attaching) return "Attaching SFTP channel…";
-    if (session.error) return `SFTP error: ${session.error}`;
-    if (!session.attached) return "SFTP not attached.";
+    if (session.attaching) return t("fileBrowser.bannerAttaching");
+    if (session.error) return t("fileBrowser.bannerError", { error: session.error });
+    if (!session.attached) return t("fileBrowser.bannerNotAttached");
     return null;
-  }, [session]);
+  }, [session, t]);
 
   const showCwdToolbar = !!props.onRequestTerminalCwd || props.cwdHint != null;
 
@@ -475,14 +479,14 @@ export function FileBrowser(props: FileBrowserProps) {
           className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0 gap-1"
           style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
         >
-          <span className="truncate flex-1">{props.title ?? "SFTP"}</span>
-          <OrientationToggle orientation={orientation} onChange={setOrientation} />
+          <span className="truncate flex-1">{props.title ?? t("fileBrowser.headerSftp")}</span>
+          <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
           {props.onDetach && (
             <button
               data-testid="sftp-detach"
               type="button"
               className="px-1 hover:bg-[var(--moba-hover)] rounded"
-              title="Open in its own window"
+              title={t("fileBrowser.detachOpenInWindow")}
               onClick={props.onDetach}
             >
               <Maximize2 className="w-3 h-3" />
@@ -493,7 +497,7 @@ export function FileBrowser(props: FileBrowserProps) {
               data-testid="sftp-close"
               type="button"
               className="px-1 hover:bg-[var(--moba-hover)] rounded"
-              title="Hide SFTP panel"
+              title={t("fileBrowser.hideSftpPanel")}
               onClick={props.onClose}
             >
               <X className="w-3 h-3" />
@@ -510,22 +514,22 @@ export function FileBrowser(props: FileBrowserProps) {
             color: "var(--moba-text-muted)",
           }}
         >
-          <span className="shrink-0">Terminal cwd:</span>
+          <span className="shrink-0">{t("fileBrowser.terminalCwdLabel")}</span>
           <span className="font-mono truncate flex-1" title={props.cwdHint ?? ""}>
-            {props.cwdHint ?? "Not requested"}
+            {props.cwdHint ?? t("fileBrowser.terminalCwdNotRequested")}
           </span>
           <button
             type="button"
             className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--moba-hover)] shrink-0"
-            title="Query the terminal cwd and sync the remote pane"
+            title={t("fileBrowser.terminalCwdQueryTitle")}
             onClick={syncToTerminalCwd}
             style={{ color: "var(--moba-accent)" }}
           >
             <Link2 className="w-3 h-3" />
-            <span>Sync</span>
+            <span>{t("fileBrowser.terminalCwdSync")}</span>
           </button>
           {!props.showHeader && (
-            <OrientationToggle orientation={orientation} onChange={setOrientation} />
+            <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
           )}
         </div>
       )}
@@ -552,11 +556,11 @@ export function FileBrowser(props: FileBrowserProps) {
                     username: props.username,
                     authMethod: props.authMethod,
                     authData: props.authData,
-                  }).catch((err) => setStatus(`Reconnect failed: ${err}`))
+                  }).catch((err) => setStatus(t("fileBrowser.statusReconnectFailed", { error: String(err) })))
                 );
               }}
             >
-              retry
+              {t("fileBrowser.bannerRetry")}
             </button>
           )}
         </div>
@@ -598,8 +602,8 @@ export function FileBrowser(props: FileBrowserProps) {
                 if (entries.length === 0) return;
                 const summary = entries.length === 1
                   ? entries[0].name
-                  : `${entries.length} items`;
-                if (!window.confirm(`Delete remote: ${summary}?`)) return;
+                  : t("fileBrowser.summaryItems", { count: entries.length });
+                if (!window.confirm(t("fileBrowser.confirmDeleteRemoteSummary", { summary }))) return;
                 for (const entry of entries) {
                   void controller.remove(entry.path, "remote", true);
                 }
@@ -610,7 +614,7 @@ export function FileBrowser(props: FileBrowserProps) {
               }}
               onPreviewSelected={(entry) => {
                 if (!isPreviewable(entry)) {
-                  setStatus(`Preview not supported for ${entry.name}`);
+                  setStatus(t("fileBrowser.statusPreviewUnsupported", { name: entry.name }));
                   return;
                 }
                 void (async () => {
@@ -619,12 +623,12 @@ export function FileBrowser(props: FileBrowserProps) {
                     const text = await sftpReadFileText(props.sessionId, entry.path, "remote");
                     setPreviewing({ entry, side: "remote", text });
                   } catch (err) {
-                    setStatus(`Preview failed: ${err}`);
+                    setStatus(t("fileBrowser.statusPreviewFailed", { error: String(err) }));
                   }
                 })();
               }}
               onNewFile={() => {
-                const name = window.prompt("New file name", "new-file.txt");
+                const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
                 if (name) void controller.createFile(session?.remote.path ?? "/", name, "remote");
               }}
               onOpenTerminalHere={props.onOpenTerminalHere}
@@ -656,7 +660,7 @@ export function FileBrowser(props: FileBrowserProps) {
                     const { sftpOpenPath } = await import("../../lib/sftp");
                     await sftpOpenPath(path);
                   } catch (err) {
-                    setStatus(`Open failed: ${err}`);
+                    setStatus(t("fileBrowser.statusOpenFailed", { error: String(err) }));
                   }
                 })();
               }}
@@ -672,8 +676,8 @@ export function FileBrowser(props: FileBrowserProps) {
                 if (entries.length === 0) return;
                 const summary = entries.length === 1
                   ? entries[0].name
-                  : `${entries.length} items`;
-                if (!window.confirm(`Delete ${summary}?`)) return;
+                  : t("fileBrowser.summaryItems", { count: entries.length });
+                if (!window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) return;
                 for (const entry of entries) {
                   void controller.remove(entry.path, "local", true);
                 }
@@ -684,7 +688,7 @@ export function FileBrowser(props: FileBrowserProps) {
               }}
               onPreviewSelected={(entry) => {
                 if (!isPreviewable(entry)) {
-                  setStatus(`Preview not supported for ${entry.name}`);
+                  setStatus(t("fileBrowser.statusPreviewUnsupported", { name: entry.name }));
                   return;
                 }
                 void (async () => {
@@ -693,12 +697,12 @@ export function FileBrowser(props: FileBrowserProps) {
                     const text = await sftpReadFileText(props.sessionId, entry.path, "local");
                     setPreviewing({ entry, side: "local", text });
                   } catch (err) {
-                    setStatus(`Preview failed: ${err}`);
+                    setStatus(t("fileBrowser.statusPreviewFailed", { error: String(err) }));
                   }
                 })();
               }}
               onNewFile={() => {
-                const name = window.prompt("New file name", "new-file.txt");
+                const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
                 if (name) void controller.createFile(session?.local.path ?? "", name, "local");
               }}
             />
@@ -718,16 +722,16 @@ export function FileBrowser(props: FileBrowserProps) {
       >
         <ArrowLeftRight className="w-3 h-3" />
         <span className="truncate">
-          Cross-host transfer (remote ↔ remote) — coming soon
+          {t("fileBrowser.crossHostBanner")}
         </span>
         <button
           type="button"
           disabled
           className="ml-auto px-1.5 py-0.5 rounded text-[10px] opacity-50 cursor-not-allowed"
           style={{ border: "1px solid var(--moba-divider)" }}
-          title="Will let you move files directly between two SFTP sessions"
+          title={t("fileBrowser.crossHostPickPeerTitle")}
         >
-          Pick peer…
+          {t("fileBrowser.crossHostPickPeer")}
         </button>
       </div>
       <FileTransferQueue
@@ -780,9 +784,11 @@ export function FileBrowser(props: FileBrowserProps) {
 function OrientationToggle({
   orientation,
   onChange,
+  t,
 }: {
   orientation: Orientation;
   onChange: (next: Orientation) => void;
+  t: TranslateFn;
 }) {
   const next: Orientation = orientation === "horizontal" ? "vertical" : "horizontal";
   return (
@@ -792,8 +798,8 @@ function OrientationToggle({
       className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--moba-hover)] shrink-0"
       title={
         orientation === "horizontal"
-          ? "Switch to top/bottom layout"
-          : "Switch to side-by-side layout"
+          ? t("fileBrowser.orientationToggleStackTitle")
+          : t("fileBrowser.orientationToggleSideTitle")
       }
       onClick={() => onChange(next)}
       style={{ color: "var(--moba-text-muted)" }}
@@ -803,7 +809,9 @@ function OrientationToggle({
       ) : (
         <Rows className="w-3 h-3" />
       )}
-      <span className="text-[10px]">{orientation === "horizontal" ? "Side" : "Stack"}</span>
+      <span className="text-[10px]">
+        {orientation === "horizontal" ? t("fileBrowser.orientationSide") : t("fileBrowser.orientationStack")}
+      </span>
     </button>
   );
 }
@@ -819,6 +827,7 @@ function DownloadPrompt({
   onCancel: () => void;
   onDownload: (openAfter: boolean) => void;
 }) {
+  const t = useT();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -832,9 +841,9 @@ function DownloadPrompt({
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-2">Open remote file?</div>
+        <div className="text-sm font-semibold mb-2">{t("fileBrowser.downloadPromptTitle")}</div>
         <div className="text-[12px] mb-3 break-all" style={{ color: "var(--moba-text-muted)" }}>
-          To open <strong>{entry.name}</strong>, MobaXterm-style we first download it to:
+          {t("fileBrowser.downloadPromptDescription", { name: entry.name })}
           <div className="mt-1 font-mono text-[11px]">{joinPath(localDir, entry.name)}</div>
         </div>
         <div className="flex gap-2 justify-end">
@@ -843,14 +852,14 @@ function DownloadPrompt({
             className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
             onClick={onCancel}
           >
-            Cancel
+            {t("fileBrowser.chmodCancel")}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
             onClick={() => onDownload(false)}
           >
-            Download only
+            {t("fileBrowser.downloadPromptDownloadOnly")}
           </button>
           <button
             type="button"
@@ -858,7 +867,7 @@ function DownloadPrompt({
             style={{ background: "var(--moba-accent)" }}
             onClick={() => onDownload(true)}
           >
-            Download &amp; open
+            {t("fileBrowser.downloadPromptDownloadAndOpen")}
           </button>
         </div>
       </div>
@@ -877,6 +886,7 @@ function PreviewModal({
   text: string;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -896,7 +906,7 @@ function PreviewModal({
           <span className="ml-2 text-[var(--moba-text-muted)]">{path}</span>
           <div className="flex-1" />
           <button type="button" className="px-2 py-0.5 hover:bg-[var(--moba-hover)] rounded" onClick={onClose}>
-            Close
+            {t("fileBrowser.previewClose")}
           </button>
         </div>
         <pre className="flex-1 overflow-auto px-3 py-2 text-[12px] font-mono whitespace-pre-wrap break-all"

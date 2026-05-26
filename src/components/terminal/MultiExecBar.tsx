@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Users, X, Send, ChevronUp, ChevronDown, Maximize2, Clock, CornerDownLeft,
 } from "lucide-react";
+import { useT } from "../../lib/i18n";
 
 // Module-level history shared between compact bar and expanded panel
 const _history: string[] = [];
@@ -38,6 +39,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dragStartY = useRef<number | null>(null);
   const dragStartHeight = useRef(DEFAULT_HEIGHT);
+  const t = useT();
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
@@ -129,7 +131,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
             borderBottom: "1px solid var(--moba-divider)",
           }}
           onMouseDown={handleResizeMouseDown}
-          title="Drag to resize"
+          title={t("multiExec.dragResize")}
         >
           <div
             style={{
@@ -151,17 +153,17 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
         >
           <Users className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
           <span className="text-xs font-semibold" style={{ color: "var(--moba-text)" }}>
-            MultiExec — Command Editor
+            {t("multiExec.editorTitle")}
           </span>
           <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
-            Shift+Enter for newline · Enter to send · Esc to close
+            {t("multiExec.editorHint")}
           </span>
           <div className="flex-1" />
           <button
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
             onClick={onClose}
             type="button"
-            title="Close (Esc)"
+            title={t("multiExec.closeEsc")}
           >
             <X className="w-3 h-3" />
           </button>
@@ -185,7 +187,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                 // Escape handled by window listener above
               }}
               spellCheck={false}
-              placeholder={"Enter command(s) to broadcast…\nShift+Enter for multiple lines"}
+              placeholder={t("multiExec.placeholderExpanded")}
             />
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
@@ -196,19 +198,19 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                 type="button"
               >
                 <Send className="w-3 h-3" />
-                {lineCount > 1 ? `Send (${lineCount} lines)` : "Send"}
+                {lineCount > 1 ? t("multiExec.sendLinesLong", { lines: lineCount }) : t("multiExec.send")}
               </button>
               <button
                 className="moba-btn flex items-center gap-1"
                 onClick={handleApply}
                 type="button"
-                title="Copy to compact bar without sending"
+                title={t("multiExec.applyToBarTitle")}
               >
                 <CornerDownLeft className="w-3 h-3" />
-                Apply to bar
+                {t("multiExec.applyToBar")}
               </button>
               <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
-                {lineCount} line{lineCount !== 1 ? "s" : ""}
+                {lineCount === 1 ? t("multiExec.lineCount", { count: lineCount }) : t("multiExec.lineCountPlural", { count: lineCount })}
               </span>
             </div>
           </div>
@@ -228,7 +230,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                 }}
               >
                 <Clock className="w-3 h-3 inline mr-1" />
-                History ({history.length})
+                {t("multiExec.historyHeader", { count: history.length })}
               </div>
               <div className="flex-1 overflow-y-auto moba-scroll-y">
                 {[...history].reverse().map((cmd, i) => {
@@ -298,6 +300,7 @@ export function MultiExecBar({
   const draftRef = useRef("");
   const [expanded, setExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const t = useT();
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => textareaRef.current?.focus());
@@ -422,7 +425,7 @@ export function MultiExecBar({
             className="moba-input flex-1 resize-none leading-5 py-0.5"
             style={{ minHeight: 22, maxHeight: 100, overflow: "auto" }}
             rows={1}
-            placeholder="Send to selected terminals… (Enter to send, Shift+Enter for newline)"
+            placeholder={t("multiExec.placeholderBar")}
             value={value}
             onChange={(e) => handleValueChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -436,7 +439,7 @@ export function MultiExecBar({
               style={{ border: "1px solid var(--moba-divider)", borderBottom: "none", background: "var(--moba-button-to)" }}
               onClick={() => navigateHistory("up")}
               disabled={history.length === 0}
-              title="Previous command (↑)"
+              title={t("multiExec.historyPrev")}
             >
               <ChevronUp className="w-2.5 h-2.5" />
             </button>
@@ -446,7 +449,7 @@ export function MultiExecBar({
               style={{ border: "1px solid var(--moba-divider)", background: "var(--moba-button-to)" }}
               onClick={() => navigateHistory("down")}
               disabled={historyIdx === null}
-              title="Next command (↓)"
+              title={t("multiExec.historyNext")}
             >
               <ChevronDown className="w-2.5 h-2.5" />
             </button>
@@ -457,7 +460,7 @@ export function MultiExecBar({
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)] flex-shrink-0 mt-0.5"
             style={{ border: "1px solid var(--moba-divider)" }}
             onClick={() => setExpanded(true)}
-            title="Open expanded editor"
+            title={t("multiExec.expand")}
           >
             <Maximize2 className="w-3 h-3" />
           </button>
@@ -469,10 +472,10 @@ export function MultiExecBar({
             onClick={handleSend}
             disabled={!value.trim()}
             type="button"
-            title={lineCount > 1 ? `Send ${lineCount} lines (Enter)` : "Send (Enter)"}
+            title={lineCount > 1 ? t("multiExec.sendTitleMulti", { lines: lineCount }) : t("multiExec.sendTitleSingle")}
           >
             <Send className="w-3 h-3 mr-1" />
-            {lineCount > 1 ? `Send (${lineCount})` : "Send"}
+            {lineCount > 1 ? t("multiExec.sendLines", { lines: lineCount }) : t("multiExec.send")}
           </button>
           <span className="moba-pill flex-shrink-0" style={{ fontSize: 11 }}>
             {selectedCount} / {totalTerminalCount}
@@ -482,24 +485,24 @@ export function MultiExecBar({
             style={{ color: "var(--moba-text-muted)" }}
             onClick={onSelectAll}
             type="button"
-            title="Select all terminals"
+            title={t("multiExec.selectAll")}
           >
-            All
+            {t("multiExec.selectAllShort")}
           </button>
           <button
             className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--moba-hover)] flex-shrink-0"
             style={{ color: "var(--moba-text-muted)" }}
             onClick={onClearSelection}
             type="button"
-            title="Clear selection"
+            title={t("multiExec.clearSelection")}
           >
-            Clear
+            {t("multiExec.clearShort")}
           </button>
           <button
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)] flex-shrink-0"
             onClick={onClose}
             type="button"
-            title="Close MultiExec"
+            title={t("multiExec.closeBar")}
           >
             <X className="w-3 h-3" />
           </button>

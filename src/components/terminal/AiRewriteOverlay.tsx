@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Loader2, Wand2 } from "lucide-react";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../../lib/ipc";
+import { useT } from "../../lib/i18n";
 
 interface AiRewriteOverlayProps {
   currentCommand: string;
@@ -20,6 +21,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -50,12 +52,11 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
         window.dispatchEvent(
           new CustomEvent(VAULT_LOCKED_EVENT, {
             detail: {
-              reason:
-                "This AI provider's API key is in the credential vault — unlock it to continue.",
+              reason: t("terminal.aiRewriteVaultLockedDetail"),
             },
           }),
         );
-        setError("Vault is locked — unlock it to use this AI provider, then try again.");
+        setError(t("terminal.aiRewriteVaultLockedError"));
       } else {
         setError(String(e));
       }
@@ -75,13 +76,13 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
     >
       <div className="flex items-center gap-2 mb-2">
         <Wand2 className="w-3.5 h-3.5 text-[var(--moba-accent)] shrink-0" />
-        <span className="text-[12px] font-semibold">AI 改写命令</span>
-        <span className="text-[11px] text-[var(--moba-text-muted)] ml-auto">Esc 关闭</span>
+        <span className="text-[12px] font-semibold">{t("terminal.aiRewriteHeading")}</span>
+        <span className="text-[11px] text-[var(--moba-text-muted)] ml-auto">{t("terminal.aiRewriteEscHint")}</span>
       </div>
 
       {/* Current command */}
       <div className="mb-2 font-mono text-[11px] bg-[var(--moba-bg)] rounded px-2 py-1 text-[var(--moba-text-muted)] truncate">
-        {currentCommand || <span className="italic">（空命令行）</span>}
+        {currentCommand || <span className="italic">{t("terminal.aiRewriteEmpty")}</span>}
       </div>
 
       {/* Instruction input */}
@@ -90,7 +91,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
           ref={inputRef}
           type="text"
           className="moba-input h-7 flex-1 text-[12px]"
-          placeholder="改写要求，例：改成查找 status != Running 的"
+          placeholder={t("terminal.aiRewritePlaceholder")}
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
           onKeyDown={(e) => {
@@ -103,7 +104,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
           onClick={handleRewrite}
           disabled={loading || !instruction.trim()}
         >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "改写"}
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t("terminal.aiRewriteApply")}
         </button>
       </div>
 
@@ -131,14 +132,14 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
             className="moba-btn h-7 px-3 text-[12px]"
             onClick={handleAccept}
           >
-            接受 (Enter)
+            {t("terminal.aiRewriteAccept")}
           </button>
           <button
             type="button"
             className="moba-btn h-7 px-3 text-[12px] text-[var(--moba-text-muted)]"
             onClick={onDismiss}
           >
-            取消
+            {t("terminal.aiRewriteCancel")}
           </button>
         </div>
       )}

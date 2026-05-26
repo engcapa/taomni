@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Search, Check, X } from "lucide-react";
 import { isMonospaceFont } from "../../lib/systemFonts";
+import { useT } from "../../lib/i18n";
 
 interface FontPickerPanelProps {
   fonts: string[];
@@ -11,6 +12,7 @@ interface FontPickerPanelProps {
 export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   // Focus search input when the panel opens/mounts
   useEffect(() => {
@@ -68,7 +70,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search fonts..."
+            placeholder={t("fontPicker.searchPlaceholder")}
             className="moba-input w-full text-[12px] h-7 pl-7 pr-7 font-normal"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -99,7 +101,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
       >
         {monospaceFonts.length === 0 && proportionalFonts.length === 0 ? (
           <div className="px-3 py-4 text-center text-[var(--moba-text-muted)] italic">
-            No matching fonts found
+            {t("fontPicker.noResults")}
           </div>
         ) : (
           <>
@@ -110,7 +112,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
                   className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--moba-text-muted)]"
                   style={{ background: "rgba(0, 0, 0, 0.05)" }}
                 >
-                  Monospace Fonts
+                  {t("fontPicker.monospaceHeading")}
                 </div>
                 {monospaceFonts.map((font) => {
                   const isChecked = font.toLowerCase() === lowerSelectedFont;
@@ -144,7 +146,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
                   className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--moba-text-muted)]"
                   style={{ background: "rgba(0, 0, 0, 0.05)" }}
                 >
-                  Proportional Fonts (Not Recommended)
+                  {t("fontPicker.proportionalHeading")}
                 </div>
                 {proportionalFonts.map((font) => {
                   const isChecked = font.toLowerCase() === lowerSelectedFont;

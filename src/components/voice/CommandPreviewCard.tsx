@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle, Copy, Edit2, X } from "lucide-react";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 export type RiskLevel = "low" | "medium" | "high";
 
@@ -20,16 +21,19 @@ interface CommandPreviewCardProps {
   onCopy: (command: string) => void;
 }
 
-const RISK_CONFIG = {
-  low:    { label: "低风险",  color: "text-green-400",  border: "border-green-500/30",  bg: "bg-green-500/5"  },
-  medium: { label: "中风险",  color: "text-yellow-400", border: "border-yellow-500/40", bg: "bg-yellow-500/5" },
-  high:   { label: "高风险",  color: "text-red-400",    border: "border-red-500/50",    bg: "bg-red-500/8"    },
-};
+function riskConfig(t: TranslateFn) {
+  return {
+    low:    { label: t("voice.riskLow"),    color: "text-green-400",  border: "border-green-500/30",  bg: "bg-green-500/5"  },
+    medium: { label: t("voice.riskMedium"), color: "text-yellow-400", border: "border-yellow-500/40", bg: "bg-yellow-500/5" },
+    high:   { label: t("voice.riskHigh"),   color: "text-red-400",    border: "border-red-500/50",    bg: "bg-red-500/8"    },
+  };
+}
 
 // High-risk commands require 800ms before the execute button becomes clickable.
 const HIGH_RISK_DELAY_MS = 800;
 
 export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: CommandPreviewCardProps) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [edited, setEdited] = useState(false);
   const [editedCommand, setEditedCommand] = useState(preview.command);
@@ -38,7 +42,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const risk = RISK_CONFIG[preview.risk];
+  const risk = riskConfig(t)[preview.risk];
   const command = editing || edited ? editedCommand : preview.command;
 
   // Start the anti-misclick timer for high-risk commands.
@@ -85,7 +89,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <AlertTriangle className={`w-4 h-4 ${risk.color} shrink-0`} />
-        <span className="text-[13px] font-semibold flex-1">AI 生成的命令（未执行）</span>
+        <span className="text-[13px] font-semibold flex-1">{t("voice.cardTitle")}</span>
         <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${risk.border} ${risk.color}`}>
           {risk.label}
         </span>
@@ -93,7 +97,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
           type="button"
           className="text-[var(--moba-text-muted)] hover:text-[var(--moba-text)] transition-colors"
           onClick={() => onCancel(preview.audit_id)}
-          title="取消 (Esc)"
+          title={t("voice.cardCancelTitle")}
         >
           <X className="w-4 h-4" />
         </button>
@@ -102,9 +106,9 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
       {/* Blocked warning */}
       {preview.blocked && (
         <div className="mb-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
-          ⛔ 命令被安全规则拦截：{preview.blocked_reason}
+          {t("voice.cardBlockedPrefix", { reason: preview.blocked_reason ?? "" })}
           <br />
-          <span className="text-[11px] text-[var(--moba-text-muted)]">可编辑后复制到剪贴板，但无法直接执行。</span>
+          <span className="text-[11px] text-[var(--moba-text-muted)]">{t("voice.cardBlockedHint")}</span>
         </div>
       )}
 
@@ -133,7 +137,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
       {/* Unfilled placeholders */}
       {preview.needs_inputs.length > 0 && (
         <div className="mb-3 text-[11px] text-yellow-400">
-          ⚠ 需要填入：{preview.needs_inputs.join("、")}
+          {t("voice.cardNeedsInputs", { inputs: preview.needs_inputs.join("、") })}
         </div>
       )}
 
@@ -150,7 +154,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
               }
             }}
           />
-          <label htmlFor="high-risk-confirm">我已阅读命令并理解后果</label>
+          <label htmlFor="high-risk-confirm">{t("voice.cardHighRiskAck")}</label>
         </div>
       )}
 
@@ -164,10 +168,10 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
             }`}
             onClick={() => executeReady && onExecute(command, preview.audit_id, edited)}
             disabled={!executeReady}
-            title={executeReady ? "执行 (Enter)" : `等待 ${HIGH_RISK_DELAY_MS}ms...`}
+            title={executeReady ? t("voice.cardExecuteEnterTitle") : t("voice.cardExecuteWaitTitle", { ms: HIGH_RISK_DELAY_MS })}
           >
             <CheckCircle className="w-3.5 h-3.5" />
-            {executeReady ? "执行 (Enter)" : "稍等..."}
+            {executeReady ? t("voice.cardExecuteEnter") : t("voice.cardExecuteWait")}
           </button>
         )}
 
@@ -176,10 +180,10 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
             type="button"
             className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
             onClick={() => setEditing(true)}
-            title="编辑 (E)"
+            title={t("voice.cardEditTitle")}
           >
             <Edit2 className="w-3.5 h-3.5" />
-            编辑 (E)
+            {t("voice.cardEdit")}
           </button>
         ) : (
           <button
@@ -187,7 +191,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
             className="moba-btn h-7 px-3 text-[12px]"
             onClick={() => setEditing(false)}
           >
-            完成编辑
+            {t("voice.cardEditDone")}
           </button>
         )}
 
@@ -197,16 +201,16 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
           onClick={handleCopy}
         >
           <Copy className="w-3.5 h-3.5" />
-          {copied ? "已复制" : "复制"}
+          {copied ? t("voice.cardCopied") : t("voice.cardCopy")}
         </button>
 
         <button
           type="button"
           className="moba-btn h-7 px-3 text-[12px] text-[var(--moba-text-muted)]"
           onClick={() => onCancel(preview.audit_id)}
-          title="取消 (Esc)"
+          title={t("voice.cardCancelTitle")}
         >
-          取消 (Esc)
+          {t("voice.cardCancel")}
         </button>
       </div>
     </div>

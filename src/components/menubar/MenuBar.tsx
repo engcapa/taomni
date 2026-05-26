@@ -31,22 +31,48 @@ import {
   type SessionImportResult,
 } from "../../lib/sessionImportExport";
 import { SessionImportPreview } from "../session/SessionImportPreview";
+import { useT, t as translate } from "../../lib/i18n";
 
 interface MenuBarProps {
   activeTabClosable: boolean;
   onCommand: (command: RibbonCommand | "close-active" | "reload-sessions") => void;
 }
 
+// Stable identifiers used for test IDs and underscore-name routing. Labels
+// come from the locale dictionary so the visible text changes with the
+// active language without affecting automation hooks.
+type MenuId =
+  | "terminal"
+  | "sessions"
+  | "view"
+  | "x-server"
+  | "tools"
+  | "settings"
+  | "macros"
+  | "help";
+
+const MENU_LABEL_KEYS: Record<MenuId, string> = {
+  terminal: "menu.terminal",
+  sessions: "menu.sessions",
+  view: "menu.view",
+  "x-server": "menu.xserver",
+  tools: "menu.tools",
+  settings: "menu.settings",
+  macros: "menu.macros",
+  help: "menu.help",
+};
+
 export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
   const ctx = useContextMenu();
   const { sessions, importSessions } = useSessionStore();
   const { setStatusMessage } = useAppStore();
+  const t = useT();
   const [pendingImport, setPendingImport] = useState<{
     result: SessionImportResult;
     source: string;
   } | null>(null);
-  const items = [
-    "Terminal", "Sessions", "View", "X server", "Tools", "Settings", "Macros", "Help",
+  const items: MenuId[] = [
+    "terminal", "sessions", "view", "x-server", "tools", "settings", "macros", "help",
   ];
   const hasSessions = sessions.length > 0;
 
@@ -96,9 +122,17 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
   const exportResult = (format: string, result: SessionExportResult) => {
     downloadTextFile(result.filename, result.text, result.mimeType);
     const count = sessions.length - result.skipped;
-    const skipped = result.skipped ? `, skipped ${result.skipped}` : "";
-    const warningSuffix = result.warnings.length ? `, ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}` : "";
-    setStatusMessage(`Exported ${count} ${format} session${count === 1 ? "" : "s"} from User sessions${skipped}${warningSuffix}`);
+    const skipped = result.skipped ? translate("status.skippedSuffix", { count: result.skipped }) : "";
+    const warningSuffix = result.warnings.length
+      ? translate("status.warningsSuffix", { count: result.warnings.length, plural: result.warnings.length === 1 ? "" : "s" })
+      : "";
+    setStatusMessage(translate("status.exportedSessions", {
+      count,
+      format,
+      plural: count === 1 ? "" : "s",
+      skipped,
+      warnings: warningSuffix,
+    }));
     if (result.warnings.length) {
       window.alert(result.warnings.slice(0, 8).join("\n"));
     }
@@ -109,82 +143,82 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
   const exportCsv = () => exportResult("CSV", serializeCsvSessions(sessions, null));
   const exportHtml = () => exportResult("HTML", serializeHtmlSessions(sessions, null));
 
-  const openMenu = (event: React.MouseEvent<HTMLButtonElement>, menu: string) => {
+  const openMenu = (event: React.MouseEvent<HTMLButtonElement>, menu: MenuId) => {
     event.preventDefault();
     event.stopPropagation();
 
     const rect = event.currentTarget.getBoundingClientRect();
     const showMenu = (menuItems: MenuItem[]) => ctx.showAt(rect.left, rect.bottom, menuItems);
 
-    if (menu === "Terminal") {
+    if (menu === "terminal") {
       showMenu([
-        { label: "New local terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
-        { label: "New remote session…", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+        { label: t("menu.newLocalTerminal"), testId: "context-menu-item-new-local-terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
+        { label: t("menu.newRemoteSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
         { label: "", separator: true, onClick: () => {} },
-        { label: "Close active tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
+        { label: t("menu.closeActiveTab"), icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
       ]);
       return;
     }
 
-    if (menu === "Sessions") {
+    if (menu === "sessions") {
       showMenu([
-        { label: "New session…", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
-        { label: "Show sessions", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("sessions") },
-        { label: "Reload sessions", icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
+        { label: t("menu.newSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+        { label: t("menu.showSessions"), icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("sessions") },
+        { label: t("menu.reloadSessions"), testId: "context-menu-item-reload-sessions", icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
         { label: "", separator: true },
         {
-          label: "Import sessions",
+          label: t("menu.importSessions"),
           testId: "menu-import-sessions",
           icon: <Upload className="w-3 h-3" />,
           children: [
-            { label: "Import NewMob sessions", testId: "import-json", icon: <Upload className="w-3 h-3" />, onClick: importJson },
-            { label: "Import MobaXterm sessions", testId: "import-mobaxterm", icon: <Upload className="w-3 h-3" />, onClick: importMoba },
-            { label: "Import sessions from a CSV file", testId: "import-csv", icon: <FileText className="w-3 h-3" />, onClick: importCsv },
-            { label: "Import OpenSSH config", testId: "import-openssh", icon: <TerminalIcon className="w-3 h-3" />, onClick: importOpenSsh },
+            { label: t("menu.importNewMob"), testId: "import-json", icon: <Upload className="w-3 h-3" />, onClick: importJson },
+            { label: t("menu.importMobaXterm"), testId: "import-mobaxterm", icon: <Upload className="w-3 h-3" />, onClick: importMoba },
+            { label: t("menu.importCsv"), testId: "import-csv", icon: <FileText className="w-3 h-3" />, onClick: importCsv },
+            { label: t("menu.importOpenSsh"), testId: "import-openssh", icon: <TerminalIcon className="w-3 h-3" />, onClick: importOpenSsh },
           ],
         },
         {
-          label: "Export sessions",
+          label: t("menu.exportSessions"),
           testId: "menu-export-sessions",
           icon: <Download className="w-3 h-3" />,
           disabled: !hasSessions,
           children: [
-            { label: "Export NewMob sessions", testId: "export-json", icon: <Download className="w-3 h-3" />, onClick: exportJson },
-            { label: "Export MobaXterm sessions", testId: "export-mobaxterm", icon: <Download className="w-3 h-3" />, onClick: exportMoba },
-            { label: "Export sessions as CSV", testId: "export-csv", icon: <FileText className="w-3 h-3" />, onClick: exportCsv },
-            { label: "Generate HTML web page", testId: "export-html", icon: <FileText className="w-3 h-3" />, onClick: exportHtml },
+            { label: t("menu.exportNewMob"), testId: "export-json", icon: <Download className="w-3 h-3" />, onClick: exportJson },
+            { label: t("menu.exportMobaXterm"), testId: "export-mobaxterm", icon: <Download className="w-3 h-3" />, onClick: exportMoba },
+            { label: t("menu.exportCsv"), testId: "export-csv", icon: <FileText className="w-3 h-3" />, onClick: exportCsv },
+            { label: t("menu.exportHtml"), testId: "export-html", icon: <FileText className="w-3 h-3" />, onClick: exportHtml },
           ],
         },
       ]);
       return;
     }
 
-    if (menu === "View") {
+    if (menu === "view") {
       showMenu([
-        { label: "Toggle sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("view") },
-        { label: "Toggle compact mode", icon: <PanelTopClose className="w-3 h-3" />, shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
-        { label: "Split active terminal", icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("split") },
+        { label: t("menu.toggleSidebar"), icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("view") },
+        { label: t("menu.toggleCompact"), icon: <PanelTopClose className="w-3 h-3" />, shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
+        { label: t("menu.splitTerminal"), icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("split") },
       ]);
       return;
     }
 
-    if (menu === "X server") {
+    if (menu === "x-server") {
       showMenu([
-        { label: "Toggle X server status", onClick: () => onCommand("toggle-xserver") },
+        { label: t("menu.toggleXServer"), onClick: () => onCommand("toggle-xserver") },
       ]);
       return;
     }
 
-    if (menu === "Help") {
+    if (menu === "help") {
       showMenu([
-        { label: "About NewMob", icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+        { label: t("menu.aboutNewMob"), icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
       ]);
       return;
     }
 
-    const command = menu.toLowerCase() as RibbonCommand;
+    const command = menu as RibbonCommand;
     showMenu([
-      { label: `Open ${menu}`, onClick: () => onCommand(command) },
+      { label: t("menu.openMenuFallback", { menu: t(MENU_LABEL_KEYS[menu]) }), onClick: () => onCommand(command) },
     ]);
   };
 
@@ -208,32 +242,43 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
           onConfirm={() => void confirmPendingImport()}
         />
       )}
-      {items.map((m) => (
-        <button
-          key={m}
-          data-testid={`menu-${m.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-          className="px-1 hover:bg-[var(--moba-hover)] rounded"
-          onClick={(event) => openMenu(event, m)}
-          onMouseEnter={(event) => {
-            if (ctx.isOpen) openMenu(event, m);
-          }}
-          type="button"
-        >
-          <span className="underline-offset-2">
-            <span className="underline">{m[0]}</span>
-            {m.slice(1)}
-          </span>
-        </button>
-      ))}
+      {items.map((id) => {
+        const label = t(MENU_LABEL_KEYS[id]);
+        return (
+          <button
+            key={id}
+            data-testid={`menu-${id}`}
+            className="px-1 hover:bg-[var(--moba-hover)] rounded"
+            onClick={(event) => openMenu(event, id)}
+            onMouseEnter={(event) => {
+              if (ctx.isOpen) openMenu(event, id);
+            }}
+            type="button"
+          >
+            <span className="underline-offset-2">
+              <span className="underline">{label[0]}</span>
+              {label.slice(1)}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 function importStatusMessage(source: string, result: SessionImportResult): string {
   const count = result.sessions.length;
-  const skipped = result.skipped ? `, skipped ${result.skipped}` : "";
-  const warningSuffix = result.warnings.length ? `, ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}` : "";
-  return `Imported ${count} ${source} session${count === 1 ? "" : "s"} into User sessions${skipped}${warningSuffix}`;
+  const skipped = result.skipped ? translate("status.skippedSuffix", { count: result.skipped }) : "";
+  const warningSuffix = result.warnings.length
+    ? translate("status.warningsSuffix", { count: result.warnings.length, plural: result.warnings.length === 1 ? "" : "s" })
+    : "";
+  return translate("status.importedSessions", {
+    count,
+    source,
+    plural: count === 1 ? "" : "s",
+    skipped,
+    warnings: warningSuffix,
+  });
 }
 
 function reportError(error: unknown) {

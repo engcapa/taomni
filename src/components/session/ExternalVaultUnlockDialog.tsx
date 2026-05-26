@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../../lib/i18n";
 
 export interface ExternalVaultUnlockDialogProps {
   /** Source tool name, e.g. "Tabby". Drives the dialog title. */
@@ -25,6 +26,7 @@ export function ExternalVaultUnlockDialog({
   onSkip,
   errorMessage,
 }: ExternalVaultUnlockDialogProps) {
+  const t = useT();
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function ExternalVaultUnlockDialog({
     >
       <div
         role="dialog"
-        aria-label={`Unlock ${toolName} vault`}
+        aria-label={t("externalVault.ariaLabel", { tool: toolName })}
         aria-modal="true"
         data-testid="external-vault-unlock-dialog"
         className="w-[460px] rounded shadow-lg p-4"
@@ -87,7 +89,7 @@ export function ExternalVaultUnlockDialog({
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-1">Unlock {toolName} vault</div>
+        <div className="text-sm font-semibold mb-1">{t("externalVault.title", { tool: toolName })}</div>
         <div
           className="text-[12px] mb-3"
           style={{ color: "var(--moba-text-muted)" }}
@@ -97,7 +99,7 @@ export function ExternalVaultUnlockDialog({
         </div>
 
         <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
-          {toolName} master password
+          {t("externalVault.masterPasswordLabel", { tool: toolName })}
         </label>
         <input
           ref={inputRef}
@@ -127,7 +129,7 @@ export function ExternalVaultUnlockDialog({
             onClick={onSkip}
             disabled={busy}
           >
-            Skip
+            {t("externalVault.skip")}
           </button>
           <button
             type="button"
@@ -137,7 +139,7 @@ export function ExternalVaultUnlockDialog({
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >
-            {busy ? "Unlocking…" : "Unlock"}
+            {busy ? t("externalVault.unlocking") : t("externalVault.unlock")}
           </button>
         </div>
       </div>

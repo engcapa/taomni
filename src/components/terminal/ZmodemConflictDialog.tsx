@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ConflictAction, ConflictActionType } from "../../lib/zmodem";
+import { useT } from "../../lib/i18n";
 
 export interface ZmodemConflictDialogProps {
   fileName: string;
@@ -11,6 +12,7 @@ export interface ZmodemConflictDialogProps {
 export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: ZmodemConflictDialogProps) {
   const [applyToAll, setApplyToAll] = useState(false);
   const firstButtonRef = useRef<HTMLButtonElement>(null);
+  const t = useT();
 
   useEffect(() => {
     firstButtonRef.current?.focus();
@@ -24,7 +26,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
     if (e.key === "Escape") resolve("skip");
   };
 
-  const title = mode === "send" ? "File already exists on remote" : "File already exists";
+  const title = mode === "send" ? t("terminal.zmodemConflictTitleSend") : t("terminal.zmodemConflictTitleReceive");
 
   return (
     <div
@@ -60,7 +62,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
               style={{ background: "var(--moba-accent)", color: "#fff" }}
               onClick={() => resolve("overwrite")}
             >
-              Overwrite
+              {t("terminal.zmodemOverwrite")}
             </button>
           )}
           <button
@@ -75,7 +77,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
             }}
             onClick={() => resolve("rename")}
           >
-            Rename (add number)
+            {t("terminal.zmodemRename")}
           </button>
           <button
             type="button"
@@ -88,7 +90,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
             }}
             onClick={() => resolve("skip")}
           >
-            Skip
+            {t("terminal.zmodemSkip")}
           </button>
         </div>
 
@@ -99,7 +101,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
               checked={applyToAll}
               onChange={(e) => setApplyToAll(e.target.checked)}
             />
-            <span>Apply to all remaining files</span>
+            <span>{t("terminal.zmodemApplyToAll")}</span>
           </label>
         )}
       </div>

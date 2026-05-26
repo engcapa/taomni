@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bot, RotateCcw, Type, Undo } from "lucide-react";
-import { appThemeModeLabel, useAppTheme } from "../../lib/appTheme";
+import { useAppTheme } from "../../lib/appTheme";
+import { useT } from "../../lib/i18n";
+import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import {
   DEFAULT_TERMINAL_PROFILE,
   loadGlobalTerminalProfile,
@@ -9,6 +11,7 @@ import {
 } from "../../lib/terminalProfile";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { AppThemeSwitcher } from "./AppThemeSwitcher";
+import { LanguageSection } from "./LanguageSection";
 import { VaultSettings } from "../vault/VaultSettings";
 import { useAppStore } from "../../stores/appStore";
 import { useSystemFonts } from "../../lib/systemFonts";
@@ -43,6 +46,8 @@ export function SettingsPanel() {
   const systemFonts = useSystemFonts();
   const voiceShellEnabled = useAiStore((s) => s.voiceShellEnabled);
   const toggleVoiceShell = useAiStore((s) => s.toggleVoiceShell);
+  const t = useT();
+  const themeLabel = useAppThemeI18nLabel();
 
   const currentSelectValue = useMemo(() => {
     if (UI_FONTS.some((f) => f.value === uiFontFamily)) {
@@ -68,18 +73,20 @@ export function SettingsPanel() {
     >
       <div className="mx-auto max-w-5xl p-5">
         <div className="mb-4">
-          <div className="text-[18px] font-semibold">Settings</div>
+          <div className="text-[18px] font-semibold">{t("settings.title")}</div>
           <div className="text-[12px] text-[var(--moba-text-muted)]">
-            Application appearance and terminal defaults
+            {t("settings.subtitle")}
           </div>
         </div>
+
+        <LanguageSection />
 
         <section className="mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
           <div className="mb-2 flex items-center gap-3">
             <div>
-              <div className="text-[14px] font-semibold">Application Theme</div>
+              <div className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</div>
               <div className="text-[12px] text-[var(--moba-text-muted)]">
-                Current appearance: {appThemeModeLabel(mode)} ({resolvedTheme})
+                {t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
               </div>
             </div>
           </div>
@@ -91,10 +98,10 @@ export function SettingsPanel() {
             <div>
               <div className="text-[14px] font-semibold flex items-center gap-2">
                 <Type className="w-4 h-4 text-[var(--moba-accent)]" />
-                Global UI Appearance Settings
+                {t("settings.globalUiTitle")}
               </div>
               <div className="text-[12px] text-[var(--moba-text-muted)]">
-                Customize the typography and layout font scaling (excluding terminal / code blocks)
+                {t("settings.globalUiSubtitle")}
               </div>
             </div>
             <button
@@ -104,17 +111,17 @@ export function SettingsPanel() {
                 setUiFontFamily('"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
                 setUiFontSize(12);
               }}
-              title="Reset UI typography to defaults"
+              title={t("settings.resetUiFontTitle")}
             >
               <Undo className="w-3.5 h-3.5" />
-              Reset UI Font
+              {t("settings.resetUiFont")}
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--moba-divider)]">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--moba-text-muted)]">
-                UI Font Family
+                {t("settings.fontFamilyLabel")}
               </label>
               <select
                 id="ui-font-family-select"
@@ -122,7 +129,7 @@ export function SettingsPanel() {
                 value={currentSelectValue}
                 onChange={(e) => setUiFontFamily(e.target.value)}
               >
-                <optgroup label="Curated UI Fonts">
+                <optgroup label={t("settings.fontFamilyCurated")}>
                   {UI_FONTS.map((font) => (
                     <option key={font.value} value={font.value}>
                       {font.label}
@@ -130,7 +137,7 @@ export function SettingsPanel() {
                   ))}
                 </optgroup>
                 {systemFonts.fonts.length > 0 && (
-                  <optgroup label="All System Fonts">
+                  <optgroup label={t("settings.fontFamilySystem")}>
                     {systemFonts.fonts.map((font) => {
                       const fontValue = `"${font}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
                       return (
@@ -146,7 +153,7 @@ export function SettingsPanel() {
 
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center text-[12px] font-medium text-[var(--moba-text-muted)]">
-                <label htmlFor="ui-font-size-slider">UI Base Font Size</label>
+                <label htmlFor="ui-font-size-slider">{t("settings.fontSizeLabel")}</label>
                 <span className="font-mono bg-[var(--moba-selected)] text-[var(--moba-accent)] px-1.5 py-0.5 rounded text-[11px] font-semibold">
                   {uiFontSize}px
                 </span>
@@ -171,8 +178,8 @@ export function SettingsPanel() {
 
         <div className="mb-4 flex items-center gap-3">
           <div>
-            <div className="text-[18px] font-semibold">Terminal Appearance</div>
-            <div className="text-[12px] text-[var(--moba-text-muted)]">Font and theme defaults</div>
+            <div className="text-[18px] font-semibold">{t("settings.terminalAppearanceTitle")}</div>
+            <div className="text-[12px] text-[var(--moba-text-muted)]">{t("settings.terminalAppearanceSubtitle")}</div>
           </div>
           <button
             data-testid="settings-reset-terminal-profile"
@@ -181,7 +188,7 @@ export function SettingsPanel() {
             onClick={() => setProfile(DEFAULT_TERMINAL_PROFILE)}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Reset
+            {t("settings.reset")}
           </button>
         </div>
         <TerminalAppearanceSettings profile={profile} onProfileChange={setProfile} showCustomColors />
@@ -194,9 +201,9 @@ export function SettingsPanel() {
           <div className="mb-3 flex items-center gap-2">
             <Bot className="w-4 h-4 text-[var(--moba-accent)]" />
             <div>
-              <div className="text-[14px] font-semibold">AI Settings</div>
+              <div className="text-[14px] font-semibold">{t("settings.aiSection")}</div>
               <div className="text-[11px] text-[var(--moba-text-muted)]">
-                Speech recognition (ASR) · LLM Provider · Privacy mode
+                {t("settings.aiSubtitle")}
               </div>
             </div>
           </div>

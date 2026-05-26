@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { folderOptionLabel, normalizeGroupPath } from "../../lib/sessionPaths";
+import { useT } from "../../lib/i18n";
 
 export interface FolderNameDialogProps {
   parentPath: string | null;
@@ -12,13 +13,16 @@ export interface FolderNameDialogProps {
 
 export function FolderNameDialog({
   parentPath,
-  initialName = "New folder",
-  title = "New folder",
-  confirmLabel = "OK",
+  initialName,
+  title,
+  confirmLabel,
   onCancel,
   onSubmit,
 }: FolderNameDialogProps) {
-  const [name, setName] = useState(initialName);
+  const t = useT();
+  const resolvedTitle = title ?? t("sidebar.newFolder");
+  const resolvedConfirm = confirmLabel ?? t("common.ok");
+  const [name, setName] = useState(initialName ?? t("sidebar.newFolder"));
   const inputRef = useRef<HTMLInputElement>(null);
 
   const parentLabel = folderOptionLabel(parentPath);
@@ -61,14 +65,14 @@ export function FolderNameDialog({
     >
       <div
         role="dialog"
-        aria-label={title}
+        aria-label={resolvedTitle}
         aria-modal="true"
         data-testid="folder-name-dialog"
         className="w-[420px] rounded shadow-lg p-4"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-3">{title}</div>
+        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
 
         <div
           className="flex items-stretch text-[12px] rounded overflow-hidden"
@@ -88,10 +92,10 @@ export function FolderNameDialog({
             type="text"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Folder name"
+            placeholder={t("sidebar.folderNamePlaceholder")}
             className="flex-1 min-w-0 px-2 py-1 outline-none"
             style={{ background: "transparent", color: "var(--moba-text)" }}
-            aria-label="Folder name"
+            aria-label={t("sidebar.folderNamePlaceholder")}
           />
         </div>
 
@@ -102,7 +106,7 @@ export function FolderNameDialog({
             className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
             onClick={onCancel}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -112,7 +116,7 @@ export function FolderNameDialog({
             onClick={handleSubmit}
             disabled={!valid}
           >
-            {confirmLabel}
+            {resolvedConfirm}
           </button>
         </div>
       </div>

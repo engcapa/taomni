@@ -1,5 +1,6 @@
 import { Terminal as TerminalIcon, FileText, Server, X } from "lucide-react";
 import type { AttachmentRef } from "../../lib/chat/composerRefs";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface AttachmentChipProps {
   /**
@@ -17,7 +18,8 @@ interface AttachmentChipProps {
  * MessageBubble to render references attached to past messages.
  */
 export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
-  const { icon, label } = describe(attachment);
+  const t = useT();
+  const { icon, label } = describe(attachment, t);
   return (
     <span
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--moba-divider)] bg-[var(--moba-bg)] text-[10px] text-[var(--moba-text-muted)]"
@@ -29,7 +31,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
       {onRemove && (
         <button
           type="button"
-          aria-label="Remove attachment"
+          aria-label={t("attachment.remove")}
           className="hover:text-red-400 transition-colors"
           onClick={onRemove}
         >
@@ -40,11 +42,11 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   );
 }
 
-function describe(attachment: AttachmentRef): { icon: JSX.Element; label: string } {
+function describe(attachment: AttachmentRef, t: TranslateFn): { icon: JSX.Element; label: string } {
   if (attachment.kind === "terminal") {
     return {
       icon: <TerminalIcon className="w-2.5 h-2.5" />,
-      label: `terminal: last-${attachment.lines}`,
+      label: t("attachment.terminalLabel", { lines: attachment.lines }),
     };
   }
   if (attachment.kind === "file") {
@@ -55,6 +57,6 @@ function describe(attachment: AttachmentRef): { icon: JSX.Element; label: string
   }
   return {
     icon: <Server className="w-2.5 h-2.5" />,
-    label: `session: ${attachment.query}`,
+    label: t("attachment.sessionLabel", { query: attachment.query }),
   };
 }

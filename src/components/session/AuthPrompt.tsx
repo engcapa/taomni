@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { KeyRound, X } from "lucide-react";
 import { useVaultStore } from "../../stores/vaultStore";
+import { useT } from "../../lib/i18n";
 
 interface AuthPromptProps {
   host: string;
@@ -14,6 +15,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
   const [save, setSave] = useState(false);
   const vaultState = useVaultStore((s) => s.state);
   const refreshVault = useVaultStore((s) => s.refresh);
+  const t = useT();
 
   useEffect(() => {
     void refreshVault().catch(() => undefined);
@@ -40,33 +42,33 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
         <div className="h-8 flex items-center px-3"
              style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
           <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-          <span className="text-[12px] font-semibold">Authentication required</span>
+          <span className="text-[12px] font-semibold">{t("authPrompt.titleRequired")}</span>
           <div className="flex-1" />
-          <button data-testid="auth-close" type="button" onClick={onCancel} className="hover:bg-white/20 rounded p-0.5">
+          <button data-testid="auth-close" type="button" onClick={onCancel} aria-label={t("authPrompt.closeAria")} className="hover:bg-white/20 rounded p-0.5">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="p-4">
           <div className="text-[12px] mb-3 text-[var(--moba-text-muted)]">
-            Enter password for <span className="font-semibold text-[var(--moba-text)]">{username}@{host}</span>
+            {t("authPrompt.subtitle", { user: username, host })}
           </div>
           <input
             data-testid="auth-password"
-            aria-label="SSH password"
+            aria-label={t("authPrompt.sshPasswordAria")}
             type="password"
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="moba-input w-full h-8 text-[13px]"
-            placeholder="Password"
+            placeholder={t("authPrompt.password")}
           />
           <label
             className="flex items-center gap-1.5 mt-3 text-[11px] cursor-pointer"
             title={
               vaultState === "empty"
-                ? "Set a master password in the vault settings first."
-                : "When checked, the password is encrypted with your master password and stored for next time."
+                ? t("authPrompt.saveTooltipEmpty")
+                : t("authPrompt.saveTooltipDefault")
             }
           >
             <input
@@ -79,8 +81,8 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             />
             <span style={{ color: "var(--moba-text-muted)" }}>
               {vaultState === "empty"
-                ? "Save in vault (set up a master password first)"
-                : "Save password in vault for this session"}
+                ? t("authPrompt.saveToVaultUnsetup")
+                : t("authPrompt.saveToVault")}
             </span>
           </label>
         </div>
@@ -89,14 +91,14 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
              style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}>
           <button data-testid="auth-cancel" type="button" onClick={onCancel}
                   className="moba-btn">
-            Cancel
+            {t("authPrompt.cancel")}
           </button>
           <button type="submit"
                   data-testid="auth-submit"
                   className="moba-btn font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!password}
                   data-primary="true">
-            Connect
+            {t("authPrompt.submit")}
           </button>
         </div>
       </form>

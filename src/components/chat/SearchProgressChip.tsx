@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Globe, Loader2, X } from "lucide-react";
+import { useT } from "../../lib/i18n";
 
 interface SearchProgressChipProps {
   query: string;
@@ -10,6 +11,7 @@ interface SearchProgressChipProps {
 }
 
 export function SearchProgressChip({ query, provider, onCancel, done, resultCount }: SearchProgressChipProps) {
+  const t = useT();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -28,8 +30,12 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
       )}
       <span className="text-[var(--moba-text-muted)]">
         {done
-          ? `🔍 搜索到 ${resultCount ?? 0} 条 (via ${provider})`
-          : `🔍 搜索 "${query.slice(0, 30)}${query.length > 30 ? "…" : ""}" via ${provider}… (${elapsed}s)`
+          ? t("chat.searchChipDoneCount", { count: resultCount ?? 0, provider })
+          : t("chat.searchChipPending", {
+              query: `${query.slice(0, 30)}${query.length > 30 ? "…" : ""}`,
+              provider,
+              elapsed,
+            })
         }
       </span>
       {!done && onCancel && (
@@ -37,7 +43,7 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
           type="button"
           className="text-[var(--moba-text-muted)] hover:text-[var(--moba-text)] ml-0.5"
           onClick={onCancel}
-          title="取消搜索"
+          title={t("chat.searchChipCancel")}
         >
           <X className="w-3 h-3" />
         </button>

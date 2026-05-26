@@ -7,6 +7,7 @@ import {
   type TerminalRegistryEntry,
 } from "../../lib/terminal/terminalRegistry";
 import { useAppStore } from "../../stores/appStore";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface CodeBlockToolbarProps {
   /** Plain-text contents of the code block. */
@@ -33,6 +34,7 @@ interface CodeBlockToolbarProps {
  * so we can interleave per-line checkboxes with the original syntax.
  */
 export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolbarProps) {
+  const t = useT();
   const lines = useMemo(() => code.split("\n"), [code]);
   const lineMeta = useMemo(
     () => lines.map((line) => ({
@@ -136,7 +138,7 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
   return (
     <div className="rounded border border-[var(--moba-divider)] my-2 overflow-hidden">
       <div className="flex items-center gap-1 px-2 py-1 bg-[var(--moba-divider)]/40 text-[10px] text-[var(--moba-text-muted)]">
-        <span className="font-mono uppercase tracking-wide">{lang || "code"}</span>
+        <span className="font-mono uppercase tracking-wide">{lang || t("chat.codeLangFallback")}</span>
         <span className="flex-1" />
         <button
           type="button"
@@ -145,25 +147,26 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
             setSelecting((v) => !v);
             setPicked(new Set());
           }}
-          title="选择部分行后再发送"
+          title={t("chat.codeSelectLinesTitle")}
         >
           {allSelected ? <CheckSquare className="w-2.5 h-2.5" /> : <Square className="w-2.5 h-2.5" />}
-          <span>选行</span>
+          <span>{t("chat.codeSelectLines")}</span>
         </button>
         <button
           type="button"
           className="moba-btn h-5 px-1.5 inline-flex items-center gap-1"
           onClick={handleCopy}
-          title="复制到剪贴板"
+          title={t("chat.codeCopyTitle")}
         >
           {copied ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Copy className="w-2.5 h-2.5" />}
-          <span>复制</span>
+          <span>{t("chat.codeCopy")}</span>
         </button>
         <SendToTerminalButton
           targetEntry={targetEntry}
           disabled={selecting && selectedSelectableCount === 0}
           sent={sent}
           onSend={handleSendToTerminal}
+          t={t}
         />
       </div>
       <pre className="m-0 p-2 text-[11px] leading-snug overflow-x-auto bg-[var(--moba-bg)]">
@@ -204,10 +207,10 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
       </pre>
       {pendingSend && (
         <ConfirmDialog
-          title="确认发送多行内容"
-          message={`将向终端“${pendingSend.entry.title}”发送 ${pendingSend.payload.lineCount} 行内容。多行内容可能会触发终端执行，请确认后继续。`}
-          confirmLabel="发送"
-          cancelLabel="取消"
+          title={t("chat.confirmMultiTitle")}
+          message={t("chat.confirmMultiBody", { target: pendingSend.entry.title, count: pendingSend.payload.lineCount })}
+          confirmLabel={t("chat.confirmSend")}
+          cancelLabel={t("chat.confirmCancel")}
           onCancel={() => setPendingSend(null)}
           onConfirm={() => {
             commitTerminalSend(pendingSend.entry, pendingSend.payload);
@@ -338,6 +341,7 @@ interface SendToTerminalButtonProps {
   disabled: boolean;
   sent: boolean;
   onSend: (entry: TerminalRegistryEntry | null) => void;
+  t: TranslateFn;
 }
 
 /**
@@ -346,7 +350,7 @@ interface SendToTerminalButtonProps {
  * dropdown picker when the user has multiple terminals open and the snippet
  * has no preferred target.
  */
-function SendToTerminalButton({ targetEntry, disabled, sent, onSend }: SendToTerminalButtonProps) {
+function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendToTerminalButtonProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -371,12 +375,12 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend }: SendToTer
         disabled={baseDisabled}
         title={
           targetEntry
-            ? `发送到终端：${targetEntry.title}`
-            : "无可用终端"
+            ? t("chat.codeSendTargetTitle", { target: targetEntry.title })
+            : t("chat.codeSendNoTarget")
         }
       >
         {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Send className="w-2.5 h-2.5" />}
-        <span>发送到终端</span>
+        <span>{t("chat.codeSendToTerminal")}</span>
       </button>
     );
   }
@@ -388,10 +392,10 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend }: SendToTer
         className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-accent)]/15 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30 hover:bg-[var(--moba-accent)]/25"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled || allTerminals.length === 0}
-        title="发送到指定终端"
+        title={t("chat.codeSendPickTitle")}
       >
         {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Send className="w-2.5 h-2.5" />}
-        <span>发送到终端 ▾</span>
+        <span>{t("chat.codeSendToTerminalDropdown")}</span>
       </button>
       {open && (
         <div

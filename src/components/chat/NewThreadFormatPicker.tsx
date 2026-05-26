@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Globe, Link2, X } from "lucide-react";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
+import { useT } from "../../lib/i18n";
 
 interface NewThreadFormatPickerProps {
   /** Initial format selection (typically pulled from the global default). */
@@ -38,6 +39,7 @@ export function NewThreadFormatPicker({
   onCancel,
   onConfirm,
 }: NewThreadFormatPickerProps) {
+  const t = useT();
   const [format, setFormat] = useState<ChatOutputFormat | "inherit">("inherit");
   const [scope, setScope] = useState<"terminal" | "global">(
     activeTerminalTitle ? defaultScope : "global",
@@ -65,15 +67,15 @@ export function NewThreadFormatPicker({
         className="w-[300px] max-w-[90%] rounded-lg border border-[var(--moba-divider)] shadow-xl"
         style={{ background: "var(--moba-panel-bg)" }}
         role="dialog"
-        aria-label="New chat thread"
+        aria-label={t("chat.pickerDialogAria")}
       >
         <div className="flex items-center px-3 py-2 border-b border-[var(--moba-divider)]">
-          <span className="text-[12px] font-semibold flex-1">新建对话</span>
+          <span className="text-[12px] font-semibold flex-1">{t("chat.pickerTitle")}</span>
           <button
             type="button"
             className="moba-btn h-5 w-5 p-0 inline-flex items-center justify-center"
             onClick={onCancel}
-            aria-label="Cancel"
+            aria-label={t("chat.pickerCancel")}
           >
             <X className="w-3 h-3" />
           </button>
@@ -81,7 +83,7 @@ export function NewThreadFormatPicker({
 
         <div className="p-3 space-y-3">
           <fieldset className="space-y-1">
-            <legend className="text-[11px] font-semibold mb-1">范围 (Scope)</legend>
+            <legend className="text-[11px] font-semibold mb-1">{t("chat.pickerScopeLegend")}</legend>
             <label className="flex items-start gap-2 text-[11px] cursor-pointer">
               <input
                 type="radio"
@@ -94,12 +96,12 @@ export function NewThreadFormatPicker({
               <span className="flex-1">
                 <span className="inline-flex items-center gap-1 font-medium">
                   <Link2 className="w-2.5 h-2.5" />
-                  绑定到当前终端
+                  {t("chat.pickerBindToTerminal")}
                 </span>
                 <span className="block text-[10px] text-[var(--moba-text-muted)]">
                   {activeTerminalTitle
-                    ? `${activeTerminalTitle} — @terminal:last-N 与"发送到终端"按钮默认指向此终端。`
-                    : "未检测到聚焦的终端，仅可创建全局对话。"}
+                    ? t("chat.pickerBindHelp", { title: activeTerminalTitle })
+                    : t("chat.pickerBindNoTerminal")}
                 </span>
               </span>
             </label>
@@ -114,23 +116,23 @@ export function NewThreadFormatPicker({
               <span className="flex-1">
                 <span className="inline-flex items-center gap-1 font-medium">
                   <Globe className="w-2.5 h-2.5" />
-                  全局对话
+                  {t("chat.pickerGlobal")}
                 </span>
                 <span className="block text-[10px] text-[var(--moba-text-muted)]">
-                  不与特定终端绑定；仍可手动选择 @terminal:&lt;tab&gt; 引用。
+                  {t("chat.pickerGlobalDesc")}
                 </span>
               </span>
             </label>
           </fieldset>
 
           <fieldset className="space-y-1">
-            <legend className="text-[11px] font-semibold mb-1">输出格式 (锁定后不可修改)</legend>
+            <legend className="text-[11px] font-semibold mb-1">{t("chat.pickerFormatLegend")}</legend>
             {(["inherit", "md", "html", "plain"] as const).map((opt) => {
               const labels: Record<typeof opt, string> = {
-                inherit: `沿用全局默认 (${defaultFormat})`,
-                md: "Markdown",
-                html: "HTML",
-                plain: "纯文本",
+                inherit: t("chat.pickerInheritFormat", { format: defaultFormat }),
+                md: t("chat.formatMd"),
+                html: t("chat.formatHtml"),
+                plain: t("chat.formatPlainOption"),
               };
               return (
                 <label
@@ -149,7 +151,7 @@ export function NewThreadFormatPicker({
               );
             })}
             <p className="text-[10px] text-[var(--moba-text-muted)] mt-1">
-              提示：第一条消息发送后，原始格式即被锁定。后续可通过工具栏"显示"按钮在 md / html / plain 之间切换显示，但不会改变 LLM 的输出契约。
+              {t("chat.pickerFormatTip")}
             </p>
           </fieldset>
         </div>
@@ -161,7 +163,7 @@ export function NewThreadFormatPicker({
             onClick={onCancel}
             disabled={submitting}
           >
-            取消
+            {t("chat.pickerCancel")}
           </button>
           <button
             type="button"
@@ -169,7 +171,7 @@ export function NewThreadFormatPicker({
             onClick={handleConfirm}
             disabled={submitting}
           >
-            {submitting ? "创建中…" : "创建对话"}
+            {submitting ? t("chat.pickerSubmitting") : t("chat.pickerCreate")}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle, Copy, Loader2, Terminal, XCircle, AlertTriangle } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
+import { useT } from "../../lib/i18n";
 
 interface CcStatusResult {
   status:
@@ -21,6 +22,7 @@ const INSTALL_COMMANDS = [
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const t = useT();
   return (
     <button
       type="button"
@@ -30,7 +32,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      title="Copy"
+      title={t("aiSettings.ccCopy")}
     >
       <Copy className={`w-3 h-3 ${copied ? "text-green-400" : ""}`} />
     </button>
@@ -41,6 +43,7 @@ export function ClaudeCodePanel() {
   const { config, loadConfig, saveConfig } = useAiStore();
   const [status, setStatus] = useState<CcStatusResult | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     if (!config) loadConfig();
@@ -80,9 +83,9 @@ export function ClaudeCodePanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">Claude Code Integration</div>
+        <div className="text-[13px] font-semibold">{t("aiSettings.ccTitle")}</div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
-          Bring your own CLI · NewMob does not bundle the binary · No Anthropic credentials are stored
+          {t("aiSettings.ccSubtitle")}
         </div>
       </div>
 
@@ -98,10 +101,10 @@ export function ClaudeCodePanel() {
         <StatusIcon />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">
-            Claude Code Integration {cc.enabled ? "· Enabled" : ""}
+            {t("aiSettings.ccTitle")} {cc.enabled ? t("aiSettings.ccEnabledSuffix") : ""}
           </div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            {status?.message ?? "When enabled, Claude Code becomes a selectable provider in the Chat Drawer"}
+            {status?.message ?? t("aiSettings.ccDefaultMessage")}
           </div>
         </div>
         <div className={`w-9 h-5 rounded-full transition-colors relative ${cc.enabled ? "bg-[var(--moba-accent)]" : "bg-[var(--moba-divider)]"}`}>
@@ -117,13 +120,13 @@ export function ClaudeCodePanel() {
         disabled={detecting}
       >
         {detecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Terminal className="w-3.5 h-3.5" />}
-        Detect Claude Code
+        {t("aiSettings.ccDetect")}
       </button>
 
       {/* Install instructions (shown when not found) */}
       {isNotFound && (
         <div className="rounded border border-[var(--moba-divider)] p-3 space-y-2">
-          <div className="text-[12px] font-semibold">Install Claude Code CLI</div>
+          <div className="text-[12px] font-semibold">{t("aiSettings.ccInstallTitle")}</div>
           {INSTALL_COMMANDS.map(({ platform, cmd }) => (
             <div key={platform}>
               <div className="text-[10px] text-[var(--moba-text-muted)] mb-0.5">{platform}</div>
@@ -141,8 +144,7 @@ export function ClaudeCodePanel() {
       {/* Version too low */}
       {isVersionLow && status?.status.type === "version_too_low" && (
         <div className="text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
-          Found v{status.status.found}, but v{status.status.required} or higher is required.
-          Run <code className="font-mono">npm update -g @anthropic-ai/claude-code</code> to upgrade.
+          {t("aiSettings.ccVersionLow", { found: status.status.found, required: status.status.required, cmd: "npm update -g @anthropic-ai/claude-code" })}
         </div>
       )}
 
@@ -150,7 +152,7 @@ export function ClaudeCodePanel() {
       {isNotAuth && (
         <div className="flex items-center gap-2 text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          <span>Not authenticated. Run <code className="font-mono">claude login</code> in a terminal to sign in.</span>
+          <span>{t("aiSettings.ccNotAuthenticated", { cmd: "claude login" })}</span>
         </div>
       )}
 
@@ -159,19 +161,19 @@ export function ClaudeCodePanel() {
         <div className="space-y-2 pt-2 border-t border-[var(--moba-divider)]">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Default model</label>
+              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
               <select
                 className="moba-input h-7 w-full text-[12px]"
                 value={cc.default_model}
                 onChange={(e) => saveConfig({ ...config, cc_bridge: { ...cc, default_model: e.target.value } })}
               >
-                <option value="sonnet">claude-sonnet (recommended)</option>
-                <option value="opus">claude-opus (most capable)</option>
-                <option value="haiku">claude-haiku (fastest)</option>
+                <option value="sonnet">{t("aiSettings.ccModelSonnet")}</option>
+                <option value="opus">{t("aiSettings.ccModelOpus")}</option>
+                <option value="haiku">{t("aiSettings.ccModelHaiku")}</option>
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">Max turns</label>
+              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.ccMaxTurns")}</label>
               <input
                 type="number"
                 className="moba-input h-7 w-full text-[12px]"
@@ -183,7 +185,7 @@ export function ClaudeCodePanel() {
             </div>
           </div>
           <div className="text-[10px] text-[var(--moba-text-muted)]">
-            ⚠ Claude Code is hidden automatically when full-local mode is on (CC must call Anthropic over the network)
+            {t("aiSettings.ccLocalModeNote")}
           </div>
         </div>
       )}

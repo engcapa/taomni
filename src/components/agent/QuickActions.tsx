@@ -2,6 +2,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Bot, Loader2, Sparkles, Terminal } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
+import { useT } from "../../lib/i18n";
 
 interface QuickActionsProps {
   /** The terminal session ID. */
@@ -26,6 +27,7 @@ interface PendingAction {
  * Only visible when hasError=true (for "explain error") or always (for others).
  */
 export function QuickActions({ sessionId, terminalContent, hasError, onExplanation }: QuickActionsProps) {
+  const t = useT();
   const [loading, setLoading] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [sessionAllowedTools, setSessionAllowedTools] = useState<Set<string>>(new Set());
@@ -40,7 +42,7 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
       });
       onExplanation(explanation);
     } catch (e) {
-      onExplanation(`错误：${String(e)}`);
+      onExplanation(t("agent.explainErrorPrefix", { error: String(e) }));
     } finally {
       setLoading(null);
     }
@@ -94,52 +96,52 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
           className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1 text-yellow-400 border-yellow-500/30"
           onClick={handleExplainError}
           disabled={loading === "explain"}
-          title="AI 解释这个错误"
+          title={t("agent.explainErrorTitle")}
         >
           {loading === "explain" ? (
             <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
             <Bot className="w-3 h-3" />
           )}
-          AI 解释
+          {t("agent.explainError")}
         </button>
       )}
 
       <button
         type="button"
         className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-        onClick={() => handlePlanTool("列出所有已保存的会话", "sessions")}
+        onClick={() => handlePlanTool(t("agent.planRequestList"), "sessions")}
         disabled={!!loading}
-        title="列出会话"
+        title={t("agent.listSessionsTitle")}
       >
         {loading === "sessions" ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : (
           <Terminal className="w-3 h-3" />
         )}
-        会话列表
+        {t("agent.listSessions")}
       </button>
 
       <button
         type="button"
         className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-        onClick={() => handlePlanTool("搜索最近使用的命令历史", "history")}
+        onClick={() => handlePlanTool(t("agent.planRequestHistory"), "history")}
         disabled={!!loading}
-        title="搜索历史"
+        title={t("agent.findHistoryTitle")}
       >
         {loading === "history" ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : (
           <Sparkles className="w-3 h-3" />
         )}
-        找历史
+        {t("agent.findHistory")}
       </button>
 
       {pendingAction && (
         <div className="absolute bottom-full left-0 mb-2 z-[400]">
           <ActionCard
             tool={pendingAction.tool}
-            description={`Agent 想要执行：${pendingAction.tool}`}
+            description={t("chat.agentWantsExecute", { tool: pendingAction.tool })}
             preview={pendingAction.dry_run_preview}
             requiresConfirmation={pendingAction.requires_confirmation}
             onDecide={handleDecide}

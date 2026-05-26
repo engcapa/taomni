@@ -1,5 +1,7 @@
 import { Monitor, Moon, Sun } from "lucide-react";
-import { appThemeModeLabel, useAppTheme, type AppThemeMode } from "../../lib/appTheme";
+import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
+import { useT } from "../../lib/i18n";
+import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
 const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
   { mode: "light", icon: <Sun className="w-4 h-4" /> },
@@ -9,21 +11,23 @@ const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
 
 export function AppThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { mode, resolvedTheme, setMode } = useAppTheme();
+  const t = useT();
+  const themeLabel = useAppThemeI18nLabel();
 
   if (compact) {
     return (
       <label className="inline-flex items-center gap-1.5 text-[11px]">
-        <span className="text-[var(--moba-text-muted)]">Theme</span>
+        <span className="text-[var(--moba-text-muted)]">{t("settings.themeLabel")}</span>
         <select
           className="moba-input h-6 w-[122px]"
-          aria-label="Application theme"
+          aria-label={t("titlebar.appThemeAria")}
           value={mode}
-          title={`Current appearance: ${appThemeModeLabel(mode)} (${resolvedTheme})`}
+          title={t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
           onChange={(event) => setMode(event.target.value as AppThemeMode)}
         >
           {THEME_MODES.map((item) => (
             <option key={item.mode} value={item.mode}>
-              {appThemeModeLabel(item.mode)}
+              {themeLabel(item.mode)}
             </option>
           ))}
         </select>
@@ -48,6 +52,8 @@ export function AppThemeSwitcher({ compact = false }: { compact?: boolean }) {
 
 export function AppThemeIconButton() {
   const { mode, resolvedTheme, setMode } = useAppTheme();
+  const t = useT();
+  const themeLabel = useAppThemeI18nLabel();
   const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
   const current = THEME_MODES[currentIndex] ?? THEME_MODES[0];
   const next = THEME_MODES[(currentIndex + 1) % THEME_MODES.length] ?? THEME_MODES[0];
@@ -61,12 +67,12 @@ export function AppThemeIconButton() {
         background: "var(--moba-input-bg)",
         color: "var(--moba-text)",
       }}
-      title={`Theme: ${appThemeModeLabel(mode)} (${resolvedTheme}). Click for ${appThemeModeLabel(next.mode)}.`}
-      aria-label="Cycle application theme"
+      title={t("titlebar.cycleTheme", { mode: themeLabel(mode), resolved: resolvedTheme, next: themeLabel(next.mode) })}
+      aria-label={t("titlebar.cycleThemeAria")}
       onClick={() => setMode(next.mode)}
     >
       {current.icon}
-      <span>{appThemeModeLabel(mode)}</span>
+      <span>{themeLabel(mode)}</span>
     </button>
   );
 }
@@ -82,6 +88,7 @@ function ThemeModeButton({
   onSelect: (mode: AppThemeMode) => void;
   icon: React.ReactNode;
 }) {
+  const themeLabel = useAppThemeI18nLabel();
   const selected = mode === currentMode;
 
   return (
@@ -98,7 +105,7 @@ function ThemeModeButton({
       onClick={() => onSelect(mode)}
     >
       {icon}
-      {appThemeModeLabel(mode)}
+      {themeLabel(mode)}
     </button>
   );
 }

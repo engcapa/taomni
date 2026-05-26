@@ -1,5 +1,6 @@
 import { Sparkles, BookOpen, Copy, X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useT } from "../../lib/i18n";
 
 interface SelectionToolbarProps {
   /// Viewport-relative bounding rect of the current selection.
@@ -16,7 +17,8 @@ interface SelectionToolbarProps {
 /**
  * Floating toolbar that appears above a terminal text selection.
  * Three actions: copy, send-to-AI (inserts as @selection in Composer),
- * explain (creates a fresh thread auto-asking "请解释这段输出").
+ * explain (creates a fresh thread auto-asking for an explanation of the
+ * selected output).
  *
  * Positioned absolutely in the viewport based on the selection rect; escapes
  * the terminal scroll container so it doesn't get clipped.
@@ -31,6 +33,7 @@ export function SelectionToolbar({
   onDismiss,
 }: SelectionToolbarProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT();
 
   useEffect(() => {
     if (!visible) return;
@@ -60,34 +63,34 @@ export function SelectionToolbar({
       <button
         type="button"
         className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-        title="复制 (Ctrl+C)"
+        title={t("terminal.selectionCopyTitle")}
         onClick={() => onCopy(selectionText)}
       >
         <Copy className="w-3 h-3" />
-        复制
+        {t("terminal.selectionCopy")}
       </button>
       <button
         type="button"
         className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-        title="把选区作为 @selection 插入 AI Drawer 输入框"
+        title={t("terminal.selectionSendToAiTitle")}
         onClick={() => onSendToAi(selectionText)}
       >
         <Sparkles className="w-3 h-3" />
-        Send to AI
+        {t("terminal.selectionSendToAi")}
       </button>
       <button
         type="button"
         className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-        title="新开一个 AI 对话直接解释这段输出"
+        title={t("terminal.selectionExplainTitle")}
         onClick={() => onExplain(selectionText)}
       >
         <BookOpen className="w-3 h-3" />
-        Explain
+        {t("terminal.selectionExplain")}
       </button>
       <button
         type="button"
         className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-        title="关闭 (Esc)"
+        title={t("terminal.selectionDismissTitle")}
         onClick={onDismiss}
       >
         <X className="w-3 h-3" />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { historyListRecent } from "../../lib/ipc";
 import type { PresetCommand } from "../../lib/commonCommandsPresets";
 import type { UserCommonCommand } from "../../lib/terminalProfile";
+import { useT } from "../../lib/i18n";
 
 const HISTORY_LIMIT = 50;
 
@@ -21,12 +22,6 @@ export interface CommonCommandsPaletteProps {
   onPick: (command: string) => void;
   onClose: () => void;
 }
-
-const SOURCE_LABEL: Record<CommandSource, string> = {
-  history: "历史",
-  user: "用户",
-  preset: "预置",
-};
 
 export function mergeCandidates(
   history: ReadonlyArray<string>,
@@ -83,6 +78,12 @@ export function CommonCommandsPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const t = useT();
+  const sourceLabel: Record<CommandSource, string> = {
+    history: t("terminal.commandPaletteSourceHistory"),
+    user: t("terminal.commandPaletteSourceUser"),
+    preset: t("terminal.commandPaletteSourcePreset"),
+  };
 
   // Reset state on open and fetch a fresh history snapshot.
   useEffect(() => {
@@ -178,7 +179,7 @@ export function CommonCommandsPalette({
     >
       <div
         role="dialog"
-        aria-label="Common commands"
+        aria-label={t("terminal.commandPaletteTitle")}
         data-testid="commands-palette"
         className="w-[560px] max-w-[92vw] rounded shadow-lg flex flex-col"
         style={{
@@ -193,10 +194,10 @@ export function CommonCommandsPalette({
             ref={inputRef}
             data-testid="commands-search"
             className="moba-input w-full"
-            placeholder="搜索常用命令…   (↑↓ 选择, Enter 插入, Esc 关闭)"
+            placeholder={t("terminal.commandPaletteSearchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Filter commands"
+            aria-label={t("terminal.commandPaletteFilterAria")}
             autoFocus
           />
         </div>
@@ -206,7 +207,7 @@ export function CommonCommandsPalette({
               className="px-3 py-4 text-[12px]"
               style={{ color: "var(--moba-text-muted)" }}
             >
-              没有匹配的命令
+              {t("terminal.commandPaletteEmpty")}
             </div>
           ) : (
             <ul ref={listRef} className="text-[12px]" role="listbox">
@@ -247,7 +248,7 @@ export function CommonCommandsPalette({
                       border: "1px solid var(--moba-divider)",
                     }}
                   >
-                    {SOURCE_LABEL[c.source]}
+                    {sourceLabel[c.source]}
                   </span>
                 </li>
               ))}
@@ -261,7 +262,7 @@ export function CommonCommandsPalette({
             borderColor: "var(--moba-divider)",
           }}
         >
-          选中后插入到当前输入行（不回车），可继续编辑后再执行
+          {t("terminal.commandPaletteFooter")}
         </div>
       </div>
     </div>

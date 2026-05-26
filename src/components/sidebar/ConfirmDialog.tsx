@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useT } from "../../lib/i18n";
 
 export interface ConfirmDialogProps {
   title?: string;
@@ -15,15 +16,19 @@ export interface ConfirmDialogProps {
 // no-ops on macOS. This in-app dialog renders as a normal React modal so it
 // works uniformly on every platform without pulling in tauri-plugin-dialog.
 export function ConfirmDialog({
-  title = "Confirm",
+  title,
   message,
-  confirmLabel = "OK",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
+  const t = useT();
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const resolvedTitle = title ?? t("common.confirm");
+  const resolvedConfirm = confirmLabel ?? t("common.ok");
+  const resolvedCancel = cancelLabel ?? t("common.cancel");
 
   useEffect(() => {
     confirmRef.current?.focus();
@@ -51,14 +56,14 @@ export function ConfirmDialog({
     >
       <div
         role="dialog"
-        aria-label={title}
+        aria-label={resolvedTitle}
         aria-modal="true"
         data-testid="confirm-dialog"
         className="w-[420px] rounded shadow-lg p-4"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-3">{title}</div>
+        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
         <div
           data-testid="confirm-dialog-message"
           className="text-[12px] mb-4 whitespace-pre-line"
@@ -73,7 +78,7 @@ export function ConfirmDialog({
             className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
             onClick={onCancel}
           >
-            {cancelLabel}
+            {resolvedCancel}
           </button>
           <button
             ref={confirmRef}
@@ -83,7 +88,7 @@ export function ConfirmDialog({
             style={{ background: danger ? "#b22222" : "var(--moba-accent)" }}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {resolvedConfirm}
           </button>
         </div>
       </div>

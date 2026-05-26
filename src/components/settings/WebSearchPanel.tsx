@@ -2,13 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Globe, Loader2 } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
-
-const CONFIRM_MODE_OPTIONS = [
-  { value: "per_call",    label: "Confirm every time (default)", desc: "Show a confirmation card for every search" },
-  { value: "per_thread",  label: "Confirm once per thread",      desc: "Subsequent searches in the same thread skip the card" },
-  { value: "always",      label: "Always allow",                 desc: "No confirmation card, but the drawer still shows search activity" },
-  { value: "disabled",    label: "Disabled",                     desc: "Agents cannot see the search tool" },
-] as const;
+import { useT } from "../../lib/i18n";
 
 const PROVIDER_OPTIONS = [
   { value: "searxng",    label: "SearXNG (default, no API key required)" },
@@ -23,12 +17,20 @@ export function WebSearchPanel() {
   const { config, loadConfig, saveConfig } = useAiStore();
   const [probing, setProbing] = useState(false);
   const [probeResult, setProbeResult] = useState<string | null>(null);
+  const t = useT();
+
+  const CONFIRM_MODE_OPTIONS = [
+    { value: "per_call",    label: t("aiSettings.webConfirmPerCall"),    desc: t("aiSettings.webConfirmPerCallDesc") },
+    { value: "per_thread",  label: t("aiSettings.webConfirmPerThread"),  desc: t("aiSettings.webConfirmPerThreadDesc") },
+    { value: "always",      label: t("aiSettings.webConfirmAlways"),     desc: t("aiSettings.webConfirmAlwaysDesc") },
+    { value: "disabled",    label: t("aiSettings.webConfirmDisabled"),   desc: t("aiSettings.webConfirmDisabledDesc") },
+  ] as const;
 
   useEffect(() => {
     if (!config) loadConfig();
   }, []);
 
-  if (!config) return <div className="text-[12px] text-[var(--moba-text-muted)]">Loading...</div>;
+  if (!config) return <div className="text-[12px] text-[var(--moba-text-muted)]">{t("aiSettings.loading")}</div>;
 
   const ws = config.web_search;
 
@@ -42,9 +44,9 @@ export function WebSearchPanel() {
     setProbeResult(null);
     try {
       const best = await invoke<string | null>("probe_searxng_instances");
-      setProbeResult(best ?? "All public instances are unreachable; please enter a custom URL");
+      setProbeResult(best ?? t("aiSettings.webProbeNone"));
     } catch (e) {
-      setProbeResult(`Probe failed: ${String(e)}`);
+      setProbeResult(t("aiSettings.webProbeFailed", { error: String(e) }));
     } finally {
       setProbing(false);
     }
@@ -53,9 +55,9 @@ export function WebSearchPanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">Web Search</div>
+        <div className="text-[13px] font-semibold">{t("aiSettings.webTitle")}</div>
         <div className="text-[11px] text-[var(--moba-text-muted)]">
-          Agent web search · Off by default · Each search requires user confirmation
+          {t("aiSettings.webSubtitle")}
         </div>
       </div>
 
@@ -70,9 +72,9 @@ export function WebSearchPanel() {
       >
         <Globe className={`w-4 h-4 shrink-0 ${ws.client_enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">Enable client web search</div>
+          <div className="text-[13px] font-semibold">{t("aiSettings.webEnable")}</div>
           <div className="text-[11px] text-[var(--moba-text-muted)]">
-            When enabled, agents can search the web (each call requires user confirmation)
+            {t("aiSettings.webEnableDesc")}
           </div>
         </div>
         <div className={`w-9 h-5 rounded-full transition-colors relative ${ws.client_enabled ? "bg-[var(--moba-accent)]" : "bg-[var(--moba-divider)]"}`}>
@@ -84,7 +86,7 @@ export function WebSearchPanel() {
         <>
           {/* Provider selection */}
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">Search provider</div>
+            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("aiSettings.webProvider")}</div>
             <div className="space-y-1">
               {PROVIDER_OPTIONS.map(({ value, label }) => (
                 <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -105,7 +107,7 @@ export function WebSearchPanel() {
           {/* SearXNG URL */}
           {ws.client_provider === "searxng" && (
             <div>
-              <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">SearXNG instance URL (leave blank to auto-probe)</div>
+              <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">{t("aiSettings.webSearxngUrl")}</div>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -120,7 +122,7 @@ export function WebSearchPanel() {
                   onClick={handleProbe}
                   disabled={probing}
                 >
-                  {probing ? <Loader2 className="w-3 h-3 animate-spin" /> : "Probe fastest"}
+                  {probing ? <Loader2 className="w-3 h-3 animate-spin" /> : t("aiSettings.webProbe")}
                 </button>
               </div>
               {probeResult && (
@@ -137,19 +139,19 @@ export function WebSearchPanel() {
             ws.client_provider === "google_cse") && (
             <div>
               <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">
-                {ws.client_provider === "tavily" && "Tavily API Key"}
-                {ws.client_provider === "serper" && "Serper API Key"}
-                {ws.client_provider === "brave" && "Brave Search API Key"}
-                {ws.client_provider === "exa" && "Exa API Key"}
-                {ws.client_provider === "google_cse" && "Google CSE Key (API_KEY:CX)"}
+                {ws.client_provider === "tavily" && t("aiSettings.webApiKeyTavily")}
+                {ws.client_provider === "serper" && t("aiSettings.webApiKeySerper")}
+                {ws.client_provider === "brave" && t("aiSettings.webApiKeyBrave")}
+                {ws.client_provider === "exa" && t("aiSettings.webApiKeyExa")}
+                {ws.client_provider === "google_cse" && t("aiSettings.webApiKeyGoogle")}
               </div>
               <input
                 type="password"
                 className="moba-input h-7 w-full text-[12px]"
                 placeholder={
                   ws.client_provider === "google_cse"
-                    ? "AIza...:abc123:xyz"
-                    : "Paste API Key..."
+                    ? t("aiSettings.webApiKeyGooglePlaceholder")
+                    : t("aiSettings.webApiKeyPlaceholder")
                 }
                 value={ws.byok_key}
                 onChange={(e) => update({ byok_key: e.target.value })}
@@ -159,7 +161,7 @@ export function WebSearchPanel() {
 
           {/* Confirmation mode */}
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">Confirmation mode</div>
+            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("aiSettings.webConfirmMode")}</div>
             <div className="space-y-1">
               {CONFIRM_MODE_OPTIONS.map(({ value, label, desc }) => (
                 <label key={value} className="flex items-start gap-2 cursor-pointer">
