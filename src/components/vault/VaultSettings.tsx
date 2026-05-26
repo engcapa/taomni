@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { useVaultStore } from "../../stores/vaultStore";
 import { VaultSetupDialog } from "./VaultSetupDialog";
 import { VaultUnlockDialog } from "./VaultUnlockDialog";
+import { useT } from "../../lib/i18n";
 
 type Action = null | "init" | "unlock" | "change-master";
 
 export function VaultSettings() {
+  const t = useT();
   const {
     state,
     entries,
@@ -38,11 +40,11 @@ export function VaultSettings() {
 
   const handleChangeMaster = async () => {
     if (newPw1.length < 8) {
-      setError("New password must be at least 8 characters.");
+      setError(t("vaultSettings.newTooShort"));
       return;
     }
     if (newPw1 !== newPw2) {
-      setError("New passwords do not match.");
+      setError(t("vaultSettings.newMismatch"));
       return;
     }
     setBusy(true);
@@ -50,14 +52,14 @@ export function VaultSettings() {
     setInfo(null);
     try {
       await changeMaster(oldPw, newPw1);
-      setInfo("Master password updated.");
+      setInfo(t("vaultSettings.masterUpdated"));
       setOldPw("");
       setNewPw1("");
       setNewPw2("");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(
-        msg.includes("VAULT_BAD_PASSWORD") ? "Current master password is wrong." : msg,
+        msg.includes("VAULT_BAD_PASSWORD") ? t("vaultSettings.currentWrong") : msg,
       );
     } finally {
       setBusy(false);
@@ -87,13 +89,12 @@ export function VaultSettings() {
   return (
     <div className="p-4" data-testid="vault-settings">
       <div className="flex items-center gap-2 mb-3">
-        <div className="text-sm font-semibold">Credential vault</div>
+        <div className="text-sm font-semibold">{t("vaultSettings.sectionTitle")}</div>
         {stateBadge}
       </div>
 
       <div className="text-[12px] mb-4" style={{ color: "var(--moba-text-muted)" }}>
-        Saved passwords are encrypted with AES-256-GCM under a key derived from your master
-        password (Argon2id). Lock the vault to evict the key from memory.
+        {t("vaultSettings.description")}
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -105,7 +106,7 @@ export function VaultSettings() {
             style={{ background: "var(--moba-accent)" }}
             onClick={() => setAction("init")}
           >
-            Set master password
+            {t("vaultSettings.setMasterPassword")}
           </button>
         )}
         {state === "locked" && (
@@ -116,7 +117,7 @@ export function VaultSettings() {
             style={{ background: "var(--moba-accent)" }}
             onClick={() => setAction("unlock")}
           >
-            Unlock
+            {t("vaultSettings.unlock")}
           </button>
         )}
         {state === "unlocked" && (
@@ -127,7 +128,7 @@ export function VaultSettings() {
               className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
               onClick={() => void lock()}
             >
-              Lock now
+              {t("vaultSettings.lockNow")}
             </button>
             <button
               type="button"
@@ -139,7 +140,7 @@ export function VaultSettings() {
                 setInfo(null);
               }}
             >
-              Change master password
+              {t("vaultSettings.changeMasterPassword")}
             </button>
           </>
         )}
@@ -151,12 +152,12 @@ export function VaultSettings() {
           style={{ border: "1px solid var(--moba-card-border)" }}
           data-testid="vault-change-master-form"
         >
-          <div className="text-[12px] font-semibold mb-2">Change master password</div>
+          <div className="text-[12px] font-semibold mb-2">{t("vaultSettings.changeMasterPassword")}</div>
           <input
             type="password"
             value={oldPw}
             onChange={(e) => setOldPw(e.target.value)}
-            placeholder="Current password"
+            placeholder={t("vaultSettings.currentPassword")}
             className="moba-input w-full mb-2"
             autoComplete="current-password"
             data-testid="vault-change-master-old"
@@ -165,7 +166,7 @@ export function VaultSettings() {
             type="password"
             value={newPw1}
             onChange={(e) => setNewPw1(e.target.value)}
-            placeholder="New password (min 8 chars)"
+            placeholder={t("vaultSettings.newPassword")}
             className="moba-input w-full mb-2"
             autoComplete="new-password"
             data-testid="vault-change-master-new1"
@@ -174,7 +175,7 @@ export function VaultSettings() {
             type="password"
             value={newPw2}
             onChange={(e) => setNewPw2(e.target.value)}
-            placeholder="Confirm new password"
+            placeholder={t("vaultSettings.confirmNewPassword")}
             className="moba-input w-full mb-2"
             autoComplete="new-password"
             data-testid="vault-change-master-new2"
@@ -200,7 +201,7 @@ export function VaultSettings() {
               }}
               disabled={busy}
             >
-              Close
+              {t("vaultSettings.close")}
             </button>
             <button
               type="button"
@@ -210,7 +211,7 @@ export function VaultSettings() {
               disabled={busy}
               data-testid="vault-change-master-submit"
             >
-              {busy ? "Updating…" : "Update"}
+              {busy ? t("vaultSettings.updating") : t("vaultSettings.update")}
             </button>
           </div>
         </div>
@@ -219,11 +220,11 @@ export function VaultSettings() {
       {state === "unlocked" && (
         <div data-testid="vault-entries-section">
           <div className="text-[12px] font-semibold mb-2">
-            Saved entries ({entries.length})
+            {t("vaultSettings.savedEntries", { count: entries.length })}
           </div>
           {entries.length === 0 ? (
             <div className="text-[12px]" style={{ color: "var(--moba-text-muted)" }}>
-              No entries yet. Save a session or tunnel password to add one.
+              {t("vaultSettings.noEntries")}
             </div>
           ) : (
             <div className="space-y-1">
@@ -242,7 +243,7 @@ export function VaultSettings() {
                     onClick={() => {
                       if (
                         window.confirm(
-                          `Delete vault entry "${e.label}"? Sessions referencing it will fail to connect until updated.`,
+                          t("vaultSettings.confirmDeleteEntry", { label: e.label }),
                         )
                       ) {
                         void deleteEntry(e.id);
@@ -250,7 +251,7 @@ export function VaultSettings() {
                     }}
                     data-testid={`vault-entry-delete-${e.id}`}
                   >
-                    Delete
+                    {t("vaultSettings.deleteEntry")}
                   </button>
                 </div>
               ))}

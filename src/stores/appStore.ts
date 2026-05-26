@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Tab } from "../types";
+import { t as tr } from "../lib/i18n";
 
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
@@ -154,7 +155,7 @@ export const useAppStore = create<AppState>((set) => ({
   compactMode: readCompactMode(),
   activeSideTab: "sessions",
   xServerEnabled: false,
-  statusMessage: "Ready",
+  statusMessage: tr("status.ready"),
   multiExecActive: false,
   multiExecSelectedTabIds: new Set(),
   terminalSplitActive: false,
@@ -170,7 +171,7 @@ export const useAppStore = create<AppState>((set) => ({
         tabs: nextTabs,
         activeTabId: tab.id,
         terminalSplitActive: tab.type === "terminal" ? s.terminalSplitActive : false,
-        statusMessage: `Opened ${tab.title}`,
+        statusMessage: tr("status.openedTab", { title: tab.title }),
       };
     }),
 
@@ -189,7 +190,7 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
-        statusMessage: "Closed tab",
+        statusMessage: tr("status.closedTab"),
       };
     }),
 
@@ -209,14 +210,14 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
-        statusMessage: "Closed tabs",
+        statusMessage: tr("status.closedTabs"),
       };
     }),
 
   updateTabTitle: (id, title) =>
     set((s) => ({
       tabs: s.tabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
-      statusMessage: `Renamed tab to ${title}`,
+      statusMessage: tr("status.renamedTab", { title }),
     })),
 
   setActiveTab: (id) =>
@@ -264,14 +265,14 @@ export const useAppStore = create<AppState>((set) => ({
       writeCompactMode(compactMode);
       return {
         compactMode,
-        statusMessage: `Compact mode ${compactMode ? "enabled" : "disabled"}`,
+        statusMessage: compactMode ? tr("status.compactEnabled") : tr("status.compactDisabled"),
       };
     }),
   setCompactMode: (compactMode) => {
     writeCompactMode(compactMode);
     set({
       compactMode,
-      statusMessage: `Compact mode ${compactMode ? "enabled" : "disabled"}`,
+      statusMessage: compactMode ? tr("status.compactEnabled") : tr("status.compactDisabled"),
     });
   },
   setActiveSideTab: (tab) => set({ activeSideTab: tab, sidebarCollapsed: false }),
@@ -279,7 +280,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleXServer: () =>
     set((s) => ({
       xServerEnabled: !s.xServerEnabled,
-      statusMessage: `X server ${!s.xServerEnabled ? "enabled" : "disabled"}`,
+      statusMessage: !s.xServerEnabled ? tr("status.xServerEnabled") : tr("status.xServerDisabled"),
     })),
 
   setStatusMessage: (message) => set({ statusMessage: message }),
@@ -291,7 +292,7 @@ export const useAppStore = create<AppState>((set) => ({
         multiExecActive: next,
         multiExecSelectedTabIds: new Set(),
         tabs: next ? s.tabs : s.tabs.map((t) => ({ ...t, hasNewOutput: false })),
-        statusMessage: next ? "MultiExec enabled" : "MultiExec disabled",
+        statusMessage: next ? tr("status.multiExecEnabled") : tr("status.multiExecDisabled"),
       };
     }),
 
@@ -321,14 +322,14 @@ export const useAppStore = create<AppState>((set) => ({
       if (!active) {
         return {
           terminalSplitActive: false,
-          statusMessage: "Terminal split view disabled",
+          statusMessage: tr("status.splitDisabled"),
         };
       }
       const terminalTabs = s.tabs.filter((tab) => tab.type === "terminal");
       if (terminalTabs.length === 0) {
         return {
           terminalSplitActive: false,
-          statusMessage: "No terminal tabs to split",
+          statusMessage: tr("status.splitNoTerminals"),
         };
       }
       const activeTabId = activeTabIsTerminal(s.tabs, s.activeTabId)
@@ -337,7 +338,7 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         terminalSplitActive: true,
         activeTabId,
-        statusMessage: "Terminal split view enabled",
+        statusMessage: tr("status.splitEnabled"),
       };
     }),
 
@@ -346,14 +347,14 @@ export const useAppStore = create<AppState>((set) => ({
       if (s.terminalSplitActive) {
         return {
           terminalSplitActive: false,
-          statusMessage: "Terminal split view disabled",
+          statusMessage: tr("status.splitDisabled"),
         };
       }
       const terminalTabs = s.tabs.filter((tab) => tab.type === "terminal");
       if (terminalTabs.length === 0) {
         return {
           terminalSplitActive: false,
-          statusMessage: "No terminal tabs to split",
+          statusMessage: tr("status.splitNoTerminals"),
         };
       }
       const activeTabId = activeTabIsTerminal(s.tabs, s.activeTabId)
@@ -362,7 +363,7 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         terminalSplitActive: true,
         activeTabId,
-        statusMessage: "Terminal split view enabled",
+        statusMessage: tr("status.splitEnabled"),
       };
     }),
 
@@ -370,7 +371,7 @@ export const useAppStore = create<AppState>((set) => ({
     writeTerminalSplitLayout(layout);
     set({
       terminalSplitLayout: layout,
-      statusMessage: `Terminal split layout: ${layout}`,
+      statusMessage: tr("status.splitLayout", { layout }),
     });
   },
 
@@ -387,14 +388,14 @@ export const useAppStore = create<AppState>((set) => ({
       }
       return {
         terminalSplitInputLockedTabIds: next,
-        statusMessage: next.has(tabId) ? "Terminal pane input locked" : "Terminal pane input unlocked",
+        statusMessage: next.has(tabId) ? tr("status.paneInputLocked") : tr("status.paneInputUnlocked"),
       };
     }),
 
   clearTerminalSplitInputLocks: () =>
     set({
       terminalSplitInputLockedTabIds: new Set(),
-      statusMessage: "Terminal split input locks cleared",
+      statusMessage: tr("status.splitLocksCleared"),
     }),
 
   setTabHasNewOutput: (tabId, hasNewOutput) =>

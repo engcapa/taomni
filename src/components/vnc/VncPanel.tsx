@@ -25,6 +25,7 @@ import {
   writeMultiFormat,
   writeText as writeClipboardText,
 } from "../../lib/clipboard";
+import { useT, t as tr } from "../../lib/i18n";
 
 export interface VncPanelProps {
   tabId: string;
@@ -97,6 +98,7 @@ export default function VncPanel({
   password,
   visible,
 }: VncPanelProps) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -318,13 +320,13 @@ export default function VncPanel({
             heartbeatTimerRef.current = null;
           }
           if (!destroyedRef.current && !disconnectedByServerRef.current) {
-            store.setDisconnected(tabId, "Connection closed");
+            store.setDisconnected(tabId, tr("vnc.closedConnection"));
           }
         };
 
         ws.onerror = () => {
           if (!destroyedRef.current) {
-            store.setDisconnected(tabId, "WebSocket error");
+            store.setDisconnected(tabId, tr("vnc.websocketError"));
           }
         };
       } catch (err) {
@@ -845,11 +847,11 @@ export default function VncPanel({
           <CaptureToolbar
             filenamePrefix={`vnc-${host}`}
             getVisible={async () => {
-              if (!canvasRef.current) throw new Error("VNC not ready");
+              if (!canvasRef.current) throw new Error(t("vnc.notReady"));
               return await captureCanvasPng(canvasRef.current);
             }}
             getFull={async () => {
-              if (!canvasRef.current) throw new Error("VNC not ready");
+              if (!canvasRef.current) throw new Error(t("vnc.notReady"));
               return await captureCanvasPng(canvasRef.current);
             }}
             getScrollFrame={async () => canvasRef.current ?? null}
@@ -869,7 +871,7 @@ export default function VncPanel({
               color: "#ccc",
               display: "flex",
             }}
-            title={scaleMode === "fit" ? "1:1 pixel mapping" : "Fit to window"}
+            title={scaleMode === "fit" ? t("vnc.scaleToggleOne") : t("vnc.scaleToggleFit")}
           >
             {scaleMode === "fit" ? <Maximize size={14} /> : <Minimize size={14} />}
           </button>
@@ -890,7 +892,7 @@ export default function VncPanel({
           }}
         >
           <div style={{ color: "#aaa", textAlign: "center" }}>
-            <p>Connecting to {host}:{port}…</p>
+            <p>{t("vnc.connectingHost", { host, port })}</p>
           </div>
         </div>
       )}
@@ -910,7 +912,7 @@ export default function VncPanel({
           }}
         >
           <div style={{ color: "#e44", textAlign: "center" }}>
-            <p>Disconnected{conn?.error ? `: ${conn.error}` : ""}</p>
+            <p>{conn?.error ? t("vnc.disconnectedReason", { reason: conn.error }) : t("vnc.disconnected")}</p>
           </div>
           <button
             data-testid="vnc-reconnect"
@@ -938,7 +940,7 @@ export default function VncPanel({
             }}
           >
             <RefreshCw size={14} />
-            Reconnect
+            {t("vnc.reconnect")}
           </button>
         </div>
       )}

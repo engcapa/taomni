@@ -1,9 +1,12 @@
 import { Monitor, Moon, Sun, PanelTopClose, PanelTopOpen, SplitSquareVertical, Users, Bot } from "lucide-react";
-import { appThemeModeLabel, useAppTheme, type AppThemeMode } from "../../lib/appTheme";
+import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
+import { useT } from "../../lib/i18n";
+import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { PttButton } from "./PttButton";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
   { mode: "light", icon: <Sun className="w-[16px] h-[16px]" /> },
@@ -23,10 +26,19 @@ export function TitleBarTrayControls() {
   const drawerScope = useChatStore((s) => s.drawerScope);
   const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const t = useT();
+  const themeLabel = useAppThemeI18nLabel();
 
   const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
   const current = THEME_MODES[currentIndex] ?? THEME_MODES[0];
   const next = THEME_MODES[(currentIndex + 1) % THEME_MODES.length] ?? THEME_MODES[0];
+
+  const compactTitle = compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact");
+  const splitTitle = terminalSplitActive ? t("titlebar.disableSplit") : t("titlebar.enableSplit");
+  const multiExecTitle = multiExecActive ? t("titlebar.disableMultiExec") : t("titlebar.enableMultiExec");
+  const chatOpenForGlobal = drawerOpen && drawerScope === "global";
+  const chatTitle = chatOpenForGlobal ? t("titlebar.closeGlobalChat") : t("titlebar.openGlobalChat");
+  const chatAria = chatOpenForGlobal ? t("titlebar.closeGlobalChatAria") : t("titlebar.openGlobalChatAria");
 
   return (
     <div className="moba-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
@@ -41,16 +53,20 @@ export function TitleBarTrayControls() {
       <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
           testId="theme-cycle"
-          title={`Theme: ${appThemeModeLabel(mode)} (${resolvedTheme}). Click for ${appThemeModeLabel(next.mode)}.`}
-          ariaLabel="Cycle application theme"
+          title={t("titlebar.cycleTheme", {
+            mode: themeLabel(mode),
+            resolved: resolvedTheme,
+            next: themeLabel(next.mode),
+          })}
+          ariaLabel={t("titlebar.cycleThemeAria")}
           onClick={() => setMode(next.mode)}
         >
           {current.icon}
         </TrayButton>
         <TrayButton
           testId="compact-toggle"
-          title={compactMode ? "Exit compact mode" : "Enter compact mode"}
-          ariaLabel={compactMode ? "Exit compact mode" : "Enter compact mode"}
+          title={compactTitle}
+          ariaLabel={compactTitle}
           active={compactMode}
           onClick={toggleCompactMode}
         >
@@ -64,8 +80,8 @@ export function TitleBarTrayControls() {
       <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
           testId="tab-split-view"
-          title={terminalSplitActive ? "Disable terminal split view" : "Enable terminal split view"}
-          ariaLabel={terminalSplitActive ? "Disable terminal split view" : "Enable terminal split view"}
+          title={splitTitle}
+          ariaLabel={splitTitle}
           active={terminalSplitActive}
           onClick={toggleTerminalSplit}
         >
@@ -73,8 +89,8 @@ export function TitleBarTrayControls() {
         </TrayButton>
         <TrayButton
           testId="tab-multiexec-toggle"
-          title={multiExecActive ? "Disable MultiExec" : "Enable MultiExec"}
-          ariaLabel={multiExecActive ? "Disable MultiExec" : "Enable MultiExec"}
+          title={multiExecTitle}
+          ariaLabel={multiExecTitle}
           active={multiExecActive}
           onClick={toggleMultiExec}
         >
@@ -89,13 +105,9 @@ export function TitleBarTrayControls() {
           <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
             <TrayButton
               testId="ai-chat-drawer-toggle"
-              title={
-                drawerOpen && drawerScope === "global"
-                  ? "Close global AI Chat (Ctrl+L)"
-                  : "Open global AI Chat (Ctrl+L)"
-              }
-              ariaLabel={drawerOpen && drawerScope === "global" ? "Close global AI Chat" : "Open global AI Chat"}
-              active={drawerOpen && drawerScope === "global"}
+              title={chatTitle}
+              ariaLabel={chatAria}
+              active={chatOpenForGlobal}
               onClick={() => void toggleGlobalChat()}
             >
               <Bot className="w-[16px] h-[16px]" />
@@ -103,6 +115,15 @@ export function TitleBarTrayControls() {
           </div>
         </>
       )}
+
+      <TrayGroupSeparator />
+
+      {/* Language switcher — anchored to the rightmost tray slot so it always
+          sits at the top-right of the title bar, in both regular and compact
+          layouts. */}
+      <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
+        <LanguageSwitcher />
+      </div>
     </div>
   );
 }

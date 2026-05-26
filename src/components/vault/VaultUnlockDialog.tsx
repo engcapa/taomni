@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../../lib/i18n";
 
 export interface VaultUnlockDialogProps {
   onCancel: () => void;
@@ -12,6 +13,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -28,7 +30,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(
-        msg.includes("VAULT_BAD_PASSWORD") ? "Incorrect master password." : msg,
+        msg.includes("VAULT_BAD_PASSWORD") ? t("vault.incorrectPassword") : msg,
       );
     } finally {
       setBusy(false);
@@ -57,14 +59,14 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
     >
       <div
         role="dialog"
-        aria-label="Unlock vault"
+        aria-label={t("vault.unlockTitle")}
         aria-modal="true"
         data-testid="vault-unlock-dialog"
         className="w-[420px] rounded shadow-lg p-4"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-1">Unlock vault</div>
+        <div className="text-sm font-semibold mb-1">{t("vault.unlockTitle")}</div>
         {reason && (
           <div
             className="text-[12px] mb-3"
@@ -76,7 +78,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
         )}
 
         <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
-          Master password
+          {t("vault.masterPassword")}
         </label>
         <input
           ref={inputRef}
@@ -106,7 +108,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
             onClick={onCancel}
             disabled={busy}
           >
-            Cancel
+            {t("vault.cancel")}
           </button>
           <button
             type="button"
@@ -116,7 +118,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >
-            {busy ? "Unlocking…" : "Unlock"}
+            {busy ? t("vault.unlocking") : t("vault.unlock")}
           </button>
         </div>
       </div>

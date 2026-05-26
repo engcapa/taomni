@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FileEntry } from "../../lib/sftp";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 type Who = "owner" | "group" | "other";
 type Bit = "read" | "write" | "execute";
@@ -7,17 +8,21 @@ type Bit = "read" | "write" | "execute";
 const WHO_ORDER: Who[] = ["owner", "group", "other"];
 const BIT_ORDER: Bit[] = ["read", "write", "execute"];
 
-const WHO_LABEL: Record<Who, string> = {
-  owner: "Owner",
-  group: "Group",
-  other: "Other",
-};
+function whoLabel(t: TranslateFn, who: Who): string {
+  switch (who) {
+    case "owner": return t("fileBrowser.chmodOwnerLabel");
+    case "group": return t("fileBrowser.chmodGroupLabel");
+    case "other": return t("fileBrowser.chmodOtherLabel");
+  }
+}
 
-const BIT_LABEL: Record<Bit, string> = {
-  read: "Read",
-  write: "Write",
-  execute: "Execute",
-};
+function bitLabel(t: TranslateFn, bit: Bit): string {
+  switch (bit) {
+    case "read": return t("fileBrowser.chmodReadLabel");
+    case "write": return t("fileBrowser.chmodWriteLabel");
+    case "execute": return t("fileBrowser.chmodExecuteLabel");
+  }
+}
 
 const BIT_CHAR: Record<Bit, string> = {
   read: "r",
@@ -60,6 +65,7 @@ export interface ChmodDialogProps {
 }
 
 export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
+  const t = useT();
   const initialMode = useMemo(() => {
     if (entries.length === 0) return 0o644;
     const first = entries[0].mode;
@@ -81,7 +87,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
   const summary =
     entries.length === 1
       ? entries[0].name
-      : `${entries.length} items`;
+      : t("fileBrowser.chmodEntriesLabel", { count: entries.length });
 
   const toggleBit = (who: Who, bit: Bit) => {
     setMode((m) => m ^ bitMask(who, bit));
@@ -114,12 +120,12 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
     >
       <div
         role="dialog"
-        aria-label="Permissions"
+        aria-label={t("fileBrowser.chmodHeading")}
         className="w-[420px] rounded shadow-lg p-4"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-1">Permissions</div>
+        <div className="text-sm font-semibold mb-1">{t("fileBrowser.chmodHeading")}</div>
         <div
           className="text-[12px] mb-3 break-all"
           style={{ color: "var(--moba-text-muted)" }}
@@ -134,7 +140,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
               <th className="text-left font-normal pb-1"></th>
               {BIT_ORDER.map((b) => (
                 <th key={b} className="font-normal pb-1 text-center">
-                  {BIT_LABEL[b]}
+                  {bitLabel(t, b)}
                 </th>
               ))}
             </tr>
@@ -142,7 +148,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
           <tbody>
             {WHO_ORDER.map((w) => (
               <tr key={w}>
-                <td className="py-0.5 pr-2">{WHO_LABEL[w]}</td>
+                <td className="py-0.5 pr-2">{whoLabel(t, w)}</td>
                 {BIT_ORDER.map((b) => {
                   const checked = (mode & bitMask(w, b)) !== 0;
                   const id = `chmod-${w}-${b}`;
@@ -151,7 +157,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
                       <input
                         id={id}
                         type="checkbox"
-                        aria-label={`${WHO_LABEL[w]} ${BIT_LABEL[b]}`}
+                        aria-label={t("fileBrowser.chmodAriaCheckbox", { who: whoLabel(t, w), bit: bitLabel(t, b) })}
                         checked={checked}
                         onChange={() => toggleBit(w, b)}
                       />
@@ -165,7 +171,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
 
         <div className="flex items-center gap-2 mb-2 text-[12px]">
           <label htmlFor="chmod-octal" className="shrink-0" style={{ color: "var(--moba-text-muted)" }}>
-            Octal:
+            {t("fileBrowser.chmodOctalLabel")}
           </label>
           <input
             id="chmod-octal"
@@ -194,7 +200,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
               checked={recursive}
               onChange={(e) => setRecursive(e.target.checked)}
             />
-            <span>Apply recursively to all children</span>
+            <span>{t("fileBrowser.chmodApplyRecursive")}</span>
           </label>
         )}
 
@@ -204,7 +210,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
             className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
             onClick={onCancel}
           >
-            Cancel
+            {t("fileBrowser.chmodCancel")}
           </button>
           <button
             type="button"
@@ -213,7 +219,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
             onClick={handleApply}
             disabled={!octalValid}
           >
-            Apply
+            {t("fileBrowser.chmodApply")}
           </button>
         </div>
       </div>

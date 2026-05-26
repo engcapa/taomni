@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { ChevronRight, Home, HardDrive } from "lucide-react";
+import { useT } from "../../lib/i18n";
 
 interface PathBreadcrumbProps {
   path: string;
@@ -18,6 +19,7 @@ export function PathBreadcrumb({
   detectWindows,
   testId,
 }: PathBreadcrumbProps) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(path);
 
@@ -32,7 +34,7 @@ export function PathBreadcrumb({
   const segments = useMemo(() => {
     if (!path) return [];
     if (path === "/") return [{ label: "/", path: "/" }];
-    if (isDrivesRoot) return [{ label: "Drives", path: "\\\\" }];
+    if (isDrivesRoot) return [{ label: t("fileBrowser.pathBreadcrumbDrives"), path: "\\\\" }];
     if (isWindows) {
       const drive = path.match(/^([A-Z]):/i)?.[1];
       const rest = path.slice(drive ? 2 : 0).replace(/\\$/, "");
@@ -54,7 +56,7 @@ export function PathBreadcrumb({
       result.push({ label: part, path: acc });
     }
     return result;
-  }, [path, isWindows]);
+  }, [path, isWindows, isDrivesRoot, t]);
 
   const handleEnter = () => {
     setEditing(false);
@@ -94,7 +96,7 @@ export function PathBreadcrumb({
         e.preventDefault();
         navigator.clipboard?.writeText(path).catch(() => {});
       }}
-      title="Click to edit • right-click to copy"
+      title={t("fileBrowser.pathBreadcrumbEditTitle")}
     >
       {homePath && homePath !== path && (
         <button
@@ -104,7 +106,7 @@ export function PathBreadcrumb({
             e.stopPropagation();
             onNavigate(homePath);
           }}
-          title="Go to home"
+          title={t("fileBrowser.pathBreadcrumbHome")}
         >
           <Home className="w-3 h-3" />
         </button>
@@ -118,7 +120,7 @@ export function PathBreadcrumb({
             e.stopPropagation();
             onNavigate("\\\\");
           }}
-          title="Show all drives"
+          title={t("fileBrowser.pathBreadcrumbShowDrives")}
         >
           <HardDrive className="w-3 h-3" />
         </button>

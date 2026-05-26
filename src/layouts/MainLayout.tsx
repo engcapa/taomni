@@ -67,6 +67,7 @@ import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
+import { t as tr, useT } from "../lib/i18n";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 
@@ -77,7 +78,7 @@ interface PendingAuth {
 type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
 const MIN_SPLIT_WEIGHT = 0.35;
-const SAVED_PASSWORD_VAULT_REASON = "This connection uses a saved password — unlock the vault to continue.";
+const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 
 function localShellSelectionFromSession(session: SessionConfig): LocalShellSelection | undefined {
   const options = parseSessionOptions(session.options_json);
@@ -110,6 +111,7 @@ function passwordRefFromOptions(session: SessionConfig): string | null {
 }
 
 export function MainLayout() {
+  const t = useT();
   const {
     tabs,
     activeTabId,
@@ -197,7 +199,7 @@ export function MainLayout() {
       const detail = (evt as CustomEvent<{ reason?: string }>).detail;
       const reason =
         detail?.reason ??
-        "This connection uses a saved password — unlock the vault to continue.";
+        tr(SAVED_PASSWORD_VAULT_REASON_KEY);
       setVaultUnlockReason((prev) => prev ?? reason);
     };
     window.addEventListener(VAULT_LOCKED_EVENT, handler);
@@ -228,7 +230,7 @@ export function MainLayout() {
 
   const requestTerminalCwd = useCallback((tabId: string): boolean => {
     if (!terminalSessionIds.current[tabId]) {
-      setStatusMessage("Terminal is not ready yet");
+      setStatusMessage(tr("status.terminalNotReady"));
       return false;
     }
     setTerminalCwdRequestTokens((prev) => ({ ...prev, [tabId]: (prev[tabId] ?? 0) + 1 }));
@@ -278,7 +280,9 @@ export function MainLayout() {
       // disk for the rest of the run with no one waiting to consume them.
       void openSftpWindow(detachedSessionId, title).catch((err) => {
         clearDetachedHandoff(detachedSessionId);
-        setStatusMessage(`Could not open SFTP window: ${err instanceof Error ? err.message : err}`);
+        setStatusMessage(tr("status.sftpWindowError", {
+          error: err instanceof Error ? err.message : String(err),
+        }));
       });
       return;
     }
@@ -290,7 +294,7 @@ export function MainLayout() {
       // doesn't linger in localStorage waiting for a window that never
       // arrives.
       clearDetachedHandoff(detachedSessionId);
-      setStatusMessage("Browser blocked the SFTP window. Allow pop-ups for this site.");
+      setStatusMessage(tr("status.sftpPopupBlocked"));
     }
   }, [setStatusMessage]);
 
@@ -371,9 +375,17 @@ export function MainLayout() {
     const tabCount = currentTabs.filter((tab) => tab.closable).length;
     if (tabCount === 0) return true;
 
-    return window.confirm(
-      `There ${tabCount === 1 ? "is" : "are"} ${tabCount} open tab${tabCount === 1 ? "" : "s"}${terminalCount > 0 ? `, including ${terminalCount} terminal session${terminalCount === 1 ? "" : "s"}` : ""}. Exit NewMob and close them?`,
-    );
+    const isOne = tabCount === 1;
+    let message: string;
+    if (terminalCount > 0) {
+      message = tr(isOne ? "exit.promptOneTerminal" : "exit.promptManyTerminals", {
+        count: tabCount,
+        terminals: terminalCount,
+      });
+    } else {
+      message = tr(isOne ? "exit.promptOne" : "exit.promptMany", { count: tabCount });
+    }
+    return window.confirm(message);
   }, []);
 
   const requestAppExit = useCallback(() => {
@@ -416,7 +428,7 @@ export function MainLayout() {
   }, []);
 
   const openLocalTab = useCallback((
-    title = "Local terminal",
+    title?: string,
     sessionId?: string,
     terminalProfile?: TerminalProfile,
     localShell?: LocalShellSelection,
@@ -425,7 +437,7 @@ export function MainLayout() {
     addTab({
       id,
       type: "terminal",
-      title,
+      title: title || tr("tabs.localTerminal"),
       sessionId,
       localShell,
       terminalProfile,
@@ -505,7 +517,9 @@ export function MainLayout() {
       try {
         await sftpOpenPath(trimmed);
       } catch (err) {
-        setStatusMessage(`Open failed: ${err instanceof Error ? err.message : String(err)}`);
+        setStatusMessage(tr("status.openFailed", {
+          error: err instanceof Error ? err.message : String(err),
+        }));
       }
       return;
     }
@@ -514,7 +528,9 @@ export function MainLayout() {
       const info = await sftpStat("", trimmed, "local");
       isDir = effectiveFileType(info) === "dir";
     } catch (err) {
-      setStatusMessage(`Stat failed: ${err instanceof Error ? err.message : String(err)}`);
+      setStatusMessage(tr("status.statFailed", {
+        error: err instanceof Error ? err.message : String(err),
+      }));
       return;
     }
     if (isDir && opts.embedFolder) {
@@ -524,14 +540,16 @@ export function MainLayout() {
     try {
       await sftpOpenPath(trimmed);
     } catch (err) {
-      setStatusMessage(`Open failed: ${err instanceof Error ? err.message : String(err)}`);
+      setStatusMessage(tr("status.openFailed", {
+        error: err instanceof Error ? err.message : String(err),
+      }));
     }
   }, [openFileBrowserTab, setStatusMessage]);
 
   const openFileSession = useCallback((session: SessionConfig) => {
     const target = session.host?.trim();
     if (!target) {
-      setStatusMessage("File session has no path or URL configured.");
+      setStatusMessage(tr("status.fileSessionMissing"));
       return;
     }
     let embed = true;
@@ -593,7 +611,7 @@ export function MainLayout() {
       awaitingVaultUnlockRef.current = false;
       continueConnectQueueRef.current();
     };
-    setVaultUnlockReason((current) => current ?? SAVED_PASSWORD_VAULT_REASON);
+    setVaultUnlockReason((current) => current ?? tr(SAVED_PASSWORD_VAULT_REASON_KEY));
     return "awaiting-vault";
   }, []);
 
@@ -632,7 +650,7 @@ export function MainLayout() {
       }
     } else if (session.session_type === "LocalShell") {
       openLocalTab(
-        session.name || "Local terminal",
+        session.name || tr("tabs.localTerminal"),
         session.id,
         getSessionTerminalProfile(session.options_json),
         localShellSelectionFromSession(session),
@@ -786,7 +804,7 @@ export function MainLayout() {
     addTab({
       id: "settings",
       type: "settings",
-      title: "Settings",
+      title: t("tabs.settings"),
       closable: true,
     });
   }, [addTab, setActiveTab]);
@@ -807,7 +825,7 @@ export function MainLayout() {
         break;
       case "reload-sessions":
         void loadSessions();
-        setStatusMessage("Sessions reloaded");
+        setStatusMessage(tr("status.sessionsReloaded"));
         break;
       case "toggle-xserver":
         toggleXServer();
@@ -847,29 +865,29 @@ export function MainLayout() {
           addTab({
             id: "nettools-tunnels",
             type: "nettools",
-            title: "SSH tunnels",
+            title: t("tunnels.title"),
             closable: true,
           });
         }
         break;
       }
       case "tools":
-        openPlaceholderTab("Network tools", "Additional network utilities will be added in a later phase.");
+        openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
         break;
       case "packages":
-        openPlaceholderTab("Packages", "Package management is not part of Phase 1-2.");
+        openPlaceholderTab(t("tabs.packages"), t("status.commandUnavailable"));
         break;
       case "settings":
         openSettingsTab();
         break;
       case "macros":
-        openPlaceholderTab("Macros", "This module is intentionally inactive in the MVP.");
+        openPlaceholderTab(t("tabs.macros"), t("status.commandUnavailable"));
         break;
       case "help":
         setShowAbout(true);
         break;
       default:
-        setStatusMessage("Command is not available in this phase");
+        setStatusMessage(tr("status.commandUnavailable"));
     }
   }, [
     activeTab,
@@ -1112,7 +1130,7 @@ export function MainLayout() {
                 {/* Welcome panel */}
                 {(activeTab?.type === "welcome" || !activeTab) && (
                   <WelcomePanel
-                    onStartLocalTerminal={(localShell) => openLocalTab(localShell?.name ?? "Local terminal", undefined, undefined, localShell)}
+                    onStartLocalTerminal={(localShell) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)}
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                   />
@@ -1273,8 +1291,8 @@ export function MainLayout() {
                             <button
                               type="button"
                               data-testid={`terminal-split-lock-${tab.id}`}
-                              aria-label={inputLocked ? `Unlock input for ${tab.title}` : `Lock input for ${tab.title}`}
-                              title={inputLocked ? "Unlock input" : "Lock input"}
+                              aria-label={inputLocked ? t("terminalSplit.unlockInput", { title: tab.title }) : t("terminalSplit.lockInput", { title: tab.title })}
+                              title={inputLocked ? t("terminalSplit.unlockTitle") : t("terminalSplit.lockTitle")}
                               className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
                               style={inputLocked ? { color: "var(--moba-accent)" } : undefined}
                               onClick={(event) => {
@@ -1331,7 +1349,7 @@ export function MainLayout() {
                             onPointerDown={(event) => startLinearSplitResize(index, event)}
                             role="separator"
                             aria-orientation={terminalSplitLayout === "horizontal" ? "vertical" : "horizontal"}
-                            title="Resize split panes"
+                            title={t("terminalSplit.resizePanes")}
                           />
                         )}
                         </Fragment>
@@ -1348,7 +1366,7 @@ export function MainLayout() {
                             onPointerDown={(event) => startGridSplitResize("column", index, event)}
                             role="separator"
                             aria-orientation="vertical"
-                            title="Resize split column"
+                            title={t("terminalSplit.resizeColumn")}
                           />
                         ))}
                         {splitGridRowWeightsForLayout.slice(0, -1).map((_, index) => (
@@ -1360,7 +1378,7 @@ export function MainLayout() {
                             onPointerDown={(event) => startGridSplitResize("row", index, event)}
                             role="separator"
                             aria-orientation="horizontal"
-                            title="Resize split row"
+                            title={t("terminalSplit.resizeRow")}
                           />
                         ))}
                       </>
@@ -1583,10 +1601,11 @@ function TerminalSplitToolbar({
   onClearLocks: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const options: Array<{ id: TerminalSplitLayout; label: string; icon: ReactNode }> = [
-    { id: "horizontal", label: "Horizontal split", icon: <Columns2 className="w-3.5 h-3.5" /> },
-    { id: "vertical", label: "Vertical split", icon: <Rows3 className="w-3.5 h-3.5" /> },
-    { id: "grid", label: "Grid split", icon: <Grid2X2 className="w-3.5 h-3.5" /> },
+    { id: "horizontal", label: t("terminalSplit.horizontal"), icon: <Columns2 className="w-3.5 h-3.5" /> },
+    { id: "vertical", label: t("terminalSplit.vertical"), icon: <Rows3 className="w-3.5 h-3.5" /> },
+    { id: "grid", label: t("terminalSplit.grid"), icon: <Grid2X2 className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -1614,7 +1633,7 @@ function TerminalSplitToolbar({
         </button>
       ))}
       <span className="moba-pill ml-1" style={{ fontSize: 11 }}>
-        {lockedCount} locked
+        {t("terminalSplit.locked", { count: lockedCount })}
       </span>
       <button
         type="button"
@@ -1623,13 +1642,13 @@ function TerminalSplitToolbar({
         disabled={lockedCount === 0}
         onClick={onClearLocks}
       >
-        Clear locks
+        {t("terminalSplit.clearLocks")}
       </button>
       <div className="flex-1" />
       <button
         type="button"
-        aria-label="Close split view"
-        title="Close split view"
+        aria-label={t("terminalSplit.closeView")}
+        title={t("terminalSplit.closeView")}
         className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
         onClick={onClose}
       >
@@ -1652,6 +1671,7 @@ function CompactSidebarDrawer({
   onEditSession: (session: SessionConfig) => void;
   onConnectSession: (session: SessionConfig) => void;
 }) {
+  const t = useT();
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -1664,7 +1684,7 @@ function CompactSidebarDrawer({
     <div data-testid="compact-sidebar-drawer" className="absolute inset-x-0 top-8 bottom-0 z-[1200] pointer-events-none">
       <button
         type="button"
-        aria-label="Close sessions drawer"
+        aria-label={t("sidebar.closeDrawer")}
         className="absolute inset-0 bg-black/10 pointer-events-auto"
         onClick={onClose}
       />
@@ -1679,11 +1699,11 @@ function CompactSidebarDrawer({
           className="h-7 flex items-center px-2 border-b text-[12px] font-semibold"
           style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
         >
-          Sessions
+          {t("sidebar.headerTitle")}
           <button
             type="button"
-            title="Close sessions drawer"
-            aria-label="Close sessions drawer"
+            title={t("sidebar.closeDrawer")}
+            aria-label={t("sidebar.closeDrawer")}
             className="ml-auto h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
             onClick={onClose}
           >
@@ -1705,17 +1725,19 @@ function CompactSidebarDrawer({
 }
 
 function VncLoadingPanel() {
+  const t = useT();
   return (
     <div
       className="w-full h-full flex items-center justify-center text-sm"
       style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
     >
-      Loading VNC...
+      {t("vnc.loading")}
     </div>
   );
 }
 
 function UnavailablePanel({ title, message }: { title: string; message?: string }) {
+  const t = useT();
   return (
     <div
       className="w-full h-full flex items-center justify-center text-sm p-6"
@@ -1724,7 +1746,7 @@ function UnavailablePanel({ title, message }: { title: string; message?: string 
       <div className="max-w-md text-center">
         <div className="text-lg font-semibold mb-2">{title}</div>
         <div className="text-[12px] text-slate-300">
-          {message ?? "This module is not active in the current MVP."}
+          {message ?? t("status.commandUnavailable")}
         </div>
       </div>
     </div>

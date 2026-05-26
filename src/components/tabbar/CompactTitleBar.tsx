@@ -17,6 +17,7 @@ import { useContextMenu } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import type { RibbonCommand } from "../menubar/Ribbon";
+import { useT } from "../../lib/i18n";
 
 type CompactCommand = RibbonCommand | "close-active" | "reload-sessions";
 
@@ -32,6 +33,7 @@ export function CompactTitleBar({
   onToggleSidebarDrawer,
 }: CompactTitleBarProps) {
   const ctx = useContextMenu();
+  const t = useT();
 
   const startDrag = (event: React.MouseEvent) => {
     if (event.button !== 0) return;
@@ -41,36 +43,37 @@ export function CompactTitleBar({
 
   const openMainMenu = (event: React.MouseEvent) => {
     ctx.show(event, [
-      { label: "New local terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
-      { label: "New remote session...", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
-      { label: "New SFTP browser...", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
-      { label: "Close active tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
+      { label: t("menu.newLocalTerminal"), icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
+      { label: t("menu.newRemoteSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+      { label: t("ribbon.newSftp"), icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
+      { label: t("menu.closeActiveTab"), icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
       { label: "", separator: true, onClick: () => {} },
       {
-        label: "Sessions",
+        label: t("menu.sessions"),
+        testId: "context-menu-item-sessions",
         icon: <PanelLeft className="w-3 h-3" />,
         children: [
-          { label: "Show sessions drawer", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebarDrawer },
-          { label: "New session...", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
-          { label: "Reload sessions", icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
+          { label: t("sidebar.headerTitle"), icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebarDrawer },
+          { label: t("menu.newSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+          { label: t("menu.reloadSessions"), icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
         ],
         onClick: () => {},
       },
       {
-        label: "View",
+        label: t("menu.view"),
         icon: <PanelTopOpen className="w-3 h-3" />,
         children: [
-          { label: "Exit compact mode", shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
-          { label: "Toggle sessions drawer", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebarDrawer },
-          { label: "Split active terminal", onClick: () => onCommand("split") },
+          { label: t("titlebar.exitCompact"), shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
+          { label: t("sidebar.headerTitle"), icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebarDrawer },
+          { label: t("menu.splitTerminal"), onClick: () => onCommand("split") },
         ],
         onClick: () => {},
       },
-      { label: "Tunneling", icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
-      { label: "Settings", icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
-      { label: "Help", icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+      { label: t("ribbon.tunneling"), icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
+      { label: t("menu.settings"), icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
+      { label: t("menu.help"), icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
       { label: "", separator: true, onClick: () => {} },
-      { label: "Exit NewMob", onClick: () => onCommand("exit"), danger: true },
+      { label: t("ribbon.exit"), onClick: () => onCommand("exit"), danger: true },
     ]);
   };
 
@@ -82,8 +85,8 @@ export function CompactTitleBar({
     >
       {ctx.render}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
-        <TitleBarButton testId="compact-main-menu" title="Main menu" icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
-        <TitleBarButton testId="compact-sidebar-drawer-toggle" title="Show sessions drawer" icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebarDrawer} />
+        <TitleBarButton testId="compact-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
+        <TitleBarButton testId="compact-sidebar-drawer-toggle" title={t("compactTitleBar.sessionsDrawer")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebarDrawer} />
       </div>
       <div className="min-w-0 flex-1 self-stretch">
         <TabBar />

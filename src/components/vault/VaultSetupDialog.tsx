@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../../lib/i18n";
 
 export interface VaultSetupDialogProps {
   onCancel: () => void;
@@ -11,6 +12,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   const tooShort = pw1.length > 0 && pw1.length < 8;
   const mismatch = pw2.length > 0 && pw1 !== pw2;
@@ -55,21 +57,20 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
     >
       <div
         role="dialog"
-        aria-label="Set master password"
+        aria-label={t("vault.setupTitleSet")}
         aria-modal="true"
         data-testid="vault-setup-dialog"
         className="w-[440px] rounded shadow-lg p-4"
         style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-1">Set vault master password</div>
+        <div className="text-sm font-semibold mb-1">{t("vault.setupTitleSet")}</div>
         <div className="text-[12px] mb-3" style={{ color: "var(--moba-text-muted)" }}>
-          The vault encrypts saved passwords with this master password. It is never stored — if
-          you lose it, saved passwords cannot be recovered.
+          {t("vault.setupDescription")}
         </div>
 
         <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
-          Master password (min 8 chars)
+          {t("vault.masterPasswordHint")}
         </label>
         <input
           ref={inputRef}
@@ -83,7 +84,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         />
 
         <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
-          Confirm
+          {t("vault.confirmLabel")}
         </label>
         <input
           data-testid="vault-setup-pw2"
@@ -101,7 +102,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
             style={{ color: "var(--moba-error, #c33)" }}
             data-testid="vault-setup-too-short"
           >
-            Password must be at least 8 characters.
+            {t("vault.tooShort")}
           </div>
         )}
         {mismatch && (
@@ -110,7 +111,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
             style={{ color: "var(--moba-error, #c33)" }}
             data-testid="vault-setup-mismatch"
           >
-            Passwords do not match.
+            {t("vault.mismatchLong")}
           </div>
         )}
         {error && (
@@ -131,7 +132,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
             onClick={onCancel}
             disabled={busy}
           >
-            Cancel
+            {t("vault.cancel")}
           </button>
           <button
             type="button"
@@ -141,7 +142,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >
-            {busy ? "Setting up…" : "Create vault"}
+            {busy ? t("vault.settingUp") : t("vault.createVault")}
           </button>
         </div>
       </div>

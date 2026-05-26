@@ -1,23 +1,6 @@
 import { FileText } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
-
-const FORMAT_OPTIONS = [
-  {
-    value: "md",
-    label: "Markdown (recommended)",
-    desc: "Lists, code blocks, tables — rendered with marked + DOMPurify",
-  },
-  {
-    value: "html",
-    label: "HTML",
-    desc: "Trust the model to emit raw HTML; output is sanitised before display",
-  },
-  {
-    value: "plain",
-    label: "Plain text",
-    desc: "No markup — preserves whitespace, no DOM injection at all",
-  },
-] as const;
+import { useT } from "../../lib/i18n";
 
 /**
  * Global default for the chat output format. Each thread can still override
@@ -27,7 +10,26 @@ const FORMAT_OPTIONS = [
  */
 export function ChatOutputFormatPanel() {
   const { config, saveConfig } = useAiStore();
+  const t = useT();
   if (!config) return null;
+
+  const FORMAT_OPTIONS = [
+    {
+      value: "md",
+      label: t("aiSettings.chatFormatMarkdown"),
+      desc: t("aiSettings.chatFormatMarkdownDesc"),
+    },
+    {
+      value: "html",
+      label: t("aiSettings.chatFormatHtml"),
+      desc: t("aiSettings.chatFormatHtmlDesc"),
+    },
+    {
+      value: "plain",
+      label: t("aiSettings.chatFormatPlain"),
+      desc: t("aiSettings.chatFormatPlainDesc"),
+    },
+  ] as const;
 
   const current = config.chat_output_format ?? "md";
 
@@ -40,10 +42,10 @@ export function ChatOutputFormatPanel() {
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <FileText className="w-4 h-4 text-[var(--moba-accent)]" />
-        <div className="text-[13px] font-semibold flex-1">Chat output format</div>
+        <div className="text-[13px] font-semibold flex-1">{t("aiSettings.chatFormatTitle")}</div>
       </div>
       <div className="text-[11px] text-[var(--moba-text-muted)] -mt-1">
-        How assistant replies are formatted by default. Per-thread overrides live in the drawer header.
+        {t("aiSettings.chatFormatDesc")}
       </div>
       <div className="space-y-1 pt-1">
         {FORMAT_OPTIONS.map(({ value, label, desc }) => (

@@ -1,4 +1,5 @@
 import { CheckCircle, Loader2, X, XCircle } from "lucide-react";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 export type ActionCardDecision = "allow" | "allow-session" | "deny";
 
@@ -17,13 +18,16 @@ export interface ActionCardProps {
   executing?: boolean;
 }
 
-const TOOL_LABELS: Record<string, string> = {
-  list_sessions:      "列出会话",
-  search_history:     "搜索历史",
-  run_in_terminal:    "执行命令",
-  read_terminal_tail: "读取终端输出",
-  explain_error:      "分析错误",
-};
+function toolLabel(tool: string, t: TranslateFn): string {
+  switch (tool) {
+    case "list_sessions":      return t("agent.toolListSessions");
+    case "search_history":     return t("agent.toolSearchHistory");
+    case "run_in_terminal":    return t("agent.toolRunInTerminal");
+    case "read_terminal_tail": return t("agent.toolReadTerminalTail");
+    case "explain_error":      return t("agent.toolExplainError");
+    default:                   return tool;
+  }
+}
 
 export function ActionCard({
   tool,
@@ -33,7 +37,8 @@ export function ActionCard({
   onDecide,
   executing = false,
 }: ActionCardProps) {
-  const label = TOOL_LABELS[tool] ?? tool;
+  const t = useT();
+  const label = toolLabel(tool, t);
   const isWrite = requiresConfirmation;
 
   return (
@@ -46,11 +51,11 @@ export function ActionCard({
     >
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[12px] font-semibold">
-          Agent 想要：{label}
+          {t("agent.agentWants", { label })}
         </span>
         {isWrite && (
           <span className="text-[10px] text-yellow-400 border border-yellow-500/40 rounded px-1.5 py-0.5">
-            写操作
+            {t("agent.writeBadge")}
           </span>
         )}
         <button
@@ -81,15 +86,15 @@ export function ActionCard({
               onClick={() => onDecide("allow")}
             >
               <CheckCircle className="w-3.5 h-3.5" />
-              允许
+              {t("agent.actionAllow")}
             </button>
             <button
               type="button"
               className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
               onClick={() => onDecide("allow-session")}
-              title="本会话内不再询问此工具"
+              title={t("agent.actionAllowSessionTitle")}
             >
-              本会话允许
+              {t("agent.actionAllowSession")}
             </button>
             <button
               type="button"
@@ -97,7 +102,7 @@ export function ActionCard({
               onClick={() => onDecide("deny")}
             >
               <XCircle className="w-3.5 h-3.5" />
-              拒绝
+              {t("agent.actionDeny")}
             </button>
           </>
         )}

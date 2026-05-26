@@ -23,6 +23,7 @@ import {
   useTerminalFontOptions,
 } from "../../lib/systemFonts";
 import { historyClear } from "../../lib/ipc";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface TerminalAppearanceSettingsProps {
   profile: TerminalProfile;
@@ -32,20 +33,24 @@ interface TerminalAppearanceSettingsProps {
   className?: string;
 }
 
-const TERMINAL_CURSOR_OPTIONS: Array<{ label: string; style: TerminalCursorStyle; blink: boolean }> = [
-  { label: "Block (blink)", style: "block", blink: true },
-  { label: "Block (steady)", style: "block", blink: false },
-  { label: "Underline (blink)", style: "underline", blink: true },
-  { label: "Underline (steady)", style: "underline", blink: false },
-  { label: "Vertical bar (blink)", style: "bar", blink: true },
-  { label: "Vertical bar (steady)", style: "bar", blink: false },
-];
+function buildCursorOptions(t: TranslateFn): Array<{ label: string; style: TerminalCursorStyle; blink: boolean }> {
+  return [
+    { label: t("terminalAppearance.cursorBlockBlink"), style: "block", blink: true },
+    { label: t("terminalAppearance.cursorBlockSteady"), style: "block", blink: false },
+    { label: t("terminalAppearance.cursorUnderlineBlink"), style: "underline", blink: true },
+    { label: t("terminalAppearance.cursorUnderlineSteady"), style: "underline", blink: false },
+    { label: t("terminalAppearance.cursorBarBlink"), style: "bar", blink: true },
+    { label: t("terminalAppearance.cursorBarSteady"), style: "bar", blink: false },
+  ];
+}
 
-const RIGHT_CLICK_OPTIONS: Array<{ label: string; value: TerminalRightClickBehavior }> = [
-  { label: "Show context menu", value: "menu" },
-  { label: "Paste clipboard", value: "paste" },
-  { label: "Copy selection or paste", value: "copy-or-paste" },
-];
+function buildRightClickOptions(t: TranslateFn): Array<{ label: string; value: TerminalRightClickBehavior }> {
+  return [
+    { label: t("terminalAppearance.rightClickContextMenu"), value: "menu" },
+    { label: t("terminalAppearance.rightClickPaste"), value: "paste" },
+    { label: t("terminalAppearance.rightClickCopyOrPaste"), value: "copy-or-paste" },
+  ];
+}
 
 export function TerminalAppearanceSettings({
   profile,
@@ -54,6 +59,9 @@ export function TerminalAppearanceSettings({
   showPreview = true,
   className = "",
 }: TerminalAppearanceSettingsProps) {
+  const t = useT();
+  const cursorOptions = useMemo(() => buildCursorOptions(t), [t]);
+  const rightClickOptions = useMemo(() => buildRightClickOptions(t), [t]);
   const fontState = useSystemFonts();
   const fontOptions = useTerminalFontOptions(fontState.fonts);
   const partitionedFonts = useMemo(() => {
@@ -128,28 +136,28 @@ export function TerminalAppearanceSettings({
 
   const resolvedTheme = resolveTerminalTheme(profile.theme);
   const selectedThemeId = resolveThemeId(profile.theme);
-  const selectedCursor = TERMINAL_CURSOR_OPTIONS.find((option) =>
+  const selectedCursor = cursorOptions.find((option) =>
     option.style === profile.cursorStyle && option.blink === profile.cursorBlink
-  )?.label ?? "Block (blink)";
-  const selectedRightClick = RIGHT_CLICK_OPTIONS.find((option) =>
+  )?.label ?? cursorOptions[0].label;
+  const selectedRightClick = rightClickOptions.find((option) =>
     option.value === profile.rightClickBehavior
-  )?.label ?? RIGHT_CLICK_OPTIONS[0].label;
+  )?.label ?? rightClickOptions[0].label;
 
   return (
     <div data-testid="terminal-appearance-settings" className={`space-y-4 ${className}`}>
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-7">
-            <span className="block text-[12px] font-semibold mb-1">Font</span>
+            <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.fontLabel")}</span>
             <select
-              aria-label="Terminal font"
+              aria-label={t("terminalAppearance.fontAria")}
               className="moba-input w-full"
               value={selectedFont}
               disabled={fontOptions.length === 0}
               onChange={(event) => updateProfile({ fontFamily: makeTerminalFontFamily(event.target.value) })}
             >
               {partitionedFonts.mono.length > 0 && (
-                <optgroup label="Monospace Fonts (Recommended)">
+                <optgroup label={t("terminalAppearance.fontGroupMonoRecommended")}>
                   {partitionedFonts.mono.map((font) => (
                     <option key={font} value={font}>
                       {font}
@@ -158,7 +166,7 @@ export function TerminalAppearanceSettings({
                 </optgroup>
               )}
               {partitionedFonts.prop.length > 0 && (
-                <optgroup label="Proportional Fonts (Not Recommended)">
+                <optgroup label={t("terminalAppearance.fontGroupProportional")}>
                   {partitionedFonts.prop.map((font) => (
                     <option key={font} value={font}>
                       {font}
@@ -169,25 +177,25 @@ export function TerminalAppearanceSettings({
             </select>
             {showFontWarning && (
               <p className="mt-1.5 text-[11px] text-[#ff6b6b] leading-snug">
-                ⚠️ This font is not monospace. It will be forced into a grid in the terminal, causing uneven character spacing.
+                ⚠️ {t("terminalAppearance.nonMonospaceWarning")}
               </p>
             )}
           </label>
 
           <div className="col-span-8 md:col-span-3">
-            <span className="block text-[12px] font-semibold mb-1">Text Size</span>
+            <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.textSizeLabel")}</span>
             <div className="inline-flex items-center gap-1">
               <button
                 className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center"
                 type="button"
-                aria-label="Decrease text size"
+                aria-label={t("terminalAppearance.decreaseTextSize")}
                 onClick={() => updateProfile({ fontSize: Math.max(8, profile.fontSize - 1) })}
               >
                 <Minus className="w-4 h-4" />
               </button>
               <input
                 className="moba-input h-8 w-14 text-center"
-                aria-label="Terminal font size"
+                aria-label={t("terminalAppearance.fontSizeAria")}
                 value={fontSizeText}
                 inputMode="numeric"
                 onChange={(event) => {
@@ -213,7 +221,7 @@ export function TerminalAppearanceSettings({
               <button
                 className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center"
                 type="button"
-                aria-label="Increase text size"
+                aria-label={t("terminalAppearance.increaseTextSize")}
                 onClick={() => updateProfile({ fontSize: Math.min(32, profile.fontSize + 1) })}
               >
                 <Plus className="w-4 h-4" />
@@ -225,17 +233,17 @@ export function TerminalAppearanceSettings({
             <input
               className="moba-checkbox"
               type="checkbox"
-              aria-label="Enable font ligatures"
+              aria-label={t("terminalAppearance.enableLigaturesAria")}
               checked={profile.fontLigatures}
               onChange={(event) => updateProfile({ fontLigatures: event.target.checked })}
             />
-            <span className="text-[12px]">Ligatures</span>
+            <span className="text-[12px]">{t("terminalAppearance.ligaturesLabel")}</span>
           </label>
         </div>
       </section>
 
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">Terminal theme</div>
+        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.themeHeading")}</div>
         <div data-testid="terminal-theme-gallery" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
           {TERMINAL_THEME_DEFINITIONS.map((definition) => (
             <ThemeCard
@@ -243,6 +251,7 @@ export function TerminalAppearanceSettings({
               definition={definition}
               selected={definition.id === selectedThemeId}
               onSelect={() => updateProfile({ theme: definition.id })}
+              t={t}
             />
           ))}
         </div>
@@ -252,34 +261,34 @@ export function TerminalAppearanceSettings({
         <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
           <div className="grid grid-cols-12 gap-2 items-center">
             <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
-              <span className="w-24 text-[12px] font-semibold">Background</span>
+              <span className="w-24 text-[12px] font-semibold">{t("terminalAppearance.customBackgroundLabel")}</span>
               <input
                 type="color"
                 value={isHexColor(bg) ? bg : "#000000"}
                 onChange={(event) => updateCustomColor(event.target.value, fg)}
-                aria-label="Terminal background color"
+                aria-label={t("terminalAppearance.backgroundColorAria")}
                 className="w-8 h-7 border border-[#8aa0bd] rounded-sm"
               />
               <input
                 className="moba-input w-24 moba-mono"
                 value={bg}
-                aria-label="Terminal background hex"
+                aria-label={t("terminalAppearance.backgroundHexAria")}
                 onChange={(event) => updateCustomColor(event.target.value, fg)}
               />
             </label>
             <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
-              <span className="w-24 text-[12px] font-semibold">Foreground</span>
+              <span className="w-24 text-[12px] font-semibold">{t("terminalAppearance.customForegroundLabel")}</span>
               <input
                 type="color"
                 value={isHexColor(fg) ? fg : "#ffffff"}
                 onChange={(event) => updateCustomColor(bg, event.target.value)}
-                aria-label="Terminal foreground color"
+                aria-label={t("terminalAppearance.foregroundColorAria")}
                 className="w-8 h-7 border border-[#8aa0bd] rounded-sm"
               />
               <input
                 className="moba-input w-24 moba-mono"
                 value={fg}
-                aria-label="Terminal foreground hex"
+                aria-label={t("terminalAppearance.foregroundHexAria")}
                 onChange={(event) => updateCustomColor(bg, event.target.value)}
               />
             </label>
@@ -288,32 +297,32 @@ export function TerminalAppearanceSettings({
       )}
 
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">Terminal behavior</div>
+        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.behaviorHeading")}</div>
         <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px]">
           <label className="col-span-12 md:col-span-4">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">Cursor</span>
+            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.cursorLabel")}</span>
             <select
-              aria-label="Terminal cursor"
+              aria-label={t("terminalAppearance.cursorAria")}
               className="moba-input w-full"
               value={selectedCursor}
               onChange={(event) => {
-                const option = TERMINAL_CURSOR_OPTIONS.find((item) => item.label === event.target.value);
+                const option = cursorOptions.find((item) => item.label === event.target.value);
                 if (option) updateProfile({ cursorStyle: option.style, cursorBlink: option.blink });
               }}
             >
-              {TERMINAL_CURSOR_OPTIONS.map((option) => (
+              {cursorOptions.map((option) => (
                 <option key={option.label}>{option.label}</option>
               ))}
             </select>
           </label>
 
           <label className="col-span-12 md:col-span-4">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">Scrollback</span>
+            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.scrollbackLabel")}</span>
             <span className="flex items-center gap-2">
               <input
                 className="moba-input w-28"
                 value={scrollbackText}
-                aria-label="Scrollback lines"
+                aria-label={t("terminalAppearance.scrollbackLinesAria")}
                 inputMode="numeric"
                 onChange={(event) => {
                   const next = event.target.value;
@@ -335,22 +344,22 @@ export function TerminalAppearanceSettings({
                   }
                 }}
               />
-              <span className="text-[var(--moba-text-muted)]">lines</span>
+              <span className="text-[var(--moba-text-muted)]">{t("terminalAppearance.scrollbackLinesSuffix")}</span>
             </span>
           </label>
 
           <label className="col-span-12 md:col-span-4">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">Right click</span>
+            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.rightClickLabel")}</span>
             <select
-              aria-label="Right click behavior"
+              aria-label={t("terminalAppearance.rightClickAria")}
               className="moba-input w-full"
               value={selectedRightClick}
               onChange={(event) => {
-                const option = RIGHT_CLICK_OPTIONS.find((item) => item.label === event.target.value);
+                const option = rightClickOptions.find((item) => item.label === event.target.value);
                 if (option) updateProfile({ rightClickBehavior: option.value });
               }}
             >
-              {RIGHT_CLICK_OPTIONS.map((option) => (
+              {rightClickOptions.map((option) => (
                 <option key={option.value}>{option.label}</option>
               ))}
             </select>
@@ -358,42 +367,42 @@ export function TerminalAppearanceSettings({
 
           <div className="col-span-12 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
             <CheckControl
-              label="Show terminal scrollbar"
+              label={t("terminalAppearance.showScrollbar")}
               checked={profile.showScrollbar}
               onChange={(checked) => updateProfile({ showScrollbar: checked })}
             />
             <CheckControl
-              label="Copy on select"
+              label={t("terminalAppearance.copyOnSelect")}
               checked={profile.copyOnSelect}
               onChange={(checked) => updateProfile({ copyOnSelect: checked })}
             />
             <CheckControl
-              label="Allow SSH OSC 52 clipboard"
+              label={t("terminalAppearance.allowOsc52")}
               checked={profile.allowRemoteOsc52Clipboard}
               onChange={(checked) => updateProfile({ allowRemoteOsc52Clipboard: checked })}
             />
             <CheckControl
-              label="Read-only terminal"
+              label={t("terminalAppearance.readOnly")}
               checked={profile.readOnly}
               onChange={(checked) => updateProfile({ readOnly: checked })}
             />
             <CheckControl
-              label="Bracketed paste"
+              label={t("terminalAppearance.bracketedPaste")}
               checked={profile.bracketedPaste}
               onChange={(checked) => updateProfile({ bracketedPaste: checked })}
             />
             <CheckControl
-              label="Confirm multiline paste"
+              label={t("terminalAppearance.multilinePasteConfirm")}
               checked={profile.multilinePasteConfirm}
               onChange={(checked) => updateProfile({ multilinePasteConfirm: checked })}
             />
             <CheckControl
-              label="Enable keyword highlighting"
+              label={t("terminalAppearance.keywordHighlighting")}
               checked={profile.syntaxMode === "keywords"}
               onChange={(checked) => updateProfile({ syntaxMode: checked ? "keywords" : "default" })}
             />
             <CheckControl
-              label="Save scrollback to log file on disconnect"
+              label={t("terminalAppearance.saveScrollbackOnDisconnect")}
               checked={profile.loggingEnabled}
               onChange={(checked) => updateProfile({ loggingEnabled: checked })}
             />
@@ -414,27 +423,25 @@ export function TerminalAppearanceSettings({
       )}
 
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">Inline command suggestions</div>
+        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.inlineSuggestionsHeading")}</div>
         <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px] items-end">
           <div className="col-span-12 md:col-span-7">
             <CheckControl
-              label="Show ghost-text suggestions from command history"
+              label={t("terminalAppearance.inlineSuggestionsToggle")}
               checked={profile.inlineSuggestions}
               onChange={(checked) => updateProfile({ inlineSuggestions: checked })}
             />
             <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
-              Press → or End at the end of the line to accept. Recommended with a bar or
-              underline cursor. Ignored for local PowerShell (its PSReadLine already provides
-              predictions).
+              {t("terminalAppearance.inlineSuggestionsHint")}
             </p>
           </div>
 
           <label className="col-span-8 md:col-span-3">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">Max entries per host</span>
+            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.inlineSuggestionsMaxLabel")}</span>
             <input
               className="moba-input w-28"
               value={inlineSuggestionsMaxText}
-              aria-label="Maximum command history entries per host"
+              aria-label={t("terminalAppearance.inlineSuggestionsMaxAria")}
               inputMode="numeric"
               disabled={!profile.inlineSuggestions}
               onChange={(event) => {
@@ -465,7 +472,7 @@ export function TerminalAppearanceSettings({
               className="moba-btn h-8 px-2 text-[11px]"
               disabled={clearingHistory}
               onClick={() => {
-                if (!window.confirm("Clear all command history? This affects every host.")) {
+                if (!window.confirm(t("terminalAppearance.clearAllHistoryConfirm"))) {
                   return;
                 }
                 setClearingHistory(true);
@@ -476,23 +483,23 @@ export function TerminalAppearanceSettings({
                   .finally(() => setClearingHistory(false));
               }}
             >
-              Clear all history
+              {t("terminalAppearance.clearAllHistory")}
             </button>
           </div>
         </div>
       </section>
 
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">AI input assistance</div>
+        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.aiAssistanceHeading")}</div>
         <div className="space-y-3">
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">Suggestion source</div>
+            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("terminalAppearance.suggestionSourceLabel")}</div>
             <div className="flex flex-col gap-1.5">
               {(
                 [
-                  { value: "history",          label: "History only",              desc: "Fast prefix match from command history (default)" },
-                  { value: "history+path",     label: "History + PATH / files",    desc: "Also suggests executables from $PATH and current directory files" },
-                  { value: "history+path+ai",  label: "History + PATH + AI (FIM)", desc: "Adds AI fill-in-the-middle completions — requires downloading the FIM model (~400 MB)" },
+                  { value: "history",          label: t("terminalAppearance.suggestionSourceHistory"),         desc: t("terminalAppearance.suggestionSourceHistoryDesc") },
+                  { value: "history+path",     label: t("terminalAppearance.suggestionSourceHistoryPath"),     desc: t("terminalAppearance.suggestionSourceHistoryPathDesc") },
+                  { value: "history+path+ai",  label: t("terminalAppearance.suggestionSourceHistoryPathAi"),   desc: t("terminalAppearance.suggestionSourceHistoryPathAiDesc") },
                 ] as const
               ).map(({ value, label, desc }) => (
                 <label key={value} className="flex items-start gap-2 cursor-pointer">
@@ -516,20 +523,19 @@ export function TerminalAppearanceSettings({
 
           <div className="pt-2 border-t border-[var(--moba-divider)]">
             <CheckControl
-              label="Enable AI command rewrite (Ctrl+K)"
+              label={t("terminalAppearance.enableAiRewrite")}
               checked={profile.aiCommandRewriteEnabled}
               onChange={(checked) => updateProfile({ aiCommandRewriteEnabled: checked })}
             />
             <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
-              Press the configured shortcut to open an AI rewrite overlay for the current
-              command line. Ignored for local PowerShell.
+              {t("terminalAppearance.enableAiRewriteHint")}
             </p>
             <label className="mt-2 flex items-center gap-2 text-[11px]">
-              <span className="text-[var(--moba-text-muted)]">Shortcut</span>
+              <span className="text-[var(--moba-text-muted)]">{t("terminalAppearance.aiRewriteShortcutLabel")}</span>
               <input
                 className="moba-input h-7 w-32 text-[12px]"
                 value={profile.aiCommandRewriteShortcut}
-                aria-label="AI command rewrite shortcut"
+                aria-label={t("terminalAppearance.aiRewriteShortcutAria")}
                 disabled={!profile.aiCommandRewriteEnabled}
                 onChange={(event) =>
                   updateProfile({ aiCommandRewriteShortcut: event.target.value })
@@ -541,28 +547,26 @@ export function TerminalAppearanceSettings({
 
           <div className="pt-2 border-t border-[var(--moba-divider)]">
             <CheckControl
-              label='Render `?? <question>` answers inline in the terminal (experimental)'
+              label={t("terminalAppearance.aiInlineQqLabel")}
               checked={profile.aiInlineQqRender}
               onChange={(checked) => updateProfile({ aiInlineQqRender: checked })}
             />
             <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
-              When off (default), `?? &lt;q&gt;` is staged into the AI Chat Drawer so you can review
-              and edit before sending. When on, the answer streams directly into the terminal
-              as gray ANSI text — fastest path, but breaks if you happen to have an interactive
-              `read` prompt running. Auto-disabled in alt-screen mode (vim, less, top, …).
+              {t("terminalAppearance.aiInlineQqHint")}
             </p>
           </div>
         </div>
       </section>
 
       <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">Common commands (Ctrl+Shift+P)</div>
+        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.commonCommandsHeading")}</div>
         <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug mb-2">
-          Local terminals only. Press Ctrl+Shift+P to open a searchable command list; the selected command is inserted into the current input line (without Enter). These entries are merged with command history and preset commands.
+          {t("terminalAppearance.commonCommandsHint")}
         </p>
         <CommonCommandsEditor
           value={profile.commonCommands}
           onChange={(next) => updateProfile({ commonCommands: next })}
+          t={t}
         />
       </section>
 
@@ -596,10 +600,12 @@ function ThemeCard({
   definition,
   selected,
   onSelect,
+  t,
 }: {
   definition: TerminalThemeDefinition;
   selected: boolean;
   onSelect: () => void;
+  t: TranslateFn;
 }) {
   const theme = definition.theme;
   const borderColor = selected ? "var(--moba-accent)" : "var(--moba-divider)";
@@ -607,7 +613,7 @@ function ThemeCard({
   return (
     <button
       type="button"
-      aria-label={`Use theme ${definition.name}`}
+      aria-label={t("terminalAppearance.themeUseLabel", { name: definition.name })}
       data-selected={selected}
       className="h-[74px] rounded-md border bg-[var(--moba-card-bg)] text-left p-2 flex items-center gap-2 hover:bg-[var(--moba-hover)]"
       style={{ borderColor }}
@@ -762,9 +768,10 @@ function isHexColor(value: string): boolean {
 interface CommonCommandsEditorProps {
   value: UserCommonCommand[];
   onChange: (next: UserCommonCommand[]) => void;
+  t: TranslateFn;
 }
 
-function CommonCommandsEditor({ value, onChange }: CommonCommandsEditorProps) {
+function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEditorProps) {
   const updateRow = (index: number, patch: Partial<UserCommonCommand>) => {
     const next = value.slice();
     const current = next[index] ?? { command: "" };
@@ -784,7 +791,7 @@ function CommonCommandsEditor({ value, onChange }: CommonCommandsEditorProps) {
     <div className="flex flex-col gap-1.5">
       {value.length === 0 ? (
         <div className="text-[11px] text-[var(--moba-text-muted)] italic px-1 py-2">
-          No custom commands
+          {t("terminalAppearance.commonCommandsEmpty")}
         </div>
       ) : (
         <div className="flex flex-col gap-1">
@@ -792,24 +799,24 @@ function CommonCommandsEditor({ value, onChange }: CommonCommandsEditorProps) {
             <div key={idx} className="flex items-center gap-2">
               <input
                 className="moba-input flex-1 min-w-0 font-mono text-[12px]"
-                placeholder="Command"
+                placeholder={t("terminalAppearance.commonCommandPlaceholder")}
                 value={item.command}
                 onChange={(e) => updateRow(idx, { command: e.target.value })}
-                aria-label={`Command ${idx + 1}`}
+                aria-label={t("terminalAppearance.commonCommandAriaCommand", { index: idx + 1 })}
               />
               <input
                 className="moba-input flex-1 min-w-0 text-[12px]"
-                placeholder="Description (optional)"
+                placeholder={t("terminalAppearance.commonCommandDescriptionPlaceholder")}
                 value={item.description ?? ""}
                 onChange={(e) => updateRow(idx, { description: e.target.value })}
-                aria-label={`Description ${idx + 1}`}
+                aria-label={t("terminalAppearance.commonCommandAriaDescription", { index: idx + 1 })}
               />
               <button
                 type="button"
                 className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center"
                 onClick={() => removeRow(idx)}
-                aria-label={`Remove command ${idx + 1}`}
-                title="Remove"
+                aria-label={t("terminalAppearance.commonCommandRemoveAria", { index: idx + 1 })}
+                title={t("terminalAppearance.commonCommandRemove")}
               >
                 <Trash2 size={14} />
               </button>
@@ -822,7 +829,7 @@ function CommonCommandsEditor({ value, onChange }: CommonCommandsEditorProps) {
         className="moba-btn h-8 px-2 text-[11px] self-start inline-flex items-center gap-1"
         onClick={addRow}
       >
-        <Plus size={12} /> Add entry
+        <Plus size={12} /> {t("terminalAppearance.commonCommandAddEntry")}
       </button>
     </div>
   );

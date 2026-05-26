@@ -17,6 +17,7 @@ import { defaultTunnel } from "../../lib/tunnel";
 import type { SessionConfig } from "../../lib/ipc";
 import { vaultPut, isVaultReference, isVaultLockedError } from "../../lib/ipc";
 import { useVaultStore } from "../../stores/vaultStore";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   initial?: TunnelConfig;
@@ -26,13 +27,14 @@ interface Props {
   onCancel: () => void;
 }
 
-const KIND_OPTIONS: { id: TunnelKind; label: string; description: string }[] = [
-  { id: "Local",   label: "Local port forwarding",  description: "Connection from local applications to remote server" },
-  { id: "Remote",  label: "Remote port forwarding", description: "Connection from remote applications to a local server" },
-  { id: "Dynamic", label: "Dynamic port forwarding (SOCKS proxy)", description: "Generic SOCKS5 proxy tunnelled over SSH" },
+const KIND_OPTION_KEYS: { id: TunnelKind; label: string; description: string }[] = [
+  { id: "Local",   label: "tunnels.editor.kindLocal",   description: "tunnels.editor.kindLocalDesc" },
+  { id: "Remote",  label: "tunnels.editor.kindRemote",  description: "tunnels.editor.kindRemoteDesc" },
+  { id: "Dynamic", label: "tunnels.editor.kindDynamic", description: "tunnels.editor.kindDynamicDesc" },
 ];
 
 export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Props) {
+  const t = useT();
   const [draft, setDraft] = useState<TunnelConfig>(() => initial ?? defaultTunnel("Local"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,15 +101,15 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
   };
 
   const validate = (): string | null => {
-    if (!draft.name.trim()) return "Tunnel name is required";
-    if (!draft.ssh.host.trim()) return "SSH server host is required";
-    if (!draft.ssh.username.trim()) return "SSH login is required";
-    if (!Number.isFinite(draft.ssh.port) || draft.ssh.port <= 0) return "SSH port must be > 0";
+    if (!draft.name.trim()) return t("tunnels.editor.errNameRequired");
+    if (!draft.ssh.host.trim()) return t("tunnels.editor.errHostRequired");
+    if (!draft.ssh.username.trim()) return t("tunnels.editor.errUsernameRequired");
+    if (!Number.isFinite(draft.ssh.port) || draft.ssh.port <= 0) return t("tunnels.editor.errSshPort");
     if (!Number.isFinite(draft.listenPort) || draft.listenPort <= 0)
-      return draft.kind === "Remote" ? "Remote port must be > 0" : "Forwarded port must be > 0";
+      return draft.kind === "Remote" ? t("tunnels.editor.errRemotePortGt0") : t("tunnels.editor.errForwardPortGt0");
     if (draft.kind !== "Dynamic") {
-      if (!draft.destHost.trim()) return "Remote server is required";
-      if (!Number.isFinite(draft.destPort) || draft.destPort <= 0) return "Remote port must be > 0";
+      if (!draft.destHost.trim()) return t("tunnels.editor.errDestHostRequired");
+      if (!Number.isFinite(draft.destPort) || draft.destPort <= 0) return t("tunnels.editor.errRemotePortGt0");
     }
     return null;
   };
@@ -157,7 +159,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
       await onSave(next);
     } catch (err) {
       if (isVaultLockedError(err)) {
-        setError("Vault is locked — unlock it first to save the password.");
+        setError(t("tunnels.editor.errVaultLocked"));
       } else {
         setError(err instanceof Error ? err.message : String(err));
       }
@@ -170,8 +172,8 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
   const isDynamic = draft.kind === "Dynamic";
 
   // Mode-specific labels (mirrors MobaSSHTunnel diagram)
-  const forwardedLabel = isRemote ? "Local port" : "Forwarded port";
-  const destLabel = isRemote ? "Bind address" : "Remote server";
+  const forwardedLabel = isRemote ? t("tunnels.editor.localPort") : t("tunnels.editor.forwardedPort");
+  const destLabel = isRemote ? t("tunnels.editor.bindAddress") : t("tunnels.editor.remoteServer");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.45)" }}>
@@ -186,9 +188,9 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
           style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "white" }}
         >
           <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">{initial ? "Edit SSH tunnel" : "New SSH tunnel"}</div>
+          <div className="text-[12px] font-semibold">{initial ? t("tunnels.editor.titleEdit") : t("tunnels.editor.titleNew")}</div>
           <button
-            title="Close"
+            title={t("tunnels.editor.close")}
             className="ml-auto hover:bg-red-500 rounded p-0.5"
             onClick={onCancel}
             type="button"
@@ -199,7 +201,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
 
         {/* Mode picker */}
         <div className="px-4 py-3 border-b shrink-0 grid grid-cols-3 gap-3" style={{ borderColor: "var(--moba-divider)" }}>
-          {KIND_OPTIONS.map((opt) => (
+          {KIND_OPTION_KEYS.map((opt) => (
             <label
               key={opt.id}
               className="flex items-start gap-2 cursor-pointer p-2 rounded border"
@@ -216,10 +218,10 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               />
               <div className="text-[12px] leading-tight">
                 <div className="font-semibold" style={{ color: draft.kind === opt.id ? "var(--moba-accent)" : "var(--moba-text)" }}>
-                  {opt.label}
+                  {t(opt.label)}
                 </div>
                 <div className="text-[11px] mt-0.5" style={{ color: "var(--moba-text-muted)" }}>
-                  {opt.description}
+                  {t(opt.description)}
                 </div>
               </div>
             </label>
@@ -233,20 +235,20 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         >
           {/* Name / saved-session row */}
           <div className="flex items-center gap-2 mb-4">
-            <label className="text-[12px] w-28 text-right">Tunnel name *</label>
+            <label className="text-[12px] w-28 text-right">{t("tunnels.editor.tunnelNameRequired")}</label>
             <input
               className="moba-input w-64"
-              placeholder="e.g. postgres-replica"
+              placeholder={t("tunnels.editor.namePlaceholder")}
               value={draft.name}
               onChange={(e) => update("name", e.target.value)}
             />
-            <label className="text-[12px] w-32 text-right ml-3">Use saved session</label>
+            <label className="text-[12px] w-32 text-right ml-3">{t("tunnels.editor.useSavedSession")}</label>
             <select
               className="moba-input w-64 appearance-none"
               value={draft.sshSessionId ?? ""}
               onChange={(e) => pickSshSession(e.target.value)}
             >
-              <option value="">— None (fill below) —</option>
+              <option value="">{t("tunnels.editor.savedNone")}</option>
               {sshSessionOptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name || `${s.username ?? "user"}@${s.host}`}
@@ -263,8 +265,8 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             {/* Left column: Local clients / My computer */}
             <DiagramCard
               icon={isRemote ? <Server className="w-7 h-7" style={{ color: "#2b5d8b" }} /> : <Users className="w-7 h-7" style={{ color: "#c97a23" }} />}
-              title={isRemote ? "Remote clients" : "Local clients"}
-              subtitle={isRemote ? "On the SSH server side" : "Apps on this computer"}
+              title={isRemote ? t("tunnels.editor.remoteClients") : t("tunnels.editor.localClients")}
+              subtitle={isRemote ? t("tunnels.editor.remoteClientsDesc") : t("tunnels.editor.localClientsDesc")}
             >
               <Field label={forwardedLabel}>
                 <input
@@ -275,10 +277,10 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   onChange={(e) => update("listenPort", parseInt(e.target.value || "0", 10) || 0)}
                 />
                 <span className="text-[11px] ml-1" style={{ color: "var(--moba-text-muted)" }}>
-                  {isRemote ? "(server bind)" : "(listen)"}
+                  {isRemote ? t("tunnels.editor.serverBindHint") : t("tunnels.editor.listenHint")}
                 </span>
               </Field>
-              <Field label={isRemote ? "Bind address" : "Listen address"}>
+              <Field label={isRemote ? t("tunnels.editor.bindAddress") : t("tunnels.editor.listenAddress")}>
                 <input
                   className="moba-input w-32"
                   placeholder={isRemote ? "0.0.0.0" : "127.0.0.1"}
@@ -288,8 +290,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               </Field>
               {isRemote && (
                 <div className="text-[11px] mt-2" style={{ color: "var(--moba-text-muted)" }}>
-                  The SSH server will listen on this address/port and forward
-                  inbound connections to the local target on the right.
+                  {t("tunnels.editor.remoteListenNote")}
                 </div>
               )}
               <div className="flex items-center justify-end mt-2">
@@ -300,10 +301,10 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             {/* Middle column: SSH tunnel through firewall */}
             <DiagramCard
               icon={<Flame className="w-7 h-7" style={{ color: "#d35a2c" }} />}
-              title="SSH tunnel"
-              subtitle="Through the firewall"
+              title={t("tunnels.editor.sshTunnelTitle")}
+              subtitle={t("tunnels.editor.sshTunnelDesc")}
             >
-              <Field label="SSH server *">
+              <Field label={t("tunnels.editor.sshServerRequired")}>
                 <input
                   className="moba-input w-44"
                   placeholder="ssh.example.com"
@@ -311,7 +312,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   onChange={(e) => updateSsh("host", e.target.value)}
                 />
               </Field>
-              <Field label="SSH login *">
+              <Field label={t("tunnels.editor.sshLoginRequired")}>
                 <input
                   className="moba-input w-32"
                   placeholder="user"
@@ -319,7 +320,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   onChange={(e) => updateSsh("username", e.target.value)}
                 />
               </Field>
-              <Field label="SSH port">
+              <Field label={t("tunnels.editor.sshPort")}>
                 <input
                   className="moba-input w-20"
                   type="number"
@@ -328,19 +329,19 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   onChange={(e) => updateSsh("port", parseInt(e.target.value || "22", 10) || 22)}
                 />
               </Field>
-              <Field label="Auth">
+              <Field label={t("tunnels.editor.auth")}>
                 <select
                   className="moba-input w-32 appearance-none"
                   value={draft.ssh.authMethod}
                   onChange={(e) => updateSsh("authMethod", e.target.value as "Password" | "PrivateKey" | "Agent")}
                 >
-                  <option value="Password">Password</option>
-                  <option value="PrivateKey">Private key</option>
-                  <option value="Agent">SSH agent</option>
+                  <option value="Password">{t("tunnels.editor.authPassword")}</option>
+                  <option value="PrivateKey">{t("tunnels.editor.authPrivateKey")}</option>
+                  <option value="Agent">{t("tunnels.editor.authAgent")}</option>
                 </select>
               </Field>
               <Field
-                label={draft.ssh.authMethod === "PrivateKey" ? "Key path" : "Password"}
+                label={draft.ssh.authMethod === "PrivateKey" ? t("tunnels.editor.keyPath") : t("tunnels.editor.password")}
                 disabled={draft.ssh.authMethod === "Agent"}
               >
                 <input
@@ -349,11 +350,11 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   type={draft.ssh.authMethod === "Password" ? "password" : "text"}
                   placeholder={
                     draft.ssh.authMethod === "PrivateKey"
-                      ? "~/.ssh/id_ed25519"
+                      ? t("tunnels.editor.keyPathPlaceholder")
                       : draft.ssh.authMethod === "Agent"
-                        ? "(using SSH agent)"
+                        ? t("tunnels.editor.usingAgentPlaceholder")
                         : draft.ssh.authData && isVaultReference(draft.ssh.authData)
-                          ? "•••••• (saved in vault)"
+                          ? t("tunnels.editor.savedInVault")
                           : ""
                   }
                   value={
@@ -365,12 +366,12 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   disabled={draft.ssh.authMethod === "Agent"}
                 />
               </Field>
-              <Field label="Vault" disabled={draft.ssh.authMethod === "Agent"}>
+              <Field label={t("tunnels.editor.vault")} disabled={draft.ssh.authMethod === "Agent"}>
                 <label
                   className="flex items-center gap-1.5 text-[11px]"
                   title={
                     vaultState === "empty"
-                      ? "Set a master password in the vault settings first."
+                      ? t("tunnels.editor.vaultEmptyHint")
                       : undefined
                   }
                 >
@@ -384,12 +385,12 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                       (vaultState === "empty" && !draft.ssh.saveAuth)
                     }
                   />
-                  Save credentials in vault
+                  {t("tunnels.editor.saveCredentials")}
                 </label>
               </Field>
               {draft.ssh.saveAuth && draft.ssh.authMethod === "Password" && vaultState === "empty" && (
                 <div className="text-[10.5px] pl-[6.25rem]" style={{ color: "#a04b00" }}>
-                  Vault not initialized — set a master password in vault settings before saving.
+                  {t("tunnels.editor.vaultNotInit")}
                 </div>
               )}
             </DiagramCard>
@@ -405,20 +406,20 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   <Server className="w-7 h-7" style={{ color: "#1e6db8" }} />
                 )
               }
-              title={isDynamic ? "SOCKS5 proxy" : isRemote ? "This computer" : "Remote server"}
+              title={isDynamic ? t("tunnels.editor.socksProxy") : isRemote ? t("tunnels.editor.thisComputer") : t("tunnels.editor.remoteServer")}
               subtitle={
                 isDynamic
-                  ? "Apps reach any host through the SSH server"
+                  ? t("tunnels.editor.socksProxyDesc")
                   : isRemote
-                    ? "Local service the SSH server reaches"
-                    : "Reachable from the SSH server"
+                    ? t("tunnels.editor.thisComputerDesc")
+                    : t("tunnels.editor.remoteServerDesc")
               }
             >
               <div className="flex items-center justify-start mb-1">
                 <ArrowLeft className="w-5 h-5" style={{ color: "var(--moba-accent)" }} />
               </div>
               <Field
-                label={isRemote ? "Local target *" : `${destLabel} *`}
+                label={isRemote ? t("tunnels.editor.localTargetRequired") : t("tunnels.editor.remoteServerRequired", { label: destLabel })}
                 disabled={isDynamic}
               >
                 <input
@@ -430,7 +431,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 />
               </Field>
               <Field
-                label={isRemote ? "Local port *" : "Remote port *"}
+                label={isRemote ? t("tunnels.editor.localPortRequired") : t("tunnels.editor.remotePortRequired")}
                 disabled={isDynamic}
               >
                 <input
@@ -444,11 +445,11 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               </Field>
               {isDynamic && (
                 <div className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
-                  No fixed destination — point your applications at{" "}
+                  {t("tunnels.editor.dynamicHintPrefix")}{" "}
                   <strong>
                     socks5://{draft.listenHost || "127.0.0.1"}:{draft.listenPort || "<port>"}
                   </strong>{" "}
-                  and they'll reach any host the SSH server can.
+                  {t("tunnels.editor.dynamicHintSuffix")}
                 </div>
               )}
             </DiagramCard>
@@ -456,10 +457,10 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
 
           {/* Description / autostart */}
           <div className="mt-4 grid grid-cols-12 gap-3 items-center">
-            <label className="col-span-2 text-[12px] text-right">Description</label>
+            <label className="col-span-2 text-[12px] text-right">{t("tunnels.editor.description")}</label>
             <input
               className="moba-input col-span-7"
-              placeholder="Optional description shown in the tunnels table"
+              placeholder={t("tunnels.editor.descriptionPlaceholder")}
               value={draft.description ?? ""}
               onChange={(e) => update("description", e.target.value)}
             />
@@ -470,7 +471,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 checked={!!draft.autostart}
                 onChange={(e) => update("autostart", e.target.checked)}
               />
-              Auto-start on app launch
+              {t("tunnels.editor.autostartLaunch")}
             </label>
           </div>
 
@@ -497,10 +498,10 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             onClick={handleSave}
             disabled={busy}
           >
-            <SaveIcon className="w-3.5 h-3.5" /> {busy ? "Saving…" : "Save"}
+            <SaveIcon className="w-3.5 h-3.5" /> {busy ? t("tunnels.editor.saving") : t("tunnels.editor.save")}
           </button>
           <button type="button" className="moba-btn flex items-center gap-1.5" data-testid="tunnel-editor-cancel" onClick={onCancel} disabled={busy}>
-            <XCircle className="w-3.5 h-3.5" /> Cancel
+            <XCircle className="w-3.5 h-3.5" /> {t("tunnels.editor.cancel")}
           </button>
         </div>
       </div>

@@ -1,8 +1,10 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WindowControls } from "./WindowControls";
 import { TitleBarTrayControls } from "./TitleBarTrayControls";
+import { useT } from "../../lib/i18n";
 
 export function AppTitleBar() {
+  const t = useT();
   const startDrag = (event: React.MouseEvent) => {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest("button")) return;
@@ -22,7 +24,7 @@ export function AppTitleBar() {
       onDoubleClick={toggleMaximize}
     >
       <div className="w-28 shrink-0" />
-      <div className="flex-1 text-center text-[12px] font-semibold truncate">NewMob</div>
+      <div className="flex-1 text-center text-[12px] font-semibold truncate">{t("app.title")}</div>
       <TitleBarTrayControls />
       <WindowControls />
     </div>

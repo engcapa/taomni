@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useT } from "../lib/i18n";
 
 export interface AboutDialogProps {
   onClose: () => void;
@@ -6,6 +7,7 @@ export interface AboutDialogProps {
 
 export function AboutDialog({ onClose }: AboutDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const t = useT();
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -24,7 +26,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
     >
       <div
         role="dialog"
-        aria-label="About NewMob"
+        aria-label={t("about.title")}
         aria-modal="true"
         data-testid="about-dialog"
         className="w-[380px] rounded shadow-lg p-5"
@@ -39,19 +41,19 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
             N
           </div>
           <div>
-            <div className="text-lg font-semibold">NewMob</div>
+            <div className="text-lg font-semibold">{t("app.name")}</div>
             <div
               data-testid="about-version"
               className="text-[12px] moba-mono"
               style={{ color: "var(--moba-text-muted)" }}
             >
-              Version {__APP_VERSION__}
+              {t("about.version", { version: __APP_VERSION__ })}
             </div>
           </div>
         </div>
 
         <div className="text-[12px] mb-4" style={{ color: "var(--moba-text-muted)" }}>
-          A cross‑platform port of the MobaXterm experience — Linux • macOS • Windows.
+          {t("about.description")}
         </div>
 
         <div className="flex justify-end">
@@ -61,7 +63,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
             className="moba-btn h-8 px-4"
             onClick={onClose}
           >
-            Close
+            {t("common.close")}
           </button>
         </div>
       </div>

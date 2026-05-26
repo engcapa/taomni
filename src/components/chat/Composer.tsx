@@ -3,6 +3,7 @@ import { Loader2, Send } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 import { parseComposerInput, type AttachmentRef } from "../../lib/chat/composerRefs";
 import { AttachmentChip } from "./AttachmentChip";
+import { useT } from "../../lib/i18n";
 
 interface ComposerProps {
   onSend: (content: string, terminalContext?: string) => Promise<void>;
@@ -18,6 +19,7 @@ interface ComposerProps {
 }
 
 export function Composer({ onSend, sending, disabled, resolveTerminalContext }: ComposerProps) {
+  const t = useT();
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pending = useChatStore((s) => s.pendingComposerText);
@@ -82,7 +84,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
         <textarea
           ref={textareaRef}
           className="moba-input flex-1 text-[12px] resize-none min-h-[56px] max-h-[120px] py-1.5"
-          placeholder="输入消息... (Ctrl+Enter 发送 · 支持 @terminal:last-50 / @file:./error.log)"
+          placeholder={t("chat.inputPlaceholder")}
           value={text}
           disabled={disabled || sending}
           onChange={(e) => setText(e.target.value)}
@@ -98,7 +100,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
           className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
           onClick={handleSend}
           disabled={!text.trim() || sending || disabled}
-          title="发送 (Ctrl+Enter)"
+          title={t("chat.sendShortcutTitle")}
         >
           {sending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
