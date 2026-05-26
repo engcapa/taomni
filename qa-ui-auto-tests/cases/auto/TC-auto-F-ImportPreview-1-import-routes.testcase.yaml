@@ -1,0 +1,49 @@
+id: TC-auto-F-ImportPreview-1
+title: Session import flow exposes the "Import sessions from third-party programs" menu
+description: |
+  F-ImportPreview-1 closes the "no testcase" gap. Driving the actual file
+  picker → SessionImportPreview dialog requires a real OS file dialog (we
+  use a transient `<input type="file">` element that is removed from the DOM
+  before Playwright can target it). The realistic e2e here verifies:
+    1. SessionTree's root context menu lists the third-party import group;
+    2. The submenu contains MobaXterm / WSL / PuTTY / Xshell / Tabby
+       Termius / WindTerm / iTerm2 entries;
+    3. The MenuBar's `Sessions → Import sessions` chain is present.
+  Authoring the dialog-side assertions (preview-summary / select-all / confirm)
+  needs a real fixture file — left for a follow-up that adds an upload helper.
+covers: [F-ImportPreview-1]
+tags: [auto-generated, sessions, import, p2, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-tree"]'
+  # Root context menu lists the third-party import submenu.
+  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+  - wait_for: '[data-testid="context-menu"]'
+  - assert_visible: '[data-testid="context-menu"] >> text="Import sessions from third-party programs"'
+  - hover: '[data-testid="context-menu"] >> text="Import sessions from third-party programs"'
+  - wait: 1
+  # Spot-check a representative cross-section of supported tools.
+  - assert_visible: 'text="Import MobaXterm sessions"'
+  - assert_visible: 'text="Import WSL sessions"'
+  - assert_visible: 'text="Import PuTTY sessions"'
+  - assert_visible: 'text="Import Xshell sessions"'
+  - assert_visible: 'text="Import Tabby sessions"'
+  - assert_visible: 'text="Import iTerm2 profiles"'
+  - assert_visible: 'text="Import Termius sessions"'
+  - assert_visible: 'text="Import WindTerm sessions"'
+  - press: Escape
+  # MenuBar route — Sessions → Import sessions submenu lists the four
+  # MenuBar-level formats (NewMob / MobaXterm / CSV / OpenSSH).
+  - click: '[data-testid="menu-sessions"]'
+  - wait_for: '[data-testid="context-menu"]'
+  - hover: '[data-testid="context-menu"] >> text="Import sessions"'
+  - wait: 1
+  - assert_visible: '[data-testid="import-json"]'
+  - assert_visible: '[data-testid="import-mobaxterm"]'
+  - assert_visible: '[data-testid="import-csv"]'
+  - assert_visible: '[data-testid="import-openssh"]'
+  - press: Escape
+  - screenshot: import-preview-route.png

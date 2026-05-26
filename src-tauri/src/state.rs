@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
+use crate::rdp::ws::RdpSession;
 use crate::terminal::ActiveTerminal;
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
@@ -28,6 +29,7 @@ pub struct AppState {
     pub transfers: Arc<RwLock<HashMap<String, Arc<TransferHandle>>>>,
     pub tunnels: Arc<TunnelRegistry>,
     pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
+    pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
@@ -48,6 +50,7 @@ impl AppState {
             transfers: Arc::new(RwLock::new(HashMap::new())),
             tunnels: Arc::new(TunnelRegistry::new()),
             vnc_sessions: Arc::new(RwLock::new(HashMap::new())),
+            rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
             read_handles: Arc::new(Mutex::new(HashMap::new())),
             write_handles: Arc::new(Mutex::new(HashMap::new())),
             clipboard: Arc::new(Mutex::new(None)),

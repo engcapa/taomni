@@ -62,6 +62,8 @@ import { useVaultStore } from "../stores/vaultStore";
 import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
+import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
+import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
@@ -70,6 +72,7 @@ import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
 import { t as tr, useT } from "../lib/i18n";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
+const RdpPanel = lazy(() => import("../components/rdp/RdpPanel"));
 
 interface PendingAuth {
   session: SessionConfig;
@@ -491,6 +494,29 @@ export function MainLayout() {
     });
   }, [addTab]);
 
+  const openRdpTab = useCallback((session: SessionConfig, password?: string) => {
+    const id = `rdp-${session.id}-${Date.now()}`;
+    const opts = parseRdpOptions(session.options_json);
+    const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
+    addTab({
+      id,
+      type: "rdp",
+      title: session.name || `${session.host}:${session.port}`,
+      sessionId: session.id,
+      closable: true,
+      rdp: {
+        sessionId: session.id,
+        host: session.host,
+        port: session.port,
+        username: session.username,
+        password,
+        options: opts,
+        networkSettingsJson: JSON.stringify(ns),
+      },
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   const openFileBrowserTab = useCallback((title: string, initialPath: string, sessionId?: string) => {
     const id = `file-${sessionId ?? "ad-hoc"}-${Date.now()}`;
     addTab({
@@ -591,12 +617,12 @@ export function MainLayout() {
 
   const openUnsupportedTab = useCallback((session: SessionConfig) => {
     const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
-    const kind = ["SFTP", "RDP", "VNC"].includes(session.session_type)
+    const kind = ["SFTP", "VNC"].includes(session.session_type)
       ? session.session_type.toLowerCase()
       : "placeholder";
     addTab({
       id,
-      type: kind as "sftp" | "rdp" | "vnc" | "placeholder",
+      type: kind as "sftp" | "vnc" | "placeholder",
       title: session.name || session.host || session.session_type,
       sessionId: session.id,
       closable: true,
@@ -671,6 +697,22 @@ export function MainLayout() {
       } else {
         openVncTab(session, data ?? undefined);
       }
+    } else if (session.session_type === "RDP") {
+      const { method, data } = resolveSessionAuth(session);
+      if (method === "Password") {
+        const ref = passwordRefFromOptions(session);
+        if (ref) {
+          const vaultState = useVaultStore.getState().state;
+          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+          openRdpTab(session, ref);
+        } else {
+          awaitingManualAuthRef.current = true;
+          setPendingAuth({ session });
+          return "awaiting-auth";
+        }
+      } else {
+        openRdpTab(session, data ?? undefined);
+      }
     } else if (session.session_type === "File") {
       openFileSession(session);
     } else {
@@ -686,6 +728,7 @@ export function MainLayout() {
     openSshTab,
     openUnsupportedTab,
     openVncTab,
+    openRdpTab,
     queueVaultUnlock,
   ]);
 
@@ -721,7 +764,11 @@ export function MainLayout() {
     if (saveToVault) {
       try {
         const kind =
-          session.session_type === "VNC" ? "vnc-password" : "ssh-password";
+          session.session_type === "VNC"
+            ? "vnc-password"
+            : session.session_type === "RDP"
+              ? "rdp-password"
+              : "ssh-password";
         const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
         const result = await vaultPut(kind, label, password);
         credential = result.reference;
@@ -750,13 +797,15 @@ export function MainLayout() {
       openSftpTab(session, "Password", credential);
     } else if (session.session_type === "VNC") {
       openVncTab(session, credential);
+    } else if (session.session_type === "RDP") {
+      openRdpTab(session, credential);
     } else {
       openSshTab(session, "Password", credential);
     }
     setPendingAuth(null);
     awaitingManualAuthRef.current = false;
     continueConnectQueueRef.current();
-  }, [pendingAuth, openSftpTab, openSshTab, openVncTab, updateSession]);
+  }, [pendingAuth, openSftpTab, openSshTab, openVncTab, openRdpTab, updateSession]);
 
   const handleQuickConnect = useCallback((value: string) => {
     try {
@@ -912,6 +961,7 @@ export function MainLayout() {
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
+  const rdpTabs = tabs.filter((t) => t.type === "rdp" && t.rdp);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
@@ -1062,6 +1112,11 @@ export function MainLayout() {
           activeTabClosable={!!activeTab?.closable}
           onCommand={handleCommand}
           onToggleSidebarDrawer={() => setCompactSidebarOpen((open) => !open)}
+          onStartLocalTerminal={(localShell) =>
+            openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+          }
+          onConnectSession={handleConnectSession}
+          onOpenSessionEditor={() => handleNewSession()}
         />
       )}
 
@@ -1116,7 +1171,15 @@ export function MainLayout() {
 
           <Panel>
             <div className="h-full flex flex-col min-w-0">
-              {!compactMode && <TabBar />}              {multiExecActive && (
+              {!compactMode && (
+                <TabBar
+                  onStartLocalTerminal={(localShell) =>
+                    openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+                  }
+                  onConnectSession={handleConnectSession}
+                  onOpenSessionEditor={() => handleNewSession()}
+                />
+              )}              {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}
@@ -1438,6 +1501,32 @@ export function MainLayout() {
                   );
                 })}
 
+                {/* RDP tabs — always mounted so the WS relay stays alive across tab switches */}
+                {rdpTabs.map((tab) => {
+                  if (!tab.rdp) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <Suspense fallback={<RdpLoadingPanel />}>
+                        <RdpPanel
+                          tabId={tab.id}
+                          host={tab.rdp.host}
+                          port={tab.rdp.port}
+                          username={tab.rdp.username}
+                          password={tab.rdp.password}
+                          options={tab.rdp.options}
+                          networkSettingsJson={tab.rdp.networkSettingsJson}
+                          visible={isActive}
+                        />
+                      </Suspense>
+                    </div>
+                  );
+                })}
+
                 {/* Embedded local file-browser tabs (File session type). */}
                 {fileBrowserTabs.map((tab) => {
                   if (!tab.fileBrowser) return null;
@@ -1463,12 +1552,13 @@ export function MainLayout() {
                   />
                 )}
 
-                {/* Non-terminal, non-sftp, non-vnc, non-welcome, non-settings, non-nettools tabs */}
+                {/* Non-terminal, non-sftp, non-vnc, non-rdp, non-welcome, non-settings, non-nettools tabs */}
                 {activeTab &&
                   activeTab.type !== "welcome" &&
                   activeTab.type !== "terminal" &&
                   activeTab.type !== "sftp" &&
                   activeTab.type !== "vnc" &&
+                  activeTab.type !== "rdp" &&
                   activeTab.type !== "file-browser" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "nettools" && (
@@ -1732,6 +1822,18 @@ function VncLoadingPanel() {
       style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
     >
       {t("vnc.loading")}
+    </div>
+  );
+}
+
+function RdpLoadingPanel() {
+  const t = useT();
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center text-sm"
+      style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
+    >
+      {t("rdp.loading")}
     </div>
   );
 }

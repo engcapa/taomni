@@ -18,6 +18,8 @@ import { WindowControls } from "../window/WindowControls";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import type { RibbonCommand } from "../menubar/Ribbon";
 import { useT } from "../../lib/i18n";
+import type { LocalShellSelection } from "../../types";
+import type { SessionConfig } from "../../lib/ipc";
 
 type CompactCommand = RibbonCommand | "close-active" | "reload-sessions";
 
@@ -25,12 +27,18 @@ interface CompactTitleBarProps {
   activeTabClosable: boolean;
   onCommand: (command: CompactCommand) => void;
   onToggleSidebarDrawer: () => void;
+  onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
+  onConnectSession: (session: SessionConfig) => void;
+  onOpenSessionEditor: () => void;
 }
 
 export function CompactTitleBar({
   activeTabClosable,
   onCommand,
   onToggleSidebarDrawer,
+  onStartLocalTerminal,
+  onConnectSession,
+  onOpenSessionEditor,
 }: CompactTitleBarProps) {
   const ctx = useContextMenu();
   const t = useT();
@@ -89,7 +97,11 @@ export function CompactTitleBar({
         <TitleBarButton testId="compact-sidebar-drawer-toggle" title={t("compactTitleBar.sessionsDrawer")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebarDrawer} />
       </div>
       <div className="min-w-0 flex-1 self-stretch">
-        <TabBar />
+        <TabBar
+          onStartLocalTerminal={onStartLocalTerminal}
+          onConnectSession={onConnectSession}
+          onOpenSessionEditor={onOpenSessionEditor}
+        />
       </div>
       <div data-window-drag className="w-10 self-stretch shrink-0" />
       <TitleBarTrayControls />

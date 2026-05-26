@@ -1,0 +1,47 @@
+id: TC-auto-F-I18n-1
+title: Language switcher cycles between English and Simplified Chinese
+description: |
+  F-I18n-1: tests the bilingual UI introduced in v0.1.32. Default locale
+  is English; opening the title-bar globe button reveals every supported
+  locale (currently English + 简体中文). Selecting 简体中文 must persist
+  across reloads (`localStorage.newmob.locale.v1`) and update the
+  document language attribute. Settings → Language section mirrors the
+  same set of options for users who don't notice the tray button.
+covers: [F-I18n-1]
+tags: [auto-generated, i18n, ui, p1, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  # Title-bar globe button is mounted on the rightmost tray slot.
+  - assert_visible: '[data-testid="language-switcher"]'
+  - click: '[data-testid="language-switcher"]'
+  - wait_for: '[data-testid="context-menu"]'
+  - assert_visible: '[data-testid="language-option-en"]'
+  - assert_visible: '[data-testid="language-option-zh-CN"]'
+  # Switch to Simplified Chinese.
+  - click: '[data-testid="language-option-zh-CN"]'
+  - wait_for:
+      selector: '[data-testid="context-menu"]'
+      state: detached
+      timeout_sec: 5
+  - assert_localstorage:
+      key: newmob.locale.v1
+      contains: 'zh-CN'
+  # Settings panel exposes the same picker.
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - assert_visible: '[data-testid="settings-language-section"]'
+  - assert_visible: '[data-testid="settings-language-en"]'
+  - assert_visible: '[data-testid="settings-language-zh-CN"]'
+  - click: '[data-testid="settings-language-zh-CN"]'
+  - assert_localstorage:
+      key: newmob.locale.v1
+      contains: 'zh-CN'
+  - click: '[data-testid="settings-language-en"]'
+  - assert_localstorage:
+      key: newmob.locale.v1
+      contains: 'en'
+  - screenshot: i18n-language-switcher.png

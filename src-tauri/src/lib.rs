@@ -8,6 +8,8 @@ mod serial;
 mod config;
 mod appearance;
 mod vnc;
+mod rdp;
+mod wsl;
 mod history;
 pub mod vault;
 pub mod ai;
@@ -82,6 +84,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             terminal::list_local_shells,
+            wsl::list_wsl_distros,
             terminal::open_local_shell_as_administrator,
             terminal::create_local_terminal,
             terminal::create_ssh_terminal,
@@ -162,6 +165,9 @@ pub fn run() {
             vnc::vnc_connect,
             vnc::vnc_disconnect,
             vnc::vnc_test_connection,
+            rdp::rdp_connect,
+            rdp::rdp_disconnect,
+            rdp::rdp_test_connection,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,

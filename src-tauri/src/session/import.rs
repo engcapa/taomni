@@ -167,36 +167,15 @@ fn reg_u16(key: &winreg::RegKey, name: &str) -> Option<u16> {
 
 #[cfg(windows)]
 fn platform_wsl_sessions() -> Result<Vec<SessionConfig>, String> {
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    use std::os::windows::process::CommandExt;
-
-    let output = Command::new("wsl.exe")
-        .args(["-l", "-q"])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .map_err(|e| format!("Failed to run wsl.exe: {}", e))?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-
-    let text = decode_command_output(&output.stdout);
+    let distros = crate::wsl::list_distros()?;
     let now = now_seconds();
-    let mut seen = HashSet::new();
-    let mut sessions = Vec::new();
-    for raw in text.lines() {
-        let distro = raw.trim().trim_matches('\u{0}').trim();
-        if distro.is_empty()
-            || distro.contains("Windows Subsystem")
-            || !seen.insert(distro.to_string())
-        {
-            continue;
-        }
+    let mut sessions = Vec::with_capacity(distros.len());
+    for distro in distros {
         sessions.push(local_shell_session(
-            format!("WSL: {}", distro),
+            format!("WSL: {}", distro.name),
             "User sessions / Imported / WSL",
             "wsl.exe".to_string(),
-            vec!["-d".to_string(), distro.to_string()],
+            vec!["-d".to_string(), distro.name],
             "Imported from WSL",
             now,
         ));
@@ -569,7 +548,7 @@ fn split_user_host(host_name: &str, explicit_user: String) -> (Option<String>, S
     (user, host_name.trim().to_string())
 }
 
-fn decode_command_output(bytes: &[u8]) -> String {
+pub(crate) fn decode_command_output(bytes: &[u8]) -> String {
     if bytes.len() >= 2 && bytes[0] == 0xff && bytes[1] == 0xfe {
         let units = bytes[2..]
             .chunks_exact(2)

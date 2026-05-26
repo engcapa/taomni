@@ -1,0 +1,482 @@
+//! RDP ↔ WebSocket relay.
+//!
+//! Mirror of `crate::vnc::ws`: bind a loopback listener on a dynamic port,
+//! accept one WebSocket from the React canvas, then drive an RDP session in
+//! the background. Bytes flow over a binary WS protocol with a one-byte
+//! channel tag in front of every frame so display, audio, cursor,
+//! clipboard, and drive-redirect events share the same socket.
+//!
+//! ```text
+//! 0           1                                              N
+//! +-----------+----------------------------------------------+
+//! | tag (u8)  | payload (channel-specific)                   |
+//! +-----------+----------------------------------------------+
+//! ```
+//!
+//! See [`channel`] constants for the tag values.
+//!
+//! The handshake itself is a four-step state machine:
+//!
+//! 1. Open a transport (direct, proxy, or RD Gateway) via
+//!    [`crate::rdp::transport::open_transport`].
+//! 2. Send the X.224 Connection Request + RDP Negotiation Request and
+//!    parse the Connection Confirm + Negotiation Response.
+//! 3. Upgrade to TLS / NLA according to the negotiated protocol. Handled
+//!    by [`crate::rdp::session::run_post_negotiation`] (full IronRDP
+//!    integration is wired in step 2 of the implementation plan).
+//! 4. Hand the established session to the `run_relay` event loop, which
+//!    pumps frames out and control PDUs in.
+
+use std::time::{Duration, Instant};
+
+use futures::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use tokio::net::TcpListener;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::Mutex as AsyncMutex;
+use tokio_util::sync::CancellationToken;
+use tungstenite::Message;
+
+use crate::rdp::frame::TileHeader;
+use crate::rdp::input::{KeyEvent, PointerEvent};
+use crate::rdp::pdu::nego;
+use crate::rdp::session::{run_post_negotiation, RdpSessionHandle};
+use crate::rdp::transport::open_transport;
+use crate::rdp::RdpOptions;
+use crate::terminal::network::NetworkSettings;
+
+const WS_ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
+const WS_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const WS_IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+
+/// Wire-protocol channel tags for the binary WS frames.
+pub mod channel {
+    pub const FRAME: u8 = 0; // bitmap tile (display)
+    pub const AUDIO: u8 = 1; // PCM audio
+    pub const CURSOR: u8 = 2; // cursor shape change
+    pub const CLIPBOARD_OFFER: u8 = 3; // text/file offer metadata
+    pub const CLIPBOARD_DATA: u8 = 4; // requested clipboard contents
+    pub const STATUS: u8 = 5; // text status / error JSON
+
+    pub const FRAME_END: u8 = 6; // sentinel: server flushed a batch
+
+    /// Inbound (browser → relay) tags.
+    pub const IN_PING: u8 = 0;
+    pub const IN_ACK: u8 = 1;
+    pub const IN_KEY: u8 = 2;
+    pub const IN_POINTER: u8 = 3;
+    pub const IN_RESIZE: u8 = 4;
+}
+
+#[derive(Debug)]
+pub enum RdpControl {
+    Key(KeyEvent),
+    Pointer(PointerEvent),
+    Resize { width: u16, height: u16 },
+    ClipboardOffer { formats: u32 },
+    ClipboardData { format: u32, data: Vec<u8> },
+    Ack,
+    Disconnect,
+}
+
+pub enum WsOutgoing {
+    Frame(Vec<u8>),
+    Text(String),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum WsIncomingText {
+    #[serde(rename = "ping")]
+    Ping,
+    #[serde(rename = "ack")]
+    Ack,
+    #[serde(rename = "clipboard")]
+    Clipboard { text: String },
+    #[serde(rename = "resize")]
+    Resize { width: u16, height: u16 },
+    #[serde(rename = "disconnect")]
+    Disconnect,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+enum WsOutgoingText {
+    #[serde(rename = "connected")]
+    Connected {
+        width: u16,
+        height: u16,
+        protocol: String,
+        server_name: String,
+    },
+    #[serde(rename = "disconnected")]
+    Disconnected { reason: String },
+    #[serde(rename = "status")]
+    Status { stage: String, detail: String },
+    #[serde(rename = "clipboard")]
+    Clipboard { text: String },
+    #[serde(rename = "error")]
+    Error { code: String, message: String },
+}
+
+pub struct RdpSession {
+    pub control_tx: UnboundedSender<RdpControl>,
+    pub ws_port: u16,
+    pub cancel: CancellationToken,
+}
+
+pub struct RdpSpawnConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub options: RdpOptions,
+    pub network: Option<NetworkSettings>,
+}
+
+pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> {
+    let cancel = CancellationToken::new();
+
+    // 1. Transport
+    let mut stream = open_transport(
+        &cfg.host,
+        cfg.port,
+        cfg.network.as_ref(),
+        cfg.options.gateway.as_ref(),
+    )
+    .await?;
+
+    // 2. X.224 + Negotiation
+    let req = nego::negotiate_request(&cfg.options);
+    nego::send_negotiation_with_cookie(&mut stream, &req, cfg.username.as_deref()).await?;
+    let resp = nego::recv_negotiation(&mut stream).await?;
+
+    // 3. Bind WS listener (we do this before TLS so the frontend has the port
+    //    early; the TLS upgrade and NLA happen on the inner stream).
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .map_err(|e| format!("rdp: bind WS listener: {}", e))?;
+    let ws_port = listener
+        .local_addr()
+        .map_err(|e| format!("rdp: local_addr: {}", e))?
+        .port();
+
+    let (control_tx, control_rx) = mpsc::unbounded_channel::<RdpControl>();
+    let (ws_out_tx, ws_out_rx) = mpsc::unbounded_channel::<WsOutgoing>();
+
+    // 4. Hand off to the post-negotiation pipeline (TLS upgrade, MCS,
+    //    capability exchange, virtual-channel setup, draw loop). This
+    //    returns a handle the relay drives. Until IronRDP is wired in,
+    //    `run_post_negotiation` returns a placeholder that emits a
+    //    `Status { stage: "awaiting-implementation" }` message and idles.
+    let session = run_post_negotiation(stream, resp, cfg.options.clone(), cfg.username.clone(), cfg.password.clone())
+        .await?;
+
+    let connected = serde_json::to_string(&WsOutgoingText::Connected {
+        width: cfg.options.screen_w,
+        height: cfg.options.screen_h,
+        protocol: resp.selected_protocol_label().to_string(),
+        server_name: cfg.host.clone(),
+    })
+    .unwrap();
+    let _ = ws_out_tx.send(WsOutgoing::Text(connected));
+
+    let cancel_clone = cancel.clone();
+    let control_tx_for_relay = control_tx.clone();
+    tokio::spawn(async move {
+        if let Err(e) = run_relay(
+            listener,
+            session,
+            ws_out_tx,
+            ws_out_rx,
+            control_tx_for_relay,
+            control_rx,
+            cancel_clone,
+        )
+        .await
+        {
+            tracing::error!("RDP relay error: {}", e);
+        }
+    });
+
+    Ok(RdpSession {
+        control_tx,
+        ws_port,
+        cancel,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_relay(
+    listener: TcpListener,
+    mut session: RdpSessionHandle,
+    ws_out_tx: UnboundedSender<WsOutgoing>,
+    mut ws_out_rx: UnboundedReceiver<WsOutgoing>,
+    _control_tx: UnboundedSender<RdpControl>,
+    mut control_rx: UnboundedReceiver<RdpControl>,
+    cancel: CancellationToken,
+) -> Result<(), String> {
+    let (stream, _) = tokio::select! {
+        r = tokio::time::timeout(WS_ACCEPT_TIMEOUT, listener.accept()) => match r {
+            Ok(Ok(pair)) => pair,
+            Ok(Err(e)) => return Err(format!("rdp accept: {}", e)),
+            Err(_) => {
+                tracing::warn!("RDP WS accept timed out after {:?}", WS_ACCEPT_TIMEOUT);
+                cancel.cancel();
+                return Ok(());
+            }
+        },
+        _ = cancel.cancelled() => return Ok(()),
+    };
+    let ws_stream = tokio_tungstenite::accept_async(stream)
+        .await
+        .map_err(|e| format!("rdp WS upgrade: {}", e))?;
+    let (mut ws_sink, ws_reader) = ws_stream.split();
+    let last_seen = std::sync::Arc::new(AsyncMutex::new(Instant::now()));
+
+    // Pump outgoing → WS sink.
+    let ws_write = tokio::spawn(async move {
+        while let Some(out) = ws_out_rx.recv().await {
+            let msg = match out {
+                WsOutgoing::Frame(b) => Message::Binary(b.into()),
+                WsOutgoing::Text(t) => Message::Text(t.into()),
+            };
+            if ws_sink.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Read WS → control_tx.
+    let last_seen_read = last_seen.clone();
+    let cancel_read = cancel.clone();
+    let ctrl = _control_tx.clone();
+    let ws_read = tokio::spawn(async move {
+        let mut reader = ws_reader;
+        while let Some(Ok(msg)) = reader.next().await {
+            if cancel_read.is_cancelled() {
+                break;
+            }
+            *last_seen_read.lock().await = Instant::now();
+            match msg {
+                Message::Binary(bytes) => {
+                    if let Some(c) = parse_binary_control(&bytes) {
+                        let _ = ctrl.send(c);
+                    }
+                }
+                Message::Text(text) => {
+                    if let Ok(parsed) = serde_json::from_str::<WsIncomingText>(&text) {
+                        match parsed {
+                            WsIncomingText::Ping | WsIncomingText::Ack => {
+                                let _ = ctrl.send(RdpControl::Ack);
+                            }
+                            WsIncomingText::Clipboard { text } => {
+                                let _ = ctrl.send(RdpControl::ClipboardData {
+                                    format: 13, // CF_UNICODETEXT
+                                    data: text.into_bytes(),
+                                });
+                            }
+                            WsIncomingText::Resize { width, height } => {
+                                let _ = ctrl.send(RdpControl::Resize { width, height });
+                            }
+                            WsIncomingText::Disconnect => {
+                                let _ = ctrl.send(RdpControl::Disconnect);
+                                break;
+                            }
+                        }
+                    }
+                }
+                Message::Close(_) => {
+                    let _ = ctrl.send(RdpControl::Disconnect);
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
+
+    // Drive the session: forward ws_out frames out, control input to the
+    // session. The placeholder session is a Pending future when there's
+    // no real RDP connection yet — that lets the relay still respond to
+    // pings, status messages, and disconnects without panicking.
+    let session_drive = tokio::spawn({
+        let cancel = cancel.clone();
+        let ws_out_clone = ws_out_tx.clone();
+        async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => break,
+                    msg = control_rx.recv() => match msg {
+                        Some(RdpControl::Disconnect) => { cancel.cancel(); break; }
+                        Some(other) => {
+                            if let Err(e) = session.dispatch_control(other).await {
+                                let json = serde_json::to_string(&WsOutgoingText::Error {
+                                    code: "control-failed".into(),
+                                    message: e,
+                                })
+                                .unwrap();
+                                let _ = ws_out_clone.send(WsOutgoing::Text(json));
+                            }
+                        }
+                        None => break,
+                    },
+                    out = session.next_outgoing() => match out {
+                        Some((tag, payload)) => {
+                            let mut frame = Vec::with_capacity(1 + payload.len());
+                            frame.push(tag);
+                            frame.extend_from_slice(&payload);
+                            let _ = ws_out_clone.send(WsOutgoing::Frame(frame));
+                        }
+                        None => break,
+                    }
+                }
+            }
+        }
+    });
+
+    // Idle watchdog.
+    let watchdog_cancel = cancel.clone();
+    let watchdog_last_seen = last_seen.clone();
+    let idle_watch = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(WS_IDLE_CHECK_INTERVAL);
+        ticker.tick().await;
+        loop {
+            tokio::select! {
+                _ = ticker.tick() => {
+                    let elapsed = watchdog_last_seen.lock().await.elapsed();
+                    if elapsed > WS_IDLE_TIMEOUT {
+                        tracing::warn!(
+                            "RDP relay idle for {:?} (> {:?}); disconnecting",
+                            elapsed, WS_IDLE_TIMEOUT
+                        );
+                        watchdog_cancel.cancel();
+                        break;
+                    }
+                }
+                _ = watchdog_cancel.cancelled() => break,
+            }
+        }
+    });
+
+    tokio::select! {
+        r = ws_write => { if let Err(e) = r { tracing::error!("ws_write: {}", e); } }
+        r = ws_read => { if let Err(e) = r { tracing::error!("ws_read: {}", e); } }
+        r = session_drive => { if let Err(e) = r { tracing::error!("session_drive: {}", e); } }
+        r = idle_watch => { if let Err(e) = r { tracing::error!("idle_watch: {}", e); } }
+    }
+    cancel.cancel();
+    Ok(())
+}
+
+/// Decode a binary control frame from the canvas. Layout:
+///
+/// ```text
+/// tag=IN_KEY:    [tag, down, scan_lo, scan_hi]
+/// tag=IN_POINTER:[tag, buttons, x_hi, x_lo, y_hi, y_lo]
+/// tag=IN_RESIZE: [tag, w_hi, w_lo, h_hi, h_lo]
+/// tag=IN_PING:   [tag]
+/// tag=IN_ACK:    [tag]
+/// ```
+pub fn parse_binary_control(bytes: &[u8]) -> Option<RdpControl> {
+    if bytes.is_empty() { return None; }
+    match bytes[0] {
+        channel::IN_PING | channel::IN_ACK => Some(RdpControl::Ack),
+        channel::IN_KEY if bytes.len() >= 4 => {
+            let down = bytes[1] != 0;
+            let scancode = u16::from_be_bytes([bytes[2], bytes[3]]);
+            Some(RdpControl::Key(KeyEvent { down, scancode }))
+        }
+        channel::IN_POINTER if bytes.len() >= 6 => {
+            let buttons = bytes[1];
+            let x = u16::from_be_bytes([bytes[2], bytes[3]]);
+            let y = u16::from_be_bytes([bytes[4], bytes[5]]);
+            Some(RdpControl::Pointer(PointerEvent { x, y, buttons }))
+        }
+        channel::IN_RESIZE if bytes.len() >= 5 => {
+            let w = u16::from_be_bytes([bytes[1], bytes[2]]);
+            let h = u16::from_be_bytes([bytes[3], bytes[4]]);
+            Some(RdpControl::Resize { width: w, height: h })
+        }
+        _ => None,
+    }
+}
+
+/// Helper for callers that want to embed a tile header in an outgoing
+/// FRAME-channel message. Header layout (big-endian): x, y, w, h.
+pub fn frame_payload_with_header(header: TileHeader, rgba: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 + rgba.len());
+    out.extend_from_slice(&header.x.to_be_bytes());
+    out.extend_from_slice(&header.y.to_be_bytes());
+    out.extend_from_slice(&header.w.to_be_bytes());
+    out.extend_from_slice(&header.h.to_be_bytes());
+    out.extend_from_slice(rgba);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_key_event() {
+        let buf = [channel::IN_KEY, 1, 0x00, 0x1c]; // Enter
+        match parse_binary_control(&buf).unwrap() {
+            RdpControl::Key(k) => {
+                assert!(k.down);
+                assert_eq!(k.scancode, 0x001c);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parse_pointer_event() {
+        let buf = [channel::IN_POINTER, 0x01, 0x01, 0x90, 0x01, 0x2c];
+        match parse_binary_control(&buf).unwrap() {
+            RdpControl::Pointer(p) => {
+                assert_eq!(p.buttons, 1);
+                assert_eq!(p.x, 0x0190);
+                assert_eq!(p.y, 0x012c);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parse_resize() {
+        let buf = [channel::IN_RESIZE, 0x07, 0x80, 0x04, 0x38];
+        match parse_binary_control(&buf).unwrap() {
+            RdpControl::Resize { width, height } => {
+                assert_eq!(width, 1920);
+                assert_eq!(height, 1080);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parse_ping_and_ack_are_ack() {
+        assert!(matches!(parse_binary_control(&[channel::IN_PING]), Some(RdpControl::Ack)));
+        assert!(matches!(parse_binary_control(&[channel::IN_ACK]), Some(RdpControl::Ack)));
+    }
+
+    #[test]
+    fn parse_truncated_returns_none() {
+        assert!(parse_binary_control(&[channel::IN_KEY]).is_none());
+        assert!(parse_binary_control(&[channel::IN_POINTER, 1]).is_none());
+        assert!(parse_binary_control(&[]).is_none());
+    }
+
+    #[test]
+    fn frame_payload_layout() {
+        let h = TileHeader { x: 10, y: 20, w: 30, h: 40 };
+        let rgba = vec![0xff, 0x00, 0x00, 0xff];
+        let p = frame_payload_with_header(h, &rgba);
+        assert_eq!(&p[0..2], &10u16.to_be_bytes());
+        assert_eq!(&p[2..4], &20u16.to_be_bytes());
+        assert_eq!(&p[4..6], &30u16.to_be_bytes());
+        assert_eq!(&p[6..8], &40u16.to_be_bytes());
+        assert_eq!(&p[8..], &rgba[..]);
+    }
+}

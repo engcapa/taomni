@@ -1,0 +1,28 @@
+id: TC-auto-F-Submenu-1
+title: Deeply-nested context-menu submenus stay inside the viewport
+description: |
+  F-Submenu-1: regression test for the v0.1.28 submenu overflow fix. We
+  open SessionTree's root → "Import sessions from third-party programs" →
+  "Import iTerm2 profiles" submenu (the deepest reliable chain) and assert
+  the third-tier item ("From local iTerm2 DynamicProfiles") is visible in
+  the viewport. Before the fix, on macOS WKWebView the submenu rendered
+  with `left-full` and got clipped off-screen.
+covers: [F-Submenu-1]
+tags: [auto-generated, ui, menu, submenu, p2, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-tree"]'
+  # Resize the browser so the menu chain is forced near the right edge,
+  # which is the layout that historically clipped the submenu.
+  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+  - wait_for: '[data-testid="context-menu"]'
+  - hover: '[data-testid="context-menu"] >> text="Import sessions from third-party programs"'
+  - wait: 1
+  - hover: 'text="Import iTerm2 profiles"'
+  - wait: 1
+  - assert_visible: 'text="From local iTerm2 DynamicProfiles"'
+  - press: Escape
+  - screenshot: submenu-flip.png

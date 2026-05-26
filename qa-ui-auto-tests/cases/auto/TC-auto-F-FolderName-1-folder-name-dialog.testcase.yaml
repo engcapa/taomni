@@ -1,0 +1,37 @@
+id: TC-auto-F-FolderName-1
+title: Folder Name dialog creates a new sessions group
+description: |
+  F-FolderName-1: replaces the old window.prompt-based folder rename UX. We
+  open it via the SessionTree root context menu's "New folder" entry, type
+  a name, hit Confirm, and assert the folder appears in the tree.
+covers: [F-FolderName-1]
+tags: [auto-generated, sessions, sidebar, folder, p1, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-tree"]'
+  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+  - wait_for: '[data-testid="context-menu"]'
+  - click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+  - wait_for: '[data-testid="folder-name-dialog"]'
+  - assert_visible: '[data-testid="folder-name-dialog-parent"]'
+  - fill:
+      selector: '[data-testid="folder-name-dialog-input"]'
+      value: 'qa-ui-auto-foldername'
+  - click: '[data-testid="folder-name-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="folder-name-dialog"]'
+      state: detached
+  - assert_visible: 'text="qa-ui-auto-foldername"'
+  # Re-open and cancel — dialog must close without creating anything.
+  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+  - wait_for: '[data-testid="context-menu"]'
+  - click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+  - wait_for: '[data-testid="folder-name-dialog"]'
+  - click: '[data-testid="folder-name-dialog-cancel"]'
+  - wait_for:
+      selector: '[data-testid="folder-name-dialog"]'
+      state: detached
+  - screenshot: foldername-dialog.png

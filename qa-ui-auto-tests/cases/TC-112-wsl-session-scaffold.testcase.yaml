@@ -1,0 +1,53 @@
+id: TC-112
+title: WSL session form mounts and saved session round-trips to proto=WSL
+description: |
+  Coverage smoke for the new WSL feature. Opens SessionEditor, switches to
+  the WSL protocol, asserts the WSL options form mounts (live argv preview
+  visible), saves a session, and reopens it to confirm the proto=WSL chip
+  is highlighted (round-trip fix in sessionTypeToProto).
+
+  The test does NOT actually launch a wsl.exe terminal — browser-mode
+  cannot spawn processes, and WSL is Windows-only at runtime. Distro
+  discovery is gated on Windows, so on a non-Windows browser-mode runner
+  the form falls through to the free-text distro input and the
+  "unsupported" hint is asserted.
+covers: [F9.8]
+tags: [smoke, p1, wsl, scaffolding-only, no-launch]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="sidebar"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-wsl"]'
+  # The WSL form mounts immediately and renders the argv preview block.
+  - wait_for:
+      selector: '[data-testid="wsl-argv-preview"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="wsl-argv-preview"]'
+  # On non-Windows browser-mode runners, the unsupported hint is shown
+  # AND the free-text distro fallback input is visible.
+  - assert_visible: '[data-testid="wsl-status-unsupported"]'
+  - fill:
+      selector: '[data-testid="wsl-distro-text"]'
+      value: qa-ubuntu-stub
+  - fill:
+      selector: '[data-testid="wsl-user"]'
+      value: ada
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill:
+      selector: '[data-testid="session-name"]'
+      value: qa-ui-auto-wsl
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-wsl"]'
+  # Round-trip check — reopen the editor and assert proto=WSL chip is active.
+  - open_session: { name: qa-ui-auto-wsl, edit: true }
+  - wait_for: '[data-testid="session-editor"]'
+  - wait_for:
+      selector: '[data-testid="session-proto-wsl"][data-active="true"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="wsl-argv-preview"]'
+  - screenshot: 112-wsl-saved.png

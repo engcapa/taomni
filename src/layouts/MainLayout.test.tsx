@@ -140,6 +140,8 @@ vi.mock("../lib/ipc", () => ({
   exitApp: vi.fn(async () => undefined),
   listSessionGroups: vi.fn(async () => []),
   listSessions: vi.fn(async () => []),
+  listLocalShells: vi.fn(async () => []),
+  listWslDistros: vi.fn(async () => []),
   markSessionConnected: vi.fn(async () => 0),
   writeTerminal: vi.fn(async () => undefined),
   // Vault helpers used by MainLayout's lock-aware connect flow.
