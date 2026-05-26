@@ -23,15 +23,16 @@ steps:
   # Open drawer via Ctrl+L
   - press: 'Control+l'
   - wait_for: '[data-testid="ai-chat-drawer"]'
-  # Drawer header shows New / History / Close buttons
-  - assert_visible: 'button[title="新对话"]'
-  - assert_visible: 'button[title="历史对话"]'
-  - assert_visible: '[data-testid="ai-chat-drawer"] button[title^="关闭"]'
+  # Drawer header shows New / History / Close buttons (English defaults
+  # — locale switcher can change them, see F-i18n-1).
+  - assert_visible: 'button[title="New chat"]'
+  - assert_visible: 'button[title="History"]'
+  - assert_visible: '[data-testid="ai-chat-drawer"] button[title^="Close"]'
   # Composer placeholder advertises @reference syntax
   - assert_attribute:
       selector: '[data-testid="ai-chat-drawer"] textarea'
       name: placeholder
-      equals: '输入消息... (Ctrl+Enter 发送 · 支持 @terminal:last-50 / @file:./error.log)'
+      equals: 'Type a message... (Ctrl+Enter to send · supports @terminal:last-50 / @file:./error.log)'
   # Type a message with an attachment ref → chip should appear
   - fill:
       selector: '[data-testid="ai-chat-drawer"] textarea'

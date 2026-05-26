@@ -5,7 +5,7 @@
 > - ✅ 已完成
 > - 🟡 已部分完成（关键路径可用，仍有未覆盖的能力，列出具体范围）
 > - 未完成的能力不写入本文档（详见各 plan 文档的待办项）
-> 当前对照版本：v0.1.0 → v0.1.31（含本仓库 `package.json` 标识的当前版本）。
+> 当前对照版本：v0.1.0 → v0.1.32（含本仓库 `package.json` 标识的当前版本）。
 
 ---
 
@@ -83,6 +83,10 @@ controls:
     selector: '[data-testid="ai-chat-drawer-toggle"]'
     kind: interactive
     optional: true             # absent in fully_disabled mode
+  # language-switcher control is owned by F-I18n-1; the tray simply hosts the
+  # button. Putting it both places would create a duplicate-selector lint
+  # error, so this feature only documents that the title bar is its mount
+  # point in prose below.
   - id: window-controls
     selector: '[data-testid="window-controls"]'
     kind: display
@@ -98,7 +102,7 @@ controls:
 -->
 
 - 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
-- 标题栏托盘 `TitleBarTrayControls`：分组排列 — Voice (PTT) | View (主题循环 + 紧凑模式) | Terminal (Split + MultiExec) | AI (Chat Drawer)
+- 标题栏托盘 `TitleBarTrayControls`：分组排列 — Voice (PTT) | View (主题循环 + 紧凑模式) | Terminal (Split + MultiExec) | AI (Chat Drawer) | Language (locale 切换)
 - `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
 
@@ -2201,15 +2205,15 @@ controls:
     kind: interactive
     optional: true
   - id: ai-chat-new
-    selector: 'button[title="新对话"]'
+    selector: 'button[title="New chat"]'
     kind: interactive
     optional: true
   - id: ai-chat-new-global
-    selector: 'button[title="新建全局对话（不绑定终端）"]'
+    selector: 'button[title="New global chat (no terminal binding)"]'
     kind: interactive
     optional: true
   - id: ai-chat-history
-    selector: 'button[title="历史对话"]'
+    selector: 'button[title="History"]'
     kind: interactive
     optional: true
   - id: ai-chat-copy-all
@@ -2217,7 +2221,7 @@ controls:
     kind: interactive
     optional: true
   - id: ai-chat-close
-    selector: '[data-testid="ai-chat-drawer"] button[title^="关闭"]'
+    selector: '[data-testid="ai-chat-drawer"] button[title^="Close"]'
     kind: interactive
     optional: true
   - id: ai-chat-provider-select
@@ -2240,7 +2244,7 @@ controls:
 
 - 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope` 控制状态机
 - **打开方式**：标题栏 `ai-chat-drawer-toggle` / 全局快捷键 `Ctrl+L` 打开 global drawer；终端浮动工具条上的 `tab-chat-toggle` / `Ctrl+Shift+L` 打开 tab-bound drawer（绑定当前终端，自动注入终端上下文）
-- **抽屉头部**：复制全部对话 / 新建全局对话 / 新对话 / 历史对话 / 关闭 五个按钮
+- **抽屉头部**：复制全部对话 / 新建全局对话 / 新对话 / 历史对话 / 关闭 五个按钮（标题文案随当前 locale 切换 — 默认英文 `New chat / History / Close`，中文为 `新对话 / 历史对话 / 关闭`）
 - **Thread badge 区**：显示 thread 是绑定到具体终端 (`Link2` 图标 + 终端标题) 还是 Global；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
 - **Composer**：`Ctrl+Enter` 发送、`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`（文件/会话目前仅展示，不发送内容）
 - **Format cycling**：右上角按钮按 `md → html → plain` 循环显示格式
@@ -2262,16 +2266,16 @@ controls:
     selector: 'text="Web Search"'
     kind: display
   - id: web-search-confirm-per-call
-    selector: 'text="每次确认"'
+    selector: 'text="Confirm every time (default)"'
     kind: display
   - id: web-search-confirm-per-thread
-    selector: 'text="本 thread 静默"'
+    selector: 'text="Confirm once per thread"'
     kind: display
   - id: web-search-confirm-always
-    selector: 'text="总是允许"'
+    selector: 'text="Always allow"'
     kind: display
   - id: web-search-confirm-disabled
-    selector: 'text="完全禁用"'
+    selector: 'text="Disabled"'
     kind: display
 -->
 
@@ -2293,31 +2297,31 @@ files:
   - src/components/settings/ChatOutputFormatPanel.tsx
 controls:
   - id: ai-settings-section
-    selector: 'text="AI 设置"'
+    selector: 'text="AI Settings"'
     kind: display
   - id: models-mirror-section
-    selector: 'text="模型分发"'
+    selector: 'text="Model distribution & GPU acceleration"'
     kind: display
   - id: models-mirror-modelscope
-    selector: 'text="ModelScope 优先"'
+    selector: 'text="ModelScope first"'
     kind: display
   - id: models-mirror-github
-    selector: 'text="GitHub 直连"'
+    selector: 'text="GitHub direct"'
     kind: display
   - id: models-mirror-ghproxy
-    selector: 'text="gh-proxy 代理"'
+    selector: 'text="gh-proxy"'
     kind: display
   - id: models-mirror-custom
-    selector: 'text="自定义 base URL"'
+    selector: 'text="Custom base URL"'
     kind: display
   - id: chat-history-section
-    selector: 'text="对话历史管理"'
+    selector: 'text="Chat history management"'
     kind: display
   - id: chat-history-retention
     selector: 'input[aria-label="Chat history retention days"]'
     kind: interactive
   - id: chat-history-retention-label
-    selector: 'text="保留天数"'
+    selector: 'text="Retention (days)"'
     kind: display
 -->
 
@@ -2652,6 +2656,54 @@ controls: []   # no dedicated testid: the submenu container itself uses class-ba
 - 二级 / 三级 子菜单出现时，若按默认 `left-full` 渲染会超出视口右边缘，则通过 `getBoundingClientRect` 切换到 `right-full` 向左展开
 - macOS WKWebView 上原本被裁掉的子菜单恢复可见
 - 没有 testid，行为通过现有右键菜单链路（如会话树 Import / Export 子菜单）覆盖
+
+---
+
+## 19. 双语 UI
+
+### 19.1 语言切换 (i18n) ✅
+
+<!-- feature
+id: F-I18n-1
+status: done
+area: ui/i18n
+components: [LanguageSwitcher, LanguageSection, useT, useLocale]
+files:
+  - src/components/window/LanguageSwitcher.tsx
+  - src/components/settings/LanguageSection.tsx
+  - src/lib/i18n/index.ts
+  - src/lib/i18n/labels.ts
+  - src/lib/i18n/locales/en.ts
+  - src/lib/i18n/locales/zh-CN.ts
+controls:
+  - id: tray-switcher
+    selector: '[data-testid="language-switcher"]'
+    kind: interactive
+  - id: language-option-en
+    selector: '[data-testid="language-option-en"]'
+    kind: interactive
+    optional: true       # only after the tray button opens its menu
+  - id: language-option-zh
+    selector: '[data-testid="language-option-zh-CN"]'
+    kind: interactive
+    optional: true
+  - id: settings-section
+    selector: '[data-testid="settings-language-section"]'
+    kind: display
+  - id: settings-language-en
+    selector: '[data-testid="settings-language-en"]'
+    kind: interactive
+  - id: settings-language-zh
+    selector: '[data-testid="settings-language-zh-CN"]'
+    kind: interactive
+-->
+
+- 标题栏 `LanguageSwitcher`（地球图标 + EN / 中 缩写）打开 locale 选择上下文菜单
+- 设置面板 `LanguageSection` 提供同样的切换入口（适合不熟悉托盘的用户）
+- locale 持久化到 `localStorage` (`newmob.locale.v1`)；默认 `en`，已保存的偏好最优先
+- 切换时 `document.documentElement.lang` 同步更新
+- 字典覆盖范围：menu / ribbon / quick connect / session editor / settings / capture / SFTP toolbar / chat drawer / agent / file browser / tunnel manager / vault / about dialog 等所有用户可见入口
+- 未翻译键自动回落到英文，缺失键直接显示 key 路径（便于发现缺漏）
 
 ---
 

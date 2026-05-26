@@ -15,17 +15,17 @@ steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
-  - wait_for: 'text=AI 设置'
-  - assert_visible: 'text="AI 设置"'
+  - wait_for: 'text=AI Settings'
+  - assert_visible: 'text="AI Settings"'
   # Models advanced panel: mirror radios
-  - assert_visible: 'text="模型分发"'
-  - assert_visible: 'text="ModelScope 优先"'
-  - assert_visible: 'text="GitHub 直连"'
-  - assert_visible: 'text="gh-proxy 代理"'
-  - assert_visible: 'text="自定义 base URL"'
+  - assert_visible: 'text="Model distribution & GPU acceleration"'
+  - assert_visible: 'text="ModelScope first"'
+  - assert_visible: 'text="GitHub direct"'
+  - assert_visible: 'text="gh-proxy"'
+  - assert_visible: 'text="Custom base URL"'
   # Chat history retention
-  - assert_visible: 'text="对话历史管理"'
-  - assert_visible: 'text="保留天数"'
+  - assert_visible: 'text="Chat history management"'
+  - assert_visible: 'text="Retention (days)"'
   - fill:
       selector: 'input[aria-label="Chat history retention days"]'
       value: '30'

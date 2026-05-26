@@ -23,9 +23,10 @@ steps:
   - assert_visible: 'text="Brave Search"'
   - assert_visible: 'text="Exa"'
   - assert_visible: 'text="Google CSE"'
-  # Confirmation modes (when enabled)
-  - assert_visible: 'text="每次确认"'
-  - assert_visible: 'text="本 thread 静默"'
-  - assert_visible: 'text="总是允许"'
-  - assert_visible: 'text="完全禁用"'
+  # Confirmation modes (when enabled). English defaults from i18n
+  # locale "en"; zh-CN substitutes 每次确认 / 本 thread 静默 / etc.
+  - assert_visible: 'text="Confirm every time (default)"'
+  - assert_visible: 'text="Confirm once per thread"'
+  - assert_visible: 'text="Always allow"'
+  - assert_visible: 'text="Disabled"'
   - screenshot: ai-003-web-search.png

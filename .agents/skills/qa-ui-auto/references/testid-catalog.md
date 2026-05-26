@@ -12,11 +12,11 @@
 
 - `[data-testid="ai-chat-drawer"]` — display [optional] — F-AI-2.4.ai-chat-drawer
 - `[data-testid="ai-chat-drawer"] textarea` — interactive [optional] — F-AI-2.4.ai-chat-drawer-textarea
-- `button[title="新对话"]` — interactive [optional] — F-AI-2.4.ai-chat-new
-- `button[title="新建全局对话（不绑定终端）"]` — interactive [optional] — F-AI-2.4.ai-chat-new-global
-- `button[title="历史对话"]` — interactive [optional] — F-AI-2.4.ai-chat-history
+- `button[title="New chat"]` — interactive [optional] — F-AI-2.4.ai-chat-new
+- `button[title="New global chat (no terminal binding)"]` — interactive [optional] — F-AI-2.4.ai-chat-new-global
+- `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
-- `[data-testid="ai-chat-drawer"] button[title^="关闭"]` — interactive [optional] — F-AI-2.4.ai-chat-close
+- `[data-testid="ai-chat-drawer"] button[title^="Close"]` — interactive [optional] — F-AI-2.4.ai-chat-close
 - `select[aria-label="Thread LLM provider"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select
 - `select[aria-label="Thread output format"]` — interactive [optional] — F-AI-2.4.ai-chat-output-format
 - `button[aria-label="Convert visible transcript to another format"]` — interactive [optional] — F-AI-2.4.ai-chat-format-cycle
@@ -24,23 +24,23 @@
 
 ## ai/models (F-AI-2.6)
 
-- `text="AI 设置"` — display — F-AI-2.6.ai-settings-section
-- `text="模型分发"` — display — F-AI-2.6.models-mirror-section
-- `text="ModelScope 优先"` — display — F-AI-2.6.models-mirror-modelscope
-- `text="GitHub 直连"` — display — F-AI-2.6.models-mirror-github
-- `text="gh-proxy 代理"` — display — F-AI-2.6.models-mirror-ghproxy
-- `text="自定义 base URL"` — display — F-AI-2.6.models-mirror-custom
-- `text="对话历史管理"` — display — F-AI-2.6.chat-history-section
+- `text="AI Settings"` — display — F-AI-2.6.ai-settings-section
+- `text="Model distribution & GPU acceleration"` — display — F-AI-2.6.models-mirror-section
+- `text="ModelScope first"` — display — F-AI-2.6.models-mirror-modelscope
+- `text="GitHub direct"` — display — F-AI-2.6.models-mirror-github
+- `text="gh-proxy"` — display — F-AI-2.6.models-mirror-ghproxy
+- `text="Custom base URL"` — display — F-AI-2.6.models-mirror-custom
+- `text="Chat history management"` — display — F-AI-2.6.chat-history-section
 - `input[aria-label="Chat history retention days"]` — interactive — F-AI-2.6.chat-history-retention
-- `text="保留天数"` — display — F-AI-2.6.chat-history-retention-label
+- `text="Retention (days)"` — display — F-AI-2.6.chat-history-retention-label
 
 ## ai/search (F-AI-2.5)
 
 - `text="Web Search"` — display — F-AI-2.5.web-search-section
-- `text="每次确认"` — display — F-AI-2.5.web-search-confirm-per-call
-- `text="本 thread 静默"` — display — F-AI-2.5.web-search-confirm-per-thread
-- `text="总是允许"` — display — F-AI-2.5.web-search-confirm-always
-- `text="完全禁用"` — display — F-AI-2.5.web-search-confirm-disabled
+- `text="Confirm every time (default)"` — display — F-AI-2.5.web-search-confirm-per-call
+- `text="Confirm once per thread"` — display — F-AI-2.5.web-search-confirm-per-thread
+- `text="Always allow"` — display — F-AI-2.5.web-search-confirm-always
+- `text="Disabled"` — display — F-AI-2.5.web-search-confirm-disabled
 
 ## ai/settings (F-AI-2.1)
 
@@ -490,6 +490,15 @@
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
+
+## ui/i18n (F-I18n-1)
+
+- `[data-testid="language-switcher"]` — interactive — F-I18n-1.tray-switcher
+- `[data-testid="language-option-en"]` — interactive [optional] — F-I18n-1.language-option-en
+- `[data-testid="language-option-zh-CN"]` — interactive [optional] — F-I18n-1.language-option-zh
+- `[data-testid="settings-language-section"]` — display — F-I18n-1.settings-section
+- `[data-testid="settings-language-en"]` — interactive — F-I18n-1.settings-language-en
+- `[data-testid="settings-language-zh-CN"]` — interactive — F-I18n-1.settings-language-zh
 
 ## vault (F12.1)
 
