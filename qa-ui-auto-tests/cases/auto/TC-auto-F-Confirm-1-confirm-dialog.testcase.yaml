@@ -1,0 +1,52 @@
+id: TC-auto-F-Confirm-1
+title: ConfirmDialog gates SessionTree "Delete folder" action
+description: |
+  F-Confirm-1: the in-app confirm modal replaces window.confirm so it works
+  on Tauri 2's macOS WKWebView. We exercise it through the SessionTree
+  delete-folder flow — create a folder, right-click it, click "Delete folder",
+  cancel the dialog (folder must still exist), reopen it and confirm
+  (folder must be removed). All three testids — message / cancel / confirm —
+  are touched.
+covers: [F-Confirm-1]
+tags: [auto-generated, dialog, sessions, sidebar, p1, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-tree"]'
+  # Create the target folder via FolderNameDialog.
+  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+  - wait_for: '[data-testid="context-menu"]'
+  - click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+  - wait_for: '[data-testid="folder-name-dialog"]'
+  - fill:
+      selector: '[data-testid="folder-name-dialog-input"]'
+      value: 'qa-ui-auto-confirm'
+  - click: '[data-testid="folder-name-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="folder-name-dialog"]'
+      state: detached
+  - assert_visible: 'text="qa-ui-auto-confirm"'
+  # Right-click the folder, choose Delete folder, cancel the dialog.
+  - right_click: '[data-testid="session-tree"] >> text="qa-ui-auto-confirm"'
+  - wait_for: '[data-testid="context-menu"]'
+  - click: '[data-testid="context-menu"] >> text="Delete folder"'
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - assert_visible: '[data-testid="confirm-dialog-message"]'
+  - click: '[data-testid="confirm-dialog-cancel"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      state: detached
+  - assert_visible: 'text="qa-ui-auto-confirm"'
+  # Reopen and confirm — folder must vanish.
+  - right_click: '[data-testid="session-tree"] >> text="qa-ui-auto-confirm"'
+  - wait_for: '[data-testid="context-menu"]'
+  - click: '[data-testid="context-menu"] >> text="Delete folder"'
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for:
+      selector: 'text="qa-ui-auto-confirm"'
+      state: detached
+      timeout_sec: 10
+  - screenshot: confirm-dialog.png

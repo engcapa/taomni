@@ -1,6 +1,6 @@
-id: TC-108
+id: TC-110
 title: Terminal split view supports layouts, input locks, and MultiExec target count
-covers: [F4.11]
+covers: [F-Split-1, F4.11]
 tags: [smoke, p1, terminal, split, multiexec]
 modes: [browser]
 fixtures: [reset_db]
@@ -39,4 +39,4 @@ steps:
       timeout_sec: 5
   - click: 'text="All"'
   - assert_visible: 'text="1 / 2"'
-  - screenshot: 108-terminal-split-smoke.png
+  - screenshot: 110-terminal-split-smoke.png

@@ -1,13 +1,13 @@
 id: TC-AI-001
-title: AI Chat Drawer opens, lists threads, and shows provider switcher
+title: AI Chat Drawer opens, lists threads, and shows attachment chips
 description: |
-  Verifies the v2.4 AI Chat Drawer surface: Ctrl+L opens the global drawer,
-  the title bar PTT button is mounted, history pane lists existing threads
-  (or empty state), provider badge dropdown is populated when AI providers
-  are configured, and the @reference syntax preview chip appears for
-  `@terminal:last-50`. Tab-bound chat is opened separately from the terminal
-  floating toolbar or Ctrl+Shift+L. Does not exercise streaming or send
-  (those need a real LLM key); the assertion target is UI plumbing only.
+  Verifies the AI Chat Drawer surface (F-AI-2.4): the title-bar AI button is
+  mounted (and hidden when AI is fully disabled), Ctrl+L opens the global
+  drawer, the header exposes the New / History / Close buttons, the composer
+  placeholder advertises the @reference syntax, typing `@terminal:last-30`
+  raises an attachment chip, and Ctrl+L toggles the drawer closed again.
+  Does not exercise streaming or send (those need a real LLM key);
+  the assertion target is UI plumbing only.
 covers: [F-AI-2.4]
 tags: [ai, drawer, p1]
 modes: [browser]
@@ -18,25 +18,27 @@ steps:
   - wait_for: '[data-testid="status-bar"]'
   # PTT button mounted in title bar
   - assert_visible: '[data-testid="ptt-button"]'
+  # AI Chat tray button is present (AI mode is not "fully_disabled" by default)
+  - assert_visible: '[data-testid="ai-chat-drawer-toggle"]'
   # Open drawer via Ctrl+L
-  - press_key: 'Control+l'
+  - press: 'Control+l'
   - wait_for: '[data-testid="ai-chat-drawer"]'
-  - assert_visible: '[data-testid="ai-chat-drawer"]'
   # Drawer header shows New / History / Close buttons
   - assert_visible: 'button[title="新对话"]'
   - assert_visible: 'button[title="历史对话"]'
-  - assert_visible: 'button[title^="关闭"]'
+  - assert_visible: '[data-testid="ai-chat-drawer"] button[title^="关闭"]'
   # Composer placeholder advertises @reference syntax
-  - assert_text:
+  - assert_attribute:
       selector: '[data-testid="ai-chat-drawer"] textarea'
-      contains: '@terminal:last-50'
+      name: placeholder
+      equals: '输入消息... (Ctrl+Enter 发送 · 支持 @terminal:last-50 / @file:./error.log)'
   # Type a message with an attachment ref → chip should appear
-  - type:
+  - fill:
       selector: '[data-testid="ai-chat-drawer"] textarea'
-      text: 'show me what failed @terminal:last-30'
+      value: 'show me what failed @terminal:last-30'
   - wait_for: '[data-testid="attachment-chip"]'
   - assert_visible: '[data-testid="attachment-chip"]'
   - screenshot: ai-001-drawer.png
   # Closing via Ctrl+L should hide drawer
-  - press_key: 'Control+l'
-  - assert_hidden: '[data-testid="ai-chat-drawer"]'
+  - press: 'Control+l'
+  - assert_not_visible: '[data-testid="ai-chat-drawer"]'

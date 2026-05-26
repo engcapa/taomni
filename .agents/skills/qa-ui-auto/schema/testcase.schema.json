@@ -17,7 +17,7 @@
     "covers": {
       "type": "array",
       "description": "Feature IDs from tests/features.yaml that this case exercises.",
-      "items": { "type": "string", "pattern": "^F[0-9]+(\\.[0-9]+)*[a-z]?$" },
+      "items": { "type": "string", "pattern": "^F(?:[0-9]+(?:\\.[0-9]+)*[a-z]?|-[A-Z][A-Za-z0-9]*-[0-9]+(?:\\.[0-9]+)*[a-z]?)$" },
       "uniqueItems": true
     },
     "tags": {

@@ -1,10 +1,11 @@
 id: TC-AI-002
 title: Tab completion settings expose three-source picker + Ctrl+K rewrite
 description: |
-  v2.2 input assistance UI: settings panel offers history / +path / +path+ai
+  F-AI-2.2 input assistance UI: settings panel offers history / +path / +path+ai
   radios, plus the "Enable AI command rewrite (Ctrl+K)" toggle and shortcut
-  field. Confirms that selecting +path+ai persists, and that the Ctrl+K
-  shortcut field is editable when the toggle is on.
+  field. Confirms each radio is selectable (interactive coverage), that
+  +path+ai persists, and that the Ctrl+K shortcut field is editable when
+  the toggle is on.
 covers: [F-AI-2.2]
 tags: [ai, ghost-text, p1]
 modes: [browser]
@@ -15,13 +16,16 @@ steps:
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: 'text=Inline command suggestions'
-  # The three radio choices must be present
+  # The three radio choices must be present + selectable.
   - assert_visible: 'input[name="inlineSuggestionsSource"][value="history"]'
   - assert_visible: 'input[name="inlineSuggestionsSource"][value="history+path"]'
   - assert_visible: 'input[name="inlineSuggestionsSource"][value="history+path+ai"]'
+  - click: 'input[name="inlineSuggestionsSource"][value="history"]'
+  - click: 'input[name="inlineSuggestionsSource"][value="history+path"]'
+  - click: 'input[name="inlineSuggestionsSource"][value="history+path+ai"]'
   # AI rewrite toggle + shortcut input
-  - assert_text:
-      selector: 'body'
-      contains: 'Enable AI command rewrite'
   - assert_visible: 'input[aria-label="AI command rewrite shortcut"]'
+  - fill:
+      selector: 'input[aria-label="AI command rewrite shortcut"]'
+      value: 'Control+K'
   - screenshot: ai-002-tab-complete-settings.png

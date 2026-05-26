@@ -1,0 +1,68 @@
+id: TC-auto-F-Sidebar-1
+title: SessionTree Ctrl+click multi-select drives "Connect selected sessions (N)"
+description: |
+  F-Sidebar-1: regression test for the multi-select feature added in
+  v0.1.30. Creates two saved sessions, single-clicks the first to select,
+  Ctrl+clicks the second to extend selection, and confirms both rows
+  carry `data-selected="true"`. Right-clicking either row should produce a
+  "Connect selected sessions (2)" menu entry.
+covers: [F-Sidebar-1]
+tags: [auto-generated, sessions, sidebar, multi-select, p1, needs-review]
+modes: [browser]
+fixtures: [reset_db, ssh_required]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-tree"]'
+  # Create session A.
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - fill: {selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}'}
+  - fill: {selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}'}
+  - fill: {selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}'}
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill: {selector: '[data-testid="session-name"]', value: 'qa-multi-a'}
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+  # Create session B.
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - fill: {selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}'}
+  - fill: {selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}'}
+  - fill: {selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}'}
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill: {selector: '[data-testid="session-name"]', value: 'qa-multi-b'}
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+  # Single-click A → A selected.
+  - click: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+  - assert_attribute:
+      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+      name: data-selected
+      equals: 'true'
+  # Ctrl+click B → both selected.
+  - click:
+      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+      modifiers: [Control]
+  - assert_attribute:
+      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+      name: data-selected
+      equals: 'true'
+  - assert_attribute:
+      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+      name: data-selected
+      equals: 'true'
+  # Right-click reveals the multi-connect entry.
+  - right_click: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+  - wait_for: '[data-testid="context-menu"]'
+  - assert_visible: '[data-testid="context-menu"] >> text="Connect selected sessions (2)"'
+  - press: Escape
+  # Plain click on A drops B's selection back.
+  - click: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+  - assert_attribute:
+      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+      name: data-selected
+      equals: 'false'
+  - screenshot: sidebar-multi-select.png

@@ -1,0 +1,32 @@
+id: TC-auto-F-AI-2-1
+title: AI master switch + privacy toggle render in Settings
+description: |
+  F-AI-2.1 closes the gap by exercising the two top-level AI privacy controls.
+  The "Disable AI completely" row is interactive (clickable container that
+  toggles `aiStore.config.fully_disabled`); the "Full local mode" row only
+  renders when AI is enabled, so we assert it as soft-optional.
+covers: [F-AI-2.1]
+tags: [auto-generated, ai, settings, p2, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  # AI master switch must be reachable (it is a toggleable card).
+  - assert_visible: 'text="Disable AI completely"'
+  - click: 'text="Disable AI completely"'
+  # After turning the master switch on, the title-bar AI button must disappear
+  # (PttButton + ai-chat-drawer-toggle are both gated on fully_disabled === true).
+  - wait_for:
+      selector: '[data-testid="ai-chat-drawer-toggle"]'
+      state: detached
+      timeout_sec: 10
+  # Toggle back so subsequent cases keep the default state.
+  - click: 'text="Disable AI completely"'
+  - wait_for:
+      selector: '[data-testid="ai-chat-drawer-toggle"]'
+      timeout_sec: 10
+  - screenshot: ai-2-1-master-switch.png

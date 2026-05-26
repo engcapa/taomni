@@ -19,7 +19,7 @@ steps:
   - assert_visible: '[data-testid="menu-bar"]'
 
   # Terminal menu — items "New local terminal", "New remote session…", "Close active tab"
-  - click: '[data-testid="menu-bar"] button:has-text("Terminal")'
+  - click: '[data-testid="menu-terminal"]'
   - wait_for: '[data-testid="context-menu"]'
   - assert_visible: text="New local terminal"
   - assert_visible: text="New remote session…"
@@ -31,7 +31,7 @@ steps:
       timeout_sec: 5
 
   # Sessions menu — items "New session…", "Show sessions", "Reload sessions"
-  - click: '[data-testid="menu-bar"] button:has-text("Sessions")'
+  - click: '[data-testid="menu-sessions"]'
   - wait_for: '[data-testid="context-menu"]'
   - assert_visible: text="New session…"
   - assert_visible: text="Show sessions"
@@ -43,7 +43,7 @@ steps:
       timeout_sec: 5
 
   # View menu — Toggle sidebar / Toggle compact mode / Split active terminal
-  - click: '[data-testid="menu-bar"] button:has-text("View")'
+  - click: '[data-testid="menu-view"]'
   - wait_for: '[data-testid="context-menu"]'
   - assert_visible: text="Toggle sidebar"
   - assert_visible: text="Toggle compact mode"
@@ -65,7 +65,7 @@ steps:
       timeout_sec: 5
 
   # Help menu — About NewMob
-  - click: '[data-testid="menu-bar"] button:has-text("Help")'
+  - click: '[data-testid="menu-help"]'
   - wait_for: '[data-testid="context-menu"]'
   - assert_visible: text="About NewMob"
   - press: Escape
@@ -75,7 +75,7 @@ steps:
       timeout_sec: 5
 
   # End-to-end: Terminal → New local terminal opens a local terminal pane
-  - click: '[data-testid="menu-bar"] button:has-text("Terminal")'
+  - click: '[data-testid="menu-terminal"]'
   - wait_for: '[data-testid="context-menu"]'
   - click: text="New local terminal"
   - wait_for: '[data-testid="terminal-pane"]'

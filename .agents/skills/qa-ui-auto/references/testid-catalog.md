@@ -8,6 +8,56 @@
 > controls (only render under conditions) are marked with `[optional]`.
 > Aliases are listed underneath the primary selector indented with `↳`.
 
+## ai/chat (F-AI-2.4)
+
+- `[data-testid="ai-chat-drawer"]` — display [optional] — F-AI-2.4.ai-chat-drawer
+- `[data-testid="ai-chat-drawer"] textarea` — interactive [optional] — F-AI-2.4.ai-chat-drawer-textarea
+- `button[title="新对话"]` — interactive [optional] — F-AI-2.4.ai-chat-new
+- `button[title="新建全局对话（不绑定终端）"]` — interactive [optional] — F-AI-2.4.ai-chat-new-global
+- `button[title="历史对话"]` — interactive [optional] — F-AI-2.4.ai-chat-history
+- `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
+- `[data-testid="ai-chat-drawer"] button[title^="关闭"]` — interactive [optional] — F-AI-2.4.ai-chat-close
+- `select[aria-label="Thread LLM provider"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select
+- `select[aria-label="Thread output format"]` — interactive [optional] — F-AI-2.4.ai-chat-output-format
+- `button[aria-label="Convert visible transcript to another format"]` — interactive [optional] — F-AI-2.4.ai-chat-format-cycle
+- `[data-testid="attachment-chip"]` — display [optional] — F-AI-2.4.attachment-chip
+
+## ai/models (F-AI-2.6)
+
+- `text="AI 设置"` — display — F-AI-2.6.ai-settings-section
+- `text="模型分发"` — display — F-AI-2.6.models-mirror-section
+- `text="ModelScope 优先"` — display — F-AI-2.6.models-mirror-modelscope
+- `text="GitHub 直连"` — display — F-AI-2.6.models-mirror-github
+- `text="gh-proxy 代理"` — display — F-AI-2.6.models-mirror-ghproxy
+- `text="自定义 base URL"` — display — F-AI-2.6.models-mirror-custom
+- `text="对话历史管理"` — display — F-AI-2.6.chat-history-section
+- `input[aria-label="Chat history retention days"]` — interactive — F-AI-2.6.chat-history-retention
+- `text="保留天数"` — display — F-AI-2.6.chat-history-retention-label
+
+## ai/search (F-AI-2.5)
+
+- `text="Web Search"` — display — F-AI-2.5.web-search-section
+- `text="每次确认"` — display — F-AI-2.5.web-search-confirm-per-call
+- `text="本 thread 静默"` — display — F-AI-2.5.web-search-confirm-per-thread
+- `text="总是允许"` — display — F-AI-2.5.web-search-confirm-always
+- `text="完全禁用"` — display — F-AI-2.5.web-search-confirm-disabled
+
+## ai/settings (F-AI-2.1)
+
+- `text="Disable AI completely"` — interactive — F-AI-2.1.ai-master-toggle
+- `text="Full local mode"` — interactive [optional] — F-AI-2.1.privacy-fully-local
+
+## ai/terminal (F-AI-2.2)
+
+- `input[name="inlineSuggestionsSource"][value="history"]` — interactive — F-AI-2.2.inline-suggestions-history
+- `input[name="inlineSuggestionsSource"][value="history+path"]` — interactive — F-AI-2.2.inline-suggestions-history-path
+- `input[name="inlineSuggestionsSource"][value="history+path+ai"]` — interactive — F-AI-2.2.inline-suggestions-history-path-ai
+- `input[aria-label="AI command rewrite shortcut"]` — interactive — F-AI-2.2.ai-command-rewrite-shortcut
+
+## ai/voice (F-AI-2.3)
+
+- `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
+
 ## capture (F4.13)
 
 - `[data-testid="capture-toolbar"]` — display — F4.13.toolbar-root
@@ -29,6 +79,12 @@
 ## main/menubar (F1.8)
 
 - `[data-testid="menu-bar"]` — display — F1.8.menu-bar
+- `[data-testid="menu-terminal"]` — interactive — F1.8.menu-terminal
+- `[data-testid="menu-sessions"]` — interactive — F1.8.menu-sessions
+- `[data-testid="menu-view"]` — interactive — F1.8.menu-view
+- `[data-testid="menu-help"]` — interactive — F1.8.menu-help
+- `[data-testid="menu-import-sessions"]` — interactive [optional] — F1.8.menu-import-sessions
+- `[data-testid="menu-export-sessions"]` — interactive [optional] — F1.8.menu-export-sessions
 
 ## main/ribbon (F1.9)
 
@@ -51,8 +107,6 @@
 - `[data-testid="tab-title"]` — interactive — F1.5.tab-title
 - `[data-testid="tab-title-input"]` — interactive [optional] — F1.5.tab-title-input
 - `[data-testid="new-local-terminal"]` — interactive — F1.5.new-local-terminal
-- `[data-testid="tab-split-view"]` — display — F1.5.split-view
-- `[data-testid="tab-multiexec-toggle"]` — interactive — F1.5.multiexec-toggle
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
 - `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
@@ -91,6 +145,9 @@
 - `[data-testid="titlebar-tray"]` — display — F1.3.tray
 - `[data-testid="theme-cycle"]` — interactive — F1.3.theme-cycle
 - `[data-testid="compact-toggle"]` — interactive — F1.3.compact-toggle
+- `[data-testid="tab-split-view"]` — interactive — F1.3.split-view
+- `[data-testid="tab-multiexec-toggle"]` — interactive — F1.3.multiexec-toggle
+- `[data-testid="ai-chat-drawer-toggle"]` — interactive [optional] — F1.3.ai-chat-drawer-toggle
 - `[data-testid="window-controls"]` — display — F1.3.window-controls
 - `[data-testid="window-min"]` — display — F1.3.window-min
 - `[data-testid="window-max"]` — display — F1.3.window-max
@@ -179,6 +236,41 @@
 - `[data-testid="auth-submit"]` — interactive — F6.5.submit
 - `[data-testid="auth-cancel"]` — interactive — F6.5.cancel
 - `[data-testid="auth-close"]` — interactive — F6.5.close
+
+## sessions/folder (F-FolderName-1)
+
+- `[data-testid="folder-name-dialog"]` — display [optional] — F-FolderName-1.dialog
+- `[data-testid="folder-name-dialog-parent"]` — display [optional] — F-FolderName-1.parent-readout
+- `[data-testid="folder-name-dialog-input"]` — interactive [optional] — F-FolderName-1.input
+- `[data-testid="folder-name-dialog-cancel"]` — interactive [optional] — F-FolderName-1.cancel
+- `[data-testid="folder-name-dialog-confirm"]` — interactive [optional] — F-FolderName-1.confirm
+
+## sessions/import (F-ExternalVault-1)
+
+- `[data-testid="external-vault-unlock-dialog"]` — display [optional] — F-ExternalVault-1.dialog
+- `[data-testid="external-vault-unlock-description"]` — display [optional] — F-ExternalVault-1.description
+- `[data-testid="external-vault-unlock-pw"]` — interactive [optional] — F-ExternalVault-1.pw-input
+- `[data-testid="external-vault-unlock-error"]` — display [optional] — F-ExternalVault-1.error
+- `[data-testid="external-vault-unlock-skip"]` — interactive [optional] — F-ExternalVault-1.skip
+- `[data-testid="external-vault-unlock-confirm"]` — interactive [optional] — F-ExternalVault-1.confirm
+
+## sessions/import (F-ImportPreview-1)
+
+- `[data-testid="session-import-preview"]` — display [optional] — F-ImportPreview-1.preview-dialog
+- `[data-testid="session-import-preview-summary"]` — display [optional] — F-ImportPreview-1.preview-summary
+- `[data-testid="session-import-preview-warnings"]` — display [optional] — F-ImportPreview-1.preview-warnings
+- `[data-testid="session-import-preview-table"]` — display [optional] — F-ImportPreview-1.preview-table
+- `[data-testid="session-import-preview-select-all"]` — interactive [optional] — F-ImportPreview-1.preview-select-all
+- `[data-testid="session-import-preview-cancel"]` — interactive [optional] — F-ImportPreview-1.preview-cancel
+- `[data-testid="session-import-preview-confirm"]` — interactive [optional] — F-ImportPreview-1.preview-confirm
+- `[data-testid="import-json"]` — interactive [optional] — F-ImportPreview-1.import-json
+- `[data-testid="import-mobaxterm"]` — interactive [optional] — F-ImportPreview-1.import-mobaxterm
+- `[data-testid="import-csv"]` — interactive [optional] — F-ImportPreview-1.import-csv
+- `[data-testid="import-openssh"]` — interactive [optional] — F-ImportPreview-1.import-openssh
+- `[data-testid="export-json"]` — interactive [optional] — F-ImportPreview-1.export-json
+- `[data-testid="export-mobaxterm"]` — interactive [optional] — F-ImportPreview-1.export-mobaxterm
+- `[data-testid="export-csv"]` — interactive [optional] — F-ImportPreview-1.export-csv
+- `[data-testid="export-html"]` — interactive [optional] — F-ImportPreview-1.export-html
 
 ## settings (F11.1)
 
@@ -280,6 +372,7 @@
 
 - `[data-testid="terminal-pane"]` — interactive — F2.2.terminal-pane
 - `[data-testid="attached-sftp-toggle"]` — interactive [optional] — F2.2.attached-sftp-toggle
+- `[data-testid="tab-chat-toggle"]` — interactive [optional] — F2.2.tab-chat-toggle
 - `[data-testid="context-menu"]` — display [optional] — F2.2.context-menu
 
 ## terminal/multiexec (F4.11)
@@ -341,6 +434,21 @@
 - `[data-testid="context-menu-item-event-log"]` — interactive [optional] — F4.7.event-log-menu-item
   ↳ `text="Event Log"` — alias
 
+## terminal/split (F-Split-1)
+
+- `[data-testid="terminal-split-stage"]` — display [optional] — F-Split-1.split-stage
+- `[data-testid="terminal-split-toolbar"]` — display [optional] — F-Split-1.split-toolbar
+- `[data-testid="terminal-split-panes"]` — display [optional] — F-Split-1.split-panes
+- `[data-testid="terminal-split-pane"]` — display [optional] — F-Split-1.split-pane
+- `[data-testid="terminal-split-resize-handle"]` — interactive [optional] — F-Split-1.split-resize-handle
+- `[data-testid="terminal-split-grid-column-resize-handle"]` — interactive [optional] — F-Split-1.split-grid-column-resize-handle
+- `[data-testid="terminal-split-grid-row-resize-handle"]` — interactive [optional] — F-Split-1.split-grid-row-resize-handle
+- `[data-testid="terminal-split-layout-horizontal"]` — interactive [optional] — F-Split-1.split-layout-horizontal
+- `[data-testid="terminal-split-layout-vertical"]` — interactive [optional] — F-Split-1.split-layout-vertical
+- `[data-testid="terminal-split-layout-grid"]` — interactive [optional] — F-Split-1.split-layout-grid
+- `[data-testid^="terminal-split-lock-"]` — interactive [optional] — F-Split-1.split-input-lock
+- `[data-testid="terminal-input-locked"]` — display [optional] — F-Split-1.terminal-input-locked
+
 ## tunnel (F8.2)
 
 - `[data-testid="tunnel-manager"]` — display — F8.2.panel-root
@@ -375,6 +483,13 @@
 - `[data-testid="tunnel-editor-save"]` — interactive — F8.2.editor-save
   ↳ `button:has-text("Save")` — alias
 - `[data-testid="tunnel-editor-cancel"]` — interactive [optional] — F8.2.editor-cancel
+
+## ui/dialog (F-Confirm-1)
+
+- `[data-testid="confirm-dialog"]` — display [optional] — F-Confirm-1.confirm-dialog
+- `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
+- `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
+- `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
 
 ## vault (F12.1)
 

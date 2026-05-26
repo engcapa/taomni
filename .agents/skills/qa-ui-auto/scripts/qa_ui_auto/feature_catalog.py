@@ -51,7 +51,9 @@ import yaml
 
 DEFAULT_PATH = Path("qa-ui-auto-tests/feature-list.md")
 FEATURE_BLOCK = re.compile(r"<!--\s*feature\s*\n(.*?)-->", re.DOTALL)
-ID_PATTERN = re.compile(r"^F[0-9]+(?:\.[0-9]+)*[a-z]?$")
+ID_PATTERN = re.compile(
+    r"^F(?:[0-9]+(?:\.[0-9]+)*[a-z]?|-[A-Z][A-Za-z0-9]*-[0-9]+(?:\.[0-9]+)*[a-z]?)$"
+)
 
 
 @dataclass

@@ -1,0 +1,29 @@
+id: TC-auto-F-ExternalVault-1
+title: Tabby import menu route is reachable; vault unlock dialog scaffold
+description: |
+  F-ExternalVault-1: the dialog is only mounted in flight, after a Tabby
+  config file with an encrypted vault block is parsed. Driving the actual
+  unlock requires an OS file picker we can't easily synthesise from
+  Playwright in browser mode. This case anchors the menu route only — the
+  dialog testids stay optional, and a follow-up that wires `upload_file`
+  through a transient input shim can flesh it out.
+covers: [F-ExternalVault-1]
+tags: [auto-generated, sessions, import, vault, p2, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="session-tree"]'
+  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+  - wait_for: '[data-testid="context-menu"]'
+  - hover: '[data-testid="context-menu"] >> text="Import sessions from third-party programs"'
+  - wait: 1
+  - assert_visible: 'text="Import Tabby sessions"'
+  - hover: 'text="Import Tabby sessions"'
+  - wait: 1
+  # Submenu has two leaves — config.yaml file + scanned local config.
+  - assert_visible: 'text="From config.yaml"'
+  - assert_visible: 'text="From local Tabby config"'
+  - press: Escape
+  - screenshot: external-vault-route.png

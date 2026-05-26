@@ -16,13 +16,17 @@ steps:
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: 'text=AI 设置'
+  - assert_visible: 'text="AI 设置"'
   # Models advanced panel: mirror radios
-  - assert_text: {selector: 'body', contains: '模型分发'}
-  - assert_text: {selector: 'body', contains: 'ModelScope 优先'}
-  - assert_text: {selector: 'body', contains: 'GitHub 直连'}
-  - assert_text: {selector: 'body', contains: 'gh-proxy 代理'}
-  - assert_text: {selector: 'body', contains: '自定义 base URL'}
+  - assert_visible: 'text="模型分发"'
+  - assert_visible: 'text="ModelScope 优先"'
+  - assert_visible: 'text="GitHub 直连"'
+  - assert_visible: 'text="gh-proxy 代理"'
+  - assert_visible: 'text="自定义 base URL"'
   # Chat history retention
-  - assert_text: {selector: 'body', contains: '对话历史管理' }
-  - assert_text: {selector: 'body', contains: '保留天数' }
+  - assert_visible: 'text="对话历史管理"'
+  - assert_visible: 'text="保留天数"'
+  - fill:
+      selector: 'input[aria-label="Chat history retention days"]'
+      value: '30'
   - screenshot: ai-004-native-and-cc.png

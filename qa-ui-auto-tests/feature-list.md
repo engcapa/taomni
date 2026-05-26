@@ -5,7 +5,7 @@
 > - ✅ 已完成
 > - 🟡 已部分完成（关键路径可用，仍有未覆盖的能力，列出具体范围）
 > - 未完成的能力不写入本文档（详见各 plan 文档的待办项）
-> 当前对照版本：v0.1.0 → v0.1.24（含本仓库 `package.json` 标识的当前版本）。
+> 当前对照版本：v0.1.0 → v0.1.31（含本仓库 `package.json` 标识的当前版本）。
 
 ---
 
@@ -159,12 +159,6 @@ controls:
   - id: new-local-terminal     # the "+" plus tab button
     selector: '[data-testid="new-local-terminal"]'
     kind: interactive
-  - id: split-view             # MOVED to F1.3 title-bar tray; selector still resolves
-    selector: '[data-testid="tab-split-view"]'
-    kind: interactive
-  - id: multiexec-toggle       # MOVED to F1.3 title-bar tray; selector still resolves
-    selector: '[data-testid="tab-multiexec-toggle"]'
-    kind: interactive
   - id: tabs-more
     selector: '[data-testid="tab-more"]'
     kind: interactive
@@ -294,6 +288,26 @@ controls:
   - id: menu-bar
     selector: '[data-testid="menu-bar"]'
     kind: display
+  - id: menu-terminal
+    selector: '[data-testid="menu-terminal"]'
+    kind: interactive
+  - id: menu-sessions
+    selector: '[data-testid="menu-sessions"]'
+    kind: interactive
+  - id: menu-view
+    selector: '[data-testid="menu-view"]'
+    kind: interactive
+  - id: menu-help
+    selector: '[data-testid="menu-help"]'
+    kind: interactive
+  - id: menu-import-sessions      # submenu trigger inside Sessions menu
+    selector: '[data-testid="menu-import-sessions"]'
+    kind: interactive
+    optional: true       # only after opening the Sessions menu
+  - id: menu-export-sessions      # submenu trigger inside Sessions menu
+    selector: '[data-testid="menu-export-sessions"]'
+    kind: interactive
+    optional: true
 -->
 
 - 顶级菜单：Terminal / Sessions / View / X server / Tools / Settings / Macros / Help
@@ -2075,6 +2089,569 @@ controls:
 ### 13.4 部署 ✅
 - Replit 上验证通过：Tauri 桌面构建（`pnpm tauri build --debug --no-bundle`）通过 VNC 查看；Web 模式作为静态站点构建到 `dist/`
 - GitHub Actions：`release.yml` 推送 `v<version>` tag 触发跨平台打包
+
+---
+
+## 14. AI 子系统
+
+### 14.1 AI 总开关与隐私 ✅
+
+<!-- feature
+id: F-AI-2.1
+status: done
+area: ai/settings
+components: [AiMasterSwitch, PrivacyToggle, SettingsPanel]
+files:
+  - src/components/settings/AiMasterSwitch.tsx
+  - src/components/settings/PrivacyToggle.tsx
+  - src/components/settings/SettingsPanel.tsx
+  - src/stores/aiStore.ts
+controls:
+  - id: ai-master-toggle
+    selector: 'text="Disable AI completely"'
+    kind: interactive
+  - id: privacy-fully-local
+    selector: 'text="Full local mode"'
+    kind: interactive
+    optional: true       # only shown when AI master is enabled
+-->
+
+- `AiMasterSwitch`：一键关闭所有 AI 入口（Drawer 按钮、PTT、命令重写等），内存占用与网络调用全部归零
+- `PrivacyToggle`：保持 AI 启用，但强制把请求路由到 loopback / 本地 provider
+- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后标题栏 `ai-chat-drawer-toggle` 与 `ptt-button` 立即从 DOM 中移除
+
+### 14.2 终端补全与命令重写 ✅
+
+<!-- feature
+id: F-AI-2.2
+status: done
+area: ai/terminal
+components: [TerminalAppearanceSettings, AiRewriteOverlay]
+files:
+  - src/components/terminal/TerminalAppearanceSettings.tsx
+  - src/components/terminal/AiRewriteOverlay.tsx
+controls:
+  - id: inline-suggestions-history
+    selector: 'input[name="inlineSuggestionsSource"][value="history"]'
+    kind: interactive
+  - id: inline-suggestions-history-path
+    selector: 'input[name="inlineSuggestionsSource"][value="history+path"]'
+    kind: interactive
+  - id: inline-suggestions-history-path-ai
+    selector: 'input[name="inlineSuggestionsSource"][value="history+path+ai"]'
+    kind: interactive
+  - id: ai-command-rewrite-shortcut
+    selector: 'input[aria-label="AI command rewrite shortcut"]'
+    kind: interactive
+-->
+
+- 三档 inline 候选源切换（History / +PATH / +PATH+AI）持久化至 `terminalProfile`
+- `Enable AI command rewrite (Ctrl+K)` 开关 + 自定义快捷键输入框
+- 选择 `+ai` 时按需下载 FIM 模型（约 400 MB）；本地 PowerShell 终端忽略此功能避免与 PSReadLine 冲突
+
+### 14.3 PTT 语音录制按钮 ✅
+
+<!-- feature
+id: F-AI-2.3
+status: done
+area: ai/voice
+components: [PttButton, AsrPanel, TitleBarTrayControls]
+files:
+  - src/components/window/PttButton.tsx
+  - src/components/settings/AsrPanel.tsx
+  - src-tauri/src/voice/
+controls:
+  - id: ptt-button
+    selector: '[data-testid="ptt-button"]'
+    kind: interactive
+    optional: true       # hidden when AI master switch is on (fully_disabled)
+-->
+
+- 标题栏托盘内的麦克风按钮：按下开始录音、释放停止 + 转写
+- 探测 `voice_capture_supported` 失败时按钮置灰并显示 `MicOff` 图标（`data-state="unsupported"`）
+- 转写结果通过 `chatStore.attachToComposer(text, "global")` 暂存到 Chat 输入框，便于检视后再发送
+- AI 全局禁用 (`fully_disabled`) 时整个按钮被卸载
+
+### 14.4 AI Chat Drawer ✅
+
+<!-- feature
+id: F-AI-2.4
+status: done
+area: ai/chat
+components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, NewThreadFormatPicker, SearchProgressChip, CodeBlockToolbar]
+files:
+  - src/components/chat/ChatDrawer.tsx
+  - src/components/chat/ChatThreadList.tsx
+  - src/components/chat/Composer.tsx
+  - src/components/chat/AttachmentChip.tsx
+  - src/components/chat/MessageBubble.tsx
+  - src/components/chat/NewThreadFormatPicker.tsx
+  - src/components/chat/SearchProgressChip.tsx
+  - src/components/chat/CodeBlockToolbar.tsx
+  - src/lib/chat/composerRefs.ts
+  - src/lib/chat/renderFormatted.ts
+  - src/stores/chatStore.ts
+controls:
+  - id: ai-chat-drawer
+    selector: '[data-testid="ai-chat-drawer"]'
+    kind: display
+    optional: true       # only mounted when drawerOpen
+  - id: ai-chat-drawer-textarea
+    selector: '[data-testid="ai-chat-drawer"] textarea'
+    kind: interactive
+    optional: true
+  - id: ai-chat-new
+    selector: 'button[title="新对话"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-new-global
+    selector: 'button[title="新建全局对话（不绑定终端）"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-history
+    selector: 'button[title="历史对话"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-copy-all
+    selector: 'button[aria-label="Copy entire conversation"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-close
+    selector: '[data-testid="ai-chat-drawer"] button[title^="关闭"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-provider-select
+    selector: 'select[aria-label="Thread LLM provider"]'
+    kind: interactive
+    optional: true       # rendered only when an active thread + at least one provider configured
+  - id: ai-chat-output-format
+    selector: 'select[aria-label="Thread output format"]'
+    kind: interactive
+    optional: true       # locked into a span once the thread has any messages
+  - id: ai-chat-format-cycle
+    selector: 'button[aria-label="Convert visible transcript to another format"]'
+    kind: interactive
+    optional: true
+  - id: attachment-chip
+    selector: '[data-testid="attachment-chip"]'
+    kind: display
+    optional: true       # only when composer text contains a parseable @ref
+-->
+
+- 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope` 控制状态机
+- **打开方式**：标题栏 `ai-chat-drawer-toggle` / 全局快捷键 `Ctrl+L` 打开 global drawer；终端浮动工具条上的 `tab-chat-toggle` / `Ctrl+Shift+L` 打开 tab-bound drawer（绑定当前终端，自动注入终端上下文）
+- **抽屉头部**：复制全部对话 / 新建全局对话 / 新对话 / 历史对话 / 关闭 五个按钮
+- **Thread badge 区**：显示 thread 是绑定到具体终端 (`Link2` 图标 + 终端标题) 还是 Global；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
+- **Composer**：`Ctrl+Enter` 发送、`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`（文件/会话目前仅展示，不发送内容）
+- **Format cycling**：右上角按钮按 `md → html → plain` 循环显示格式
+- 历史对话面板可删除 thread；删除当前 thread 时自动落到下一个或新建
+- 抽屉宽度可拖拽调整且持久化
+
+### 14.5 Web Search Provider 矩阵 ✅
+
+<!-- feature
+id: F-AI-2.5
+status: done
+area: ai/search
+components: [WebSearchPanel, SearchProgressChip]
+files:
+  - src/components/settings/WebSearchPanel.tsx
+  - src/components/chat/SearchProgressChip.tsx
+controls:
+  - id: web-search-section
+    selector: 'text="Web Search"'
+    kind: display
+  - id: web-search-confirm-per-call
+    selector: 'text="每次确认"'
+    kind: display
+  - id: web-search-confirm-per-thread
+    selector: 'text="本 thread 静默"'
+    kind: display
+  - id: web-search-confirm-always
+    selector: 'text="总是允许"'
+    kind: display
+  - id: web-search-confirm-disabled
+    selector: 'text="完全禁用"'
+    kind: display
+-->
+
+- 设置面板列出至少 6 个搜索 provider：SearXNG / Tavily / Serper / Brave Search / Exa / Google CSE
+- 每次调用前的确认模式四选一：每次确认 / 本 thread 静默 / 总是允许 / 完全禁用
+- `SearchProgressChip` 在 Chat 中实时显示搜索进度并可取消
+
+### 14.6 Claude Code & 模型分发设置 ✅
+
+<!-- feature
+id: F-AI-2.6
+status: done
+area: ai/models
+components: [ClaudeCodePanel, ModelsAdvancedPanel, ChatHistoryPanel, ChatOutputFormatPanel]
+files:
+  - src/components/settings/ClaudeCodePanel.tsx
+  - src/components/settings/ModelsAdvancedPanel.tsx
+  - src/components/settings/ChatHistoryPanel.tsx
+  - src/components/settings/ChatOutputFormatPanel.tsx
+controls:
+  - id: ai-settings-section
+    selector: 'text="AI 设置"'
+    kind: display
+  - id: models-mirror-section
+    selector: 'text="模型分发"'
+    kind: display
+  - id: models-mirror-modelscope
+    selector: 'text="ModelScope 优先"'
+    kind: display
+  - id: models-mirror-github
+    selector: 'text="GitHub 直连"'
+    kind: display
+  - id: models-mirror-ghproxy
+    selector: 'text="gh-proxy 代理"'
+    kind: display
+  - id: models-mirror-custom
+    selector: 'text="自定义 base URL"'
+    kind: display
+  - id: chat-history-section
+    selector: 'text="对话历史管理"'
+    kind: display
+  - id: chat-history-retention
+    selector: 'input[aria-label="Chat history retention days"]'
+    kind: interactive
+  - id: chat-history-retention-label
+    selector: 'text="保留天数"'
+    kind: display
+-->
+
+- 模型分发镜像四选一：ModelScope 优先 / GitHub 直连 / gh-proxy 代理 / 自定义 base URL
+- Claude Code 集成面板（账号、CLI 入口、会话引用）
+- 对话历史保留天数滑动 + 一键清理（位于 `ChatHistoryPanel`）
+- Thread 默认输出格式（`ChatOutputFormatPanel`）
+
+### 14.7 LLM Provider 列表 ✅
+
+<!-- feature
+id: F-AI-11
+status: done
+area: ai/providers
+components: [LlmProvidersPanel]
+files:
+  - src/components/settings/LlmProvidersPanel.tsx
+controls: []   # SettingsPanel-level concern; the provider editor renders inline rows without dedicated testids — covered indirectly via TC-AI-004's "AI 设置" section assertions
+-->
+
+- LLM provider 列表（OpenAI / Anthropic / 自定义 base URL 等）
+- API key 写入 vault；vault 锁定时整段会话保留但显示锁图标，提示用户先解锁
+- 与 `aiStore.providers` 双向同步
+
+---
+
+## 15. 终端分屏
+
+### 15.1 Terminal Split View ✅
+
+<!-- feature
+id: F-Split-1
+status: done
+area: terminal/split
+components: [MainLayout, TerminalSplitToolbar]
+files:
+  - src/layouts/MainLayout.tsx
+  - src/stores/appStore.ts
+controls:
+  - id: split-stage
+    selector: '[data-testid="terminal-split-stage"]'
+    kind: display
+    optional: true       # rendered only when split active
+  - id: split-toolbar
+    selector: '[data-testid="terminal-split-toolbar"]'
+    kind: display
+    optional: true
+  - id: split-panes
+    selector: '[data-testid="terminal-split-panes"]'
+    kind: display
+    optional: true
+  - id: split-pane
+    selector: '[data-testid="terminal-split-pane"]'
+    kind: display
+    optional: true
+  - id: split-resize-handle
+    selector: '[data-testid="terminal-split-resize-handle"]'
+    kind: interactive
+    optional: true       # only in horizontal/vertical layouts
+  - id: split-grid-column-resize-handle
+    selector: '[data-testid="terminal-split-grid-column-resize-handle"]'
+    kind: interactive
+    optional: true       # only in grid layout
+  - id: split-grid-row-resize-handle
+    selector: '[data-testid="terminal-split-grid-row-resize-handle"]'
+    kind: interactive
+    optional: true
+  - id: split-layout-horizontal
+    selector: '[data-testid="terminal-split-layout-horizontal"]'
+    kind: interactive
+    optional: true
+  - id: split-layout-vertical
+    selector: '[data-testid="terminal-split-layout-vertical"]'
+    kind: interactive
+    optional: true
+  - id: split-layout-grid
+    selector: '[data-testid="terminal-split-layout-grid"]'
+    kind: interactive
+    optional: true
+  - id: split-input-lock
+    selector: '[data-testid^="terminal-split-lock-"]'
+    kind: interactive
+    optional: true
+  - id: terminal-input-locked
+    selector: '[data-testid="terminal-input-locked"]'
+    kind: display
+    optional: true       # rendered when a pane is input-locked
+-->
+
+- 标题栏 `tab-split-view` 切换分屏；激活后所有打开的本地/SSH 终端 tab 同时挂载到 `terminal-split-stage`
+- 三种布局：horizontal / vertical / grid，分别由 `data-layout` 属性标识
+- 拖拽中分割条（`terminal-split-resize-handle` 或 grid 模式下的列/行 handle）调整面板尺寸
+- 每个 pane 上的 `terminal-split-lock-<id>` 按钮可单独锁定该 pane 输入
+- 与 MultiExec 协同：选 "All" 时计数文案为 `<active>/<total>`
+
+---
+
+## 16. 通用对话框
+
+### 16.1 In-app `ConfirmDialog` ✅
+
+<!-- feature
+id: F-Confirm-1
+status: done
+area: ui/dialog
+components: [ConfirmDialog]
+files:
+  - src/components/sidebar/ConfirmDialog.tsx
+controls:
+  - id: confirm-dialog
+    selector: '[data-testid="confirm-dialog"]'
+    kind: display
+    optional: true
+  - id: confirm-dialog-message
+    selector: '[data-testid="confirm-dialog-message"]'
+    kind: display
+    optional: true
+  - id: confirm-dialog-cancel
+    selector: '[data-testid="confirm-dialog-cancel"]'
+    kind: interactive
+    optional: true
+  - id: confirm-dialog-confirm
+    selector: '[data-testid="confirm-dialog-confirm"]'
+    kind: interactive
+    optional: true
+-->
+
+- 取代 `window.confirm` 的跨平台 React 模态（macOS WKWebView 默认禁用 `window.confirm`/`alert`）
+- 支持 `danger` 标志、自定义 confirm/cancel 文案、Esc 取消、Enter 确认
+- 当前在 SessionTree 删除文件夹流程中替换原生 confirm
+
+### 16.2 Session Import 预览 ✅
+
+<!-- feature
+id: F-ImportPreview-1
+status: done
+area: sessions/import
+components: [SessionImportPreview]
+files:
+  - src/components/session/SessionImportPreview.tsx
+  - src/components/sidebar/SessionTree.tsx
+  - src/components/menubar/MenuBar.tsx
+controls:
+  - id: preview-dialog
+    selector: '[data-testid="session-import-preview"]'
+    kind: display
+    optional: true       # only after triggering an import flow
+  - id: preview-summary
+    selector: '[data-testid="session-import-preview-summary"]'
+    kind: display
+    optional: true
+  - id: preview-warnings
+    selector: '[data-testid="session-import-preview-warnings"]'
+    kind: display
+    optional: true       # only when result.warnings.length > 0
+  - id: preview-table
+    selector: '[data-testid="session-import-preview-table"]'
+    kind: display
+    optional: true
+  - id: preview-select-all
+    selector: '[data-testid="session-import-preview-select-all"]'
+    kind: interactive
+    optional: true
+  - id: preview-cancel
+    selector: '[data-testid="session-import-preview-cancel"]'
+    kind: interactive
+    optional: true
+  - id: preview-confirm
+    selector: '[data-testid="session-import-preview-confirm"]'
+    kind: interactive
+    optional: true
+  # Menu-bar leaf items that trigger the preview (under Sessions →
+  # Import / Export submenus). Each calls openTextFile/openBinaryFile,
+  # which means the preview dialog only renders after a real file picker
+  # selects a fixture — but the menu route itself is observable.
+  - id: import-json
+    selector: '[data-testid="import-json"]'
+    kind: interactive
+    optional: true
+  - id: import-mobaxterm
+    selector: '[data-testid="import-mobaxterm"]'
+    kind: interactive
+    optional: true
+  - id: import-csv
+    selector: '[data-testid="import-csv"]'
+    kind: interactive
+    optional: true
+  - id: import-openssh
+    selector: '[data-testid="import-openssh"]'
+    kind: interactive
+    optional: true
+  - id: export-json
+    selector: '[data-testid="export-json"]'
+    kind: interactive
+    optional: true
+  - id: export-mobaxterm
+    selector: '[data-testid="export-mobaxterm"]'
+    kind: interactive
+    optional: true
+  - id: export-csv
+    selector: '[data-testid="export-csv"]'
+    kind: interactive
+    optional: true
+  - id: export-html
+    selector: '[data-testid="export-html"]'
+    kind: interactive
+    optional: true
+-->
+
+- 第三方会话 / NewMob JSON / MobaXterm / CSV / OpenSSH / Tabby / Xshell / WindTerm / iTerm2 / Terminal.app / Termius / PuTTYCM / SuperPuTTY / mRemote / Exceed / SecureCRT / RDM / WSL / PuTTY / External Bash 等导入入口共用的预览对话框
+- 支持每行勾选 + 全选 / 反选；前 80 条出现在表格预览中，剩余仍按选择应用
+- Cancel 走遮罩点击 / Esc / Cancel 按钮；Confirm 在没有选中行时禁用
+- 摘要区列出待写入 vault 的密码数与 standalone secret 数
+
+### 16.3 第三方 Vault 解锁对话框 ✅
+
+<!-- feature
+id: F-ExternalVault-1
+status: done
+area: sessions/import
+components: [ExternalVaultUnlockDialog]
+files:
+  - src/components/session/ExternalVaultUnlockDialog.tsx
+  - src/components/sidebar/SessionTree.tsx
+controls:
+  - id: dialog
+    selector: '[data-testid="external-vault-unlock-dialog"]'
+    kind: display
+    optional: true       # only when importing a tool that has an encrypted vault (e.g. Tabby)
+  - id: description
+    selector: '[data-testid="external-vault-unlock-description"]'
+    kind: display
+    optional: true
+  - id: pw-input
+    selector: '[data-testid="external-vault-unlock-pw"]'
+    kind: interactive
+    optional: true
+  - id: error
+    selector: '[data-testid="external-vault-unlock-error"]'
+    kind: display
+    optional: true       # only after wrong password / decryption error
+  - id: skip
+    selector: '[data-testid="external-vault-unlock-skip"]'
+    kind: interactive
+    optional: true
+  - id: confirm
+    selector: '[data-testid="external-vault-unlock-confirm"]'
+    kind: interactive
+    optional: true
+-->
+
+- 通用 prop 驱动的第三方主密码输入框（与 NewMob 自身的 `VaultUnlockDialog` 区分，避免误导）
+- 用于 Tabby vault 解密：错误密码后保留对话框并显示内联错误（`tabby_vault_bad_password` → "Incorrect Tabby master password (attempt N)"）
+- 「Skip」按钮跳过 vault 解密但仍继续走 OS keychain 回退
+
+### 16.4 Folder Name 对话框 ✅
+
+<!-- feature
+id: F-FolderName-1
+status: done
+area: sessions/folder
+components: [FolderNameDialog, SessionTree]
+files:
+  - src/components/sidebar/FolderNameDialog.tsx
+  - src/components/sidebar/SessionTree.tsx
+controls:
+  - id: dialog
+    selector: '[data-testid="folder-name-dialog"]'
+    kind: display
+    optional: true
+  - id: parent-readout
+    selector: '[data-testid="folder-name-dialog-parent"]'
+    kind: display
+    optional: true
+  - id: input
+    selector: '[data-testid="folder-name-dialog-input"]'
+    kind: interactive
+    optional: true
+  - id: cancel
+    selector: '[data-testid="folder-name-dialog-cancel"]'
+    kind: interactive
+    optional: true
+  - id: confirm
+    selector: '[data-testid="folder-name-dialog-confirm"]'
+    kind: interactive
+    optional: true
+-->
+
+- 替代 `window.prompt` 的文件夹命名 React 模态，新建 / 重命名共用
+- 父路径只读显示在顶部
+- 空名 / 非法字符（"/"、控制字符）禁用 Confirm
+
+---
+
+## 17. 会话侧边栏与多选
+
+### 17.1 多选会话连接 ✅
+
+<!-- feature
+id: F-Sidebar-1
+status: done
+area: sessions/multiselect
+components: [SessionTree, Sidebar, MainLayout]
+files:
+  - src/components/sidebar/SessionTree.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/layouts/MainLayout.tsx
+controls: []   # selection state is exposed via [data-selected] / [aria-selected] on existing session-tree-item rows; no new dedicated testids
+-->
+
+- 在 SessionTree 中按住 Ctrl / Meta 单击会话条目可累加选中
+- 选中状态通过 `data-selected` / `aria-selected` 属性暴露
+- 右键菜单首项变成 `Connect selected sessions (N)`，一次性把所有选中会话作为新 tab 打开
+- 普通点击仍然回到单选语义
+
+---
+
+## 18. 上下文菜单容错
+
+### 18.1 子菜单视口翻转 ✅
+
+<!-- feature
+id: F-Submenu-1
+status: done
+area: ui/menu
+components: [ContextMenu]
+files:
+  - src/components/ContextMenu.tsx
+controls: []   # no dedicated testid: the submenu container itself uses class-based positioning, not a testid. behavior-only feature kept here to document the fix.
+-->
+
+- 二级 / 三级 子菜单出现时，若按默认 `left-full` 渲染会超出视口右边缘，则通过 `getBoundingClientRect` 切换到 `right-full` 向左展开
+- macOS WKWebView 上原本被裁掉的子菜单恢复可见
+- 没有 testid，行为通过现有右键菜单链路（如会话树 Import / Export 子菜单）覆盖
 
 ---
 
