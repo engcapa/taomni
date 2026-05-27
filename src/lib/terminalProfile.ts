@@ -82,6 +82,21 @@ export function parseSessionOptions(optionsJson: string | null | undefined): Rec
   }
 }
 
+export function isWslSessionOptions(optionsJson: string | null | undefined): boolean {
+  const options = parseSessionOptions(optionsJson);
+  const path = typeof options.localShellPath === "string" ? options.localShellPath : "";
+  const basename = path.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+  return basename === "wsl.exe";
+}
+
+export function sessionTypeLabel(
+  sessionType: string | undefined | null,
+  optionsJson: string | null | undefined,
+): string {
+  if (sessionType === "LocalShell" && isWslSessionOptions(optionsJson)) return "WSL";
+  return sessionType ?? "";
+}
+
 export function getSessionTerminalProfile(optionsJson: string | null | undefined): TerminalProfile | undefined {
   const options = parseSessionOptions(optionsJson);
   if (!("terminalProfile" in options)) return undefined;

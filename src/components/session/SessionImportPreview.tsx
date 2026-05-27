@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionImportResult } from "../../lib/sessionImportExport";
 import { folderOptionLabel } from "../../lib/sessionPaths";
+import { sessionTypeLabel } from "../../lib/terminalProfile";
 import { useT } from "../../lib/i18n";
 
 export interface SessionImportPreviewProps {
@@ -195,7 +196,7 @@ export function SessionImportPreview({
                       <td className="px-2 py-1 border max-w-[180px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.name}>
                         {session.name}
                       </td>
-                      <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{session.session_type}</td>
+                      <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{sessionTypeLabel(session.session_type, session.options_json)}</td>
                       <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.host}>
                         {session.host || "-"}
                       </td>

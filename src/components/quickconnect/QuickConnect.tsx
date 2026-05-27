@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Home, RefreshCw } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
 import type { SessionConfig } from "../../lib/ipc";
+import { sessionTypeLabel } from "../../lib/terminalProfile";
 import { useT } from "../../lib/i18n";
 
 interface QuickConnectProps {
@@ -84,21 +85,24 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
       {recent.length === 0 ? (
         <span className="text-[var(--moba-text-muted)]">{t("quickConnect.recentNone")}</span>
       ) : (
-        recent.map((session) => (
+        recent.map((session) => {
+          const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
+          return (
           <button
             data-testid="qc-recent"
             data-session-id={session.id}
-            data-session-type={session.session_type}
+            data-session-type={typeLabel}
             key={session.id}
             className="px-1.5 py-0.5 rounded hover:bg-[var(--moba-control-hover)] underline max-w-[110px] truncate"
             style={{ color: "var(--moba-link)" }}
             onClick={() => onConnectSession(session)}
-            title={`${session.name} (${session.session_type})`}
+            title={`${session.name} (${typeLabel})`}
             type="button"
           >
             {session.name}
           </button>
-        ))
+          );
+        })
       )}
       <button
         data-testid="qc-refresh"
