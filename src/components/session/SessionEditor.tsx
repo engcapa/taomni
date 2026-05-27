@@ -949,18 +949,17 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isEdit = !!session;
 
   const initialOptions = useMemo(() => parseSessionOptions(session?.options_json), [session?.options_json]);
+  const initialProtoValue = session
+    ? sessionTypeToProto(session.session_type, session.options_json)
+    : sessionTypeToProto(initialProto);
 
   /* --- core fields --- */
-  const [proto, setProto] = useState<Proto>(
-    session
-      ? sessionTypeToProto(session.session_type, session.options_json)
-      : sessionTypeToProto(initialProto),
-  );
+  const [proto, setProto] = useState<Proto>(initialProtoValue);
   const [section, setSection] = useState<SectionTab>("advanced");
   const [name, setName] = useState(session?.name ?? "");
   const [host, setHost] = useState(session?.host ?? "");
   const [port, setPort] = useState(
-    String(session?.port ?? DEFAULT_PORTS["SSH"]),
+    String(session?.port ?? DEFAULT_PORTS[initialProtoValue] ?? 22),
   );
   const [username, setUsername] = useState(session?.username ?? "");
   const [specifyUser, setSpecifyUser] = useState(!!session?.username);
@@ -1131,9 +1130,49 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
+  const buildOptionsJson = ({
+    passwordRefValue = passwordRef,
+    networkSettingsValue = networkSettings,
+    proxyPassValue = networkSettings.proxyPass,
+  }: {
+    passwordRefValue?: string;
+    networkSettingsValue?: NetworkSettingsValue;
+    proxyPassValue?: string;
+  } = {}): string => {
+    const previousOptions = stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json));
+    const wslOverrides: Record<string, unknown> =
+      proto === "WSL"
+        ? {
+            ...serializeWslOptions(wslOptions),
+            localShellPath: "wsl.exe",
+            localShellArgs: buildWslLaunchArgs(wslOptions),
+          }
+        : {};
+
+    return JSON.stringify({
+      ...previousOptions,
+      x11, compression, startupCmd, jumpHost: jumpHost || "",
+      jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
+      remoteEnv, sshBrowser, usePrivKey, useJump,
+      fileEmbedInTab, fileExtraArgs,
+      terminalProfile,
+      // SSH password vault reference (vault:<id>). Empty string means no
+      // saved password; the user types it on connect.
+      passwordRef: passwordRefValue || "",
+      // Strip the proxy password unless the user explicitly opted into
+      // "Save in vault". `options_json` lands in the SQLite session row
+      // in plaintext, so this is the gate keeping secrets out at rest.
+      // When proxySaveAuth is on AND the value is already a vault: ref,
+      // we keep it (the resolution happens server-side).
+      networkSettings: networkSettingsValue.proxySaveAuth
+        ? { ...networkSettingsValue, proxyPass: proxyPassValue }
+        : { ...networkSettingsValue, proxyPass: "" },
+      ...wslOverrides,
+    });
+  };
+
   const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
     const now = Math.floor(Date.now() / 1000);
-    const previousOptions = stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json));
     let auth: AuthMethod = "Password";
     if (authMethod === "PrivateKey")
       auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
@@ -1146,14 +1185,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         : (proto === "File" && host
           ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
           : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal")));
-    const wslOverrides: Record<string, unknown> =
-      proto === "WSL"
-        ? {
-            ...serializeWslOptions(wslOptions),
-            localShellPath: "wsl.exe",
-            localShellArgs: buildWslLaunchArgs(wslOptions),
-          }
-        : {};
     return {
       id: session?.id ?? crypto.randomUUID(),
       name: displayName,
@@ -1163,26 +1194,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       port: parseInt(port) || DEFAULT_PORTS[proto] || 0,
       username: username || null,
       auth_method: auth,
-      options_json: JSON.stringify({
-        ...previousOptions,
-        x11, compression, startupCmd, jumpHost: jumpHost || "",
-        jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
-        remoteEnv, sshBrowser, usePrivKey, useJump,
-        fileEmbedInTab, fileExtraArgs,
-        terminalProfile,
-        // SSH password vault reference (vault:<id>). Empty string means no
-        // saved password; the user types it on connect.
-        passwordRef: passwordRef || "",
-        // Strip the proxy password unless the user explicitly opted into
-        // "Save in vault". `options_json` lands in the SQLite session row
-        // in plaintext, so this is the gate keeping secrets out at rest.
-        // When proxySaveAuth is on AND the value is already a vault: ref,
-        // we keep it (the resolution happens server-side).
-        networkSettings: networkSettings.proxySaveAuth
-          ? networkSettings
-          : { ...networkSettings, proxyPass: "" },
-        ...wslOverrides,
-      }),
+      options_json: buildOptionsJson(),
       created_at: session?.created_at ?? now,
       updated_at: now,
       last_connected_at: session?.last_connected_at ?? null,
@@ -1266,17 +1278,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
     setPasswordRef(nextPasswordRef);
     const config = buildConfig({
-      options_json: JSON.stringify({
-        ...stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
-        x11, compression, startupCmd, jumpHost: jumpHost || "",
-        jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
-        remoteEnv, sshBrowser, usePrivKey, useJump,
-        fileEmbedInTab, fileExtraArgs,
-        terminalProfile,
-        passwordRef: nextPasswordRef || "",
-        networkSettings: networkSettings.proxySaveAuth
-          ? { ...networkSettings, proxyPass: nextProxyPass }
-          : { ...networkSettings, proxyPass: "" },
+      options_json: buildOptionsJson({
+        passwordRefValue: nextPasswordRef,
+        proxyPassValue: nextProxyPass,
       }),
     });
 

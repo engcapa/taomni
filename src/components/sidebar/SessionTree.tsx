@@ -65,7 +65,7 @@ import {
   type SessionImportOptions,
   type SessionImportResult,
 } from "../../lib/sessionImportExport";
-import { parseSessionOptions } from "../../lib/terminalProfile";
+import { parseSessionOptions, sessionTypeLabel } from "../../lib/terminalProfile";
 import { parseOpenSshConfig } from "../../lib/quickConnect";
 import { openBinaryFile, openTextFile, openTextFileWithName, downloadTextFile } from "../../lib/fileHelpers";
 import { serializeHtmlSessions } from "../../lib/sessionExportHtml";
@@ -1435,7 +1435,8 @@ function SessionItem({
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
-  const icon = sessionIcon(session.session_type);
+  const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
+  const icon = sessionIcon(typeLabel);
   const ref = useRef<HTMLDivElement>(null);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1459,7 +1460,7 @@ function SessionItem({
       data-testid="session-tree-item"
       data-session-id={session.id}
       data-session-name={session.name}
-      data-session-type={session.session_type}
+      data-session-type={typeLabel}
       className="moba-tree-row group"
       data-selected={selected}
       aria-selected={selected}
@@ -1483,7 +1484,7 @@ function SessionItem({
         className="px-1 rounded"
         style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)", background: "#e1ecfa", color: "#1e3a5f" }}
       >
-        {session.session_type}
+        {typeLabel}
       </span>
     </div>
   );
@@ -1502,6 +1503,8 @@ function sessionIcon(type: string) {
       return <Folder className="w-3.5 h-3.5" style={{ color: "#3b7ac2" }} />;
     case "Serial":
       return <Wifi className="w-3.5 h-3.5" style={{ color: "#236a98" }} />;
+    case "WSL":
+      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#0078d4" }} />;
     case "LocalShell":
       return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#62d36f" }} />;
     case "File":
@@ -1591,7 +1594,7 @@ function filterSessions(sessions: SessionConfig[], query: string): SessionConfig
   return sessions.filter((session) => {
     const haystack = [
       session.name,
-      session.session_type,
+      sessionTypeLabel(session.session_type, session.options_json),
       folderOptionLabel(session.group_path),
       session.host,
       session.username ?? "",

@@ -107,4 +107,32 @@ describe("SessionTree multi-select connect", () => {
       "person-cloudcone",
     ]);
   });
+
+  it("labels saved WSL sessions as WSL in the tree", () => {
+    const wslSession: SessionConfig = {
+      ...makeSession("wsl-ubuntu", "WSL: Ubuntu", "ipy"),
+      session_type: "LocalShell",
+      host: "",
+      port: 0,
+      username: null,
+      options_json: JSON.stringify({
+        localShellPath: "wsl.exe",
+        localShellArgs: ["-d", "Ubuntu"],
+      }),
+    };
+    ipcMocks.listSessions.mockResolvedValue([wslSession]);
+    useSessionStore.setState({
+      sessions: [wslSession],
+      groups,
+      loading: false,
+      selectedSessionId: null,
+      searchQuery: "",
+    });
+
+    render(<SessionTree />);
+    fireEvent.click(screen.getByText("ipy"));
+
+    expect(sessionRow("wsl-ubuntu")).toHaveAttribute("data-session-type", "WSL");
+    expect(sessionRow("wsl-ubuntu")).toHaveTextContent("WSL");
+  });
 });
