@@ -20,10 +20,24 @@ pub struct PointerEvent {
     pub buttons: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PointerWheelEvent {
+    pub x: u16,
+    pub y: u16,
+    pub is_vertical: bool,
+    pub rotation_units: i16,
+}
+
 impl PointerEvent {
-    pub fn left(&self) -> bool { self.buttons & 0x01 != 0 }
-    pub fn right(&self) -> bool { self.buttons & 0x02 != 0 }
-    pub fn middle(&self) -> bool { self.buttons & 0x04 != 0 }
+    pub fn left(&self) -> bool {
+        self.buttons & 0x01 != 0
+    }
+    pub fn right(&self) -> bool {
+        self.buttons & 0x02 != 0
+    }
+    pub fn middle(&self) -> bool {
+        self.buttons & 0x04 != 0
+    }
 }
 
 /// Translate a browser `KeyboardEvent.code` value into a set-1 scancode.
@@ -79,7 +93,11 @@ mod tests {
 
     #[test]
     fn pointer_buttons_decode() {
-        let e = PointerEvent { x: 0, y: 0, buttons: 0b101 };
+        let e = PointerEvent {
+            x: 0,
+            y: 0,
+            buttons: 0b101,
+        };
         assert!(e.left());
         assert!(!e.right());
         assert!(e.middle());

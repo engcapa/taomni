@@ -15,22 +15,20 @@
 //!
 //! See [`channel`] constants for the tag values.
 //!
-//! The handshake itself is a four-step state machine:
+//! The connection itself is a three-step state machine:
 //!
-//! 1. Open a transport (direct, proxy, or RD Gateway) via
+//! 1. Open a direct TCP, HTTP/SOCKS5 proxy, or RD Gateway tunnel via
 //!    [`crate::rdp::transport::open_transport`].
-//! 2. Send the X.224 Connection Request + RDP Negotiation Request and
-//!    parse the Connection Confirm + Negotiation Response.
-//! 3. Upgrade to TLS / NLA according to the negotiated protocol. Handled
-//!    by [`crate::rdp::session::run_post_negotiation`] (full IronRDP
-//!    integration is wired in step 2 of the implementation plan).
-//! 4. Hand the established session to the `run_relay` event loop, which
-//!    pumps frames out and control PDUs in.
+//! 2. Bind the loopback WebSocket listener so the frontend can receive
+//!    status updates while RDP authentication continues.
+//! 3. Hand the TCP stream to [`crate::rdp::session::start_ironrdp_session`],
+//!    which owns X.224 negotiation, TLS, CredSSP/NLA, active-stage display
+//!    decoding, and input encoding.
 
 use std::time::{Duration, Instant};
 
 use futures::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex as AsyncMutex;
@@ -38,9 +36,10 @@ use tokio_util::sync::CancellationToken;
 use tungstenite::Message;
 
 use crate::rdp::frame::TileHeader;
-use crate::rdp::input::{KeyEvent, PointerEvent};
-use crate::rdp::pdu::nego;
-use crate::rdp::session::{run_post_negotiation, RdpSessionHandle};
+use crate::rdp::input::{KeyEvent, PointerEvent, PointerWheelEvent};
+use crate::rdp::session::{
+    start_ironrdp_session, RdpSessionConfig, RdpSessionHandle, SessionOutput,
+};
 use crate::rdp::transport::open_transport;
 use crate::rdp::RdpOptions;
 use crate::terminal::network::NetworkSettings;
@@ -66,15 +65,18 @@ pub mod channel {
     pub const IN_KEY: u8 = 2;
     pub const IN_POINTER: u8 = 3;
     pub const IN_RESIZE: u8 = 4;
+    pub const IN_WHEEL: u8 = 5;
 }
 
 #[derive(Debug)]
 pub enum RdpControl {
     Key(KeyEvent),
     Pointer(PointerEvent),
+    Wheel(PointerWheelEvent),
     Resize { width: u16, height: u16 },
     ClipboardOffer { formats: u32 },
     ClipboardData { format: u32, data: Vec<u8> },
+    ClipboardFiles { paths: Vec<String> },
     Ack,
     Disconnect,
 }
@@ -93,30 +95,12 @@ enum WsIncomingText {
     Ack,
     #[serde(rename = "clipboard")]
     Clipboard { text: String },
+    #[serde(rename = "clipboard_files")]
+    ClipboardFiles { paths: Vec<String> },
     #[serde(rename = "resize")]
     Resize { width: u16, height: u16 },
     #[serde(rename = "disconnect")]
     Disconnect,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "type")]
-enum WsOutgoingText {
-    #[serde(rename = "connected")]
-    Connected {
-        width: u16,
-        height: u16,
-        protocol: String,
-        server_name: String,
-    },
-    #[serde(rename = "disconnected")]
-    Disconnected { reason: String },
-    #[serde(rename = "status")]
-    Status { stage: String, detail: String },
-    #[serde(rename = "clipboard")]
-    Clipboard { text: String },
-    #[serde(rename = "error")]
-    Error { code: String, message: String },
 }
 
 pub struct RdpSession {
@@ -137,8 +121,10 @@ pub struct RdpSpawnConfig {
 pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> {
     let cancel = CancellationToken::new();
 
-    // 1. Transport
-    let mut stream = open_transport(
+    // 1. Transport. Direct TCP, HTTP/SOCKS5 proxy, and RD Gateway all
+    // converge on the same async stream abstraction; IronRDP owns all
+    // RDP-layer negotiation after this point.
+    let transport = open_transport(
         &cfg.host,
         cfg.port,
         cfg.network.as_ref(),
@@ -146,13 +132,8 @@ pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> 
     )
     .await?;
 
-    // 2. X.224 + Negotiation
-    let req = nego::negotiate_request(&cfg.options);
-    nego::send_negotiation_with_cookie(&mut stream, &req, cfg.username.as_deref()).await?;
-    let resp = nego::recv_negotiation(&mut stream).await?;
-
-    // 3. Bind WS listener (we do this before TLS so the frontend has the port
-    //    early; the TLS upgrade and NLA happen on the inner stream).
+    // 2. Bind WS listener before the IronRDP worker finishes authentication so
+    // the frontend can show granular status updates.
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(|e| format!("rdp: bind WS listener: {}", e))?;
@@ -164,22 +145,18 @@ pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> 
     let (control_tx, control_rx) = mpsc::unbounded_channel::<RdpControl>();
     let (ws_out_tx, ws_out_rx) = mpsc::unbounded_channel::<WsOutgoing>();
 
-    // 4. Hand off to the post-negotiation pipeline (TLS upgrade, MCS,
-    //    capability exchange, virtual-channel setup, draw loop). This
-    //    returns a handle the relay drives. Until IronRDP is wired in,
-    //    `run_post_negotiation` returns a placeholder that emits a
-    //    `Status { stage: "awaiting-implementation" }` message and idles.
-    let session = run_post_negotiation(stream, resp, cfg.options.clone(), cfg.username.clone(), cfg.password.clone())
-        .await?;
-
-    let connected = serde_json::to_string(&WsOutgoingText::Connected {
-        width: cfg.options.screen_w,
-        height: cfg.options.screen_h,
-        protocol: resp.selected_protocol_label().to_string(),
-        server_name: cfg.host.clone(),
-    })
-    .unwrap();
-    let _ = ws_out_tx.send(WsOutgoing::Text(connected));
+    // 3. Hand off to IronRDP: connector, TLS, CredSSP, active-stage display
+    //    decoding, and input all run behind this handle.
+    let session = start_ironrdp_session(RdpSessionConfig {
+        stream: transport.stream,
+        local_addr: transport.local_addr,
+        host: cfg.host.clone(),
+        port: cfg.port,
+        username: cfg.username.clone(),
+        password: cfg.password.clone(),
+        options: cfg.options.clone(),
+        network: cfg.network.clone(),
+    });
 
     let cancel_clone = cancel.clone();
     let control_tx_for_relay = control_tx.clone();
@@ -276,6 +253,9 @@ async fn run_relay(
                                     data: text.into_bytes(),
                                 });
                             }
+                            WsIncomingText::ClipboardFiles { paths } => {
+                                let _ = ctrl.send(RdpControl::ClipboardFiles { paths });
+                            }
                             WsIncomingText::Resize { width, height } => {
                                 let _ = ctrl.send(RdpControl::Resize { width, height });
                             }
@@ -295,10 +275,8 @@ async fn run_relay(
         }
     });
 
-    // Drive the session: forward ws_out frames out, control input to the
-    // session. The placeholder session is a Pending future when there's
-    // no real RDP connection yet — that lets the relay still respond to
-    // pings, status messages, and disconnects without panicking.
+    // Drive the session: forward display/status output to the WebSocket and
+    // pass browser controls into IronRDP.
     let session_drive = tokio::spawn({
         let cancel = cancel.clone();
         let ws_out_clone = ws_out_tx.clone();
@@ -311,22 +289,26 @@ async fn run_relay(
                         Some(RdpControl::Disconnect) => { cancel.cancel(); break; }
                         Some(other) => {
                             if let Err(e) = session.dispatch_control(other).await {
-                                let json = serde_json::to_string(&WsOutgoingText::Error {
-                                    code: "control-failed".into(),
-                                    message: e,
+                                let json = serde_json::json!({
+                                    "type": "error",
+                                    "code": "control-failed",
+                                    "message": e,
                                 })
-                                .unwrap();
+                                .to_string();
                                 let _ = ws_out_clone.send(WsOutgoing::Text(json));
                             }
                         }
                         None => break,
                     },
                     out = session.next_outgoing() => match out {
-                        Some((tag, payload)) => {
+                        Some(SessionOutput::Channel { tag, payload }) => {
                             let mut frame = Vec::with_capacity(1 + payload.len());
                             frame.push(tag);
                             frame.extend_from_slice(&payload);
                             let _ = ws_out_clone.send(WsOutgoing::Frame(frame));
+                        }
+                        Some(SessionOutput::Text(text)) => {
+                            let _ = ws_out_clone.send(WsOutgoing::Text(text));
                         }
                         None => break,
                     }
@@ -375,11 +357,14 @@ async fn run_relay(
 /// tag=IN_KEY:    [tag, down, scan_lo, scan_hi]
 /// tag=IN_POINTER:[tag, buttons, x_hi, x_lo, y_hi, y_lo]
 /// tag=IN_RESIZE: [tag, w_hi, w_lo, h_hi, h_lo]
+/// tag=IN_WHEEL:  [tag, orientation, x_hi, x_lo, y_hi, y_lo, units_hi, units_lo]
 /// tag=IN_PING:   [tag]
 /// tag=IN_ACK:    [tag]
 /// ```
 pub fn parse_binary_control(bytes: &[u8]) -> Option<RdpControl> {
-    if bytes.is_empty() { return None; }
+    if bytes.is_empty() {
+        return None;
+    }
     match bytes[0] {
         channel::IN_PING | channel::IN_ACK => Some(RdpControl::Ack),
         channel::IN_KEY if bytes.len() >= 4 => {
@@ -396,7 +381,22 @@ pub fn parse_binary_control(bytes: &[u8]) -> Option<RdpControl> {
         channel::IN_RESIZE if bytes.len() >= 5 => {
             let w = u16::from_be_bytes([bytes[1], bytes[2]]);
             let h = u16::from_be_bytes([bytes[3], bytes[4]]);
-            Some(RdpControl::Resize { width: w, height: h })
+            Some(RdpControl::Resize {
+                width: w,
+                height: h,
+            })
+        }
+        channel::IN_WHEEL if bytes.len() >= 8 => {
+            let is_vertical = bytes[1] == 0;
+            let x = u16::from_be_bytes([bytes[2], bytes[3]]);
+            let y = u16::from_be_bytes([bytes[4], bytes[5]]);
+            let rotation_units = i16::from_be_bytes([bytes[6], bytes[7]]);
+            (rotation_units != 0).then_some(RdpControl::Wheel(PointerWheelEvent {
+                x,
+                y,
+                is_vertical,
+                rotation_units,
+            }))
         }
         _ => None,
     }
@@ -456,21 +456,48 @@ mod tests {
     }
 
     #[test]
+    fn parse_wheel() {
+        let buf = [channel::IN_WHEEL, 0x00, 0x01, 0x90, 0x01, 0x2c, 0xff, 0x88];
+        match parse_binary_control(&buf).unwrap() {
+            RdpControl::Wheel(w) => {
+                assert!(w.is_vertical);
+                assert_eq!(w.x, 0x0190);
+                assert_eq!(w.y, 0x012c);
+                assert_eq!(w.rotation_units, -120);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
     fn parse_ping_and_ack_are_ack() {
-        assert!(matches!(parse_binary_control(&[channel::IN_PING]), Some(RdpControl::Ack)));
-        assert!(matches!(parse_binary_control(&[channel::IN_ACK]), Some(RdpControl::Ack)));
+        assert!(matches!(
+            parse_binary_control(&[channel::IN_PING]),
+            Some(RdpControl::Ack)
+        ));
+        assert!(matches!(
+            parse_binary_control(&[channel::IN_ACK]),
+            Some(RdpControl::Ack)
+        ));
     }
 
     #[test]
     fn parse_truncated_returns_none() {
         assert!(parse_binary_control(&[channel::IN_KEY]).is_none());
         assert!(parse_binary_control(&[channel::IN_POINTER, 1]).is_none());
+        assert!(parse_binary_control(&[channel::IN_WHEEL, 0]).is_none());
+        assert!(parse_binary_control(&[channel::IN_WHEEL, 0, 0, 0, 0, 0, 0, 0]).is_none());
         assert!(parse_binary_control(&[]).is_none());
     }
 
     #[test]
     fn frame_payload_layout() {
-        let h = TileHeader { x: 10, y: 20, w: 30, h: 40 };
+        let h = TileHeader {
+            x: 10,
+            y: 20,
+            w: 30,
+            h: 40,
+        };
         let rgba = vec![0xff, 0x00, 0x00, 0xff];
         let p = frame_payload_with_header(h, &rgba);
         assert_eq!(&p[0..2], &10u16.to_be_bytes());

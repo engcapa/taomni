@@ -50,6 +50,10 @@ dirs = "5"
 flate2 = "1"
 tungstenite = "0.24"
 tokio-tungstenite = "0.24"
+ironrdp = { version = "0.14.0", features = ["connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol"] }
+ironrdp-tls = { version = "0.2.0", features = ["rustls"] }
+ironrdp-tokio = { version = "0.8.0", features = ["reqwest-rustls-ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 aes = "0.8"
 cbc = "0.1"
 des = "0.8"
@@ -81,7 +85,7 @@ vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["fileapi", "commdlg"] }
+winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winbase", "winuser"] }
 winreg = "0.55"
 
 [dev-dependencies]

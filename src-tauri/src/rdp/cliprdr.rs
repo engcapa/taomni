@@ -127,7 +127,9 @@ pub fn decode_format_list(body: &[u8]) -> Result<Vec<ClipFormat>, String> {
             }
             let u = u16::from_le_bytes([body[i], body[i + 1]]);
             i += 2;
-            if u == 0 { break; }
+            if u == 0 {
+                break;
+            }
             units.push(u);
         }
         let name = String::from_utf16(&units).map_err(|e| format!("utf16 name: {}", e))?;
@@ -242,10 +244,13 @@ fn decode_one_descriptor(buf: &[u8]) -> Result<FileDescriptor, String> {
     let mut units: Vec<u16> = Vec::with_capacity(260);
     for chunk in buf[72..72 + 520].chunks_exact(2) {
         let u = u16::from_le_bytes([chunk[0], chunk[1]]);
-        if u == 0 { break; }
+        if u == 0 {
+            break;
+        }
         units.push(u);
     }
-    let name = String::from_utf16(&units).map_err(|e| format!("FILEDESCRIPTORW name utf16: {}", e))?;
+    let name =
+        String::from_utf16(&units).map_err(|e| format!("FILEDESCRIPTORW name utf16: {}", e))?;
     Ok(FileDescriptor {
         name,
         size,
@@ -326,10 +331,7 @@ pub fn encode_file_contents_request(req: &FileContentsRequest) -> Vec<u8> {
 
 pub fn decode_file_contents_request(buf: &[u8]) -> Result<FileContentsRequest, String> {
     if buf.len() < 24 {
-        return Err(format!(
-            "CB_FILECONTENTS_REQUEST: {} bytes < 24",
-            buf.len()
-        ));
+        return Err(format!("CB_FILECONTENTS_REQUEST: {} bytes < 24", buf.len()));
     }
     let stream_id = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
     let list_index = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
@@ -389,7 +391,9 @@ pub fn uri_list_to_paths(text: &str) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for line in text.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') { continue; }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
         if let Some(rest) = trimmed.strip_prefix("file://") {
             let rest = rest.trim_start_matches('/');
             let decoded = percent_decode(rest);
@@ -412,8 +416,8 @@ fn percent_encode_path(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.as_bytes() {
         let c = *b;
-        let safe = c.is_ascii_alphanumeric()
-            || matches!(c, b'-' | b'_' | b'.' | b'~' | b'/' | b':');
+        let safe =
+            c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.' | b'~' | b'/' | b':');
         if safe {
             out.push(c as char);
         } else {
@@ -454,6 +458,16 @@ fn hex_nibble(c: u8) -> Option<u8> {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    fn uri_path(path: &str) -> PathBuf {
+        PathBuf::from(path.trim_start_matches('/'))
+    }
+
+    #[cfg(not(windows))]
+    fn uri_path(path: &str) -> PathBuf {
+        PathBuf::from(path)
+    }
+
     #[test]
     fn header_round_trip() {
         let h = ClipHeader {
@@ -474,9 +488,18 @@ mod tests {
     #[test]
     fn format_list_round_trip() {
         let entries = vec![
-            ClipFormat { id: CF_UNICODETEXT, name: String::new() },
-            ClipFormat { id: 0x0000_C001, name: FORMAT_NAME_FGW.into() },
-            ClipFormat { id: 0x0000_C002, name: FORMAT_NAME_FCONT.into() },
+            ClipFormat {
+                id: CF_UNICODETEXT,
+                name: String::new(),
+            },
+            ClipFormat {
+                id: 0x0000_C001,
+                name: FORMAT_NAME_FGW.into(),
+            },
+            ClipFormat {
+                id: 0x0000_C002,
+                name: FORMAT_NAME_FCONT.into(),
+            },
         ];
         let body = encode_format_list(&entries);
         let decoded = decode_format_list(&body).unwrap();
@@ -486,8 +509,14 @@ mod tests {
     #[test]
     fn format_list_handles_unicode_names() {
         let entries = vec![
-            ClipFormat { id: 0x0001, name: "中文".into() },
-            ClipFormat { id: 0x0002, name: "🎉".into() },
+            ClipFormat {
+                id: 0x0001,
+                name: "中文".into(),
+            },
+            ClipFormat {
+                id: 0x0002,
+                name: "🎉".into(),
+            },
         ];
         let body = encode_format_list(&entries);
         let decoded = decode_format_list(&body).unwrap();
@@ -505,10 +534,7 @@ mod tests {
         let version = u32::from_le_bytes([buf[8], buf[9], buf[10], buf[11]]);
         assert_eq!(version, 2);
         let flags = u32::from_le_bytes([buf[12], buf[13], buf[14], buf[15]]);
-        assert_eq!(
-            flags,
-            CB_USE_LONG_FORMAT_NAMES | CB_STREAM_FILECLIP_ENABLED
-        );
+        assert_eq!(flags, CB_USE_LONG_FORMAT_NAMES | CB_STREAM_FILECLIP_ENABLED);
     }
 
     #[test]
@@ -621,7 +647,10 @@ mod tests {
 
     #[test]
     fn uri_list_round_trip_simple() {
-        let paths = vec![PathBuf::from("/tmp/file with space.txt"), PathBuf::from("/tmp/中文.txt")];
+        let paths = vec![
+            uri_path("/tmp/file with space.txt"),
+            uri_path("/tmp/中文.txt"),
+        ];
         let s = paths_to_uri_list(&paths);
         let parsed = uri_list_to_paths(&s);
         assert_eq!(parsed, paths);
@@ -631,14 +660,14 @@ mod tests {
     fn uri_list_drops_blank_and_comment_lines() {
         let s = "# comment\n\nfile:///tmp/a.txt\n";
         let parsed = uri_list_to_paths(s);
-        assert_eq!(parsed, vec![PathBuf::from("/tmp/a.txt")]);
+        assert_eq!(parsed, vec![uri_path("/tmp/a.txt")]);
     }
 
     #[test]
     fn uri_list_skips_unknown_schemes() {
         let s = "https://example.com/x\nfile:///etc/hostname\n";
         let parsed = uri_list_to_paths(s);
-        assert_eq!(parsed, vec![PathBuf::from("/etc/hostname")]);
+        assert_eq!(parsed, vec![uri_path("/etc/hostname")]);
     }
 
     #[test]

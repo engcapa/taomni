@@ -8,17 +8,28 @@ import {
   encodePing,
   encodePointer,
   encodeResize,
+  encodeWheel,
   keyEventToScancode,
   mouseButtonMask,
+  normalizeRdpResizeSize,
+  OUT_AUDIO,
   OUT_FRAME,
+  parseAudioFrame,
   parseFrameTile,
   parseRdpWsText,
   rdpConnect,
   rdpDisconnect,
+  wheelDeltaToRotationUnits,
 } from "../../lib/rdp";
 import { useRdpStore } from "../../stores/rdpStore";
 import type { RdpOptions } from "../../types/rdp";
 import { useT, t as tr } from "../../lib/i18n";
+import {
+  readFiles as readClipboardFiles,
+  readText as readClipboardText,
+  writeFiles as writeClipboardFiles,
+  writeText as writeClipboardText,
+} from "../../lib/clipboard";
 
 export interface RdpPanelProps {
   tabId: string;
@@ -46,11 +57,15 @@ export default function RdpPanel({
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const heartbeatRef = useRef<number | null>(null);
+  const audioRef = useRef<{ ctx: AudioContext; nextTime: number } | null>(null);
+  const lastResizeRequestRef = useRef<string | null>(null);
   const destroyedRef = useRef(false);
   const visibleRef = useRef(visible);
+  const suppressNextPasteKeyUpRef = useRef(false);
   const initRef = useRef({ host, port, username, password, options, networkSettingsJson });
   const [scaleMode, setScaleMode] = useState<ScaleMode>("fit");
   const [fullscreen, setFullscreen] = useState(false);
@@ -66,11 +81,89 @@ export default function RdpPanel({
     }
   }, []);
 
+  const sendText = useCallback((data: unknown) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+    }
+  }, []);
+
+  const sendRemoteResize = useCallback(
+    (width: number, height: number, force = false) => {
+      const size = normalizeRdpResizeSize(width, height);
+      if (!size) return;
+      const key = `${size.width}x${size.height}`;
+      if (!force && lastResizeRequestRef.current === key) return;
+      lastResizeRequestRef.current = key;
+      sendBinary(encodeResize(size.width, size.height));
+    },
+    [sendBinary],
+  );
+
+  const requestViewportResize = useCallback(
+    (force = false) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const rect = viewport.getBoundingClientRect();
+      sendRemoteResize(rect.width, rect.height, force);
+    },
+    [sendRemoteResize],
+  );
+
+  const closeAudio = useCallback(() => {
+    const audio = audioRef.current;
+    audioRef.current = null;
+    if (audio) {
+      void audio.ctx.close().catch(() => {});
+    }
+  }, []);
+
+  const playAudioFrame = useCallback((frame: ReturnType<typeof parseAudioFrame>) => {
+    if (!frame || initRef.current.options.redirectAudio !== "play") return;
+    if (frame.channels < 1 || frame.channels > 2 || frame.bitsPerSample !== 16) return;
+
+    const AudioContextCtor =
+      typeof AudioContext !== "undefined"
+        ? AudioContext
+        : (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    let audio = audioRef.current;
+    if (!audio || audio.ctx.state === "closed") {
+      audio = { ctx: new AudioContextCtor({ sampleRate: frame.sampleRate }), nextTime: 0 };
+      audioRef.current = audio;
+    }
+    if (audio.ctx.state === "suspended") {
+      void audio.ctx.resume().catch(() => {});
+    }
+
+    const bytesPerSample = frame.bitsPerSample / 8;
+    const frameSize = bytesPerSample * frame.channels;
+    const sampleCount = Math.floor(frame.pcm.byteLength / frameSize);
+    if (sampleCount <= 0) return;
+
+    const buffer = audio.ctx.createBuffer(frame.channels, sampleCount, frame.sampleRate);
+    const view = new DataView(frame.pcm.buffer, frame.pcm.byteOffset, frame.pcm.byteLength);
+    for (let i = 0; i < sampleCount; i += 1) {
+      for (let ch = 0; ch < frame.channels; ch += 1) {
+        const offset = i * frameSize + ch * bytesPerSample;
+        buffer.getChannelData(ch)[i] = view.getInt16(offset, true) / 32768;
+      }
+    }
+
+    const source = audio.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audio.ctx.destination);
+    const startAt = Math.max(audio.nextTime, audio.ctx.currentTime + 0.02);
+    source.start(startAt);
+    audio.nextTime = startAt + buffer.duration;
+  }, []);
+
   /* ── Connect lifecycle ───────────────────────────────────────────── */
 
   const doConnect = useCallback(() => {
     const args = initRef.current;
     destroyedRef.current = false;
+    lastResizeRequestRef.current = null;
     store.initConnection(tabId);
 
     let cancelled = false;
@@ -114,9 +207,9 @@ export default function RdpPanel({
               const tile = parseFrameTile(event.data);
               if (tile) drawTile(canvasRef.current, tile);
               if (visibleRef.current) sendBinary(encodeAck());
+            } else if (tag === OUT_AUDIO) {
+              playAudioFrame(parseAudioFrame(event.data));
             }
-            // Other channels (audio / cursor / clipboard) are stubs in v0;
-            // they land in steps 2/4/5 of the implementation plan.
           } else {
             const msg = parseRdpWsText(event.data as string);
             if (!msg) return;
@@ -124,6 +217,7 @@ export default function RdpPanel({
               case "connected":
                 store.setConnected(tabId, msg.width, msg.height, msg.protocol, msg.server_name);
                 resizeCanvas(canvasRef.current, msg.width, msg.height);
+                window.setTimeout(() => requestViewportResize(false), 0);
                 break;
               case "disconnected":
                 store.setDisconnected(tabId, msg.reason);
@@ -135,13 +229,24 @@ export default function RdpPanel({
                 store.setDisconnected(tabId, msg.message);
                 break;
               case "clipboard":
-                // Clipboard text from server — wire in step 4.
+                void writeClipboardText(msg.text).catch((err) => {
+                  console.warn("[rdp.clip] write local clipboard failed:", err);
+                });
+                break;
+              case "clipboard_files":
+                void writeClipboardFiles(msg.paths).catch((err) => {
+                  console.warn("[rdp.clip] write local file clipboard failed:", err);
+                  if ("text" in msg && typeof msg.text === "string") {
+                    void writeClipboardText(msg.text).catch(() => {});
+                  }
+                });
                 break;
             }
           }
         };
 
         ws.onclose = () => {
+          closeAudio();
           wsRef.current = null;
           if (heartbeatRef.current !== null) {
             window.clearInterval(heartbeatRef.current);
@@ -166,7 +271,7 @@ export default function RdpPanel({
     return () => {
       cancelled = true;
     };
-  }, [sendBinary, store, tabId]);
+  }, [closeAudio, playAudioFrame, requestViewportResize, sendBinary, store, tabId]);
 
   useEffect(() => {
     initRef.current = { host, port, username, password, options, networkSettingsJson };
@@ -182,6 +287,7 @@ export default function RdpPanel({
         window.clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
       }
+      closeAudio();
       const sid = sessionIdRef.current;
       if (sid) rdpDisconnect(sid).catch(() => {});
       if (wsRef.current) {
@@ -199,15 +305,57 @@ export default function RdpPanel({
 
   /* ── Input handlers ──────────────────────────────────────────────── */
 
+  const syncClipboardForRemotePaste = useCallback(async () => {
+    const files = await readClipboardFiles().catch((err) => {
+      console.warn("[rdp.clip] read local file clipboard failed:", err);
+      return [];
+    });
+    if (files.length > 0) {
+      sendText({ type: "clipboard_files", paths: files });
+      window.setTimeout(() => {
+        sendBinary(encodeKey(true, 0x1d)); // Ctrl
+        sendBinary(encodeKey(true, 0x2f)); // V
+        sendBinary(encodeKey(false, 0x2f));
+        sendBinary(encodeKey(false, 0x1d));
+      }, 40);
+      return;
+    }
+
+    const text = await readClipboardText().catch((err) => {
+      console.warn("[rdp.clip] read local clipboard failed:", err);
+      return "";
+    });
+    if (!text) return;
+
+    sendText({ type: "clipboard", text });
+    window.setTimeout(() => {
+      sendBinary(encodeKey(true, 0x1d)); // Ctrl
+      sendBinary(encodeKey(true, 0x2f)); // V
+      sendBinary(encodeKey(false, 0x2f));
+      sendBinary(encodeKey(false, 0x1d));
+    }, 40);
+  }, [sendBinary, sendText]);
+
   const onKey = useCallback(
     (down: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!visible || conn?.status !== "connected") return;
+      if (!down && suppressNextPasteKeyUpRef.current && e.nativeEvent.code === "KeyV") {
+        suppressNextPasteKeyUpRef.current = false;
+        e.preventDefault();
+        return;
+      }
+      if (down && (e.ctrlKey || e.metaKey) && e.nativeEvent.code === "KeyV") {
+        e.preventDefault();
+        suppressNextPasteKeyUpRef.current = true;
+        void syncClipboardForRemotePaste();
+        return;
+      }
       const sc = keyEventToScancode(e.nativeEvent);
       if (!sc) return;
       e.preventDefault();
       sendBinary(encodeKey(down, applyExtended(sc.scancode, sc.extended)));
     },
-    [conn?.status, sendBinary, visible],
+    [conn?.status, sendBinary, syncClipboardForRemotePaste, visible],
   );
 
   const onPointer = useCallback(
@@ -215,25 +363,59 @@ export default function RdpPanel({
       if (!visible || conn?.status !== "connected") return;
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const cssX = e.clientX - rect.left;
-      const cssY = e.clientY - rect.top;
-      const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(cssX * (canvas.width / rect.width))));
-      const y = Math.max(
-        0,
-        Math.min(canvas.height - 1, Math.floor(cssY * (canvas.height / rect.height))),
-      );
+      const { x, y } = canvasPointFromClient(canvas, e.clientX, e.clientY);
       sendBinary(encodePointer(x, y, mouseButtonMask(e.nativeEvent)));
     },
     [conn?.status, sendBinary, visible],
   );
 
-  const triggerResize = useCallback(
-    (w: number, h: number) => {
-      sendBinary(encodeResize(w, h));
+  const onWheel = useCallback(
+    (e: React.WheelEvent<HTMLCanvasElement>) => {
+      if (!visible || conn?.status !== "connected") return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      e.preventDefault();
+      const { x, y } = canvasPointFromClient(canvas, e.clientX, e.clientY);
+
+      const verticalUnits = wheelDeltaToRotationUnits(e.deltaY, e.deltaMode);
+      if (verticalUnits !== 0) {
+        sendBinary(encodeWheel(x, y, -verticalUnits, true));
+      }
+
+      const horizontalUnits = wheelDeltaToRotationUnits(e.deltaX, e.deltaMode);
+      if (horizontalUnits !== 0) {
+        sendBinary(encodeWheel(x, y, horizontalUnits, false));
+      }
     },
-    [sendBinary],
+    [conn?.status, sendBinary, visible],
   );
+
+  useEffect(() => {
+    if (!visible || conn?.status !== "connected") return;
+    const viewport = viewportRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+
+    let timer: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => requestViewportResize(false), 300);
+    });
+    observer.observe(viewport);
+    requestViewportResize(false);
+
+    return () => {
+      observer.disconnect();
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [conn?.status, requestViewportResize, visible]);
+
+  const triggerResize = useCallback(() => {
+    requestViewportResize(true);
+  }, [requestViewportResize]);
 
   const reconnect = useCallback(() => {
     const sid = sessionIdRef.current;
@@ -242,9 +424,10 @@ export default function RdpPanel({
       wsRef.current.close();
       wsRef.current = null;
     }
+    closeAudio();
     store.setDisconnected(tabId);
     doConnect();
-  }, [doConnect, store, tabId]);
+  }, [closeAudio, doConnect, store, tabId]);
 
   const toggleFullscreen = useCallback(() => {
     setFullscreen((f) => !f);
@@ -270,10 +453,19 @@ export default function RdpPanel({
       tabIndex={0}
       onKeyDown={onKey(true)}
       onKeyUp={onKey(false)}
-      style={{ outline: "none", position: "relative", width: "100%", height: "100%" }}
+      style={{
+        outline: "none",
+        position: fullscreen ? "fixed" : "relative",
+        inset: fullscreen ? 0 : undefined,
+        zIndex: fullscreen ? 9000 : undefined,
+        width: "100%",
+        height: "100%",
+        background: "#000",
+      }}
     >
       <div
         className="rdp-toolbar"
+        data-testid="rdp-toolbar"
         style={{
           display: "flex",
           gap: 8,
@@ -292,6 +484,7 @@ export default function RdpPanel({
         <button
           type="button"
           className="moba-button"
+          data-testid="rdp-scale-toggle"
           onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
         >
           {scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
@@ -299,20 +492,29 @@ export default function RdpPanel({
         <button
           type="button"
           className="moba-button"
-          onClick={() => triggerResize(conn?.width ?? 0, conn?.height ?? 0)}
+          data-testid="rdp-resize"
+          disabled={conn?.status !== "connected"}
+          onClick={triggerResize}
           title={t("rdp.resize")}
         >
           {t("rdp.resize")}
         </button>
-        <button type="button" className="moba-button" onClick={reconnect} title={t("rdp.reconnect")}>
+        <button
+          type="button"
+          className="moba-button"
+          data-testid="rdp-reconnect"
+          onClick={reconnect}
+          title={t("rdp.reconnect")}
+        >
           <RefreshCw size={14} />
         </button>
-        <button type="button" className="moba-button" onClick={toggleFullscreen}>
+        <button type="button" className="moba-button" data-testid="rdp-fullscreen" onClick={toggleFullscreen}>
           {fullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
         </button>
       </div>
 
       <div
+        ref={viewportRef}
         style={{
           flex: 1,
           background: "#000",
@@ -321,6 +523,7 @@ export default function RdpPanel({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          overflow: scaleMode === "one" ? "auto" : "hidden",
         }}
       >
         <canvas
@@ -332,6 +535,7 @@ export default function RdpPanel({
           onPointerMove={onPointer}
           onPointerDown={onPointer}
           onPointerUp={onPointer}
+          onWheel={onWheel}
           onContextMenu={(e) => e.preventDefault()}
           style={{
             maxWidth: scaleMode === "fit" ? "100%" : undefined,
@@ -372,6 +576,15 @@ function resizeCanvas(canvas: HTMLCanvasElement | null, w: number, h: number) {
   if (!canvas) return;
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
+}
+
+function canvasPointFromClient(canvas: HTMLCanvasElement, clientX: number, clientY: number) {
+  const rect = canvas.getBoundingClientRect();
+  const cssX = clientX - rect.left;
+  const cssY = clientY - rect.top;
+  const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(cssX * (canvas.width / rect.width))));
+  const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(cssY * (canvas.height / rect.height))));
+  return { x, y };
 }
 
 function drawTile(

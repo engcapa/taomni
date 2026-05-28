@@ -96,10 +96,16 @@ pub fn negotiate_request(opts: &RdpOptions) -> NegotiationRequest {
 /// caller may supply just the user, or a full `username@domain` string.
 pub fn build_cookie(user: Option<&str>) -> Option<String> {
     let u = user?.trim();
-    if u.is_empty() { return None; }
+    if u.is_empty() {
+        return None;
+    }
     // ASCII only; truncate at 9 characters per spec recommendation.
     let safe: String = u.chars().filter(|c| c.is_ascii_graphic()).take(9).collect();
-    if safe.is_empty() { None } else { Some(format!("mstshash={}", safe)) }
+    if safe.is_empty() {
+        None
+    } else {
+        Some(format!("mstshash={}", safe))
+    }
 }
 
 /// Parse a 8-byte negotiation response or failure body.
@@ -217,16 +223,7 @@ mod tests {
 
     #[test]
     fn failure_round_trip() {
-        let body = [
-            TYPE_NEG_FAIL,
-            0x00,
-            0x08,
-            0x00,
-            0x05,
-            0,
-            0,
-            0,
-        ];
+        let body = [TYPE_NEG_FAIL, 0x00, 0x08, 0x00, 0x05, 0, 0, 0];
         match parse_negotiation(&body).unwrap() {
             NegotiationOutcome::Failure(f) => assert_eq!(f.failure_code, 0x0000_0005),
             _ => panic!("expected failure"),
@@ -240,7 +237,10 @@ mod tests {
 
     #[test]
     fn cookie_truncates_long_user() {
-        assert_eq!(build_cookie(Some("alice")).as_deref(), Some("mstshash=alice"));
+        assert_eq!(
+            build_cookie(Some("alice")).as_deref(),
+            Some("mstshash=alice")
+        );
         assert_eq!(
             build_cookie(Some("AVeryLongUserNameThatExceeds")).as_deref(),
             Some("mstshash=AVeryLong")
@@ -282,16 +282,7 @@ mod tests {
 
         // Build a valid CC carrying a negotiation response and feed it back.
         // 7-byte fixed header + 8-byte negotiation response → LI = 14.
-        let nego_body = [
-            TYPE_NEG_RSP,
-            0x00,
-            0x08,
-            0x00,
-            PROTOCOL_SSL as u8,
-            0,
-            0,
-            0,
-        ];
+        let nego_body = [TYPE_NEG_RSP, 0x00, 0x08, 0x00, PROTOCOL_SSL as u8, 0, 0, 0];
         let mut cc = vec![0x0Eu8, 0xD0, 0, 0, 0x12, 0x34, 0];
         cc.extend_from_slice(&nego_body);
         let framed = tpkt::encode(&cc).unwrap();

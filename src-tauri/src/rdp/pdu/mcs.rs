@@ -149,7 +149,10 @@ fn decode_per_length(buf: &[u8]) -> Result<(usize, usize), String> {
         let len = (((first & 0x3f) as usize) << 8) | buf[1] as usize;
         Ok((len, 2))
     } else {
-        Err(format!("PER length: unsupported initial byte 0x{:02x}", first))
+        Err(format!(
+            "PER length: unsupported initial byte 0x{:02x}",
+            first
+        ))
     }
 }
 
@@ -209,8 +212,10 @@ mod tests {
         let buf = [
             encode_choice(PDU_CHANNEL_JOIN_CONFIRM),
             0,
-            0x03, 0xE9,
-            0x03, 0xEB,
+            0x03,
+            0xE9,
+            0x03,
+            0xEB,
         ];
         assert_eq!(parse_channel_join_confirm(&buf).unwrap(), 1003);
     }

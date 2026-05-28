@@ -8,8 +8,9 @@
 //! - [`TileHeader`] — the 8-byte (x, y, w, h) header prepended to each
 //!   FRAME-channel WS message. See `ws::frame_payload_with_header`.
 //!
-//! Real RemoteFX / RDP6 / Bitmap decoders land here in step 8 of the plan.
-//! For now the helpers provide the stable wire format the canvas expects.
+//! IronRDP's active stage performs the bitmap, RemoteFX, and surface decoding.
+//! This module owns the stable RGBA tile wire format the canvas expects plus a
+//! few color conversion helpers for fallback and cursor-adjacent paths.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TileHeader {
@@ -109,7 +110,12 @@ mod tests {
     #[test]
     fn validate_rejects_size_mismatch() {
         let t = DecodedTile {
-            header: TileHeader { x: 0, y: 0, w: 4, h: 4 },
+            header: TileHeader {
+                x: 0,
+                y: 0,
+                w: 4,
+                h: 4,
+            },
             rgba: vec![0; 60], // expected 64
         };
         assert!(t.validate().is_err());

@@ -63,6 +63,7 @@ export const IN_ACK = 1;
 export const IN_KEY = 2;
 export const IN_POINTER = 3;
 export const IN_RESIZE = 4;
+export const IN_WHEEL = 5;
 
 /** Inbound channel tags (relay → browser). */
 export const OUT_FRAME = 0;
@@ -78,6 +79,7 @@ export type RdpWsText =
   | { type: "disconnected"; reason: string }
   | { type: "status"; stage: string; detail: string }
   | { type: "clipboard"; text: string }
+  | { type: "clipboard_files"; paths: string[]; text?: string }
   | { type: "error"; code: string; message: string };
 
 export function parseRdpWsText(data: string): RdpWsText | null {
@@ -124,6 +126,56 @@ export function encodeResize(width: number, height: number): ArrayBuffer {
   return b.buffer;
 }
 
+export function encodeWheel(
+  x: number,
+  y: number,
+  rotationUnits: number,
+  isVertical = true,
+): ArrayBuffer {
+  const b = new Uint8Array(8);
+  const v = new DataView(b.buffer);
+  b[0] = IN_WHEEL;
+  b[1] = isVertical ? 0 : 1;
+  v.setUint16(2, x & 0xffff);
+  v.setUint16(4, y & 0xffff);
+  v.setInt16(6, clampWheelRotationUnits(rotationUnits));
+  return b.buffer;
+}
+
+export interface RdpResizeSize {
+  width: number;
+  height: number;
+}
+
+export function normalizeRdpResizeSize(width: number, height: number): RdpResizeSize | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  const roundedWidth = Math.round(width);
+  const roundedHeight = Math.round(height);
+  if (roundedWidth <= 0 || roundedHeight <= 0) return null;
+
+  let normalizedWidth = Math.max(200, Math.min(8192, roundedWidth));
+  if (normalizedWidth % 2 !== 0) normalizedWidth -= 1;
+  normalizedWidth = Math.max(200, normalizedWidth);
+
+  const normalizedHeight = Math.max(200, Math.min(8192, roundedHeight));
+  return { width: normalizedWidth, height: normalizedHeight };
+}
+
+export function wheelDeltaToRotationUnits(delta: number, deltaMode: number): number {
+  if (!Number.isFinite(delta) || delta === 0) return 0;
+
+  const divisor = deltaMode === 1 ? 3 : deltaMode === 2 ? 1 : 120;
+  const rawUnits = delta / divisor;
+  const magnitude = Math.max(1, Math.round(Math.abs(rawUnits)));
+  return clampWheelRotationUnits(Math.sign(delta) * magnitude);
+}
+
+function clampWheelRotationUnits(rotationUnits: number): number {
+  if (!Number.isFinite(rotationUnits) || rotationUnits === 0) return 0;
+  const rounded = Math.round(rotationUnits);
+  return Math.max(-255, Math.min(255, rounded));
+}
+
 /**
  * Parse an inbound binary WS frame. The first byte is the channel tag;
  * the meaning of the rest depends on the tag.
@@ -139,6 +191,16 @@ export interface RdpFrameTile {
   rgba: Uint8ClampedArray<ArrayBuffer>;
 }
 
+export interface RdpAudioFrame {
+  tag: number;
+  sampleRate: number;
+  channels: number;
+  bitsPerSample: number;
+  timestamp: number;
+  formatNo: number;
+  pcm: Uint8Array<ArrayBuffer>;
+}
+
 export function parseFrameTile(data: ArrayBuffer): RdpFrameTile | null {
   if (data.byteLength < 9) return null;
   const dv = new DataView(data);
@@ -150,6 +212,20 @@ export function parseFrameTile(data: ArrayBuffer): RdpFrameTile | null {
   const h = dv.getUint16(7);
   const rgba = new Uint8ClampedArray(data, 9) as Uint8ClampedArray<ArrayBuffer>;
   return { tag, x, y, w, h, rgba };
+}
+
+export function parseAudioFrame(data: ArrayBuffer): RdpAudioFrame | null {
+  if (data.byteLength < 17) return null;
+  const dv = new DataView(data);
+  const tag = dv.getUint8(0);
+  if (tag !== OUT_AUDIO) return null;
+  const sampleRate = dv.getUint32(1);
+  const channels = dv.getUint16(5);
+  const bitsPerSample = dv.getUint16(7);
+  const timestamp = dv.getUint32(9);
+  const formatNo = dv.getUint16(13);
+  const pcm = new Uint8Array(data, 17) as Uint8Array<ArrayBuffer>;
+  return { tag, sampleRate, channels, bitsPerSample, timestamp, formatNo, pcm };
 }
 
 /** Map a DOM `KeyboardEvent` to a (scancode, isExtended) pair. */
