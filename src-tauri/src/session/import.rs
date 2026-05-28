@@ -56,8 +56,8 @@ pub fn scan_local_session_files(source: String) -> Result<Vec<LocalSessionFile>,
 pub fn read_plist_session_file(path: String) -> Result<LocalSessionFile, String> {
     let expanded = shellexpand::tilde(&path).to_string();
     let path_buf = PathBuf::from(&expanded);
-    let meta = fs::metadata(&path_buf)
-        .map_err(|e| format!("Failed to read plist metadata: {}", e))?;
+    let meta =
+        fs::metadata(&path_buf).map_err(|e| format!("Failed to read plist metadata: {}", e))?;
     if !meta.is_file() {
         return Err("The selected path is not a file.".to_string());
     }

@@ -1,17 +1,17 @@
-use crate::agent::cc_bridge::{detect, CcStatusResult};
-use crate::agent::cc_bridge::process::CcProcess;
-use crate::agent::cc_bridge::protocol::{CcEvent, extract_answer, extract_session_id};
 use crate::agent::cc_bridge::config::{
     sensitive_deny_dirs, write_temp_mcp_config, write_temp_settings,
 };
-use crate::ai::config::{AiConfig, default_ai_config_path};
+use crate::agent::cc_bridge::process::CcProcess;
+use crate::agent::cc_bridge::protocol::{extract_answer, extract_session_id, CcEvent};
+use crate::agent::cc_bridge::{detect, CcStatusResult};
+use crate::ai::config::{default_ai_config_path, AiConfig};
+use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
-use crate::state::AppState;
 
 /// Per-thread CC process registry (held in AppState via a separate Mutex).
 pub type CcProcessRegistry = Mutex<HashMap<String, Arc<CcProcess>>>;
@@ -85,8 +85,7 @@ pub async fn cc_send_message(
 
     let config = AiConfig::load(&default_ai_config_path());
     let binary = if config.cc_bridge.binary == "auto" {
-        crate::agent::cc_bridge::find_claude_binary()
-            .ok_or("Claude Code CLI not found")?
+        crate::agent::cc_bridge::find_claude_binary().ok_or("Claude Code CLI not found")?
     } else {
         config.cc_bridge.binary.clone()
     };
@@ -96,8 +95,12 @@ pub async fn cc_send_message(
     let settings_path = tmp_dir.join("settings.json");
     let mcp_path = tmp_dir.join(".mcp.json");
 
-    write_temp_settings(&config.cc_bridge.permission_mode, &sensitive_deny_dirs(), &settings_path)
-        .map_err(|e| format!("Failed to write CC settings: {}", e))?;
+    write_temp_settings(
+        &config.cc_bridge.permission_mode,
+        &sensitive_deny_dirs(),
+        &settings_path,
+    )
+    .map_err(|e| format!("Failed to write CC settings: {}", e))?;
     write_temp_mcp_config(&mcp_path)
         .map_err(|e| format!("Failed to write CC MCP config: {}", e))?;
 
@@ -112,12 +115,16 @@ pub async fn cc_send_message(
 
     // Build extra args.
     let mut extra_args = vec![
-        "--model".into(), config.cc_bridge.default_model.clone(),
-        "--max-turns".into(), config.cc_bridge.max_turns.to_string(),
-        "--settings".into(), settings_path.to_string_lossy().to_string(),
+        "--model".into(),
+        config.cc_bridge.default_model.clone(),
+        "--max-turns".into(),
+        config.cc_bridge.max_turns.to_string(),
+        "--settings".into(),
+        settings_path.to_string_lossy().to_string(),
         // §36/37: route every tool call through NewMob's permission prompt
         // and expose NewMob's tool surface back to CC via --mcp-config.
-        "--mcp-config".into(), mcp_path.to_string_lossy().to_string(),
+        "--mcp-config".into(),
+        mcp_path.to_string_lossy().to_string(),
         "--permission-prompt-tool".into(),
         crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
     ];
@@ -162,7 +169,8 @@ pub async fn cc_send_message(
         }
     }
 
-    let tool_calls: Vec<CcToolCall> = events.iter()
+    let tool_calls: Vec<CcToolCall> = events
+        .iter()
         .filter_map(|e| match e {
             CcEvent::ToolUse { id, name, input } => Some(CcToolCall {
                 id: id.clone(),
@@ -173,15 +181,17 @@ pub async fn cc_send_message(
         })
         .collect();
 
-    Ok(CcSendResponse { answer, events, tool_calls, session_id })
+    Ok(CcSendResponse {
+        answer,
+        events,
+        tool_calls,
+        session_id,
+    })
 }
 
 /// Stop the CC process for a thread.
 #[tauri::command]
-pub async fn cc_stop_session(
-    thread_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut registry = state.cc_processes.lock().await;
     if let Some(process) = registry.remove(&thread_id) {
         process.stop().await;
@@ -210,8 +220,7 @@ pub async fn cc_stream_message(
 
     let config = AiConfig::load(&default_ai_config_path());
     let binary = if config.cc_bridge.binary == "auto" {
-        crate::agent::cc_bridge::find_claude_binary()
-            .ok_or("Claude Code CLI not found")?
+        crate::agent::cc_bridge::find_claude_binary().ok_or("Claude Code CLI not found")?
     } else {
         config.cc_bridge.binary.clone()
     };
@@ -219,8 +228,12 @@ pub async fn cc_stream_message(
     let tmp_dir = std::env::temp_dir().join(format!("newmob-cc-{}", &req.thread_id[..8]));
     let settings_path = tmp_dir.join("settings.json");
     let mcp_path = tmp_dir.join(".mcp.json");
-    write_temp_settings(&config.cc_bridge.permission_mode, &sensitive_deny_dirs(), &settings_path)
-        .map_err(|e| format!("Failed to write CC settings: {}", e))?;
+    write_temp_settings(
+        &config.cc_bridge.permission_mode,
+        &sensitive_deny_dirs(),
+        &settings_path,
+    )
+    .map_err(|e| format!("Failed to write CC settings: {}", e))?;
     write_temp_mcp_config(&mcp_path)
         .map_err(|e| format!("Failed to write CC MCP config: {}", e))?;
 
@@ -233,9 +246,12 @@ pub async fn cc_stream_message(
     };
 
     let mut extra_args = vec![
-        "--model".into(), config.cc_bridge.default_model.clone(),
-        "--max-turns".into(), config.cc_bridge.max_turns.to_string(),
-        "--settings".into(), settings_path.to_string_lossy().to_string(),
+        "--model".into(),
+        config.cc_bridge.default_model.clone(),
+        "--max-turns".into(),
+        config.cc_bridge.max_turns.to_string(),
+        "--settings".into(),
+        settings_path.to_string_lossy().to_string(),
     ];
     if let Some(ws) = &req.workspace_dir {
         let path = PathBuf::from(ws);
@@ -264,9 +280,11 @@ pub async fn cc_stream_message(
 
     let event_name = format!("cc-stream:{}", req.thread_id);
     let app_clone = app.clone();
-    let events = process.send_with_callback(&req.message, move |evt| {
-        let _ = app_clone.emit(&event_name, evt.clone());
-    }).await?;
+    let events = process
+        .send_with_callback(&req.message, move |evt| {
+            let _ = app_clone.emit(&event_name, evt.clone());
+        })
+        .await?;
 
     let answer = extract_answer(&events);
     let session_id = extract_session_id(&events).or(resume_session);
@@ -275,7 +293,8 @@ pub async fn cc_stream_message(
             let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
         }
     }
-    let tool_calls: Vec<CcToolCall> = events.iter()
+    let tool_calls: Vec<CcToolCall> = events
+        .iter()
         .filter_map(|e| match e {
             CcEvent::ToolUse { id, name, input } => Some(CcToolCall {
                 id: id.clone(),
@@ -285,5 +304,10 @@ pub async fn cc_stream_message(
             _ => None,
         })
         .collect();
-    Ok(CcSendResponse { answer, events, tool_calls, session_id })
+    Ok(CcSendResponse {
+        answer,
+        events,
+        tool_calls,
+        session_id,
+    })
 }

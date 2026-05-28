@@ -1,6 +1,6 @@
 use super::{Tool, ToolDescriptor, ToolResult};
-use async_trait::async_trait;
 use crate::ai::shell_safety::check_blacklist;
+use async_trait::async_trait;
 
 /// Preview a shell command without executing it (dry_run=true by default).
 pub struct RunInTerminalTool;
@@ -20,7 +20,10 @@ impl Tool for RunInTerminalTool {
             Some(c) => c.to_string(),
             None => return ToolResult::err("run_in_terminal", "command is required"),
         };
-        let dry_run = args.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(true);
+        let dry_run = args
+            .get("dry_run")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
 
         // Always run blacklist check.
         let safety = check_blacklist(&command);
@@ -32,7 +35,10 @@ impl Tool for RunInTerminalTool {
         }
 
         if dry_run {
-            ToolResult::ok("run_in_terminal", format!("[dry-run] Would execute: {}", command))
+            ToolResult::ok(
+                "run_in_terminal",
+                format!("[dry-run] Would execute: {}", command),
+            )
         } else {
             // Actual execution is handled by the frontend after user confirmation.
             // The agent backend only returns the command; the frontend calls write_terminal.
@@ -41,7 +47,9 @@ impl Tool for RunInTerminalTool {
     }
 
     fn dry_run_preview(&self, args: &serde_json::Value) -> Option<String> {
-        args.get("command").and_then(|v| v.as_str()).map(|c| c.to_string())
+        args.get("command")
+            .and_then(|v| v.as_str())
+            .map(|c| c.to_string())
     }
 }
 
@@ -53,13 +61,17 @@ impl Tool for ReadTerminalTailTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
             name: "read_terminal_tail",
-            description: "读取当前活跃终端最近 N 行输出。仅用户在 'AI 解释报错' 流程中显式触发时可用。",
+            description:
+                "读取当前活跃终端最近 N 行输出。仅用户在 'AI 解释报错' 流程中显式触发时可用。",
             params: "session_id: string, lines?: u32 (default 50), user_invoked: bool",
         }
     }
 
     async fn execute(&self, args: &serde_json::Value) -> ToolResult {
-        let user_invoked = args.get("user_invoked").and_then(|v| v.as_bool()).unwrap_or(false);
+        let user_invoked = args
+            .get("user_invoked")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !user_invoked {
             return ToolResult::err("read_terminal_tail", "user_invoked must be true");
         }

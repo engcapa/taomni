@@ -5,27 +5,40 @@
 
 mod support;
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use newmob_lib::llm::router::LlmRouter;
 use newmob_lib::llm::{ChatRequest, TaskKind};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use support::mock_provider::{MockEvent, MockLlm};
 
 #[tokio::test(flavor = "current_thread")]
 async fn fim_completes_within_budget() {
     let mut r = LlmRouter::new("fim");
-    r.add_provider("fim", Arc::new(MockLlm::new(vec![
-        MockEvent::Wait(Duration::from_millis(150)),
-        MockEvent::Token("ckout main".into()),
-    ])));
+    r.add_provider(
+        "fim",
+        Arc::new(MockLlm::new(vec![
+            MockEvent::Wait(Duration::from_millis(150)),
+            MockEvent::Token("ckout main".into()),
+        ])),
+    );
     r.set_task_route(TaskKind::TabCompletion, "fim");
 
     let started = Instant::now();
-    let resp = r.complete(ChatRequest::simple("sys", "git che"), TaskKind::TabCompletion).await.unwrap();
+    let resp = r
+        .complete(
+            ChatRequest::simple("sys", "git che"),
+            TaskKind::TabCompletion,
+        )
+        .await
+        .unwrap();
     let elapsed = started.elapsed();
 
     assert_eq!(resp.content, "ckout main");
     // 300ms is the documented P95 target; we assert <500ms in CI to absorb
     // jitter while still failing if a regression takes us past 1.5x budget.
-    assert!(elapsed < Duration::from_millis(500), "FIM too slow: {:?}", elapsed);
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "FIM too slow: {:?}",
+        elapsed
+    );
 }

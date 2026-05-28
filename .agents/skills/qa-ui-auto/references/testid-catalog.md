@@ -160,6 +160,17 @@
 - `[data-testid="compact-sidebar-drawer-toggle"]` — interactive — F1.4.sidebar-drawer-toggle
   ↳ `[aria-label="Show sessions drawer"]` — alias
 
+## rdp (F9.7)
+
+- `[data-testid="rdp-panel"]` — display — F9.7.panel-root
+- `[data-testid="rdp-toolbar"]` — display — F9.7.toolbar
+- `[data-testid="rdp-status"]` — display — F9.7.status
+- `[data-testid="rdp-canvas"]` — display — F9.7.canvas
+- `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
+- `[data-testid="rdp-resize"]` — interactive [optional] — F9.7.resize
+- `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
+- `[data-testid="rdp-fullscreen"]` — interactive — F9.7.fullscreen
+
 ## sessions (F6.2)
 
 - `[data-testid="sidebar"]` — display — F6.2.sidebar

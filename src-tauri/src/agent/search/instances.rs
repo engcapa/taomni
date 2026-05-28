@@ -58,7 +58,9 @@ fn record(url: &str, succeeded: bool) {
 /// instances default to 1.0 so they get a fair shot on first contact.
 fn availability(url: &str) -> f64 {
     let guard = STATS.lock().unwrap();
-    let Some(map) = guard.as_ref() else { return 1.0; };
+    let Some(map) = guard.as_ref() else {
+        return 1.0;
+    };
     map.get(url)
         .filter(|s| s.probes > 0)
         .map(|s| s.successes as f64 / s.probes as f64)
@@ -68,10 +70,17 @@ fn availability(url: &str) -> f64 {
 /// Snapshot of availability ratios per instance, useful for the UI / debugging.
 pub fn availability_snapshot() -> Vec<(String, f64, u64)> {
     let guard = STATS.lock().unwrap();
-    let Some(map) = guard.as_ref() else { return Vec::new(); };
-    let mut out: Vec<(String, f64, u64)> = map.iter()
+    let Some(map) = guard.as_ref() else {
+        return Vec::new();
+    };
+    let mut out: Vec<(String, f64, u64)> = map
+        .iter()
         .map(|(k, v)| {
-            let ratio = if v.probes == 0 { 1.0 } else { v.successes as f64 / v.probes as f64 };
+            let ratio = if v.probes == 0 {
+                1.0
+            } else {
+                v.successes as f64 / v.probes as f64
+            };
             (k.clone(), ratio, v.probes)
         })
         .collect();
@@ -94,27 +103,27 @@ pub async fn probe_best_instance(client: &reqwest::Client) -> Option<String> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let futures: Vec<_> = candidates.iter().map(|&url| {
-        let client = client.clone();
-        let url = url.to_string();
-        Box::pin(async move {
-            let probe_url = format!("{}/search?q=test&format=json", url);
-            let result = timeout(
-                Duration::from_secs(2),
-                client.get(&probe_url).send(),
-            ).await;
-            match result {
-                Ok(Ok(resp)) if resp.status().is_success() => {
-                    record(&url, true);
-                    Ok(url)
+    let futures: Vec<_> = candidates
+        .iter()
+        .map(|&url| {
+            let client = client.clone();
+            let url = url.to_string();
+            Box::pin(async move {
+                let probe_url = format!("{}/search?q=test&format=json", url);
+                let result = timeout(Duration::from_secs(2), client.get(&probe_url).send()).await;
+                match result {
+                    Ok(Ok(resp)) if resp.status().is_success() => {
+                        record(&url, true);
+                        Ok(url)
+                    }
+                    _ => {
+                        record(&url, false);
+                        Err(format!("unreachable: {}", url))
+                    }
                 }
-                _ => {
-                    record(&url, false);
-                    Err(format!("unreachable: {}", url))
-                }
-            }
+            })
         })
-    }).collect();
+        .collect();
 
     select_ok(futures).await.ok().map(|(url, _)| url)
 }

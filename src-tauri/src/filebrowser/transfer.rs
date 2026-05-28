@@ -71,10 +71,18 @@ pub struct CompletePayload {
 
 impl CompletePayload {
     pub fn ok(final_path: Option<String>) -> Self {
-        Self { success: true, error: None, final_path }
+        Self {
+            success: true,
+            error: None,
+            final_path,
+        }
     }
     pub fn err(message: &str) -> Self {
-        Self { success: false, error: Some(message.to_string()), final_path: None }
+        Self {
+            success: false,
+            error: Some(message.to_string()),
+            final_path: None,
+        }
     }
 }
 

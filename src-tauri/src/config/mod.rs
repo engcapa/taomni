@@ -52,8 +52,7 @@ pub fn select_save_file_path(
 #[tauri::command]
 pub fn read_file_bytes(path: String) -> Result<Response, String> {
     let expanded = shellexpand::tilde(&path).to_string();
-    let bytes = std::fs::read(&expanded)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let bytes = std::fs::read(&expanded).map_err(|e| format!("Failed to read file: {}", e))?;
     Ok(Response::new(bytes))
 }
 
@@ -145,15 +144,18 @@ pub fn write_stream_open(path: String, state: State<'_, AppState>) -> Result<Str
         .write_handles
         .lock()
         .map_err(|e| format!("Write stream lock failed: {}", e))?;
-    handles.insert(handle_id.clone(), WriteStreamHandle { path: expanded, file });
+    handles.insert(
+        handle_id.clone(),
+        WriteStreamHandle {
+            path: expanded,
+            file,
+        },
+    );
     Ok(handle_id)
 }
 
 #[tauri::command]
-pub fn write_stream_append(
-    request: Request<'_>,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub fn write_stream_append(request: Request<'_>, state: State<'_, AppState>) -> Result<(), String> {
     let handle_id = request
         .headers()
         .get("x-handle-id")
@@ -247,6 +249,35 @@ pub fn clipboard_write_text(text: String, state: State<'_, AppState>) -> Result<
         .map_err(|e| format!("clipboard write: {}", e))
 }
 
+#[tauri::command]
+pub fn clipboard_read_files(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let native = platform::clipboard_read_files()?;
+    if !native.is_empty() {
+        return Ok(native);
+    }
+
+    let text = clipboard_read_text(state).unwrap_or_default();
+    let files = crate::rdp::cliprdr::uri_list_to_paths(&text)
+        .into_iter()
+        .filter(|path| path.exists())
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect();
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn clipboard_write_files(paths: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    if platform::clipboard_write_files(&paths).is_ok() {
+        return Ok(());
+    }
+
+    let path_bufs: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+    clipboard_write_text(crate::rdp::cliprdr::paths_to_uri_list(&path_bufs), state)
+}
+
 fn expanded_path(value: &str) -> PathBuf {
     PathBuf::from(shellexpand::tilde(value).to_string())
 }
@@ -286,6 +317,23 @@ mod platform {
         CommDlgExtendedError, GetOpenFileNameW, OFN_ALLOWMULTISELECT, OFN_EXPLORER,
         OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST, OPENFILENAMEW,
     };
+    use winapi::um::shellapi::DragQueryFileW;
+    use winapi::um::winbase::{
+        GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT,
+    };
+    use winapi::um::winuser::{
+        CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
+        OpenClipboard, SetClipboardData, CF_HDROP,
+    };
+
+    #[repr(C)]
+    struct DropFiles {
+        p_files: u32,
+        x: i32,
+        y: i32,
+        f_nc: i32,
+        f_wide: i32,
+    }
 
     pub fn select_private_key_file(current_path: Option<&str>) -> Result<Option<String>, String> {
         let mut file_buf = [0u16; 32768];
@@ -331,7 +379,11 @@ mod platform {
         let ok = unsafe { GetOpenFileNameW(&mut ofn) };
         if ok == 0 {
             let err = unsafe { CommDlgExtendedError() };
-            return if err == 0 { Ok(vec![]) } else { Err(format!("Windows file dialog failed: 0x{err:04x}")) };
+            return if err == 0 {
+                Ok(vec![])
+            } else {
+                Err(format!("Windows file dialog failed: 0x{err:04x}"))
+            };
         }
 
         // Parse the result buffer.
@@ -346,10 +398,7 @@ mod platform {
         Ok(match segments.as_slice() {
             [] => vec![],
             [single] => vec![single.clone()],
-            [dir, files @ ..] => files
-                .iter()
-                .map(|f| format!("{}\\{}", dir, f))
-                .collect(),
+            [dir, files @ ..] => files.iter().map(|f| format!("{}\\{}", dir, f)).collect(),
         })
     }
 
@@ -365,9 +414,7 @@ mod platform {
         ofn.lpstrFile = file_buf.as_mut_ptr();
         ofn.nMaxFile = file_buf.len() as u32;
         ofn.lpstrTitle = title.as_ptr();
-        ofn.lpstrInitialDir = initial_dir
-            .map(|dir| dir.as_ptr())
-            .unwrap_or(ptr::null());
+        ofn.lpstrInitialDir = initial_dir.map(|dir| dir.as_ptr()).unwrap_or(ptr::null());
         ofn.Flags = OFN_EXPLORER
             | OFN_FILEMUSTEXIST
             | OFN_PATHMUSTEXIST
@@ -526,6 +573,124 @@ mod platform {
             Err(format!("Windows save dialog failed: 0x{err:04x}"))
         }
     }
+
+    pub fn clipboard_read_files() -> Result<Vec<String>, String> {
+        struct ClipboardGuard;
+        impl Drop for ClipboardGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    CloseClipboard();
+                }
+            }
+        }
+
+        let opened = unsafe { OpenClipboard(ptr::null_mut()) };
+        if opened == 0 {
+            return Err("clipboard open failed".to_string());
+        }
+        let _guard = ClipboardGuard;
+
+        if unsafe { IsClipboardFormatAvailable(CF_HDROP) } == 0 {
+            return Ok(Vec::new());
+        }
+        let handle = unsafe { GetClipboardData(CF_HDROP) };
+        if handle.is_null() {
+            return Ok(Vec::new());
+        }
+
+        let count = unsafe { DragQueryFileW(handle as _, u32::MAX, ptr::null_mut(), 0) };
+        let mut out = Vec::with_capacity(count as usize);
+        for i in 0..count {
+            let len = unsafe { DragQueryFileW(handle as _, i, ptr::null_mut(), 0) };
+            if len == 0 {
+                continue;
+            }
+            let mut buf = vec![0u16; len as usize + 1];
+            let written = unsafe { DragQueryFileW(handle as _, i, buf.as_mut_ptr(), len + 1) };
+            if written == 0 {
+                continue;
+            }
+            out.push(String::from_utf16_lossy(&buf[..written as usize]));
+        }
+        Ok(out)
+    }
+
+    pub fn clipboard_write_files(paths: &[String]) -> Result<(), String> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+
+        let mut wide_paths = Vec::new();
+        for path in paths {
+            wide_paths.extend(OsStr::new(path).encode_wide());
+            wide_paths.push(0);
+        }
+        wide_paths.push(0);
+
+        let header_size = size_of::<DropFiles>();
+        let total_bytes = header_size + wide_paths.len() * size_of::<u16>();
+        let handle = unsafe { GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, total_bytes) };
+        if handle.is_null() {
+            return Err("clipboard file drop allocation failed".to_string());
+        }
+
+        let memory = unsafe { GlobalLock(handle) };
+        if memory.is_null() {
+            unsafe {
+                GlobalFree(handle);
+            }
+            return Err("clipboard file drop lock failed".to_string());
+        }
+
+        let mut drop_files: DropFiles = unsafe { zeroed() };
+        drop_files.p_files = header_size as u32;
+        drop_files.f_wide = 1;
+        unsafe {
+            ptr::copy_nonoverlapping(
+                &drop_files as *const DropFiles as *const u8,
+                memory as *mut u8,
+                header_size,
+            );
+            ptr::copy_nonoverlapping(
+                wide_paths.as_ptr(),
+                (memory as *mut u8).add(header_size) as *mut u16,
+                wide_paths.len(),
+            );
+            GlobalUnlock(handle);
+        }
+
+        struct ClipboardGuard;
+        impl Drop for ClipboardGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    CloseClipboard();
+                }
+            }
+        }
+
+        let opened = unsafe { OpenClipboard(ptr::null_mut()) };
+        if opened == 0 {
+            unsafe {
+                GlobalFree(handle);
+            }
+            return Err("clipboard open failed".to_string());
+        }
+        let _guard = ClipboardGuard;
+
+        if unsafe { EmptyClipboard() } == 0 {
+            unsafe {
+                GlobalFree(handle);
+            }
+            return Err("clipboard empty failed".to_string());
+        }
+        if unsafe { SetClipboardData(CF_HDROP, handle) }.is_null() {
+            unsafe {
+                GlobalFree(handle);
+            }
+            return Err("clipboard set file drop failed".to_string());
+        }
+        Ok(())
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -537,7 +702,9 @@ mod platform {
     }
 
     pub fn select_upload_file() -> Result<Vec<String>, String> {
-        run_osascript_multi(r#"POSIX path of (choose file with prompt "Select files to send" with multiple selections allowed)"#)
+        run_osascript_multi(
+            r#"POSIX path of (choose file with prompt "Select files to send" with multiple selections allowed)"#,
+        )
     }
 
     pub fn select_save_directory(_current_path: Option<&str>) -> Result<Option<String>, String> {
@@ -613,6 +780,14 @@ mod platform {
             Err(format!("open file dialog: {}", stderr.trim()))
         }
     }
+
+    pub fn clipboard_read_files() -> Result<Vec<String>, String> {
+        Ok(Vec::new())
+    }
+
+    pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
+        Err("native file clipboard is not implemented on macOS".to_string())
+    }
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -662,7 +837,10 @@ mod platform {
         open_save_dialog("Save as", initial_path.as_deref())
     }
 
-    fn open_file_dialog_multi(title: &str, initial_dir: Option<&Path>) -> Result<Vec<String>, String> {
+    fn open_file_dialog_multi(
+        title: &str,
+        initial_dir: Option<&Path>,
+    ) -> Result<Vec<String>, String> {
         match run_zenity_multi(title, initial_dir) {
             Ok(result) => return result,
             Err(DialogAttempt::NotFound) => {}
@@ -721,7 +899,10 @@ mod platform {
             Ok(output) if output.status.code() == Some(1) => Ok(Ok(vec![])),
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(DialogAttempt::Failed(format!("{helper}: {}", stderr.trim())))
+                Err(DialogAttempt::Failed(format!(
+                    "{helper}: {}",
+                    stderr.trim()
+                )))
             }
         }
     }
@@ -885,6 +1066,14 @@ mod platform {
             .arg(initial_path.unwrap_or_else(|| Path::new("~")));
         handle_output(cmd.output(), "kdialog")
     }
+
+    pub fn clipboard_read_files() -> Result<Vec<String>, String> {
+        Ok(Vec::new())
+    }
+
+    pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
+        Err("native file clipboard is not implemented on this Linux desktop".to_string())
+    }
 }
 
 #[cfg(not(any(windows, unix)))]
@@ -914,5 +1103,13 @@ mod platform {
 
     pub fn select_file_path(_current_path: Option<&str>) -> Result<Option<String>, String> {
         Err("Native file dialog is not supported on this platform".to_string())
+    }
+
+    pub fn clipboard_read_files() -> Result<Vec<String>, String> {
+        Ok(Vec::new())
+    }
+
+    pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
+        Err("Native file clipboard is not supported on this platform".to_string())
     }
 }

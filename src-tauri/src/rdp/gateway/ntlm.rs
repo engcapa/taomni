@@ -33,6 +33,8 @@ pub const NEG_UNICODE: u32 = 0x0000_0001;
 pub const NEG_OEM: u32 = 0x0000_0002;
 pub const NEG_REQUEST_TARGET: u32 = 0x0000_0004;
 pub const NEG_NTLM: u32 = 0x0000_0200;
+pub const NEG_OEM_DOMAIN_SUPPLIED: u32 = 0x0000_1000;
+pub const NEG_OEM_WORKSTATION_SUPPLIED: u32 = 0x0000_2000;
 pub const NEG_ALWAYS_SIGN: u32 = 0x0000_8000;
 pub const NEG_EXTENDED_SESSION_SECURITY: u32 = 0x0008_0000;
 pub const NEG_TARGET_INFO: u32 = 0x0080_0000;
@@ -45,8 +47,21 @@ const FLAGS_TYPE1: u32 = NEG_UNICODE
     | NEG_OEM
     | NEG_REQUEST_TARGET
     | NEG_NTLM
+    | NEG_OEM_DOMAIN_SUPPLIED
+    | NEG_OEM_WORKSTATION_SUPPLIED
     | NEG_ALWAYS_SIGN
     | NEG_EXTENDED_SESSION_SECURITY
+    | NEG_TARGET_INFO
+    | NEG_VERSION
+    | NEG_128
+    | NEG_56;
+
+const FLAGS_TYPE3_SUPPORTED: u32 = NEG_UNICODE
+    | NEG_REQUEST_TARGET
+    | NEG_NTLM
+    | NEG_ALWAYS_SIGN
+    | NEG_EXTENDED_SESSION_SECURITY
+    | NEG_TARGET_INFO
     | NEG_VERSION
     | NEG_128
     | NEG_56;
@@ -73,7 +88,7 @@ pub fn build_negotiate(domain: &str, workstation: &str) -> Vec<u8> {
     out.extend_from_slice(&(workstation_bytes.len() as u16).to_le_bytes());
     out.extend_from_slice(&workstation_off.to_le_bytes());
     out.extend_from_slice(&[0, 0]); // padding
-    // Version field (8 bytes) — we report Windows 10 build.
+                                    // Version field (8 bytes) — we report Windows 10 build.
     out.extend_from_slice(&[10, 0, 0x00, 0x40, 0, 0, 0, 0x0F]);
     out.extend_from_slice(domain_bytes);
     out.extend_from_slice(workstation_bytes);
@@ -119,7 +134,11 @@ pub fn parse_challenge(buf: &[u8]) -> Result<ChallengeMessage, String> {
 }
 
 fn slice_payload(buf: &[u8], off: usize, len: usize) -> Result<&[u8], String> {
-    if off.checked_add(len).map(|end| end > buf.len()).unwrap_or(true) {
+    if off
+        .checked_add(len)
+        .map(|end| end > buf.len())
+        .unwrap_or(true)
+    {
         return Err(format!(
             "ntlm: payload slice ({}..{}) out of bounds (buffer {} bytes)",
             off,
@@ -149,9 +168,17 @@ pub struct AuthenticateMessage {
     pub session_base_key: [u8; 16],
 }
 
+pub const AUTHENTICATE_MIC_OFFSET: usize = 72;
+pub const AUTHENTICATE_MIC_LEN: usize = 16;
+pub const AUTHENTICATE_FIXED_HEADER_LEN: usize = AUTHENTICATE_MIC_OFFSET + AUTHENTICATE_MIC_LEN;
+
 pub fn build_authenticate(input: &AuthenticateInputs<'_>) -> AuthenticateMessage {
     let nt_owf2 = ntowf_v2(input.user, input.domain, input.password);
-    let temp = build_ntlmv2_temp(input.timestamp, input.client_challenge, &input.challenge.target_info);
+    let temp = build_ntlmv2_temp(
+        input.timestamp,
+        input.client_challenge,
+        &input.challenge.target_info,
+    );
     let mut hmac_input = Vec::with_capacity(8 + temp.len());
     hmac_input.extend_from_slice(&input.challenge.server_challenge);
     hmac_input.extend_from_slice(&temp);
@@ -167,9 +194,21 @@ pub fn build_authenticate(input: &AuthenticateInputs<'_>) -> AuthenticateMessage
     lm_response.extend_from_slice(&hmac_md5(&nt_owf2, &lm_input));
     lm_response.extend_from_slice(&input.client_challenge);
     let session_base_key = hmac_md5(&nt_owf2, &nt_proof);
-    let user_utf16: Vec<u8> = input.user.encode_utf16().flat_map(u16::to_le_bytes).collect();
-    let domain_utf16: Vec<u8> = input.domain.encode_utf16().flat_map(u16::to_le_bytes).collect();
-    let ws_utf16: Vec<u8> = input.workstation.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let user_utf16: Vec<u8> = input
+        .user
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let domain_utf16: Vec<u8> = input
+        .domain
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let ws_utf16: Vec<u8> = input
+        .workstation
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
 
     // Layout payloads after the 88-byte fixed header.
     let mut payloads = Vec::new();
@@ -177,7 +216,7 @@ pub fn build_authenticate(input: &AuthenticateInputs<'_>) -> AuthenticateMessage
     header.extend_from_slice(NTLM_SIGNATURE);
     header.extend_from_slice(&TYPE_AUTHENTICATE.to_le_bytes());
 
-    let mut push_field = |payloads: &mut Vec<u8>, header: &mut Vec<u8>, data: &[u8]| {
+    let push_field = |payloads: &mut Vec<u8>, header: &mut Vec<u8>, data: &[u8]| {
         let off = 88u32 + payloads.len() as u32;
         let len = data.len() as u16;
         header.extend_from_slice(&len.to_le_bytes());
@@ -192,8 +231,11 @@ pub fn build_authenticate(input: &AuthenticateInputs<'_>) -> AuthenticateMessage
     push_field(&mut payloads, &mut header, &ws_utf16);
     // EncryptedRandomSessionKey field — empty (we don't request key exchange).
     header.extend_from_slice(&[0, 0, 0, 0, 88, 0, 0, 0]);
-    // NegotiateFlags — echo what the server advertised + our extras.
-    header.extend_from_slice(&input.challenge.flags.to_le_bytes());
+    // NegotiateFlags — keep only the NTLMv2 features this builder actually
+    // implements. In particular, do not echo KEY_EXCHANGE unless an encrypted
+    // random session key is present.
+    let response_flags = input.challenge.flags & FLAGS_TYPE3_SUPPORTED;
+    header.extend_from_slice(&response_flags.to_le_bytes());
     // Version (8 bytes) — same shape as Type 1.
     header.extend_from_slice(&[10, 0, 0x00, 0x40, 0, 0, 0, 0x0F]);
     // MIC (16 bytes zeroed; integrity check is computed later if required).
@@ -201,16 +243,57 @@ pub fn build_authenticate(input: &AuthenticateInputs<'_>) -> AuthenticateMessage
 
     let mut bytes = header;
     bytes.extend_from_slice(&payloads);
-    AuthenticateMessage { bytes, session_base_key }
+    AuthenticateMessage {
+        bytes,
+        session_base_key,
+    }
+}
+
+pub fn write_mic(
+    authenticate_message: &mut [u8],
+    session_base_key: &[u8; 16],
+    negotiate_message: &[u8],
+    challenge_message: &[u8],
+) -> Result<[u8; 16], String> {
+    if authenticate_message.len() < AUTHENTICATE_FIXED_HEADER_LEN {
+        return Err(format!(
+            "ntlm: authenticate message too short for MIC ({} bytes)",
+            authenticate_message.len()
+        ));
+    }
+    if &authenticate_message[0..8] != NTLM_SIGNATURE {
+        return Err("ntlm: bad authenticate signature".into());
+    }
+    let message_type = u32::from_le_bytes([
+        authenticate_message[8],
+        authenticate_message[9],
+        authenticate_message[10],
+        authenticate_message[11],
+    ]);
+    if message_type != TYPE_AUTHENTICATE {
+        return Err(format!(
+            "ntlm: expected authenticate type 3, got {}",
+            message_type
+        ));
+    }
+
+    authenticate_message[AUTHENTICATE_MIC_OFFSET..AUTHENTICATE_FIXED_HEADER_LEN].fill(0);
+    let mut mic_input = Vec::with_capacity(
+        negotiate_message.len() + challenge_message.len() + authenticate_message.len(),
+    );
+    mic_input.extend_from_slice(negotiate_message);
+    mic_input.extend_from_slice(challenge_message);
+    mic_input.extend_from_slice(authenticate_message);
+    let mic = hmac_md5(session_base_key, &mic_input);
+    authenticate_message[AUTHENTICATE_MIC_OFFSET..AUTHENTICATE_FIXED_HEADER_LEN]
+        .copy_from_slice(&mic);
+    Ok(mic)
 }
 
 // ── NTLMv2 helpers ─────────────────────────────────────────────────────
 
 fn ntowf_v2(user: &str, domain: &str, password: &str) -> [u8; 16] {
-    let pw_utf16: Vec<u8> = password
-        .encode_utf16()
-        .flat_map(u16::to_le_bytes)
-        .collect();
+    let pw_utf16: Vec<u8> = password.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let nt_hash = md4(&pw_utf16);
     let mut combo: Vec<u16> = user.to_uppercase().encode_utf16().collect();
     combo.extend(domain.encode_utf16());
@@ -262,7 +345,7 @@ pub fn md4(bytes: &[u8]) -> [u8; 16] {
         let g = |x: u32, y: u32, z: u32| (x & y) | (x & z) | (y & z);
         let h = |x: u32, y: u32, z: u32| x ^ y ^ z;
 
-        let mut round1 = |a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32| {
+        let round1 = |a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32| {
             *a = rotate_left(a.wrapping_add(f(b, c, d)).wrapping_add(x[k]), s);
         };
         round1(&mut a, b, c, d, 0, 3);
@@ -282,7 +365,7 @@ pub fn md4(bytes: &[u8]) -> [u8; 16] {
         round1(&mut c, d, a, b, 14, 11);
         round1(&mut b, c, d, a, 15, 19);
 
-        let mut round2 = |a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32| {
+        let round2 = |a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32| {
             *a = rotate_left(
                 a.wrapping_add(g(b, c, d))
                     .wrapping_add(x[k])
@@ -307,7 +390,7 @@ pub fn md4(bytes: &[u8]) -> [u8; 16] {
         round2(&mut c, d, a, b, 11, 9);
         round2(&mut b, c, d, a, 15, 13);
 
-        let mut round3 = |a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32| {
+        let round3 = |a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32| {
             *a = rotate_left(
                 a.wrapping_add(h(b, c, d))
                     .wrapping_add(x[k])
@@ -348,23 +431,75 @@ pub fn md4(bytes: &[u8]) -> [u8; 16] {
 
 pub fn md5(bytes: &[u8]) -> [u8; 16] {
     const T: [u32; 64] = [
-        0xd76a_a478, 0xe8c7_b756, 0x2420_70db, 0xc1bd_ceee, 0xf57c_0faf, 0x4787_c62a,
-        0xa830_4613, 0xfd46_9501, 0x6980_98d8, 0x8b44_f7af, 0xffff_5bb1, 0x895c_d7be,
-        0x6b90_1122, 0xfd98_7193, 0xa679_438e, 0x49b4_0821, 0xf61e_2562, 0xc040_b340,
-        0x265e_5a51, 0xe9b6_c7aa, 0xd62f_105d, 0x0244_1453, 0xd8a1_e681, 0xe7d3_fbc8,
-        0x21e1_cde6, 0xc337_07d6, 0xf4d5_0d87, 0x455a_14ed, 0xa9e3_e905, 0xfcef_a3f8,
-        0x676f_02d9, 0x8d2a_4c8a, 0xfffa_3942, 0x8771_f681, 0x6d9d_6122, 0xfde5_380c,
-        0xa4be_ea44, 0x4bde_cfa9, 0xf6bb_4b60, 0xbebf_bc70, 0x289b_7ec6, 0xeaa1_27fa,
-        0xd4ef_3085, 0x0488_1d05, 0xd9d4_d039, 0xe6db_99e5, 0x1fa2_7cf8, 0xc4ac_5665,
-        0xf429_2244, 0x432a_ff97, 0xab94_23a7, 0xfc93_a039, 0x655b_59c3, 0x8f0c_cc92,
-        0xffef_f47d, 0x8584_5dd1, 0x6fa8_7e4f, 0xfe2c_e6e0, 0xa301_4314, 0x4e08_11a1,
-        0xf753_7e82, 0xbd3a_f235, 0x2ad7_d2bb, 0xeb86_d391,
+        0xd76a_a478,
+        0xe8c7_b756,
+        0x2420_70db,
+        0xc1bd_ceee,
+        0xf57c_0faf,
+        0x4787_c62a,
+        0xa830_4613,
+        0xfd46_9501,
+        0x6980_98d8,
+        0x8b44_f7af,
+        0xffff_5bb1,
+        0x895c_d7be,
+        0x6b90_1122,
+        0xfd98_7193,
+        0xa679_438e,
+        0x49b4_0821,
+        0xf61e_2562,
+        0xc040_b340,
+        0x265e_5a51,
+        0xe9b6_c7aa,
+        0xd62f_105d,
+        0x0244_1453,
+        0xd8a1_e681,
+        0xe7d3_fbc8,
+        0x21e1_cde6,
+        0xc337_07d6,
+        0xf4d5_0d87,
+        0x455a_14ed,
+        0xa9e3_e905,
+        0xfcef_a3f8,
+        0x676f_02d9,
+        0x8d2a_4c8a,
+        0xfffa_3942,
+        0x8771_f681,
+        0x6d9d_6122,
+        0xfde5_380c,
+        0xa4be_ea44,
+        0x4bde_cfa9,
+        0xf6bb_4b60,
+        0xbebf_bc70,
+        0x289b_7ec6,
+        0xeaa1_27fa,
+        0xd4ef_3085,
+        0x0488_1d05,
+        0xd9d4_d039,
+        0xe6db_99e5,
+        0x1fa2_7cf8,
+        0xc4ac_5665,
+        0xf429_2244,
+        0x432a_ff97,
+        0xab94_23a7,
+        0xfc93_a039,
+        0x655b_59c3,
+        0x8f0c_cc92,
+        0xffef_f47d,
+        0x8584_5dd1,
+        0x6fa8_7e4f,
+        0xfe2c_e6e0,
+        0xa301_4314,
+        0x4e08_11a1,
+        0xf753_7e82,
+        0xbd3a_f235,
+        0x2ad7_d2bb,
+        0xeb86_d391,
     ];
     const S: [u32; 64] = [
-        7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-        5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-        4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-        6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+        7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5,
+        9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10,
+        15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
     ];
     let mut a: u32 = 0x6745_2301;
     let mut b: u32 = 0xefcd_ab89;
@@ -413,7 +548,11 @@ pub fn md5(bytes: &[u8]) -> [u8; 16] {
 }
 
 pub fn hmac_md5(key: &[u8], msg: &[u8]) -> [u8; 16] {
-    let mut k = if key.len() > 64 { md5(key).to_vec() } else { key.to_vec() };
+    let mut k = if key.len() > 64 {
+        md5(key).to_vec()
+    } else {
+        key.to_vec()
+    };
     k.resize(64, 0);
     let opad: Vec<u8> = k.iter().map(|b| b ^ 0x5c).collect();
     let ipad: Vec<u8> = k.iter().map(|b| b ^ 0x36).collect();
@@ -436,14 +575,8 @@ mod tests {
     #[test]
     fn md4_known_answers() {
         // RFC 1320 test vectors.
-        assert_eq!(
-            hex(&md4(b"")),
-            "31d6cfe0d16ae931b73c59d7e0c089c0"
-        );
-        assert_eq!(
-            hex(&md4(b"abc")),
-            "a448017aaf21d8525fc10ae87aa6729d"
-        );
+        assert_eq!(hex(&md4(b"")), "31d6cfe0d16ae931b73c59d7e0c089c0");
+        assert_eq!(hex(&md4(b"abc")), "a448017aaf21d8525fc10ae87aa6729d");
         assert_eq!(
             hex(&md4(b"message digest")),
             "d9130a8164549fe818874806e1c7014b"
@@ -539,6 +672,53 @@ mod tests {
         });
         assert_eq!(auth.session_base_key, auth2.session_base_key);
         assert_eq!(auth.bytes.len(), auth2.bytes.len());
+    }
+
+    #[test]
+    fn authenticate_mic_is_written_and_stable() {
+        let negotiate = build_negotiate("DOMAIN", "HOST");
+        let chal = ChallengeMessage {
+            target_name: b"DOMAIN\0".to_vec(),
+            flags: NEG_NTLM | NEG_EXTENDED_SESSION_SECURITY | NEG_TARGET_INFO,
+            server_challenge: [1, 2, 3, 4, 5, 6, 7, 8],
+            target_info: vec![0, 0, 0, 0],
+        };
+        let challenge = synthesize_challenge(&chal);
+        let mut auth = build_authenticate(&AuthenticateInputs {
+            user: "alice",
+            domain: "DOMAIN",
+            workstation: "HOST",
+            password: "Password!1",
+            challenge: &chal,
+            client_challenge: [9; 8],
+            timestamp: 0,
+        });
+
+        assert_eq!(
+            &auth.bytes[AUTHENTICATE_MIC_OFFSET..AUTHENTICATE_FIXED_HEADER_LEN],
+            &[0u8; AUTHENTICATE_MIC_LEN]
+        );
+        let mic = write_mic(
+            &mut auth.bytes,
+            &auth.session_base_key,
+            &negotiate,
+            &challenge,
+        )
+        .unwrap();
+        assert_ne!(mic, [0u8; AUTHENTICATE_MIC_LEN]);
+        assert_eq!(
+            &auth.bytes[AUTHENTICATE_MIC_OFFSET..AUTHENTICATE_FIXED_HEADER_LEN],
+            &mic
+        );
+
+        let mic_again = write_mic(
+            &mut auth.bytes,
+            &auth.session_base_key,
+            &negotiate,
+            &challenge,
+        )
+        .unwrap();
+        assert_eq!(mic, mic_again);
     }
 
     #[test]

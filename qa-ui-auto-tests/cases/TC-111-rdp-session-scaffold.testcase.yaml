@@ -1,19 +1,19 @@
 id: TC-111
-title: Saved RDP session opens the RDP panel scaffolding
+title: Saved RDP session opens the RDP panel and toolbar
 description: |
-  Coverage smoke for the new RDP feature (Phase 1: transport + X.224 + RDP
-  Negotiation; canvas scaffolding mounted). Creates an RDP session
-  bookmark and double-clicks to open it. The panel mounts immediately
-  (the canvas inside is rendered until conn.status === "connected"),
-  so we assert the rdp-panel testid is present without requiring a
-  real RDP server.
+  Coverage smoke for the desktop-only RDP client shell. Creates an RDP
+  session bookmark and double-clicks to open it. Browser mode cannot
+  authenticate to a real RDP target, so this case verifies the saved
+  session route, panel mount, canvas mount, and toolbar controls; live
+  protocol/display coverage is handled by ignored Rust live tests against
+  a configured Windows/xrdp target.
 
   Because the configured cfg.ssh.host is not necessarily an RDP server,
   the test does NOT authenticate — it only confirms the protocol
   selector + tab-mount path is wired up. Real connection testing
   requires a configured RDP fixture (xrdp / Windows host).
 covers: [F9.7]
-tags: [smoke, p1, rdp, scaffolding-only]
+tags: [smoke, p1, rdp, desktop-only]
 modes: [browser]
 fixtures: [reset_db]
 timeout_sec: 45
@@ -49,4 +49,10 @@ steps:
       timeout_sec: 5
   # The status chip should be present and show "connecting" or "error" (no real server).
   - assert_visible: '[data-testid="rdp-status"]'
+  - assert_visible: '[data-testid="rdp-toolbar"]'
+  - click: '[data-testid="rdp-scale-toggle"]'
+  - assert_visible: '[data-testid="rdp-resize"]'
+  - click: '[data-testid="rdp-fullscreen"]'
+  - click: '[data-testid="rdp-fullscreen"]'
+  - click: '[data-testid="rdp-reconnect"]'
   - screenshot: 111-rdp-saved.png

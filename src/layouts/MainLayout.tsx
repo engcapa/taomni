@@ -813,7 +813,11 @@ export function MainLayout() {
       const session = parsed.config;
       if (session.session_type === "LocalShell") {
         openLocalTab(session.name);
-      } else if (session.session_type === "SSH" || session.session_type === "SFTP") {
+      } else if (
+        session.session_type === "SSH"
+        || session.session_type === "SFTP"
+        || session.session_type === "RDP"
+      ) {
         if (session.auth_method === "Password") {
           awaitingManualAuthRef.current = true;
           setPendingAuth({ session });
@@ -821,6 +825,8 @@ export function MainLayout() {
           const authMethod = typeof session.auth_method === "string" ? session.auth_method : "PrivateKey";
           if (session.session_type === "SFTP") {
             openSftpTab(session, authMethod, parsed.authData);
+          } else if (session.session_type === "RDP") {
+            openRdpTab(session, parsed.authData ?? undefined);
           } else {
             openSshTab(session, authMethod, parsed.authData);
           }
@@ -831,7 +837,7 @@ export function MainLayout() {
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : String(err));
     }
-  }, [openLocalTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
+  }, [openLocalTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
 
   const openPlaceholderTab = useCallback((title: string, message: string) => {
     addTab({

@@ -8,6 +8,19 @@ export type TunnelStatus = "stopped" | "starting" | "running" | "error";
 
 export type TunnelAuthMethod = "Password" | "PrivateKey" | "Agent";
 
+/**
+ * Server-side hint about where the credential lives. Set by `list_tunnels`
+ * so the UI can render a masked indicator (and enable the eye toggle) for
+ * Password tunnels even when `authData` was stripped from disk because
+ * `saveAuth=false`.
+ */
+export type TunnelAuthStatus =
+  | "agent"
+  | "vault"
+  | "session"
+  | "plaintext"
+  | "none";
+
 export interface TunnelSshCreds {
   host: string;
   port: number;
@@ -17,6 +30,8 @@ export interface TunnelSshCreds {
   authData: string | null;
   /** If true, persist authData to disk (vault). Default false. */
   saveAuth?: boolean;
+  /** Output-only hint from the backend. Never sent on upserts. */
+  authStatus?: TunnelAuthStatus;
 }
 
 export interface TunnelConfig {

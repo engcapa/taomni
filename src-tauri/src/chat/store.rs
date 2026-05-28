@@ -122,7 +122,14 @@ pub fn insert_message(conn: &Connection, msg: &ChatMessage) -> SqlResult<()> {
     conn.execute(
         "INSERT INTO ai_chat_messages (id, thread_id, role, content, created_at, redacted)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![msg.id, msg.thread_id, msg.role, msg.content, msg.created_at, msg.redacted as i64],
+        params![
+            msg.id,
+            msg.thread_id,
+            msg.role,
+            msg.content,
+            msg.created_at,
+            msg.redacted as i64
+        ],
     )?;
     // Update thread updated_at.
     conn.execute(

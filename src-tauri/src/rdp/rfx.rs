@@ -38,8 +38,7 @@ impl RfxBlockHeader {
             return Err(format!("RFX block: {} bytes < {}", buf.len(), Self::SIZE));
         }
         let block_type = u16::from_le_bytes([buf[0], buf[1]]);
-        let block_len =
-            u32::from_le_bytes([buf[2], buf[3], buf[4], buf[5]]);
+        let block_len = u32::from_le_bytes([buf[2], buf[3], buf[4], buf[5]]);
         if (block_len as usize) < Self::SIZE {
             return Err(format!(
                 "RFX block: declared length {} < header {}",
@@ -119,11 +118,7 @@ impl RfxTileHeader {
 
     pub fn parse(buf: &[u8]) -> Result<Self, String> {
         if buf.len() < Self::SIZE {
-            return Err(format!(
-                "RFX_TILE: {} bytes < {}",
-                buf.len(),
-                Self::SIZE
-            ));
+            return Err(format!("RFX_TILE: {} bytes < {}", buf.len(), Self::SIZE));
         }
         let block_type = u16::from_le_bytes([buf[0], buf[1]]);
         if block_type != Self::CBT_TILE {
@@ -214,7 +209,12 @@ mod tests {
 
     #[test]
     fn rect_round_trip() {
-        let r = RfxRect { x: 16, y: 32, width: 64, height: 64 };
+        let r = RfxRect {
+            x: 16,
+            y: 32,
+            width: 64,
+            height: 64,
+        };
         let parsed = RfxRect::parse(&r.encode()).unwrap();
         assert_eq!(r, parsed);
     }
@@ -244,7 +244,9 @@ mod tests {
 
     #[test]
     fn tile_header_rejects_wrong_type() {
-        let buf = vec![0xAB, 0xCD, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let buf = vec![
+            0xAB, 0xCD, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
         assert!(RfxTileHeader::parse(&buf).is_err());
     }
 

@@ -47,7 +47,10 @@ struct TavilyResult {
 impl SearchProvider for TavilyProvider {
     async fn search(&self, query: &str, opts: &SearchOptions) -> Result<Vec<SearchHit>, String> {
         let days = opts.freshness.as_deref().map(|f| match f {
-            "day" => 1, "week" => 7, "month" => 30, _ => 365,
+            "day" => 1,
+            "week" => 7,
+            "month" => 30,
+            _ => 365,
         });
 
         let body = TavilyRequest {
@@ -57,7 +60,8 @@ impl SearchProvider for TavilyProvider {
             days,
         };
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.tavily.com/search")
             .json(&body)
             .send()
@@ -70,16 +74,22 @@ impl SearchProvider for TavilyProvider {
             return Err(format!("Tavily HTTP {}: {}", status, text));
         }
 
-        let data: TavilyResponse = resp.json().await
+        let data: TavilyResponse = resp
+            .json()
+            .await
             .map_err(|e| format!("Tavily JSON parse failed: {}", e))?;
 
-        Ok(data.results.into_iter().map(|r| SearchHit {
-            title: r.title,
-            url: r.url,
-            snippet: r.content,
-            source: "tavily".into(),
-            published_at: r.published_date,
-        }).collect())
+        Ok(data
+            .results
+            .into_iter()
+            .map(|r| SearchHit {
+                title: r.title,
+                url: r.url,
+                snippet: r.content,
+                source: "tavily".into(),
+                published_at: r.published_date,
+            })
+            .collect())
     }
 
     fn provider_id(&self) -> &str {

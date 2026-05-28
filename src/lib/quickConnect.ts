@@ -69,7 +69,8 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
 
   const port = parsed.port ?? DEFAULT_PORTS[sessionType] ?? 22;
   const username = parsed.username ?? (sessionType === "SSH" || sessionType === "SFTP" ? "root" : null);
-  const authMethod: AuthMethod = sessionType === "SSH" ? "Password" : "None";
+  const authMethod: AuthMethod =
+    sessionType === "SSH" || sessionType === "RDP" ? "Password" : "None";
   const titlePrefix = username ? `${username}@` : "";
 
   return {

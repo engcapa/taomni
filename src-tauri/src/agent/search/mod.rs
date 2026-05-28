@@ -29,7 +29,10 @@ pub struct SearchOptions {
 
 impl SearchOptions {
     pub fn new(max_results: u32) -> Self {
-        Self { max_results, freshness: None }
+        Self {
+            max_results,
+            freshness: None,
+        }
     }
 }
 

@@ -38,9 +38,9 @@ pub struct AttachResultPayload {
 fn auth_from(method: &str, data: Option<String>) -> SshAuth {
     match method {
         "Password" => SshAuth::Password(data.unwrap_or_default()),
-        "PrivateKey" => SshAuth::PrivateKey(
-            data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()),
-        ),
+        "PrivateKey" => {
+            SshAuth::PrivateKey(data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
+        }
         "Agent" => SshAuth::Agent,
         _ => SshAuth::Password(data.unwrap_or_default()),
     }
@@ -87,10 +87,7 @@ pub async fn sftp_attach(
 }
 
 #[tauri::command]
-pub async fn sftp_detach(
-    session_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn sftp_detach(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut sessions = state.sftp_sessions.write().await;
     sessions.remove(&session_id);
     Ok(())
@@ -321,7 +318,13 @@ pub async fn sftp_upload(
     };
     let app = app_handle.clone();
     let result = session
-        .upload_file(&local, &dest, transfer_id.clone(), handle.clone(), app.clone())
+        .upload_file(
+            &local,
+            &dest,
+            transfer_id.clone(),
+            handle.clone(),
+            app.clone(),
+        )
         .await;
     transfer::unregister(&state, &transfer_id).await;
     let payload = match &result {
@@ -362,7 +365,13 @@ pub async fn sftp_download(
     };
     let app = app_handle.clone();
     let result = session
-        .download_file(&remote_path, &dest, transfer_id.clone(), handle.clone(), app.clone())
+        .download_file(
+            &remote_path,
+            &dest,
+            transfer_id.clone(),
+            handle.clone(),
+            app.clone(),
+        )
         .await;
     transfer::unregister(&state, &transfer_id).await;
     let final_path = dest.to_string_lossy().to_string();
@@ -401,7 +410,13 @@ pub async fn sftp_upload_dir(
     };
     let app = app_handle.clone();
     let result = session
-        .upload_dir(&local, &dest, transfer_id.clone(), handle.clone(), app.clone())
+        .upload_dir(
+            &local,
+            &dest,
+            transfer_id.clone(),
+            handle.clone(),
+            app.clone(),
+        )
         .await;
     transfer::unregister(&state, &transfer_id).await;
     let payload = match &result {
@@ -437,7 +452,13 @@ pub async fn sftp_download_dir(
     };
     let app = app_handle.clone();
     let result = session
-        .download_dir(&remote_path, &dest, transfer_id.clone(), handle.clone(), app.clone())
+        .download_dir(
+            &remote_path,
+            &dest,
+            transfer_id.clone(),
+            handle.clone(),
+            app.clone(),
+        )
         .await;
     transfer::unregister(&state, &transfer_id).await;
     let final_path = dest.to_string_lossy().to_string();
@@ -486,7 +507,10 @@ pub async fn open_sftp_window(
     session_id: String,
     title: Option<String>,
 ) -> Result<(), String> {
-    let label = format!("sftp-{}", session_id.replace(|c: char| !c.is_alphanumeric(), "-"));
+    let label = format!(
+        "sftp-{}",
+        session_id.replace(|c: char| !c.is_alphanumeric(), "-")
+    );
     if app_handle.get_webview_window(&label).is_some() {
         // Reuse / focus the existing window if it is still alive.
         if let Some(w) = app_handle.get_webview_window(&label) {

@@ -58,7 +58,8 @@ pub fn list_drives() -> Vec<DriveDto> {
 
 pub fn list_dir(path: &Path) -> Result<Vec<FileEntryDto>, String> {
     let mut entries = Vec::new();
-    let read = fs::read_dir(path).map_err(|e| format!("Failed to list {}: {}", path.display(), e))?;
+    let read =
+        fs::read_dir(path).map_err(|e| format!("Failed to list {}: {}", path.display(), e))?;
     for item in read {
         match item {
             Ok(item) => {
@@ -83,8 +84,7 @@ pub fn mkdir(path: &Path) -> Result<(), String> {
 }
 
 pub fn remove(path: &Path, recursive: bool) -> Result<(), String> {
-    let meta = fs::symlink_metadata(path)
-        .map_err(|e| format!("stat {}: {}", path.display(), e))?;
+    let meta = fs::symlink_metadata(path).map_err(|e| format!("stat {}: {}", path.display(), e))?;
     if meta.is_dir() {
         if recursive {
             fs::remove_dir_all(path).map_err(|e| format!("rmdir {}: {}", path.display(), e))
@@ -97,7 +97,8 @@ pub fn remove(path: &Path, recursive: bool) -> Result<(), String> {
 }
 
 pub fn rename(from: &Path, to: &Path) -> Result<(), String> {
-    fs::rename(from, to).map_err(|e| format!("rename {} -> {}: {}", from.display(), to.display(), e))
+    fs::rename(from, to)
+        .map_err(|e| format!("rename {} -> {}: {}", from.display(), to.display(), e))
 }
 
 pub fn read_bytes(path: &Path, max_bytes: u64) -> Result<Vec<u8>, String> {
@@ -135,8 +136,7 @@ pub fn write_bytes(path: &Path, data: &[u8]) -> Result<(), String> {
 pub fn chmod(path: &Path, mode: u32) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     let perms = fs::Permissions::from_mode(mode);
-    fs::set_permissions(path, perms)
-        .map_err(|e| format!("chmod {}: {}", path.display(), e))
+    fs::set_permissions(path, perms).map_err(|e| format!("chmod {}: {}", path.display(), e))
 }
 
 #[cfg(not(unix))]
@@ -151,13 +151,11 @@ pub fn chmod(_path: &Path, _mode: u32) -> Result<(), String> {
 /// transfers an accurate "total bytes" up front for progress reporting.
 pub fn dir_size(path: &Path) -> Result<u64, String> {
     let mut total: u64 = 0;
-    let read = fs::read_dir(path)
-        .map_err(|e| format!("read {}: {}", path.display(), e))?;
+    let read = fs::read_dir(path).map_err(|e| format!("read {}: {}", path.display(), e))?;
     for item in read {
         let entry = item.map_err(|e| format!("read entry: {}", e))?;
         let p = entry.path();
-        let meta = fs::symlink_metadata(&p)
-            .map_err(|e| format!("stat {}: {}", p.display(), e))?;
+        let meta = fs::symlink_metadata(&p).map_err(|e| format!("stat {}: {}", p.display(), e))?;
         if meta.file_type().is_dir() {
             total = total.saturating_add(dir_size(&p)?);
         } else if meta.file_type().is_file() {
@@ -191,8 +189,7 @@ pub fn open_path(path: &Path) -> Result<(), String> {
 }
 
 fn entry_for(path: &Path) -> Result<FileEntryDto, String> {
-    let meta = fs::symlink_metadata(path)
-        .map_err(|e| format!("stat {}: {}", path.display(), e))?;
+    let meta = fs::symlink_metadata(path).map_err(|e| format!("stat {}: {}", path.display(), e))?;
     let name = path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
@@ -217,7 +214,9 @@ fn entry_for(path: &Path) -> Result<FileEntryDto, String> {
 
     let mode = mode_for(&meta);
     let symlink_target = if meta.file_type().is_symlink() {
-        fs::read_link(path).ok().map(|p| p.to_string_lossy().to_string())
+        fs::read_link(path)
+            .ok()
+            .map(|p| p.to_string_lossy().to_string())
     } else {
         None
     };
@@ -261,5 +260,9 @@ fn mode_for(meta: &fs::Metadata) -> u32 {
 
 #[cfg(not(unix))]
 fn mode_for(meta: &fs::Metadata) -> u32 {
-    if meta.permissions().readonly() { 0o444 } else { 0o644 }
+    if meta.permissions().readonly() {
+        0o444
+    } else {
+        0o644
+    }
 }

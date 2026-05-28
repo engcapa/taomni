@@ -187,8 +187,9 @@ fn extract_secrets(plaintext: &Zeroizing<Vec<u8>>) -> Result<Vec<TabbySecret>, T
     for raw in envelope.secrets {
         match raw.kind.as_str() {
             "ssh:password" => {
-                let key: PasswordKey = serde_json::from_value(raw.key)
-                    .map_err(|e| TabbyVaultError::MalformedPlaintext(format!("password key: {e}")))?;
+                let key: PasswordKey = serde_json::from_value(raw.key).map_err(|e| {
+                    TabbyVaultError::MalformedPlaintext(format!("password key: {e}"))
+                })?;
                 let host = match key.host {
                     Some(h) if !h.is_empty() => h,
                     _ => continue,
@@ -202,8 +203,9 @@ fn extract_secrets(plaintext: &Zeroizing<Vec<u8>>) -> Result<Vec<TabbySecret>, T
                 });
             }
             "ssh:key-passphrase" => {
-                let key: KeyPassphraseKey = serde_json::from_value(raw.key)
-                    .map_err(|e| TabbyVaultError::MalformedPlaintext(format!("key-passphrase key: {e}")))?;
+                let key: KeyPassphraseKey = serde_json::from_value(raw.key).map_err(|e| {
+                    TabbyVaultError::MalformedPlaintext(format!("key-passphrase key: {e}"))
+                })?;
                 let id = match key.hash {
                     Some(h) if !h.is_empty() => h,
                     _ => continue,
@@ -242,9 +244,7 @@ pub struct DecryptVaultResponse {
 }
 
 #[tauri::command]
-pub async fn tabby_decrypt_vault(
-    args: DecryptVaultArgs,
-) -> Result<DecryptVaultResponse, String> {
+pub async fn tabby_decrypt_vault(args: DecryptVaultArgs) -> Result<DecryptVaultResponse, String> {
     let DecryptVaultArgs {
         yaml_text,
         master_password,
@@ -316,7 +316,12 @@ mod tests {
         let out = decrypt_vault_yaml(&yaml, "correct horse").unwrap();
         assert_eq!(out.len(), 2);
         match &out[0] {
-            TabbySecret::Password { host, port, user, value } => {
+            TabbySecret::Password {
+                host,
+                port,
+                user,
+                value,
+            } => {
                 assert_eq!(host, "example.com");
                 assert_eq!(*port, Some(22));
                 assert_eq!(user.as_deref(), Some("alice"));

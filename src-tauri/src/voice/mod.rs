@@ -15,9 +15,9 @@
 // transport-agnostic and never imports asr::* directly — it only goes through
 // the AsrManager held in AppAiCtx.
 
-pub mod commands;
 #[cfg(feature = "voice-capture")]
 pub mod capture;
+pub mod commands;
 
 use serde::{Deserialize, Serialize};
 

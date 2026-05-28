@@ -96,7 +96,18 @@ export function parseRdpOptions(optionsJson: string | undefined | null): RdpOpti
 
 /** Serialize back into JSON suitable for `SessionConfig.options_json`. */
 export function serializeRdpOptions(opts: RdpOptions): string {
-  return JSON.stringify(opts);
+  const redirectDrive = {
+    ...opts.redirectDrive,
+    label: sanitizeDriveLabel(opts.redirectDrive.label),
+    path: opts.redirectDrive.enabled ? opts.redirectDrive.path : "",
+  };
+  const gateway = normalizeGatewayForStorage(opts.gateway);
+  return JSON.stringify({
+    ...opts,
+    domain: opts.domain?.trim() || undefined,
+    redirectDrive,
+    gateway,
+  });
 }
 
 function clampInt(
@@ -157,4 +168,24 @@ function mergeGateway(raw: unknown): RdpGatewayOptions | undefined {
     useSessionCreds:
       typeof o.useSessionCreds === "boolean" ? o.useSessionCreds : true,
   };
+}
+
+function normalizeGatewayForStorage(
+  raw: RdpGatewayOptions | undefined,
+): RdpGatewayOptions | undefined {
+  if (!raw || !raw.host.trim()) return undefined;
+  const useSessionCreds = raw.useSessionCreds;
+  return {
+    host: raw.host.trim(),
+    port: clampInt(raw.port, 443, undefined, 1, 65535),
+    username: useSessionCreds ? "" : raw.username.trim(),
+    password: useSessionCreds ? undefined : raw.password || undefined,
+    auth: raw.auth === "basic" ? "basic" : "ntlm",
+    useSessionCreds,
+  };
+}
+
+function sanitizeDriveLabel(label: string): string {
+  const trimmed = label.trim();
+  return (trimmed || "NEWMOB").slice(0, 8);
 }

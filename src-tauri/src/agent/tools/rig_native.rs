@@ -13,14 +13,12 @@
 //! `RedactTextTool` struct that implements `rig_core::tool::Tool`, plus the
 //! JSON schema for arguments — exactly what plan §7.1 promises.
 
-use rig_core::tool_macro;
 use rig_core::tool::Tool as RigTool;
+use rig_core::tool_macro;
 
 #[tool_macro(
     description = "Redact common sensitive patterns (passwords, tokens, Bearer headers, etc.) from a piece of text. Returns the cleaned text plus a count of how many patterns were replaced.",
-    params(
-        text = "The original text to redact"
-    )
+    params(text = "The original text to redact")
 )]
 pub async fn redact_text(text: String) -> Result<serde_json::Value, rig_core::tool::ToolError> {
     let (cleaned, hits) = crate::chat::redact::redact(&text);
@@ -45,7 +43,9 @@ mod tests {
     #[tokio::test]
     async fn macro_generated_tool_runs() {
         let tool = RedactText::default();
-        let args = RedactTextParameters { text: "password=hunter2 hello".into() };
+        let args = RedactTextParameters {
+            text: "password=hunter2 hello".into(),
+        };
         let out = RigTool::call(&tool, args).await.unwrap();
         let txt = out.get("redacted_text").and_then(|v| v.as_str()).unwrap();
         assert!(txt.contains("[REDACTED]"));

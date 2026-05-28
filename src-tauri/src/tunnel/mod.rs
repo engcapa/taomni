@@ -55,6 +55,14 @@ pub struct TunnelSshCreds {
     pub auth_data: Option<String>,
     #[serde(default)]
     pub save_auth: Option<bool>,
+    /// Synthetic, output-only flag set by `list_tunnels` so the UI can show
+    /// a masked indicator and enable the eye/reveal toggle without leaking
+    /// the secret. Values: "vault" (auth_data is `vault:<id>`), "session"
+    /// (plaintext lives only in the in-memory cache), "plaintext" (raw
+    /// data on disk — only happens for PrivateKey paths), or "none".
+    /// Stripped before persistence so this never round-trips to disk.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub auth_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +172,8 @@ fn save_all(app: &AppHandle, list: &[TunnelConfig]) -> Result<(), String> {
             if !keep {
                 t.ssh.auth_data = None;
             }
+            // `auth_status` is purely UI-side metadata; never persist it.
+            t.ssh.auth_status = None;
             t
         })
         .collect();
@@ -294,7 +304,12 @@ async fn run_local_forward(
             let originator = peer.ip().to_string();
             let originator_port = peer.port() as u32;
             let channel = match h
-                .channel_open_direct_tcpip(dh.as_str(), dp as u32, originator.as_str(), originator_port)
+                .channel_open_direct_tcpip(
+                    dh.as_str(),
+                    dp as u32,
+                    originator.as_str(),
+                    originator_port,
+                )
                 .await
             {
                 Ok(c) => c,
@@ -415,18 +430,30 @@ async fn handle_socks5(
 ) -> Result<(), String> {
     // --- greeting ---
     let mut greet = [0u8; 2];
-    stream.read_exact(&mut greet).await.map_err(|e| e.to_string())?;
+    stream
+        .read_exact(&mut greet)
+        .await
+        .map_err(|e| e.to_string())?;
     if greet[0] != 0x05 {
         return Err("not a SOCKS5 client".to_string());
     }
     let mut methods = vec![0u8; greet[1] as usize];
-    stream.read_exact(&mut methods).await.map_err(|e| e.to_string())?;
+    stream
+        .read_exact(&mut methods)
+        .await
+        .map_err(|e| e.to_string())?;
     // We support "no authentication" (0x00) only.
-    stream.write_all(&[0x05, 0x00]).await.map_err(|e| e.to_string())?;
+    stream
+        .write_all(&[0x05, 0x00])
+        .await
+        .map_err(|e| e.to_string())?;
 
     // --- request ---
     let mut req = [0u8; 4];
-    stream.read_exact(&mut req).await.map_err(|e| e.to_string())?;
+    stream
+        .read_exact(&mut req)
+        .await
+        .map_err(|e| e.to_string())?;
     if req[0] != 0x05 {
         return Err("bad SOCKS5 request".to_string());
     }
@@ -445,9 +472,15 @@ async fn handle_socks5(
         }
         0x03 => {
             let mut len = [0u8; 1];
-            stream.read_exact(&mut len).await.map_err(|e| e.to_string())?;
+            stream
+                .read_exact(&mut len)
+                .await
+                .map_err(|e| e.to_string())?;
             let mut name = vec![0u8; len[0] as usize];
-            stream.read_exact(&mut name).await.map_err(|e| e.to_string())?;
+            stream
+                .read_exact(&mut name)
+                .await
+                .map_err(|e| e.to_string())?;
             String::from_utf8_lossy(&name).to_string()
         }
         0x04 => {
@@ -463,13 +496,21 @@ async fn handle_socks5(
         }
     };
     let mut port_bytes = [0u8; 2];
-    stream.read_exact(&mut port_bytes).await.map_err(|e| e.to_string())?;
+    stream
+        .read_exact(&mut port_bytes)
+        .await
+        .map_err(|e| e.to_string())?;
     let port = u16::from_be_bytes(port_bytes);
 
     let originator = peer.ip().to_string();
     let originator_port = peer.port() as u32;
     let channel = match ssh
-        .channel_open_direct_tcpip(host.as_str(), port as u32, originator.as_str(), originator_port)
+        .channel_open_direct_tcpip(
+            host.as_str(),
+            port as u32,
+            originator.as_str(),
+            originator_port,
+        )
         .await
     {
         Ok(c) => c,
@@ -520,8 +561,34 @@ pub async fn list_tunnels(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Vec<TunnelConfig>, String> {
-    let _guard = state.tunnels.store_lock.lock().await;
-    load_all(&app)
+    let mut list = {
+        let _guard = state.tunnels.store_lock.lock().await;
+        load_all(&app)?
+    };
+    // Annotate each entry with `auth_status` so the UI can show a masked
+    // indicator (and enable the eye-toggle) without exposing plaintext.
+    let cache = state.tunnels.session_passwords.lock().await;
+    for t in list.iter_mut() {
+        t.ssh.auth_status = Some(compute_auth_status(&t.ssh, cache.contains_key(&t.id)));
+    }
+    Ok(list)
+}
+
+fn compute_auth_status(creds: &TunnelSshCreds, has_session: bool) -> String {
+    if matches!(creds.auth_method, TunnelAuthMethod::Agent) {
+        return "agent".to_string();
+    }
+    match creds.auth_data.as_deref() {
+        Some(s) if s.starts_with(crate::vault::VAULT_REF_PREFIX) => "vault".to_string(),
+        Some(s) if !s.is_empty() => "plaintext".to_string(),
+        _ => {
+            if has_session {
+                "session".to_string()
+            } else {
+                "none".to_string()
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -531,20 +598,35 @@ pub async fn upsert_tunnel(
     state: State<'_, AppState>,
 ) -> Result<TunnelConfig, String> {
     // Capture (or evict) the in-memory password BEFORE save_all strips it.
-    // - Password auth + save_auth=false + plaintext authData → cache it so
+    //
+    // Cases (auth_method == Password, save_auth == false):
+    // * Plaintext authData supplied  → insert/replace the cache so
     //   "Save then Start" works without re-prompting.
-    // - Anything else (PrivateKey/Agent, save_auth=true, vault ref, empty)
-    //   → drop any prior cache entry to avoid stale secrets.
+    // * Empty/None authData          → KEEP whatever we already have. The
+    //   user is editing the row (e.g. renaming, toggling autostart) and
+    //   the editor leaves authData blank when the original was a stripped
+    //   secret; evicting here would silently break a working tunnel.
+    //
+    // Anything else (PrivateKey/Agent, save_auth=true, vault ref) → drop
+    // any prior cache entry to avoid stale secrets surviving an auth
+    // method or storage change.
     {
         let cache = &state.tunnels.session_passwords;
         let mut map = cache.lock().await;
-        let want_cache = matches!(config.ssh.auth_method, TunnelAuthMethod::Password)
-            && !config.ssh.save_auth.unwrap_or(false);
-        match (want_cache, config.ssh.auth_data.as_deref()) {
-            (true, Some(raw)) if !raw.is_empty() && !raw.starts_with("vault:") => {
+        let is_password = matches!(config.ssh.auth_method, TunnelAuthMethod::Password);
+        let wants_session = is_password && !config.ssh.save_auth.unwrap_or(false);
+        match (wants_session, config.ssh.auth_data.as_deref()) {
+            (true, Some(raw)) if !raw.is_empty() && !raw.starts_with(crate::vault::VAULT_REF_PREFIX) => {
+                // Fresh plaintext typed by the user: refresh the cache.
                 map.insert(config.id.clone(), raw.to_string());
             }
+            (true, _) => {
+                // No new plaintext provided. Preserve any existing cached
+                // password so unrelated edits don't break the tunnel.
+            }
             _ => {
+                // Switched away from cached-password mode (vault, agent,
+                // private key, etc.) — clear the stale cache entry.
                 map.remove(&config.id);
             }
         }
@@ -578,7 +660,9 @@ pub async fn delete_tunnel(
     if let Some(active) = running.remove(&id) {
         active.task.abort();
         let bridges = active.bridges.lock().await;
-        for b in bridges.iter() { b.abort(); }
+        for b in bridges.iter() {
+            b.abort();
+        }
     }
     state.tunnels.statuses.lock().await.remove(&id);
     Ok(())
@@ -590,14 +674,12 @@ pub async fn get_tunnel_status(
     state: State<'_, AppState>,
 ) -> Result<TunnelStatusInfo, String> {
     let s = state.tunnels.statuses.lock().await;
-    Ok(s.get(&id)
-        .cloned()
-        .unwrap_or(TunnelStatusInfo {
-            id,
-            status: TunnelStatus::Stopped,
-            error: None,
-            active_connections: None,
-        }))
+    Ok(s.get(&id).cloned().unwrap_or(TunnelStatusInfo {
+        id,
+        status: TunnelStatus::Stopped,
+        error: None,
+        active_connections: None,
+    }))
 }
 
 #[tauri::command]
@@ -662,9 +744,33 @@ pub async fn start_tunnel(
     let bridges_for_task = bridges.clone();
     let task = tokio::spawn(async move {
         let result = match kind {
-            TunnelKind::Local => run_local_forward(app_for_task.clone(), registry.clone(), bridges_for_task.clone(), config).await,
-            TunnelKind::Dynamic => run_dynamic_forward(app_for_task.clone(), registry.clone(), bridges_for_task.clone(), config).await,
-            TunnelKind::Remote => run_remote_forward(app_for_task.clone(), registry.clone(), bridges_for_task.clone(), config).await,
+            TunnelKind::Local => {
+                run_local_forward(
+                    app_for_task.clone(),
+                    registry.clone(),
+                    bridges_for_task.clone(),
+                    config,
+                )
+                .await
+            }
+            TunnelKind::Dynamic => {
+                run_dynamic_forward(
+                    app_for_task.clone(),
+                    registry.clone(),
+                    bridges_for_task.clone(),
+                    config,
+                )
+                .await
+            }
+            TunnelKind::Remote => {
+                run_remote_forward(
+                    app_for_task.clone(),
+                    registry.clone(),
+                    bridges_for_task.clone(),
+                    config,
+                )
+                .await
+            }
         };
         if let Err(e) = result {
             let info = TunnelStatusInfo {
@@ -682,17 +788,16 @@ pub async fn start_tunnel(
         // Cancel any in-flight bridges, then drop ourselves.
         {
             let bridges = bridges_for_task.lock().await;
-            for b in bridges.iter() { b.abort(); }
+            for b in bridges.iter() {
+                b.abort();
+            }
         }
         let mut running = registry.running.lock().await;
         running.remove(&task_id);
     });
 
     let mut running = state.tunnels.running.lock().await;
-    running.insert(
-        id.clone(),
-        ActiveTunnel { task, bridges },
-    );
+    running.insert(id.clone(), ActiveTunnel { task, bridges });
     Ok(starting)
 }
 
@@ -707,7 +812,9 @@ pub async fn stop_tunnel(
         if let Some(active) = running.remove(&id) {
             active.task.abort();
             let bridges = active.bridges.lock().await;
-            for b in bridges.iter() { b.abort(); }
+            for b in bridges.iter() {
+                b.abort();
+            }
         }
     }
     let info = TunnelStatusInfo {
@@ -850,4 +957,3 @@ pub async fn stop_all_tunnels(
     }
     Ok(out)
 }
-

@@ -1,26 +1,26 @@
-mod state;
-mod terminal;
-mod session;
-mod filebrowser;
-mod tunnel;
-mod nettools;
-mod serial;
-mod config;
-mod appearance;
-mod vnc;
-mod rdp;
-mod wsl;
-mod history;
-pub mod vault;
-pub mod ai;
-mod asr;
-pub mod llm;
-mod tab;
 pub mod agent;
+pub mod ai;
+mod appearance;
+mod asr;
 mod chat;
+mod config;
+mod filebrowser;
+mod history;
+pub mod llm;
 pub mod models;
+mod nettools;
 pub mod perf;
+mod rdp;
+mod serial;
+mod session;
+mod state;
+mod tab;
+mod terminal;
+mod tunnel;
+pub mod vault;
+mod vnc;
 mod voice;
+mod wsl;
 
 use state::AppState;
 use std::sync::Arc;
@@ -42,8 +42,7 @@ pub fn run() {
             std::fs::create_dir_all(&app_data).ok();
 
             let db_path = app_data.join("newmob.db");
-            let conn = rusqlite::Connection::open(&db_path)
-                .expect("failed to open database");
+            let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
 
             let vault_path = vault::default_vault_path(app.handle());
@@ -151,6 +150,8 @@ pub fn run() {
             config::check_file_exists,
             config::clipboard_read_text,
             config::clipboard_write_text,
+            config::clipboard_read_files,
+            config::clipboard_write_files,
             tunnel::list_tunnels,
             tunnel::upsert_tunnel,
             tunnel::delete_tunnel,

@@ -496,7 +496,11 @@ pub fn create_pty(
     Ok((handle, reader, shell_id))
 }
 
-pub fn resize_pty(master: &dyn portable_pty::MasterPty, cols: u16, rows: u16) -> Result<(), String> {
+pub fn resize_pty(
+    master: &dyn portable_pty::MasterPty,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
     master
         .resize(PtySize {
             rows,

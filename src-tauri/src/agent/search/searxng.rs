@@ -51,29 +51,41 @@ struct SearXngResult {
 impl SearchProvider for SearXngProvider {
     async fn search(&self, query: &str, opts: &SearchOptions) -> Result<Vec<SearchHit>, String> {
         let base = self.base_url();
-        let mut url = format!("{}/search?q={}&format=json&language=auto", base, urlencoding::encode(query));
+        let mut url = format!(
+            "{}/search?q={}&format=json&language=auto",
+            base,
+            urlencoding::encode(query)
+        );
 
         if let Some(freshness) = &opts.freshness {
             let time_range = match freshness.as_str() {
-                "day"   => "day",
-                "week"  => "week",
+                "day" => "day",
+                "week" => "week",
                 "month" => "month",
-                _       => "year",
+                _ => "year",
             };
             url.push_str(&format!("&time_range={}", time_range));
         }
 
-        let resp = self.client.get(&url).send().await
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| format!("SearXNG request failed: {}", e))?;
 
         if !resp.status().is_success() {
             return Err(format!("SearXNG returned HTTP {}", resp.status()));
         }
 
-        let data: SearXngResponse = resp.json().await
+        let data: SearXngResponse = resp
+            .json()
+            .await
             .map_err(|e| format!("SearXNG JSON parse failed: {}", e))?;
 
-        let hits = data.results.into_iter()
+        let hits = data
+            .results
+            .into_iter()
             .take(opts.max_results as usize)
             .map(|r| SearchHit {
                 title: r.title,

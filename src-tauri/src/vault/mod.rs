@@ -329,7 +329,10 @@ impl Vault {
         // Rewrap every entry under the new key in a single transaction so a
         // crash mid-rekey does not leave the DB inconsistent.
         let entries = db::list_all_for_rekey(&inner.conn).map_err(|e| e.to_string())?;
-        let tx = inner.conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let tx = inner
+            .conn
+            .unchecked_transaction()
+            .map_err(|e| e.to_string())?;
         for e in entries {
             let entry_nonce: [u8; crypto::NONCE_LEN] = e
                 .nonce
@@ -381,10 +384,7 @@ pub async fn vault_status(state: State<'_, AppState>) -> Result<VaultStatus, Str
 }
 
 #[tauri::command]
-pub async fn vault_init(
-    master_password: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn vault_init(master_password: String, state: State<'_, AppState>) -> Result<(), String> {
     state.vault.init(&master_password)
 }
 

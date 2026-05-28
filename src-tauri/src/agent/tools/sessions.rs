@@ -19,13 +19,31 @@ impl Tool for ListSessionsTool {
     }
 
     async fn execute(&self, args: &serde_json::Value) -> ToolResult {
-        let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+        let query = args
+            .get("query")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_lowercase();
         let db = self.db.lock().unwrap();
         match crate::session::db::list_sessions(&db, None) {
             Ok(sessions) => {
-                let filtered: Vec<_> = sessions.iter()
-                    .filter(|s| query.is_empty() || s.name.to_lowercase().contains(&query) || s.host.to_lowercase().contains(&query))
-                    .map(|s| format!("{}: {} ({}@{}:{})", s.id, s.name, s.username.as_deref().unwrap_or(""), s.host, s.port))
+                let filtered: Vec<_> = sessions
+                    .iter()
+                    .filter(|s| {
+                        query.is_empty()
+                            || s.name.to_lowercase().contains(&query)
+                            || s.host.to_lowercase().contains(&query)
+                    })
+                    .map(|s| {
+                        format!(
+                            "{}: {} ({}@{}:{})",
+                            s.id,
+                            s.name,
+                            s.username.as_deref().unwrap_or(""),
+                            s.host,
+                            s.port
+                        )
+                    })
                     .collect();
                 ToolResult::ok("list_sessions", filtered.join("\n"))
             }
@@ -81,11 +99,17 @@ impl Tool for SwitchTabTool {
 
         match chosen {
             Some(s) => {
-                let _ = self.app.emit("agent-switch-tab", serde_json::json!({
-                    "session_id": s.id,
-                    "name": s.name,
-                }));
-                ToolResult::ok("switch_tab", format!("Requested switch to '{}' ({})", s.name, s.id))
+                let _ = self.app.emit(
+                    "agent-switch-tab",
+                    serde_json::json!({
+                        "session_id": s.id,
+                        "name": s.name,
+                    }),
+                );
+                ToolResult::ok(
+                    "switch_tab",
+                    format!("Requested switch to '{}' ({})", s.name, s.id),
+                )
             }
             None => ToolResult::err("switch_tab", format!("No session matched '{query}'")),
         }

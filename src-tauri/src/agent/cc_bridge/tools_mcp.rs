@@ -64,7 +64,10 @@ pub fn run_stdio() -> io::Result<()> {
                 jsonrpc: "2.0",
                 id: None,
                 result: None,
-                error: Some(JsonRpcError { code: -32700, message: format!("parse error: {e}") }),
+                error: Some(JsonRpcError {
+                    code: -32700,
+                    message: format!("parse error: {e}"),
+                }),
             },
         };
         if let Ok(text) = serde_json::to_string(&response) {
@@ -94,8 +97,17 @@ async fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             error: None,
         },
         "tools/call" => {
-            let name = req.params.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let arguments = req.params.get("arguments").cloned().unwrap_or(serde_json::Value::Null);
+            let name = req
+                .params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let arguments = req
+                .params
+                .get("arguments")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             match dispatch(&name, arguments).await {
                 Ok(text) => JsonRpcResponse {
                     jsonrpc: "2.0",
@@ -109,7 +121,10 @@ async fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
                     jsonrpc: "2.0",
                     id: req.id,
                     result: None,
-                    error: Some(JsonRpcError { code: -32000, message }),
+                    error: Some(JsonRpcError {
+                        code: -32000,
+                        message,
+                    }),
                 },
             }
         }
@@ -117,7 +132,10 @@ async fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             jsonrpc: "2.0",
             id: req.id,
             result: None,
-            error: Some(JsonRpcError { code: -32601, message: format!("method not found: {other}") }),
+            error: Some(JsonRpcError {
+                code: -32601,
+                message: format!("method not found: {other}"),
+            }),
         },
     }
 }
@@ -172,11 +190,13 @@ async fn dispatch(name: &str, args: serde_json::Value) -> Result<String, String>
 
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(crate::agent::tools::terminal::ExplainErrorTool));
-    registry.register(Box::new(crate::agent::tools::web_search::WebSearchTool::new(
-        Arc::new(crate::agent::search::searxng::SearXngProvider::new(
-            crate::agent::search::instances::PUBLIC_INSTANCES[0],
+    registry.register(Box::new(
+        crate::agent::tools::web_search::WebSearchTool::new(Arc::new(
+            crate::agent::search::searxng::SearXngProvider::new(
+                crate::agent::search::instances::PUBLIC_INSTANCES[0],
+            ),
         )),
-    )));
+    ));
     registry.register(Box::new(crate::agent::tools::web_fetch::WebFetchTool::new()));
 
     if name == "redact_text" {
@@ -185,10 +205,14 @@ async fn dispatch(name: &str, args: serde_json::Value) -> Result<String, String>
         return Ok(serde_json::json!({
             "redacted_text": cleaned,
             "patterns_matched": hits,
-        }).to_string());
+        })
+        .to_string());
     }
 
-    let call = ToolCall { tool: name.into(), args };
+    let call = ToolCall {
+        tool: name.into(),
+        args,
+    };
     crate::agent::safety::check_tool_call(&call)?;
     let result = registry.execute(&call).await;
     if result.ok {

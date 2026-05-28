@@ -35,7 +35,8 @@ pub fn write_temp_settings(
     deny_dirs: &[PathBuf],
     out_path: &PathBuf,
 ) -> std::io::Result<()> {
-    let deny_patterns: Vec<String> = deny_dirs.iter()
+    let deny_patterns: Vec<String> = deny_dirs
+        .iter()
         .map(|d| format!("{}/**", d.to_string_lossy().replace('\\', "/")))
         .collect();
 

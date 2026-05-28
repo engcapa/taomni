@@ -46,13 +46,20 @@ struct SerperResult {
 impl SearchProvider for SerperProvider {
     async fn search(&self, query: &str, opts: &SearchOptions) -> Result<Vec<SearchHit>, String> {
         let tbs = opts.freshness.as_deref().map(|f| match f {
-            "day" => "qdr:d".to_string(), "week" => "qdr:w".to_string(),
-            "month" => "qdr:m".to_string(), _ => "qdr:y".to_string(),
+            "day" => "qdr:d".to_string(),
+            "week" => "qdr:w".to_string(),
+            "month" => "qdr:m".to_string(),
+            _ => "qdr:y".to_string(),
         });
 
-        let body = SerperRequest { q: query, num: opts.max_results.min(10), tbs };
+        let body = SerperRequest {
+            q: query,
+            num: opts.max_results.min(10),
+            tbs,
+        };
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://google.serper.dev/search")
             .header("X-API-KEY", &self.api_key)
             .json(&body)
@@ -64,16 +71,22 @@ impl SearchProvider for SerperProvider {
             return Err(format!("Serper HTTP {}", resp.status()));
         }
 
-        let data: SerperResponse = resp.json().await
+        let data: SerperResponse = resp
+            .json()
+            .await
             .map_err(|e| format!("Serper JSON parse failed: {}", e))?;
 
-        Ok(data.organic.into_iter().map(|r| SearchHit {
-            title: r.title,
-            url: r.link,
-            snippet: r.snippet.unwrap_or_default(),
-            source: "serper".into(),
-            published_at: r.date,
-        }).collect())
+        Ok(data
+            .organic
+            .into_iter()
+            .map(|r| SearchHit {
+                title: r.title,
+                url: r.link,
+                snippet: r.snippet.unwrap_or_default(),
+                source: "serper".into(),
+                published_at: r.date,
+            })
+            .collect())
     }
 
     fn provider_id(&self) -> &str {

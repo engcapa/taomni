@@ -20,7 +20,9 @@ pub fn check_tool_call(call: &ToolCall) -> Result<(), String> {
         }
         "read_terminal_tail" => {
             // Must have user_invoked=true.
-            let user_invoked = call.args.get("user_invoked")
+            let user_invoked = call
+                .args
+                .get("user_invoked")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             if !user_invoked {

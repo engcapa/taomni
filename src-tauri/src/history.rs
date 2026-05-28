@@ -85,7 +85,8 @@ pub async fn history_match_prefix(
             row.get::<_, String>(0)
         })
         .map_err(|e| e.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -107,7 +108,8 @@ pub async fn history_list_recent(
     let rows = stmt
         .query_map(params![host_key, limit], |row| row.get::<_, String>(0))
         .map_err(|e| e.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -118,8 +120,11 @@ pub async fn history_clear(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     match host_key {
         Some(h) => {
-            db.execute("DELETE FROM command_history WHERE host_key = ?1", params![h])
-                .map_err(|e| e.to_string())?;
+            db.execute(
+                "DELETE FROM command_history WHERE host_key = ?1",
+                params![h],
+            )
+            .map_err(|e| e.to_string())?;
         }
         None => {
             db.execute("DELETE FROM command_history", [])
@@ -130,7 +135,11 @@ pub async fn history_clear(
 }
 
 /// Non-command version for use by the agent tools module.
-pub fn db_search(conn: &rusqlite::Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<String>> {
+pub fn db_search(
+    conn: &rusqlite::Connection,
+    query: &str,
+    limit: usize,
+) -> rusqlite::Result<Vec<String>> {
     let pattern = format!("%{}%", query);
     let mut stmt = conn.prepare(
         "SELECT DISTINCT command FROM command_history

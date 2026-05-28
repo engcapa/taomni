@@ -275,11 +275,7 @@ impl ActiveSftp {
         let mut file = tokio::fs::File::open(local)
             .await
             .map_err(|e| format!("open {}: {}", local.display(), e))?;
-        let total = file
-            .metadata()
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let total = file.metadata().await.map(|m| m.len()).unwrap_or(0);
 
         // Open the remote file under the session lock, then release the lock
         // so other ops (list, stat) can interleave with the chunked transfer.
@@ -336,8 +332,7 @@ impl ActiveSftp {
         let mut total: u64 = 0;
         for entry in entries {
             if entry.file_type == "dir" {
-                total =
-                    total.saturating_add(Box::pin(self.dir_size(&entry.path)).await?);
+                total = total.saturating_add(Box::pin(self.dir_size(&entry.path)).await?);
             } else if entry.file_type == "file" {
                 total = total.saturating_add(entry.size);
             }
@@ -773,11 +768,7 @@ fn emit_paused(app: &AppHandle, transfer_id: &str, bytes: u64, total: u64) {
     );
 }
 
-fn entry_from_attrs(
-    name: String,
-    path: String,
-    attrs: FileAttributes,
-) -> FileEntryDto {
+fn entry_from_attrs(name: String, path: String, attrs: FileAttributes) -> FileEntryDto {
     let file_type = match attrs.file_type() {
         SftpFileType::Dir => "dir",
         SftpFileType::File => "file",

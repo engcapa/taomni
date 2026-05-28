@@ -1,4 +1,4 @@
-use super::protocol::{CcEvent, parse_ndjson_line};
+use super::protocol::{parse_ndjson_line, CcEvent};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -79,13 +79,20 @@ impl CcProcess {
         self.ensure_running().await?;
 
         // Write the message as a JSON line to stdin.
-        let input = format!("{}\n", serde_json::json!({ "type": "user", "message": message }));
+        let input = format!(
+            "{}\n",
+            serde_json::json!({ "type": "user", "message": message })
+        );
         {
             let mut stdin_guard = self.stdin.lock().await;
             if let Some(stdin) = stdin_guard.as_mut() {
-                stdin.write_all(input.as_bytes()).await
+                stdin
+                    .write_all(input.as_bytes())
+                    .await
                     .map_err(|e| format!("Failed to write to CC stdin: {}", e))?;
-                stdin.flush().await
+                stdin
+                    .flush()
+                    .await
                     .map_err(|e| format!("Failed to flush CC stdin: {}", e))?;
             }
         }
@@ -145,8 +152,7 @@ impl CcProcess {
             }
         };
 
-        let stdin = child.stdin.take()
-            .ok_or("Failed to get CC stdin")?;
+        let stdin = child.stdin.take().ok_or("Failed to get CC stdin")?;
 
         *child_guard = Some(child);
         *self.stdin.lock().await = Some(stdin);
@@ -206,15 +212,16 @@ impl CcProcess {
         });
     }
 
-    async fn collect_events<F: FnMut(&CcEvent)>(&self, on_event: &mut F) -> Result<Vec<CcEvent>, String> {
+    async fn collect_events<F: FnMut(&CcEvent)>(
+        &self,
+        on_event: &mut F,
+    ) -> Result<Vec<CcEvent>, String> {
         let mut events = Vec::new();
         let mut child_guard = self.child.lock().await;
 
-        let child = child_guard.as_mut()
-            .ok_or("CC process not running")?;
+        let child = child_guard.as_mut().ok_or("CC process not running")?;
 
-        let stdout = child.stdout.as_mut()
-            .ok_or("CC stdout not available")?;
+        let stdout = child.stdout.as_mut().ok_or("CC stdout not available")?;
 
         let mut reader = BufReader::new(stdout);
         let mut line = String::new();
@@ -224,16 +231,22 @@ impl CcProcess {
             match tokio::time::timeout(
                 std::time::Duration::from_secs(30),
                 reader.read_line(&mut line),
-            ).await {
+            )
+            .await
+            {
                 Ok(Ok(0)) => break, // EOF
                 Ok(Ok(_)) => {
                     let trimmed = line.trim();
-                    if trimmed.is_empty() { continue; }
+                    if trimmed.is_empty() {
+                        continue;
+                    }
                     if let Some(event) = parse_ndjson_line(trimmed) {
                         on_event(&event);
                         let done = matches!(event, CcEvent::Done | CcEvent::Error { .. });
                         events.push(event);
-                        if done { break; }
+                        if done {
+                            break;
+                        }
                     }
                 }
                 Ok(Err(e)) => return Err(format!("CC stdout read error: {}", e)),

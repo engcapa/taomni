@@ -98,7 +98,9 @@ fn enumerate_via_ash() -> Option<GpuBackend> {
         let devices = unsafe { instance.enumerate_physical_devices().ok()? };
         let device = devices.first().copied()?;
         let props = unsafe { instance.get_physical_device_properties(device) };
-        let name = props.device_name_as_c_str().ok()
+        let name = props
+            .device_name_as_c_str()
+            .ok()
             .and_then(|c| c.to_str().ok())
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown GPU".to_string());
@@ -109,7 +111,10 @@ fn enumerate_via_ash() -> Option<GpuBackend> {
         let api_version = format!("{major}.{minor}.{patch}");
 
         unsafe { instance.destroy_instance(None) };
-        Some(GpuBackend::Vulkan { device: name, api_version })
+        Some(GpuBackend::Vulkan {
+            device: name,
+            api_version,
+        })
     });
     result.ok().flatten()
 }

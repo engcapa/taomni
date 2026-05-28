@@ -4,8 +4,10 @@
 //! the main library surface.
 
 use async_trait::async_trait;
-use newmob_lib::llm::{ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError, LlmResult, TokenUsage};
 use futures::stream::{self, BoxStream, StreamExt};
+use newmob_lib::llm::{
+    ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError, LlmResult, TokenUsage,
+};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -46,10 +48,12 @@ impl Llm for MockLlm {
             match ev {
                 MockEvent::Token(t) => buf.push_str(t),
                 MockEvent::Wait(d) => sleep(*d).await,
-                MockEvent::Error(m) => return Err(LlmError::Provider {
-                    status: 500,
-                    message: m.clone(),
-                }),
+                MockEvent::Error(m) => {
+                    return Err(LlmError::Provider {
+                        status: 500,
+                        message: m.clone(),
+                    })
+                }
             }
         }
         Ok(ChatResponse {

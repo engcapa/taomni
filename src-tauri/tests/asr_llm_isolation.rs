@@ -22,7 +22,9 @@ fn scan(dir: &Path, needles: &[&str]) -> Vec<String> {
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
             continue;
         }
-        let Ok(contents) = fs::read_to_string(&path) else { continue; };
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
         for (i, line) in contents.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") || trimmed.starts_with("*") {

@@ -41,13 +41,7 @@ fn read_u32_be<R: Read>(r: &mut R) -> std::io::Result<u32> {
 /// Read a Raw-encoded rectangle from the stream: `w*h` PIXEL units of 4 bytes
 /// each (per the RGBA32 pixel format we negotiate). Alpha byte is forced to
 /// 0xFF because many servers leave it at 0.
-pub fn read_raw<R: Read>(
-    r: &mut R,
-    x: u16,
-    y: u16,
-    w: u16,
-    h: u16,
-) -> Result<DecodedRect, String> {
+pub fn read_raw<R: Read>(r: &mut R, x: u16, y: u16, w: u16, h: u16) -> Result<DecodedRect, String> {
     let pixel_count = w as usize * h as usize;
     let mut rgba = vec![0u8; pixel_count * 4];
     r.read_exact(&mut rgba)
@@ -85,7 +79,13 @@ pub fn read_copyrect<R: Read>(
     // off the framebuffer. Clip rather than panic.
     let mut rgba = vec![0u8; w_us * h_us * 4];
     if fb_w == 0 || fb_h == 0 {
-        return Ok(DecodedRect::Pixels { x: dst_x, y: dst_y, w, h, rgba });
+        return Ok(DecodedRect::Pixels {
+            x: dst_x,
+            y: dst_y,
+            w,
+            h,
+            rgba,
+        });
     }
     for row in 0..h_us {
         let sy = src_y as usize + row;
@@ -102,7 +102,13 @@ pub fn read_copyrect<R: Read>(
             rgba[dst_start..dst_end].copy_from_slice(&fb[src_start..src_end]);
         }
     }
-    Ok(DecodedRect::Pixels { x: dst_x, y: dst_y, w, h, rgba })
+    Ok(DecodedRect::Pixels {
+        x: dst_x,
+        y: dst_y,
+        w,
+        h,
+        rgba,
+    })
 }
 
 // ── Hextile encoding (type 5) ──────────────────────────────────────
@@ -189,8 +195,8 @@ pub fn read_hextile<R: Read>(
             }
 
             if subenc & HEXTILE_ANY_SUBRECTS != 0 {
-                let n_subrects = read_u8(r).map_err(|e| format!("hextile: n_subrects: {}", e))?
-                    as usize;
+                let n_subrects =
+                    read_u8(r).map_err(|e| format!("hextile: n_subrects: {}", e))? as usize;
                 let coloured = subenc & HEXTILE_SUBRECTS_COLOURED != 0;
                 for _ in 0..n_subrects {
                     let colour = if coloured {
@@ -373,7 +379,9 @@ fn zrle_read_tile(buf: &[u8], pos: &mut usize, w: u16, h: u16) -> Result<Vec<u8>
     let pixel_count = w as usize * h as usize;
     let mut rgba = vec![0u8; pixel_count * 4];
 
-    let subenc = *buf.get(*pos).ok_or_else(|| "zrle: eof subenc".to_string())?;
+    let subenc = *buf
+        .get(*pos)
+        .ok_or_else(|| "zrle: eof subenc".to_string())?;
     *pos += 1;
 
     if subenc == 0 {
@@ -412,7 +420,9 @@ fn zrle_read_tile(buf: &[u8], pos: &mut usize, w: u16, h: u16) -> Result<Vec<u8>
         for row in 0..h as usize {
             let mut col = 0usize;
             while col < w as usize {
-                let byte = *buf.get(*pos).ok_or_else(|| "zrle: eof packed".to_string())?;
+                let byte = *buf
+                    .get(*pos)
+                    .ok_or_else(|| "zrle: eof packed".to_string())?;
                 *pos += 1;
                 let pixels_in_byte = 8 / bpp;
                 for slot in 0..pixels_in_byte {
@@ -550,7 +560,7 @@ mod tests {
     fn hextile_raw_subencoding_reads_exact_bytes() {
         let mut payload = vec![HEXTILE_RAW]; // subenc byte
         payload.extend_from_slice(&[255, 0, 0, 0, 0, 255, 0, 0]); // 2 pixels
-        // 2x1 rect, exactly one tile
+                                                                  // 2x1 rect, exactly one tile
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
         let out = read_hextile(&mut cur, 0, 0, 2, 1, &mut st).unwrap();

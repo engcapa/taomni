@@ -42,7 +42,9 @@ fn scan_for_forbidden(dir: &Path, needles: &[&str], dir_label: &str) {
         if ext != Some("rs") {
             continue;
         }
-        let Ok(contents) = fs::read_to_string(&path) else { continue; };
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
         for line in contents.lines() {
             // Skip comments / docs (line starts with // or */ etc.).
             let trimmed = line.trim_start();
@@ -51,7 +53,9 @@ fn scan_for_forbidden(dir: &Path, needles: &[&str], dir_label: &str) {
             }
             for n in needles {
                 if line.contains(n) {
-                    let rel = path.strip_prefix(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default()).unwrap_or(&path);
+                    let rel = path
+                        .strip_prefix(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default())
+                        .unwrap_or(&path);
                     panic!(
                         "ASR/LLM isolation violation: {} contains forbidden import `{}`. \n\
                          The {} module must not import the other side directly. \n\

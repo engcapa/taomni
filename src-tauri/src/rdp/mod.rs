@@ -34,10 +34,11 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use uuid::Uuid;
 
+use crate::rdp::session::{test_ironrdp_connection, RdpSessionConfig};
+use crate::rdp::ws::{spawn_rdp_relay, RdpControl, RdpSpawnConfig};
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 use crate::vault::Vault;
-use crate::rdp::ws::{spawn_rdp_relay, RdpControl, RdpSpawnConfig};
 
 /// Configuration parsed out of `SessionConfig.options_json` for an RDP
 /// session. Mirrors the TS-side `RdpOptions` in `src/types/rdp.ts`.
@@ -66,21 +67,37 @@ pub struct RdpOptions {
     pub gateway: Option<GatewayOpt>,
 }
 
-fn default_color_depth() -> u8 { 32 }
-fn default_screen_w() -> u16 { 1920 }
-fn default_screen_h() -> u16 { 1080 }
-fn default_true() -> bool { true }
-fn default_audio_mode() -> String { "play".into() }
+fn default_color_depth() -> u8 {
+    32
+}
+fn default_screen_w() -> u16 {
+    1920
+}
+fn default_screen_h() -> u16 {
+    1080
+}
+fn default_true() -> bool {
+    true
+}
+fn default_audio_mode() -> String {
+    "play".into()
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PerformanceFlags {
-    #[serde(default)] pub wallpaper: bool,
-    #[serde(default)] pub themes: bool,
-    #[serde(default = "default_true")] pub font_smooth: bool,
-    #[serde(default = "default_true")] pub disable_full_window_drag: bool,
-    #[serde(default = "default_true")] pub disable_menu_animations: bool,
-    #[serde(default = "default_true")] pub disable_cursor_shadow: bool,
+    #[serde(default)]
+    pub wallpaper: bool,
+    #[serde(default)]
+    pub themes: bool,
+    #[serde(default = "default_true")]
+    pub font_smooth: bool,
+    #[serde(default = "default_true")]
+    pub disable_full_window_drag: bool,
+    #[serde(default = "default_true")]
+    pub disable_menu_animations: bool,
+    #[serde(default = "default_true")]
+    pub disable_cursor_shadow: bool,
 }
 
 impl Default for PerformanceFlags {
@@ -101,12 +118,24 @@ impl PerformanceFlags {
     /// 2.2.1.11.1.1.1 (TS_EXTENDED_INFO_PACKET.performanceFlags).
     pub fn to_bitmask(&self) -> u32 {
         let mut m = 0u32;
-        if !self.wallpaper { m |= 0x0000_0001; } // PERF_DISABLE_WALLPAPER
-        if !self.font_smooth { m |= 0x0000_0080; } // PERF_DISABLE_FONT_SMOOTHING (sense inverted in spec)
-        if self.disable_full_window_drag { m |= 0x0000_0002; }
-        if self.disable_menu_animations { m |= 0x0000_0004; }
-        if !self.themes { m |= 0x0000_0008; } // PERF_DISABLE_THEMING
-        if self.disable_cursor_shadow { m |= 0x0000_0020; }
+        if !self.wallpaper {
+            m |= 0x0000_0001;
+        } // PERF_DISABLE_WALLPAPER
+        if !self.font_smooth {
+            m |= 0x0000_0080;
+        } // PERF_DISABLE_FONT_SMOOTHING (sense inverted in spec)
+        if self.disable_full_window_drag {
+            m |= 0x0000_0002;
+        }
+        if self.disable_menu_animations {
+            m |= 0x0000_0004;
+        }
+        if !self.themes {
+            m |= 0x0000_0008;
+        } // PERF_DISABLE_THEMING
+        if self.disable_cursor_shadow {
+            m |= 0x0000_0020;
+        }
         m
     }
 }
@@ -114,9 +143,12 @@ impl PerformanceFlags {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DriveRedirectOpt {
-    #[serde(default)] pub enabled: bool,
-    #[serde(default)] pub label: String,
-    #[serde(default)] pub path: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub path: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -135,12 +167,19 @@ pub struct GatewayOpt {
     pub use_session_creds: bool,
 }
 
-fn default_gateway_port() -> u16 { 443 }
-fn default_gateway_auth() -> String { "ntlm".into() }
+fn default_gateway_port() -> u16 {
+    443
+}
+fn default_gateway_auth() -> String {
+    "ntlm".into()
+}
 
 impl RdpOptions {
     pub fn from_json(raw: Option<&str>) -> Self {
-        let s = match raw { Some(s) if !s.trim().is_empty() => s, _ => return Self::default() };
+        let s = match raw {
+            Some(s) if !s.trim().is_empty() => s,
+            _ => return Self::default(),
+        };
         match serde_json::from_str::<Self>(s) {
             Ok(v) => v,
             Err(e) => {
@@ -169,6 +208,19 @@ fn resolve_secret(vault: &Vault, value: Option<&str>) -> Result<Option<String>, 
     }
 }
 
+fn apply_session_credentials_to_gateway(
+    options: &mut RdpOptions,
+    username: &Option<String>,
+    password: &Option<String>,
+) {
+    if let Some(g) = options.gateway.as_mut() {
+        if g.use_session_creds {
+            g.username = username.clone().unwrap_or_default();
+            g.password = password.clone();
+        }
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn rdp_connect(
@@ -191,6 +243,7 @@ pub async fn rdp_connect(
             }
         }
     }
+    apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
     let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
     if let Some(n) = network.as_mut() {
         n.resolve_proxy_pass(&state.vault)?;
@@ -226,8 +279,8 @@ pub async fn rdp_disconnect(state: State<'_, AppState>, session_id: String) -> R
     Ok(())
 }
 
-/// Run a transport-level handshake (X.224 + RDP Negotiation) without spawning
-/// the relay. Used by the SessionEditor "Test connection" button.
+/// Run the real IronRDP connection path without spawning the UI relay. Used
+/// by the SessionEditor "Test connection" button.
 #[tauri::command]
 pub async fn rdp_test_connection(
     state: State<'_, AppState>,
@@ -238,8 +291,7 @@ pub async fn rdp_test_connection(
     options_json: Option<String>,
     network_settings_json: Option<String>,
 ) -> Result<String, String> {
-    let _ = (username, password); // reserved for full NLA test in step 2.
-
+    let resolved_password = resolve_secret(&state.vault, password.as_deref())?;
     let mut options = RdpOptions::from_json(options_json.as_deref());
     if let Some(g) = options.gateway.as_mut() {
         if let Some(p) = g.password.as_deref() {
@@ -248,19 +300,82 @@ pub async fn rdp_test_connection(
             }
         }
     }
+    apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
     let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
     if let Some(n) = network.as_mut() {
         n.resolve_proxy_pass(&state.vault)?;
     }
 
-    let mut stream =
+    let transport =
         transport::open_transport(&host, port, network.as_ref(), options.gateway.as_ref()).await?;
-    let neg = pdu::nego::negotiate_request(&options);
-    pdu::nego::send_negotiation(&mut stream, &neg).await?;
-    let resp = pdu::nego::recv_negotiation(&mut stream).await?;
+    let result = test_ironrdp_connection(
+        RdpSessionConfig {
+            stream: transport.stream,
+            local_addr: transport.local_addr,
+            host: host.clone(),
+            port,
+            username,
+            password: resolved_password,
+            options,
+            network,
+        },
+        std::time::Duration::from_secs(45),
+    )
+    .await?;
+
     Ok(format!(
-        "RDP negotiation OK — selected protocol={}, flags=0x{:02x}",
-        resp.selected_protocol_label(),
-        resp.flags
+        "RDP connection OK — protocol={}, desktop={}x{}, server={}",
+        result.protocol, result.width, result.height, result.server_name,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gateway_reuses_session_credentials_when_requested() {
+        let mut options = RdpOptions {
+            gateway: Some(GatewayOpt {
+                host: "rdg.example.com".into(),
+                port: 443,
+                username: "gateway-user".into(),
+                password: Some("gateway-pass".into()),
+                auth: "ntlm".into(),
+                use_session_creds: true,
+            }),
+            ..RdpOptions::default()
+        };
+        apply_session_credentials_to_gateway(
+            &mut options,
+            &Some("rdp-user".into()),
+            &Some("rdp-pass".into()),
+        );
+        let gateway = options.gateway.unwrap();
+        assert_eq!(gateway.username, "rdp-user");
+        assert_eq!(gateway.password.as_deref(), Some("rdp-pass"));
+    }
+
+    #[test]
+    fn gateway_keeps_explicit_credentials_when_not_reusing_session() {
+        let mut options = RdpOptions {
+            gateway: Some(GatewayOpt {
+                host: "rdg.example.com".into(),
+                port: 443,
+                username: "gateway-user".into(),
+                password: Some("gateway-pass".into()),
+                auth: "basic".into(),
+                use_session_creds: false,
+            }),
+            ..RdpOptions::default()
+        };
+        apply_session_credentials_to_gateway(
+            &mut options,
+            &Some("rdp-user".into()),
+            &Some("rdp-pass".into()),
+        );
+        let gateway = options.gateway.unwrap();
+        assert_eq!(gateway.username, "gateway-user");
+        assert_eq!(gateway.password.as_deref(), Some("gateway-pass"));
+    }
 }

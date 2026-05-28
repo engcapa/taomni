@@ -13,21 +13,66 @@
 //! Higher layers (X.224 negotiation, TLS upgrade, MCS, …) treat the
 //! transport opaquely.
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use std::net::SocketAddr;
+
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 
 use crate::rdp::gateway::{self, GatewayOpt};
 use crate::terminal::network::{establish_transport, NetworkSettings};
 
-/// Boxed object-safe transport.
-pub type BoxedStream = Box<dyn AsyncReadWrite>;
+pub struct RdpTransport {
+    pub stream: RdpStream,
+    pub local_addr: SocketAddr,
+}
 
-/// A trait-object marker combining `AsyncRead + AsyncWrite + Unpin + Send`
-/// so we can return one out of `open_transport` regardless of which path
-/// we took. We can't directly `Box<dyn AsyncRead + AsyncWrite + …>` because
-/// only one auto-trait can be combined into a trait object.
-pub trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-impl<T: AsyncRead + AsyncWrite + Unpin + Send + ?Sized> AsyncReadWrite for T {}
+pub enum RdpStream {
+    Tcp(TcpStream),
+    Gateway(gateway::GatewayStream),
+}
+
+impl AsyncRead for RdpStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        match self.as_mut().get_mut() {
+            Self::Tcp(stream) => Pin::new(stream).poll_read(cx, buf),
+            Self::Gateway(stream) => Pin::new(stream).poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncWrite for RdpStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        match self.as_mut().get_mut() {
+            Self::Tcp(stream) => Pin::new(stream).poll_write(cx, buf),
+            Self::Gateway(stream) => Pin::new(stream).poll_write(cx, buf),
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.as_mut().get_mut() {
+            Self::Tcp(stream) => Pin::new(stream).poll_flush(cx),
+            Self::Gateway(stream) => Pin::new(stream).poll_flush(cx),
+        }
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.as_mut().get_mut() {
+            Self::Tcp(stream) => Pin::new(stream).poll_shutdown(cx),
+            Self::Gateway(stream) => Pin::new(stream).poll_shutdown(cx),
+        }
+    }
+}
 
 /// Open an RDP transport.
 ///
@@ -43,20 +88,35 @@ pub async fn open_transport(
     port: u16,
     network: Option<&NetworkSettings>,
     gw: Option<&GatewayOpt>,
-) -> Result<BoxedStream, String> {
+) -> Result<RdpTransport, String> {
     if let Some(g) = gw {
         let stream = gateway::open_tunnel(g, host, port).await?;
-        return Ok(Box::new(stream));
+        return Ok(RdpTransport {
+            stream: RdpStream::Gateway(stream),
+            local_addr: SocketAddr::from(([0, 0, 0, 0], 0)),
+        });
     }
     let proxy_kind = network.map(|n| n.proxy_kind.as_str()).unwrap_or("none");
     match proxy_kind {
         "" | "none" => {
             let s = direct_tcp(host, port, network).await?;
-            Ok(Box::new(s))
+            let local_addr = s
+                .local_addr()
+                .map_err(|e| format!("rdp: get local address: {}", e))?;
+            Ok(RdpTransport {
+                stream: RdpStream::Tcp(s),
+                local_addr,
+            })
         }
         "http" | "socks5" => {
             let s = establish_transport(host, port, network).await?;
-            Ok(Box::new(s))
+            let local_addr = s
+                .local_addr()
+                .map_err(|e| format!("rdp: get local address: {}", e))?;
+            Ok(RdpTransport {
+                stream: RdpStream::Tcp(s),
+                local_addr,
+            })
         }
         other => Err(format!(
             "Proxy type '{}' is not implemented for RDP (supported: none, http, socks5, plus RD Gateway).",

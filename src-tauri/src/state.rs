@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::sync::RwLock;
 
+use crate::agent::cc_bridge::process::CcProcess;
+use crate::ai::AppAiCtx;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::rdp::ws::RdpSession;
@@ -11,8 +13,6 @@ use crate::terminal::ActiveTerminal;
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
-use crate::agent::cc_bridge::process::CcProcess;
-use crate::ai::AppAiCtx;
 
 pub struct WriteStreamHandle {
     pub path: PathBuf,
@@ -61,4 +61,3 @@ impl AppState {
         }
     }
 }
-

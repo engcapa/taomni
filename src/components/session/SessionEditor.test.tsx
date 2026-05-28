@@ -369,6 +369,47 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists RDP options through the session store save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "RDP" });
+
+    await waitFor(() => expect(screen.getByTestId("session-rdp-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "rdp.example.com");
+    await user.type(screen.getByLabelText("Domain"), "CORP");
+    await user.selectOptions(screen.getByLabelText("Color depth"), "16");
+    await user.click(screen.getByRole("radio", { name: "Disable" }));
+    await user.click(screen.getByRole("checkbox", { name: "Sync clipboard" }));
+    await user.click(screen.getByRole("checkbox", { name: "Drive redirection" }));
+
+    const driveLabel = screen.getByLabelText("Drive label");
+    await user.clear(driveLabel);
+    await user.type(driveLabel, "SHAREDIR");
+    await user.type(screen.getByLabelText("Local folder"), "D:\\shared");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "RDP",
+      host: "rdp.example.com",
+      port: 3389,
+    });
+    expect(savedOptions).toMatchObject({
+      domain: "CORP",
+      colorDepth: 16,
+      redirectAudio: "off",
+      redirectClipboard: false,
+      redirectDrive: {
+        enabled: true,
+        label: "SHAREDIR",
+        path: "D:\\shared",
+      },
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists edited Terminal settings for an existing session", async () => {
     const user = userEvent.setup();
     const session = {

@@ -29,7 +29,9 @@ impl PathScanner {
         self.ensure_cache();
         let cache = self.cache.lock().unwrap();
         let prefix_lower = prefix.to_lowercase();
-        cache.executables.iter()
+        cache
+            .executables
+            .iter()
             .filter(|e| e.to_lowercase().starts_with(&prefix_lower))
             .take(limit)
             .cloned()
@@ -39,7 +41,8 @@ impl PathScanner {
     /// Return files/dirs in `dir` whose name starts with the last component of `prefix`.
     pub fn match_files(&self, prefix: &str, dir: &str, limit: usize) -> Vec<String> {
         // Split prefix into directory part and file name part.
-        let (search_dir, name_prefix) = if let Some(slash) = prefix.rfind(|c| c == '/' || c == '\\') {
+        let (search_dir, name_prefix) = if let Some(slash) = prefix.rfind(|c| c == '/' || c == '\\')
+        {
             let d = &prefix[..=slash];
             let n = &prefix[slash + 1..];
             (d.to_string(), n.to_string())
@@ -49,7 +52,9 @@ impl PathScanner {
 
         let base = if search_dir.is_empty() {
             PathBuf::from(dir)
-        } else if search_dir.starts_with('/') || (search_dir.len() >= 2 && search_dir.chars().nth(1) == Some(':')) {
+        } else if search_dir.starts_with('/')
+            || (search_dir.len() >= 2 && search_dir.chars().nth(1) == Some(':'))
+        {
             PathBuf::from(&search_dir)
         } else {
             Path::new(dir).join(&search_dir)
@@ -82,7 +87,8 @@ impl PathScanner {
     fn ensure_cache(&self) {
         let needs_refresh = {
             let cache = self.cache.lock().unwrap();
-            cache.refreshed_at
+            cache
+                .refreshed_at
                 .map(|t| t.elapsed() > PATH_CACHE_TTL)
                 .unwrap_or(true)
         };
@@ -105,12 +111,20 @@ fn scan_path_executables() -> Vec<String> {
 
     for dir in path_var.split(separator) {
         let dir = dir.trim();
-        if dir.is_empty() { continue; }
-        let Ok(entries) = std::fs::read_dir(dir) else { continue; };
+        if dir.is_empty() {
+            continue;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            continue;
+        };
 
         for entry in entries.flatten() {
-            let Ok(file_type) = entry.file_type() else { continue; };
-            if !file_type.is_file() && !file_type.is_symlink() { continue; }
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if !file_type.is_file() && !file_type.is_symlink() {
+                continue;
+            }
 
             let name = entry.file_name().to_string_lossy().to_string();
 
@@ -118,11 +132,15 @@ fn scan_path_executables() -> Vec<String> {
             #[cfg(windows)]
             {
                 let lower = name.to_lowercase();
-                if !lower.ends_with(".exe") && !lower.ends_with(".cmd")
-                    && !lower.ends_with(".bat") && !lower.ends_with(".ps1") {
+                if !lower.ends_with(".exe")
+                    && !lower.ends_with(".cmd")
+                    && !lower.ends_with(".bat")
+                    && !lower.ends_with(".ps1")
+                {
                     continue;
                 }
-                let display = lower.rsplit_once('.')
+                let display = lower
+                    .rsplit_once('.')
                     .map(|(base, _)| base.to_string())
                     .unwrap_or_else(|| lower.clone());
                 if seen.insert(display.clone()) {

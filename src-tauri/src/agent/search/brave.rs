@@ -52,15 +52,22 @@ impl SearchProvider for BraveProvider {
         );
         if let Some(freshness) = opts.freshness.as_deref() {
             // Brave: pd (past day), pw (past week), pm (past month), py (past year)
-            let code = match freshness { "day" => "pd", "week" => "pw", "month" => "pm", _ => "py" };
+            let code = match freshness {
+                "day" => "pd",
+                "week" => "pw",
+                "month" => "pm",
+                _ => "py",
+            };
             url.push_str(&format!("&freshness={}", code));
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .header("X-Subscription-Token", &self.api_key)
             .header("Accept", "application/json")
-            .send().await
+            .send()
+            .await
             .map_err(|e| format!("Brave request failed: {}", e))?;
 
         if !resp.status().is_success() {
@@ -69,18 +76,26 @@ impl SearchProvider for BraveProvider {
             return Err(format!("Brave HTTP {}: {}", status, text));
         }
 
-        let data: BraveResponse = resp.json().await
+        let data: BraveResponse = resp
+            .json()
+            .await
             .map_err(|e| format!("Brave JSON parse failed: {}", e))?;
         let results = data.web.map(|w| w.results).unwrap_or_default();
 
-        Ok(results.into_iter().take(opts.max_results as usize).map(|r| SearchHit {
-            title: r.title,
-            url: r.url,
-            snippet: r.description.unwrap_or_default(),
-            source: "brave".into(),
-            published_at: r.age,
-        }).collect())
+        Ok(results
+            .into_iter()
+            .take(opts.max_results as usize)
+            .map(|r| SearchHit {
+                title: r.title,
+                url: r.url,
+                snippet: r.description.unwrap_or_default(),
+                source: "brave".into(),
+                published_at: r.age,
+            })
+            .collect())
     }
 
-    fn provider_id(&self) -> &str { "brave" }
+    fn provider_id(&self) -> &str {
+        "brave"
+    }
 }

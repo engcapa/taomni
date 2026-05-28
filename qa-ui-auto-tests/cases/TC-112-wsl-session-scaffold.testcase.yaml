@@ -44,7 +44,8 @@ steps:
   - click: '[data-testid="session-save"]'
   - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-wsl"]'
   # Round-trip check — reopen the editor and assert proto=WSL chip is active.
-  - open_session: { name: qa-ui-auto-wsl, edit: true }
+  - click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-wsl"]'
+  - click: '[data-testid="session-edit"]'
   - wait_for: '[data-testid="session-editor"]'
   - wait_for:
       selector: '[data-testid="session-proto-wsl"][data-active="true"]'

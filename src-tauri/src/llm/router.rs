@@ -84,16 +84,15 @@ impl LlmRouter {
     }
 
     pub async fn complete(&self, req: ChatRequest, task: TaskKind) -> LlmResult<ChatResponse> {
-        let primary_id = self.task_routing
-            .get(&task)
-            .unwrap_or(&self.active)
-            .clone();
+        let primary_id = self.task_routing.get(&task).unwrap_or(&self.active).clone();
 
         let primary = match self.providers.get(&primary_id) {
             Some(p) => p,
             None => {
                 if self.unresolved.contains(&primary_id) {
-                    return Err(LlmError::VaultLocked { provider: primary_id });
+                    return Err(LlmError::VaultLocked {
+                        provider: primary_id,
+                    });
                 }
                 return Err(LlmError::NoProvider(task));
             }
@@ -105,7 +104,8 @@ impl LlmRouter {
                 let result = timeout(
                     Duration::from_millis(fb.timeout_ms),
                     primary.chat(req.clone()),
-                ).await;
+                )
+                .await;
 
                 match result {
                     Ok(Ok(resp)) => return Ok(resp),
@@ -137,7 +137,9 @@ impl LlmRouter {
 
     /// Test connectivity to a provider by sending a minimal ping request.
     pub async fn test_connection(&self, provider_id: &str) -> LlmResult<String> {
-        let provider = self.providers.get(provider_id)
+        let provider = self
+            .providers
+            .get(provider_id)
             .ok_or_else(|| LlmError::NoProvider(TaskKind::ChatDrawer))?;
 
         let req = ChatRequest::simple("You are a test assistant.", "Reply with exactly: pong");
@@ -151,21 +153,21 @@ impl LlmRouter {
 
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
-use crate::ai::config::{AiConfig, LlmConfig};
 use super::anthropic::AnthropicProvider;
 use super::openai_compat::OpenAiCompatProvider;
+use crate::ai::config::{AiConfig, LlmConfig};
 
 fn task_kind_from_str(s: &str) -> Option<TaskKind> {
     Some(match s {
-        "voice_intent"    => TaskKind::VoiceIntent,
-        "voice_to_shell"  => TaskKind::VoiceToShell,
-        "tab_completion"  => TaskKind::TabCompletion,
+        "voice_intent" => TaskKind::VoiceIntent,
+        "voice_to_shell" => TaskKind::VoiceToShell,
+        "tab_completion" => TaskKind::TabCompletion,
         "command_rewrite" => TaskKind::CommandRewrite,
-        "chat_drawer"     => TaskKind::ChatDrawer,
-        "inline_qq"       => TaskKind::InlineQq,
-        "agent_default"   => TaskKind::AgentDefault,
-        "web_search"      => TaskKind::WebSearch,
-        "code_mode"       => TaskKind::CodeMode,
+        "chat_drawer" => TaskKind::ChatDrawer,
+        "inline_qq" => TaskKind::InlineQq,
+        "agent_default" => TaskKind::AgentDefault,
+        "web_search" => TaskKind::WebSearch,
+        "code_mode" => TaskKind::CodeMode,
         _ => return None,
     })
 }
@@ -179,10 +181,7 @@ fn task_kind_from_str(s: &str) -> Option<TaskKind> {
 ///   entry is missing, or decryption failed. The caller must NOT fall back
 ///   to using the literal `vault:<id>` string as a credential — that's how
 ///   we end up with bogus 401s on app start.
-fn resolve_api_key(
-    value: &str,
-    vault: Option<&crate::vault::Vault>,
-) -> Result<String, ()> {
+fn resolve_api_key(value: &str, vault: Option<&crate::vault::Vault>) -> Result<String, ()> {
     let is_ref = value.starts_with(crate::vault::VAULT_REF_PREFIX);
     if !is_ref {
         return Ok(value.to_string());
@@ -292,8 +291,8 @@ pub fn build_router(
         && router.has_provider(&cfg.fallback.secondary)
     {
         router.set_fallback(FallbackConfig {
-            primary:    cfg.fallback.primary.clone(),
-            secondary:  cfg.fallback.secondary.clone(),
+            primary: cfg.fallback.primary.clone(),
+            secondary: cfg.fallback.secondary.clone(),
             timeout_ms: cfg.fallback.timeout_ms,
         });
     }
@@ -305,4 +304,3 @@ pub fn build_router(
 pub fn build_router_from_ai(cfg: &AiConfig, vault: Option<&crate::vault::Vault>) -> LlmRouter {
     build_router(&cfg.llm, vault, cfg.full_local_mode)
 }
-

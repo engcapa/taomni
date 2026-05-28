@@ -33,10 +33,21 @@ impl InProcFim {
     /// Generate a continuation for `prefix`. Without the `local-llm-fim`
     /// feature this returns `None`, signalling the caller to fall through to
     /// the LlmRouter path.
-    pub async fn complete_fim(&self, prefix: &str, suffix: &str, max_tokens: u32) -> Option<String> {
+    pub async fn complete_fim(
+        &self,
+        prefix: &str,
+        suffix: &str,
+        max_tokens: u32,
+    ) -> Option<String> {
         #[cfg(feature = "local-llm-fim")]
         {
-            return crate::tab::fim_engine_real::complete(&self.model_path, prefix, suffix, max_tokens).await;
+            return crate::tab::fim_engine_real::complete(
+                &self.model_path,
+                prefix,
+                suffix,
+                max_tokens,
+            )
+            .await;
         }
         #[cfg(not(feature = "local-llm-fim"))]
         {
@@ -72,6 +83,8 @@ pub async fn resolve() -> Option<InProcFim> {
         return None;
     }
     let engine = InProcFim::new(path);
-    *guard = Some(InProcFim { model_path: engine.model_path.clone() });
+    *guard = Some(InProcFim {
+        model_path: engine.model_path.clone(),
+    });
     Some(engine)
 }

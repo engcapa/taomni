@@ -7,16 +7,22 @@ import {
   encodePing,
   encodePointer,
   encodeResize,
+  encodeWheel,
   IN_ACK,
   IN_KEY,
   IN_PING,
   IN_POINTER,
   IN_RESIZE,
+  IN_WHEEL,
   keyEventToScancode,
   mouseButtonMask,
+  normalizeRdpResizeSize,
+  OUT_AUDIO,
   OUT_FRAME,
+  parseAudioFrame,
   parseFrameTile,
   parseRdpWsText,
+  wheelDeltaToRotationUnits,
 } from "./rdp";
 import {
   DEFAULT_RDP_OPTIONS,
@@ -58,9 +64,36 @@ describe("rdp WS encoders", () => {
     expect(buf[4]).toBe(0x38);
   });
 
+  it("encodes a wheel event", () => {
+    const buf = new Uint8Array(encodeWheel(0x0190, 0x012c, -120, true));
+    expect(buf[0]).toBe(IN_WHEEL);
+    expect(buf[1]).toBe(0);
+    expect(buf[2]).toBe(0x01);
+    expect(buf[3]).toBe(0x90);
+    expect(buf[4]).toBe(0x01);
+    expect(buf[5]).toBe(0x2c);
+    expect(buf[6]).toBe(0xff);
+    expect(buf[7]).toBe(0x88);
+  });
+
   it("applyExtended sets bit 0x100 when extended", () => {
     expect(applyExtended(0x1d, false)).toBe(0x1d);
     expect(applyExtended(0x1d, true)).toBe(0x11d);
+  });
+
+  it("normalizes resize sizes to Display Control limits", () => {
+    expect(normalizeRdpResizeSize(1367.4, 119.2)).toEqual({ width: 1366, height: 200 });
+    expect(normalizeRdpResizeSize(8193, 9000)).toEqual({ width: 8192, height: 8192 });
+    expect(normalizeRdpResizeSize(0, 1080)).toBeNull();
+    expect(normalizeRdpResizeSize(Number.NaN, 1080)).toBeNull();
+  });
+
+  it("normalizes browser wheel deltas to RDP rotation units", () => {
+    expect(wheelDeltaToRotationUnits(120, 0)).toBe(1);
+    expect(wheelDeltaToRotationUnits(-120, 0)).toBe(-1);
+    expect(wheelDeltaToRotationUnits(3, 1)).toBe(1);
+    expect(wheelDeltaToRotationUnits(5000, 0)).toBe(42);
+    expect(wheelDeltaToRotationUnits(Number.NaN, 0)).toBe(0);
   });
 });
 
@@ -96,6 +129,36 @@ describe("rdp WS frame parser", () => {
   it("returns null when frame is too short", () => {
     const buf = new Uint8Array([OUT_FRAME, 0, 0]);
     expect(parseFrameTile(buf.buffer)).toBeNull();
+  });
+});
+
+describe("rdp WS audio parser", () => {
+  it("parses a PCM audio packet with metadata", () => {
+    const pcm = new Uint8Array([0, 1, 2, 3]);
+    const buf = new Uint8Array(17 + pcm.length);
+    const dv = new DataView(buf.buffer);
+    buf[0] = OUT_AUDIO;
+    dv.setUint32(1, 44_100);
+    dv.setUint16(5, 2);
+    dv.setUint16(7, 16);
+    dv.setUint32(9, 0x1234_5678);
+    dv.setUint16(13, 7);
+    buf.set(pcm, 17);
+
+    const frame = parseAudioFrame(buf.buffer);
+    expect(frame).not.toBeNull();
+    expect(frame?.sampleRate).toBe(44_100);
+    expect(frame?.channels).toBe(2);
+    expect(frame?.bitsPerSample).toBe(16);
+    expect(frame?.timestamp).toBe(0x1234_5678);
+    expect(frame?.formatNo).toBe(7);
+    expect([...frame!.pcm]).toEqual([...pcm]);
+  });
+
+  it("returns null for non-audio packets", () => {
+    const buf = new Uint8Array(17);
+    buf[0] = OUT_FRAME;
+    expect(parseAudioFrame(buf.buffer)).toBeNull();
   });
 });
 
@@ -178,12 +241,46 @@ describe("RdpOptions parse/serialize", () => {
         username: "alice@CORP",
         password: "vault:abc",
         auth: "ntlm",
-        useSessionCreds: true,
+        useSessionCreds: false,
       },
     };
     const json = serializeRdpOptions(opts);
     const back = parseRdpOptions(json);
     expect(back).toEqual(opts);
+  });
+
+  it("drops empty gateways and strips gateway password when reusing session credentials", () => {
+    const emptyGatewayJson = serializeRdpOptions({
+      ...DEFAULT_RDP_OPTIONS,
+      gateway: {
+        host: "",
+        port: 443,
+        username: "stale",
+        password: "plain",
+        auth: "ntlm",
+        useSessionCreds: true,
+      },
+    });
+    expect(JSON.parse(emptyGatewayJson)).not.toHaveProperty("gateway");
+
+    const sessionCredGatewayJson = serializeRdpOptions({
+      ...DEFAULT_RDP_OPTIONS,
+      gateway: {
+        host: " rdg.example.com ",
+        port: 443,
+        username: "stale",
+        password: "plain",
+        auth: "ntlm",
+        useSessionCreds: true,
+      },
+    });
+    expect(JSON.parse(sessionCredGatewayJson).gateway).toEqual({
+      host: "rdg.example.com",
+      port: 443,
+      username: "",
+      auth: "ntlm",
+      useSessionCreds: true,
+    });
   });
 
   it("clamps invalid color depth and screen sizes back to defaults", () => {

@@ -32,7 +32,13 @@ fn build_router_registers_all_when_not_locked_down() {
 fn full_local_mode_filters_cloud_providers() {
     let cfg = AiConfig::default();
     let router = build_router(&cfg.llm, None, true);
-    assert!(router.has_provider("local"), "local must survive full-local mode");
-    assert!(!router.has_provider("deepseek"), "deepseek should be filtered");
+    assert!(
+        router.has_provider("local"),
+        "local must survive full-local mode"
+    );
+    assert!(
+        !router.has_provider("deepseek"),
+        "deepseek should be filtered"
+    );
     assert!(!router.has_provider("groq"), "groq should be filtered");
 }

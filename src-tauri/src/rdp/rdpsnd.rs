@@ -158,12 +158,7 @@ impl SndProlog {
 /// Build a Wave Confirm PDU body. Time-stamp echoes the server's `wTimeStamp`
 /// from the inbound Wave PDU; `wave_block_no` echoes the outbound counter.
 pub fn build_wave_confirm(timestamp: u16, wave_block_no: u8) -> Vec<u8> {
-    let body = vec![
-        timestamp as u8,
-        (timestamp >> 8) as u8,
-        wave_block_no,
-        0,
-    ];
+    let body = vec![timestamp as u8, (timestamp >> 8) as u8, wave_block_no, 0];
     let mut out = SndProlog {
         msg_type: SNDC_WAVECONFIRM,
         body_size: body.len() as u16,
@@ -260,7 +255,10 @@ mod tests {
 
     #[test]
     fn prolog_round_trip() {
-        let p = SndProlog { msg_type: SNDC_WAVE, body_size: 1024 };
+        let p = SndProlog {
+            msg_type: SNDC_WAVE,
+            body_size: 1024,
+        };
         let buf = p.encode();
         let parsed = SndProlog::parse(&buf).unwrap();
         assert_eq!(parsed, p);

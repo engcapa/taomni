@@ -1246,7 +1246,7 @@ controls:
     kind: interactive
 -->
 
-- 协议选择：SSH、SFTP、RDP、VNC（SSH/SFTP 已实装；VNC 为基础 client 支持；RDP 仍占位）
+- 协议选择：SSH、SFTP、RDP、VNC（SSH/SFTP 已实装；VNC 与 RDP 均已接入基础 client）
 - 基础设置：host、port、username、auth method
 - Advanced SSH：SSH-browser type、Auto-inject OSC 7、Execute command、跳板机/代理
 - Terminal：复用 `TerminalAppearanceSettings` 全套外观控件
@@ -1873,8 +1873,59 @@ controls:
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
 
-### 9.7 已知限制
-- RDP 未实装（仍占位）
+### 9.7 RDP client（IronRDP 0.14）🟡
+
+<!-- feature
+id: F9.7
+status: partial
+area: rdp
+components: [RdpPanel, RdpOptionsForm]
+files:
+  - src/components/rdp/RdpPanel.tsx
+  - src/components/session/forms/RdpOptionsForm.tsx
+  - src/lib/rdp.ts
+  - src/types/rdp.ts
+  - src-tauri/src/rdp/mod.rs
+  - src-tauri/src/rdp/ws.rs
+  - src-tauri/src/rdp/session.rs
+  - src-tauri/src/rdp/transport.rs
+  - src-tauri/src/rdp/gateway/mod.rs
+controls:
+  - id: panel-root
+    selector: '[data-testid="rdp-panel"]'
+    kind: display
+  - id: toolbar
+    selector: '[data-testid="rdp-toolbar"]'
+    kind: display
+  - id: status
+    selector: '[data-testid="rdp-status"]'
+    kind: display
+  - id: canvas
+    selector: '[data-testid="rdp-canvas"]'
+    kind: display       # browser-mode smoke verifies mount; live frame paint is covered by Rust live tests
+  - id: scale-toggle
+    selector: '[data-testid="rdp-scale-toggle"]'
+    kind: interactive
+  - id: resize
+    selector: '[data-testid="rdp-resize"]'
+    kind: interactive
+    optional: true       # disabled until an RDP session reaches connected
+  - id: reconnect
+    selector: '[data-testid="rdp-reconnect"]'
+    kind: interactive
+  - id: fullscreen
+    selector: '[data-testid="rdp-fullscreen"]'
+    kind: interactive
+-->
+
+- Tauri desktop 模式下通过 IronRDP 0.14 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制
+- 传输路径支持 direct TCP、HTTP/SOCKS5 proxy，以及 RD Gateway（MS-TSGU）代码路径；RD Gateway 当前无真实环境，只以 unit test + ignored live smoke 作为验收
+- RDP tab 常驻挂载，保存会话和 `rdp://` QuickConnect 均能打开 RDP panel；密码场景复用 `AuthPrompt`
+- resize 优先使用 DisplayControl DVC；服务器不开放该通道时保持同一 WS/control session 并按新桌面尺寸重连
+- RDP options 表单已持久化 domain、color depth、NLA/performance、clipboard、audio、drive redirection、RD Gateway 配置
+- 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
+
+### 9.8 已知限制
 - QuickConnect 的 VNC URL 尚未接入主流程（已保存的 VNC 会话连接路径不受影响）
 - 浏览器预览模式没有 VNC stub（仅 Tauri 桌面下可用）
 
@@ -2713,6 +2764,5 @@ controls:
 >
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
 > - Ribbon `Packages`、`Macros`
-> - 会话协议 RDP（仅保留会话存储与编辑表单，连接动作打开占位 tab）
 > - QuickConnect 的 VNC URL 入口（已保存 VNC 会话可连接，QuickConnect 尚未接入 VNC client）
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）

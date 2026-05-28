@@ -5,29 +5,39 @@
 
 mod support;
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use newmob_lib::llm::router::LlmRouter;
 use newmob_lib::llm::{ChatRequest, TaskKind};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use support::mock_provider::{MockEvent, MockLlm};
 
 #[tokio::test(flavor = "current_thread")]
 async fn voice_intent_completes_within_budget() {
     let mut r = LlmRouter::new("voice");
-    r.add_provider("voice", Arc::new(MockLlm::new(vec![
-        MockEvent::Wait(Duration::from_millis(700)),
-        MockEvent::Token("{\"tool\":\"list_sessions\"}".into()),
-    ])));
+    r.add_provider(
+        "voice",
+        Arc::new(MockLlm::new(vec![
+            MockEvent::Wait(Duration::from_millis(700)),
+            MockEvent::Token("{\"tool\":\"list_sessions\"}".into()),
+        ])),
+    );
     r.set_task_route(TaskKind::VoiceIntent, "voice");
 
     let started = Instant::now();
-    let resp = r.complete(
-        ChatRequest::simple("voice classifier sys", "list my sessions"),
-        TaskKind::VoiceIntent,
-    ).await.unwrap();
+    let resp = r
+        .complete(
+            ChatRequest::simple("voice classifier sys", "list my sessions"),
+            TaskKind::VoiceIntent,
+        )
+        .await
+        .unwrap();
     let elapsed = started.elapsed();
 
     assert!(resp.content.contains("list_sessions"));
     // Plan: <1500ms PTT-release → ActionCard. We allow 2x headroom in CI.
-    assert!(elapsed < Duration::from_millis(1500), "voice intent too slow: {:?}", elapsed);
+    assert!(
+        elapsed < Duration::from_millis(1500),
+        "voice intent too slow: {:?}",
+        elapsed
+    );
 }
