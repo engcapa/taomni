@@ -15,15 +15,23 @@ const ipcMocks = vi.hoisted(() => ({
   saveSessionGroup: vi.fn(),
   deleteSessionGroup: vi.fn(),
   listSystemFonts: vi.fn(),
+  listWslDistros: vi.fn(),
 }));
 
 vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
 }));
 
-function renderEditor(session?: ComponentProps<typeof SessionEditor>["session"]) {
+vi.mock("../../lib/runtime", () => ({
+  getAppPlatform: () => "windows",
+}));
+
+function renderEditor(
+  session?: ComponentProps<typeof SessionEditor>["session"],
+  props: Partial<Omit<ComponentProps<typeof SessionEditor>, "session" | "onClose">> = {},
+) {
   const onClose = vi.fn();
-  render(<SessionEditor session={session} onClose={onClose} />);
+  render(<SessionEditor session={session} onClose={onClose} {...props} />);
   return { onClose };
 }
 
@@ -44,6 +52,9 @@ describe("SessionEditor SSH settings tabs", () => {
     ipcMocks.saveSessionGroup.mockResolvedValue(undefined);
     ipcMocks.testSshConnection.mockResolvedValue("Connection successful");
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
+    ipcMocks.listWslDistros.mockResolvedValue([
+      { name: "Ubuntu", isDefault: true, state: "Stopped", version: 2 },
+    ]);
   });
 
   afterEach(() => {
@@ -330,6 +341,32 @@ describe("SessionEditor SSH settings tabs", () => {
       cursorBlink: false,
     });
     expect(JSON.parse(savedConfig.options_json).terminalProfile.fontFamily).toContain("JetBrains Mono");
+  });
+
+  it("persists WSL launch options through the session store save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "WSL" });
+
+    await waitFor(() => expect(screen.getByTestId("session-wsl-section")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("wsl-distro")).toHaveValue("Ubuntu"));
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "LocalShell",
+      name: "WSL: Ubuntu",
+      host: "",
+      port: 0,
+    });
+    expect(savedOptions).toMatchObject({
+      wslDistro: "Ubuntu",
+      localShellPath: "wsl.exe",
+      localShellArgs: ["-d", "Ubuntu"],
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("persists edited Terminal settings for an existing session", async () => {

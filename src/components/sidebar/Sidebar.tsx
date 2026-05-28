@@ -18,6 +18,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { useAppStore, type SideTab } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { SessionConfig } from "../../lib/ipc";
+import { sessionTypeLabel } from "../../lib/terminalProfile";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface SidebarProps {
@@ -176,19 +177,22 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
                 )}
               </div>
             ) : (
-              recentSessions.map((session) => (
+              recentSessions.map((session) => {
+                const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
+                return (
                 <button
                   key={session.id}
                   className="moba-tree-row w-full text-left"
                   onClick={() => onConnectSession?.(session)}
-                  title={`${session.name} (${session.session_type})`}
+                  title={`${session.name} (${typeLabel})`}
                   type="button"
                 >
                   <TerminalIcon className="w-3 h-3 text-[var(--moba-accent)]" />
                   <span className="flex-1 truncate">{session.name}</span>
-                  <span className="text-slate-500" style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)" }}>{session.session_type}</span>
+                  <span className="text-slate-500" style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)" }}>{typeLabel}</span>
                 </button>
-              ))
+                );
+              })
             )}
           </div>
         </div>

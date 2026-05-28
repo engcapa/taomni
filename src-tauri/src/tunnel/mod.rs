@@ -116,6 +116,12 @@ pub struct TunnelRegistry {
     /// concurrent `upsert_tunnel` / `delete_tunnel` calls (e.g. when the
     /// UI batches a reorder) cannot lose updates.
     pub store_lock: AsyncMutex<()>,
+    /// Per-tunnel-id in-memory passwords supplied through `upsert_tunnel`
+    /// while `save_auth` is false. The disk store strips secrets in that
+    /// case (so the password never lands in tunnels.json), but the user
+    /// still expects "Save → Start" within the same session to succeed
+    /// without re-prompting. This cache lives only as long as the process.
+    pub session_passwords: AsyncMutex<HashMap<String, String>>,
 }
 
 impl TunnelRegistry {
@@ -192,18 +198,33 @@ fn ssh_auth_from(creds: &TunnelSshCreds) -> Result<SshAuth, String> {
 /// Replace `config.ssh.auth_data` with the resolved plaintext when it is
 /// `vault:<id>`. Called by command entrypoints before spawning the forward
 /// task, so the spawned task never needs to carry a `Vault` handle.
+///
+/// When the persisted `auth_data` is `None` (which happens whenever the
+/// user saves a Password tunnel with `save_auth=false` — see
+/// [`save_all`]), look for a session-cached plaintext password keyed by
+/// `config.id` so the user can Save → Start within a single session
+/// without being asked to re-enter the password.
 fn resolve_tunnel_creds(
     config: &mut TunnelConfig,
     vault: &crate::vault::Vault,
+    session_password: Option<String>,
 ) -> Result<(), String> {
     if !matches!(config.ssh.auth_method, TunnelAuthMethod::Password) {
         return Ok(());
     }
     let raw = match config.ssh.auth_data.as_deref() {
-        Some(s) => s,
-        None => return Ok(()),
+        Some(s) if !s.is_empty() => s.to_string(),
+        _ => {
+            // No persisted secret. Use the in-memory password if we have one;
+            // otherwise leave auth_data as-is and let `ssh_auth_from` raise
+            // a clear "Password is empty" error.
+            if let Some(pwd) = session_password {
+                config.ssh.auth_data = Some(pwd);
+            }
+            return Ok(());
+        }
     };
-    if let Some(plain) = vault.resolve(raw)? {
+    if let Some(plain) = vault.resolve(&raw)? {
         config.ssh.auth_data = Some((*plain).clone());
     }
     Ok(())
@@ -509,6 +530,26 @@ pub async fn upsert_tunnel(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TunnelConfig, String> {
+    // Capture (or evict) the in-memory password BEFORE save_all strips it.
+    // - Password auth + save_auth=false + plaintext authData → cache it so
+    //   "Save then Start" works without re-prompting.
+    // - Anything else (PrivateKey/Agent, save_auth=true, vault ref, empty)
+    //   → drop any prior cache entry to avoid stale secrets.
+    {
+        let cache = &state.tunnels.session_passwords;
+        let mut map = cache.lock().await;
+        let want_cache = matches!(config.ssh.auth_method, TunnelAuthMethod::Password)
+            && !config.ssh.save_auth.unwrap_or(false);
+        match (want_cache, config.ssh.auth_data.as_deref()) {
+            (true, Some(raw)) if !raw.is_empty() && !raw.starts_with("vault:") => {
+                map.insert(config.id.clone(), raw.to_string());
+            }
+            _ => {
+                map.remove(&config.id);
+            }
+        }
+    }
+
     let _guard = state.tunnels.store_lock.lock().await;
     let mut all = load_all(&app)?;
     if let Some(idx) = all.iter().position(|t| t.id == config.id) {
@@ -532,6 +573,7 @@ pub async fn delete_tunnel(
         all.retain(|t| t.id != id);
         save_all(&app, &all)?;
     }
+    state.tunnels.session_passwords.lock().await.remove(&id);
     let mut running = state.tunnels.running.lock().await;
     if let Some(active) = running.remove(&id) {
         active.task.abort();
@@ -594,7 +636,14 @@ pub async fn start_tunnel(
         .into_iter()
         .find(|t| t.id == id)
         .ok_or_else(|| format!("tunnel {} not found", id))?;
-    resolve_tunnel_creds(&mut config, &state.vault)?;
+    let session_pwd = state
+        .tunnels
+        .session_passwords
+        .lock()
+        .await
+        .get(&id)
+        .cloned();
+    resolve_tunnel_creds(&mut config, &state.vault, session_pwd)?;
 
     let starting = TunnelStatusInfo {
         id: id.clone(),
@@ -734,7 +783,14 @@ pub async fn test_tunnel(
         .into_iter()
         .find(|t| t.id == id)
         .ok_or_else(|| format!("tunnel {} not found", id))?;
-    resolve_tunnel_creds(&mut config, &state.vault)?;
+    let session_pwd = state
+        .tunnels
+        .session_passwords
+        .lock()
+        .await
+        .get(&id)
+        .cloned();
+    resolve_tunnel_creds(&mut config, &state.vault, session_pwd)?;
     let auth = ssh_auth_from(&config.ssh)?;
     let handle = connect_ssh_authenticated(
         &config.ssh.host,
