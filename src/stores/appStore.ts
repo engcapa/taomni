@@ -25,6 +25,15 @@ interface AppState {
   terminalSplitInputLockedTabIds: Set<string>;
   uiFontFamily: string;
   uiFontSize: number;
+  /**
+   * When non-null, the named tab is rendered alone in the OS window: the
+   * sidebar, menu bar, ribbon, quick-connect bar, and tab strip are all
+   * hidden so the tab content fills the available area. The OS window
+   * itself is unchanged — this is "in-window maximize", not a true
+   * Fullscreen API call. Cleared automatically if the maximized tab is
+   * removed or its kind changes.
+   */
+  tabMaximizedId: string | null;
 
   addTab: (tab: Tab) => void;
   removeTab: (id: string) => void;
@@ -52,6 +61,8 @@ interface AppState {
   setTabHasNewOutput: (tabId: string, hasNewOutput: boolean) => void;
   setUiFontFamily: (font: string) => void;
   setUiFontSize: (size: number) => void;
+  setTabMaximized: (tabId: string | null) => void;
+  toggleTabMaximized: (tabId: string) => void;
 }
 
 function readCompactMode() {
@@ -163,6 +174,7 @@ export const useAppStore = create<AppState>((set) => ({
   terminalSplitInputLockedTabIds: new Set(),
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
+  tabMaximizedId: null,
 
   addTab: (tab) =>
     set((s) => {
@@ -190,6 +202,7 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
+        tabMaximizedId: s.tabMaximizedId === id ? null : s.tabMaximizedId,
         statusMessage: tr("status.closedTab"),
       };
     }),
@@ -210,6 +223,8 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
+        tabMaximizedId:
+          s.tabMaximizedId && idSet.has(s.tabMaximizedId) ? null : s.tabMaximizedId,
         statusMessage: tr("status.closedTabs"),
       };
     }),
@@ -415,5 +430,19 @@ export const useAppStore = create<AppState>((set) => ({
     set(() => {
       writeUiFontSize(size);
       return { uiFontSize: size };
+    }),
+
+  setTabMaximized: (tabId) =>
+    set((s) => {
+      if (tabId && !s.tabs.some((t) => t.id === tabId)) {
+        return s;
+      }
+      return { tabMaximizedId: tabId };
+    }),
+
+  toggleTabMaximized: (tabId) =>
+    set((s) => {
+      if (!s.tabs.some((t) => t.id === tabId)) return s;
+      return { tabMaximizedId: s.tabMaximizedId === tabId ? null : tabId };
     }),
 }));

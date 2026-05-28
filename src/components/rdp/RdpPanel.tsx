@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Maximize, Minimize, RefreshCw } from "lucide-react";
+import { ExternalLink, Maximize2, Minimize2, RefreshCw } from "lucide-react";
 
 import {
   applyExtended,
@@ -30,6 +30,7 @@ import {
   writeFiles as writeClipboardFiles,
   writeText as writeClipboardText,
 } from "../../lib/clipboard";
+import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
 
 export interface RdpPanelProps {
   tabId: string;
@@ -40,6 +41,15 @@ export interface RdpPanelProps {
   options: RdpOptions;
   networkSettingsJson?: string | null;
   visible: boolean;
+  /** Callback for the toolbar Detach button. When undefined, the button
+   *  is hidden — used by the detached window itself, which should show
+   *  Reattach instead. */
+  onDetach?: () => void;
+  /** When provided the toolbar shows a maximize/restore toggle that the
+   *  parent layout can use to hide the chrome around the panel. The RDP
+   *  canvas still fills its parent — no `position: fixed` shenanigans. */
+  onToggleMaximize?: () => void;
+  maximized?: boolean;
 }
 
 type ScaleMode = "fit" | "one";
@@ -53,6 +63,9 @@ export default function RdpPanel({
   options,
   networkSettingsJson,
   visible,
+  onDetach,
+  onToggleMaximize,
+  maximized,
 }: RdpPanelProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,7 +81,11 @@ export default function RdpPanel({
   const suppressNextPasteKeyUpRef = useRef(false);
   const initRef = useRef({ host, port, username, password, options, networkSettingsJson });
   const [scaleMode, setScaleMode] = useState<ScaleMode>("fit");
-  const [fullscreen, setFullscreen] = useState(false);
+  // Local maximize fallback used only when the parent does NOT provide a
+  // controlled `maximized` prop. Stays scoped to the panel — never
+  // escapes the OS window.
+  const [localMaximized, setLocalMaximized] = useState(false);
+  const isMaximized = onToggleMaximize ? !!maximized : localMaximized;
 
   const store = useRdpStore();
   const conn = store.connections[tabId];
@@ -429,9 +446,13 @@ export default function RdpPanel({
     doConnect();
   }, [closeAudio, doConnect, store, tabId]);
 
-  const toggleFullscreen = useCallback(() => {
-    setFullscreen((f) => !f);
-  }, []);
+  const toggleMaximize = useCallback(() => {
+    if (onToggleMaximize) {
+      onToggleMaximize();
+    } else {
+      setLocalMaximized((m) => !m);
+    }
+  }, [onToggleMaximize]);
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -448,70 +469,95 @@ export default function RdpPanel({
   return (
     <div
       ref={containerRef}
-      className={`rdp-panel ${fullscreen ? "rdp-panel-fullscreen" : ""}`}
+      className={`rdp-panel ${isMaximized ? "rdp-panel-maximized" : ""}`}
       data-testid="rdp-panel"
       tabIndex={0}
       onKeyDown={onKey(true)}
       onKeyUp={onKey(false)}
       style={{
         outline: "none",
-        position: fullscreen ? "fixed" : "relative",
-        inset: fullscreen ? 0 : undefined,
-        zIndex: fullscreen ? 9000 : undefined,
+        position: "relative",
         width: "100%",
         height: "100%",
         background: "#000",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <div
-        className="rdp-toolbar"
-        data-testid="rdp-toolbar"
-        style={{
-          display: "flex",
-          gap: 8,
-          padding: 6,
-          background: "var(--moba-toolbar-bg, #2b2b2b)",
-          color: "var(--moba-text, #ddd)",
-          fontSize: 12,
-          alignItems: "center",
-        }}
+      <FloatingToolbar
+        storageKey="mob.rdp.toolbar"
+        defaultTop={4}
+        defaultRight={4}
+        testId="rdp-floating-toolbar"
       >
-        <span data-testid="rdp-status">{t(`rdp.status.${status}`)}</span>
-        {protocol && <span style={{ opacity: 0.7 }}>· {protocol}</span>}
-        {dims && <span style={{ opacity: 0.7 }}>· {dims}</span>}
-        {stage && <span style={{ opacity: 0.5 }}>· {stage}</span>}
-        <span style={{ flex: 1 }} />
+        <span
+          data-testid="rdp-status"
+          style={{
+            fontSize: 11,
+            color: "#ddd",
+            padding: "0 6px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t(`rdp.status.${status}`)}
+          {protocol && <span style={{ opacity: 0.65 }}>· {protocol}</span>}
+          {dims && <span style={{ opacity: 0.65 }}>· {dims}</span>}
+          {stage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
+        </span>
         <button
           type="button"
-          className="moba-button"
           data-testid="rdp-scale-toggle"
           onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
+          title={scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
+          style={FT_BUTTON_STYLE}
         >
           {scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
         </button>
         <button
           type="button"
-          className="moba-button"
           data-testid="rdp-resize"
           disabled={conn?.status !== "connected"}
           onClick={triggerResize}
           title={t("rdp.resize")}
+          style={{ ...FT_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
         >
           {t("rdp.resize")}
         </button>
         <button
           type="button"
-          className="moba-button"
           data-testid="rdp-reconnect"
           onClick={reconnect}
           title={t("rdp.reconnect")}
+          style={FT_BUTTON_STYLE}
         >
           <RefreshCw size={14} />
         </button>
-        <button type="button" className="moba-button" data-testid="rdp-fullscreen" onClick={toggleFullscreen}>
-          {fullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+        {onDetach && (
+          <button
+            type="button"
+            data-testid="rdp-detach"
+            onClick={onDetach}
+            title={t("rdp.detach")}
+            aria-label={t("rdp.detach")}
+            style={FT_BUTTON_STYLE}
+          >
+            <ExternalLink size={14} />
+          </button>
+        )}
+        <button
+          type="button"
+          data-testid="rdp-maximize"
+          onClick={toggleMaximize}
+          title={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
+          aria-label={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
+          style={FT_BUTTON_STYLE}
+        >
+          {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
-      </div>
+      </FloatingToolbar>
 
       <div
         ref={viewportRef}
@@ -519,7 +565,7 @@ export default function RdpPanel({
           flex: 1,
           background: "#000",
           width: "100%",
-          height: "calc(100% - 36px)",
+          minHeight: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -569,6 +615,21 @@ export default function RdpPanel({
     </div>
   );
 }
+
+const FT_BUTTON_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+  padding: "3px 8px",
+  background: "rgba(0,0,0,0.45)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 4,
+  fontSize: 11,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
 
 /* ── Canvas helpers ─────────────────────────────────────────────────── */
 

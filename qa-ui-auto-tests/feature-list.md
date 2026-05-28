@@ -1895,7 +1895,7 @@ controls:
     selector: '[data-testid="rdp-panel"]'
     kind: display
   - id: toolbar
-    selector: '[data-testid="rdp-toolbar"]'
+    selector: '[data-testid="rdp-floating-toolbar"]'
     kind: display
   - id: status
     selector: '[data-testid="rdp-status"]'
@@ -1913,8 +1913,11 @@ controls:
   - id: reconnect
     selector: '[data-testid="rdp-reconnect"]'
     kind: interactive
-  - id: fullscreen
-    selector: '[data-testid="rdp-fullscreen"]'
+  - id: detach
+    selector: '[data-testid="rdp-detach"]'
+    kind: interactive
+  - id: maximize
+    selector: '[data-testid="rdp-maximize"]'
     kind: interactive
 -->
 

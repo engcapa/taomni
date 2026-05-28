@@ -678,6 +678,27 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       }
       return undefined as T;
     }
+    case "open_detached_window": {
+      const kind = args?.kind as string;
+      const sessionId = args?.sessionId as string;
+      const width = (args?.width as number | undefined) ?? 1200;
+      const height = (args?.height as number | undefined) ?? 760;
+      const url = new URL(window.location.href);
+      url.searchParams.set(kind, sessionId);
+      url.hash = "";
+      const features = `width=${width},height=${height},resizable=yes,scrollbars=yes`;
+      const handle = window.open(
+        url.toString(),
+        `newmob_${kind}_${sessionId}`,
+        features,
+      );
+      if (!handle) {
+        throw new Error(
+          `Browser blocked the ${kind} window. Allow pop-ups for this site.`,
+        );
+      }
+      return undefined as T;
+    }
     case "sftp_open_path": {
       // No real OS shell in browser preview.
       throw new Error(

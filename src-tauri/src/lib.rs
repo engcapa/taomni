@@ -20,6 +20,7 @@ mod tunnel;
 pub mod vault;
 mod vnc;
 mod voice;
+mod windowing;
 mod wsl;
 
 use state::AppState;
@@ -132,6 +133,7 @@ pub fn run() {
             filebrowser::sftp_pause_transfer,
             filebrowser::sftp_resume_transfer,
             filebrowser::open_sftp_window,
+            windowing::open_detached_window,
             appearance::list_system_fonts,
             config::select_private_key_file,
             config::select_upload_file,

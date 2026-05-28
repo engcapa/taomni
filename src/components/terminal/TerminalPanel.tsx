@@ -54,7 +54,7 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
-import { Bot, FolderOpen } from "lucide-react";
+import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
 import {
   createInputEchoSuppressor,
   type InputEchoSuppressor,
@@ -166,6 +166,19 @@ interface TerminalPanelProps {
     open: boolean;
     onToggle: () => void;
   };
+  /** When set, the floating toolbar exposes a "Detach to its own window"
+   *  button that calls back into MainLayout. Hidden in detached windows
+   *  themselves (which already live in their own OS window). */
+  detachToggle?: {
+    onDetach: () => void;
+  };
+  /** When set, the floating toolbar exposes an "in-window maximize"
+   *  toggle. The terminal content always fills its parent — the parent
+   *  is responsible for hiding the chrome around it. */
+  maximizeToggle?: {
+    maximized: boolean;
+    onToggle: () => void;
+  };
 }
 
 const DEFAULT_FONT_SIZE = 14;
@@ -209,6 +222,8 @@ export function TerminalPanel({
   onInputBroadcast,
   sftpToggle,
   chatToggle,
+  detachToggle,
+  maximizeToggle,
 }: TerminalPanelProps) {
   const t = useT();
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
@@ -2108,6 +2123,50 @@ export function TerminalPanel({
           >
             <Bot size={12} />
             {t("terminal.chatFloatingButtonLabel")}
+          </button>
+        )}
+        {detachToggle && (
+          <button
+            type="button"
+            data-testid="terminal-detach"
+            aria-label={t("rdp.detach")}
+            title={t("rdp.detach")}
+            onClick={detachToggle.onDetach}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px 6px",
+              borderRadius: 4,
+              background: "rgba(0,0,0,0.5)",
+              color: "#ccc",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+            }}
+          >
+            <ExternalLink size={12} />
+          </button>
+        )}
+        {maximizeToggle && (
+          <button
+            type="button"
+            data-testid="terminal-maximize"
+            aria-label={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
+            title={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
+            onClick={maximizeToggle.onToggle}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px 6px",
+              borderRadius: 4,
+              background: "rgba(0,0,0,0.5)",
+              color: "#ccc",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+            }}
+          >
+            {maximizeToggle.maximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
           </button>
         )}
       </FloatingToolbar>

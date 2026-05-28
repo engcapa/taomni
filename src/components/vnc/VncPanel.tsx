@@ -15,7 +15,7 @@ import {
 import type { WsOutgoing } from "../../lib/vnc";
 import { useVncStore } from "../../stores/vncStore";
 import { useAppStore } from "../../stores/appStore";
-import { Maximize, Minimize, RefreshCw } from "lucide-react";
+import { ExternalLink, Maximize, Maximize2, Minimize, Minimize2, RefreshCw } from "lucide-react";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
 import { captureCanvasPng } from "../../lib/capture";
@@ -34,6 +34,9 @@ export interface VncPanelProps {
   username?: string | null;
   password?: string;
   visible: boolean;
+  onDetach?: () => void;
+  onToggleMaximize?: () => void;
+  maximized?: boolean;
 }
 
 type ScaleMode = "fit" | "one";
@@ -97,6 +100,9 @@ export default function VncPanel({
   username,
   password,
   visible,
+  onDetach,
+  onToggleMaximize,
+  maximized,
 }: VncPanelProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -875,6 +881,44 @@ export default function VncPanel({
           >
             {scaleMode === "fit" ? <Maximize size={14} /> : <Minimize size={14} />}
           </button>
+          {onDetach && (
+            <button
+              data-testid="vnc-detach"
+              onClick={onDetach}
+              title={t("rdp.detach")}
+              aria-label={t("rdp.detach")}
+              style={{
+                background: "rgba(0,0,0,0.5)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: 4,
+                padding: 4,
+                cursor: "pointer",
+                color: "#ccc",
+                display: "flex",
+              }}
+            >
+              <ExternalLink size={14} />
+            </button>
+          )}
+          {onToggleMaximize && (
+            <button
+              data-testid="vnc-maximize"
+              onClick={onToggleMaximize}
+              title={maximized ? t("rdp.restore") : t("rdp.maximize")}
+              aria-label={maximized ? t("rdp.restore") : t("rdp.maximize")}
+              style={{
+                background: "rgba(0,0,0,0.5)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: 4,
+                padding: 4,
+                cursor: "pointer",
+                color: "#ccc",
+                display: "flex",
+              }}
+            >
+              {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          )}
         </FloatingToolbar>
       )}
 
