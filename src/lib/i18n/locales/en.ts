@@ -814,6 +814,11 @@ const dict = {
     toggleFailed: "Toggle failed: {error}",
     loadFailed: "Failed to load tunnels: {error}",
     unknownError: "unknown error",
+    logTitle: "Activity log",
+    logCount: "{count} entries",
+    logErrors: "{count} error(s)",
+    logEmpty: "No activity yet — test or start a tunnel.",
+    logClear: "Clear",
     editor: {
       kindLocal: "Local port forwarding",
       kindLocalDesc: "Connection from local applications to remote server",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Play,
@@ -6,8 +6,6 @@ import {
   Pencil,
   Copy,
   Trash2,
-  Eye,
-  EyeOff,
   Zap,
   Power,
   Network as NetworkIcon,
@@ -17,8 +15,11 @@ import {
   CheckCircle2,
   CircleDot,
   Key as KeyIcon,
-  TestTube2,
+  Activity,
   LogOut,
+  ChevronDown,
+  ChevronUp,
+  Trash,
 } from "lucide-react";
 import {
   defaultTunnel,
@@ -34,6 +35,7 @@ import {
   stopTunnel,
   testTunnel,
   upsertTunnel,
+  type TunnelAuthStatus,
   type TunnelConfig,
   type TunnelStatus,
   type TunnelStatusInfo,
@@ -48,6 +50,16 @@ interface Props {
   onClose?: () => void;
 }
 
+type TunnelLogLevel = "info" | "success" | "error";
+
+interface TunnelLogEntry {
+  id: string;
+  level: TunnelLogLevel;
+  text: string;
+  /** Wall-clock ms; rendered as HH:MM:SS in the panel. */
+  ts: number;
+}
+
 export function TunnelManager({ onStatusMessage, onClose }: Props) {
   const t = useT();
   const { sessions, loadSessions } = useSessionStore();
@@ -56,9 +68,35 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
   const [editing, setEditing] = useState<TunnelConfig | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [editorFocus, setEditorFocus] = useState<"auth" | undefined>(undefined);
-  const [revealAuth, setRevealAuth] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  /**
+   * Rolling activity log — every test/start/stop result lands here so the
+   * user can read the full message even after the bottom status bar has
+   * cleared. Errors auto-expand the panel; successes leave it closed.
+   */
+  const [logs, setLogs] = useState<TunnelLogEntry[]>([]);
+  const [logExpanded, setLogExpanded] = useState(false);
+  const logRef = useRef<HTMLDivElement | null>(null);
+
+  const appendLog = useCallback((level: TunnelLogLevel, text: string) => {
+    setLogs((prev) => {
+      const next = prev.concat({ id: `log-${Date.now()}-${prev.length}`, level, text, ts: Date.now() });
+      // Cap history so a long-running session can't grow without bound.
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+    if (level === "error") setLogExpanded(true);
+  }, []);
+
+  // Mirror every status-bar message into the log panel so the user has a
+  // single place to review what happened, even for ephemeral toasts.
+  const reportStatus = useCallback(
+    (msg: string, level: TunnelLogLevel = "info") => {
+      onStatusMessage?.(msg);
+      appendLog(level, msg);
+    },
+    [onStatusMessage, appendLog],
+  );
 
   const setStatus = useCallback((info: TunnelStatusInfo) => {
     setStatuses((prev) => ({ ...prev, [info.id]: info }));
@@ -72,11 +110,14 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       for (const s of st) map[s.id] = s;
       setStatuses(map);
     } catch (err) {
-      onStatusMessage?.(t("tunnels.loadFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.loadFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
     } finally {
       setLoading(false);
     }
-  }, [onStatusMessage]);
+  }, [reportStatus, t]);
 
   useEffect(() => {
     void loadSessions();
@@ -85,11 +126,31 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    void listenTunnelStatus(setStatus).then((fn) => {
+    void listenTunnelStatus((info) => {
+      setStatus(info);
+      // Background errors (e.g. an SSH handshake that fails after the
+      // command returned "starting") only land on this event — surface
+      // them in the log so the user can read the cause without watching
+      // the bottom status bar.
+      if (info.status === "error" && info.error) {
+        const errMsg = info.error;
+        setTunnels((current) => {
+          const tunnel = current.find((tt) => tt.id === info.id);
+          appendLog(
+            "error",
+            t("tunnels.tunnelFailed", {
+              name: tunnel?.name ?? info.id,
+              error: errMsg,
+            }),
+          );
+          return current;
+        });
+      }
+    }).then((fn) => {
       unlisten = fn;
     });
     return () => unlisten?.();
-  }, [setStatus]);
+  }, [setStatus, appendLog, t]);
 
   const handleNew = () => {
     setEditing(null);
@@ -110,13 +171,14 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
   };
 
   const handleTest = async (t2: TunnelConfig) => {
-    onStatusMessage?.(t("tunnels.testing", { name: t2.name }));
+    reportStatus(t("tunnels.testing", { name: t2.name }));
     try {
       const msg = await testTunnel(t2.id);
-      onStatusMessage?.(msg);
+      reportStatus(msg, "success");
     } catch (err) {
-      onStatusMessage?.(
+      reportStatus(
         t("tunnels.testFailed", { name: t2.name, error: err instanceof Error ? err.message : String(err) }),
+        "error",
       );
     }
   };
@@ -131,9 +193,12 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     try {
       await upsertTunnel(copy);
       await refresh();
-      onStatusMessage?.(t("tunnels.cloned", { name: copy.name }));
+      reportStatus(t("tunnels.cloned", { name: copy.name }));
     } catch (err) {
-      onStatusMessage?.(t("tunnels.cloneFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.cloneFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
     }
   };
 
@@ -142,9 +207,12 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     try {
       await deleteTunnel(t2.id);
       await refresh();
-      onStatusMessage?.(t("tunnels.deleted", { name: t2.name }));
+      reportStatus(t("tunnels.deleted", { name: t2.name }));
     } catch (err) {
-      onStatusMessage?.(t("tunnels.deleteFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.deleteFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
     }
   };
 
@@ -154,17 +222,23 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       const info = await startTunnel(t2.id);
       setStatus(info);
       if (info.status === "error") {
-        onStatusMessage?.(t("tunnels.tunnelFailed", { name: t2.name, error: info.error ?? t("tunnels.unknownError") }));
+        reportStatus(
+          t("tunnels.tunnelFailed", { name: t2.name, error: info.error ?? t("tunnels.unknownError") }),
+          "error",
+        );
       } else if (info.status === "running") {
-        onStatusMessage?.(t("tunnels.tunnelRunningOn", { name: t2.name, endpoint: `${t2.listenHost}:${t2.listenPort}` }));
+        reportStatus(
+          t("tunnels.tunnelRunningOn", { name: t2.name, endpoint: `${t2.listenHost}:${t2.listenPort}` }),
+          "success",
+        );
       } else {
         // "starting" — final outcome will arrive on the tunnel-status event.
-        onStatusMessage?.(t("tunnels.tunnelStarting", { name: t2.name }));
+        reportStatus(t("tunnels.tunnelStarting", { name: t2.name }));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatus({ id: t2.id, status: "error", error: msg });
-      onStatusMessage?.(t("tunnels.tunnelFailed", { name: t2.name, error: msg }));
+      reportStatus(t("tunnels.tunnelFailed", { name: t2.name, error: msg }), "error");
     }
   };
 
@@ -173,7 +247,10 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       const info = await stopTunnel(t2.id);
       setStatus(info);
     } catch (err) {
-      onStatusMessage?.(t("tunnels.stopFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.stopFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
     }
   };
 
@@ -185,11 +262,29 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       for (const s of list) map[s.id] = s;
       setStatuses(map);
       const failed = list.filter((s) => s.status === "error").length;
-      onStatusMessage?.(failed > 0
-        ? t("tunnels.startedAllWithErrors", { errors: failed })
-        : t("tunnels.startedAll"));
+      // Surface every per-tunnel error to the log so the user can see what
+      // broke even if the bottom status bar only shows the aggregate count.
+      for (const info of list) {
+        if (info.status === "error" && info.error) {
+          const tunnel = tunnels.find((tt) => tt.id === info.id);
+          appendLog(
+            "error",
+            t("tunnels.tunnelFailed", {
+              name: tunnel?.name ?? info.id,
+              error: info.error,
+            }),
+          );
+        }
+      }
+      reportStatus(
+        failed > 0 ? t("tunnels.startedAllWithErrors", { errors: failed }) : t("tunnels.startedAll"),
+        failed > 0 ? "error" : "success",
+      );
     } catch (err) {
-      onStatusMessage?.(t("tunnels.startAllFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.startAllFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -202,9 +297,12 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       const map = { ...statuses };
       for (const s of list) map[s.id] = s;
       setStatuses(map);
-      onStatusMessage?.(t("tunnels.stoppedAll"));
+      reportStatus(t("tunnels.stoppedAll"));
     } catch (err) {
-      onStatusMessage?.(t("tunnels.stopAllFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.stopAllFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -219,7 +317,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     await refresh();
     setShowEditor(false);
     setEditing(null);
-    onStatusMessage?.(t("tunnels.savedNamed", { name: next.name }));
+    reportStatus(t("tunnels.savedNamed", { name: next.name }));
   };
 
   const reorder = async (from: number, to: number) => {
@@ -231,7 +329,10 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     try {
       await reorderTunnels(next.map((tt) => tt.id));
     } catch (err) {
-      onStatusMessage?.(t("tunnels.reorderFailed", { error: err instanceof Error ? err.message : String(err) }));
+      reportStatus(
+        t("tunnels.reorderFailed", { error: err instanceof Error ? err.message : String(err) }),
+        "error",
+      );
       void refresh();
     }
   };
@@ -314,10 +415,6 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
                     index={idx}
                     total={tunnels.length}
                     status={statuses[tt.id]}
-                    revealAuth={!!revealAuth[tt.id]}
-                    onToggleReveal={() =>
-                      setRevealAuth((prev) => ({ ...prev, [tt.id]: !prev[tt.id] }))
-                    }
                     onStart={() => handleStart(tt)}
                     onStop={() => handleStop(tt)}
                     onEdit={() => handleEdit(tt)}
@@ -332,7 +429,10 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
                         await upsertTunnel({ ...tt, autostart: !tt.autostart });
                         await refresh();
                       } catch (err) {
-                        onStatusMessage?.(t("tunnels.toggleFailed", { error: err instanceof Error ? err.message : String(err) }));
+                        reportStatus(
+                          t("tunnels.toggleFailed", { error: err instanceof Error ? err.message : String(err) }),
+                          "error",
+                        );
                       }
                     }}
                   />
@@ -341,6 +441,15 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           </table>
         </div>
       </div>
+
+      {/* Activity / error log */}
+      <ActivityLog
+        logs={logs}
+        expanded={logExpanded}
+        onToggle={() => setLogExpanded((v) => !v)}
+        onClear={() => setLogs([])}
+        listRef={logRef}
+      />
 
       {/* Footer */}
       <div
@@ -453,8 +562,6 @@ function TunnelRow({
   index,
   total,
   status,
-  revealAuth,
-  onToggleReveal,
   onStart,
   onStop,
   onEdit,
@@ -470,8 +577,6 @@ function TunnelRow({
   index: number;
   total: number;
   status?: TunnelStatusInfo;
-  revealAuth: boolean;
-  onToggleReveal: () => void;
   onStart: () => void;
   onStop: () => void;
   onEdit: () => void;
@@ -490,17 +595,32 @@ function TunnelRow({
       ? t("tunnels.dynamicSocks")
       : `${tunnel.destHost || "?"}:${tunnel.destPort || "?"}`;
   const sshLabel = `${tunnel.ssh.username || "?"}@${tunnel.ssh.host || "?"}:${tunnel.ssh.port || 22}`;
+  // The backend annotates each tunnel with `authStatus` so the masked
+  // indicator stays visible even when the password was stripped from disk
+  // (`saveAuth=false` keeps it only in the in-memory cache). Without this
+  // hint the row would look empty even though Start would succeed using
+  // the cached secret.
+  const authStatus: TunnelAuthStatus =
+    tunnel.ssh.authStatus ??
+    (tunnel.ssh.authMethod === "Agent"
+      ? "agent"
+      : tunnel.ssh.authData
+        ? tunnel.ssh.authData.startsWith("vault:")
+          ? "vault"
+          : "plaintext"
+        : "none");
+  const hasSecret =
+    authStatus === "vault" || authStatus === "session" || authStatus === "plaintext";
   const authPreview = useMemo(() => {
     if (tunnel.ssh.authMethod === "Agent") return "agent";
-    const data = tunnel.ssh.authData ?? "";
-    if (!data) return "(none)";
-    if (revealAuth) return data;
     if (tunnel.ssh.authMethod === "PrivateKey") {
-      const head = data.length > 24 ? `…${data.slice(-22)}` : data;
-      return head;
+      const data = tunnel.ssh.authData ?? "";
+      if (!data) return "(none)";
+      return data.length > 24 ? `…${data.slice(-22)}` : data;
     }
-    return "•".repeat(Math.min(8, Math.max(4, data.length)));
-  }, [revealAuth, tunnel.ssh.authData, tunnel.ssh.authMethod]);
+    if (!hasSecret) return "(none)";
+    return "••••••••";
+  }, [tunnel.ssh.authMethod, tunnel.ssh.authData, hasSecret]);
 
   return (
     <tr
@@ -589,15 +709,6 @@ function TunnelRow({
           <span className="text-[10.5px] moba-mono" style={{ color: "var(--moba-text-muted)" }}>
             {authPreview}
           </span>
-          <button
-            data-testid="tunnel-row-toggle-reveal"
-            type="button"
-            className="p-0.5 hover:text-[var(--moba-accent)]"
-            title={revealAuth ? t("tunnels.rowHide") : t("tunnels.rowShow")}
-            onClick={onToggleReveal}
-          >
-            {revealAuth ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-          </button>
         </div>
       </Td>
       <Td className="text-center">
@@ -609,7 +720,7 @@ function TunnelRow({
             <KeyIcon className="w-3.5 h-3.5" style={{ color: "#c97a23" }} />
           </IconBtn>
           <IconBtn testId="tunnel-row-test" title={t("tunnels.rowTest")} onClick={onTest}>
-            <TestTube2 className="w-3.5 h-3.5" style={{ color: "#1e6db8" }} />
+            <Activity className="w-3.5 h-3.5" style={{ color: "#1f7a4a" }} strokeWidth={2.5} />
           </IconBtn>
           <IconBtn testId="tunnel-row-clone" title={t("tunnels.rowClone")} onClick={onClone}>
             <Copy className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
@@ -673,3 +784,127 @@ function IconBtn({
 
 // Re-export so other modules don't have to think about the manager file
 export { defaultTunnel };
+
+function ActivityLog({
+  logs,
+  expanded,
+  onToggle,
+  onClear,
+  listRef,
+}: {
+  logs: TunnelLogEntry[];
+  expanded: boolean;
+  onToggle: () => void;
+  onClear: () => void;
+  listRef: React.RefObject<HTMLDivElement>;
+}) {
+  const t = useT();
+  const errorCount = logs.filter((l) => l.level === "error").length;
+  const latest = logs.length > 0 ? logs[logs.length - 1] : null;
+
+  // Auto-scroll to the newest entry whenever the panel is open and a new
+  // log lands. Skipping this when collapsed keeps the toggle bar stable.
+  useEffect(() => {
+    if (!expanded) return;
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [logs, expanded, listRef]);
+
+  return (
+    <div
+      data-testid="tunnel-activity-log"
+      className="border-t shrink-0 flex flex-col"
+      style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}
+    >
+      <button
+        type="button"
+        data-testid="tunnel-activity-log-toggle"
+        className="h-7 px-3 flex items-center gap-2 text-[11px] hover:bg-[var(--moba-hover)] text-left"
+        onClick={onToggle}
+        style={{ color: "var(--moba-text)" }}
+      >
+        {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+        <span className="font-semibold">{t("tunnels.logTitle")}</span>
+        <span style={{ color: "var(--moba-text-muted)" }}>
+          {t("tunnels.logCount", { count: logs.length })}
+        </span>
+        {errorCount > 0 && (
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+            style={{ background: "rgba(178,34,34,0.15)", color: "#b22222" }}
+          >
+            {t("tunnels.logErrors", { count: errorCount })}
+          </span>
+        )}
+        <div className="flex-1" />
+        {!expanded && latest && (
+          <span
+            className="truncate max-w-[60%]"
+            style={{
+              color:
+                latest.level === "error"
+                  ? "#b22222"
+                  : latest.level === "success"
+                    ? "#1f7a4a"
+                    : "var(--moba-text-muted)",
+            }}
+            title={latest.text}
+          >
+            {latest.text}
+          </span>
+        )}
+      </button>
+      {expanded && (
+        <div className="flex flex-col" style={{ maxHeight: 180 }}>
+          <div className="flex items-center justify-end px-2 py-1 border-b" style={{ borderColor: "var(--moba-divider)" }}>
+            <button
+              type="button"
+              data-testid="tunnel-activity-log-clear"
+              className="moba-btn flex items-center gap-1 text-[11px]"
+              onClick={onClear}
+              disabled={logs.length === 0}
+              title={t("tunnels.logClear")}
+            >
+              <Trash className="w-3 h-3" /> {t("tunnels.logClear")}
+            </button>
+          </div>
+          <div
+            ref={listRef}
+            className="flex-1 overflow-auto px-3 py-1.5 moba-mono text-[11px] leading-[1.6]"
+            style={{ background: "var(--moba-bg)" }}
+          >
+            {logs.length === 0 ? (
+              <div className="text-center py-3" style={{ color: "var(--moba-text-muted)" }}>
+                {t("tunnels.logEmpty")}
+              </div>
+            ) : (
+              logs.map((entry) => <ActivityLogRow key={entry.id} entry={entry} />)
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActivityLogRow({ entry }: { entry: TunnelLogEntry }) {
+  const color =
+    entry.level === "error"
+      ? "#b22222"
+      : entry.level === "success"
+        ? "#1f7a4a"
+        : "var(--moba-text)";
+  return (
+    <div className="flex items-start gap-2" style={{ color }}>
+      <span style={{ color: "var(--moba-text-muted)" }}>{formatLogTime(entry.ts)}</span>
+      <span className="whitespace-pre-wrap break-words">{entry.text}</span>
+    </div>
+  );
+}
+
+function formatLogTime(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}

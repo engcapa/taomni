@@ -813,6 +813,11 @@ export const zhCN: DeepPartial<typeof en> = {
     toggleFailed: "切换失败：{error}",
     loadFailed: "加载隧道失败：{error}",
     unknownError: "未知错误",
+    logTitle: "活动日志",
+    logCount: "{count} 条",
+    logErrors: "{count} 条错误",
+    logEmpty: "暂无活动 — 测试或启动隧道后会显示。",
+    logClear: "清空",
     editor: {
       kindLocal: "本地端口转发",
       kindLocalDesc: "本地应用通过 SSH 访问远端服务",
