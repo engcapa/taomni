@@ -53,8 +53,15 @@ impl SearchProvider for ExaProvider {
     async fn search(&self, query: &str, opts: &SearchOptions) -> Result<Vec<SearchHit>, String> {
         let start_published = opts.freshness.as_deref().map(|f| {
             let now = chrono::Utc::now();
-            let days = match f { "day" => 1, "week" => 7, "month" => 30, _ => 365 };
-            (now - chrono::Duration::days(days)).format("%Y-%m-%dT%H:%M:%S.000Z").to_string()
+            let days = match f {
+                "day" => 1,
+                "week" => 7,
+                "month" => 30,
+                _ => 365,
+            };
+            (now - chrono::Duration::days(days))
+                .format("%Y-%m-%dT%H:%M:%S.000Z")
+                .to_string()
         });
 
         let body = ExaRequest {
@@ -64,11 +71,13 @@ impl SearchProvider for ExaProvider {
             start_published_date: start_published,
         };
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.exa.ai/search")
             .header("x-api-key", &self.api_key)
             .json(&body)
-            .send().await
+            .send()
+            .await
             .map_err(|e| format!("Exa request failed: {}", e))?;
 
         if !resp.status().is_success() {
@@ -77,16 +86,24 @@ impl SearchProvider for ExaProvider {
             return Err(format!("Exa HTTP {}: {}", status, text));
         }
 
-        let data: ExaResponse = resp.json().await
+        let data: ExaResponse = resp
+            .json()
+            .await
             .map_err(|e| format!("Exa JSON parse failed: {}", e))?;
-        Ok(data.results.into_iter().map(|r| SearchHit {
-            title: r.title.unwrap_or_else(|| r.url.clone()),
-            url: r.url,
-            snippet: r.text.unwrap_or_default(),
-            source: "exa".into(),
-            published_at: r.published_date,
-        }).collect())
+        Ok(data
+            .results
+            .into_iter()
+            .map(|r| SearchHit {
+                title: r.title.unwrap_or_else(|| r.url.clone()),
+                url: r.url,
+                snippet: r.text.unwrap_or_default(),
+                source: "exa".into(),
+                published_at: r.published_date,
+            })
+            .collect())
     }
 
-    fn provider_id(&self) -> &str { "exa" }
+    fn provider_id(&self) -> &str {
+        "exa"
+    }
 }

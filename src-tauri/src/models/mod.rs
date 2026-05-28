@@ -24,10 +24,7 @@ pub async fn models_list() -> Result<Vec<crate::models::manifest::ModelMetaSumma
 }
 
 #[tauri::command]
-pub async fn models_download(
-    app: tauri::AppHandle,
-    id: String,
-) -> Result<(), String> {
+pub async fn models_download(app: tauri::AppHandle, id: String) -> Result<(), String> {
     use tauri::Emitter;
     let manifest = manifest::load_manifest().map_err(|e| e.to_string())?;
     let meta = manifest
@@ -135,9 +132,7 @@ pub async fn cuda_pack_status() -> Result<CudaPackStatus, String> {
 /// published yet, returns a clear error instructing the user to provide
 /// a manual pack path. The pack lands under `<cache>/newmob/sidecar-cuda/`.
 #[tauri::command]
-pub async fn cuda_pack_install(
-    app: tauri::AppHandle,
-) -> Result<String, String> {
+pub async fn cuda_pack_install(app: tauri::AppHandle) -> Result<String, String> {
     use tauri::Emitter;
     let manifest = manifest::load_manifest().map_err(|e| e.to_string())?;
     let triple = std::env::consts::ARCH.to_string() + "_" + std::env::consts::OS;
@@ -145,14 +140,23 @@ pub async fn cuda_pack_install(
         .models
         .keys()
         .find(|k| k.starts_with("sidecar_llama_server_cuda") && k.contains(&triple))
-        .or_else(|| manifest.models.keys().find(|k| k.starts_with("sidecar_llama_server_cuda")))
+        .or_else(|| {
+            manifest
+                .models
+                .keys()
+                .find(|k| k.starts_with("sidecar_llama_server_cuda"))
+        })
         .cloned()
         .ok_or_else(|| {
             "No CUDA pack published in the manifest yet. Drop a custom build into \
-             ~/.cache/newmob/sidecar-cuda/ to enable it manually.".to_string()
+             ~/.cache/newmob/sidecar-cuda/ to enable it manually."
+                .to_string()
         })?;
 
-    let meta = manifest.models.get(&id).cloned()
+    let meta = manifest
+        .models
+        .get(&id)
+        .cloned()
         .ok_or_else(|| format!("Manifest missing entry for {id}"))?;
 
     let target_dir = cuda_pack_dir();
@@ -192,7 +196,9 @@ pub enum MirrorPreference {
 }
 
 impl Default for MirrorPreference {
-    fn default() -> Self { Self::Auto }
+    fn default() -> Self {
+        Self::Auto
+    }
 }
 
 /// Persistent mirror preference (§11.4). Stored at
@@ -219,7 +225,10 @@ pub async fn mirror_get_config() -> Result<MirrorConfig, String> {
             return Ok(cfg);
         }
     }
-    Ok(MirrorConfig { preference: "auto".into(), custom_base: None })
+    Ok(MirrorConfig {
+        preference: "auto".into(),
+        custom_base: None,
+    })
 }
 
 #[tauri::command]

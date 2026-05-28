@@ -17,8 +17,8 @@
 //!   path, so blacklisted commands and disabled-write sessions stay blocked.
 
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex, OnceLock};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
@@ -59,9 +59,11 @@ pub async fn mcp_server_start() -> Result<McpServerInfo, String> {
         }
     }
 
-    let listener = TcpListener::bind("127.0.0.1:0").await
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
         .map_err(|e| format!("Failed to bind MCP listener: {e}"))?;
-    let addr = listener.local_addr()
+    let addr = listener
+        .local_addr()
         .map_err(|e| e.to_string())?
         .to_string();
     let token = generate_token();
@@ -79,12 +81,13 @@ pub async fn mcp_server_start() -> Result<McpServerInfo, String> {
     let token_clone = token.clone();
     tokio::spawn(async move {
         loop {
-            if stop_flag.load(Ordering::SeqCst) { break; }
-            let accept = tokio::time::timeout(
-                Duration::from_secs(1),
-                listener.accept(),
-            ).await;
-            let Ok(Ok((stream, _peer))) = accept else { continue; };
+            if stop_flag.load(Ordering::SeqCst) {
+                break;
+            }
+            let accept = tokio::time::timeout(Duration::from_secs(1), listener.accept()).await;
+            let Ok(Ok((stream, _peer))) = accept else {
+                continue;
+            };
             let token = token_clone.clone();
             tokio::spawn(handle_connection(stream, token));
         }
@@ -120,7 +123,11 @@ pub async fn mcp_server_status() -> Result<McpServerInfo, String> {
             url: Some(format!("http://{}", s.addr)),
             token: Some(s.token.clone()),
         },
-        None => McpServerInfo { running: false, url: None, token: None },
+        None => McpServerInfo {
+            running: false,
+            url: None,
+            token: None,
+        },
     })
 }
 
@@ -164,16 +171,22 @@ async fn handle_connection(mut stream: tokio::net::TcpStream, token: String) {
     let mut reader = BufReader::new(read);
 
     let mut req_line = String::new();
-    if reader.read_line(&mut req_line).await.is_err() { return; }
+    if reader.read_line(&mut req_line).await.is_err() {
+        return;
+    }
 
     let mut headers: Vec<(String, String)> = Vec::new();
     let mut content_length: usize = 0;
     let mut auth_ok = false;
     loop {
         let mut line = String::new();
-        if reader.read_line(&mut line).await.is_err() { return; }
+        if reader.read_line(&mut line).await.is_err() {
+            return;
+        }
         let trimmed = line.trim_end();
-        if trimmed.is_empty() { break; }
+        if trimmed.is_empty() {
+            break;
+        }
         if let Some((k, v)) = trimmed.split_once(':') {
             let k = k.trim().to_lowercase();
             let v = v.trim().to_string();
@@ -188,12 +201,16 @@ async fn handle_connection(mut stream: tokio::net::TcpStream, token: String) {
     }
 
     if !auth_ok {
-        let _ = write.write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n").await;
+        let _ = write
+            .write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n")
+            .await;
         return;
     }
 
     let mut body = vec![0u8; content_length];
-    if reader.read_exact(&mut body).await.is_err() { return; }
+    if reader.read_exact(&mut body).await.is_err() {
+        return;
+    }
 
     let response_body = match serde_json::from_slice::<JsonRpcRequest>(&body) {
         Ok(req) => handle_jsonrpc(req).await,
@@ -201,8 +218,12 @@ async fn handle_connection(mut stream: tokio::net::TcpStream, token: String) {
             jsonrpc: "2.0",
             id: None,
             result: None,
-            error: Some(JsonRpcError { code: -32700, message: format!("parse error: {e}") }),
-        }).unwrap_or_default(),
+            error: Some(JsonRpcError {
+                code: -32700,
+                message: format!("parse error: {e}"),
+            }),
+        })
+        .unwrap_or_default(),
     };
 
     let response = format!(
@@ -225,8 +246,17 @@ async fn handle_jsonrpc(req: JsonRpcRequest) -> String {
             }
         }
         "tools/call" => {
-            let name = req.params.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let arguments = req.params.get("arguments").cloned().unwrap_or(serde_json::Value::Null);
+            let name = req
+                .params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let arguments = req
+                .params
+                .get("arguments")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             match call_tool(&name, arguments).await {
                 Ok(result) => JsonRpcResponse {
                     jsonrpc: "2.0",
@@ -238,7 +268,10 @@ async fn handle_jsonrpc(req: JsonRpcRequest) -> String {
                     jsonrpc: "2.0",
                     id: req.id,
                     result: None,
-                    error: Some(JsonRpcError { code: -32000, message }),
+                    error: Some(JsonRpcError {
+                        code: -32000,
+                        message,
+                    }),
                 },
             }
         }
@@ -246,7 +279,10 @@ async fn handle_jsonrpc(req: JsonRpcRequest) -> String {
             jsonrpc: "2.0",
             id: req.id,
             result: None,
-            error: Some(JsonRpcError { code: -32601, message: format!("method not found: {}", req.method) }),
+            error: Some(JsonRpcError {
+                code: -32601,
+                message: format!("method not found: {}", req.method),
+            }),
         },
     };
     serde_json::to_string(&response).unwrap_or_default()
@@ -258,8 +294,14 @@ fn enumerate_tools() -> Vec<serde_json::Value> {
     [
         ("list_sessions", "列出所有已保存的 SSH 会话"),
         ("switch_tab", "切换到指定标签"),
-        ("run_in_terminal", "在指定会话的终端中执行命令（默认 dry_run）"),
-        ("read_terminal_tail", "读取当前活跃终端最近 N 行（需 user_invoked=true）"),
+        (
+            "run_in_terminal",
+            "在指定会话的终端中执行命令（默认 dry_run）",
+        ),
+        (
+            "read_terminal_tail",
+            "读取当前活跃终端最近 N 行（需 user_invoked=true）",
+        ),
         ("sftp_upload", "在 SFTP 会话中上传本地文件"),
         ("search_history", "搜索命令历史并预填命令面板"),
         ("open_session_editor", "在新建会话编辑器中预填字段"),
@@ -267,10 +309,15 @@ fn enumerate_tools() -> Vec<serde_json::Value> {
         ("save_as_runbook", "把一组刚执行过的命令打包成 Runbook"),
         ("web_search", "在网络上搜索信息（需用户确认）"),
         ("web_fetch", "抓取一个 URL 的可读内容（仅 https 公网）"),
-    ].iter().map(|(name, description)| serde_json::json!({
-        "name": name,
-        "description": description,
-    })).collect()
+    ]
+    .iter()
+    .map(|(name, description)| {
+        serde_json::json!({
+            "name": name,
+            "description": description,
+        })
+    })
+    .collect()
 }
 
 async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -283,14 +330,19 @@ async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json::Va
     // minimal v0 bridge.
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(crate::agent::tools::terminal::ExplainErrorTool));
-    registry.register(Box::new(crate::agent::tools::web_search::WebSearchTool::new(
-        Arc::new(crate::agent::search::searxng::SearXngProvider::new(
-            crate::agent::search::instances::PUBLIC_INSTANCES[0],
+    registry.register(Box::new(
+        crate::agent::tools::web_search::WebSearchTool::new(Arc::new(
+            crate::agent::search::searxng::SearXngProvider::new(
+                crate::agent::search::instances::PUBLIC_INSTANCES[0],
+            ),
         )),
-    )));
+    ));
     registry.register(Box::new(crate::agent::tools::web_fetch::WebFetchTool::new()));
 
-    let call = ToolCall { tool: name.into(), args };
+    let call = ToolCall {
+        tool: name.into(),
+        args,
+    };
     crate::agent::safety::check_tool_call(&call)?;
     let result = registry.execute(&call).await;
     if result.ok {

@@ -28,8 +28,10 @@ pub async fn tab_suggest_path(
     let sc = scanner();
 
     // File path completion: prefix contains a slash or starts with . or ~
-    if prefix.contains('/') || prefix.contains('\\')
-        || prefix.starts_with('.') || prefix.starts_with('~')
+    if prefix.contains('/')
+        || prefix.contains('\\')
+        || prefix.starts_with('.')
+        || prefix.starts_with('~')
     {
         let dir = cwd.as_deref().unwrap_or(".");
         return Ok(sc.match_files(&prefix, dir, 20));
@@ -48,7 +50,8 @@ pub async fn tab_suggest_path(
             let matches = sc.match_files(last_word, dir, 20);
             // Return full command with last word replaced
             let prefix_without_last = &prefix[..prefix.rfind(last_word).unwrap_or(prefix.len())];
-            return Ok(matches.into_iter()
+            return Ok(matches
+                .into_iter()
                 .map(|m| format!("{}{}", prefix_without_last, m))
                 .collect());
         }
@@ -144,7 +147,10 @@ pub async fn tab_suggest_fim(
 
     match ai_ctx.llm.complete(req, TaskKind::TabCompletion).await {
         Ok(resp) => {
-            let text = resp.content.trim_matches(|c: char| c.is_whitespace() || c == '`').to_string();
+            let text = resp
+                .content
+                .trim_matches(|c: char| c.is_whitespace() || c == '`')
+                .to_string();
             if text.is_empty() || text.len() > 80 {
                 Ok(None)
             } else {
@@ -199,4 +205,3 @@ pub async fn tab_rewrite_command(
         .trim_matches(|c: char| c.is_whitespace() || c == '`')
         .to_string())
 }
-

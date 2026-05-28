@@ -66,6 +66,12 @@ import {
   serializeWslOptions,
   type WslOptions,
 } from "../../types/wsl";
+import {
+  parseRdpOptions,
+  serializeRdpOptions,
+  type RdpOptions,
+} from "../../types/rdp";
+import { RdpOptionsForm } from "./forms/RdpOptionsForm";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { AppThemeSwitcher } from "../settings/AppThemeSwitcher";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
@@ -1065,6 +1071,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proto]);
 
+  /* --- RDP options --- */
+  const [rdpOptions, setRdpOptions] = useState<RdpOptions>(() =>
+    parseRdpOptions(session?.options_json),
+  );
+
   /* --- network settings --- */
   const [networkSettings, setNetworkSettings] = useState<NetworkSettingsValue>(
     () => getSessionNetworkSettings(session?.options_json),
@@ -1148,6 +1159,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             localShellArgs: buildWslLaunchArgs(wslOptions),
           }
         : {};
+    const rdpOverrides: Record<string, unknown> =
+      proto === "RDP"
+        ? (JSON.parse(serializeRdpOptions(rdpOptions)) as Record<string, unknown>)
+        : {};
 
     return JSON.stringify({
       ...previousOptions,
@@ -1168,6 +1183,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         ? { ...networkSettingsValue, proxyPass: proxyPassValue }
         : { ...networkSettingsValue, proxyPass: "" },
       ...wslOverrides,
+      ...rdpOverrides,
     });
   };
 
@@ -1347,6 +1363,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
+    setRdpOptions(parseRdpOptions(session?.options_json));
     setSaveError(null);
     setTestResult(null);
   };
@@ -1687,6 +1704,24 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               status={wslStatus}
               onChange={setWslOptions}
             />
+          </div>
+        )}
+
+        {/* Basic RDP settings — appears for the RDP protocol only */}
+        {proto === "RDP" && (
+          <div
+            data-testid="session-rdp-section"
+            className="px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+          >
+            <div
+              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              style={{ color: "var(--moba-accent)" }}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              {t("rdp.options.title")}
+            </div>
+            <RdpOptionsForm options={rdpOptions} onChange={setRdpOptions} />
           </div>
         )}
 

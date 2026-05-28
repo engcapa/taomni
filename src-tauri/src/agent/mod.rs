@@ -90,7 +90,12 @@ impl Agent {
 
         // Try to parse as tool call JSON.
         let json_str = if content.starts_with("```") {
-            content.lines().skip(1).take_while(|l| !l.starts_with("```")).collect::<Vec<_>>().join("\n")
+            content
+                .lines()
+                .skip(1)
+                .take_while(|l| !l.starts_with("```"))
+                .collect::<Vec<_>>()
+                .join("\n")
         } else {
             content.to_string()
         };
@@ -103,11 +108,7 @@ impl Agent {
 
     /// Run a multi-step ReAct loop. Returns a stream of step results.
     /// The caller is responsible for confirming tool calls before calling execute_tool.
-    pub async fn run_steps(
-        &self,
-        system: &str,
-        user: &str,
-    ) -> Vec<AgentStepResult> {
+    pub async fn run_steps(&self, system: &str, user: &str) -> Vec<AgentStepResult> {
         let tools_desc = self.tools.describe_all();
         let system_prompt = format!(
             "{}\n\nAvailable tools:\n{}\n\nWhen you need to use a tool, respond with JSON: {{\"tool\": \"<name>\", \"args\": {{...}}}}\nWhen you have a final answer, respond with plain text.",
@@ -132,7 +133,9 @@ impl Agent {
             let resp = match self.llm.chat(req).await {
                 Ok(r) => r,
                 Err(e) => {
-                    results.push(AgentStepResult::Error { message: e.to_string() });
+                    results.push(AgentStepResult::Error {
+                        message: e.to_string(),
+                    });
                     return results;
                 }
             };
@@ -141,7 +144,12 @@ impl Agent {
 
             // Try to parse as tool call.
             let json_str = if content.starts_with("```") {
-                content.lines().skip(1).take_while(|l| !l.starts_with("```")).collect::<Vec<_>>().join("\n")
+                content
+                    .lines()
+                    .skip(1)
+                    .take_while(|l| !l.starts_with("```"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             } else {
                 content.clone()
             };

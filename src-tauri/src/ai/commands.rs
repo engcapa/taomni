@@ -1,6 +1,6 @@
-use crate::ai::config::{AiConfig, LlmProviderConfig, default_ai_config_path};
-use crate::ai::shell_safety::{check_blacklist, RiskLevel};
+use crate::ai::config::{default_ai_config_path, AiConfig, LlmProviderConfig};
 use crate::ai::shell_prompt::SHELL_COMMAND_SYSTEM_PROMPT;
+use crate::ai::shell_safety::{check_blacklist, RiskLevel};
 use crate::ai::tools_shell::GeneratedCommand;
 use crate::llm::anthropic::AnthropicProvider;
 use crate::llm::openai_compat::OpenAiCompatProvider;
@@ -41,10 +41,7 @@ pub async fn get_ai_config() -> Result<AiConfig, String> {
 /// Save the AI configuration. Rebuilds the LlmRouter so changes take
 /// effect immediately without an app restart.
 #[tauri::command]
-pub async fn save_ai_config(
-    config: AiConfig,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn save_ai_config(config: AiConfig, state: State<'_, AppState>) -> Result<(), String> {
     let path = default_ai_config_path();
     config.save(&path).map_err(|e| e.to_string())?;
 
@@ -143,10 +140,7 @@ pub async fn generate_shell_command(
     state: State<'_, AppState>,
 ) -> Result<CommandPreview, String> {
     let cwd_str = cwd.as_deref().unwrap_or("~");
-    let user_msg = format!(
-        "当前工作目录：{}\n\n用户请求：{}",
-        cwd_str, description
-    );
+    let user_msg = format!("当前工作目录：{}\n\n用户请求：{}", cwd_str, description);
 
     // Per-session "AI write actions disabled" flag — when set, we still
     // generate the preview but mark it blocked so the frontend disables
@@ -164,10 +158,7 @@ pub async fn generate_shell_command(
     );
 
     let req = ChatRequest {
-        messages: vec![
-            ChatMessage::system(system),
-            ChatMessage::user(user_msg),
-        ],
+        messages: vec![ChatMessage::system(system), ChatMessage::user(user_msg)],
         max_tokens: Some(512),
         temperature: Some(0.2),
         stream: false,
@@ -176,7 +167,9 @@ pub async fn generate_shell_command(
     // Route through LlmRouter using VoiceToShell task — gets fallback for free.
     let resp = {
         let ai_ctx = state.ai_ctx.read().await;
-        ai_ctx.llm.complete(req, crate::llm::TaskKind::VoiceToShell)
+        ai_ctx
+            .llm
+            .complete(req, crate::llm::TaskKind::VoiceToShell)
             .await
             .map_err(|e| e.to_string())?
     };
@@ -256,6 +249,7 @@ pub async fn update_shell_audit_outcome(
     db.execute(
         "UPDATE voice_audit SET outcome = ?1 WHERE id = ?2",
         params![outcome, audit_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }

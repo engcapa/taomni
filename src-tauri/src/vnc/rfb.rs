@@ -670,7 +670,8 @@ impl RfbConnection {
 
             match encoding {
                 0 => {
-                    let rect = self.decode_via_reader(|reader| encodings::read_raw(reader, x, y, w, h))?;
+                    let rect =
+                        self.decode_via_reader(|reader| encodings::read_raw(reader, x, y, w, h))?;
                     self.write_to_fb(&rect);
                     decoded.push(rect);
                 }
@@ -688,7 +689,16 @@ impl RfbConnection {
                     } = self;
                     let rect = {
                         let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_copyrect(&mut reader, x, y, w, h, framebuffer, *width, *height)?
+                        encodings::read_copyrect(
+                            &mut reader,
+                            x,
+                            y,
+                            w,
+                            h,
+                            framebuffer,
+                            *width,
+                            *height,
+                        )?
                     };
                     self.write_to_fb(&rect);
                     decoded.push(rect);
@@ -749,7 +759,9 @@ impl RfbConnection {
         &mut self,
         f: impl FnOnce(&mut RfbStreamReader<'_>) -> Result<T, String>,
     ) -> Result<T, String> {
-        let Self { stream, secure_io, .. } = self;
+        let Self {
+            stream, secure_io, ..
+        } = self;
         let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
         f(&mut reader)
     }

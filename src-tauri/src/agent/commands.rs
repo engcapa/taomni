@@ -26,7 +26,10 @@ fn build_registry(state: &AppState, app: AppHandle) -> ToolRegistry {
 
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(ListSessionsTool { db: db.clone() }));
-    registry.register(Box::new(SwitchTabTool { app: app.clone(), db: db.clone() }));
+    registry.register(Box::new(SwitchTabTool {
+        app: app.clone(),
+        db: db.clone(),
+    }));
     registry.register(Box::new(OpenSessionEditorTool { app: app.clone() }));
     registry.register(Box::new(SearchHistoryTool { db: db.clone() }));
     registry.register(Box::new(RunInTerminalTool));
@@ -48,7 +51,10 @@ pub async fn agent_explain_error(
     let _ = session_id; // currently unused; reserved for per-session policy
 
     let system = "你是一个终端错误分析助手。分析用户提供的终端输出，解释错误原因，并给出具体的修复建议。用中文回答，简洁清晰。";
-    let user = format!("请分析以下终端输出中的错误：\n\n```\n{}\n```", terminal_content);
+    let user = format!(
+        "请分析以下终端输出中的错误：\n\n```\n{}\n```",
+        terminal_content
+    );
 
     let req = ChatRequest {
         messages: vec![
@@ -62,7 +68,9 @@ pub async fn agent_explain_error(
 
     let resp = {
         let ai_ctx = state.ai_ctx.read().await;
-        ai_ctx.llm.complete(req, TaskKind::AgentDefault)
+        ai_ctx
+            .llm
+            .complete(req, TaskKind::AgentDefault)
             .await
             .map_err(|e| e.to_string())?
     };
@@ -78,7 +86,8 @@ pub async fn agent_plan_tool(
     state: State<'_, AppState>,
 ) -> Result<Option<PendingAction>, String> {
     let registry = build_registry(&state, app);
-    let agent = Agent::from_state(&state, TaskKind::AgentDefault, registry).await
+    let agent = Agent::from_state(&state, TaskKind::AgentDefault, registry)
+        .await
         .ok_or("No LLM provider configured")?;
 
     let system = "你是 NewMob 终端管理器的 AI 助手。根据用户请求，选择合适的工具执行操作。";
@@ -106,7 +115,10 @@ pub async fn agent_execute_tool(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     use crate::agent::tools::ToolCall;
-    let call = ToolCall { tool: tool.clone(), args };
+    let call = ToolCall {
+        tool: tool.clone(),
+        args,
+    };
 
     // Blacklist + read-tail user-invoked safety.
     crate::agent::safety::check_tool_call(&call)?;
@@ -131,10 +143,10 @@ pub async fn agent_run(
     state: State<'_, AppState>,
 ) -> Result<Vec<AgentStepResult>, String> {
     let registry = build_registry(&state, app);
-    let agent = Agent::from_state(&state, TaskKind::AgentDefault, registry).await
+    let agent = Agent::from_state(&state, TaskKind::AgentDefault, registry)
+        .await
         .ok_or("No LLM provider configured")?;
 
     let system = "你是 NewMob 终端管理器的 AI 助手。帮助用户管理 SSH 会话、执行命令、分析错误。每次只调用一个工具，等待结果后再继续。";
     Ok(agent.run_steps(system, &request).await)
 }
-

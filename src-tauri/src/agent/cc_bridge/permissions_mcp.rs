@@ -64,7 +64,10 @@ pub fn run_stdio() -> io::Result<()> {
                 jsonrpc: "2.0",
                 id: None,
                 result: None,
-                error: Some(JsonRpcError { code: -32700, message: format!("parse error: {e}") }),
+                error: Some(JsonRpcError {
+                    code: -32700,
+                    message: format!("parse error: {e}"),
+                }),
             },
         };
         if let Ok(text) = serde_json::to_string(&response) {
@@ -107,20 +110,41 @@ fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             error: None,
         },
         "tools/call" => {
-            let name = req.params.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let name = req
+                .params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if name != "permission_prompt" {
                 return JsonRpcResponse {
                     jsonrpc: "2.0",
                     id: req.id,
                     result: None,
-                    error: Some(JsonRpcError { code: -32602, message: format!("unknown tool: {name}") }),
+                    error: Some(JsonRpcError {
+                        code: -32602,
+                        message: format!("unknown tool: {name}"),
+                    }),
                 };
             }
-            let args = req.params.get("arguments").cloned().unwrap_or(serde_json::Value::Null);
-            let tool_name = args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let tool_input = args.get("tool_input").cloned().unwrap_or(serde_json::Value::Object(Default::default()));
+            let args = req
+                .params
+                .get("arguments")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let tool_name = args
+                .get("tool_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let tool_input = args
+                .get("tool_input")
+                .cloned()
+                .unwrap_or(serde_json::Value::Object(Default::default()));
 
-            let call = crate::agent::tools::ToolCall { tool: tool_name.clone(), args: tool_input.clone() };
+            let call = crate::agent::tools::ToolCall {
+                tool: tool_name.clone(),
+                args: tool_input.clone(),
+            };
             let decision = match crate::agent::safety::check_tool_call(&call) {
                 Ok(()) => serde_json::json!({
                     "behavior": "allow",
@@ -147,7 +171,10 @@ fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             jsonrpc: "2.0",
             id: req.id,
             result: None,
-            error: Some(JsonRpcError { code: -32601, message: format!("method not found: {other}") }),
+            error: Some(JsonRpcError {
+                code: -32601,
+                message: format!("method not found: {other}"),
+            }),
         },
     }
 }

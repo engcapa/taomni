@@ -48,7 +48,9 @@ pub fn start() -> Result<u32, String> {
     let channels = supported.channels();
 
     let config: StreamConfig = supported.clone().into();
-    let pcm: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::with_capacity(TARGET_SAMPLE_RATE as usize * 30)));
+    let pcm: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::with_capacity(
+        TARGET_SAMPLE_RATE as usize * 30,
+    )));
 
     let pcm_capture = pcm.clone();
     let mut downsample_acc: f64 = 0.0;
@@ -60,7 +62,13 @@ pub fn start() -> Result<u32, String> {
         SampleFormat::F32 => device.build_input_stream(
             &config,
             move |data: &[f32], _| {
-                push_resampled(data, channels, &mut downsample_acc, downsample_step, &pcm_capture);
+                push_resampled(
+                    data,
+                    channels,
+                    &mut downsample_acc,
+                    downsample_step,
+                    &pcm_capture,
+                );
             },
             err_fn,
             None,
@@ -69,7 +77,13 @@ pub fn start() -> Result<u32, String> {
             &config,
             move |data: &[i16], _| {
                 let buf: Vec<f32> = data.iter().map(|s| *s as f32 / i16::MAX as f32).collect();
-                push_resampled(&buf, channels, &mut downsample_acc, downsample_step, &pcm_capture);
+                push_resampled(
+                    &buf,
+                    channels,
+                    &mut downsample_acc,
+                    downsample_step,
+                    &pcm_capture,
+                );
             },
             err_fn,
             None,
@@ -81,7 +95,13 @@ pub fn start() -> Result<u32, String> {
                     .iter()
                     .map(|s| (*s as f32 - 32768.0) / 32768.0)
                     .collect();
-                push_resampled(&buf, channels, &mut downsample_acc, downsample_step, &pcm_capture);
+                push_resampled(
+                    &buf,
+                    channels,
+                    &mut downsample_acc,
+                    downsample_step,
+                    &pcm_capture,
+                );
             },
             err_fn,
             None,
@@ -92,7 +112,10 @@ pub fn start() -> Result<u32, String> {
 
     stream.play().map_err(|e| format!("stream.play: {e}"))?;
 
-    *guard = Some(CaptureSession { _stream: stream, pcm });
+    *guard = Some(CaptureSession {
+        _stream: stream,
+        pcm,
+    });
     Ok(device_sr)
 }
 

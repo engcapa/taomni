@@ -7,12 +7,12 @@ use crate::agent::search::tavily::TavilyProvider;
 use crate::agent::search::{key_storage, SearchHit, SearchOptions, SearchProvider};
 use crate::agent::tools::web_fetch::WebFetchTool;
 use crate::agent::tools::Tool;
-use crate::ai::config::{AiConfig, default_ai_config_path};
+use crate::ai::config::{default_ai_config_path, AiConfig};
+use crate::state::AppState;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
-use crate::state::AppState;
 
 fn build_search_provider(config: &AiConfig) -> Result<Arc<dyn SearchProvider>, String> {
     let ws = &config.web_search;
@@ -24,15 +24,16 @@ fn build_search_provider(config: &AiConfig) -> Result<Arc<dyn SearchProvider>, S
     let api_key = key_from_keyring.unwrap_or_else(|| ws.byok_key.clone());
 
     match ws.client_provider.as_str() {
-        "tavily" if !api_key.is_empty()     => Ok(Arc::new(TavilyProvider::new(&api_key))),
-        "serper" if !api_key.is_empty()     => Ok(Arc::new(SerperProvider::new(&api_key))),
-        "brave"  if !api_key.is_empty()     => Ok(Arc::new(BraveProvider::new(&api_key))),
-        "exa"    if !api_key.is_empty()     => Ok(Arc::new(ExaProvider::new(&api_key))),
+        "tavily" if !api_key.is_empty() => Ok(Arc::new(TavilyProvider::new(&api_key))),
+        "serper" if !api_key.is_empty() => Ok(Arc::new(SerperProvider::new(&api_key))),
+        "brave" if !api_key.is_empty() => Ok(Arc::new(BraveProvider::new(&api_key))),
+        "exa" if !api_key.is_empty() => Ok(Arc::new(ExaProvider::new(&api_key))),
         "google_cse" if !api_key.is_empty() => Ok(Arc::new(GoogleCseProvider::new(&api_key)?)),
         // Default / fallback: SearXNG public instance (no key required).
         _ => Ok(Arc::new(SearXngProvider::new(
-            ws.searxng_url.as_deref()
-                .unwrap_or(crate::agent::search::instances::PUBLIC_INSTANCES[0])
+            ws.searxng_url
+                .as_deref()
+                .unwrap_or(crate::agent::search::instances::PUBLIC_INSTANCES[0]),
         ))),
     }
 }
@@ -92,7 +93,7 @@ pub async fn web_search_execute(
     let now = chrono::Utc::now().timestamp();
     let (outcome, count) = match &search_result {
         Ok(hits) => ("search_allowed", hits.len()),
-        Err(_)   => ("search_denied", 0),
+        Err(_) => ("search_denied", 0),
     };
     if let Ok(db) = state.db.lock() {
         let _ = db.execute(
@@ -107,7 +108,11 @@ pub async fn web_search_execute(
     }
 
     let hits = search_result?;
-    Ok(WebSearchResult { hits, provider: provider_id, query })
+    Ok(WebSearchResult {
+        hits,
+        provider: provider_id,
+        query,
+    })
 }
 
 /// Same as `web_search_execute` but used when the active LLM provider has its

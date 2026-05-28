@@ -41,7 +41,9 @@ impl SherpaOnnxAsr {
         // Both paths require at least one `.onnx` weight to be present so the
         // user gets a clear error instead of a black-box "not warmed" later.
         let has_weights = std::fs::read_dir(&self.model_dir)
-            .map_err(|e| AsrError::NotLoaded(format!("read {} failed: {e}", self.model_dir.display())))?
+            .map_err(|e| {
+                AsrError::NotLoaded(format!("read {} failed: {e}", self.model_dir.display()))
+            })?
             .flatten()
             .any(|entry| {
                 entry
@@ -118,7 +120,9 @@ impl Asr for SherpaOnnxAsr {
 
 #[cfg(not(feature = "asr-sherpa-onnx"))]
 fn compute_rms(pcm: &[f32]) -> f32 {
-    if pcm.is_empty() { return 0.0; }
+    if pcm.is_empty() {
+        return 0.0;
+    }
     let sum_sq: f64 = pcm.iter().map(|s| (*s as f64) * (*s as f64)).sum();
     (sum_sq / pcm.len() as f64).sqrt() as f32
 }

@@ -44,9 +44,15 @@ pub struct NetworkSettings {
     pub local_forwards: Vec<NetworkForward>,
 }
 
-fn default_proxy_kind() -> String { "none".into() }
-fn default_ip_version() -> String { "auto".into() }
-fn default_true() -> bool { true }
+fn default_proxy_kind() -> String {
+    "none".into()
+}
+fn default_ip_version() -> String {
+    "auto".into()
+}
+fn default_true() -> bool {
+    true
+}
 
 impl NetworkSettings {
     /// Parse a JSON blob coming from the frontend. Returns `None` for
@@ -54,7 +60,9 @@ impl NetworkSettings {
     /// that as "use defaults / no proxy".
     pub fn from_json(raw: Option<&str>) -> Option<Self> {
         let s = raw?.trim();
-        if s.is_empty() { return None; }
+        if s.is_empty() {
+            return None;
+        }
         match serde_json::from_str::<Self>(s) {
             Ok(v) => Some(v),
             Err(e) => {
@@ -87,11 +95,7 @@ impl NetworkSettings {
 /// Resolve `host:port` honouring the IP-version preference, then connect
 /// to the first address that succeeds. Returns the underlying TCP stream;
 /// the caller is expected to layer SSH (or a proxy hop) on top.
-async fn open_tcp_filtered(
-    host: &str,
-    port: u16,
-    ip_version: &str,
-) -> Result<TcpStream, String> {
+async fn open_tcp_filtered(host: &str, port: u16, ip_version: &str) -> Result<TcpStream, String> {
     let mut addrs: Vec<std::net::SocketAddr> = lookup_host((host, port))
         .await
         .map_err(|e| format!("DNS lookup for {}:{} failed: {}", host, port, e))?
@@ -105,7 +109,10 @@ async fn open_tcp_filtered(
         _ => addrs.sort_by_key(|a| !a.is_ipv4()), // auto: prefer v4 first
     }
     if addrs.is_empty() {
-        return Err(format!("No matching IP{} addresses for {}", ip_version, host));
+        return Err(format!(
+            "No matching IP{} addresses for {}",
+            ip_version, host
+        ));
     }
     let mut last_err: Option<std::io::Error> = None;
     for a in addrs {
@@ -118,7 +125,9 @@ async fn open_tcp_filtered(
         "Could not connect to {}:{}: {}",
         host,
         port,
-        last_err.map(|e| e.to_string()).unwrap_or_else(|| "no addresses".into()),
+        last_err
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "no addresses".into()),
     ))
 }
 
@@ -186,7 +195,8 @@ pub async fn establish_transport(
             require_proxy(n)?;
             let dest = resolve_destination_for_proxy(host, port, ip_pref).await?;
             let mut s = open_tcp_filtered(&n.proxy_host, n.proxy_port, ip_pref).await?;
-            s.set_nodelay(nodelay).map_err(|e| format!("set_nodelay: {}", e))?;
+            s.set_nodelay(nodelay)
+                .map_err(|e| format!("set_nodelay: {}", e))?;
             http_connect_handshake(&mut s, &dest, port, &n.proxy_user, &n.proxy_pass).await?;
             s
         }
@@ -195,7 +205,8 @@ pub async fn establish_transport(
             require_proxy(n)?;
             let dest = resolve_destination_for_proxy(host, port, ip_pref).await?;
             let mut s = open_tcp_filtered(&n.proxy_host, n.proxy_port, ip_pref).await?;
-            s.set_nodelay(nodelay).map_err(|e| format!("set_nodelay: {}", e))?;
+            s.set_nodelay(nodelay)
+                .map_err(|e| format!("set_nodelay: {}", e))?;
             socks5_handshake(&mut s, &dest, port, &n.proxy_user, &n.proxy_pass).await?;
             s
         }
@@ -279,13 +290,21 @@ async fn socks5_handshake(
     user: &str,
     pass: &str,
 ) -> Result<(), String> {
-    let methods: Vec<u8> = if user.is_empty() { vec![0x00] } else { vec![0x00, 0x02] };
+    let methods: Vec<u8> = if user.is_empty() {
+        vec![0x00]
+    } else {
+        vec![0x00, 0x02]
+    };
     let mut greet = vec![0x05u8, methods.len() as u8];
     greet.extend_from_slice(&methods);
-    s.write_all(&greet).await.map_err(|e| format!("socks write: {}", e))?;
+    s.write_all(&greet)
+        .await
+        .map_err(|e| format!("socks write: {}", e))?;
 
     let mut sel = [0u8; 2];
-    s.read_exact(&mut sel).await.map_err(|e| format!("socks read: {}", e))?;
+    s.read_exact(&mut sel)
+        .await
+        .map_err(|e| format!("socks read: {}", e))?;
     if sel[0] != 0x05 {
         return Err("SOCKS5: bad version in greeting".into());
     }
@@ -301,9 +320,13 @@ async fn socks5_handshake(
             auth.extend_from_slice(u);
             auth.push(p.len() as u8);
             auth.extend_from_slice(p);
-            s.write_all(&auth).await.map_err(|e| format!("socks auth: {}", e))?;
+            s.write_all(&auth)
+                .await
+                .map_err(|e| format!("socks auth: {}", e))?;
             let mut ack = [0u8; 2];
-            s.read_exact(&mut ack).await.map_err(|e| format!("socks auth read: {}", e))?;
+            s.read_exact(&mut ack)
+                .await
+                .map_err(|e| format!("socks auth read: {}", e))?;
             if ack[1] != 0x00 {
                 return Err("SOCKS5 username/password rejected".into());
             }
@@ -336,10 +359,14 @@ async fn socks5_handshake(
         }
     }
     req.extend_from_slice(&port.to_be_bytes());
-    s.write_all(&req).await.map_err(|e| format!("socks request: {}", e))?;
+    s.write_all(&req)
+        .await
+        .map_err(|e| format!("socks request: {}", e))?;
 
     let mut head = [0u8; 4];
-    s.read_exact(&mut head).await.map_err(|e| format!("socks reply: {}", e))?;
+    s.read_exact(&mut head)
+        .await
+        .map_err(|e| format!("socks reply: {}", e))?;
     if head[0] != 0x05 {
         return Err("SOCKS5: bad version in reply".into());
     }
@@ -351,13 +378,17 @@ async fn socks5_handshake(
         0x04 => 16,
         0x03 => {
             let mut l = [0u8; 1];
-            s.read_exact(&mut l).await.map_err(|e| format!("socks bnd: {}", e))?;
+            s.read_exact(&mut l)
+                .await
+                .map_err(|e| format!("socks bnd: {}", e))?;
             l[0] as usize
         }
         other => return Err(format!("SOCKS5 unknown ATYP 0x{:02x}", other)),
     };
     let mut bnd = vec![0u8; skip + 2];
-    s.read_exact(&mut bnd).await.map_err(|e| format!("socks bnd: {}", e))?;
+    s.read_exact(&mut bnd)
+        .await
+        .map_err(|e| format!("socks bnd: {}", e))?;
     Ok(())
 }
 
@@ -371,8 +402,12 @@ pub fn parse_endpoint(s: &str) -> Result<(String, u16), String> {
         if let Some(idx) = rest.rfind(']') {
             let host = &rest[..idx];
             let after = &rest[idx + 1..];
-            let port_str = after.strip_prefix(':').ok_or_else(|| format!("missing port in '{}'", s))?;
-            let port: u16 = port_str.parse().map_err(|_| format!("invalid port in '{}'", s))?;
+            let port_str = after
+                .strip_prefix(':')
+                .ok_or_else(|| format!("missing port in '{}'", s))?;
+            let port: u16 = port_str
+                .parse()
+                .map_err(|_| format!("invalid port in '{}'", s))?;
             return Ok((host.to_string(), port));
         }
         return Err(format!("unbalanced brackets in '{}'", s));

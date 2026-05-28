@@ -65,7 +65,9 @@ fn lookup_one(query: &KeychainQuery) -> KeychainHit {
 }
 
 #[tauri::command]
-pub async fn keychain_lookup_batch(entries: Vec<KeychainQuery>) -> Result<Vec<KeychainHit>, String> {
+pub async fn keychain_lookup_batch(
+    entries: Vec<KeychainQuery>,
+) -> Result<Vec<KeychainHit>, String> {
     Ok(entries.iter().map(lookup_one).collect())
 }
 

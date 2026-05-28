@@ -2,8 +2,8 @@ pub mod commands;
 pub mod config;
 pub mod network_policy;
 pub mod session_safety;
-pub mod shell_safety;
 pub mod shell_prompt;
+pub mod shell_safety;
 pub mod tools_shell;
 
 use crate::asr::manager::AsrManager;
@@ -40,17 +40,16 @@ impl AppAiCtx {
                 if let Some(m) = manifest {
                     let model_id = match cfg.asr.active.as_str() {
                         "sherpa-zipformer-zh-en" => "asr_sherpa_zipformer_zh_en_small",
-                        "sense-voice-small"      => "asr_sense_voice_small",
+                        "sense-voice-small" => "asr_sense_voice_small",
                         _ => "",
                     };
                     if let Some(meta) = m.models.get(model_id) {
                         let path = crate::models::store::model_path(model_id, meta);
                         if path.exists() {
-                            let engine = std::sync::Arc::new(
-                                crate::asr::sherpa_onnx::SherpaOnnxAsr::new(
+                            let engine =
+                                std::sync::Arc::new(crate::asr::sherpa_onnx::SherpaOnnxAsr::new(
                                     path.parent().map(|p| p.to_path_buf()).unwrap_or(path),
-                                ),
-                            );
+                                ));
                             let _ = engine.warm_up();
                             asr.set_engine_sync(engine);
                         }
@@ -83,5 +82,3 @@ impl AppAiCtx {
         self.llm = build_router_from_ai(&self.config, Some(self.vault.as_ref()));
     }
 }
-
-

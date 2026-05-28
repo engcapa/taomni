@@ -53,7 +53,8 @@ async fn download_from(
     on_progress: &mut (dyn FnMut(DownloadProgress) + Send),
 ) -> Result<(), String> {
     let part_path = target.with_extension(
-        target.extension()
+        target
+            .extension()
             .map(|e| format!("{}.part", e.to_string_lossy()))
             .unwrap_or_else(|| "part".into()),
     );
@@ -156,7 +157,8 @@ pub async fn download_model(
     let probed = probe(&client, &meta.urls).await;
     let order: Vec<String> = match probed {
         Some(first) => {
-            let mut rest: Vec<String> = meta.urls.iter().filter(|u| **u != first).cloned().collect();
+            let mut rest: Vec<String> =
+                meta.urls.iter().filter(|u| **u != first).cloned().collect();
             let mut all = vec![first];
             all.append(&mut rest);
             all

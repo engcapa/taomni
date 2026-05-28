@@ -1,10 +1,10 @@
+pub mod history;
+pub mod rig_native;
 pub mod sessions;
 pub mod sftp_runbook;
 pub mod terminal;
-pub mod history;
-pub mod rig_native;
-pub mod web_search;
 pub mod web_fetch;
+pub mod web_search;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -27,10 +27,18 @@ pub struct ToolResult {
 
 impl ToolResult {
     pub fn ok(tool: impl Into<String>, output: impl Into<String>) -> Self {
-        Self { tool: tool.into(), ok: true, output: output.into() }
+        Self {
+            tool: tool.into(),
+            ok: true,
+            output: output.into(),
+        }
     }
     pub fn err(tool: impl Into<String>, msg: impl Into<String>) -> Self {
-        Self { tool: tool.into(), ok: false, output: msg.into() }
+        Self {
+            tool: tool.into(),
+            ok: false,
+            output: msg.into(),
+        }
     }
 }
 
@@ -61,7 +69,9 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     pub fn new() -> Self {
-        Self { tools: HashMap::new() }
+        Self {
+            tools: HashMap::new(),
+        }
     }
 
     pub fn register(&mut self, tool: Box<dyn Tool>) {
@@ -69,7 +79,8 @@ impl ToolRegistry {
     }
 
     pub fn describe_all(&self) -> String {
-        self.tools.values()
+        self.tools
+            .values()
             .map(|t| {
                 let d = t.descriptor();
                 format!("- {} ({}): {}", d.name, d.params, d.description)

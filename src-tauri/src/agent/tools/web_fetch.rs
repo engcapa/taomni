@@ -31,11 +31,7 @@ fn is_private_ip(ip: IpAddr) -> bool {
                 || v4.is_documentation()
                 || v4.is_unspecified()
         }
-        IpAddr::V6(v6) => {
-            v6.is_loopback()
-                || v6.is_unspecified()
-                || v6.is_multicast()
-        }
+        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified() || v6.is_multicast(),
     }
 }
 
@@ -54,7 +50,8 @@ async fn resolve_and_check(host: &str) -> Result<(), String> {
         if is_private_ip(addr.ip()) {
             return Err(format!(
                 "SSRF blocked: {} resolves to private/loopback address {}",
-                host, addr.ip()
+                host,
+                addr.ip()
             ));
         }
     }
@@ -111,7 +108,8 @@ impl Tool for WebFetchTool {
             Err(e) => return ToolResult::err("web_fetch", format!("Request failed: {}", e)),
         };
 
-        let content_type = resp.headers()
+        let content_type = resp
+            .headers()
             .get("content-type")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
@@ -119,7 +117,10 @@ impl Tool for WebFetchTool {
 
         // Reject non-text content.
         if !content_type.contains("text/") && !content_type.contains("application/json") {
-            return ToolResult::err("web_fetch", format!("Unsupported content type: {}", content_type));
+            return ToolResult::err(
+                "web_fetch",
+                format!("Unsupported content type: {}", content_type),
+            );
         }
 
         // Read body with 2MB limit.
@@ -185,8 +186,13 @@ fn strip_html(html: &str) -> String {
 
         // Open a skipped block?
         if chars[i] == '<' {
-            let lookahead: String = lower_chars[i..(i + 10).min(lower_chars.len())].iter().collect();
-            if let Some((_, end)) = block_starters.iter().find(|(s, _)| lookahead.starts_with(s)) {
+            let lookahead: String = lower_chars[i..(i + 10).min(lower_chars.len())]
+                .iter()
+                .collect();
+            if let Some((_, end)) = block_starters
+                .iter()
+                .find(|(s, _)| lookahead.starts_with(s))
+            {
                 in_block = Some(end);
                 i += 1;
                 continue;
@@ -215,7 +221,9 @@ fn strip_html(html: &str) -> String {
     let mut last_space = true;
     for c in result.chars() {
         if c.is_whitespace() {
-            if !last_space { collapsed.push(' '); }
+            if !last_space {
+                collapsed.push(' ');
+            }
             last_space = true;
         } else {
             collapsed.push(c);

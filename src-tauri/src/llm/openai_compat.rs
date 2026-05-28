@@ -95,18 +95,28 @@ impl OpenAiCompatProvider {
     }
 
     /// Build a preset for one of the known providers.
-    pub fn preset(id: &str, api_key: impl Into<String>, model_override: Option<String>) -> Option<Self> {
+    pub fn preset(
+        id: &str,
+        api_key: impl Into<String>,
+        model_override: Option<String>,
+    ) -> Option<Self> {
         let (base_url, default_model) = match id {
-            "deepseek"    => ("https://api.deepseek.com/v1",                    "deepseek-chat"),
-            "glm"         => ("https://open.bigmodel.cn/api/paas/v4",           "glm-4-flash"),
-            "siliconflow" => ("https://api.siliconflow.cn/v1",                  "Qwen/Qwen2.5-Coder-7B-Instruct"),
-            "groq"        => ("https://api.groq.com/openai/v1",                 "llama-3.3-70b-versatile"),
-            "cerebras"    => ("https://api.cerebras.ai/v1",                     "llama-3.3-70b"),
-            "openai"      => ("https://api.openai.com/v1",                      "gpt-4o-mini"),
-            "mistral"     => ("https://api.mistral.ai/v1",                      "mistral-small-latest"),
-            "gemini"      => ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash-lite"),
-            "local"       => ("http://127.0.0.1:8080/v1",                       "qwen3-1.7b-q4_k_m"),
-            "ollama"      => ("http://127.0.0.1:11434/v1",                      "qwen2.5-coder:1.5b"),
+            "deepseek" => ("https://api.deepseek.com/v1", "deepseek-chat"),
+            "glm" => ("https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
+            "siliconflow" => (
+                "https://api.siliconflow.cn/v1",
+                "Qwen/Qwen2.5-Coder-7B-Instruct",
+            ),
+            "groq" => ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+            "cerebras" => ("https://api.cerebras.ai/v1", "llama-3.3-70b"),
+            "openai" => ("https://api.openai.com/v1", "gpt-4o-mini"),
+            "mistral" => ("https://api.mistral.ai/v1", "mistral-small-latest"),
+            "gemini" => (
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                "gemini-2.5-flash-lite",
+            ),
+            "local" => ("http://127.0.0.1:8080/v1", "qwen3-1.7b-q4_k_m"),
+            "ollama" => ("http://127.0.0.1:11434/v1", "qwen2.5-coder:1.5b"),
             _ => return None,
         };
         Some(Self::new(
@@ -155,9 +165,11 @@ struct ApiErrorBody {
 #[async_trait]
 impl Llm for OpenAiCompatProvider {
     async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse> {
-        let messages: Vec<Value> = req.messages.iter().map(|m| {
-            json!({ "role": m.role, "content": m.content })
-        }).collect();
+        let messages: Vec<Value> = req
+            .messages
+            .iter()
+            .map(|m| json!({ "role": m.role, "content": m.content }))
+            .collect();
 
         let mut body = json!({
             "model": self.model,
@@ -173,7 +185,8 @@ impl Llm for OpenAiCompatProvider {
         }
 
         let url = format!("{}/chat/completions", self.base_url);
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .bearer_auth(&self.api_key)
             .json(&body)
@@ -190,7 +203,8 @@ impl Llm for OpenAiCompatProvider {
         }
 
         let api_resp: ApiResponse = resp.json().await?;
-        let content = api_resp.choices
+        let content = api_resp
+            .choices
             .into_iter()
             .next()
             .and_then(|c| c.message.content)
@@ -211,9 +225,11 @@ impl Llm for OpenAiCompatProvider {
         &self,
         req: ChatRequest,
     ) -> LlmResult<BoxStream<'static, LlmResult<ChatStreamEvent>>> {
-        let messages: Vec<Value> = req.messages.iter().map(|m| {
-            json!({ "role": m.role, "content": m.content })
-        }).collect();
+        let messages: Vec<Value> = req
+            .messages
+            .iter()
+            .map(|m| json!({ "role": m.role, "content": m.content }))
+            .collect();
 
         let mut body = json!({
             "model": self.model,

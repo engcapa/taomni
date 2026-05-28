@@ -59,7 +59,9 @@ pub async fn inline_qq_stream(
     let stream_result = {
         let ai_ctx = state.ai_ctx.read().await;
         let provider_id = ai_ctx.llm.provider_for_task(TaskKind::InlineQq);
-        let provider = ai_ctx.llm.provider(&provider_id)
+        let provider = ai_ctx
+            .llm
+            .provider(&provider_id)
             .or_else(|| ai_ctx.llm.provider(ai_ctx.llm.active()));
         match provider {
             Some(p) => p.chat_stream(req).await,
@@ -87,7 +89,9 @@ pub async fn inline_qq_stream(
     let mut stream = match stream_result {
         Ok(s) => s,
         Err(e) => {
-            emit(&InlineEvent::Error { message: e.to_string() });
+            emit(&InlineEvent::Error {
+                message: e.to_string(),
+            });
             return Ok(());
         }
     };
@@ -103,7 +107,9 @@ pub async fn inline_qq_stream(
                 return Ok(());
             }
             Err(e) => {
-                emit(&InlineEvent::Error { message: e.to_string() });
+                emit(&InlineEvent::Error {
+                    message: e.to_string(),
+                });
                 return Ok(());
             }
         }

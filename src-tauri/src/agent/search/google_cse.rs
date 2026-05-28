@@ -21,7 +21,8 @@ pub struct GoogleCseProvider {
 impl GoogleCseProvider {
     pub fn new(combined: impl Into<String>) -> Result<Self, String> {
         let raw = combined.into();
-        let (api_key, cx) = raw.split_once(':')
+        let (api_key, cx) = raw
+            .split_once(':')
             .ok_or_else(|| "Google CSE key must be 'API_KEY:CX' (colon-separated)".to_string())?;
         if api_key.is_empty() || cx.is_empty() {
             return Err("Google CSE key/cx cannot be empty".into());
@@ -63,11 +64,20 @@ impl SearchProvider for GoogleCseProvider {
         );
         if let Some(freshness) = opts.freshness.as_deref() {
             // Google: dateRestrict d1 / w1 / m1 / y1
-            let code = match freshness { "day" => "d1", "week" => "w1", "month" => "m1", _ => "y1" };
+            let code = match freshness {
+                "day" => "d1",
+                "week" => "w1",
+                "month" => "m1",
+                _ => "y1",
+            };
             url.push_str(&format!("&dateRestrict={}", code));
         }
 
-        let resp = self.client.get(&url).send().await
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| format!("Google CSE request failed: {}", e))?;
 
         if !resp.status().is_success() {
@@ -76,27 +86,36 @@ impl SearchProvider for GoogleCseProvider {
             return Err(format!("Google CSE HTTP {}: {}", status, text));
         }
 
-        let data: CseResponse = resp.json().await
+        let data: CseResponse = resp
+            .json()
+            .await
             .map_err(|e| format!("Google CSE JSON parse failed: {}", e))?;
 
         let items = data.items.unwrap_or_default();
-        Ok(items.into_iter().map(|i| {
-            let published = i.pagemap.as_ref()
-                .and_then(|pm| pm.get("metatags"))
-                .and_then(|m| m.as_array())
-                .and_then(|arr| arr.first())
-                .and_then(|first| first.get("article:published_time"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            SearchHit {
-                title: i.title,
-                url: i.link,
-                snippet: i.snippet.unwrap_or_default(),
-                source: "google_cse".into(),
-                published_at: published,
-            }
-        }).collect())
+        Ok(items
+            .into_iter()
+            .map(|i| {
+                let published = i
+                    .pagemap
+                    .as_ref()
+                    .and_then(|pm| pm.get("metatags"))
+                    .and_then(|m| m.as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|first| first.get("article:published_time"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                SearchHit {
+                    title: i.title,
+                    url: i.link,
+                    snippet: i.snippet.unwrap_or_default(),
+                    source: "google_cse".into(),
+                    published_at: published,
+                }
+            })
+            .collect())
     }
 
-    fn provider_id(&self) -> &str { "google_cse" }
+    fn provider_id(&self) -> &str {
+        "google_cse"
+    }
 }

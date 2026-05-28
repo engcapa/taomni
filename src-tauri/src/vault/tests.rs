@@ -146,8 +146,7 @@ fn update_changes_plaintext() {
 fn list_does_not_leak_plaintext() {
     let (_d, v) = fresh_vault();
     v.init(PW).unwrap();
-    v.put("ssh-password", "alice@host", "secret-value")
-        .unwrap();
+    v.put("ssh-password", "alice@host", "secret-value").unwrap();
     let summaries = v.list().unwrap();
     assert_eq!(summaries.len(), 1);
     let s = &summaries[0];

@@ -86,8 +86,18 @@ pub fn spawn_local_forwards(
         let local_label = f.local.clone();
         let remote_label = f.remote.clone();
         let task = tokio::spawn(async move {
-            if let Err(e) =
-                run_listener(h, lhost.clone(), lport, rhost.clone(), rport, app_c.clone(), sid.clone(), local_label.clone(), remote_label.clone()).await
+            if let Err(e) = run_listener(
+                h,
+                lhost.clone(),
+                lport,
+                rhost.clone(),
+                rport,
+                app_c.clone(),
+                sid.clone(),
+                local_label.clone(),
+                remote_label.clone(),
+            )
+            .await
             {
                 emit_forward_error(&app_c, &sid, &local_label, &remote_label, e);
             }
@@ -114,7 +124,10 @@ async fn run_listener(
         .map_err(|e| format!("bind {}:{}: {}", lhost, lport, e))?;
     tracing::info!(
         "session forward listening on {}:{} → {}:{}",
-        lhost, lport, rhost, rport
+        lhost,
+        lport,
+        rhost,
+        rport
     );
 
     // The JoinSet owns every accepted-connection bridge. When this
@@ -150,7 +163,12 @@ async fn run_listener(
             let originator = peer.ip().to_string();
             let originator_port = peer.port() as u32;
             let channel = match h
-                .channel_open_direct_tcpip(rh.as_str(), rport as u32, originator.as_str(), originator_port)
+                .channel_open_direct_tcpip(
+                    rh.as_str(),
+                    rport as u32,
+                    originator.as_str(),
+                    originator_port,
+                )
                 .await
             {
                 Ok(c) => c,

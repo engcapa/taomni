@@ -55,9 +55,7 @@ pub fn record(metric: &LatencyMetric) {
         .create(true)
         .append(true)
         .open(&path)
-        .and_then(|mut f| {
-            writeln!(f, "{}", line)
-        });
+        .and_then(|mut f| writeln!(f, "{}", line));
     if let Err(e) = result {
         tracing::warn!(?e, path = %path.display(), "perf metric write failed");
     }
@@ -66,7 +64,9 @@ pub fn record(metric: &LatencyMetric) {
 /// Read the most recent N entries (newest first) for the dashboard UI.
 pub fn read_recent(limit: usize) -> Vec<LatencyMetric> {
     let path = baseline_path();
-    let Ok(content) = std::fs::read_to_string(&path) else { return Vec::new(); };
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
     let mut out: Vec<LatencyMetric> = content
         .lines()
         .filter_map(|l| serde_json::from_str::<LatencyMetric>(l).ok())

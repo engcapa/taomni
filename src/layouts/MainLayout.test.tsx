@@ -16,6 +16,13 @@ const sidebarMock = vi.hoisted(() => ({
   props: [] as Array<{ onConnectSession?: (session: SessionConfig) => void }>,
 }));
 
+const quickConnectMock = vi.hoisted(() => ({
+  props: [] as Array<{
+    onConnectInput?: (value: string) => void;
+    onConnectSession?: (session: SessionConfig) => void;
+  }>,
+}));
+
 const vaultMock = vi.hoisted(() => {
   const mock = {
     state: "empty",
@@ -59,7 +66,13 @@ vi.mock("../components/menubar/Ribbon", () => ({
 }));
 
 vi.mock("../components/quickconnect/QuickConnect", () => ({
-  QuickConnect: () => <div data-testid="quick-connect" />,
+  QuickConnect: (props: {
+    onConnectInput?: (value: string) => void;
+    onConnectSession?: (session: SessionConfig) => void;
+  }) => {
+    quickConnectMock.props.push(props);
+    return <div data-testid="quick-connect" />;
+  },
 }));
 
 vi.mock("../components/sidebar/Sidebar", () => ({
@@ -131,6 +144,28 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
   },
 }));
 
+vi.mock("../components/rdp/RdpPanel", () => ({
+  default: ({
+    host,
+    port,
+    username,
+    password,
+  }: {
+    host: string;
+    port: number;
+    username?: string | null;
+    password?: string;
+  }) => (
+    <div
+      data-testid="rdp-panel"
+      data-host={host}
+      data-port={port}
+      data-username={username ?? ""}
+      data-password={password ?? ""}
+    />
+  ),
+}));
+
 vi.mock("../components/filebrowser/SftpSidebar", () => ({
   SftpSidebar: () => <div data-testid="sftp-sidebar" />,
 }));
@@ -167,6 +202,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     terminalLifecycle.mounted.mockClear();
     terminalLifecycle.unmounted.mockClear();
     sidebarMock.props = [];
+    quickConnectMock.props = [];
     vaultMock.state = "empty";
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
@@ -595,6 +631,32 @@ describe("MainLayout attached SFTP sidebar", () => {
       expect(openedSessionIds).toEqual(["manual-1", "manual-2"]);
     });
   });
+
+  it("opens RDP quick-connect URLs through the password prompt into an RDP tab", async () => {
+    render(<MainLayout />);
+
+    act(() => {
+      latestQuickConnectProps().onConnectInput?.("rdp://alice@win.example.test:3390");
+    });
+
+    expect(screen.getByTestId("auth-prompt")).toHaveTextContent("alice@win.example.test");
+
+    fireEvent.change(screen.getByTestId("auth-password"), { target: { value: "rdp-pw" } });
+    fireEvent.click(screen.getByTestId("auth-submit"));
+
+    await waitFor(() => {
+      const rdpTab = useAppStore.getState().tabs.find((tab) => tab.type === "rdp");
+      expect(rdpTab?.rdp).toMatchObject({
+        host: "win.example.test",
+        port: 3390,
+        username: "alice",
+        password: "rdp-pw",
+      });
+    });
+    expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-host", "win.example.test");
+    expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-port", "3390");
+    expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-username", "alice");
+  });
 });
 
 function makeSessionWithProfile(profile: TerminalProfile): SessionConfig {
@@ -636,5 +698,14 @@ function makePasswordSession(id: string, host: string, passwordRef?: string): Se
 function latestSidebarProps(): { onConnectSession?: (session: SessionConfig) => void } {
   const props = sidebarMock.props.at(-1);
   if (!props) throw new Error("Sidebar props were not captured");
+  return props;
+}
+
+function latestQuickConnectProps(): {
+  onConnectInput?: (value: string) => void;
+  onConnectSession?: (session: SessionConfig) => void;
+} {
+  const props = quickConnectMock.props.at(-1);
+  if (!props) throw new Error("QuickConnect props were not captured");
   return props;
 }

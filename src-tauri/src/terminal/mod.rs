@@ -128,9 +128,9 @@ pub async fn create_ssh_terminal(
             let resolved = state.vault.resolve(&raw)?;
             ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
-        "PrivateKey" => ssh::SshAuth::PrivateKey(
-            auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()),
-        ),
+        "PrivateKey" => {
+            ssh::SshAuth::PrivateKey(auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
+        }
         "Agent" => ssh::SshAuth::Agent,
         _ => {
             let raw = auth_data.unwrap_or_default();
@@ -259,7 +259,8 @@ pub async fn write_terminal(
     match terminal {
         ActiveTerminal::Local { writer, .. } => {
             let mut w = writer.lock().map_err(|e| format!("Lock failed: {}", e))?;
-            w.write_all(&bytes).map_err(|e| format!("Write failed: {}", e))?;
+            w.write_all(&bytes)
+                .map_err(|e| format!("Write failed: {}", e))?;
             w.flush().map_err(|e| format!("Flush failed: {}", e))?;
         }
         ActiveTerminal::Ssh { channel, .. } => {
@@ -312,9 +313,7 @@ pub async fn send_terminal_signal(
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
 
     match terminal {
-        ActiveTerminal::Local { child, .. } => {
-            send_local_signal(child, &signal)
-        }
+        ActiveTerminal::Local { child, .. } => send_local_signal(child, &signal),
         ActiveTerminal::Ssh { channel, .. } => {
             let sig = ssh_signal_from_name(&signal)?;
             let ch = channel.lock().await;
@@ -326,10 +325,7 @@ pub async fn send_terminal_signal(
 }
 
 #[tauri::command]
-pub async fn close_terminal(
-    session_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let removed = {
         let mut terminals = state.terminals.write().await;
         terminals.remove(&session_id)
@@ -382,9 +378,14 @@ fn send_local_signal(
     match signal {
         "SIGTERM" | "SIGKILL" => {
             let mut child = child.lock().map_err(|e| format!("Lock failed: {}", e))?;
-            child.kill().map_err(|e| format!("Local kill failed: {}", e))
+            child
+                .kill()
+                .map_err(|e| format!("Local kill failed: {}", e))
         }
-        _ => Err(format!("Local signal {} is not supported on this platform", signal)),
+        _ => Err(format!(
+            "Local signal {} is not supported on this platform",
+            signal
+        )),
     }
 }
 
@@ -415,9 +416,9 @@ pub async fn test_ssh_connection(
             let resolved = state.vault.resolve(&raw)?;
             ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
-        "PrivateKey" => ssh::SshAuth::PrivateKey(
-            auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()),
-        ),
+        "PrivateKey" => {
+            ssh::SshAuth::PrivateKey(auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
+        }
         "Agent" => ssh::SshAuth::Agent,
         _ => {
             let raw = auth_data.unwrap_or_default();
@@ -444,5 +445,8 @@ pub async fn test_ssh_connection(
     drop(channel);
     drop(handle);
 
-    Ok(format!("Connection successful ({:.0}ms)", elapsed.as_millis()))
+    Ok(format!(
+        "Connection successful ({:.0}ms)",
+        elapsed.as_millis()
+    ))
 }

@@ -56,7 +56,9 @@ pub fn find_claude_binary() -> Option<String> {
 fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
     let v = v.trim().trim_start_matches('v');
     let parts: Vec<&str> = v.splitn(3, '.').collect();
-    if parts.len() < 3 { return None; }
+    if parts.len() < 3 {
+        return None;
+    }
     Some((
         parts[0].parse().ok()?,
         parts[1].parse().ok()?,
@@ -89,7 +91,8 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
     let version_out = timeout(
         Duration::from_secs(5),
         Command::new(&bin).arg("--version").output(),
-    ).await;
+    )
+    .await;
 
     let version_str = match version_out {
         Ok(Ok(out)) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
@@ -103,7 +106,11 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
     };
 
     // Extract version number (output is like "Claude Code 1.2.3" or just "1.2.3").
-    let version = version_str.split_whitespace().last().unwrap_or("").to_string();
+    let version = version_str
+        .split_whitespace()
+        .last()
+        .unwrap_or("")
+        .to_string();
 
     if !version_ok(&version, MIN_VERSION) {
         return CcStatusResult {
@@ -111,7 +118,10 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
                 found: version.clone(),
                 required: MIN_VERSION.into(),
             },
-            message: format!("Claude Code {} found, but v{} or later is required.", version, MIN_VERSION),
+            message: format!(
+                "Claude Code {} found, but v{} or later is required.",
+                version, MIN_VERSION
+            ),
             binary_path: Some(bin),
         };
     }
@@ -122,13 +132,17 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
     if !auth_ok {
         return CcStatusResult {
             status: CcStatus::NotAuthenticated,
-            message: "Claude Code is installed but not authenticated. Run `claude login` in a terminal.".into(),
+            message:
+                "Claude Code is installed but not authenticated. Run `claude login` in a terminal."
+                    .into(),
             binary_path: Some(bin),
         };
     }
 
     CcStatusResult {
-        status: CcStatus::Ready { version: version.clone() },
+        status: CcStatus::Ready {
+            version: version.clone(),
+        },
         message: format!("Claude Code v{} ready.", version),
         binary_path: Some(bin),
     }
@@ -141,7 +155,8 @@ async fn probe_auth(binary: &str) -> bool {
         Command::new(binary)
             .args(["--print", "ping", "--output-format", "json"])
             .output(),
-    ).await;
+    )
+    .await;
 
     match result {
         Ok(Ok(out)) => out.status.success(),

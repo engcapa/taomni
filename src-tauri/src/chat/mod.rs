@@ -2,7 +2,7 @@ pub mod inline_qq;
 pub mod redact;
 pub mod store;
 
-use crate::ai::config::{AiConfig, default_ai_config_path};
+use crate::ai::config::{default_ai_config_path, AiConfig};
 use crate::llm::{ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, TaskKind};
 use crate::state::AppState;
 use futures::StreamExt;
@@ -147,10 +147,7 @@ pub async fn chat_set_thread_output_format(
 /// Sweep retention: delete threads older than `keep_days`. Returns the number
 /// of threads deleted. Frontend invokes this at startup and on a 24h timer.
 #[tauri::command]
-pub async fn chat_purge_old(
-    keep_days: u32,
-    state: State<'_, AppState>,
-) -> Result<usize, String> {
+pub async fn chat_purge_old(keep_days: u32, state: State<'_, AppState>) -> Result<usize, String> {
     let cutoff = chrono::Utc::now().timestamp() - (keep_days as i64) * 86_400;
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::delete_threads_older_than(&db, cutoff).map_err(|e| e.to_string())
@@ -214,7 +211,9 @@ pub async fn chat_send(
     let (thread, history) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let threads = store::list_threads(&db, 200).map_err(|e| e.to_string())?;
-        let thread = threads.into_iter().find(|t| t.id == req.thread_id)
+        let thread = threads
+            .into_iter()
+            .find(|t| t.id == req.thread_id)
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
         let history = store::list_messages(&db, &req.thread_id).map_err(|e| e.to_string())?;
         (thread, history)
@@ -229,15 +228,18 @@ pub async fn chat_send(
     let system_prompt = build_system_prompt(&output_format);
 
     // Build LLM messages from history + new user message.
-    let mut llm_messages: Vec<LlmMessage> = vec![
-        LlmMessage::system(system_prompt),
-    ];
+    let mut llm_messages: Vec<LlmMessage> = vec![LlmMessage::system(system_prompt)];
 
     // Add terminal context if provided.
     if let Some(ctx) = &req.terminal_context {
         let (clean_ctx, _) = redact::redact(ctx);
-        llm_messages.push(LlmMessage::user(format!("[Terminal context]\n```\n{}\n```", clean_ctx)));
-        llm_messages.push(LlmMessage::assistant("Acknowledged — I have read the terminal output."));
+        llm_messages.push(LlmMessage::user(format!(
+            "[Terminal context]\n```\n{}\n```",
+            clean_ctx
+        )));
+        llm_messages.push(LlmMessage::assistant(
+            "Acknowledged — I have read the terminal output.",
+        ));
     }
 
     // Add conversation history.
@@ -276,7 +278,11 @@ pub async fn chat_send(
             ));
         } else {
             // Fall back to the task-routed provider with timeout/fallback.
-            ai_ctx.llm.complete(llm_req, TaskKind::ChatDrawer).await.map_err(|e| e.to_string())?
+            ai_ctx
+                .llm
+                .complete(llm_req, TaskKind::ChatDrawer)
+                .await
+                .map_err(|e| e.to_string())?
         }
     };
 
@@ -312,7 +318,11 @@ pub async fn chat_send(
         }
     }
 
-    Ok(ChatSendResponse { user_message: user_msg, assistant_message: assistant_msg, redacted_count })
+    Ok(ChatSendResponse {
+        user_message: user_msg,
+        assistant_message: assistant_msg,
+        redacted_count,
+    })
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -321,11 +331,20 @@ pub enum StreamEventOut {
     /// User message persisted; frontend can render it immediately.
     UserMessage { message: store::ChatMessage },
     /// Assistant message id allocated; tokens will follow under this id.
-    AssistantStart { id: String, thread_id: String, created_at: i64 },
+    AssistantStart {
+        id: String,
+        thread_id: String,
+        created_at: i64,
+    },
     /// One token (or token group) of the assistant response.
     Token { id: String, content: String },
     /// Stream ended cleanly; assistant message persisted.
-    End { id: String, thread_id: String, content: String, redacted_count: usize },
+    End {
+        id: String,
+        thread_id: String,
+        content: String,
+        redacted_count: usize,
+    },
     /// Stream ended with an error (assistant message NOT persisted).
     Error { id: String, message: String },
 }
@@ -354,7 +373,9 @@ pub async fn chat_stream(
     let (thread, history) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let threads = store::list_threads(&db, 200).map_err(|e| e.to_string())?;
-        let thread = threads.into_iter().find(|t| t.id == req.thread_id)
+        let thread = threads
+            .into_iter()
+            .find(|t| t.id == req.thread_id)
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
         let history = store::list_messages(&db, &req.thread_id).map_err(|e| e.to_string())?;
         (thread, history)
@@ -376,22 +397,30 @@ pub async fn chat_stream(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &user_msg).map_err(|e| e.to_string())?;
     }
-    emit(&StreamEventOut::UserMessage { message: user_msg.clone() });
+    emit(&StreamEventOut::UserMessage {
+        message: user_msg.clone(),
+    });
 
     // Build the LLM request.
     let ai_config = AiConfig::load(&default_ai_config_path());
     let output_format = resolve_output_format(&thread, &ai_config);
     let system_prompt = build_system_prompt(&output_format);
-    let mut llm_messages: Vec<LlmMessage> = vec![
-        LlmMessage::system(system_prompt),
-    ];
+    let mut llm_messages: Vec<LlmMessage> = vec![LlmMessage::system(system_prompt)];
     if let Some(ctx) = &req.terminal_context {
         let (clean_ctx, _) = redact::redact(ctx);
-        llm_messages.push(LlmMessage::user(format!("[Terminal context]\n```\n{}\n```", clean_ctx)));
-        llm_messages.push(LlmMessage::assistant("Acknowledged — I have read the terminal output."));
+        llm_messages.push(LlmMessage::user(format!(
+            "[Terminal context]\n```\n{}\n```",
+            clean_ctx
+        )));
+        llm_messages.push(LlmMessage::assistant(
+            "Acknowledged — I have read the terminal output.",
+        ));
     }
     for msg in &history {
-        llm_messages.push(LlmMessage { role: msg.role.clone(), content: msg.content.clone() });
+        llm_messages.push(LlmMessage {
+            role: msg.role.clone(),
+            content: msg.content.clone(),
+        });
     }
     llm_messages.push(LlmMessage::user(clean_content));
 
@@ -416,8 +445,7 @@ pub async fn chat_stream(
     let stream_result = {
         let ai_ctx = state.ai_ctx.read().await;
         let pinned = ai_ctx.llm.provider(&thread.provider_id);
-        let pinned_blocked = pinned.is_none()
-            && ai_ctx.llm.needs_vault_unlock(&thread.provider_id);
+        let pinned_blocked = pinned.is_none() && ai_ctx.llm.needs_vault_unlock(&thread.provider_id);
 
         let provider = pinned.or_else(|| {
             // Don't fall back when the pinned provider is just locked — the
@@ -426,7 +454,9 @@ pub async fn chat_stream(
             if pinned_blocked {
                 None
             } else {
-                ai_ctx.llm.provider(&ai_ctx.llm.provider_for_task(TaskKind::ChatDrawer))
+                ai_ctx
+                    .llm
+                    .provider(&ai_ctx.llm.provider_for_task(TaskKind::ChatDrawer))
             }
         });
         match provider {
@@ -449,7 +479,10 @@ pub async fn chat_stream(
     let mut stream = match stream_result {
         Ok(s) => s,
         Err(e) => {
-            emit(&StreamEventOut::Error { id: assistant_id, message: e.to_string() });
+            emit(&StreamEventOut::Error {
+                id: assistant_id,
+                message: e.to_string(),
+            });
             return Ok(());
         }
     };
@@ -459,15 +492,24 @@ pub async fn chat_stream(
         match evt {
             Ok(ChatStreamEvent::Token { content }) => {
                 accumulated.push_str(&content);
-                emit(&StreamEventOut::Token { id: assistant_id.clone(), content });
+                emit(&StreamEventOut::Token {
+                    id: assistant_id.clone(),
+                    content,
+                });
             }
             Ok(ChatStreamEvent::End { .. }) => break,
             Ok(ChatStreamEvent::Error { message }) => {
-                emit(&StreamEventOut::Error { id: assistant_id, message });
+                emit(&StreamEventOut::Error {
+                    id: assistant_id,
+                    message,
+                });
                 return Ok(());
             }
             Err(e) => {
-                emit(&StreamEventOut::Error { id: assistant_id, message: e.to_string() });
+                emit(&StreamEventOut::Error {
+                    id: assistant_id,
+                    message: e.to_string(),
+                });
                 return Ok(());
             }
         }

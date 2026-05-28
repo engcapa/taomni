@@ -37,10 +37,7 @@ pub fn list_distros() -> Result<Vec<WslDistro>, String> {
         let stderr = crate::session::import::decode_command_output(&output.stderr);
         let trimmed = stderr.trim();
         return Err(if trimmed.is_empty() {
-            format!(
-                "wsl.exe exited with status {:?}",
-                output.status.code(),
-            )
+            format!("wsl.exe exited with status {:?}", output.status.code(),)
         } else {
             trimmed.to_string()
         });

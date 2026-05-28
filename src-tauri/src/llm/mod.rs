@@ -55,13 +55,22 @@ pub struct ChatMessage {
 
 impl ChatMessage {
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: "system".into(), content: content.into() }
+        Self {
+            role: "system".into(),
+            content: content.into(),
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: "user".into(), content: content.into() }
+        Self {
+            role: "user".into(),
+            content: content.into(),
+        }
     }
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: "assistant".into(), content: content.into() }
+        Self {
+            role: "assistant".into(),
+            content: content.into(),
+        }
     }
 }
 
@@ -76,10 +85,7 @@ pub struct ChatRequest {
 impl ChatRequest {
     pub fn simple(system: impl Into<String>, user: impl Into<String>) -> Self {
         Self {
-            messages: vec![
-                ChatMessage::system(system),
-                ChatMessage::user(user),
-            ],
+            messages: vec![ChatMessage::system(system), ChatMessage::user(user)],
             max_tokens: Some(512),
             temperature: Some(0.3),
             stream: false,

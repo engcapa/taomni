@@ -15,7 +15,12 @@ use std::path::Path;
 /// manifest to publish a known-good Qwen3-0.6B GGUF and a tested infill
 /// prompt template. Until that lands we surface the same fallback as the
 /// no-feature path so users still get completions through the sidecar.
-pub async fn complete(_model_path: &Path, _prefix: &str, _suffix: &str, _max_tokens: u32) -> Option<String> {
+pub async fn complete(
+    _model_path: &Path,
+    _prefix: &str,
+    _suffix: &str,
+    _max_tokens: u32,
+) -> Option<String> {
     tracing::debug!("local-llm-fim feature compiled but real decode not yet wired; falling back");
     None
 }

@@ -60,6 +60,19 @@ export async function readText(): Promise<string> {
   }
 }
 
+export async function readFiles(): Promise<string[]> {
+  try {
+    return await invoke<string[]>("clipboard_read_files");
+  } catch {
+    return [];
+  }
+}
+
+export async function writeFiles(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await invoke("clipboard_write_files", { paths });
+}
+
 export async function writeText(text: string): Promise<void> {
   if (!text) return;
   try {

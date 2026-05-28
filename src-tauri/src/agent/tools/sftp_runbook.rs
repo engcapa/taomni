@@ -21,15 +21,30 @@ impl Tool for SftpUploadTool {
     }
 
     fn dry_run_preview(&self, args: &serde_json::Value) -> Option<String> {
-        let local = args.get("local_path").and_then(|v| v.as_str()).unwrap_or("?");
-        let remote = args.get("remote_path").and_then(|v| v.as_str()).unwrap_or("?");
+        let local = args
+            .get("local_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?");
+        let remote = args
+            .get("remote_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?");
         Some(format!("Upload {local} → {remote}"))
     }
 
     async fn execute(&self, args: &serde_json::Value) -> ToolResult {
-        let dry_run = args.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(true);
-        let local = args.get("local_path").and_then(|v| v.as_str()).unwrap_or("");
-        let remote = args.get("remote_path").and_then(|v| v.as_str()).unwrap_or("");
+        let dry_run = args
+            .get("dry_run")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let local = args
+            .get("local_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let remote = args
+            .get("remote_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         if local.is_empty() || remote.is_empty() {
             return ToolResult::err("sftp_upload", "local_path and remote_path required");
@@ -66,7 +81,10 @@ impl Tool for SaveAsRunbookTool {
 
     fn dry_run_preview(&self, args: &serde_json::Value) -> Option<String> {
         let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-        let n = args.get("last_n_commands").and_then(|v| v.as_u64()).unwrap_or(0);
+        let n = args
+            .get("last_n_commands")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         Some(format!("Save last {n} commands as runbook '{name}'"))
     }
 

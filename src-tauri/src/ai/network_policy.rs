@@ -36,5 +36,8 @@ pub fn reject_if_remote(full_local: bool, url: &str) -> Result<(), String> {
 /// True when this LLM provider runtime is local-only (sidecar / in-process /
 /// user-installed Ollama on loopback).
 pub fn is_local_runtime(runtime: &str) -> bool {
-    matches!(runtime, "llama-server" | "llama-cpp-2" | "ollama" | "in-process")
+    matches!(
+        runtime,
+        "llama-server" | "llama-cpp-2" | "ollama" | "in-process"
+    )
 }

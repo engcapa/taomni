@@ -16,7 +16,10 @@ fn req() -> ChatRequest {
 #[tokio::test]
 async fn complete_returns_active_when_no_routing() {
     let mut r = LlmRouter::new("active-id");
-    r.add_provider("active-id", Arc::new(MockLlm::new(vec![MockEvent::Token("OK".into())])));
+    r.add_provider(
+        "active-id",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("OK".into())])),
+    );
 
     let resp = r.complete(req(), TaskKind::ChatDrawer).await.unwrap();
     assert_eq!(resp.content, "OK");
@@ -25,8 +28,14 @@ async fn complete_returns_active_when_no_routing() {
 #[tokio::test]
 async fn task_routing_overrides_active() {
     let mut r = LlmRouter::new("active-id");
-    r.add_provider("active-id", Arc::new(MockLlm::new(vec![MockEvent::Token("FROM-ACTIVE".into())])));
-    r.add_provider("local", Arc::new(MockLlm::new(vec![MockEvent::Token("FROM-LOCAL".into())])));
+    r.add_provider(
+        "active-id",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("FROM-ACTIVE".into())])),
+    );
+    r.add_provider(
+        "local",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("FROM-LOCAL".into())])),
+    );
     r.set_task_route(TaskKind::TabCompletion, "local");
 
     let resp = r.complete(req(), TaskKind::TabCompletion).await.unwrap();
@@ -36,11 +45,17 @@ async fn task_routing_overrides_active() {
 #[tokio::test]
 async fn fallback_kicks_in_on_timeout() {
     let mut r = LlmRouter::new("primary");
-    r.add_provider("primary", Arc::new(MockLlm::new(vec![
-        MockEvent::Wait(Duration::from_millis(800)),
-        MockEvent::Token("TOO-SLOW".into()),
-    ])));
-    r.add_provider("secondary", Arc::new(MockLlm::new(vec![MockEvent::Token("FALLBACK".into())])));
+    r.add_provider(
+        "primary",
+        Arc::new(MockLlm::new(vec![
+            MockEvent::Wait(Duration::from_millis(800)),
+            MockEvent::Token("TOO-SLOW".into()),
+        ])),
+    );
+    r.add_provider(
+        "secondary",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("FALLBACK".into())])),
+    );
     r.set_fallback(FallbackConfig {
         primary: "primary".into(),
         secondary: "secondary".into(),
@@ -54,8 +69,14 @@ async fn fallback_kicks_in_on_timeout() {
 #[tokio::test]
 async fn fallback_kicks_in_on_provider_error() {
     let mut r = LlmRouter::new("primary");
-    r.add_provider("primary", Arc::new(MockLlm::new(vec![MockEvent::Error("503".into())])));
-    r.add_provider("secondary", Arc::new(MockLlm::new(vec![MockEvent::Token("FALLBACK".into())])));
+    r.add_provider(
+        "primary",
+        Arc::new(MockLlm::new(vec![MockEvent::Error("503".into())])),
+    );
+    r.add_provider(
+        "secondary",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("FALLBACK".into())])),
+    );
     r.set_fallback(FallbackConfig {
         primary: "primary".into(),
         secondary: "secondary".into(),
@@ -97,7 +118,10 @@ async fn complete_returns_vault_locked_when_fallback_secondary_unresolved() {
     // Primary fails, secondary is the unresolved one — the user should still
     // see VAULT_LOCKED so they understand which provider needs an unlock.
     let mut r = LlmRouter::new("primary");
-    r.add_provider("primary", Arc::new(MockLlm::new(vec![MockEvent::Error("503".into())])));
+    r.add_provider(
+        "primary",
+        Arc::new(MockLlm::new(vec![MockEvent::Error("503".into())])),
+    );
     r.mark_unresolved("secondary");
     r.set_fallback(FallbackConfig {
         primary: "primary".into(),

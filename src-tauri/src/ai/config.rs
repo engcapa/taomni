@@ -118,51 +118,69 @@ impl Default for LlmConfig {
     fn default() -> Self {
         let mut providers = HashMap::new();
 
-        providers.insert("deepseek".into(), LlmProviderConfig {
-            base_url: "https://api.deepseek.com/v1".into(),
-            api_key: String::new(),
-            model: "deepseek-chat".into(),
-            runtime: "openai-compat".into(),
-        });
-        providers.insert("glm".into(), LlmProviderConfig {
-            base_url: "https://open.bigmodel.cn/api/paas/v4".into(),
-            api_key: String::new(),
-            model: "glm-4-flash".into(),
-            runtime: "openai-compat".into(),
-        });
-        providers.insert("siliconflow".into(), LlmProviderConfig {
-            base_url: "https://api.siliconflow.cn/v1".into(),
-            api_key: String::new(),
-            model: "Qwen/Qwen2.5-Coder-7B-Instruct".into(),
-            runtime: "openai-compat".into(),
-        });
-        providers.insert("groq".into(), LlmProviderConfig {
-            base_url: "https://api.groq.com/openai/v1".into(),
-            api_key: String::new(),
-            model: "llama-3.3-70b-versatile".into(),
-            runtime: "openai-compat".into(),
-        });
-        providers.insert("local".into(), LlmProviderConfig {
-            base_url: "http://127.0.0.1:8080/v1".into(),
-            api_key: "local".into(),
-            model: "qwen3-1.7b-q4_k_m".into(),
-            runtime: "llama-server".into(),
-        });
-        providers.insert("anthropic".into(), LlmProviderConfig {
-            base_url: "https://api.anthropic.com/v1".into(),
-            api_key: String::new(),
-            model: "claude-sonnet-4-5".into(),
-            runtime: "anthropic".into(),
-        });
+        providers.insert(
+            "deepseek".into(),
+            LlmProviderConfig {
+                base_url: "https://api.deepseek.com/v1".into(),
+                api_key: String::new(),
+                model: "deepseek-chat".into(),
+                runtime: "openai-compat".into(),
+            },
+        );
+        providers.insert(
+            "glm".into(),
+            LlmProviderConfig {
+                base_url: "https://open.bigmodel.cn/api/paas/v4".into(),
+                api_key: String::new(),
+                model: "glm-4-flash".into(),
+                runtime: "openai-compat".into(),
+            },
+        );
+        providers.insert(
+            "siliconflow".into(),
+            LlmProviderConfig {
+                base_url: "https://api.siliconflow.cn/v1".into(),
+                api_key: String::new(),
+                model: "Qwen/Qwen2.5-Coder-7B-Instruct".into(),
+                runtime: "openai-compat".into(),
+            },
+        );
+        providers.insert(
+            "groq".into(),
+            LlmProviderConfig {
+                base_url: "https://api.groq.com/openai/v1".into(),
+                api_key: String::new(),
+                model: "llama-3.3-70b-versatile".into(),
+                runtime: "openai-compat".into(),
+            },
+        );
+        providers.insert(
+            "local".into(),
+            LlmProviderConfig {
+                base_url: "http://127.0.0.1:8080/v1".into(),
+                api_key: "local".into(),
+                model: "qwen3-1.7b-q4_k_m".into(),
+                runtime: "llama-server".into(),
+            },
+        );
+        providers.insert(
+            "anthropic".into(),
+            LlmProviderConfig {
+                base_url: "https://api.anthropic.com/v1".into(),
+                api_key: String::new(),
+                model: "claude-sonnet-4-5".into(),
+                runtime: "anthropic".into(),
+            },
+        );
 
         let mut task_routing = HashMap::new();
-        task_routing.insert("voice_intent".into(),    "deepseek".into());
-        task_routing.insert("voice_to_shell".into(),  "deepseek".into());
-        task_routing.insert("tab_completion".into(),  "local".into());
+        task_routing.insert("voice_intent".into(), "deepseek".into());
+        task_routing.insert("voice_to_shell".into(), "deepseek".into());
+        task_routing.insert("tab_completion".into(), "local".into());
         task_routing.insert("command_rewrite".into(), "deepseek".into());
-        task_routing.insert("chat_drawer".into(),     "deepseek".into());
-        task_routing.insert("inline_qq".into(),       "deepseek".into());
-        task_routing.insert("agent_default".into(),   "deepseek".into());
+        task_routing.insert("chat_drawer".into(), "deepseek".into());
+        task_routing.insert("inline_qq".into(), "deepseek".into());
+        task_routing.insert("agent_default".into(), "deepseek".into());
 
         Self {
             active: "deepseek".into(),
