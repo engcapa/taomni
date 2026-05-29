@@ -927,6 +927,7 @@ const dict = {
     scaleFit: "Fit",
     scaleOne: "1:1",
     resize: "Resize",
+    refreshScreen: "Refresh screen",
     closedConnection: "Connection closed",
     websocketError: "WebSocket error",
     errorGeneric: "Connection failed",

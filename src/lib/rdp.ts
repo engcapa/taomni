@@ -64,6 +64,7 @@ export const IN_KEY = 2;
 export const IN_POINTER = 3;
 export const IN_RESIZE = 4;
 export const IN_WHEEL = 5;
+export const IN_REFRESH = 6;
 
 /** Inbound channel tags (relay → browser). */
 export const OUT_FRAME = 0;
@@ -96,6 +97,11 @@ export function encodePing(): ArrayBuffer {
 
 export function encodeAck(): ArrayBuffer {
   return new Uint8Array([IN_ACK]).buffer;
+}
+
+/** Ask the relay to request a full-desktop redraw from the RDP server. */
+export function encodeRefresh(): ArrayBuffer {
+  return new Uint8Array([IN_REFRESH]).buffer;
 }
 
 export function encodeKey(down: boolean, scancode: number): ArrayBuffer {

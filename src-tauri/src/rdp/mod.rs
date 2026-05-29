@@ -53,7 +53,7 @@ pub struct RdpOptions {
     pub screen_w: u16,
     #[serde(default = "default_screen_h")]
     pub screen_h: u16,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub nla: bool,
     #[serde(default)]
     pub performance: PerformanceFlags,
@@ -263,6 +263,18 @@ pub async fn rdp_connect(
         session_id: session_id.clone(),
         ws_port: session.ws_port,
     };
+
+    // Reap the session-map entry once the relay's cancellation token fires
+    // (idle timeout, WS close, server disconnect, or explicit
+    // `rdp_disconnect`). Without this the `RdpSession` would linger in the
+    // map after its backend worker has already exited.
+    let reaper_cancel = session.cancel.clone();
+    let reaper_sessions = state.rdp_sessions.clone();
+    let reaper_id = session_id.clone();
+    tokio::spawn(async move {
+        reaper_cancel.cancelled().await;
+        reaper_sessions.write().await.remove(&reaper_id);
+    });
 
     let mut sessions = state.rdp_sessions.write().await;
     sessions.insert(session_id, session);

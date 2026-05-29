@@ -57,7 +57,7 @@ export const DEFAULT_RDP_OPTIONS: RdpOptions = {
   colorDepth: 32,
   screenW: 1920,
   screenH: 1080,
-  nla: true,
+  nla: false,
   performance: DEFAULT_RDP_PERFORMANCE,
   redirectClipboard: true,
   redirectAudio: "play",
@@ -83,7 +83,7 @@ export function parseRdpOptions(optionsJson: string | undefined | null): RdpOpti
     colorDepth: clampInt(o.colorDepth, 32, [8, 15, 16, 24, 32]),
     screenW: clampInt(o.screenW, 1920, undefined, 320, 8192),
     screenH: clampInt(o.screenH, 1080, undefined, 200, 8192),
-    nla: typeof o.nla === "boolean" ? o.nla : true,
+    nla: typeof o.nla === "boolean" ? o.nla : false,
     performance,
     redirectClipboard:
       typeof o.redirectClipboard === "boolean" ? o.redirectClipboard : true,

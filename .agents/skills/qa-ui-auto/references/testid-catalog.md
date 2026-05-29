@@ -168,6 +168,7 @@
 - `[data-testid="rdp-canvas"]` — display — F9.7.canvas
 - `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
 - `[data-testid="rdp-resize"]` — interactive [optional] — F9.7.resize
+- `[data-testid="rdp-refresh-screen"]` — interactive [optional] — F9.7.refresh-screen
 - `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
 - `[data-testid="rdp-fullscreen"]` — interactive — F9.7.fullscreen
 

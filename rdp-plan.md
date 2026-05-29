@@ -379,11 +379,10 @@ RDP is desktop-only.
 - `vite-plugins/rdpProxy.ts` is registered in `vite.config.ts` (dev only) and
   returns `501 not implemented` for the bridge endpoint, so `pnpm dev` does not
   crash when `src/lib/rdp.ts` imports `@tauri-apps/api/core`.
-- **Gap vs. the original plan:** the `src/stubs/tauri-core.ts` IPC stub does
-  **not** yet special-case `rdp_connect` / `rdp_disconnect` /
-  `rdp_test_connection`. They fall through to the `default` branch (warn +
-  return `undefined`) instead of throwing a clear "RDP not available in browser
-  mode" error. This is a small outstanding cleanup item, not a blocker.
+- `src/stubs/tauri-core.ts` now special-cases `rdp_connect` /
+  `rdp_disconnect` / `rdp_test_connection`: they throw a clear "RDP is only
+  available in the desktop build" error instead of silently falling through to
+  the `default` warn-and-return-undefined branch.
 
 ## Implementation order (as built)
 
@@ -439,11 +438,22 @@ Modified:
 - `src/lib/i18n/locales/{en,zh-CN}.ts` — `rdp.*` keys.
 
 Outstanding vs. plan:
-- `src/stubs/tauri-core.ts` — RDP IPC stub case not yet added (see Dev/browser).
-- `src-tauri/src/session/models.rs` — the planned `options_json` doc comment near
-  `SessionType::RDP` was not added.
 - Leftover hand-rolled modules (`pdu/*`, `rfx.rs`, `rdpsnd.rs`, the CLIPRDR codec
   half of `cliprdr.rs`) are unused and can be pruned.
+
+Shipped after the initial plan:
+- `src/stubs/tauri-core.ts` now throws a clear desktop-only error for the three
+  RDP commands in browser preview.
+- `src-tauri/src/session/models.rs` documents the `options_json` shape near
+  `SessionType::RDP`.
+- A Refresh Rect path (`RdpControl::Refresh` → `request_full_refresh`) forces a
+  full desktop redraw: automatically after reactivation and shortly after each
+  `connected` event (fixes the stale screen after the Windows logon→desktop
+  transition), plus a manual toolbar "Refresh screen" button.
+- The RDP editor renders its options as a dedicated section tab (parallel to
+  Network/Bookmark, replacing the Terminal tab) and defaults NLA off.
+- `rdp_connect` reaps its `rdp_sessions` map entry when the relay's cancellation
+  token fires, so detached/closed sessions no longer linger in the map.
 
 ## Verification
 

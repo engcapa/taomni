@@ -35,6 +35,8 @@ use ironrdp::pdu::gcc::KeyboardType;
 use ironrdp::pdu::geometry::InclusiveRectangle;
 use ironrdp::pdu::rdp::capability_sets::MajorPlatformType;
 use ironrdp::pdu::rdp::client_info::{PerformanceFlags as IronPerformanceFlags, TimezoneInfo};
+use ironrdp::pdu::rdp::headers::ShareDataPdu;
+use ironrdp::pdu::rdp::refresh_rectangle::RefreshRectanglePdu;
 use ironrdp::pdu::Action;
 use ironrdp::rdpsnd::client::{Rdpsnd, RdpsndClientHandler};
 use ironrdp::rdpsnd::pdu::{
@@ -1060,6 +1062,9 @@ where
                 }
             }
         }
+        RdpControl::Refresh => {
+            request_full_refresh(active_stage, image, framed, out_tx).await?;
+        }
         RdpControl::ClipboardOffer { .. } => {
             send_status(
                 out_tx,
@@ -1137,6 +1142,52 @@ where
         }
     }
     Ok(ControlOutcome::Continue)
+}
+
+/// Ask the server to redraw the entire desktop via a Refresh Rect PDU
+/// (MS-RDPBCGR 2.2.11.2). Windows occasionally leaves the client showing a
+/// stale framebuffer after a session transition (e.g. the move from the
+/// logon/credential screen to the interactive desktop, which arrives as a
+/// Deactivate-All → reactivation). Re-requesting the full rectangle forces a
+/// fresh paint so the canvas is not stuck on the pre-login image.
+async fn request_full_refresh<S>(
+    active_stage: &mut ActiveStage,
+    image: &IronDecodedImage,
+    framed: &mut Framed<S>,
+    out_tx: &UnboundedSender<SessionOutput>,
+) -> Result<(), String>
+where
+    S: FramedWrite,
+{
+    let width = image.width();
+    let height = image.height();
+    if width == 0 || height == 0 {
+        return Ok(());
+    }
+    let pdu = ShareDataPdu::RefreshRectangle(RefreshRectanglePdu {
+        areas_to_refresh: vec![InclusiveRectangle {
+            left: 0,
+            top: 0,
+            right: width - 1,
+            bottom: height - 1,
+        }],
+    });
+    let mut output = WriteBuf::new();
+    active_stage
+        .encode_static(&mut output, pdu)
+        .map_err(|e| format!("rdp refresh encode: {}", e))?;
+    if !output.filled().is_empty() {
+        framed
+            .write_all(output.filled())
+            .await
+            .map_err(|e| format!("rdp refresh write: {}", e))?;
+    }
+    send_status(
+        out_tx,
+        "refresh-requested",
+        "Requested a full desktop redraw from the RDP server.",
+    );
+    Ok(())
 }
 
 async fn drain_clipboard_actions<S>(
@@ -1387,6 +1438,11 @@ where
             "reactivated",
             "RDP session reactivated after desktop resize.",
         );
+        // The desktop that arrives after a reactivation (notably the
+        // post-logon interactive desktop when NLA is off) is frequently not
+        // fully repainted by the server on its own. Force a full redraw so
+        // the canvas does not stay stuck on the pre-transition image.
+        request_full_refresh(active_stage, image, framed, out_tx).await?;
         return Ok(true);
     }
 

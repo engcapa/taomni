@@ -703,6 +703,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       }
       return undefined as T;
     }
+    // ---------- RDP commands (desktop-only) ----------
+    case "rdp_connect":
+    case "rdp_disconnect":
+    case "rdp_test_connection": {
+      throw new Error(
+        "RDP is only available in the desktop build of NewMob, not in browser preview.",
+      );
+    }
     case "sftp_open_path": {
       // No real OS shell in browser preview.
       throw new Error(

@@ -926,6 +926,7 @@ export const zhCN: DeepPartial<typeof en> = {
     scaleFit: "适应",
     scaleOne: "1:1",
     resize: "重设大小",
+    refreshScreen: "刷新屏幕",
     closedConnection: "连接已关闭",
     websocketError: "WebSocket 错误",
     errorGeneric: "连接失败",

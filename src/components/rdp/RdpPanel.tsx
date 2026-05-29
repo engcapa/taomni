@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Maximize2, Minimize2, RefreshCw } from "lucide-react";
+import {
+  Expand,
+  Fullscreen,
+  Maximize2,
+  Minimize2,
+  PictureInPicture,
+  PictureInPicture2,
+  RefreshCw,
+  Scan,
+} from "lucide-react";
 
 import {
   applyExtended,
@@ -7,6 +16,7 @@ import {
   encodeKey,
   encodePing,
   encodePointer,
+  encodeRefresh,
   encodeResize,
   encodeWheel,
   keyEventToScancode,
@@ -241,6 +251,12 @@ export default function RdpPanel({
                 store.setConnected(tabId, msg.width, msg.height, msg.protocol, msg.server_name);
                 resizeCanvas(canvasRef.current, msg.width, msg.height);
                 window.setTimeout(() => requestViewportResize(false), 0);
+                // Nudge the server to repaint the whole desktop shortly after
+                // we (re)connect. Windows often hands us a stale framebuffer
+                // across the logon→desktop transition; a Refresh Rect request
+                // forces a fresh paint so the canvas is never stuck on the
+                // pre-login image.
+                window.setTimeout(() => sendBinary(encodeRefresh()), 400);
                 break;
               case "disconnected":
                 store.setDisconnected(tabId, msg.reason);
@@ -440,6 +456,10 @@ export default function RdpPanel({
     requestViewportResize(true);
   }, [requestViewportResize]);
 
+  const refreshScreen = useCallback(() => {
+    sendBinary(encodeRefresh());
+  }, [sendBinary]);
+
   const reconnect = useCallback(() => {
     const sid = sessionIdRef.current;
     if (sid) rdpDisconnect(sid).catch(() => {});
@@ -528,19 +548,34 @@ export default function RdpPanel({
           disabled={conn?.status !== "connected"}
           onClick={triggerResize}
           title={t("rdp.resize")}
-          style={{ ...FT_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
+          aria-label={t("rdp.resize")}
+          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
         >
-          {t("rdp.resize")}
+          <Expand size={14} />
+        </button>
+        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+        <button
+          type="button"
+          data-testid="rdp-refresh-screen"
+          disabled={conn?.status !== "connected"}
+          onClick={refreshScreen}
+          title={t("rdp.refreshScreen")}
+          aria-label={t("rdp.refreshScreen")}
+          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
+        >
+          <Scan size={14} />
         </button>
         <button
           type="button"
           data-testid="rdp-reconnect"
           onClick={reconnect}
           title={t("rdp.reconnect")}
-          style={FT_BUTTON_STYLE}
+          aria-label={t("rdp.reconnect")}
+          style={FT_ICON_BUTTON_STYLE}
         >
           <RefreshCw size={14} />
         </button>
+        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
         {onDetach && (
           <button
             type="button"
@@ -548,9 +583,9 @@ export default function RdpPanel({
             onClick={onDetach}
             title={t("rdp.detach")}
             aria-label={t("rdp.detach")}
-            style={FT_BUTTON_STYLE}
+            style={FT_ICON_BUTTON_STYLE}
           >
-            <ExternalLink size={14} />
+            <PictureInPicture2 size={14} />
           </button>
         )}
         <button
@@ -559,12 +594,13 @@ export default function RdpPanel({
           onClick={toggleMaximize}
           title={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
           aria-label={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
-          style={FT_BUTTON_STYLE}
+          style={FT_ICON_BUTTON_STYLE}
         >
           {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         {detachedWindowControls && (
           <>
+            <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
             <button
               type="button"
               data-testid="detached-reattach"
@@ -573,7 +609,7 @@ export default function RdpPanel({
               aria-label={t("rdp.reattach")}
               style={FT_BUTTON_STYLE}
             >
-              <ExternalLink size={14} />
+              <PictureInPicture size={14} />
               <span>{t("rdp.reattach")}</span>
             </button>
             <button
@@ -582,9 +618,9 @@ export default function RdpPanel({
               onClick={detachedWindowControls.onToggleOsFullscreen}
               title={t("rdp.osFullscreen")}
               aria-label={t("rdp.osFullscreen")}
-              style={FT_BUTTON_STYLE}
+              style={FT_ICON_BUTTON_STYLE}
             >
-              {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Fullscreen size={14} />}
             </button>
           </>
         )}
@@ -660,6 +696,31 @@ const FT_BUTTON_STYLE: React.CSSProperties = {
   fontSize: 11,
   cursor: "pointer",
   whiteSpace: "nowrap",
+};
+
+// Square icon-only button. Slightly larger hit area + centered glyph so the
+// distinct lucide icons (reconnect / refresh-screen / detach / maximize…) are
+// easy to tell apart at a glance.
+const FT_ICON_BUTTON_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 26,
+  height: 24,
+  padding: 0,
+  background: "rgba(0,0,0,0.45)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 4,
+  cursor: "pointer",
+};
+
+// Thin vertical rule that visually groups related toolbar buttons.
+const FT_SEPARATOR_STYLE: React.CSSProperties = {
+  width: 1,
+  alignSelf: "stretch",
+  margin: "2px 2px",
+  background: "rgba(255,255,255,0.18)",
 };
 
 /* ── Canvas helpers ─────────────────────────────────────────────────── */

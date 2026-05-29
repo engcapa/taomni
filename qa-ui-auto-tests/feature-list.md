@@ -1910,6 +1910,10 @@ controls:
     selector: '[data-testid="rdp-resize"]'
     kind: interactive
     optional: true       # disabled until an RDP session reaches connected
+  - id: refresh-screen
+    selector: '[data-testid="rdp-refresh-screen"]'
+    kind: interactive
+    optional: true       # disabled until an RDP session reaches connected
   - id: reconnect
     selector: '[data-testid="rdp-reconnect"]'
     kind: interactive
