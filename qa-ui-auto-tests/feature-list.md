@@ -1920,9 +1920,9 @@ controls:
   - id: detach
     selector: '[data-testid="rdp-detach"]'
     kind: interactive
-  - id: maximize
-    selector: '[data-testid="rdp-maximize"]'
-    kind: interactive
+  - id: view-cycle
+    selector: '[data-testid="rdp-view-cycle"]'
+    kind: interactive       # one button cycles normal → maximized → fullscreen
 -->
 
 - Tauri desktop 模式下通过 IronRDP 0.14 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制

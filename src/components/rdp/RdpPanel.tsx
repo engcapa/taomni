@@ -70,6 +70,9 @@ export interface RdpPanelProps {
 }
 
 type ScaleMode = "fit" | "one";
+// Combined view state for the single "enlarge" cycle button:
+//   normal → maximized (in-window, app chrome hidden) → fullscreen (OS window).
+type ViewMode = "normal" | "maximized" | "fullscreen";
 
 export default function RdpPanel({
   tabId,
@@ -563,6 +566,53 @@ export default function RdpPanel({
     [scaleMode],
   );
 
+  /* ── View-size cycle (maximize + fullscreen merged) ──────────────────
+   * One button walks a single linear progression so the four scattered
+   * size controls collapse into a tidy group. Attached tabs cycle
+   *   normal → maximized (in-window) → fullscreen (OS) → normal
+   * Detached windows have no in-window maximize (the window *is* the
+   * panel), so their cycle is just normal ⇄ fullscreen.
+   *
+   * The current mode is DERIVED from the two underlying booleans rather
+   * than tracked separately, so it stays correct even when the user flips
+   * a state out-of-band via F11 / Ctrl+Alt+Enter. We reconcile toward a
+   * target by reusing the existing toggles only when a flip is needed. */
+  const hasInWindowMaximize = !detachedWindowControls;
+  const currentFullscreen = detachedWindowControls
+    ? detachedWindowControls.osFullscreen
+    : osFullscreen;
+  const viewMode: ViewMode = currentFullscreen
+    ? "fullscreen"
+    : hasInWindowMaximize && isMaximized
+      ? "maximized"
+      : "normal";
+
+  const applyView = (targetMaximized: boolean, targetFullscreen: boolean) => {
+    if (hasInWindowMaximize && isMaximized !== targetMaximized) toggleMaximize();
+    if (currentFullscreen !== targetFullscreen) toggleOsFullscreen();
+  };
+
+  const cycleView = () => {
+    if (!hasInWindowMaximize) {
+      applyView(false, !currentFullscreen);
+      return;
+    }
+    if (viewMode === "normal") applyView(true, false);
+    else if (viewMode === "maximized") applyView(true, true);
+    else applyView(false, false);
+  };
+
+  // Icon + tooltip describe what the NEXT click does, so the single button
+  // still reads at a glance.
+  const cycle =
+    viewMode === "fullscreen"
+      ? { icon: <Minimize2 size={14} />, label: t("rdp.restore"), hint: " (F11)" }
+      : viewMode === "maximized"
+        ? { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" }
+        : hasInWindowMaximize
+          ? { icon: <Maximize2 size={14} />, label: t("rdp.maximize"), hint: " (Ctrl+Alt+Enter)" }
+          : { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" };
+
   return (
     <div
       ref={containerRef}
@@ -604,6 +654,44 @@ export default function RdpPanel({
           {dims && <span style={{ opacity: 0.65 }}>· {dims}</span>}
           {stage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
         </span>
+        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+        {/* Action group — operations on the live session. */}
+        <button
+          type="button"
+          data-testid="rdp-reconnect"
+          onClick={reconnect}
+          title={t("rdp.reconnect")}
+          aria-label={t("rdp.reconnect")}
+          style={FT_ICON_BUTTON_STYLE}
+        >
+          <RefreshCw size={14} />
+        </button>
+        <button
+          type="button"
+          data-testid="rdp-refresh-screen"
+          disabled={conn?.status !== "connected"}
+          onClick={refreshScreen}
+          title={t("rdp.refreshScreen")}
+          aria-label={t("rdp.refreshScreen")}
+          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
+        >
+          <Scan size={14} />
+        </button>
+        {onDetach && (
+          <button
+            type="button"
+            data-testid="rdp-detach"
+            onClick={onDetach}
+            title={t("rdp.detach")}
+            aria-label={t("rdp.detach")}
+            style={FT_ICON_BUTTON_STYLE}
+          >
+            <PictureInPicture2 size={14} />
+          </button>
+        )}
+        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+        {/* View group — everything that changes how the desktop is sized or
+            displayed, kept together so the size controls read at a glance. */}
         <button
           type="button"
           data-testid="rdp-scale-toggle"
@@ -624,63 +712,16 @@ export default function RdpPanel({
         >
           <Expand size={14} />
         </button>
-        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
         <button
           type="button"
-          data-testid="rdp-refresh-screen"
-          disabled={conn?.status !== "connected"}
-          onClick={refreshScreen}
-          title={t("rdp.refreshScreen")}
-          aria-label={t("rdp.refreshScreen")}
-          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
-        >
-          <Scan size={14} />
-        </button>
-        <button
-          type="button"
-          data-testid="rdp-reconnect"
-          onClick={reconnect}
-          title={t("rdp.reconnect")}
-          aria-label={t("rdp.reconnect")}
+          data-testid="rdp-view-cycle"
+          onClick={cycleView}
+          title={`${cycle.label}${cycle.hint}`}
+          aria-label={cycle.label}
           style={FT_ICON_BUTTON_STYLE}
         >
-          <RefreshCw size={14} />
+          {cycle.icon}
         </button>
-        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-        {onDetach && (
-          <button
-            type="button"
-            data-testid="rdp-detach"
-            onClick={onDetach}
-            title={t("rdp.detach")}
-            aria-label={t("rdp.detach")}
-            style={FT_ICON_BUTTON_STYLE}
-          >
-            <PictureInPicture2 size={14} />
-          </button>
-        )}
-        <button
-          type="button"
-          data-testid="rdp-maximize"
-          onClick={toggleMaximize}
-          title={`${isMaximized ? t("rdp.restore") : t("rdp.maximize")} (Ctrl+Alt+Enter)`}
-          aria-label={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
-          style={FT_ICON_BUTTON_STYLE}
-        >
-          {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
-        {!detachedWindowControls && (
-          <button
-            type="button"
-            data-testid="rdp-fullscreen"
-            onClick={toggleOsFullscreen}
-            title={`${t("rdp.osFullscreen")} (F11)`}
-            aria-label={t("rdp.osFullscreen")}
-            style={FT_ICON_BUTTON_STYLE}
-          >
-            {osFullscreen ? <Minimize2 size={14} /> : <Fullscreen size={14} />}
-          </button>
-        )}
         {detachedWindowControls && (
           <>
             <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
@@ -694,16 +735,6 @@ export default function RdpPanel({
             >
               <PictureInPicture size={14} />
               <span>{t("rdp.reattach")}</span>
-            </button>
-            <button
-              type="button"
-              data-testid="detached-os-fullscreen"
-              onClick={detachedWindowControls.onToggleOsFullscreen}
-              title={`${t("rdp.osFullscreen")} (F11)`}
-              aria-label={t("rdp.osFullscreen")}
-              style={FT_ICON_BUTTON_STYLE}
-            >
-              {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Fullscreen size={14} />}
             </button>
           </>
         )}

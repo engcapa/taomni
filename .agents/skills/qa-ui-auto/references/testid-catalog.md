@@ -170,7 +170,8 @@
 - `[data-testid="rdp-resize"]` — interactive [optional] — F9.7.resize
 - `[data-testid="rdp-refresh-screen"]` — interactive [optional] — F9.7.refresh-screen
 - `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
-- `[data-testid="rdp-fullscreen"]` — interactive — F9.7.fullscreen
+- `[data-testid="rdp-detach"]` — interactive — F9.7.detach
+- `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle (normal → maximized → fullscreen)
 
 ## sessions (F6.2)
 
