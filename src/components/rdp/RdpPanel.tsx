@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Expand,
   Fullscreen,
@@ -34,6 +35,7 @@ import {
 import { useRdpStore } from "../../stores/rdpStore";
 import type { RdpOptions } from "../../types/rdp";
 import { useT, t as tr } from "../../lib/i18n";
+import { isTauriRuntime } from "../../lib/runtime";
 import {
   readFiles as readClipboardFiles,
   readText as readClipboardText,
@@ -102,6 +104,10 @@ export default function RdpPanel({
   // escapes the OS window.
   const [localMaximized, setLocalMaximized] = useState(false);
   const isMaximized = onToggleMaximize ? !!maximized : localMaximized;
+  // Tracks whether the host OS window is fullscreen. Only meaningful for
+  // attached tabs (detached windows manage their own fullscreen via
+  // `detachedWindowControls`). Cosmetic — drives the toolbar icon.
+  const [osFullscreen, setOsFullscreen] = useState(false);
 
   const store = useRdpStore();
   const conn = store.connections[tabId];
@@ -375,15 +381,81 @@ export default function RdpPanel({
     }, 40);
   }, [sendBinary, sendText]);
 
+  /* ── View controls (local, never forwarded to the remote) ────────── */
+
+  const toggleMaximize = useCallback(() => {
+    if (onToggleMaximize) {
+      onToggleMaximize();
+    } else {
+      setLocalMaximized((m) => !m);
+    }
+  }, [onToggleMaximize]);
+
+  // Toggle the host OS window between fullscreen and normal. Detached
+  // windows already own a fullscreen toggle (passed via
+  // `detachedWindowControls`); attached tabs flip the main app window
+  // directly through the Tauri window API, falling back to the DOM
+  // Fullscreen API in browser dev mode.
+  const toggleOsFullscreen = useCallback(() => {
+    if (detachedWindowControls) {
+      detachedWindowControls.onToggleOsFullscreen();
+      return;
+    }
+    void (async () => {
+      if (isTauriRuntime()) {
+        try {
+          const w = getCurrentWindow();
+          const next = !(await w.isFullscreen());
+          await w.setFullscreen(next);
+          setOsFullscreen(next);
+        } catch {
+          /* window API unavailable — ignore */
+        }
+        return;
+      }
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setOsFullscreen(false);
+        } else {
+          await document.documentElement.requestFullscreen();
+          setOsFullscreen(true);
+        }
+      } catch {
+        /* fullscreen request rejected — ignore */
+      }
+    })();
+  }, [detachedWindowControls]);
+
   const onKey = useCallback(
     (down: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!visible || conn?.status !== "connected") return;
-      if (!down && suppressNextPasteKeyUpRef.current && e.nativeEvent.code === "KeyV") {
+      const code = e.nativeEvent.code;
+
+      // Local view shortcuts intercepted before reaching the remote desktop:
+      //   F11               → toggle host-window OS fullscreen
+      //   Ctrl/⌘+Alt+Enter  → toggle in-window maximize/restore
+      if (code === "F11") {
+        e.preventDefault();
+        if (down && !e.nativeEvent.repeat) toggleOsFullscreen();
+        return;
+      }
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.altKey &&
+        (code === "Enter" || code === "NumpadEnter")
+      ) {
+        e.preventDefault();
+        if (down && !e.nativeEvent.repeat) toggleMaximize();
+        return;
+      }
+
+      if (!down && suppressNextPasteKeyUpRef.current && code === "KeyV") {
         suppressNextPasteKeyUpRef.current = false;
         e.preventDefault();
         return;
       }
-      if (down && (e.ctrlKey || e.metaKey) && e.nativeEvent.code === "KeyV") {
+      if (down && (e.ctrlKey || e.metaKey) && code === "KeyV") {
         e.preventDefault();
         suppressNextPasteKeyUpRef.current = true;
         void syncClipboardForRemotePaste();
@@ -394,7 +466,14 @@ export default function RdpPanel({
       e.preventDefault();
       sendBinary(encodeKey(down, applyExtended(sc.scancode, sc.extended)));
     },
-    [conn?.status, sendBinary, syncClipboardForRemotePaste, visible],
+    [
+      conn?.status,
+      sendBinary,
+      syncClipboardForRemotePaste,
+      toggleMaximize,
+      toggleOsFullscreen,
+      visible,
+    ],
   );
 
   const onPointer = useCallback(
@@ -471,14 +550,6 @@ export default function RdpPanel({
     store.setDisconnected(tabId);
     doConnect();
   }, [closeAudio, doConnect, store, tabId]);
-
-  const toggleMaximize = useCallback(() => {
-    if (onToggleMaximize) {
-      onToggleMaximize();
-    } else {
-      setLocalMaximized((m) => !m);
-    }
-  }, [onToggleMaximize]);
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -592,12 +663,24 @@ export default function RdpPanel({
           type="button"
           data-testid="rdp-maximize"
           onClick={toggleMaximize}
-          title={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
+          title={`${isMaximized ? t("rdp.restore") : t("rdp.maximize")} (Ctrl+Alt+Enter)`}
           aria-label={isMaximized ? t("rdp.restore") : t("rdp.maximize")}
           style={FT_ICON_BUTTON_STYLE}
         >
           {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
+        {!detachedWindowControls && (
+          <button
+            type="button"
+            data-testid="rdp-fullscreen"
+            onClick={toggleOsFullscreen}
+            title={`${t("rdp.osFullscreen")} (F11)`}
+            aria-label={t("rdp.osFullscreen")}
+            style={FT_ICON_BUTTON_STYLE}
+          >
+            {osFullscreen ? <Minimize2 size={14} /> : <Fullscreen size={14} />}
+          </button>
+        )}
         {detachedWindowControls && (
           <>
             <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
@@ -616,7 +699,7 @@ export default function RdpPanel({
               type="button"
               data-testid="detached-os-fullscreen"
               onClick={detachedWindowControls.onToggleOsFullscreen}
-              title={t("rdp.osFullscreen")}
+              title={`${t("rdp.osFullscreen")} (F11)`}
               aria-label={t("rdp.osFullscreen")}
               style={FT_ICON_BUTTON_STYLE}
             >

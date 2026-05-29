@@ -1406,47 +1406,81 @@ async fn process_reactivation_frame<S>(
 where
     S: FramedWrite,
 {
+    // Step once with the server PDU the current state was waiting for, then
+    // keep draining any send-only states without waiting for more input. The
+    // Deactivation-Reactivation Sequence (MS-RDPBCGR 1.3.1.3) runs
+    // Capabilities Exchange → Synchronize → Control Cooperate → Request
+    // Control → Font List before the server sends its Font Map. Those middle
+    // states report `next_pdu_hint() == None`: they only emit a PDU and must
+    // be advanced with `step_no_input`. The server withholds the Font Map
+    // until it receives our Font List, so if we stop after a single `step`
+    // (as the old code did) both sides wait on each other forever and the
+    // canvas freezes after a maximize/restore until the user reconnects.
     let mut output = WriteBuf::new();
     sequence
         .step(frame, &mut output)
         .map_err(|e| format!("rdp reactivation: {}", e))?;
+    flush_reactivation_output(framed, &output).await?;
+
+    loop {
+        if let ConnectionActivationState::Finalized {
+            desktop_size,
+            enable_server_pointer,
+            ..
+        } = sequence.connection_activation_state()
+        {
+            active_stage.set_enable_server_pointer(enable_server_pointer);
+            *image =
+                IronDecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
+            send_connected_event(
+                out_tx,
+                desktop_size.width,
+                desktop_size.height,
+                protocol,
+                server_name,
+            );
+            send_status(
+                out_tx,
+                "reactivated",
+                "RDP session reactivated after desktop resize.",
+            );
+            // The desktop that arrives after a reactivation (notably the
+            // post-logon interactive desktop when NLA is off) is frequently not
+            // fully repainted by the server on its own. Force a full redraw so
+            // the canvas does not stay stuck on the pre-transition image.
+            request_full_refresh(active_stage, image, framed, out_tx).await?;
+            return Ok(true);
+        }
+
+        // A `Some` hint means the next transition needs another server PDU;
+        // hand control back to the read loop to fetch it.
+        if sequence.next_pdu_hint().is_some() {
+            return Ok(false);
+        }
+
+        // Send-only state: advance without input and flush the produced PDU.
+        output.clear();
+        sequence
+            .step_no_input(&mut output)
+            .map_err(|e| format!("rdp reactivation step: {}", e))?;
+        flush_reactivation_output(framed, &output).await?;
+    }
+}
+
+/// Write any bytes a reactivation step produced to the framed transport.
+/// Reactivation states may legitimately emit nothing (e.g. the Font Map
+/// `WaitForResponse` transition), so an empty buffer is not an error.
+async fn flush_reactivation_output<S>(framed: &mut Framed<S>, output: &WriteBuf) -> Result<(), String>
+where
+    S: FramedWrite,
+{
     if !output.filled().is_empty() {
         framed
             .write_all(output.filled())
             .await
             .map_err(|e| format!("rdp reactivation write: {}", e))?;
     }
-
-    if let ConnectionActivationState::Finalized {
-        desktop_size,
-        enable_server_pointer,
-        ..
-    } = sequence.connection_activation_state()
-    {
-        active_stage.set_enable_server_pointer(enable_server_pointer);
-        *image =
-            IronDecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
-        send_connected_event(
-            out_tx,
-            desktop_size.width,
-            desktop_size.height,
-            protocol,
-            server_name,
-        );
-        send_status(
-            out_tx,
-            "reactivated",
-            "RDP session reactivated after desktop resize.",
-        );
-        // The desktop that arrives after a reactivation (notably the
-        // post-logon interactive desktop when NLA is off) is frequently not
-        // fully repainted by the server on its own. Force a full redraw so
-        // the canvas does not stay stuck on the pre-transition image.
-        request_full_refresh(active_stage, image, framed, out_tx).await?;
-        return Ok(true);
-    }
-
-    Ok(false)
+    Ok(())
 }
 
 fn tile_from_image(image: &IronDecodedImage, rect: InclusiveRectangle) -> Option<DecodedTile> {

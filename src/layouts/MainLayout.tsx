@@ -1819,7 +1819,11 @@ export function MainLayout() {
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
 
-                {isTabMaximized && (
+                {/* Global restore affordance for maximized tabs. RDP panels
+                    already expose their own restore toggle (plus the
+                    Ctrl+Alt+Enter shortcut) in the floating toolbar, so the
+                    redundant top-right button is suppressed for them. */}
+                {isTabMaximized && activeTab?.type !== "rdp" && (
                   <button
                     type="button"
                     data-testid="tab-maximize-restore"
