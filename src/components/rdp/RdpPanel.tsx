@@ -50,6 +50,11 @@ export interface RdpPanelProps {
    *  canvas still fills its parent — no `position: fixed` shenanigans. */
   onToggleMaximize?: () => void;
   maximized?: boolean;
+  detachedWindowControls?: {
+    onReattach: () => void;
+    onToggleOsFullscreen: () => void;
+    osFullscreen: boolean;
+  };
 }
 
 type ScaleMode = "fit" | "one";
@@ -66,6 +71,7 @@ export default function RdpPanel({
   onDetach,
   onToggleMaximize,
   maximized,
+  detachedWindowControls,
 }: RdpPanelProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -557,6 +563,31 @@ export default function RdpPanel({
         >
           {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
+        {detachedWindowControls && (
+          <>
+            <button
+              type="button"
+              data-testid="detached-reattach"
+              onClick={detachedWindowControls.onReattach}
+              title={t("rdp.reattach")}
+              aria-label={t("rdp.reattach")}
+              style={FT_BUTTON_STYLE}
+            >
+              <ExternalLink size={14} />
+              <span>{t("rdp.reattach")}</span>
+            </button>
+            <button
+              type="button"
+              data-testid="detached-os-fullscreen"
+              onClick={detachedWindowControls.onToggleOsFullscreen}
+              title={t("rdp.osFullscreen")}
+              aria-label={t("rdp.osFullscreen")}
+              style={FT_BUTTON_STYLE}
+            >
+              {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          </>
+        )}
       </FloatingToolbar>
 
       <div

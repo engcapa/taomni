@@ -477,6 +477,12 @@ export function MainLayout() {
         case "terminal": {
           const p = msg.payload as DetachedTerminalParams | undefined;
           if (!p) return;
+          const adopted = p.reattach?.terminalSessionId
+            ? {
+                sessionId: p.reattach.terminalSessionId,
+                snapshotText: p.reattach.snapshotText,
+              }
+            : undefined;
           addTab({
             id: `term-reattach-${tsTag}`,
             type: "terminal",
@@ -485,6 +491,7 @@ export function MainLayout() {
             ssh: p.ssh ?? undefined,
             localShell: p.localShell ?? undefined,
             terminalProfile: p.terminalProfile ?? undefined,
+            adoptedTerminal: adopted,
           });
           setStatusMessage(tr("status.reattached"));
           break;
@@ -1457,6 +1464,7 @@ export function MainLayout() {
                             ssh={tab.ssh}
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
+                            adoptedTerminal={tab.adoptedTerminal}
                             visible={terminalSplitVisible || isActive}
                             activeForShortcuts={isActive}
                             inputLocked={inputLocked}

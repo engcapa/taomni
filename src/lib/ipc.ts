@@ -95,6 +95,16 @@ export async function createSshTerminal(
   );
 }
 
+export async function attachTerminalOutput(
+  sessionId: string,
+  onOutput?: (data: Uint8Array) => void,
+): Promise<void> {
+  return invoke("attach_terminal_output", {
+    sessionId,
+    onOutput: createBinaryOutputChannel(onOutput ?? (() => undefined)),
+  });
+}
+
 export async function testSshConnection(
   host: string,
   port: number,

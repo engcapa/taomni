@@ -36,6 +36,7 @@ export interface Tab {
   closable: boolean;
   ssh?: SshConnectInfo;
   localShell?: LocalShellSelection;
+  adoptedTerminal?: AdoptedTerminalInfo;
   terminalProfile?: TerminalProfile;
   message?: string;
   sftp?: SftpTabInfo;
@@ -60,6 +61,11 @@ export interface LocalShellSelection {
   id: string;
   name: string;
   args?: string[];
+}
+
+export interface AdoptedTerminalInfo {
+  sessionId: string;
+  snapshotText?: string;
 }
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";

@@ -7,6 +7,7 @@ use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use russh::Sig;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -15,7 +16,8 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::task::JoinHandle;
 
-type TerminalOutputChannel = Channel<InvokeResponseBody>;
+pub type TerminalOutputChannel = Channel<InvokeResponseBody>;
+type TerminalOutputSubscribers = Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>;
 
 pub enum ActiveTerminal {
     Local {
@@ -86,11 +88,13 @@ pub async fn create_local_terminal(
         }
         terminals.insert(session_id.clone(), terminal);
     }
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
+    let outputs = state.terminal_outputs.clone();
     std::thread::spawn(move || {
-        read_loop_local(reader, sid, app, on_output);
+        read_loop_local(reader, sid, app, outputs);
     });
 
     Ok(LocalTerminalCreated {
@@ -185,12 +189,15 @@ pub async fn create_ssh_terminal(
         terminals.insert(session_id.clone(), terminal);
     }
 
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
+
     let sid = session_id.clone();
     let app = app_handle.clone();
     let terminals = state.terminals.clone();
+    let outputs = state.terminal_outputs.clone();
     tokio::spawn(async move {
         while let Some(data) = output_rx.recv().await {
-            let _ = on_output.send(InvokeResponseBody::Raw(data));
+            send_terminal_output(&outputs, &sid, data);
         }
         // SSH session ended naturally (peer closed, network drop, exit).
         // Remove the terminal entry and abort any session-attached
@@ -209,6 +216,9 @@ pub async fn create_ssh_terminal(
                 h.abort();
             }
         }
+        if let Ok(mut outputs) = outputs.lock() {
+            outputs.remove(&sid);
+        }
         let _ = app.emit(&format!("terminal-exit-{}", sid), "closed");
     });
 
@@ -219,19 +229,63 @@ fn read_loop_local(
     mut reader: Box<dyn Read + Send>,
     session_id: String,
     app: AppHandle,
-    on_output: TerminalOutputChannel,
+    outputs: TerminalOutputSubscribers,
 ) {
     let mut buf = [0u8; 4096];
     loop {
         match reader.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                let _ = on_output.send(InvokeResponseBody::Raw(buf[..n].to_vec()));
+                send_terminal_output(&outputs, &session_id, buf[..n].to_vec());
             }
             Err(_) => break,
         }
     }
+    if let Ok(mut outputs) = outputs.lock() {
+        outputs.remove(&session_id);
+    }
     let _ = app.emit(&format!("terminal-exit-{}", session_id), "closed");
+}
+
+fn add_terminal_output_channel(
+    outputs: &TerminalOutputSubscribers,
+    session_id: &str,
+    on_output: TerminalOutputChannel,
+) -> Result<(), String> {
+    let mut outputs = outputs
+        .lock()
+        .map_err(|e| format!("Terminal output lock failed: {}", e))?;
+    outputs
+        .entry(session_id.to_string())
+        .or_default()
+        .push(on_output);
+    Ok(())
+}
+
+fn send_terminal_output(outputs: &TerminalOutputSubscribers, session_id: &str, data: Vec<u8>) {
+    let Ok(mut outputs) = outputs.lock() else {
+        return;
+    };
+    let Some(channels) = outputs.get_mut(session_id) else {
+        return;
+    };
+    channels.retain(|channel| channel.send(InvokeResponseBody::Raw(data.clone())).is_ok());
+}
+
+#[tauri::command]
+pub async fn attach_terminal_output(
+    session_id: String,
+    on_output: TerminalOutputChannel,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    validate_session_id(&session_id)?;
+    {
+        let terminals = state.terminals.read().await;
+        if !terminals.contains_key(&session_id) {
+            return Err(format!("Terminal {} not found", session_id));
+        }
+    }
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)
 }
 
 fn validate_session_id(session_id: &str) -> Result<(), String> {
@@ -337,6 +391,9 @@ pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> R
         for h in tasks.drain(..) {
             h.abort();
         }
+    }
+    if let Ok(mut outputs) = state.terminal_outputs.lock() {
+        outputs.remove(&session_id);
     }
     Ok(())
 }

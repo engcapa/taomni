@@ -9,7 +9,7 @@ use crate::ai::AppAiCtx;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::rdp::ws::RdpSession;
-use crate::terminal::ActiveTerminal;
+use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
@@ -25,6 +25,7 @@ pub struct ReadStreamHandle {
 
 pub struct AppState {
     pub terminals: Arc<RwLock<HashMap<String, ActiveTerminal>>>,
+    pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>,
     pub sftp_sessions: Arc<RwLock<HashMap<String, Arc<ActiveSftp>>>>,
     pub transfers: Arc<RwLock<HashMap<String, Arc<TransferHandle>>>>,
     pub tunnels: Arc<TunnelRegistry>,
@@ -46,6 +47,7 @@ impl AppState {
     pub fn new(db: rusqlite::Connection, vault: Arc<Vault>, ai_ctx: AppAiCtx) -> Self {
         Self {
             terminals: Arc::new(RwLock::new(HashMap::new())),
+            terminal_outputs: Arc::new(Mutex::new(HashMap::new())),
             sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
             transfers: Arc::new(RwLock::new(HashMap::new())),
             tunnels: Arc::new(TunnelRegistry::new()),

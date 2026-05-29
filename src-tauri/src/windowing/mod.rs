@@ -11,7 +11,7 @@
 //! source of truth for which `kind` strings are valid. Anything else
 //! lands in the catch-all error branch below.
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 /// Default size for a detached window, picked per kind. RDP/VNC need
 /// more breathing room than a shell.
@@ -102,4 +102,16 @@ pub async fn open_detached_window(
         .build()
         .map_err(|e| format!("failed to open detached window: {}", e))?;
     Ok(())
+}
+
+/// Close the webview that invoked the command.
+///
+/// The detached-session restore flow uses this instead of the JS window API so
+/// it is not affected by frontend window permission or close-request lifecycle
+/// quirks. `destroy` avoids dispatching another close-request reattach pass.
+#[tauri::command]
+pub async fn close_current_detached_window(window: WebviewWindow) -> Result<(), String> {
+    window
+        .destroy()
+        .map_err(|e| format!("failed to close detached window: {}", e))
 }

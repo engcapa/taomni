@@ -9,8 +9,8 @@
 //   2. `App.tsx` detects the route via `detectDetachedRoute()` and mounts
 //      this component, which consumes the handoff and renders the
 //      relevant panel full-window.
-//   3. A floating toolbar offers `Reattach` (close + recreate the tab in
-//      the main window) and an OS-fullscreen toggle (`setFullscreen`).
+//   3. The panel's own floating toolbar offers `Reattach` and an
+//      OS-fullscreen toggle (`setFullscreen`).
 //   4. Closing via the OS X button is treated as Reattach: we hook
 //      `onCloseRequested`, broadcast the reattach payload synchronously,
 //      and then let the close proceed.
@@ -24,11 +24,6 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ExternalLink,
-  Maximize2,
-  Minimize2,
-} from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import {
@@ -38,15 +33,18 @@ import {
   broadcastReattach,
   HANDOFF_TTL_MS,
 } from "../../lib/detachedSession";
+import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import type { RdpOptions } from "../../types/rdp";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
 import { useT, t as tr } from "../../lib/i18n";
 import { useAppTheme } from "../../lib/appTheme";
 import { isTauriRuntime } from "../../lib/runtime";
-import { TerminalPanel } from "../terminal/TerminalPanel";
+import {
+  TerminalPanel,
+  type TerminalReattachState,
+} from "../terminal/TerminalPanel";
 import { useAppStore } from "../../stores/appStore";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
@@ -79,6 +77,7 @@ export interface DetachedTerminalParams {
   ssh?: SshConnectInfo | null;
   localShell?: LocalShellSelection | null;
   terminalProfile?: TerminalProfile | null;
+  reattach?: TerminalReattachState;
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
@@ -178,24 +177,45 @@ export default function DetachedSessionWindow({
 
   // Reattach: write the same handoff payload back through
   // `broadcastReattach`, clear local handoffs, then close the window.
-  // The main window's `subscribeReattach` recreates the tab.
+  // The main window's `subscribeReattach` recreates/adopts the tab.
   const reattachingRef = useRef(false);
-  const requestReattach = useCallback(async () => {
+  const terminalReattachStateRef = useRef<TerminalReattachState>({});
+  const mergeTerminalReattachState = useCallback((state?: TerminalReattachState) => {
+    if (kind !== "terminal") return params;
+    const merged = {
+      ...terminalReattachStateRef.current,
+      ...(state ?? {}),
+    };
+    terminalReattachStateRef.current = merged;
+    return {
+      ...(params as DetachedTerminalParams),
+      reattach: merged,
+    } satisfies DetachedTerminalParams;
+  }, [kind, params]);
+  const requestReattach = useCallback(async (state?: TerminalReattachState) => {
     if (reattachingRef.current) return;
     if (!params) return;
     reattachingRef.current = true;
-    broadcastReattach(kind, id, params);
+    broadcastReattach(kind, id, mergeTerminalReattachState(state));
     clearDetachedHandoff(kind, id);
     try {
       if (tauri) {
-        await getCurrentWindow().close();
+        await closeCurrentDetachedWindow();
       } else {
         window.close();
       }
     } catch {
-      /* noop */
+      try {
+        if (tauri) {
+          const current = getCurrentWindow();
+          await current.hide().catch(() => undefined);
+          await current.destroy();
+        }
+      } catch {
+        /* noop */
+      }
     }
-  }, [kind, id, params, tauri]);
+  }, [kind, id, mergeTerminalReattachState, params, tauri]);
 
   // Treat OS-close as Reattach. The Tauri close-requested hook fires
   // before the window is actually destroyed, which lets us
@@ -206,7 +226,7 @@ export default function DetachedSessionWindow({
     if (!tauri) {
       const handler = () => {
         if (params && !reattachingRef.current) {
-          broadcastReattach(kind, id, params);
+          broadcastReattach(kind, id, mergeTerminalReattachState());
         }
         clearDetachedHandoff(kind, id);
       };
@@ -221,7 +241,7 @@ export default function DetachedSessionWindow({
     void getCurrentWindow()
       .onCloseRequested(() => {
         if (params && !reattachingRef.current) {
-          broadcastReattach(kind, id, params);
+          broadcastReattach(kind, id, mergeTerminalReattachState());
         }
         clearDetachedHandoff(kind, id);
         // We do NOT prevent the close — the user asked to close, and
@@ -231,7 +251,7 @@ export default function DetachedSessionWindow({
         unlisten = fn;
       });
     return () => unlisten?.();
-  }, [kind, id, params, tauri]);
+  }, [kind, id, mergeTerminalReattachState, params, tauri]);
 
   // Wipe the handoff if the page is unloaded for any other reason
   // (page navigation, reload, app shutdown). Defence-in-depth — the
@@ -290,7 +310,23 @@ export default function DetachedSessionWindow({
     );
   }
 
-  const inner = renderInner(kind, id, params);
+  const detachedWindowControls = {
+    onReattach: requestReattach,
+    onToggleOsFullscreen: toggleOsFullscreen,
+    osFullscreen,
+  };
+  const inner = renderInner(
+    kind,
+    id,
+    params,
+    detachedWindowControls,
+    (state) => {
+      terminalReattachStateRef.current = {
+        ...terminalReattachStateRef.current,
+        ...state,
+      };
+    },
+  );
 
   return (
     <div
@@ -301,40 +337,6 @@ export default function DetachedSessionWindow({
       style={{ background: "#000", color: "var(--moba-text)" }}
     >
       {inner}
-
-      {/* The kind-specific panels render their own FloatingToolbar
-          inside the canvas. We layer a *second*, smaller floating
-          toolbar dedicated to detached-window controls (Reattach + OS
-          Fullscreen) so the user always has a place to come back from
-          even when the inner toolbar is docked / collapsed. */}
-      <FloatingToolbar
-        storageKey={`mob.detached.${kind}.toolbar`}
-        defaultTop={4}
-        defaultRight={120}
-        testId="detached-toolbar"
-      >
-        <button
-          type="button"
-          data-testid="detached-reattach"
-          onClick={requestReattach}
-          title={t("rdp.reattach")}
-          aria-label={t("rdp.reattach")}
-          style={DETACHED_BUTTON_STYLE}
-        >
-          <ExternalLink size={14} />
-          <span style={{ marginLeft: 4 }}>{t("rdp.reattach")}</span>
-        </button>
-        <button
-          type="button"
-          data-testid="detached-os-fullscreen"
-          onClick={toggleOsFullscreen}
-          title={t("rdp.osFullscreen")}
-          aria-label={t("rdp.osFullscreen")}
-          style={DETACHED_BUTTON_STYLE}
-        >
-          {osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
-      </FloatingToolbar>
     </div>
   );
 }
@@ -343,6 +345,12 @@ function renderInner(
   kind: Exclude<DetachedKind, "sftp">,
   id: string,
   params: unknown,
+  detachedWindowControls: {
+    onReattach: (state?: TerminalReattachState) => void;
+    onToggleOsFullscreen: () => void;
+    osFullscreen: boolean;
+  },
+  onTerminalStateChange: (state: TerminalReattachState) => void,
 ): JSX.Element | null {
   switch (kind) {
     case "rdp": {
@@ -358,6 +366,7 @@ function renderInner(
             options={p.options}
             networkSettingsJson={p.networkSettingsJson ?? null}
             visible
+            detachedWindowControls={detachedWindowControls}
           />
         </Suspense>
       );
@@ -373,6 +382,7 @@ function renderInner(
             username={p.username ?? undefined}
             password={p.password}
             visible
+            detachedWindowControls={detachedWindowControls}
           />
         </Suspense>
       );
@@ -386,6 +396,9 @@ function renderInner(
           ssh={p.ssh ?? undefined}
           localShell={p.localShell ?? undefined}
           terminalProfile={p.terminalProfile ?? undefined}
+          preserveSessionOnUnmount
+          detachedWindowControls={detachedWindowControls}
+          onDetachedStateChange={onTerminalStateChange}
           visible
         />
       );
@@ -405,20 +418,6 @@ function LoadingScreen({ label }: { label: string }) {
     </div>
   );
 }
-
-const DETACHED_BUTTON_STYLE: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "3px 8px",
-  background: "rgba(0,0,0,0.45)",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 4,
-  fontSize: 11,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
 
 // Re-export TTL so callers expecting the previous symbol still work.
 export { HANDOFF_TTL_MS };

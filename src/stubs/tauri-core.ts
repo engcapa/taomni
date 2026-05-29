@@ -678,6 +678,10 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       }
       return undefined as T;
     }
+    case "close_current_detached_window": {
+      window.close();
+      return undefined as T;
+    }
     case "open_detached_window": {
       const kind = args?.kind as string;
       const sessionId = args?.sessionId as string;

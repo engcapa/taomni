@@ -62,6 +62,7 @@ import {
 import { makeHostKey, useCommandHistory } from "../../lib/history";
 import {
   createTerminalSessionId,
+  attachTerminalOutput,
   createLocalTerminal,
   createSshTerminal,
   writeTerminal,
@@ -128,6 +129,22 @@ export interface SshConnectInfo {
   optionsJson?: string;
 }
 
+export interface TerminalReattachState {
+  terminalSessionId?: string;
+  snapshotText?: string;
+}
+
+export interface AdoptedTerminalSession {
+  sessionId: string;
+  snapshotText?: string;
+}
+
+export interface DetachedTerminalWindowControls {
+  onReattach: (state?: TerminalReattachState) => void;
+  onToggleOsFullscreen: () => void;
+  osFullscreen: boolean;
+}
+
 interface TerminalPanelProps {
   tabId?: string;
   tabTitle?: string;
@@ -139,6 +156,10 @@ interface TerminalPanelProps {
     args?: string[];
   };
   terminalProfile?: TerminalProfile;
+  adoptedTerminal?: AdoptedTerminalSession;
+  preserveSessionOnUnmount?: boolean;
+  detachedWindowControls?: DetachedTerminalWindowControls;
+  onDetachedStateChange?: (state: TerminalReattachState) => void;
   visible?: boolean;
   activeForShortcuts?: boolean;
   inputLocked?: boolean;
@@ -210,6 +231,10 @@ export function TerminalPanel({
   ssh,
   localShell,
   terminalProfile,
+  adoptedTerminal,
+  preserveSessionOnUnmount = false,
+  detachedWindowControls,
+  onDetachedStateChange,
   visible = true,
   activeForShortcuts = visible,
   inputLocked = false,
@@ -230,14 +255,27 @@ export function TerminalPanel({
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
   const onInputBroadcastRef = useRef<typeof onInputBroadcast>(onInputBroadcast);
+  const onDetachedStateChangeRef = useRef<typeof onDetachedStateChange>(onDetachedStateChange);
+  const preserveSessionOnUnmountRef = useRef(preserveSessionOnUnmount);
+  const adoptedTerminalRef = useRef(adoptedTerminal);
   const multiExecActiveRef = useRef(multiExecActive);
   useEffect(() => {
     cwdCallbackRef.current = onCwdChange;
     onSessionReadyRef.current = onSessionReady;
     onOutputRef.current = onOutput;
     onInputBroadcastRef.current = onInputBroadcast;
+    onDetachedStateChangeRef.current = onDetachedStateChange;
+    preserveSessionOnUnmountRef.current = preserveSessionOnUnmount;
     multiExecActiveRef.current = multiExecActive;
-  }, [onCwdChange, onSessionReady, onOutput, onInputBroadcast, multiExecActive]);
+  }, [
+    onCwdChange,
+    onSessionReady,
+    onOutput,
+    onInputBroadcast,
+    onDetachedStateChange,
+    preserveSessionOnUnmount,
+    multiExecActive,
+  ]);
   const containerRef = useRef<HTMLDivElement>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
@@ -354,6 +392,14 @@ export function TerminalPanel({
 
   const focusTerminal = useCallback(() => {
     termRef.current?.focus();
+  }, []);
+
+  const collectReattachState = useCallback((): TerminalReattachState => {
+    const term = termRef.current;
+    return {
+      terminalSessionId: sessionIdRef.current ?? undefined,
+      snapshotText: term ? getBufferText(term) : undefined,
+    };
   }, []);
 
   const appendEvent = useCallback((type: string, detail: string) => {
@@ -1566,7 +1612,11 @@ export function TerminalPanel({
     observer.observe(el);
 
     const { cols, rows } = term;
-    const sid = createTerminalSessionId();
+    const adopted = adoptedTerminalRef.current;
+    const sid = adopted?.sessionId ?? createTerminalSessionId();
+    if (adopted?.snapshotText) {
+      term.write(adopted.snapshotText.replace(/\n/g, "\r\n"));
+    }
 
     // Create the ZMODEM sentry before invoking the backend. The raw output
     // channel can receive early SSH banners before create*Terminal resolves.
@@ -1653,7 +1703,13 @@ export function TerminalPanel({
       },
     );
 
-    const connectPromise = ssh
+    const handleRawOutput = (raw: Uint8Array) => zmodem.consume(raw);
+    const connectPromise = adopted
+      ? attachTerminalOutput(sid, handleRawOutput).then(() => ({
+          sessionId: sid,
+          shellId: null,
+        }))
+      : ssh
       ? createSshTerminal(
           sid,
           ssh.host,
@@ -1667,7 +1723,7 @@ export function TerminalPanel({
             const ns = getSessionNetworkSettings(ssh.optionsJson);
             return JSON.stringify(toNetworkSettingsPayload(ns));
           })(),
-          (raw) => zmodem.consume(raw),
+          handleRawOutput,
         ).then<{ sessionId: string; shellId: string | null }>((sessionId) => ({
           sessionId,
           shellId: null,
@@ -1679,10 +1735,12 @@ export function TerminalPanel({
           localShell?.id,
           localShell?.args,
           undefined,
-          (raw) => zmodem.consume(raw),
+          handleRawOutput,
         ).then(({ sessionId, shellId }) => ({ sessionId, shellId }));
 
-    if (ssh) {
+    if (adopted) {
+      appendEvent("connection", `Reattaching terminal ${sid}`);
+    } else if (ssh) {
       appendEvent("connection", `Connecting to ${ssh.username}@${ssh.host}:${ssh.port}`);
       appendEvent("auth", `Using ${ssh.authMethod} authentication`);
       term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
@@ -1693,7 +1751,11 @@ export function TerminalPanel({
     connectPromise
       .then(async ({ sessionId: connectedSid, shellId }) => {
         if (destroyed) {
-          closeTerminal(connectedSid).catch(() => {});
+          if (preserveSessionOnUnmountRef.current) {
+            onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
+          } else {
+            closeTerminal(connectedSid).catch(() => {});
+          }
           return;
         }
         sessionIdRef.current = connectedSid;
@@ -1701,8 +1763,9 @@ export function TerminalPanel({
         zmodemRef.current = zmodem;
         if (shellId) setResolvedLocalShellId(shellId);
         onSessionReadyRef.current?.(connectedSid);
-        appendEvent("connection", `Connected (${connectedSid})`);
-        if (ssh) {
+        onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
+        appendEvent("connection", `${adopted ? "Reattached" : "Connected"} (${connectedSid})`);
+        if (ssh && !adopted) {
           term.write(formatSshInfoBanner(ssh));
         }
 
@@ -1759,7 +1822,9 @@ export function TerminalPanel({
       if (loggingActiveRef.current && outputLogRef.current) {
         flushRecordedOutput("Terminal closed; saved recorded output");
       }
-      if (sessionIdRef.current) closeTerminal(sessionIdRef.current).catch(() => {});
+      if (sessionIdRef.current && !preserveSessionOnUnmountRef.current) {
+        closeTerminal(sessionIdRef.current).catch(() => {});
+      }
       term.dispose();
       termRef.current = null;
       fitAddonRef.current = null;
@@ -2168,6 +2233,57 @@ export function TerminalPanel({
           >
             {maximizeToggle.maximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
           </button>
+        )}
+        {detachedWindowControls && (
+          <>
+            <button
+              type="button"
+              data-testid="detached-reattach"
+              aria-label={t("rdp.reattach")}
+              title={t("rdp.reattach")}
+              onClick={() => {
+                preserveSessionOnUnmountRef.current = true;
+                detachedWindowControls.onReattach(collectReattachState());
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: "rgba(0,0,0,0.5)",
+                color: "#ccc",
+                border: "1px solid rgba(255,255,255,0.2)",
+                cursor: "pointer",
+                fontSize: 11,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ExternalLink size={12} />
+              <span>{t("rdp.reattach")}</span>
+            </button>
+            <button
+              type="button"
+              data-testid="detached-os-fullscreen"
+              aria-label={t("rdp.osFullscreen")}
+              title={t("rdp.osFullscreen")}
+              onClick={detachedWindowControls.onToggleOsFullscreen}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: "rgba(0,0,0,0.5)",
+                color: "#ccc",
+                border: "1px solid rgba(255,255,255,0.2)",
+                cursor: "pointer",
+              }}
+            >
+              {detachedWindowControls.osFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            </button>
+          </>
         )}
       </FloatingToolbar>
 

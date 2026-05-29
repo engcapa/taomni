@@ -25,3 +25,7 @@ export async function openDetachedWindow(
     height: opts.height,
   });
 }
+
+export async function closeCurrentDetachedWindow(): Promise<void> {
+  return invoke("close_current_detached_window");
+}

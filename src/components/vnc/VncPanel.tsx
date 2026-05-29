@@ -37,6 +37,11 @@ export interface VncPanelProps {
   onDetach?: () => void;
   onToggleMaximize?: () => void;
   maximized?: boolean;
+  detachedWindowControls?: {
+    onReattach: () => void;
+    onToggleOsFullscreen: () => void;
+    osFullscreen: boolean;
+  };
 }
 
 type ScaleMode = "fit" | "one";
@@ -103,6 +108,7 @@ export default function VncPanel({
   onDetach,
   onToggleMaximize,
   maximized,
+  detachedWindowControls,
 }: VncPanelProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -918,6 +924,49 @@ export default function VncPanel({
             >
               {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
+          )}
+          {detachedWindowControls && (
+            <>
+              <button
+                data-testid="detached-reattach"
+                onClick={detachedWindowControls.onReattach}
+                title={t("rdp.reattach")}
+                aria-label={t("rdp.reattach")}
+                style={{
+                  background: "rgba(0,0,0,0.5)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  borderRadius: 4,
+                  padding: "3px 8px",
+                  cursor: "pointer",
+                  color: "#ccc",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 11,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <ExternalLink size={14} />
+                <span>{t("rdp.reattach")}</span>
+              </button>
+              <button
+                data-testid="detached-os-fullscreen"
+                onClick={detachedWindowControls.onToggleOsFullscreen}
+                title={t("rdp.osFullscreen")}
+                aria-label={t("rdp.osFullscreen")}
+                style={{
+                  background: "rgba(0,0,0,0.5)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  borderRadius: 4,
+                  padding: 4,
+                  cursor: "pointer",
+                  color: "#ccc",
+                  display: "flex",
+                }}
+              >
+                {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+            </>
           )}
         </FloatingToolbar>
       )}
