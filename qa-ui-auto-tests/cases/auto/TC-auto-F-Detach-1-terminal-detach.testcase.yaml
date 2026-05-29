@@ -1,0 +1,40 @@
+id: TC-auto-F-Detach-1-terminal-detach
+title: Terminal floating toolbar exposes maximize + detach-to-window controls
+description: |
+  Coverage smoke for F-Detach-1 (generic detach/reattach). Opens a local
+  terminal and verifies the floating toolbar exposes the in-window maximize
+  toggle and the detach-to-window button.
+
+  Maximize is non-destructive, so it is toggled (on then off) and asserted.
+  Detach is the LAST action: in browser mode it falls back to window.open
+  and drops the source tab (same destructive pattern as TC-043/TC-111), so
+  nothing is asserted after it. The detached-window shell + reattach controls
+  (detached-session-window / detached-reattach / detached-os-fullscreen) only
+  mount inside a real detached window and are left to native/manual regression.
+covers: [F-Detach-1]
+tags: [auto-generated, smoke, needs-review, terminal, detach, window]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 30
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-open-local-terminal"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 15
+  - hover: '[data-testid="terminal-pane"]'
+  - wait_for:
+      selector: '[data-testid="terminal-floating-toolbar"]'
+      timeout_sec: 5
+  # In-window maximize toggle — non-destructive, toggle on then back off.
+  - assert_visible: '[data-testid="terminal-maximize"]'
+  - click: '[data-testid="terminal-maximize"]'
+  - wait: 0.3
+  - click: '[data-testid="terminal-maximize"]'
+  # Detach button is present and wired by MainLayout.
+  - assert_visible: '[data-testid="terminal-detach"]'
+  - screenshot: detach-1-terminal-toolbar.png
+  # LAST action — detaching spawns a window and drops this tab in browser mode.
+  - click: '[data-testid="terminal-detach"]'
+  - wait: 1

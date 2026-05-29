@@ -1,0 +1,32 @@
+id: TC-auto-F8-2-tunnel-activity-log
+title: Tunnel manager activity log expands and exposes the clear control
+description: |
+  Coverage smoke for F8.2's tunnel activity log (added in the v0.1.34
+  tunnel row/log work). Opens the tunnel manager, asserts the activity-log
+  panel renders at the footer, toggles it open, and asserts the clear
+  button appears. With no tunnel events the clear button is disabled, so
+  the case asserts presence + disabled state rather than clicking it.
+covers: [F8.2]
+tags: [auto-generated, smoke, needs-review, tunnel, activity-log]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 30
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon"]'
+  - click: '[data-testid="ribbon-tunneling"]'
+  - wait_for: '[data-testid="tunnel-manager"]'
+  - assert_visible: '[data-testid="tunnel-activity-log"]'
+  - assert_visible: '[data-testid="tunnel-activity-log-toggle"]'
+  # Expand the log to reveal the clear control.
+  - click: '[data-testid="tunnel-activity-log-toggle"]'
+  - wait_for:
+      selector: '[data-testid="tunnel-activity-log-clear"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="tunnel-activity-log-clear"]'
+  # No tunnel events yet → clear is disabled.
+  - assert_disabled: '[data-testid="tunnel-activity-log-clear"]'
+  # Collapse again to confirm the toggle is reversible.
+  - click: '[data-testid="tunnel-activity-log-toggle"]'
+  - assert_not_visible: '[data-testid="tunnel-activity-log-clear"]'
+  - screenshot: f8-2-activity-log.png
