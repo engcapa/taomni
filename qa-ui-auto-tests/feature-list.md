@@ -5,7 +5,7 @@
 > - ✅ 已完成
 > - 🟡 已部分完成（关键路径可用，仍有未覆盖的能力，列出具体范围）
 > - 未完成的能力不写入本文档（详见各 plan 文档的待办项）
-> 当前对照版本：v0.1.0 → v0.1.32（含本仓库 `package.json` 标识的当前版本）。
+> 当前对照版本：v0.1.0 → v0.1.36（含本仓库 `package.json` 标识的当前版本）。
 
 ---
 
@@ -163,6 +163,16 @@ controls:
   - id: new-local-terminal     # the "+" plus tab button
     selector: '[data-testid="new-local-terminal"]'
     kind: interactive
+  - id: new-tab-split          # the "+ ▾" split-button container (Windows Terminal style)
+    selector: '[data-testid="new-tab-split"]'
+    kind: display
+  - id: new-tab-launch-menu    # the "▾" chevron that opens the quick-launch context menu
+    selector: '[data-testid="new-tab-launch-menu"]'
+    kind: interactive
+  - id: launch-menu-new-session  # "New session…" leaf in the quick-launch menu
+    selector: '[data-testid="launch-menu-new-session"]'
+    kind: interactive
+    optional: true       # only after opening the launch menu
   - id: tabs-more
     selector: '[data-testid="tab-more"]'
     kind: interactive
@@ -190,6 +200,7 @@ controls:
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
 - 标签操作：新建、切换、关闭、中键关闭
+- **新建标签 split-button**（Windows Terminal 风格 `+ ▾`）：`+`（`new-local-terminal`）直接开默认本地终端；`▾`（`new-tab-launch-menu`）打开快速启动菜单，列出全部本地 shell（含检测到的 WSL 发行版，`launch-menu-shell-<id>`）、最近会话子菜单（`launch-menu-recent-<id>`）、以及 `New session…`（`launch-menu-new-session`）打开会话编辑器
 - **拖拽排序**：标签通过 `customDnD` 指针驱动层重新排列，拖拽时显示 drop indicator
 - **重命名**：双击标签标题或右键菜单 "Rename" 进入内联编辑，Enter 确认 / Esc 取消 / 失焦自动提交
 - 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端、重命名、Move to first/left/right/last
@@ -1125,6 +1136,10 @@ controls:
     selector: '[data-testid="session-proto-file-browser"]'
     kind: interactive
     optional: true
+  - id: proto-wsl
+    selector: '[data-testid="session-proto-wsl"]'
+    kind: interactive
+    optional: true        # WSL session type — form body owned by F9.8
   # Top-level connection fields (visible when SSH/SFTP/VNC/RDP)
   - id: host
     selector: '[data-testid="session-host"]'
@@ -1784,12 +1799,24 @@ controls:
     selector: '[data-testid="tunnel-editor-cancel"]'
     kind: interactive
     optional: true
+  # Activity log (footer, below the tunnel list) — records start/stop/error events
+  - id: activity-log
+    selector: '[data-testid="tunnel-activity-log"]'
+    kind: display
+  - id: activity-log-toggle
+    selector: '[data-testid="tunnel-activity-log-toggle"]'
+    kind: interactive
+  - id: activity-log-clear
+    selector: '[data-testid="tunnel-activity-log-clear"]'
+    kind: interactive
+    optional: true       # only visible when the log is expanded
 -->
 
 - 列表展示：类型、状态徽章（运行/错误/停止）、本地端口 → 远程地址、关联会话、认证图标
 - 操作：启动 / 停止 / 启动全部 / 停止全部 / 测试 / 编辑 / 复制 / 删除 / 显示隐藏认证 / 拖拽排序
 - 实时状态订阅 `listenTunnelStatus`
 - 编辑器 `TunnelEditor`：填写所有字段、验证
+- **活动日志**（`tunnel-activity-log`）：底部可折叠面板，记录隧道启动 / 停止 / 错误事件，显示条数与错误计数徽章；`tunnel-activity-log-toggle` 展开/折叠，展开后 `tunnel-activity-log-clear` 清空（无日志时禁用）
 
 ---
 
@@ -1932,7 +1959,69 @@ controls:
 - RDP options 表单已持久化 domain、color depth、NLA/performance、clipboard、audio、drive redirection、RD Gateway 配置
 - 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
 
-### 9.8 已知限制
+### 9.8 WSL 会话类型（WSL session）✅
+
+<!-- feature
+id: F9.8
+status: done
+area: terminal/wsl
+components: [WslOptionsForm, SessionEditor, WelcomePanel]
+files:
+  - src/components/session/forms/WslOptionsForm.tsx
+  - src/types/wsl.ts
+controls:
+  # proto-wsl chip lives in SessionEditor (owned by F6.3). This feature owns
+  # the WSL options form body + the Welcome quick-launch card.
+  - id: distro-select
+    selector: '[data-testid="wsl-distro"]'
+    kind: interactive
+    optional: true       # only when distro detection succeeds (status=ready, Windows)
+  - id: distro-text
+    selector: '[data-testid="wsl-distro-text"]'
+    kind: interactive
+    optional: true       # free-text fallback when detection unavailable (non-Windows / unsupported)
+  - id: status-unsupported
+    selector: '[data-testid="wsl-status-unsupported"]'
+    kind: display
+    optional: true       # only on non-Windows / unsupported runners
+  - id: user
+    selector: '[data-testid="wsl-user"]'
+    kind: interactive
+  - id: cwd
+    selector: '[data-testid="wsl-cwd"]'
+    kind: interactive
+  - id: initial-cmd
+    selector: '[data-testid="wsl-initial-cmd"]'
+    kind: interactive
+  - id: admin
+    selector: '[data-testid="wsl-admin"]'
+    kind: interactive
+  - id: argv-preview
+    selector: '[data-testid="wsl-argv-preview"]'
+    kind: display
+  # Welcome panel quick-launch card (only on Windows with detected distros)
+  - id: welcome-wsl-card
+    selector: '[data-testid="welcome-wsl-card"]'
+    kind: display
+    optional: true       # Windows-only — hidden on non-Windows runners
+  - id: welcome-wsl-distro
+    selector: '[data-testid="welcome-wsl-distro"]'
+    kind: interactive
+    optional: true
+  - id: welcome-wsl-open
+    selector: '[data-testid="welcome-wsl-open"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器协议选择新增 `WSL`，选中后挂载 `WslOptionsForm`：发行版（检测成功用下拉，否则自由文本）、登录用户、起始目录（带 Browse）、初始命令、以管理员身份运行
+- 实时 `wsl.exe …` argv 预览（`wsl-argv-preview`），随表单字段变化更新
+- 发行版探测（`list_wsl_distros`）仅在 Windows 可用；非 Windows / 探测失败回落到自由文本输入并显示 `wsl-status-unsupported` 提示
+- `WslOptions` 经 `SessionEditor.buildConfig` 归一化为 `localShellPath=wsl.exe` + `localShellArgs`，复用既有本地终端启动管线；保存的 WSL 会话往返保持 `proto=WSL`（`sessionTypeToProto` 修复）
+- Welcome 页在检测到发行版时显示 `welcome-wsl-card` 快速启动入口（选发行版 + 一键打开）
+- **e2e 测试限制**：浏览器预览模式无法 spawn `wsl.exe`，且发行版探测受 Windows 门控，TC-112 仅验证表单挂载 / 自由文本回落 / 保存往返，真实启动需 Windows 手动回归
+
+### 9.9 已知限制
 - QuickConnect 的 VNC URL 尚未接入主流程（已保存的 VNC 会话连接路径不受影响）
 - 浏览器预览模式没有 VNC stub（仅 Tauri 桌面下可用）
 
@@ -2145,8 +2234,9 @@ controls:
 - Vault `crypto` + `db` 模块单元测试（加密/解密、条目 CRUD、主密码变更）
 - `cargo check` 通过
 
-### 13.3 端到端测试用例（`qa-ui-auto-tests/cases/*.testcase.yaml`，被 `qa-ui-auto` 消费）✅ 89 条
-- 覆盖 TC-001 ～ TC-109：主界面、设置、会话编辑器、SSH/SFTP/QuickConnect 全流程、终端右键菜单与快捷键、SFTP 多种交互（chmod / rename / 拖拽 / 多选 / 双击下载 / 列宽 / 创建文件夹）、独立 SFTP 标签、open-terminal-here、会话树搜索 / 复制 / 拖拽、标签栏右键与移动动作、应用主题循环、隧道编辑器与重排、终端字体连字 / 字体搜索 / 语法高亮、本地管理员启动、tab 中键关闭、会话 import/export 多格式、OpenSSH config 导入、Welcome active connections、custom title bar、compact mode、MultiExec、command palette、capture toolbar、zmodem 冲突、VNC scaffold 等
+### 13.3 端到端测试用例（`qa-ui-auto-tests/cases/*.testcase.yaml`，被 `qa-ui-auto` 消费）✅ 109 条
+- 覆盖 TC-001 ～ TC-113 + TC-AI-* + TC-auto-*：主界面、设置、会话编辑器、SSH/SFTP/QuickConnect 全流程、终端右键菜单与快捷键、SFTP 多种交互（chmod / rename / 拖拽 / 多选 / 双击下载 / 列宽 / 创建文件夹）、独立 SFTP 标签、open-terminal-here、会话树搜索 / 复制 / 拖拽、标签栏右键与移动动作、应用主题循环、隧道编辑器与重排 / 活动日志、终端字体连字 / 字体搜索 / 语法高亮、本地管理员启动、tab 中键关闭、tab split-button 快速启动菜单、会话 import/export 多格式、OpenSSH config 导入、Welcome active connections、custom title bar、compact mode、MultiExec、command palette、capture toolbar、zmodem 冲突、VNC scaffold、RDP scaffold、WSL session、标签 detach/reattach、SSH MFA scaffold、Vault、i18n 等
+- v0.1.33→v0.1.36 新增/补充：F9.8 WSL 会话表单（TC-112）、F9.7 RDP detach（TC-111）、F-Detach-1 通用标签分离（TC-auto-F-Detach-1）、F-Mfa-1 键盘交互式 MFA（TC-113，scaffolding-only）、F1.5 split-button 快速启动（TC-auto-F1-5-tab-launch-menu）、F8.2 隧道活动日志（TC-auto-F8-2-tunnel-activity-log）
 
 ### 13.4 部署 ✅
 - Replit 上验证通过：Tauri 桌面构建（`pnpm tauri build --debug --no-bundle`）通过 VNC 查看；Web 模式作为静态站点构建到 `dist/`
@@ -2765,7 +2855,110 @@ controls:
 
 ---
 
-## 附：占位但未实装的入口
+## 20. 标签分离到独立窗口（Detach / Reattach）
+
+### 20.1 通用标签分离与重挂载 ✅
+
+<!-- feature
+id: F-Detach-1
+status: done
+area: main/detach
+components: [DetachedSessionWindow, TerminalPanel, VncPanel, RdpPanel, MainLayout]
+files:
+  - src/components/detached/DetachedSessionWindow.tsx
+  - src/lib/detachWindowing.ts
+  - src/lib/detachedSession.ts
+controls:
+  # Per-panel "detach to its own window" buttons in each panel's floating toolbar.
+  # Each fires window.open (browser) / open_detached_window (Tauri) and drops the
+  # source tab — a destructive action, so cases click it LAST (see TC-111).
+  - id: terminal-floating-toolbar  # the terminal panel's FloatingToolbar host (F10.1 infra)
+    selector: '[data-testid="terminal-floating-toolbar"]'
+    kind: display
+  - id: terminal-detach
+    selector: '[data-testid="terminal-detach"]'
+    kind: interactive
+    optional: true       # only when MainLayout wires detachToggle (not in terminal split mode)
+  - id: terminal-maximize
+    selector: '[data-testid="terminal-maximize"]'
+    kind: interactive
+    optional: true
+  - id: vnc-detach
+    selector: '[data-testid="vnc-detach"]'
+    kind: interactive
+    optional: true       # only after a live VNC session shows the canvas
+  # NB: rdp-detach ([data-testid="rdp-detach"]) is owned by F9.7 (RDP panel).
+  # Declaring it here too would be a duplicate-selector lint error, so this
+  # feature only documents it in prose — TC-111 exercises the click.
+  # Detached-window shell + the controls that only exist inside it.
+  - id: detached-window
+    selector: '[data-testid="detached-session-window"]'
+    kind: display
+    optional: true       # only inside an actual detached OS/popup window
+  - id: detached-reattach
+    selector: '[data-testid="detached-reattach"]'
+    kind: interactive
+    optional: true       # only inside a detached window — reattaches the session to the main window
+  - id: detached-os-fullscreen
+    selector: '[data-testid="detached-os-fullscreen"]'
+    kind: interactive
+    optional: true
+-->
+
+- 终端 / VNC / RDP 标签的浮动工具条均提供「分离到独立窗口」按钮（`terminal-detach` / `vnc-detach` / `rdp-detach`）
+- 分离流程：先把凭证 / 会话快照写入 `localStorage` handoff，再 `open_detached_window`（Tauri 真实 OS 窗口）或 `window.open`（浏览器兜底），成功后移除源标签
+- 终端分离保留后端 PTY/SSH 会话（`preserveSessionOnUnmountRef` + detach-pending 标志跳过 `closeTerminal`），新窗口通过 `consumeDetachedHandoff` adopt 既有连接而非重新拨号
+- 分离窗口由 `DetachedSessionWindow` 承载：镜像主窗口主题 / 字体副作用，提供 `detached-reattach`（把会话送回主窗口）与 `detached-os-fullscreen`
+- 终端面板另提供 `terminal-maximize`（在非分屏模式下最大化/还原当前终端 pane）
+- **e2e 测试限制**：分离会 spawn 新窗口并销毁源标签，属破坏性操作，用例只在最后一步点击（参照 TC-043/TC-111）；reattach / detached-window 内部控件需真实分离窗口或 Tauri 环境，浏览器冒烟无法挂载，留待 native/手动回归
+
+---
+
+## 21. SSH 多因素认证（Keyboard-interactive MFA）
+
+### 21.1 键盘交互式 MFA 弹窗 `MfaPrompt` ✅
+
+<!-- feature
+id: F-Mfa-1
+status: done
+area: terminal/ssh
+components: [MfaPrompt, TerminalPanel]
+files:
+  - src/components/session/MfaPrompt.tsx
+controls:
+  - id: prompt
+    selector: '[data-testid="mfa-prompt"]'
+    kind: display
+    optional: true       # only after the server issues a keyboard-interactive challenge
+  - id: instructions
+    selector: '[data-testid="mfa-instructions"]'
+    kind: display
+    optional: true       # only when the challenge carries an instruction string
+  - id: answer
+    selector: '[data-testid="mfa-answer-0"]'
+    kind: interactive
+    optional: true       # one input per prompt; mfa-answer-${idx}
+  - id: cancel
+    selector: '[data-testid="mfa-cancel"]'
+    kind: interactive
+    optional: true
+  - id: submit
+    selector: '[data-testid="mfa-submit"]'
+    kind: interactive
+    optional: true
+  - id: close
+    selector: '[data-testid="mfa-close"]'
+    kind: interactive
+    optional: true
+-->
+
+- SSH `keyboard-interactive` 认证时后端发出挑战事件，`TerminalPanel` 挂载 `MfaPrompt` 弹窗收集每个 prompt 的回答（`mfa-answer-${idx}`，密码型 prompt 自动隐藏输入）
+- 多 prompt 挑战渲染多个输入框，可选的 `instructions` / `name` 文案显示在顶部
+- Submit 回填答案续认证；Cancel / Close 中止认证流程
+- **e2e 测试限制**：弹窗只在服务器主动发起 keyboard-interactive 挑战时出现，需要一台配置了 MFA/OTP 的 SSH 服务器作为 fixture；本地 smoke sshd（密码认证）不触发，TC-113 标记 `live-only` + `needs-review`，默认 fixture 下走「无挑战即跳过」的软断言，真实 MFA 行为需配置专用服务器手动回归
+
+---
+
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >
