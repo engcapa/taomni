@@ -70,6 +70,8 @@ const ipcMocks = vi.hoisted(() => ({
   closeTerminal: vi.fn(async () => undefined),
   createLocalTerminal: vi.fn(async (sessionId: string) => ({ sessionId, shellId: "default" })),
   createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
+  listenSshAuthPrompt: vi.fn(async () => vi.fn()),
+  submitSshAuthResponse: vi.fn(async () => undefined),
   createTerminalSessionId: vi.fn(() => "terminal-session"),
   encodeBase64: vi.fn((value: string) => btoa(value)),
   listenTerminalExit: vi.fn(async () => vi.fn()),

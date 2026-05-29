@@ -36,6 +36,9 @@ export interface TerminalRegistryEntry {
 interface TerminalRegistryShape {
   entries: Map<string, TerminalRegistryEntry>;
   activeTabId: string | null;
+  /** Tab ids whose unmount should preserve the backend session because
+   *  ownership is transitioning to a detached window. Consumed once. */
+  detachPending: Set<string>;
 }
 
 const KEY = "__newmob_terminal_registry__";
@@ -44,8 +47,10 @@ function ensureRegistry(): TerminalRegistryShape {
   const g = globalThis as unknown as Record<string, unknown>;
   let reg = g[KEY] as TerminalRegistryShape | undefined;
   if (!reg) {
-    reg = { entries: new Map(), activeTabId: null };
+    reg = { entries: new Map(), activeTabId: null, detachPending: new Set() };
     g[KEY] = reg;
+  } else if (!reg.detachPending) {
+    reg.detachPending = new Set();
   }
   return reg;
 }
@@ -86,4 +91,26 @@ export function getActiveTerminal(): TerminalRegistryEntry | null {
 
 export function listTerminals(): TerminalRegistryEntry[] {
   return Array.from(ensureRegistry().entries.values());
+}
+
+/**
+ * Mark a tab as transitioning to a detached window. The TerminalPanel
+ * for that tab will skip its `closeTerminal` cleanup on the imminent
+ * unmount so the backend PTY/SSH session survives the handoff. Cleared
+ * by `consumeTerminalDetachPending` once it has been honoured (or by
+ * the caller if the detach attempt fails).
+ */
+export function markTerminalDetachPending(tabId: string): void {
+  ensureRegistry().detachPending.add(tabId);
+}
+
+export function consumeTerminalDetachPending(tabId: string): boolean {
+  const reg = ensureRegistry();
+  if (!reg.detachPending.has(tabId)) return false;
+  reg.detachPending.delete(tabId);
+  return true;
+}
+
+export function clearTerminalDetachPending(tabId: string): void {
+  ensureRegistry().detachPending.delete(tabId);
 }

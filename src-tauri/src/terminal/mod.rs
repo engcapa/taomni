@@ -7,7 +7,10 @@ use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use russh::Sig;
 use serde::Serialize;
+use std::collections::HashMap;
+use std::future::Future;
 use std::io::{Read, Write};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tauri::ipc::{Channel, InvokeResponseBody};
@@ -15,7 +18,8 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::task::JoinHandle;
 
-type TerminalOutputChannel = Channel<InvokeResponseBody>;
+pub type TerminalOutputChannel = Channel<InvokeResponseBody>;
+type TerminalOutputSubscribers = Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>;
 
 pub enum ActiveTerminal {
     Local {
@@ -58,6 +62,101 @@ pub struct LocalTerminalCreated {
     pub shell_id: String,
 }
 
+/// Single prompt forwarded to the frontend for a keyboard-interactive
+/// (MFA/OTP) auth round.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SshAuthPromptEntry {
+    prompt: String,
+    echo: bool,
+}
+
+/// Payload for the `ssh-auth-prompt-{session_id}` event. The frontend renders
+/// the prompts, collects the user's answers, and replies via
+/// `submit_ssh_auth_response` carrying the same `request_id`.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SshAuthPromptPayload {
+    request_id: String,
+    name: String,
+    instructions: String,
+    prompts: Vec<SshAuthPromptEntry>,
+}
+
+/// Build a keyboard-interactive prompter that bridges russh's auth loop to the
+/// frontend: each round registers a oneshot responder keyed by a fresh request
+/// id, emits the prompt event, and awaits the user's answers (or cancellation).
+fn build_kbd_prompter(
+    app_handle: AppHandle,
+    responders: Arc<Mutex<HashMap<String, crate::state::SshAuthResponder>>>,
+    session_id: String,
+) -> ssh::KbdInteractivePrompter {
+    Arc::new(move |req: ssh::KbdInteractiveRequest| {
+        let app_handle = app_handle.clone();
+        let responders = responders.clone();
+        let session_id = session_id.clone();
+        Box::pin(async move {
+            let request_id = format!("{}:{}", session_id, uuid_like());
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            {
+                let mut guard = match responders.lock() {
+                    Ok(g) => g,
+                    Err(p) => p.into_inner(),
+                };
+                guard.insert(request_id.clone(), tx);
+            }
+
+            let payload = SshAuthPromptPayload {
+                request_id: request_id.clone(),
+                name: req.name,
+                instructions: req.instructions,
+                prompts: req
+                    .prompts
+                    .into_iter()
+                    .map(|p| SshAuthPromptEntry {
+                        prompt: p.prompt,
+                        echo: p.echo,
+                    })
+                    .collect(),
+            };
+
+            if app_handle
+                .emit(&format!("ssh-auth-prompt-{}", session_id), payload)
+                .is_err()
+            {
+                // No listener / window gone — clean up and cancel.
+                if let Ok(mut guard) = responders.lock() {
+                    guard.remove(&request_id);
+                }
+                return None;
+            }
+
+            // Wait for the user's answer. A dropped sender (window closed,
+            // session torn down) resolves to `Err` → treated as cancellation.
+            match rx.await {
+                Ok(answers) => answers,
+                Err(_) => {
+                    if let Ok(mut guard) = responders.lock() {
+                        guard.remove(&request_id);
+                    }
+                    None
+                }
+            }
+        }) as Pin<Box<dyn Future<Output = Option<Vec<String>>> + Send>>
+    })
+}
+
+/// Small unique-ish token for correlating auth prompt rounds. Avoids pulling in
+/// a uuid dependency for what is only an internal, short-lived correlation id.
+fn uuid_like() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{:x}", nanos)
+}
+
 #[tauri::command]
 pub async fn create_local_terminal(
     session_id: String,
@@ -86,11 +185,13 @@ pub async fn create_local_terminal(
         }
         terminals.insert(session_id.clone(), terminal);
     }
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
+    let outputs = state.terminal_outputs.clone();
     std::thread::spawn(move || {
-        read_loop_local(reader, sid, app, on_output);
+        read_loop_local(reader, sid, app, outputs);
     });
 
     Ok(LocalTerminalCreated {
@@ -148,8 +249,22 @@ pub async fn create_ssh_terminal(
         None => None,
     };
 
-    let (handle, channel, mut output_rx) =
-        ssh::connect_ssh(&host, port, &username, auth, cols, rows, network.as_ref()).await?;
+    // Keyboard-interactive (MFA/OTP) prompter: bridges the SSH auth loop to
+    // the frontend so a second factor can be entered mid-connect. Cleaned up
+    // below once connect resolves (success or error).
+    let prompter = build_kbd_prompter(
+        app_handle.clone(),
+        state.ssh_auth_responders.clone(),
+        session_id.clone(),
+    );
+
+    let connect_result =
+        ssh::connect_ssh(&host, port, &username, auth, cols, rows, network.as_ref(), Some(&prompter))
+            .await;
+    // Drop any responder left dangling for this session (e.g. auth failed
+    // while a prompt round was still registered) so the map doesn't leak.
+    clear_session_auth_responders(&state.ssh_auth_responders, &session_id);
+    let (handle, channel, mut output_rx) = connect_result?;
 
     let handle_arc = Arc::new(handle);
 
@@ -185,12 +300,15 @@ pub async fn create_ssh_terminal(
         terminals.insert(session_id.clone(), terminal);
     }
 
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
+
     let sid = session_id.clone();
     let app = app_handle.clone();
     let terminals = state.terminals.clone();
+    let outputs = state.terminal_outputs.clone();
     tokio::spawn(async move {
         while let Some(data) = output_rx.recv().await {
-            let _ = on_output.send(InvokeResponseBody::Raw(data));
+            send_terminal_output(&outputs, &sid, data);
         }
         // SSH session ended naturally (peer closed, network drop, exit).
         // Remove the terminal entry and abort any session-attached
@@ -209,6 +327,9 @@ pub async fn create_ssh_terminal(
                 h.abort();
             }
         }
+        if let Ok(mut outputs) = outputs.lock() {
+            outputs.remove(&sid);
+        }
         let _ = app.emit(&format!("terminal-exit-{}", sid), "closed");
     });
 
@@ -219,19 +340,63 @@ fn read_loop_local(
     mut reader: Box<dyn Read + Send>,
     session_id: String,
     app: AppHandle,
-    on_output: TerminalOutputChannel,
+    outputs: TerminalOutputSubscribers,
 ) {
     let mut buf = [0u8; 4096];
     loop {
         match reader.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                let _ = on_output.send(InvokeResponseBody::Raw(buf[..n].to_vec()));
+                send_terminal_output(&outputs, &session_id, buf[..n].to_vec());
             }
             Err(_) => break,
         }
     }
+    if let Ok(mut outputs) = outputs.lock() {
+        outputs.remove(&session_id);
+    }
     let _ = app.emit(&format!("terminal-exit-{}", session_id), "closed");
+}
+
+fn add_terminal_output_channel(
+    outputs: &TerminalOutputSubscribers,
+    session_id: &str,
+    on_output: TerminalOutputChannel,
+) -> Result<(), String> {
+    let mut outputs = outputs
+        .lock()
+        .map_err(|e| format!("Terminal output lock failed: {}", e))?;
+    outputs
+        .entry(session_id.to_string())
+        .or_default()
+        .push(on_output);
+    Ok(())
+}
+
+fn send_terminal_output(outputs: &TerminalOutputSubscribers, session_id: &str, data: Vec<u8>) {
+    let Ok(mut outputs) = outputs.lock() else {
+        return;
+    };
+    let Some(channels) = outputs.get_mut(session_id) else {
+        return;
+    };
+    channels.retain(|channel| channel.send(InvokeResponseBody::Raw(data.clone())).is_ok());
+}
+
+#[tauri::command]
+pub async fn attach_terminal_output(
+    session_id: String,
+    on_output: TerminalOutputChannel,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    validate_session_id(&session_id)?;
+    {
+        let terminals = state.terminals.read().await;
+        if !terminals.contains_key(&session_id) {
+            return Err(format!("Terminal {} not found", session_id));
+        }
+    }
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)
 }
 
 fn validate_session_id(session_id: &str) -> Result<(), String> {
@@ -338,6 +503,9 @@ pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> R
             h.abort();
         }
     }
+    if let Ok(mut outputs) = state.terminal_outputs.lock() {
+        outputs.remove(&session_id);
+    }
     Ok(())
 }
 
@@ -438,7 +606,7 @@ pub async fn test_ssh_connection(
 
     let start = std::time::Instant::now();
     let (handle, channel, _rx) =
-        ssh::connect_ssh(&host, port, &username, auth, 80, 24, network.as_ref()).await?;
+        ssh::connect_ssh(&host, port, &username, auth, 80, 24, network.as_ref(), None).await?;
     let elapsed = start.elapsed();
 
     // Close the test connection
@@ -449,4 +617,44 @@ pub async fn test_ssh_connection(
         "Connection successful ({:.0}ms)",
         elapsed.as_millis()
     ))
+}
+
+/// Deliver the user's answer to a pending keyboard-interactive (MFA/OTP) auth
+/// round. `responses` is `None` when the user cancelled the prompt, which
+/// aborts the in-flight connection. Returns `Ok(())` even when the request id
+/// is unknown (the round may have already timed out or the session torn down),
+/// so the frontend never has to special-case a benign race.
+#[tauri::command]
+pub fn submit_ssh_auth_response(
+    request_id: String,
+    responses: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let responder = {
+        let mut guard = state
+            .ssh_auth_responders
+            .lock()
+            .map_err(|_| "auth responder registry poisoned".to_string())?;
+        guard.remove(&request_id)
+    };
+    if let Some(tx) = responder {
+        // The receiver may have been dropped if connect was cancelled in the
+        // meantime; ignore the send error in that case.
+        let _ = tx.send(responses);
+    }
+    Ok(())
+}
+
+/// Drop every pending auth responder belonging to `session_id`. Called once a
+/// connection attempt settles so stale rounds (which key by `session_id:<nanos>`)
+/// don't accumulate. Dropping the sender resolves the waiting auth future to
+/// cancellation if it somehow outlives this.
+fn clear_session_auth_responders(
+    responders: &Arc<Mutex<HashMap<String, crate::state::SshAuthResponder>>>,
+    session_id: &str,
+) {
+    let prefix = format!("{}:", session_id);
+    if let Ok(mut guard) = responders.lock() {
+        guard.retain(|key, _| !key.starts_with(&prefix));
+    }
 }

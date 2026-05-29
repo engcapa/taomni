@@ -4,6 +4,8 @@ import {
   SftpDetachedWindow,
   detectDetachedSftpRoute,
 } from "./components/filebrowser/SftpDetachedWindow";
+import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
+import { detectDetachedRoute } from "./lib/detachedSession";
 import { useAppTheme } from "./lib/appTheme";
 import { attachSftpSync } from "./lib/sftpSync";
 import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindow";
@@ -90,6 +92,12 @@ function App() {
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {
     return <SftpDetachedWindow sessionId={detachedSftpId} />;
+  }
+  const detachedRoute = detectDetachedRoute();
+  if (detachedRoute && detachedRoute.kind !== "sftp") {
+    return (
+      <DetachedSessionWindow kind={detachedRoute.kind} id={detachedRoute.id} />
+    );
   }
 
   return <MainLayout />;

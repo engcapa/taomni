@@ -37,6 +37,7 @@ import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowse
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { isTauriRuntime } from "../lib/runtime";
 import { openSftpWindow } from "../lib/sftp";
+import { openDetachedWindow } from "../lib/detachWindowing";
 import { sftpOpenPath, sftpStat, effectiveFileType } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
@@ -45,8 +46,19 @@ import {
   detachedWindowUrl,
   writeDetachedHandoff,
 } from "../components/filebrowser/SftpDetachedWindow";
-import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo } from "../types";
+import {
+  writeDetachedHandoff as writeGenericHandoff,
+  clearDetachedHandoff as clearGenericHandoff,
+  detachedWindowUrl as detachedGenericUrl,
+  subscribeReattach,
+  drainPendingReattach,
+  clearReattachHandoff,
+  type DetachedKind,
+  type ReattachMessage,
+} from "../lib/detachedSession";
+import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams } from "../components/detached/DetachedSessionWindow";
+import { Columns2, Grid2X2, Lock, Minimize2, Rows3, Unlock, X } from "lucide-react";
+import type { SftpTabInfo, Tab } from "../types";
 import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -68,7 +80,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
-import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
+import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
 import { t as tr, useT } from "../lib/i18n";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
@@ -142,6 +154,9 @@ export function MainLayout() {
     toggleTerminalSplitInputLock,
     clearTerminalSplitInputLocks,
     setTabHasNewOutput,
+    tabMaximizedId,
+    setTabMaximized,
+    toggleTabMaximized,
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -301,6 +316,218 @@ export function MainLayout() {
     }
   }, [setStatusMessage]);
 
+  /**
+   * Hand off the credentials of a non-SFTP tab to a new OS window and
+   * remove the source tab from this window. The new window opens its own
+   * backend session of the same kind. Reattach reverses the move via the
+   * `BroadcastChannel('newmob.detach.sync')` subscriber wired below.
+   */
+  const openDetachedGenericWindow = useCallback(
+    <T,>(
+      kind: DetachedKind,
+      sourceTabId: string,
+      detachedId: string,
+      payload: T,
+      title: string,
+    ) => {
+      writeGenericHandoff(kind, detachedId, payload);
+      if (isTauriRuntime()) {
+        void openDetachedWindow({
+          kind,
+          sessionId: detachedId,
+          title,
+        })
+          .then(() => {
+            // Once the OS window is up the source tab is no longer the
+            // owner of this connection. Drop it; the detached window owns
+            // a fresh connection of its own.
+            removeTab(sourceTabId);
+          })
+          .catch((err) => {
+            clearGenericHandoff(kind, detachedId);
+            if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
+            setStatusMessage(
+              tr("status.detachWindowError", {
+                error: err instanceof Error ? err.message : String(err),
+              }),
+            );
+          });
+        return;
+      }
+      const url = detachedGenericUrl(kind, detachedId);
+      const features = "width=1280,height=800,resizable=yes,scrollbars=yes";
+      const handle = window.open(url, `newmob_${kind}_${detachedId}`, features);
+      if (!handle) {
+        clearGenericHandoff(kind, detachedId);
+        if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
+        setStatusMessage(tr("status.detachPopupBlocked"));
+        return;
+      }
+      removeTab(sourceTabId);
+    },
+    [removeTab, setStatusMessage],
+  );
+
+  const openDetachedRdp = useCallback(
+    (tabId: string, info: NonNullable<Tab["rdp"]>, title: string) => {
+      const detachedId = `${tabId}__detached`;
+      const payload: DetachedRdpParams = {
+        sessionId: info.sessionId,
+        host: info.host,
+        port: info.port,
+        username: info.username ?? null,
+        password: info.password,
+        options: info.options,
+        networkSettingsJson: info.networkSettingsJson ?? null,
+        title,
+      };
+      openDetachedGenericWindow("rdp", tabId, detachedId, payload, title);
+    },
+    [openDetachedGenericWindow],
+  );
+
+  const openDetachedVnc = useCallback(
+    (tabId: string, info: NonNullable<Tab["vnc"]>, title: string) => {
+      const detachedId = `${tabId}__detached`;
+      const payload: DetachedVncParams = {
+        sessionId: info.sessionId,
+        host: info.host,
+        port: info.port,
+        username: info.username ?? null,
+        password: info.password,
+        title,
+      };
+      openDetachedGenericWindow("vnc", tabId, detachedId, payload, title);
+    },
+    [openDetachedGenericWindow],
+  );
+
+  const openDetachedTerminal = useCallback(
+    (
+      tabId: string,
+      tab: Tab,
+      title: string,
+    ) => {
+      // Capture the live backend session id + scrollback snapshot so the
+      // detached window can adopt the existing PTY/SSH session instead of
+      // spawning a fresh one. The TerminalPanel cleanup on the source tab
+      // honours the detach-pending flag and skips its `closeTerminal`
+      // call so the backend session survives the React unmount.
+      const detachedId = `${tabId}__detached`;
+      const liveSessionId = terminalSessionIds.current[tabId];
+      const liveEntry = getTerminal(tabId);
+      const snapshotText = liveEntry ? liveEntry.getBufferText() : undefined;
+      const reattach = liveSessionId
+        ? { terminalSessionId: liveSessionId, snapshotText }
+        : undefined;
+      const payload: DetachedTerminalParams = {
+        title,
+        ssh: tab.ssh ?? null,
+        localShell: tab.localShell ?? null,
+        terminalProfile: tab.terminalProfile ?? null,
+        reattach,
+      };
+      if (liveSessionId) {
+        markTerminalDetachPending(tabId);
+      }
+      try {
+        openDetachedGenericWindow("terminal", tabId, detachedId, payload, title);
+      } catch (err) {
+        clearTerminalDetachPending(tabId);
+        throw err;
+      }
+    },
+    [openDetachedGenericWindow],
+  );
+
+  /**
+   * Subscribe to reattach messages broadcast by detached windows. Each
+   * time a detached window asks to come back, recreate the equivalent
+   * tab in this window using the credential payload from the reattach
+   * envelope. localStorage envelopes left behind by abrupt closes are
+   * also drained on subscribe.
+   */
+  useEffect(() => {
+    const handle = (msg: ReattachMessage) => {
+      const tsTag = Date.now().toString(36);
+      switch (msg.kind) {
+        case "rdp": {
+          const p = msg.payload as DetachedRdpParams | undefined;
+          if (!p?.host) return;
+          addTab({
+            id: `rdp-reattach-${tsTag}`,
+            type: "rdp",
+            title: p.title || `${p.host}:${p.port}`,
+            sessionId: p.sessionId,
+            closable: true,
+            rdp: {
+              sessionId: p.sessionId,
+              host: p.host,
+              port: p.port,
+              username: p.username ?? undefined,
+              password: p.password,
+              options: p.options,
+              networkSettingsJson: p.networkSettingsJson ?? null,
+            },
+          });
+          setStatusMessage(tr("status.reattached"));
+          break;
+        }
+        case "vnc": {
+          const p = msg.payload as DetachedVncParams | undefined;
+          if (!p?.host) return;
+          addTab({
+            id: `vnc-reattach-${tsTag}`,
+            type: "vnc",
+            title: p.title || `${p.host}:${p.port}`,
+            sessionId: p.sessionId,
+            closable: true,
+            vnc: {
+              sessionId: p.sessionId,
+              host: p.host,
+              port: p.port,
+              username: p.username ?? undefined,
+              password: p.password,
+            },
+          });
+          setStatusMessage(tr("status.reattached"));
+          break;
+        }
+        case "terminal": {
+          const p = msg.payload as DetachedTerminalParams | undefined;
+          if (!p) return;
+          const adopted = p.reattach?.terminalSessionId
+            ? {
+                sessionId: p.reattach.terminalSessionId,
+                snapshotText: p.reattach.snapshotText,
+              }
+            : undefined;
+          addTab({
+            id: `term-reattach-${tsTag}`,
+            type: "terminal",
+            title: p.title || tr("tabs.localTerminal"),
+            closable: true,
+            ssh: p.ssh ?? undefined,
+            localShell: p.localShell ?? undefined,
+            terminalProfile: p.terminalProfile ?? undefined,
+            adoptedTerminal: adopted,
+          });
+          setStatusMessage(tr("status.reattached"));
+          break;
+        }
+        default:
+          /* SFTP reattach not wired — SFTP detach is co-existing, not exclusive. */
+          break;
+      }
+      clearReattachHandoff(msg.kind, msg.id);
+    };
+    const unsub = subscribeReattach(handle);
+    // Drain any envelopes left by detached windows that closed abruptly
+    // before we subscribed.
+    drainPendingReattach().forEach(handle);
+    return unsub;
+  }, [addTab, setStatusMessage]);
+
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
@@ -326,7 +553,7 @@ export function MainLayout() {
     if (!panel) return;
 
     const frame = requestAnimationFrame(() => {
-      if (compactMode || sidebarCollapsed) {
+      if (compactMode || sidebarCollapsed || tabMaximizedId) {
         panel.collapse();
       } else {
         panel.resize(lastSidebarSizeRef.current);
@@ -334,7 +561,7 @@ export function MainLayout() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [compactMode, sidebarCollapsed]);
+  }, [compactMode, sidebarCollapsed, tabMaximizedId]);
 
   useEffect(() => {
     if (!compactMode) {
@@ -1090,15 +1317,22 @@ export function MainLayout() {
     terminalSplitVisible,
   ]);
 
+  const isTabMaximized =
+    !!tabMaximizedId &&
+    tabMaximizedId === activeTabId &&
+    tabs.some((t) => t.id === tabMaximizedId);
+  const chromeHidden = isTabMaximized;
+
   return (
     <div
       data-compact-mode={compactMode}
+      data-tab-maximized={isTabMaximized ? "true" : undefined}
       className={`relative w-full h-full flex flex-col${compactMode ? " moba-compact-root" : ""}`}
       style={{ background: "var(--moba-chrome-bg)" }}
     >
       <WindowResizeHandles />
-      {!compactMode && <AppTitleBar />}
-      {!compactMode && (
+      {!compactMode && !chromeHidden && <AppTitleBar />}
+      {!compactMode && !chromeHidden && (
         <>
           <MenuBar activeTabClosable={!!activeTab?.closable} onCommand={handleCommand} />
           <Ribbon
@@ -1113,7 +1347,7 @@ export function MainLayout() {
           />
         </>
       )}
-      {compactMode && (
+      {compactMode && !chromeHidden && (
         <CompactTitleBar
           activeTabClosable={!!activeTab?.closable}
           onCommand={handleCommand}
@@ -1127,7 +1361,7 @@ export function MainLayout() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        {!compactMode && sidebarCollapsed && (
+        {!compactMode && !chromeHidden && sidebarCollapsed && (
           <div data-testid="collapsed-sidebar-rail" className="h-full w-[26px] shrink-0 overflow-hidden">
             <Sidebar
               compact
@@ -1151,7 +1385,7 @@ export function MainLayout() {
               if (!compactMode) setSidebarCollapsed(true);
             }}
             onExpand={() => {
-              if (!compactMode) setSidebarCollapsed(false);
+              if (!compactMode && !chromeHidden) setSidebarCollapsed(false);
             }}
             onResize={(size) => {
               if (size > 2) {
@@ -1159,7 +1393,7 @@ export function MainLayout() {
               }
             }}
           >
-            <div className="h-full overflow-hidden" style={compactMode || sidebarCollapsed ? { display: "none" } : undefined}>
+            <div className="h-full overflow-hidden" style={compactMode || sidebarCollapsed || chromeHidden ? { display: "none" } : undefined}>
               <Sidebar
                 compact={compactMode}
                 onNewSession={handleNewSession}
@@ -1172,12 +1406,12 @@ export function MainLayout() {
 
           <PanelResizeHandle
             data-testid="main-sidebar-resize-handle"
-            className={compactMode || sidebarCollapsed ? "hidden" : "w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize"}
+            className={compactMode || sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize"}
           />
 
           <Panel>
             <div className="h-full flex flex-col min-w-0">
-              {!compactMode && (
+              {!compactMode && !chromeHidden && (
                 <TabBar
                   onStartLocalTerminal={(localShell) =>
                     openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
@@ -1249,6 +1483,7 @@ export function MainLayout() {
                             ssh={tab.ssh}
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
+                            adoptedTerminal={tab.adoptedTerminal}
                             visible={terminalSplitVisible || isActive}
                             activeForShortcuts={isActive}
                             inputLocked={inputLocked}
@@ -1271,6 +1506,13 @@ export function MainLayout() {
                             chatToggle={!terminalSplitVisible ? {
                               open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
+                            } : undefined}
+                            detachToggle={!terminalSplitVisible ? {
+                              onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
+                            } : undefined}
+                            maximizeToggle={!terminalSplitVisible ? {
+                              maximized: tabMaximizedId === tab.id,
+                              onToggle: () => toggleTabMaximized(tab.id),
                             } : undefined}
                           />
                         </div>
@@ -1501,6 +1743,9 @@ export function MainLayout() {
                           username={tab.vnc.username}
                           password={tab.vnc.password}
                           visible={isActive}
+                          onDetach={() => openDetachedVnc(tab.id, tab.vnc!, tab.title)}
+                          onToggleMaximize={() => toggleTabMaximized(tab.id)}
+                          maximized={tabMaximizedId === tab.id}
                         />
                       </Suspense>
                     </div>
@@ -1527,6 +1772,9 @@ export function MainLayout() {
                           options={tab.rdp.options}
                           networkSettingsJson={tab.rdp.networkSettingsJson}
                           visible={isActive}
+                          onDetach={() => openDetachedRdp(tab.id, tab.rdp!, tab.title)}
+                          onToggleMaximize={() => toggleTabMaximized(tab.id)}
+                          maximized={tabMaximizedId === tab.id}
                         />
                       </Suspense>
                     </div>
@@ -1570,6 +1818,41 @@ export function MainLayout() {
                   activeTab.type !== "nettools" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
+
+                {/* Global restore affordance for maximized tabs. RDP panels
+                    already expose their own restore toggle (plus the
+                    Ctrl+Alt+Enter shortcut) in the floating toolbar, so the
+                    redundant top-right button is suppressed for them. */}
+                {isTabMaximized && activeTab?.type !== "rdp" && (
+                  <button
+                    type="button"
+                    data-testid="tab-maximize-restore"
+                    title={tr("rdp.restore")}
+                    aria-label={tr("rdp.restore")}
+                    onClick={() => setTabMaximized(null)}
+                    className="moba-button"
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      right: 6,
+                      zIndex: 60,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "3px 8px",
+                      fontSize: 11,
+                      borderRadius: 6,
+                      background: "rgba(20,20,28,0.65)",
+                      color: "#eee",
+                      border: "1px solid rgba(255,255,255,0.18)",
+                      backdropFilter: "blur(2px)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Minimize2 size={12} />
+                    {tr("rdp.restore")}
+                  </button>
+                )}
               </div>
             </div>
           </Panel>
@@ -1577,7 +1860,7 @@ export function MainLayout() {
         {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
       </div>
 
-      {!compactMode && <StatusBar />}
+      {!compactMode && !chromeHidden && <StatusBar />}
 
       {compactMode && compactSidebarOpen && (
         <CompactSidebarDrawer

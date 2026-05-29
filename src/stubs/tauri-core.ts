@@ -375,6 +375,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         onOutput: args?.onOutput as SshConnectArgs["onOutput"],
       })) as T;
     }
+    case "submit_ssh_auth_response": {
+      // Keyboard-interactive (MFA) auth is driven by the real Rust backend.
+      // The browser preview's WS SSH proxy doesn't surface interactive
+      // prompts, so this is a no-op here.
+      return undefined as T;
+    }
     case "test_ssh_connection": {
       // The browser preview can't honour proxy / port-forwarding rows
       // either; we ignore `networkSettingsJson` here for symmetry with
@@ -677,6 +683,39 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         );
       }
       return undefined as T;
+    }
+    case "close_current_detached_window": {
+      window.close();
+      return undefined as T;
+    }
+    case "open_detached_window": {
+      const kind = args?.kind as string;
+      const sessionId = args?.sessionId as string;
+      const width = (args?.width as number | undefined) ?? 1200;
+      const height = (args?.height as number | undefined) ?? 760;
+      const url = new URL(window.location.href);
+      url.searchParams.set(kind, sessionId);
+      url.hash = "";
+      const features = `width=${width},height=${height},resizable=yes,scrollbars=yes`;
+      const handle = window.open(
+        url.toString(),
+        `newmob_${kind}_${sessionId}`,
+        features,
+      );
+      if (!handle) {
+        throw new Error(
+          `Browser blocked the ${kind} window. Allow pop-ups for this site.`,
+        );
+      }
+      return undefined as T;
+    }
+    // ---------- RDP commands (desktop-only) ----------
+    case "rdp_connect":
+    case "rdp_disconnect":
+    case "rdp_test_connection": {
+      throw new Error(
+        "RDP is only available in the desktop build of NewMob, not in browser preview.",
+      );
     }
     case "sftp_open_path": {
       // No real OS shell in browser preview.

@@ -4,6 +4,14 @@ import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
 import { getAppPlatform } from "../../lib/runtime";
 import { useT } from "../../lib/i18n";
+import {
+  consumeDetachedHandoff as consumeGenericHandoff,
+  writeDetachedHandoff as writeGenericHandoff,
+  clearDetachedHandoff as clearGenericHandoff,
+  detachedWindowUrl as detachedGenericUrl,
+  detectDetachedRoute,
+  sweepExpiredHandoffs as sweepGenericHandoffs,
+} from "../../lib/detachedSession";
 
 interface DetachedSftpParams {
   /**
@@ -30,21 +38,10 @@ interface DetachedSftpParams {
   title?: string;
 }
 
-interface HandoffEnvelope {
-  payload: DetachedSftpParams;
-  /** Wall-clock time the handoff was written (ms). */
-  createdAt: number;
-}
+// Re-export TTL so callers expecting the previous symbol still work.
+export { HANDOFF_TTL_MS } from "../../lib/detachedSession";
 
 const STORAGE_PREFIX = "newmob.sftp.detached.";
-/**
- * Maximum age of a credential handoff before we refuse to consume it.
- * 60 s is comfortably long enough for any realistic
- * `window.open` / `WebviewWindowBuilder` round-trip but short enough that
- * a stranded entry (window blocked, user cancelled, app crashed) does not
- * leave SFTP credentials sitting in `localStorage` indefinitely.
- */
-const HANDOFF_TTL_MS = 60_000;
 
 /**
  * Read the credential handoff for `sessionId` without deleting it. We
@@ -62,58 +59,15 @@ const HANDOFF_TTL_MS = 60_000;
  * origin.
  */
 export function consumeDetachedHandoff(sessionId: string): DetachedSftpParams | null {
-  const key = STORAGE_PREFIX + sessionId;
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
-  let parsed: HandoffEnvelope | DetachedSftpParams;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    // Malformed entry — drop it so it doesn't linger.
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* noop */
-    }
-    return null;
-  }
-  // Backwards-compat: tolerate a bare params blob (older builds).
-  if ((parsed as HandoffEnvelope).createdAt === undefined) {
-    return parsed as DetachedSftpParams;
-  }
-  const env = parsed as HandoffEnvelope;
-  if (Date.now() - env.createdAt > HANDOFF_TTL_MS) {
-    // Expired — wipe it.
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* noop */
-    }
-    return null;
-  }
-  return env.payload;
+  return consumeGenericHandoff<DetachedSftpParams>("sftp", sessionId);
 }
 
 export function writeDetachedHandoff(params: DetachedSftpParams): void {
-  try {
-    const env: HandoffEnvelope = { payload: params, createdAt: Date.now() };
-    localStorage.setItem(STORAGE_PREFIX + params.sessionId, JSON.stringify(env));
-  } catch {
-    /* noop */
-  }
+  writeGenericHandoff<DetachedSftpParams>("sftp", params.sessionId, params);
 }
 
 export function clearDetachedHandoff(sessionId: string): void {
-  try {
-    localStorage.removeItem(STORAGE_PREFIX + sessionId);
-  } catch {
-    /* noop */
-  }
+  clearGenericHandoff("sftp", sessionId);
 }
 
 /**
@@ -125,33 +79,11 @@ export function clearDetachedHandoff(sessionId: string): void {
  * happening across restarts.
  */
 export function sweepExpiredHandoffs(): void {
-  try {
-    const now = Date.now();
-    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        const parsed = JSON.parse(raw);
-        if (parsed?.createdAt && now - parsed.createdAt > HANDOFF_TTL_MS) {
-          localStorage.removeItem(key);
-        }
-      } catch {
-        // Malformed entry — drop it so it doesn't stay forever.
-        localStorage.removeItem(key);
-      }
-    }
-  } catch {
-    /* noop */
-  }
+  sweepGenericHandoffs();
 }
 
 export function detachedWindowUrl(sessionId: string): string {
-  const url = new URL(window.location.href);
-  url.searchParams.set("sftp", sessionId);
-  url.hash = "";
-  return url.toString();
+  return detachedGenericUrl("sftp", sessionId);
 }
 
 /**
@@ -164,20 +96,8 @@ export function detachedWindowUrl(sessionId: string): string {
  * browser-mode window.open() and older builds.
  */
 export function detectDetachedSftpRoute(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    // Fragment: #sftp=<sessionId>  (Tauri native window path)
-    const hash = window.location.hash;
-    if (hash.startsWith("#sftp=")) {
-      const id = hash.slice("#sftp=".length);
-      if (id) return id;
-    }
-    // Query string: ?sftp=<sessionId>  (browser window.open path)
-    const url = new URL(window.location.href);
-    return url.searchParams.get("sftp");
-  } catch {
-    return null;
-  }
+  const route = detectDetachedRoute();
+  return route?.kind === "sftp" ? route.id : null;
 }
 
 export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {

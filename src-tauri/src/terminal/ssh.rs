@@ -1,7 +1,10 @@
 use async_trait::async_trait;
+use russh::client::KeyboardInteractiveAuthResponse;
 use russh::keys::key::{self as ssh_key, PublicKey, SignatureHash};
 use russh::{client, kex, ChannelId, Pty};
 use std::borrow::Cow;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -58,6 +61,38 @@ pub enum SshAuth {
     PrivateKey(String),
     Agent,
 }
+
+/// A single prompt inside a keyboard-interactive auth round (e.g. the
+/// "Please Input Mfa Code (AliyunOTP):" line from an Aliyun bastion host).
+#[derive(Clone, Debug)]
+pub struct KbdPrompt {
+    pub prompt: String,
+    /// When `false` the answer is secret (e.g. password/OTP) and the UI should
+    /// mask it. When `true` the typed characters may be echoed.
+    pub echo: bool,
+}
+
+/// One keyboard-interactive request from the server. A server may send several
+/// of these in sequence; each carries zero or more prompts the user must
+/// answer.
+#[derive(Clone, Debug)]
+pub struct KbdInteractiveRequest {
+    pub name: String,
+    pub instructions: String,
+    pub prompts: Vec<KbdPrompt>,
+}
+
+/// Callback invoked for each keyboard-interactive round. Implementations
+/// surface the prompts to the user and resolve with one response per prompt,
+/// or `None` if the user cancelled (which aborts the connection). The terminal
+/// connect path wires this to a Tauri event + `submit_ssh_auth_response`
+/// round-trip; callers without a UI (SFTP, tunnels) pass `None` and simply
+/// can't satisfy interactive MFA.
+pub type KbdInteractivePrompter = Arc<
+    dyn Fn(KbdInteractiveRequest) -> Pin<Box<dyn Future<Output = Option<Vec<String>>> + Send>>
+        + Send
+        + Sync,
+>;
 
 const COMPAT_KEX_ORDER: &[kex::Name] = &[
     kex::CURVE25519,
@@ -156,16 +191,33 @@ async fn authenticate(
     handle: &mut client::Handle<SshHandler>,
     username: &str,
     auth: SshAuth,
+    prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<(), String> {
     match auth {
         SshAuth::Password(password) => {
+            // First try plain password auth. Many enterprise hosts (e.g. Aliyun
+            // bastion) accept the password as the first factor but then demand
+            // a second keyboard-interactive factor (an MFA/OTP code). russh
+            // collapses that partial success into `false`, so on a non-success
+            // we fall through to keyboard-interactive while the connection is
+            // still alive, mirroring how OpenSSH / MobaXterm behave.
             let ok = handle
                 .authenticate_password(username, &password)
                 .await
                 .map_err(|e| format!("SSH auth failed: {}", e))?;
-            if !ok {
-                return Err("SSH password authentication rejected".to_string());
+            if ok {
+                return Ok(());
             }
+            if let Some(prompter) = prompter {
+                return authenticate_keyboard_interactive(
+                    handle,
+                    username,
+                    Some(&password),
+                    prompter,
+                )
+                .await;
+            }
+            return Err("SSH password authentication rejected".to_string());
         }
         SshAuth::PrivateKey(key_path) => {
             let key_path = shellexpand::tilde(&key_path).to_string();
@@ -178,6 +230,98 @@ async fn authenticate(
         }
     }
     Ok(())
+}
+
+/// Drive a keyboard-interactive auth exchange to completion. Each
+/// `InfoRequest` round is forwarded to `prompter`; its answers are sent back.
+///
+/// As a convenience, when a round has exactly one non-echo prompt that looks
+/// like a password request and we still hold an unused password (`known_password`),
+/// it is answered automatically without bothering the user — this covers
+/// servers that expose the *password* itself via keyboard-interactive. Every
+/// other prompt (notably the MFA/OTP code) is surfaced to the user.
+async fn authenticate_keyboard_interactive(
+    handle: &mut client::Handle<SshHandler>,
+    username: &str,
+    known_password: Option<&str>,
+    prompter: &KbdInteractivePrompter,
+) -> Result<(), String> {
+    let mut response = handle
+        .authenticate_keyboard_interactive_start(username, None)
+        .await
+        .map_err(|e| format!("SSH keyboard-interactive auth failed: {}", e))?;
+
+    let mut password_used = false;
+
+    loop {
+        match response {
+            KeyboardInteractiveAuthResponse::Success => return Ok(()),
+            KeyboardInteractiveAuthResponse::Failure => {
+                return Err("SSH authentication rejected (MFA/keyboard-interactive)".to_string());
+            }
+            KeyboardInteractiveAuthResponse::InfoRequest {
+                name,
+                instructions,
+                prompts,
+            } => {
+                // Empty info-requests need an empty response set; just continue.
+                if prompts.is_empty() {
+                    response = handle
+                        .authenticate_keyboard_interactive_respond(Vec::new())
+                        .await
+                        .map_err(|e| format!("SSH keyboard-interactive auth failed: {}", e))?;
+                    continue;
+                }
+
+                // Auto-answer a lone password prompt when we already have one.
+                if !password_used {
+                    if let Some(pw) = known_password {
+                        if prompts.len() == 1
+                            && !prompts[0].echo
+                            && looks_like_password_prompt(&prompts[0].prompt)
+                        {
+                            password_used = true;
+                            response = handle
+                                .authenticate_keyboard_interactive_respond(vec![pw.to_string()])
+                                .await
+                                .map_err(|e| {
+                                    format!("SSH keyboard-interactive auth failed: {}", e)
+                                })?;
+                            continue;
+                        }
+                    }
+                }
+
+                let request = KbdInteractiveRequest {
+                    name,
+                    instructions,
+                    prompts: prompts
+                        .into_iter()
+                        .map(|p| KbdPrompt {
+                            prompt: p.prompt,
+                            echo: p.echo,
+                        })
+                        .collect(),
+                };
+                let answers = prompter(request)
+                    .await
+                    .ok_or_else(|| "SSH authentication cancelled".to_string())?;
+
+                response = handle
+                    .authenticate_keyboard_interactive_respond(answers)
+                    .await
+                    .map_err(|e| format!("SSH keyboard-interactive auth failed: {}", e))?;
+            }
+        }
+    }
+}
+
+/// Heuristic: does this keyboard-interactive prompt look like a request for the
+/// account password (as opposed to an MFA/OTP code, which we must never
+/// auto-fill with the password)?
+fn looks_like_password_prompt(prompt: &str) -> bool {
+    let p = prompt.to_ascii_lowercase();
+    p.contains("password") || p.contains("密码")
 }
 
 async fn authenticate_private_key(
@@ -231,6 +375,7 @@ pub async fn connect_ssh(
     cols: u16,
     rows: u16,
     network: Option<&NetworkSettings>,
+    prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<
     (
         client::Handle<SshHandler>,
@@ -252,7 +397,7 @@ pub async fn connect_ssh(
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
 
-    authenticate(&mut handle, username, auth).await?;
+    authenticate(&mut handle, username, auth, prompter).await?;
 
     let channel = handle
         .channel_open_session()
@@ -310,6 +455,6 @@ pub async fn connect_ssh_authenticated_with(
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
 
-    authenticate(&mut handle, username, auth).await?;
+    authenticate(&mut handle, username, auth, None).await?;
     Ok(handle)
 }

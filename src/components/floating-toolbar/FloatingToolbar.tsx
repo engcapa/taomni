@@ -5,11 +5,15 @@
 // caller is responsible for making that ancestor `position: relative`. Users
 // can:
 //   * drag the grip handle to move the toolbar anywhere within its parent
-//   * click the collapse button to shrink it down to a single restore pill
-//   * the position + collapsed state persist to localStorage by `storageKey`
+//   * click the collapse button to either shrink to a small restore pill
+//     OR dock to any edge as a slim drawer pull (chevron sliver)
+//   * the position, dock edge, and collapsed state persist to localStorage
+//     by `storageKey`
 //
 // When collapsed the pill is itself draggable so it never gets stuck behind
-// content the user wants to read.
+// content the user wants to read. Dragging the pill near a window edge
+// (within 24 px) pins it to that edge as a drawer-pull tab; dragging back
+// from the edge releases it back into the floating pill state.
 
 import {
   useCallback,
@@ -20,13 +24,23 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronRight, EyeOff, GripVertical } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  EyeOff,
+  GripVertical,
+} from "lucide-react";
 import { useT } from "../../lib/i18n";
+
+type DockEdge = "top" | "right" | "bottom" | "left";
 
 interface StoredState {
   top: number;
   right: number;
   collapsed: boolean;
+  dockEdge?: DockEdge | null;
 }
 
 export interface FloatingToolbarProps {
@@ -47,6 +61,9 @@ export interface FloatingToolbarProps {
 
 const DEFAULT_TOP = 4;
 const DEFAULT_RIGHT = 4;
+/** Within this many CSS pixels of an edge, a drag snaps the pill into a
+ *  drawer-pull tab on that edge. */
+const EDGE_SNAP_PX = 24;
 
 function readStored(key: string): Partial<StoredState> | null {
   if (typeof window === "undefined") return null;
@@ -107,6 +124,97 @@ const RESTORE_PILL_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
+function dockChevron(edge: DockEdge): ReactNode {
+  // Chevron points *away* from the edge so it visually invites a click
+  // that pulls the toolbar back into view.
+  switch (edge) {
+    case "top":
+      return <ChevronDown size={14} />;
+    case "bottom":
+      return <ChevronUp size={14} />;
+    case "left":
+      return <ChevronRight size={14} />;
+    case "right":
+    default:
+      return <ChevronLeft size={14} />;
+  }
+}
+
+function dockedTabStyle(edge: DockEdge): React.CSSProperties {
+  const base: React.CSSProperties = {
+    position: "absolute",
+    background: "rgba(0,0,0,0.55)",
+    border: "1px solid rgba(255,255,255,0.18)",
+    color: "#ddd",
+    cursor: "pointer",
+    padding: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backdropFilter: "blur(2px)",
+    zIndex: 50,
+  };
+  switch (edge) {
+    case "top":
+      return {
+        ...base,
+        top: 0,
+        left: "50%",
+        transform: "translateX(-50%)",
+        height: 14,
+        width: 36,
+        borderTop: "none",
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+      };
+    case "bottom":
+      return {
+        ...base,
+        bottom: 0,
+        left: "50%",
+        transform: "translateX(-50%)",
+        height: 14,
+        width: 36,
+        borderBottom: "none",
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+      };
+    case "left":
+      return {
+        ...base,
+        left: 0,
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: 14,
+        height: 36,
+        borderLeft: "none",
+        borderTopLeftRadius: 0,
+        borderBottomLeftRadius: 0,
+        borderTopRightRadius: 8,
+        borderBottomRightRadius: 8,
+      };
+    case "right":
+    default:
+      return {
+        ...base,
+        right: 0,
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: 14,
+        height: 36,
+        borderRight: "none",
+        borderTopLeftRadius: 8,
+        borderBottomLeftRadius: 8,
+        borderTopRightRadius: 0,
+        borderBottomRightRadius: 0,
+      };
+  }
+}
+
 export function FloatingToolbar({
   storageKey,
   defaultTop = DEFAULT_TOP,
@@ -132,11 +240,23 @@ export function FloatingToolbar({
     const stored = readStored(storageKey);
     return typeof stored?.collapsed === "boolean" ? stored.collapsed : false;
   });
+  const [dockEdge, setDockEdge] = useState<DockEdge | null>(() => {
+    const stored = readStored(storageKey);
+    const edge = stored?.dockEdge;
+    return edge === "top" || edge === "right" || edge === "bottom" || edge === "left"
+      ? edge
+      : null;
+  });
 
   // Persist whenever state changes.
   useEffect(() => {
-    writeStored(storageKey, { top: position.top, right: position.right, collapsed });
-  }, [storageKey, position.top, position.right, collapsed]);
+    writeStored(storageKey, {
+      top: position.top,
+      right: position.right,
+      collapsed,
+      dockEdge,
+    });
+  }, [storageKey, position.top, position.right, collapsed, dockEdge]);
 
   // Re-clamp position into the parent rect after layout (covers parent
   // shrink, e.g. the user closed the sidebar and the panel got narrower).
@@ -164,6 +284,7 @@ export function FloatingToolbar({
     startY: number;
     startTop: number;
     startRight: number;
+    moved: boolean;
   } | null>(null);
 
   const handleDragStart = useCallback(
@@ -173,12 +294,18 @@ export function FloatingToolbar({
       if (!el) return;
       event.preventDefault();
       event.stopPropagation();
+      // Releasing edge dock when the user starts a drag turns the toolbar
+      // back into a normal floating pill so they can re-position freely.
+      if (dockEdge !== null) {
+        setDockEdge(null);
+      }
       dragStateRef.current = {
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
         startTop: position.top,
         startRight: position.right,
+        moved: false,
       };
       try {
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -186,43 +313,95 @@ export function FloatingToolbar({
         /* ignore */
       }
     },
-    [position.top, position.right],
+    [position.top, position.right, dockEdge],
   );
 
-  const handleDragMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = dragStateRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const el = containerRef.current;
-    if (!el) return;
-    const parent = el.offsetParent as HTMLElement | null;
-    const parentRect = parent ? parent.getBoundingClientRect() : null;
-    const rect = el.getBoundingClientRect();
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
-    let nextTop = drag.startTop + dy;
-    let nextRight = drag.startRight - dx;
-    if (parentRect) {
-      const maxTop = Math.max(0, parentRect.height - rect.height);
-      const maxRight = Math.max(0, parentRect.width - rect.width);
-      nextTop = Math.min(Math.max(0, nextTop), maxTop);
-      nextRight = Math.min(Math.max(0, nextRight), maxRight);
-    } else {
-      nextTop = Math.max(0, nextTop);
-      nextRight = Math.max(0, nextRight);
-    }
-    setPosition({ top: nextTop, right: nextRight });
-  }, []);
+  const handleDragMove = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = dragStateRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const el = containerRef.current;
+      if (!el) return;
+      const parent = el.offsetParent as HTMLElement | null;
+      const parentRect = parent ? parent.getBoundingClientRect() : null;
+      const rect = el.getBoundingClientRect();
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
+      let nextTop = drag.startTop + dy;
+      let nextRight = drag.startRight - dx;
+      if (parentRect) {
+        const maxTop = Math.max(0, parentRect.height - rect.height);
+        const maxRight = Math.max(0, parentRect.width - rect.width);
+        nextTop = Math.min(Math.max(0, nextTop), maxTop);
+        nextRight = Math.min(Math.max(0, nextRight), maxRight);
+      } else {
+        nextTop = Math.max(0, nextTop);
+        nextRight = Math.max(0, nextRight);
+      }
+      setPosition({ top: nextTop, right: nextRight });
+    },
+    [],
+  );
 
-  const handleDragEnd = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = dragStateRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    dragStateRef.current = null;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const handleDragEnd = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = dragStateRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      dragStateRef.current = null;
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+      // Edge-snap: if the user dropped the collapsed pill near an edge,
+      // pin it as a docked drawer-pull. Only consider snapping when the
+      // toolbar is in collapsed state — full toolbars stay free-floating.
+      if (!collapsed || !drag.moved) return;
+      const el = containerRef.current;
+      const parent = el?.offsetParent as HTMLElement | null;
+      const parentRect = parent ? parent.getBoundingClientRect() : null;
+      if (!el || !parentRect) return;
+      const rect = el.getBoundingClientRect();
+      const distTop = rect.top - parentRect.top;
+      const distLeft = rect.left - parentRect.left;
+      const distRight = parentRect.right - rect.right;
+      const distBottom = parentRect.bottom - rect.bottom;
+      const minDist = Math.min(distTop, distLeft, distRight, distBottom);
+      if (minDist > EDGE_SNAP_PX) return;
+      let edge: DockEdge = "right";
+      if (minDist === distTop) edge = "top";
+      else if (minDist === distLeft) edge = "left";
+      else if (minDist === distBottom) edge = "bottom";
+      else edge = "right";
+      setDockEdge(edge);
+    },
+    [collapsed],
+  );
+
+  if (collapsed && dockEdge) {
+    // Drawer-pull: a slim sliver pinned to the chosen edge that restores
+    // the toolbar in-place. The user can also long-press / drag it back
+    // into the parent area, which clears `dockEdge` (handled by
+    // `handleDragStart`).
+    return (
+      <button
+        ref={containerRef as unknown as React.MutableRefObject<HTMLButtonElement>}
+        type="button"
+        data-testid={testId}
+        aria-label={restoreLabelResolved}
+        title={restoreLabelResolved}
+        onClick={() => {
+          // Single click → restore the toolbar fully.
+          setDockEdge(null);
+          setCollapsed(false);
+        }}
+        style={dockedTabStyle(dockEdge)}
+      >
+        {dockChevron(dockEdge)}
+      </button>
+    );
+  }
 
   if (collapsed) {
     return (

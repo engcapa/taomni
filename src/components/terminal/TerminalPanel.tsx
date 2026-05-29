@@ -54,7 +54,7 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
-import { Bot, FolderOpen } from "lucide-react";
+import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
 import {
   createInputEchoSuppressor,
   type InputEchoSuppressor,
@@ -62,8 +62,12 @@ import {
 import { makeHostKey, useCommandHistory } from "../../lib/history";
 import {
   createTerminalSessionId,
+  attachTerminalOutput,
   createLocalTerminal,
   createSshTerminal,
+  listenSshAuthPrompt,
+  submitSshAuthResponse,
+  type SshAuthPromptPayload,
   writeTerminal,
   resizeTerminal,
   sendTerminalSignal,
@@ -85,7 +89,7 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
-import { registerTerminal } from "../../lib/terminal/terminalRegistry";
+import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
   type ZmodemState,
@@ -95,6 +99,7 @@ import {
   type SendConflictAction,
 } from "../../lib/zmodem";
 import { ZmodemConflictDialog } from "./ZmodemConflictDialog";
+import { MfaPrompt } from "../session/MfaPrompt";
 import { CommonCommandsPalette } from "./CommonCommandsPalette";
 import { AiRewriteOverlay } from "./AiRewriteOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -128,6 +133,22 @@ export interface SshConnectInfo {
   optionsJson?: string;
 }
 
+export interface TerminalReattachState {
+  terminalSessionId?: string;
+  snapshotText?: string;
+}
+
+export interface AdoptedTerminalSession {
+  sessionId: string;
+  snapshotText?: string;
+}
+
+export interface DetachedTerminalWindowControls {
+  onReattach: (state?: TerminalReattachState) => void;
+  onToggleOsFullscreen: () => void;
+  osFullscreen: boolean;
+}
+
 interface TerminalPanelProps {
   tabId?: string;
   tabTitle?: string;
@@ -139,6 +160,10 @@ interface TerminalPanelProps {
     args?: string[];
   };
   terminalProfile?: TerminalProfile;
+  adoptedTerminal?: AdoptedTerminalSession;
+  preserveSessionOnUnmount?: boolean;
+  detachedWindowControls?: DetachedTerminalWindowControls;
+  onDetachedStateChange?: (state: TerminalReattachState) => void;
   visible?: boolean;
   activeForShortcuts?: boolean;
   inputLocked?: boolean;
@@ -164,6 +189,19 @@ interface TerminalPanelProps {
   /** Floating-toolbar button for the AI chat thread bound to this tab. */
   chatToggle?: {
     open: boolean;
+    onToggle: () => void;
+  };
+  /** When set, the floating toolbar exposes a "Detach to its own window"
+   *  button that calls back into MainLayout. Hidden in detached windows
+   *  themselves (which already live in their own OS window). */
+  detachToggle?: {
+    onDetach: () => void;
+  };
+  /** When set, the floating toolbar exposes an "in-window maximize"
+   *  toggle. The terminal content always fills its parent — the parent
+   *  is responsible for hiding the chrome around it. */
+  maximizeToggle?: {
+    maximized: boolean;
     onToggle: () => void;
   };
 }
@@ -197,6 +235,10 @@ export function TerminalPanel({
   ssh,
   localShell,
   terminalProfile,
+  adoptedTerminal,
+  preserveSessionOnUnmount = false,
+  detachedWindowControls,
+  onDetachedStateChange,
   visible = true,
   activeForShortcuts = visible,
   inputLocked = false,
@@ -209,20 +251,35 @@ export function TerminalPanel({
   onInputBroadcast,
   sftpToggle,
   chatToggle,
+  detachToggle,
+  maximizeToggle,
 }: TerminalPanelProps) {
   const t = useT();
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
   const onInputBroadcastRef = useRef<typeof onInputBroadcast>(onInputBroadcast);
+  const onDetachedStateChangeRef = useRef<typeof onDetachedStateChange>(onDetachedStateChange);
+  const preserveSessionOnUnmountRef = useRef(preserveSessionOnUnmount);
+  const adoptedTerminalRef = useRef(adoptedTerminal);
   const multiExecActiveRef = useRef(multiExecActive);
   useEffect(() => {
     cwdCallbackRef.current = onCwdChange;
     onSessionReadyRef.current = onSessionReady;
     onOutputRef.current = onOutput;
     onInputBroadcastRef.current = onInputBroadcast;
+    onDetachedStateChangeRef.current = onDetachedStateChange;
+    preserveSessionOnUnmountRef.current = preserveSessionOnUnmount;
     multiExecActiveRef.current = multiExecActive;
-  }, [onCwdChange, onSessionReady, onOutput, onInputBroadcast, multiExecActive]);
+  }, [
+    onCwdChange,
+    onSessionReady,
+    onOutput,
+    onInputBroadcast,
+    onDetachedStateChange,
+    preserveSessionOnUnmount,
+    multiExecActive,
+  ]);
   const containerRef = useRef<HTMLDivElement>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
@@ -297,6 +354,12 @@ export function TerminalPanel({
     mode: "receive" | "send";
     resolve: (action: ConflictAction | SendConflictAction) => void;
   } | null>(null);
+  // Pending keyboard-interactive (MFA/OTP) auth prompt surfaced mid-connect.
+  // `null` when no prompt is active.
+  const [mfaPrompt, setMfaPrompt] = useState<SshAuthPromptPayload | null>(null);
+  // Holds the request id of the prompt awaiting an answer so unmount cleanup
+  // can cancel an unanswered round (telling the backend to abort connect).
+  const pendingMfaRequestIdRef = useRef<string | null>(null);
   const outputLogRef = useRef("");
   const loggingActiveRef = useRef(loggingActive);
   const copyOnSelectRef = useRef(copyOnSelect);
@@ -339,6 +402,14 @@ export function TerminalPanel({
 
   const focusTerminal = useCallback(() => {
     termRef.current?.focus();
+  }, []);
+
+  const collectReattachState = useCallback((): TerminalReattachState => {
+    const term = termRef.current;
+    return {
+      terminalSessionId: sessionIdRef.current ?? undefined,
+      snapshotText: term ? getBufferText(term) : undefined,
+    };
   }, []);
 
   const appendEvent = useCallback((type: string, detail: string) => {
@@ -1413,6 +1484,7 @@ export function TerminalPanel({
     let destroyed = false;
     let unlistenExit: UnlistenFn | null = null;
     let unlistenForwardError: UnlistenFn | null = null;
+    let unlistenAuthPrompt: UnlistenFn | null = null;
     let detachImeGuard: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
 
@@ -1551,7 +1623,11 @@ export function TerminalPanel({
     observer.observe(el);
 
     const { cols, rows } = term;
-    const sid = createTerminalSessionId();
+    const adopted = adoptedTerminalRef.current;
+    const sid = adopted?.sessionId ?? createTerminalSessionId();
+    if (adopted?.snapshotText) {
+      term.write(adopted.snapshotText.replace(/\n/g, "\r\n"));
+    }
 
     // Create the ZMODEM sentry before invoking the backend. The raw output
     // channel can receive early SSH banners before create*Terminal resolves.
@@ -1638,7 +1714,43 @@ export function TerminalPanel({
       },
     );
 
-    const connectPromise = ssh
+    const handleRawOutput = (raw: Uint8Array) => zmodem.consume(raw);
+
+    // SSH connections may demand a second factor (MFA/OTP) via
+    // keyboard-interactive auth. Register the prompt listener BEFORE the
+    // backend can emit — the createSshTerminal call below doesn't resolve until
+    // auth completes, and the MFA event only fires after the SSH handshake +
+    // password round-trip to the remote host, so this local listener is always
+    // in place by the time a prompt arrives.
+    if (ssh && !adopted) {
+      void listenSshAuthPrompt(sid, (payload) => {
+        if (destroyed) {
+          // Window/panel gone — cancel so the backend stops waiting.
+          void submitSshAuthResponse(payload.requestId, null).catch(() => {});
+          return;
+        }
+        pendingMfaRequestIdRef.current = payload.requestId;
+        setMfaPrompt(payload);
+      })
+        .then((un) => {
+          if (destroyed) {
+            un();
+          } else {
+            unlistenAuthPrompt = un;
+          }
+        })
+        .catch(() => {
+          /* listener registration failed — connect proceeds; if the server
+             demands MFA it'll fail with a clear auth error. */
+        });
+    }
+
+    const connectPromise = adopted
+      ? attachTerminalOutput(sid, handleRawOutput).then(() => ({
+          sessionId: sid,
+          shellId: null,
+        }))
+      : ssh
       ? createSshTerminal(
           sid,
           ssh.host,
@@ -1652,7 +1764,7 @@ export function TerminalPanel({
             const ns = getSessionNetworkSettings(ssh.optionsJson);
             return JSON.stringify(toNetworkSettingsPayload(ns));
           })(),
-          (raw) => zmodem.consume(raw),
+          handleRawOutput,
         ).then<{ sessionId: string; shellId: string | null }>((sessionId) => ({
           sessionId,
           shellId: null,
@@ -1664,10 +1776,12 @@ export function TerminalPanel({
           localShell?.id,
           localShell?.args,
           undefined,
-          (raw) => zmodem.consume(raw),
+          handleRawOutput,
         ).then(({ sessionId, shellId }) => ({ sessionId, shellId }));
 
-    if (ssh) {
+    if (adopted) {
+      appendEvent("connection", `Reattaching terminal ${sid}`);
+    } else if (ssh) {
       appendEvent("connection", `Connecting to ${ssh.username}@${ssh.host}:${ssh.port}`);
       appendEvent("auth", `Using ${ssh.authMethod} authentication`);
       term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
@@ -1678,7 +1792,15 @@ export function TerminalPanel({
     connectPromise
       .then(async ({ sessionId: connectedSid, shellId }) => {
         if (destroyed) {
-          closeTerminal(connectedSid).catch(() => {});
+          const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
+          // Adopted panels never own the backend session — don't close
+          // it on unmount even if it appears we were the only mount.
+          // The original detacher / reattacher owns lifecycle.
+          if (preserveSessionOnUnmountRef.current || detachPending || adopted) {
+            onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
+          } else {
+            closeTerminal(connectedSid).catch(() => {});
+          }
           return;
         }
         sessionIdRef.current = connectedSid;
@@ -1686,8 +1808,9 @@ export function TerminalPanel({
         zmodemRef.current = zmodem;
         if (shellId) setResolvedLocalShellId(shellId);
         onSessionReadyRef.current?.(connectedSid);
-        appendEvent("connection", `Connected (${connectedSid})`);
-        if (ssh) {
+        onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
+        appendEvent("connection", `${adopted ? "Reattached" : "Connected"} (${connectedSid})`);
+        if (ssh && !adopted) {
           term.write(formatSshInfoBanner(ssh));
         }
 
@@ -1740,11 +1863,25 @@ export function TerminalPanel({
       clearTimeout(resizeTimer);
       unlistenExit?.();
       unlistenForwardError?.();
+      unlistenAuthPrompt?.();
+      // Cancel any MFA prompt still awaiting an answer so the backend's auth
+      // task stops blocking and tears the half-open connection down.
+      if (pendingMfaRequestIdRef.current) {
+        void submitSshAuthResponse(pendingMfaRequestIdRef.current, null).catch(() => {});
+        pendingMfaRequestIdRef.current = null;
+      }
       detachImeGuard?.();
       if (loggingActiveRef.current && outputLogRef.current) {
         flushRecordedOutput("Terminal closed; saved recorded output");
       }
-      if (sessionIdRef.current) closeTerminal(sessionIdRef.current).catch(() => {});
+      if (sessionIdRef.current && !preserveSessionOnUnmountRef.current) {
+        const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
+        // Adopted sessions are owned by whoever originally created them —
+        // don't close on unmount, even when StrictMode double-mounts.
+        if (!detachPending && !adopted) {
+          closeTerminal(sessionIdRef.current).catch(() => {});
+        }
+      }
       term.dispose();
       termRef.current = null;
       fitAddonRef.current = null;
@@ -2110,6 +2247,101 @@ export function TerminalPanel({
             {t("terminal.chatFloatingButtonLabel")}
           </button>
         )}
+        {detachToggle && (
+          <button
+            type="button"
+            data-testid="terminal-detach"
+            aria-label={t("rdp.detach")}
+            title={t("rdp.detach")}
+            onClick={detachToggle.onDetach}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px 6px",
+              borderRadius: 4,
+              background: "rgba(0,0,0,0.5)",
+              color: "#ccc",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+            }}
+          >
+            <ExternalLink size={12} />
+          </button>
+        )}
+        {maximizeToggle && (
+          <button
+            type="button"
+            data-testid="terminal-maximize"
+            aria-label={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
+            title={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
+            onClick={maximizeToggle.onToggle}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px 6px",
+              borderRadius: 4,
+              background: "rgba(0,0,0,0.5)",
+              color: "#ccc",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+            }}
+          >
+            {maximizeToggle.maximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          </button>
+        )}
+        {detachedWindowControls && (
+          <>
+            <button
+              type="button"
+              data-testid="detached-reattach"
+              aria-label={t("rdp.reattach")}
+              title={t("rdp.reattach")}
+              onClick={() => {
+                preserveSessionOnUnmountRef.current = true;
+                detachedWindowControls.onReattach(collectReattachState());
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: "rgba(0,0,0,0.5)",
+                color: "#ccc",
+                border: "1px solid rgba(255,255,255,0.2)",
+                cursor: "pointer",
+                fontSize: 11,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ExternalLink size={12} />
+              <span>{t("rdp.reattach")}</span>
+            </button>
+            <button
+              type="button"
+              data-testid="detached-os-fullscreen"
+              aria-label={t("rdp.osFullscreen")}
+              title={t("rdp.osFullscreen")}
+              onClick={detachedWindowControls.onToggleOsFullscreen}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: "rgba(0,0,0,0.5)",
+                color: "#ccc",
+                border: "1px solid rgba(255,255,255,0.2)",
+                cursor: "pointer",
+              }}
+            >
+              {detachedWindowControls.osFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            </button>
+          </>
+        )}
       </FloatingToolbar>
 
       {isMultiExecTarget && (
@@ -2292,6 +2524,25 @@ export function TerminalPanel({
           onResolve={(action) => {
             setConflictDialogState(null);
             conflictDialogState.resolve(action);
+          }}
+        />
+      )}
+
+      {mfaPrompt && (
+        <MfaPrompt
+          host={ssh?.host ?? ""}
+          username={ssh?.username ?? ""}
+          request={mfaPrompt}
+          onSubmit={(responses) => {
+            void submitSshAuthResponse(mfaPrompt.requestId, responses).catch(() => {});
+            pendingMfaRequestIdRef.current = null;
+            setMfaPrompt(null);
+            focusTerminal();
+          }}
+          onCancel={() => {
+            void submitSshAuthResponse(mfaPrompt.requestId, null).catch(() => {});
+            pendingMfaRequestIdRef.current = null;
+            setMfaPrompt(null);
           }}
         />
       )}

@@ -10,6 +10,12 @@ pub struct SessionConfig {
     pub port: u16,
     pub username: Option<String>,
     pub auth_method: AuthMethod,
+    /// Protocol-specific options serialized as JSON. The shape depends on
+    /// `session_type`: SSH/Telnet carry terminal + network settings, WSL
+    /// carries the launch argv, and `SessionType::RDP` carries the
+    /// `RdpOptions` tree (`crate::rdp::RdpOptions`, camelCase) — domain,
+    /// colorDepth, screenW/H, nla, performance flags, clipboard/audio/drive
+    /// redirection, and an optional RD Gateway block.
     pub options_json: String,
     pub created_at: i64,
     pub updated_at: i64,

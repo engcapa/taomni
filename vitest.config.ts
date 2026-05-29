@@ -15,5 +15,15 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["src/test/setup.ts"],
+    // .claude/worktrees holds parallel git worktrees for other branches
+    // (Claude Code's worktree feature). They each carry their own
+    // node_modules with a *different* React copy, which makes vitest
+    // pick up two `react` instances and crash hooks at runtime. Skip.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "**/.claude/worktrees/**",
+    ],
   },
 });

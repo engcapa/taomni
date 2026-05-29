@@ -85,7 +85,7 @@ type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark";
+type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -1092,6 +1092,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   /* --- derived --- */
   const needsHost = !["Serial", "File", "Shell", "WSL"].includes(proto);
   const isSSH = ["SSH", "SFTP"].includes(proto);
+  const isRdp = proto === "RDP";
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -1472,16 +1473,28 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         ...(isSSH
           ? [{ id: "advanced" as SectionTab, label: t("sessionEditor2.sectionAdvancedSsh"), icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
           : []),
-        { id: "terminal", label: t("sessionEditor2.sectionTerminal"), icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        // RDP gets a dedicated options tab in place of the Terminal tab
+        // (terminal appearance is meaningless for a graphical RDP session).
+        ...(isRdp
+          ? [{ id: "rdp" as SectionTab, label: t("rdp.options.title"), icon: <Monitor className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+          : [{ id: "terminal" as SectionTab, label: t("sessionEditor2.sectionTerminal"), icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> }]),
         { id: "network",  label: t("sessionEditor2.sectionNetwork"),  icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"),  icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ];
 
-  /* If we switched away from SSH and were on the advanced tab, fall back */
+  /* If we switched away from SSH and were on the advanced tab, fall back.
+   * Likewise default RDP to its own options tab and bounce non-RDP protos
+   * off the rdp tab. */
   const activeSection =
     proto === "File"
       ? "bookmark"
-      : (section === "advanced" && !isSSH ? "terminal" : section);
+      : section === "advanced" && !isSSH
+        ? (isRdp ? "rdp" : "terminal")
+        : section === "rdp" && !isRdp
+          ? "terminal"
+          : section === "terminal" && isRdp
+            ? "rdp"
+            : section;
 
   return (
     <div
@@ -1707,24 +1720,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           </div>
         )}
 
-        {/* Basic RDP settings — appears for the RDP protocol only */}
-        {proto === "RDP" && (
-          <div
-            data-testid="session-rdp-section"
-            className="px-4 py-3 border-b shrink-0"
-            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
-          >
-            <div
-              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
-              style={{ color: "var(--moba-accent)" }}
-            >
-              <Monitor className="w-3.5 h-3.5" />
-              {t("rdp.options.title")}
-            </div>
-            <RdpOptionsForm options={rdpOptions} onChange={setRdpOptions} />
-          </div>
-        )}
-
         {/* Section tabs */}
         <div className="px-3 pt-2 flex shrink-0" style={{ background: "transparent" }}>
           {sectionTabs.map((t) => (
@@ -1782,6 +1777,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
           {activeSection === "terminal" && (
             <TerminalSettings profile={terminalProfile} onProfileChange={setTerminalProfile} />
+          )}
+          {activeSection === "rdp" && (
+            <div data-testid="session-rdp-section">
+              <RdpOptionsForm options={rdpOptions} onChange={setRdpOptions} />
+            </div>
           )}
           {activeSection === "network" && (
             <NetworkSettings

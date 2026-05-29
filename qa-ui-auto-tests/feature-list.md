@@ -1895,7 +1895,7 @@ controls:
     selector: '[data-testid="rdp-panel"]'
     kind: display
   - id: toolbar
-    selector: '[data-testid="rdp-toolbar"]'
+    selector: '[data-testid="rdp-floating-toolbar"]'
     kind: display
   - id: status
     selector: '[data-testid="rdp-status"]'
@@ -1910,12 +1910,19 @@ controls:
     selector: '[data-testid="rdp-resize"]'
     kind: interactive
     optional: true       # disabled until an RDP session reaches connected
+  - id: refresh-screen
+    selector: '[data-testid="rdp-refresh-screen"]'
+    kind: interactive
+    optional: true       # disabled until an RDP session reaches connected
   - id: reconnect
     selector: '[data-testid="rdp-reconnect"]'
     kind: interactive
-  - id: fullscreen
-    selector: '[data-testid="rdp-fullscreen"]'
+  - id: detach
+    selector: '[data-testid="rdp-detach"]'
     kind: interactive
+  - id: view-cycle
+    selector: '[data-testid="rdp-view-cycle"]'
+    kind: interactive       # one button cycles normal → maximized → fullscreen
 -->
 
 - Tauri desktop 模式下通过 IronRDP 0.14 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制

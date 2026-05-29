@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Maximize, Minimize, RefreshCw } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  Expand,
+  Fullscreen,
+  Maximize2,
+  Minimize2,
+  PictureInPicture,
+  PictureInPicture2,
+  RefreshCw,
+  Scan,
+} from "lucide-react";
 
 import {
   applyExtended,
@@ -7,6 +17,7 @@ import {
   encodeKey,
   encodePing,
   encodePointer,
+  encodeRefresh,
   encodeResize,
   encodeWheel,
   keyEventToScancode,
@@ -24,12 +35,14 @@ import {
 import { useRdpStore } from "../../stores/rdpStore";
 import type { RdpOptions } from "../../types/rdp";
 import { useT, t as tr } from "../../lib/i18n";
+import { isTauriRuntime } from "../../lib/runtime";
 import {
   readFiles as readClipboardFiles,
   readText as readClipboardText,
   writeFiles as writeClipboardFiles,
   writeText as writeClipboardText,
 } from "../../lib/clipboard";
+import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
 
 export interface RdpPanelProps {
   tabId: string;
@@ -40,9 +53,26 @@ export interface RdpPanelProps {
   options: RdpOptions;
   networkSettingsJson?: string | null;
   visible: boolean;
+  /** Callback for the toolbar Detach button. When undefined, the button
+   *  is hidden — used by the detached window itself, which should show
+   *  Reattach instead. */
+  onDetach?: () => void;
+  /** When provided the toolbar shows a maximize/restore toggle that the
+   *  parent layout can use to hide the chrome around the panel. The RDP
+   *  canvas still fills its parent — no `position: fixed` shenanigans. */
+  onToggleMaximize?: () => void;
+  maximized?: boolean;
+  detachedWindowControls?: {
+    onReattach: () => void;
+    onToggleOsFullscreen: () => void;
+    osFullscreen: boolean;
+  };
 }
 
 type ScaleMode = "fit" | "one";
+// Combined view state for the single "enlarge" cycle button:
+//   normal → maximized (in-window, app chrome hidden) → fullscreen (OS window).
+type ViewMode = "normal" | "maximized" | "fullscreen";
 
 export default function RdpPanel({
   tabId,
@@ -53,6 +83,10 @@ export default function RdpPanel({
   options,
   networkSettingsJson,
   visible,
+  onDetach,
+  onToggleMaximize,
+  maximized,
+  detachedWindowControls,
 }: RdpPanelProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,7 +102,15 @@ export default function RdpPanel({
   const suppressNextPasteKeyUpRef = useRef(false);
   const initRef = useRef({ host, port, username, password, options, networkSettingsJson });
   const [scaleMode, setScaleMode] = useState<ScaleMode>("fit");
-  const [fullscreen, setFullscreen] = useState(false);
+  // Local maximize fallback used only when the parent does NOT provide a
+  // controlled `maximized` prop. Stays scoped to the panel — never
+  // escapes the OS window.
+  const [localMaximized, setLocalMaximized] = useState(false);
+  const isMaximized = onToggleMaximize ? !!maximized : localMaximized;
+  // Tracks whether the host OS window is fullscreen. Only meaningful for
+  // attached tabs (detached windows manage their own fullscreen via
+  // `detachedWindowControls`). Cosmetic — drives the toolbar icon.
+  const [osFullscreen, setOsFullscreen] = useState(false);
 
   const store = useRdpStore();
   const conn = store.connections[tabId];
@@ -218,6 +260,12 @@ export default function RdpPanel({
                 store.setConnected(tabId, msg.width, msg.height, msg.protocol, msg.server_name);
                 resizeCanvas(canvasRef.current, msg.width, msg.height);
                 window.setTimeout(() => requestViewportResize(false), 0);
+                // Nudge the server to repaint the whole desktop shortly after
+                // we (re)connect. Windows often hands us a stale framebuffer
+                // across the logon→desktop transition; a Refresh Rect request
+                // forces a fresh paint so the canvas is never stuck on the
+                // pre-login image.
+                window.setTimeout(() => sendBinary(encodeRefresh()), 400);
                 break;
               case "disconnected":
                 store.setDisconnected(tabId, msg.reason);
@@ -336,15 +384,81 @@ export default function RdpPanel({
     }, 40);
   }, [sendBinary, sendText]);
 
+  /* ── View controls (local, never forwarded to the remote) ────────── */
+
+  const toggleMaximize = useCallback(() => {
+    if (onToggleMaximize) {
+      onToggleMaximize();
+    } else {
+      setLocalMaximized((m) => !m);
+    }
+  }, [onToggleMaximize]);
+
+  // Toggle the host OS window between fullscreen and normal. Detached
+  // windows already own a fullscreen toggle (passed via
+  // `detachedWindowControls`); attached tabs flip the main app window
+  // directly through the Tauri window API, falling back to the DOM
+  // Fullscreen API in browser dev mode.
+  const toggleOsFullscreen = useCallback(() => {
+    if (detachedWindowControls) {
+      detachedWindowControls.onToggleOsFullscreen();
+      return;
+    }
+    void (async () => {
+      if (isTauriRuntime()) {
+        try {
+          const w = getCurrentWindow();
+          const next = !(await w.isFullscreen());
+          await w.setFullscreen(next);
+          setOsFullscreen(next);
+        } catch {
+          /* window API unavailable — ignore */
+        }
+        return;
+      }
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setOsFullscreen(false);
+        } else {
+          await document.documentElement.requestFullscreen();
+          setOsFullscreen(true);
+        }
+      } catch {
+        /* fullscreen request rejected — ignore */
+      }
+    })();
+  }, [detachedWindowControls]);
+
   const onKey = useCallback(
     (down: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!visible || conn?.status !== "connected") return;
-      if (!down && suppressNextPasteKeyUpRef.current && e.nativeEvent.code === "KeyV") {
+      const code = e.nativeEvent.code;
+
+      // Local view shortcuts intercepted before reaching the remote desktop:
+      //   F11               → toggle host-window OS fullscreen
+      //   Ctrl/⌘+Alt+Enter  → toggle in-window maximize/restore
+      if (code === "F11") {
+        e.preventDefault();
+        if (down && !e.nativeEvent.repeat) toggleOsFullscreen();
+        return;
+      }
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.altKey &&
+        (code === "Enter" || code === "NumpadEnter")
+      ) {
+        e.preventDefault();
+        if (down && !e.nativeEvent.repeat) toggleMaximize();
+        return;
+      }
+
+      if (!down && suppressNextPasteKeyUpRef.current && code === "KeyV") {
         suppressNextPasteKeyUpRef.current = false;
         e.preventDefault();
         return;
       }
-      if (down && (e.ctrlKey || e.metaKey) && e.nativeEvent.code === "KeyV") {
+      if (down && (e.ctrlKey || e.metaKey) && code === "KeyV") {
         e.preventDefault();
         suppressNextPasteKeyUpRef.current = true;
         void syncClipboardForRemotePaste();
@@ -355,7 +469,14 @@ export default function RdpPanel({
       e.preventDefault();
       sendBinary(encodeKey(down, applyExtended(sc.scancode, sc.extended)));
     },
-    [conn?.status, sendBinary, syncClipboardForRemotePaste, visible],
+    [
+      conn?.status,
+      sendBinary,
+      syncClipboardForRemotePaste,
+      toggleMaximize,
+      toggleOsFullscreen,
+      visible,
+    ],
   );
 
   const onPointer = useCallback(
@@ -417,6 +538,10 @@ export default function RdpPanel({
     requestViewportResize(true);
   }, [requestViewportResize]);
 
+  const refreshScreen = useCallback(() => {
+    sendBinary(encodeRefresh());
+  }, [sendBinary]);
+
   const reconnect = useCallback(() => {
     const sid = sessionIdRef.current;
     if (sid) rdpDisconnect(sid).catch(() => {});
@@ -428,10 +553,6 @@ export default function RdpPanel({
     store.setDisconnected(tabId);
     doConnect();
   }, [closeAudio, doConnect, store, tabId]);
-
-  const toggleFullscreen = useCallback(() => {
-    setFullscreen((f) => !f);
-  }, []);
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -445,73 +566,179 @@ export default function RdpPanel({
     [scaleMode],
   );
 
+  /* ── View-size cycle (maximize + fullscreen merged) ──────────────────
+   * One button walks a single linear progression so the four scattered
+   * size controls collapse into a tidy group. Attached tabs cycle
+   *   normal → maximized (in-window) → fullscreen (OS) → normal
+   * Detached windows have no in-window maximize (the window *is* the
+   * panel), so their cycle is just normal ⇄ fullscreen.
+   *
+   * The current mode is DERIVED from the two underlying booleans rather
+   * than tracked separately, so it stays correct even when the user flips
+   * a state out-of-band via F11 / Ctrl+Alt+Enter. We reconcile toward a
+   * target by reusing the existing toggles only when a flip is needed. */
+  const hasInWindowMaximize = !detachedWindowControls;
+  const currentFullscreen = detachedWindowControls
+    ? detachedWindowControls.osFullscreen
+    : osFullscreen;
+  const viewMode: ViewMode = currentFullscreen
+    ? "fullscreen"
+    : hasInWindowMaximize && isMaximized
+      ? "maximized"
+      : "normal";
+
+  const applyView = (targetMaximized: boolean, targetFullscreen: boolean) => {
+    if (hasInWindowMaximize && isMaximized !== targetMaximized) toggleMaximize();
+    if (currentFullscreen !== targetFullscreen) toggleOsFullscreen();
+  };
+
+  const cycleView = () => {
+    if (!hasInWindowMaximize) {
+      applyView(false, !currentFullscreen);
+      return;
+    }
+    if (viewMode === "normal") applyView(true, false);
+    else if (viewMode === "maximized") applyView(true, true);
+    else applyView(false, false);
+  };
+
+  // Icon + tooltip describe what the NEXT click does, so the single button
+  // still reads at a glance.
+  const cycle =
+    viewMode === "fullscreen"
+      ? { icon: <Minimize2 size={14} />, label: t("rdp.restore"), hint: " (F11)" }
+      : viewMode === "maximized"
+        ? { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" }
+        : hasInWindowMaximize
+          ? { icon: <Maximize2 size={14} />, label: t("rdp.maximize"), hint: " (Ctrl+Alt+Enter)" }
+          : { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" };
+
   return (
     <div
       ref={containerRef}
-      className={`rdp-panel ${fullscreen ? "rdp-panel-fullscreen" : ""}`}
+      className={`rdp-panel ${isMaximized ? "rdp-panel-maximized" : ""}`}
       data-testid="rdp-panel"
       tabIndex={0}
       onKeyDown={onKey(true)}
       onKeyUp={onKey(false)}
       style={{
         outline: "none",
-        position: fullscreen ? "fixed" : "relative",
-        inset: fullscreen ? 0 : undefined,
-        zIndex: fullscreen ? 9000 : undefined,
+        position: "relative",
         width: "100%",
         height: "100%",
         background: "#000",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <div
-        className="rdp-toolbar"
-        data-testid="rdp-toolbar"
-        style={{
-          display: "flex",
-          gap: 8,
-          padding: 6,
-          background: "var(--moba-toolbar-bg, #2b2b2b)",
-          color: "var(--moba-text, #ddd)",
-          fontSize: 12,
-          alignItems: "center",
-        }}
+      <FloatingToolbar
+        storageKey="mob.rdp.toolbar"
+        defaultTop={4}
+        defaultRight={4}
+        testId="rdp-floating-toolbar"
       >
-        <span data-testid="rdp-status">{t(`rdp.status.${status}`)}</span>
-        {protocol && <span style={{ opacity: 0.7 }}>· {protocol}</span>}
-        {dims && <span style={{ opacity: 0.7 }}>· {dims}</span>}
-        {stage && <span style={{ opacity: 0.5 }}>· {stage}</span>}
-        <span style={{ flex: 1 }} />
+        <span
+          data-testid="rdp-status"
+          style={{
+            fontSize: 11,
+            color: "#ddd",
+            padding: "0 6px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t(`rdp.status.${status}`)}
+          {protocol && <span style={{ opacity: 0.65 }}>· {protocol}</span>}
+          {dims && <span style={{ opacity: 0.65 }}>· {dims}</span>}
+          {stage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
+        </span>
+        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+        {/* Action group — operations on the live session. */}
         <button
           type="button"
-          className="moba-button"
+          data-testid="rdp-reconnect"
+          onClick={reconnect}
+          title={t("rdp.reconnect")}
+          aria-label={t("rdp.reconnect")}
+          style={FT_ICON_BUTTON_STYLE}
+        >
+          <RefreshCw size={14} />
+        </button>
+        <button
+          type="button"
+          data-testid="rdp-refresh-screen"
+          disabled={conn?.status !== "connected"}
+          onClick={refreshScreen}
+          title={t("rdp.refreshScreen")}
+          aria-label={t("rdp.refreshScreen")}
+          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
+        >
+          <Scan size={14} />
+        </button>
+        {onDetach && (
+          <button
+            type="button"
+            data-testid="rdp-detach"
+            onClick={onDetach}
+            title={t("rdp.detach")}
+            aria-label={t("rdp.detach")}
+            style={FT_ICON_BUTTON_STYLE}
+          >
+            <PictureInPicture2 size={14} />
+          </button>
+        )}
+        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+        {/* View group — everything that changes how the desktop is sized or
+            displayed, kept together so the size controls read at a glance. */}
+        <button
+          type="button"
           data-testid="rdp-scale-toggle"
           onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
+          title={scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
+          style={FT_BUTTON_STYLE}
         >
           {scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
         </button>
         <button
           type="button"
-          className="moba-button"
           data-testid="rdp-resize"
           disabled={conn?.status !== "connected"}
           onClick={triggerResize}
           title={t("rdp.resize")}
+          aria-label={t("rdp.resize")}
+          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
         >
-          {t("rdp.resize")}
+          <Expand size={14} />
         </button>
         <button
           type="button"
-          className="moba-button"
-          data-testid="rdp-reconnect"
-          onClick={reconnect}
-          title={t("rdp.reconnect")}
+          data-testid="rdp-view-cycle"
+          onClick={cycleView}
+          title={`${cycle.label}${cycle.hint}`}
+          aria-label={cycle.label}
+          style={FT_ICON_BUTTON_STYLE}
         >
-          <RefreshCw size={14} />
+          {cycle.icon}
         </button>
-        <button type="button" className="moba-button" data-testid="rdp-fullscreen" onClick={toggleFullscreen}>
-          {fullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-        </button>
-      </div>
+        {detachedWindowControls && (
+          <>
+            <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+            <button
+              type="button"
+              data-testid="detached-reattach"
+              onClick={detachedWindowControls.onReattach}
+              title={t("rdp.reattach")}
+              aria-label={t("rdp.reattach")}
+              style={FT_BUTTON_STYLE}
+            >
+              <PictureInPicture size={14} />
+              <span>{t("rdp.reattach")}</span>
+            </button>
+          </>
+        )}
+      </FloatingToolbar>
 
       <div
         ref={viewportRef}
@@ -519,7 +746,7 @@ export default function RdpPanel({
           flex: 1,
           background: "#000",
           width: "100%",
-          height: "calc(100% - 36px)",
+          minHeight: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -569,6 +796,46 @@ export default function RdpPanel({
     </div>
   );
 }
+
+const FT_BUTTON_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+  padding: "3px 8px",
+  background: "rgba(0,0,0,0.45)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 4,
+  fontSize: 11,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+// Square icon-only button. Slightly larger hit area + centered glyph so the
+// distinct lucide icons (reconnect / refresh-screen / detach / maximize…) are
+// easy to tell apart at a glance.
+const FT_ICON_BUTTON_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 26,
+  height: 24,
+  padding: 0,
+  background: "rgba(0,0,0,0.45)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 4,
+  cursor: "pointer",
+};
+
+// Thin vertical rule that visually groups related toolbar buttons.
+const FT_SEPARATOR_STYLE: React.CSSProperties = {
+  width: 1,
+  alignSelf: "stretch",
+  margin: "2px 2px",
+  background: "rgba(255,255,255,0.18)",
+};
 
 /* ── Canvas helpers ─────────────────────────────────────────────────── */
 

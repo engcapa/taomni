@@ -20,6 +20,7 @@ mod tunnel;
 pub mod vault;
 mod vnc;
 mod voice;
+mod windowing;
 mod wsl;
 
 use state::AppState;
@@ -87,6 +88,8 @@ pub fn run() {
             terminal::open_local_shell_as_administrator,
             terminal::create_local_terminal,
             terminal::create_ssh_terminal,
+            terminal::submit_ssh_auth_response,
+            terminal::attach_terminal_output,
             terminal::test_ssh_connection,
             terminal::write_terminal,
             terminal::resize_terminal,
@@ -132,6 +135,8 @@ pub fn run() {
             filebrowser::sftp_pause_transfer,
             filebrowser::sftp_resume_transfer,
             filebrowser::open_sftp_window,
+            windowing::open_detached_window,
+            windowing::close_current_detached_window,
             appearance::list_system_fonts,
             config::select_private_key_file,
             config::select_upload_file,

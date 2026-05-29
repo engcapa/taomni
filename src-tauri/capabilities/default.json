@@ -4,7 +4,10 @@
   "description": "enables the default permissions",
   "windows": [
     "main",
-    "sftp-*"
+    "sftp-*",
+    "rdp-*",
+    "vnc-*",
+    "terminal-*"
   ],
   "permissions": [
     "core:default",
@@ -13,6 +16,8 @@
     "core:window:allow-minimize",
     "core:window:allow-start-resize-dragging",
     "core:window:allow-start-dragging",
-    "core:window:allow-toggle-maximize"
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen"
   ]
 }

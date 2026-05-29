@@ -66,6 +66,7 @@ pub mod channel {
     pub const IN_POINTER: u8 = 3;
     pub const IN_RESIZE: u8 = 4;
     pub const IN_WHEEL: u8 = 5;
+    pub const IN_REFRESH: u8 = 6; // request a full-desktop redraw
 }
 
 #[derive(Debug)]
@@ -74,6 +75,8 @@ pub enum RdpControl {
     Pointer(PointerEvent),
     Wheel(PointerWheelEvent),
     Resize { width: u16, height: u16 },
+    /// Ask the server to redraw the whole desktop (TS_REFRESH_RECT_PDU).
+    Refresh,
     ClipboardOffer { formats: u32 },
     ClipboardData { format: u32, data: Vec<u8> },
     ClipboardFiles { paths: Vec<String> },
@@ -99,6 +102,8 @@ enum WsIncomingText {
     ClipboardFiles { paths: Vec<String> },
     #[serde(rename = "resize")]
     Resize { width: u16, height: u16 },
+    #[serde(rename = "refresh")]
+    Refresh,
     #[serde(rename = "disconnect")]
     Disconnect,
 }
@@ -159,6 +164,7 @@ pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> 
     });
 
     let cancel_clone = cancel.clone();
+    let cancel_guard = cancel.clone();
     let control_tx_for_relay = control_tx.clone();
     tokio::spawn(async move {
         if let Err(e) = run_relay(
@@ -174,6 +180,10 @@ pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> 
         {
             tracing::error!("RDP relay error: {}", e);
         }
+        // Always fire the cancellation token once the relay loop ends — even
+        // on the early-return error paths — so the session-map reaper in
+        // `rdp_connect` wakes up and drops the now-dead `RdpSession` entry.
+        cancel_guard.cancel();
     });
 
     Ok(RdpSession {
@@ -258,6 +268,9 @@ async fn run_relay(
                             }
                             WsIncomingText::Resize { width, height } => {
                                 let _ = ctrl.send(RdpControl::Resize { width, height });
+                            }
+                            WsIncomingText::Refresh => {
+                                let _ = ctrl.send(RdpControl::Refresh);
                             }
                             WsIncomingText::Disconnect => {
                                 let _ = ctrl.send(RdpControl::Disconnect);
@@ -360,6 +373,7 @@ async fn run_relay(
 /// tag=IN_WHEEL:  [tag, orientation, x_hi, x_lo, y_hi, y_lo, units_hi, units_lo]
 /// tag=IN_PING:   [tag]
 /// tag=IN_ACK:    [tag]
+/// tag=IN_REFRESH:[tag]
 /// ```
 pub fn parse_binary_control(bytes: &[u8]) -> Option<RdpControl> {
     if bytes.is_empty() {
@@ -367,6 +381,7 @@ pub fn parse_binary_control(bytes: &[u8]) -> Option<RdpControl> {
     }
     match bytes[0] {
         channel::IN_PING | channel::IN_ACK => Some(RdpControl::Ack),
+        channel::IN_REFRESH => Some(RdpControl::Refresh),
         channel::IN_KEY if bytes.len() >= 4 => {
             let down = bytes[1] != 0;
             let scancode = u16::from_be_bytes([bytes[2], bytes[3]]);
@@ -478,6 +493,14 @@ mod tests {
         assert!(matches!(
             parse_binary_control(&[channel::IN_ACK]),
             Some(RdpControl::Ack)
+        ));
+    }
+
+    #[test]
+    fn parse_refresh() {
+        assert!(matches!(
+            parse_binary_control(&[channel::IN_REFRESH]),
+            Some(RdpControl::Refresh)
         ));
     }
 
