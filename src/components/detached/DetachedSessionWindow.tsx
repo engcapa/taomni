@@ -389,6 +389,12 @@ function renderInner(
     }
     case "terminal": {
       const p = params as DetachedTerminalParams;
+      const adopted = p.reattach?.terminalSessionId
+        ? {
+            sessionId: p.reattach.terminalSessionId,
+            snapshotText: p.reattach.snapshotText,
+          }
+        : undefined;
       return (
         <TerminalPanel
           tabId={`detached-term-${id}`}
@@ -396,6 +402,7 @@ function renderInner(
           ssh={p.ssh ?? undefined}
           localShell={p.localShell ?? undefined}
           terminalProfile={p.terminalProfile ?? undefined}
+          adoptedTerminal={adopted}
           preserveSessionOnUnmount
           detachedWindowControls={detachedWindowControls}
           onDetachedStateChange={onTerminalStateChange}

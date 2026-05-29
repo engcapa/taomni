@@ -86,7 +86,7 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
-import { registerTerminal } from "../../lib/terminal/terminalRegistry";
+import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
   type ZmodemState,
@@ -1751,7 +1751,11 @@ export function TerminalPanel({
     connectPromise
       .then(async ({ sessionId: connectedSid, shellId }) => {
         if (destroyed) {
-          if (preserveSessionOnUnmountRef.current) {
+          const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
+          // Adopted panels never own the backend session — don't close
+          // it on unmount even if it appears we were the only mount.
+          // The original detacher / reattacher owns lifecycle.
+          if (preserveSessionOnUnmountRef.current || detachPending || adopted) {
             onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
           } else {
             closeTerminal(connectedSid).catch(() => {});
@@ -1823,7 +1827,12 @@ export function TerminalPanel({
         flushRecordedOutput("Terminal closed; saved recorded output");
       }
       if (sessionIdRef.current && !preserveSessionOnUnmountRef.current) {
-        closeTerminal(sessionIdRef.current).catch(() => {});
+        const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
+        // Adopted sessions are owned by whoever originally created them —
+        // don't close on unmount, even when StrictMode double-mounts.
+        if (!detachPending && !adopted) {
+          closeTerminal(sessionIdRef.current).catch(() => {});
+        }
       }
       term.dispose();
       termRef.current = null;

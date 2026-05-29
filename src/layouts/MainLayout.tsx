@@ -80,7 +80,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
-import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
+import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
 import { t as tr, useT } from "../lib/i18n";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
@@ -345,6 +345,7 @@ export function MainLayout() {
           })
           .catch((err) => {
             clearGenericHandoff(kind, detachedId);
+            if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
             setStatusMessage(
               tr("status.detachWindowError", {
                 error: err instanceof Error ? err.message : String(err),
@@ -358,6 +359,7 @@ export function MainLayout() {
       const handle = window.open(url, `newmob_${kind}_${detachedId}`, features);
       if (!handle) {
         clearGenericHandoff(kind, detachedId);
+        if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
         setStatusMessage(tr("status.detachPopupBlocked"));
         return;
       }
@@ -406,17 +408,34 @@ export function MainLayout() {
       tab: Tab,
       title: string,
     ) => {
-      // Terminal credentials live on the tab itself (`tab.ssh` /
-      // `tab.localShell`). Either path is sufficient for the detached
-      // window to spin up its own pty/SSH session.
+      // Capture the live backend session id + scrollback snapshot so the
+      // detached window can adopt the existing PTY/SSH session instead of
+      // spawning a fresh one. The TerminalPanel cleanup on the source tab
+      // honours the detach-pending flag and skips its `closeTerminal`
+      // call so the backend session survives the React unmount.
       const detachedId = `${tabId}__detached`;
+      const liveSessionId = terminalSessionIds.current[tabId];
+      const liveEntry = getTerminal(tabId);
+      const snapshotText = liveEntry ? liveEntry.getBufferText() : undefined;
+      const reattach = liveSessionId
+        ? { terminalSessionId: liveSessionId, snapshotText }
+        : undefined;
       const payload: DetachedTerminalParams = {
         title,
         ssh: tab.ssh ?? null,
         localShell: tab.localShell ?? null,
         terminalProfile: tab.terminalProfile ?? null,
+        reattach,
       };
-      openDetachedGenericWindow("terminal", tabId, detachedId, payload, title);
+      if (liveSessionId) {
+        markTerminalDetachPending(tabId);
+      }
+      try {
+        openDetachedGenericWindow("terminal", tabId, detachedId, payload, title);
+      } catch (err) {
+        clearTerminalDetachPending(tabId);
+        throw err;
+      }
     },
     [openDetachedGenericWindow],
   );
