@@ -65,6 +65,9 @@ import {
   attachTerminalOutput,
   createLocalTerminal,
   createSshTerminal,
+  listenSshAuthPrompt,
+  submitSshAuthResponse,
+  type SshAuthPromptPayload,
   writeTerminal,
   resizeTerminal,
   sendTerminalSignal,
@@ -96,6 +99,7 @@ import {
   type SendConflictAction,
 } from "../../lib/zmodem";
 import { ZmodemConflictDialog } from "./ZmodemConflictDialog";
+import { MfaPrompt } from "../session/MfaPrompt";
 import { CommonCommandsPalette } from "./CommonCommandsPalette";
 import { AiRewriteOverlay } from "./AiRewriteOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -350,6 +354,12 @@ export function TerminalPanel({
     mode: "receive" | "send";
     resolve: (action: ConflictAction | SendConflictAction) => void;
   } | null>(null);
+  // Pending keyboard-interactive (MFA/OTP) auth prompt surfaced mid-connect.
+  // `null` when no prompt is active.
+  const [mfaPrompt, setMfaPrompt] = useState<SshAuthPromptPayload | null>(null);
+  // Holds the request id of the prompt awaiting an answer so unmount cleanup
+  // can cancel an unanswered round (telling the backend to abort connect).
+  const pendingMfaRequestIdRef = useRef<string | null>(null);
   const outputLogRef = useRef("");
   const loggingActiveRef = useRef(loggingActive);
   const copyOnSelectRef = useRef(copyOnSelect);
@@ -1474,6 +1484,7 @@ export function TerminalPanel({
     let destroyed = false;
     let unlistenExit: UnlistenFn | null = null;
     let unlistenForwardError: UnlistenFn | null = null;
+    let unlistenAuthPrompt: UnlistenFn | null = null;
     let detachImeGuard: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
 
@@ -1704,6 +1715,36 @@ export function TerminalPanel({
     );
 
     const handleRawOutput = (raw: Uint8Array) => zmodem.consume(raw);
+
+    // SSH connections may demand a second factor (MFA/OTP) via
+    // keyboard-interactive auth. Register the prompt listener BEFORE the
+    // backend can emit — the createSshTerminal call below doesn't resolve until
+    // auth completes, and the MFA event only fires after the SSH handshake +
+    // password round-trip to the remote host, so this local listener is always
+    // in place by the time a prompt arrives.
+    if (ssh && !adopted) {
+      void listenSshAuthPrompt(sid, (payload) => {
+        if (destroyed) {
+          // Window/panel gone — cancel so the backend stops waiting.
+          void submitSshAuthResponse(payload.requestId, null).catch(() => {});
+          return;
+        }
+        pendingMfaRequestIdRef.current = payload.requestId;
+        setMfaPrompt(payload);
+      })
+        .then((un) => {
+          if (destroyed) {
+            un();
+          } else {
+            unlistenAuthPrompt = un;
+          }
+        })
+        .catch(() => {
+          /* listener registration failed — connect proceeds; if the server
+             demands MFA it'll fail with a clear auth error. */
+        });
+    }
+
     const connectPromise = adopted
       ? attachTerminalOutput(sid, handleRawOutput).then(() => ({
           sessionId: sid,
@@ -1822,6 +1863,13 @@ export function TerminalPanel({
       clearTimeout(resizeTimer);
       unlistenExit?.();
       unlistenForwardError?.();
+      unlistenAuthPrompt?.();
+      // Cancel any MFA prompt still awaiting an answer so the backend's auth
+      // task stops blocking and tears the half-open connection down.
+      if (pendingMfaRequestIdRef.current) {
+        void submitSshAuthResponse(pendingMfaRequestIdRef.current, null).catch(() => {});
+        pendingMfaRequestIdRef.current = null;
+      }
       detachImeGuard?.();
       if (loggingActiveRef.current && outputLogRef.current) {
         flushRecordedOutput("Terminal closed; saved recorded output");
@@ -2476,6 +2524,25 @@ export function TerminalPanel({
           onResolve={(action) => {
             setConflictDialogState(null);
             conflictDialogState.resolve(action);
+          }}
+        />
+      )}
+
+      {mfaPrompt && (
+        <MfaPrompt
+          host={ssh?.host ?? ""}
+          username={ssh?.username ?? ""}
+          request={mfaPrompt}
+          onSubmit={(responses) => {
+            void submitSshAuthResponse(mfaPrompt.requestId, responses).catch(() => {});
+            pendingMfaRequestIdRef.current = null;
+            setMfaPrompt(null);
+            focusTerminal();
+          }}
+          onCancel={() => {
+            void submitSshAuthResponse(mfaPrompt.requestId, null).catch(() => {});
+            pendingMfaRequestIdRef.current = null;
+            setMfaPrompt(null);
           }}
         />
       )}

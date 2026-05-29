@@ -95,6 +95,47 @@ export async function createSshTerminal(
   );
 }
 
+/** A single prompt within a keyboard-interactive (MFA/OTP) auth round. */
+export interface SshAuthPromptEntry {
+  prompt: string;
+  /** When false the answer is secret (password/OTP) and should be masked. */
+  echo: boolean;
+}
+
+/** Payload of the `ssh-auth-prompt-{sessionId}` event. */
+export interface SshAuthPromptPayload {
+  requestId: string;
+  name: string;
+  instructions: string;
+  prompts: SshAuthPromptEntry[];
+}
+
+/**
+ * Listen for keyboard-interactive auth prompts (MFA/OTP) emitted by the
+ * backend mid-connect for `sessionId`. The callback receives the server's
+ * prompts; answer them via {@link submitSshAuthResponse} using the same
+ * `requestId`.
+ */
+export async function listenSshAuthPrompt(
+  sessionId: string,
+  callback: (payload: SshAuthPromptPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<SshAuthPromptPayload>(`ssh-auth-prompt-${sessionId}`, (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Deliver the user's answers to a pending keyboard-interactive auth round.
+ * Pass `null` for `responses` to cancel the prompt (aborts the connection).
+ */
+export async function submitSshAuthResponse(
+  requestId: string,
+  responses: string[] | null,
+): Promise<void> {
+  return invoke("submit_ssh_auth_response", { requestId, responses });
+}
+
 export async function attachTerminalOutput(
   sessionId: string,
   onOutput?: (data: Uint8Array) => void,

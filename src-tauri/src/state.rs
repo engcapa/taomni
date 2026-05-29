@@ -23,6 +23,13 @@ pub struct ReadStreamHandle {
     pub file: std::fs::File,
 }
 
+/// In-flight keyboard-interactive (MFA/OTP) auth round. The SSH connect task
+/// registers a oneshot sender here keyed by a per-round request id, emits a
+/// prompt event to the frontend, then awaits the user's answers on the
+/// receiver. `submit_ssh_auth_response` looks the sender up and delivers the
+/// responses (or `None` if the user cancelled).
+pub type SshAuthResponder = tokio::sync::oneshot::Sender<Option<Vec<String>>>;
+
 pub struct AppState {
     pub terminals: Arc<RwLock<HashMap<String, ActiveTerminal>>>,
     pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>,
@@ -33,6 +40,9 @@ pub struct AppState {
     pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
+    /// Pending keyboard-interactive auth rounds, keyed by request id. See
+    /// [`SshAuthResponder`].
+    pub ssh_auth_responders: Arc<Mutex<HashMap<String, SshAuthResponder>>>,
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
     pub vault: Arc<Vault>,
@@ -55,6 +65,7 @@ impl AppState {
             rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
             read_handles: Arc::new(Mutex::new(HashMap::new())),
             write_handles: Arc::new(Mutex::new(HashMap::new())),
+            ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
             vault,

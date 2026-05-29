@@ -375,6 +375,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         onOutput: args?.onOutput as SshConnectArgs["onOutput"],
       })) as T;
     }
+    case "submit_ssh_auth_response": {
+      // Keyboard-interactive (MFA) auth is driven by the real Rust backend.
+      // The browser preview's WS SSH proxy doesn't surface interactive
+      // prompts, so this is a no-op here.
+      return undefined as T;
+    }
     case "test_ssh_connection": {
       // The browser preview can't honour proxy / port-forwarding rows
       // either; we ignore `networkSettingsJson` here for symmetry with

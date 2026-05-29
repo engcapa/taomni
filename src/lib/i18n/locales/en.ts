@@ -374,6 +374,15 @@ const dict = {
     sshPasswordAria: "SSH password",
     closeAria: "Close authentication dialog",
   },
+  mfaPrompt: {
+    title: "Two-step verification",
+    subtitle: "{user}@{host} requires an additional verification step.",
+    defaultPrompt: "Verification code",
+    submit: "Continue",
+    cancel: "Cancel",
+    closeAria: "Close verification dialog",
+    answerAria: "Verification response",
+  },
   vault: {
     setupTitle: "Set up password vault",
     setupSubtitle: "Choose a master password to encrypt saved credentials.",

@@ -373,6 +373,15 @@ export const zhCN: DeepPartial<typeof en> = {
     sshPasswordAria: "SSH 密码",
     closeAria: "关闭认证窗口",
   },
+  mfaPrompt: {
+    title: "两步验证",
+    subtitle: "{user}@{host} 需要额外的验证步骤。",
+    defaultPrompt: "验证码",
+    submit: "继续",
+    cancel: "取消",
+    closeAria: "关闭验证窗口",
+    answerAria: "验证码输入",
+  },
   vault: {
     setupTitle: "设置密码库",
     setupSubtitle: "请设置一个主密码用于加密保存的凭据。",
