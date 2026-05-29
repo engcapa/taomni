@@ -1,5 +1,25 @@
 # RDP Support Plan
 
+> **Document status.** This file started life as the initial design plan. The
+> implementation diverged from that plan in two important ways during
+> development, and the sections below have been calibrated to match the code
+> that actually shipped:
+>
+> 1. **IronRDP was upgraded 0.8 → 0.14.** The original plan pinned 0.8-era
+>    crates; the branch now targets the IronRDP 0.14 family.
+> 2. **The RDP protocol stack is delegated to IronRDP, not hand-rolled.** The
+>    early plan described a VNC-style hand-written protocol layer
+>    (`session.rs` mirroring `vnc/rfb.rs`, hand-coded CLIPRDR/RDPSND/RFX PDUs,
+>    hand-rolled X.224/MCS). In the shipped code, IronRDP's
+>    connector/session/virtual-channel backends own all of that. Several
+>    hand-written modules from the original route survive in the tree as
+>    framing/codec helpers with round-trip unit tests but are **not on the
+>    live connection path** — they are called out explicitly below.
+>
+> The RD Gateway (MS-TSGU) transport is the one piece that remains
+> hand-rolled, because no maintained Rust crate covers it; IronRDP's
+> transport-agnostic design is the seam that lets it plug in.
+
 ## Context
 
 NewMob already supports SSH/SFTP/Telnet and a hand-rolled VNC client with a
@@ -88,8 +108,7 @@ implementation behind them.
 
 ## Architecture
 
-Mirror the VNC architecture (`src-tauri/src/vnc/`) one-for-one. The high-level
-flow is:
+The flow mirrors the VNC architecture (`src-tauri/src/vnc/`):
 
 ```
 React <RdpPanel> ──ws──▶ Rust local-WS relay ──▶ IronRDP session ──▶ Transport
@@ -97,92 +116,125 @@ React <RdpPanel> ──ws──▶ Rust local-WS relay ──▶ IronRDP session
                                                 ┌──────────────────────┼──────────────────────┐
                                                 ▼                      ▼                      ▼
                                           Direct TCP            HTTP/SOCKS5 proxy        RD Gateway
-                                          (open_tcp_filtered)   (establish_transport)    (rpc_over_https)
+                                          (establish_transport, (establish_transport)   (gateway::open_tunnel,
+                                           proxy off)                                    RPC-over-HTTPS)
 ```
 
 Everything below the "Transport" row resolves to `AsyncRead + AsyncWrite`; the
-RDP session does not know which path it took.
+IronRDP session does not know which path it took.
 
 ### Library choice — IronRDP (Devolutions)
 
 - Crate: `ironrdp` umbrella (`ironrdp-connector`, `ironrdp-session`,
   `ironrdp-async`, `ironrdp-tokio`, `ironrdp-cliprdr`, `ironrdp-rdpdr`,
   `ironrdp-rdpsnd`).
-- Use IronRDP 0.14.x, Apache-2.0/MIT, transport-agnostic, supports CredSSP
-  (NLA), TLS, RemoteFX/graphics through `ironrdp-session`, and the three
-  virtual channels we need.
-- Pin exact versions in `src-tauri/Cargo.toml` and do not keep 0.8
-  compatibility shims in this branch.
+- **Shipped on IronRDP 0.14.x** (upgraded from the 0.8.x the plan originally
+  pinned). Apache-2.0/MIT, transport-agnostic, supports CredSSP (NLA), TLS,
+  RemoteFX/graphics through `ironrdp-session`, and the three virtual channels
+  we need. The active-stage loop (`ActiveStage`), CredSSP/NLA, MCS, capability
+  exchange, bitmap/RemoteFX/surface decoding, and fast-path input are all
+  IronRDP's; `session.rs` drives that loop rather than re-implementing it.
+- Versions are pinned exactly in `src-tauri/Cargo.toml`; no 0.8 compatibility
+  shims remain.
 
 ## Backend (`src-tauri/src/rdp/`)
 
-Mirror `src-tauri/src/vnc/`:
+The actual module layout (which differs from the original plan — the
+hand-rolled protocol modules listed at the bottom survive only as
+framing/codec helpers + tests):
 
-| New file | Mirrors | Responsibility |
-|---|---|---|
-| `mod.rs` | `vnc/mod.rs` | Public Tauri commands: `rdp_connect`, `rdp_disconnect`, `rdp_test_connection`. |
-| `ws.rs` | `vnc/ws.rs` | Bind a `127.0.0.1:0` listener, return `ws_port`, accept one WS upgrade, run the relay (3 tasks: WS→input, framebuffer→WS, control). |
-| `session.rs` | `vnc/rfb.rs` | Drives `ironrdp-tokio::Framed` over the chosen transport; owns NLA/CredSSP, capability exchange, fast-path input, bitmap and surface decoding. |
-| `frame.rs` | `vnc/encodings.rs` | Owns the stable RGBA tile wire format, color helpers, and tile slicing/validation; IronRDP active stage performs bitmap, RemoteFX, and surface decoding. |
-| `transport.rs` | new | The `Transport` enum / async constructor that returns the unified `AsyncRead + AsyncWrite` (see Transport stack below). |
-| `gateway.rs` | new | RD Gateway (MS-TSGU) RPC-over-HTTPS twin-channel transport. |
-| `cliprdr.rs` | `vnc/clipboard.rs` | CLIPRDR including `CFSTR_FILEGROUPDESCRIPTORW` + `CFSTR_FILECONTENTS` for multi-file copy/paste. |
-| `rdpsnd.rs` | new | RDPSND virtual channel; emits PCM frames as binary WS messages tagged `audio`. |
-| `rdpdr.rs` | new | RDPDR drive redirection, maps one local folder → one remote drive letter. |
+**On the live connection path:**
 
-`AppState` (`src-tauri/src/state.rs`) gains:
+| File | Responsibility |
+|---|---|
+| `mod.rs` | Public Tauri commands `rdp_connect`, `rdp_disconnect`, `rdp_test_connection`; the `RdpOptions`/`GatewayOpt`/`PerformanceFlags`/`DriveRedirectOpt` config structs parsed from `options_json`; vault secret resolution; session-credential reuse for the gateway. |
+| `ws.rs` | Bind a `127.0.0.1:0` listener, return `ws_port`, accept one WS upgrade, run the relay (outgoing→WS pump, WS→control reader, session driver, idle watchdog). Owns the binary WS tag protocol and `parse_binary_control`. |
+| `session.rs` | Drives IronRDP end-to-end: `ClientConnector` → TLS upgrade → CredSSP/NLA finalize → `ActiveStage` loop. Attaches the IronRDP `CliprdrClient`, `Rdpsnd`, `Rdpdr`, and `DisplayControlClient` (via `DrdynvcClient`) backends; converts fast-path input; handles `DeactivateAll` reactivation and the resize-reconnect fallback. Also hosts the `ClipboardBridge` and the `RdpsndWsBackend`/`NewMobCliprdrBackend` adapters. |
+| `transport.rs` | The `RdpStream` enum (`Tcp` / `Gateway`) and `open_transport` async constructor returning a unified `AsyncRead + AsyncWrite` (direct / proxy / gateway). |
+| `frame.rs` | The stable RGBA tile wire format (`TileHeader` / `DecodedTile`), tile validation, and color helpers. IronRDP performs the actual bitmap/RemoteFX/surface decode into a framebuffer; `session.rs` slices tiles out of it. |
+| `input.rs` | `KeyEvent` / `PointerEvent` / `PointerWheelEvent` types shared by `ws.rs` and `session.rs`, plus a minimal `code_to_scancode` table for tests. |
+| `rdpdr.rs` | The `LocalDriveBackend` that implements IronRDP's `RdpdrBackend` trait — one mapped local folder → one redirected drive, with `safe_join` path sandboxing and the full IO-request handler set (Create/Read/Write/Close/Query{Information,Directory,Volume}/SetInformation). |
+| `gateway/mod.rs` | RD Gateway (MS-TSGU) RPC-over-HTTPS twin-channel transport: the authenticated HTTPS pair, RTS bootstrap, TsProxy handshake, and the `GatewayStream` (`AsyncRead + AsyncWrite`). |
+| `gateway/ndr.rs` | NDR encode/decode for the TsProxy* RPC stubs (create/authorize/make-call/create-channel/close). |
+| `gateway/ntlm.rs` | Hand-rolled NTLMv2 type 1/2/3 framing, HMAC-MD5, and the Type3 MIC. |
+| `gateway/rpch.rs` | RPC-over-HTTP RTS PDUs (CONN/A1, CONN/B1, CONN/A3, CONN/C2). |
+
+**Survives from the original hand-rolled route — framing/codec helpers with
+round-trip tests, NOT on the live path** (IronRDP owns the real work):
+
+| File | Note |
+|---|---|
+| `cliprdr.rs` | Only `paths_to_uri_list` / `uri_list_to_paths` are live — reused by the global clipboard commands in `config/mod.rs` for the non-Windows `text/uri-list` shim. The hand-written CLIPRDR PDU/format-list/FILEDESCRIPTORW codecs are unused (IronRDP's `CliprdrClient` handles CLIPRDR). |
+| `rdpsnd.rs` | Unused. `session.rs` uses IronRDP's `Rdpsnd` + `RdpsndClientHandler`; this module's `WaveFormat`/`pick_pcm_format`/Wave-confirm framing is dead. |
+| `rfx.rs` | RFX *envelope* framing only; the DWT/Quant/RLGR decoder was never written. RemoteFX is decoded by IronRDP (`client_codecs_capabilities(["remotefx"])`). Unused on the live path. |
+| `pdu/{tpkt,x224,nego,mcs}.rs` | Hand-rolled TPKT/X.224/Negotiation/MCS PDUs from the pre-IronRDP route. IronRDP's connector performs the real negotiation; these are unused outside their own tests. |
+
+> These four leftover modules are candidates for cleanup; they duplicate
+> IronRDP functionality and exist only because the early implementation
+> hand-rolled the protocol before the IronRDP delegation was adopted.
+
+`AppState` (`src-tauri/src/state.rs`) gained:
 
 ```rust
 pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
 ```
 
-`RdpSession` carries the same shape as `VncSession`: `control_tx`, `ws_port`,
-`cancel`. Register the three commands in `src-tauri/src/lib.rs` next to the VNC
-ones (`vnc::vnc_connect, …`).
+`RdpSession` (defined in `ws.rs`) carries `control_tx`, `ws_port`, and
+`cancel`. The three commands are registered in `src-tauri/src/lib.rs` next to
+the VNC ones; RDP spawns no autostart.
 
 ### Transport stack (`rdp/transport.rs`)
 
-One async constructor, three branches, returns
-`Box<dyn AsyncRead + AsyncWrite + Unpin + Send>`:
+`open_transport(host, port, network, gateway)` returns an `RdpTransport`
+wrapping an `RdpStream` enum (`Tcp(TcpStream)` | `Gateway(GatewayStream)`),
+both implementing `AsyncRead + AsyncWrite + Unpin + Send`. Selection:
 
-```rust
-match (network.proxy_kind.as_str(), options.gateway.as_ref()) {
-    (_, Some(g)) => gateway::open_tunnel(g, host, port).await?,
-    ("none", None) => terminal::network::open_tcp_filtered(host, port, ip_pref).await?,
-    ("http"|"socks5", None) => terminal::network::establish_transport(host, port, Some(network)).await?,
-    (other, _) => return Err(format!("proxy '{other}' not supported for RDP")),
-}
+```text
+1. gateway present        → gateway::open_tunnel (host/port = inner RDP target)
+2. proxy_kind "" | "none"  → direct TCP (establish_transport with proxy forced off)
+3. proxy_kind http|socks5 → establish_transport (HTTP-CONNECT / SOCKS5 + auth)
+4. anything else          → Err("Proxy type '…' is not implemented for RDP")
 ```
 
 Reuse:
 - `src-tauri/src/terminal/network.rs::establish_transport` — already implements
-  HTTP-CONNECT and SOCKS5 with auth; nothing else to write for proxy mode.
-- `src-tauri/src/terminal/network.rs::open_tcp_filtered` for direct.
+  HTTP-CONNECT and SOCKS5 with auth, and short-circuits to direct TCP when
+  `proxy_kind == "none"`; nothing else to write for proxy/direct mode.
 
-### RD Gateway (`rdp/gateway.rs`)
+Everything above the transport — X.224 negotiation, TLS, MCS, … — is IronRDP's;
+the session does not know which path carried the bytes.
 
-MS-TSGU is RPC-over-HTTPS with two parallel HTTPS channels (RPC_IN_DATA +
-RPC_OUT_DATA) carrying TsProxy* RPC calls. Implementation:
+### RD Gateway (`rdp/gateway/`)
 
-1. **HTTPS transport** — open two `rustls`-backed TLS streams to
-   `gateway:443`. Reuse the project's existing TLS strategy (already in the
-   tree via `tokio-tungstenite`/`rustls`).
-2. **HTTP authentication to the gateway** — Basic and Negotiate (NTLM v2).
-   Add a small NTLM helper module under `gateway/ntlm.rs`; do not pull in a
-   monolithic SSPI crate.
-3. **TsProxy RPC sequence** (see [MS-TSGU §3.7]): `TsProxyCreateTunnel` →
-   `TsProxyAuthorizeTunnel` → `TsProxyCreateChannel` →
-   `TsProxySetupReceivePipe` (on OUT) + `TsProxySendToServer` (on IN). Encode
-   PDUs by hand — DCE/RPC PDU framing is straightforward.
-4. **Inner RDP CredSSP** — after `TsProxyCreateChannel`, the resulting
+The original plan put this in a single `gateway.rs`; it shipped split across
+`gateway/{mod,ndr,ntlm,rpch}.rs`. MS-TSGU is RPC-over-HTTPS with two parallel
+HTTPS channels (RPC_IN_DATA + RPC_OUT_DATA) carrying TsProxy* RPC calls.
+Implementation:
+
+1. **HTTPS transport** — open two `rustls`-backed TLS streams to `gateway:443`
+   via `ironrdp_tls::upgrade` (`gateway/mod.rs`).
+2. **HTTP authentication to the gateway** — Basic and Negotiate (NTLM v2),
+   in `gateway/ntlm.rs` (no monolithic SSPI crate). The NTLMv2 Type3 MIC is
+   computed from the Type1/Type2/Type3 messages.
+3. **RTS bootstrap** — CONN/A1, CONN/B1, CONN/A3, CONN/C2 RTS PDUs in
+   `gateway/rpch.rs`.
+4. **TsProxy RPC sequence** (MS-TSGU §3.7): `TsProxyCreateTunnel` →
+   `TsProxyAuthorizeTunnel` → `TsProxyMakeTunnelCall` → `TsProxyCreateChannel`
+   → `TsProxySetupReceivePipe` (on OUT) + `TsProxySendToServer` (on IN). NDR
+   stub encode/decode lives in `gateway/ndr.rs`; DCE/RPC PDU framing in
+   `gateway/mod.rs`.
+5. **Inner RDP CredSSP** — after `TsProxyCreateChannel`, the resulting
    `GatewayStream` is handed to the same IronRDP session path as direct TCP;
    NLA/CredSSP remains the target-server RDP authentication layer.
-5. Wrap the tunnel in a `GatewayStream` type that implements
-   `AsyncRead + AsyncWrite` by serializing reads/writes onto OUT/IN.
-6. Cleanup: `TsProxyCloseChannel` + `TsProxyCloseTunnel` on drop / cancel.
+6. `GatewayStream` implements `AsyncRead + AsyncWrite` by serializing
+   reads/writes onto OUT/IN through background reader/writer tasks.
+7. Cleanup: `TsProxyCloseChannel` + `TsProxyCloseTunnel` on drop / cancel, and
+   the OUT reader task is cancelled on drop.
 
 Why hand-rolled: there is no maintained Rust crate for MS-TSGU. IronRDP's
-transport-agnostic design is exactly the seam we need.
+transport-agnostic design is exactly the seam we need. There is no real
+RD Gateway test environment, so acceptance for this path is Rust unit coverage
+plus an ignored live smoke (`live_rdg_tunnel_opens`).
 
 ### Virtual channels
 
@@ -193,62 +245,68 @@ software rendering (`pointer_software_rendering: true`), so cursor updates are
 composited into graphics frames and do not need a separate frontend cursor
 path right now.
 
-**CLIPRDR with multi-file copy/paste** (`rdp/cliprdr.rs`)
-- Caps negotiation: advertise `CB_USE_LONG_FORMAT_NAMES`,
-  `CB_STREAM_FILECLIP_ENABLED`, `CB_FILECLIP_NO_FILE_PATHS`.
-- Format list: `CF_UNICODETEXT`, `CFSTR_FILEGROUPDESCRIPTORW` (49158),
-  `CFSTR_FILECONTENTS` (49159).
-- Server→client (Windows → us): receive `Format List`, request
-  `FILEGROUPDESCRIPTORW`, parse `FILEDESCRIPTORW` array, then issue
-  `FILECONTENTS` requests (RANGE) and stream into a temp staging dir;
-  surface to the host clipboard via `arboard` plus a platform-specific
-  shim — on Linux/macOS we paste the staged paths as `text/uri-list`,
-  on Windows we set the file-drop format. Use the existing `arboard`
-  dependency; add `text/uri-list` handling under `rdp/cliprdr/uri_list.rs`.
-- Client→server (us → Windows): when the host clipboard contains files,
-  advertise the format and respond to remote `FILECONTENTS` requests with
-  bytes streamed from disk.
-- Reuse `arboard` (already a dep). Reuse the WS message envelope shape from
-  `vnc::clipboard` for plumbing the metadata to the frontend (the frontend
-  itself does not handle the file blobs; the OS clipboard does).
+**CLIPRDR with multi-file copy/paste** (IronRDP `CliprdrClient`, glue in
+`session.rs`)
+- The IronRDP `CliprdrClient` owns CLIPRDR caps negotiation and PDU framing.
+  `session.rs` provides a `NewMobCliprdrBackend` implementing IronRDP's
+  `CliprdrBackend` trait and a `ClipboardBridge` that queues actions
+  (advertise formats, request remote data, submit data/file-contents).
+- Client caps advertised: `STREAM_FILECLIP_ENABLED | FILECLIP_NO_FILE_PATHS`.
+  Formats: `CF_UNICODETEXT` and the file-list format (`FileGroupDescriptorW`).
+- Server→client (Windows → us): on remote copy, prefer Unicode text; else
+  request the file-group descriptor, parse it via IronRDP's `PackedFileList`,
+  issue `FileContentsRequest`s (RANGE), stream chunks into a temp staging dir,
+  then notify the frontend with a `clipboard_files` message carrying both the
+  staged paths and a `text/uri-list` string.
+- Client→server (us → Windows): when the host clipboard holds text or files,
+  `collect_local_clipboard_files` walks the selection (sandboxed, ≤4096 items)
+  and the bridge advertises the format + answers remote `FileContents`
+  requests with bytes streamed from disk.
+- The only hand-written CLIPRDR code still on the live path is the
+  `text/uri-list` shim in `rdp/cliprdr.rs` (`paths_to_uri_list` /
+  `uri_list_to_paths`), reused by the global clipboard commands in
+  `config/mod.rs`. The frontend uses `src/lib/clipboard.ts` (`writeFiles` /
+  `readFiles`) to round-trip OS file clipboards; it does not handle the blobs.
 
-**RDPSND audio playback** (`rdp/rdpsnd.rs`)
-- Negotiate PCM 44.1 kHz / 16-bit / stereo (the safe lowest common
-  denominator) plus optionally one compressed format if IronRDP exposes a
-  decoder out of the box.
-- Receive `WaveInfo` + `Wave` PDUs, emit PCM frames as
-  `WsOutgoing::Frame(audio_payload)` with a 1-byte channel tag (so
-  `RdpPanel` can route audio vs. video).
-- Frontend uses `AudioContext` + `AudioWorkletNode` to play.
-- Send `WaveConfirm` PDUs back to keep the server's wave clock in sync.
+**RDPSND audio playback** (IronRDP `Rdpsnd`, glue in `session.rs`)
+- `session.rs` attaches IronRDP's `Rdpsnd` with an `RdpsndWsBackend`
+  implementing `RdpsndClientHandler`. It advertises a single PCM
+  44.1 kHz / 16-bit / stereo format; IronRDP handles the SNDPROLOG/Wave/
+  WaveConfirm framing and the wave clock.
+- Each `wave()` callback emits an `AUDIO`-tagged WS frame: a 16-byte header
+  (sample rate, channels, bits, timestamp, format-no) + PCM, parsed by
+  `parseAudioFrame` in `src/lib/rdp.ts`.
+- The frontend plays PCM via the Web Audio `AudioContext` buffer-source queue
+  in `RdpPanel.tsx` (scheduled against `nextTime`); audio is gated on
+  `redirectAudio === "play"`.
 
-**RDPDR drive redirection** (`rdp/rdpdr.rs`)
-- Announce one device of type `RDPDR_DTYP_FILESYSTEM` named after a user-chosen
-  local folder (configured in the RDP options).
-- Implement the IO request handlers IronRDP exposes — Create, Read, Write,
+**RDPDR drive redirection** (IronRDP `Rdpdr`, backend in `rdp/rdpdr.rs`)
+- `build_drive_channel` constructs IronRDP's `Rdpdr` with a `LocalDriveBackend`
+  (implements `RdpdrBackend`) announcing one `FILESYSTEM` device named after a
+  user-chosen local folder.
+- Implements the IO request handlers IronRDP dispatches — Create, Read, Write,
   Close, Query{Information,Directory,Volume}, SetInformation, DeviceControl.
-- Sandbox to a single mapped root (no path escapes; reject `..` after
-  canonicalization).
+- Sandboxed to a single canonicalized root via `safe_join` (rejects `..` and
+  drive-letter escapes). Server acceptance is surfaced as a `drive-ready`
+  status; rejection as `drive-rejected`.
 
 ## Frontend
 
-### Tab plumbing (mirrors VNC exactly)
+### Tab plumbing (mirrors VNC)
 
 | New / changed file | Purpose |
 |---|---|
-| `src/components/rdp/RdpPanel.tsx` | New. Canvas viewer, WS client, input capture, scaling, audio worklet, status overlay. Sibling of `VncPanel.tsx`. |
-| `src/components/rdp/RdpToolbar.tsx` | New. Reconnect / disconnect / fit / 1:1 / fullscreen / clipboard hint, mirrors VNC's. |
-| `src/stores/rdpStore.ts` | New. Same shape as `vncStore.ts`: `Record<tabId, RdpConnectionState>`. |
-| `src/lib/rdp.ts` | New. IPC wrappers (`rdpConnect`, `rdpDisconnect`, `rdpTestConnection`) and the binary WS message codec. |
-| `src/lib/ipc.ts` | Add typed wrappers for the three new commands. |
-| `src/types/index.ts` | Add `RdpConnectInfo` next to `VncConnectInfo`; `Tab` gets an optional `rdp?: RdpConnectInfo`. |
-| `src/layouts/MainLayout.tsx` | Open RDP tab in `handleConnect` (model on the existing VNC branch around `MainLayout.tsx:477`); always-mount RDP panels (mirror the `vncTabs.map(...)` block around `MainLayout.tsx:1417`). |
+| `src/components/rdp/RdpPanel.tsx` | Canvas viewer, WS client, input capture, scaling, Web Audio playback, status overlay. **The toolbar is built inline here using the shared `FloatingToolbar`** — there is no separate `RdpToolbar.tsx` (the original plan called for one). Includes reconnect / fit-1:1 / resize / detach / maximize, plus the detached-window reattach + OS-fullscreen controls. |
+| `src/stores/rdpStore.ts` | `Record<tabId, RdpConnectionState>`, same shape as `vncStore.ts`. |
+| `src/lib/rdp.ts` | IPC wrappers (`rdpConnect`, `rdpDisconnect`, `rdpTestConnection`), the binary WS codec (`encodeKey/Pointer/Resize/Wheel`, `parseFrameTile`, `parseAudioFrame`), and the `keyEventToScancode` table. |
+| `src/types/rdp.ts` | `RdpOptions` + parse/serialize (mirrors the Rust `RdpOptions`); `Tab` gains an optional `rdp?` in `src/types/index.ts`. |
+| `src/layouts/MainLayout.tsx` | `openRdpTab` in the connect flow; always-mounts RDP panels (`rdpTabs.map(...)`); also wires **detach-to-window + reattach** for RDP tabs (not in the original plan). |
+| `src/components/session/forms/RdpOptionsForm.tsx` | The RDP options editor rendered by `SessionEditor`. |
 
-WS framing reuses the VNC pattern from `src/lib/vnc.ts`: a 1-byte channel tag
-selects between `frame` (RDP bitmap), `audio` (PCM), `cursor`, `clipboard`,
-`status`. Helpers `encodeWsKey/Pointer/Resize/Wheel/ClipboardOffer` are
-renamed + extended for RDP scancodes and pointer wheel units (RDP uses
-scancodes; VNC uses keysyms).
+WS framing follows the VNC pattern: a 1-byte channel tag selects between
+inbound `frame` (RGBA tile), `audio` (PCM), `cursor`, `clipboard`, `status`
+and outbound key/pointer/resize/wheel/ping/ack. RDP uses set-1 scancodes (with
+an extended-key bit) where VNC used keysyms.
 
 ### Session config (`options_json` for RDP)
 
@@ -261,20 +319,31 @@ no migration needed):
   "color_depth": 32,
   "screen_w": 1920, "screen_h": 1080,
   "nla": true,
-  "performance": { "wallpaper": false, "themes": false, "font_smooth": true },
+  "performance": {
+    "wallpaper": false, "themes": false, "font_smooth": true,
+    "disable_full_window_drag": true, "disable_menu_animations": true,
+    "disable_cursor_shadow": true
+  },
   "redirect_clipboard": true,
   "redirect_audio": "play",          // "play" | "off"
-  "redirect_drive": { "enabled": false, "label": "shared", "path": "" },
+  "redirect_drive": { "enabled": false, "label": "NEWMOB", "path": "" },
   "gateway": {                        // optional; when present, overrides direct/proxy path
     "host": "rdg.example.com",
     "port": 443,
     "username": "user@CORP",
-    "password": null,                 // or stored via auth_method secret
+    "password": null,                 // or a vault:<id> secret reference
     "auth": "ntlm",                   // "basic" | "ntlm"
     "use_session_creds": true
   }
 }
 ```
+
+The Rust side serializes camelCase (`#[serde(rename_all = "camelCase")]`), so
+the persisted keys are `colorDepth`, `screenW`, `redirectClipboard`, etc.; the
+snippet above uses the conceptual field names. When `use_session_creds` is
+true, the serializer drops the gateway username/password (they are filled from
+the RDP session credentials at connect time), and an empty gateway block is
+dropped entirely.
 
 The TypeScript mirror lives in `src/types/rdp.ts` and `RdpOptionsForm` lives in
 `src/components/session/forms/RdpOptionsForm.tsx`. `SessionEditor.tsx` renders
@@ -285,13 +354,13 @@ lives only in `RdpOptionsForm`.
 
 ### i18n
 
-Strings go through the existing i18n framework — register new keys under
-`rdp.*` in the locales used by the codebase, matching how the latest
-`v0.1.32 i18n sweep` (last commit on `qa-ui-auto/...`) handled new strings.
+Strings go through the existing i18n framework. RDP keys live under `rdp.*`
+(status, toolbar labels, and `rdp.options.*`) in
+`src/lib/i18n/locales/en.ts` and `src/lib/i18n/locales/zh-CN.ts`.
 
-## Cargo dependencies (new)
+## Cargo dependencies
 
-In `src-tauri/Cargo.toml`, add exact IronRDP 0.14-compatible versions:
+`src-tauri/Cargo.toml` pins the IronRDP 0.14 family (**upgraded from 0.8**):
 
 ```toml
 ironrdp = { version = "0.14.0", features = ["connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol"] }
@@ -300,80 +369,99 @@ ironrdp-tokio = { version = "0.8.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 ```
 
-`tokio-tungstenite`, `aes`, `sha2`, `arboard`, `rand` are already in the tree
-and reused as-is.
+`base64`, `rand`, `uuid`, `tokio-tungstenite`, and `reqwest` (rustls) are
+already in the tree and reused. The RD Gateway NTLM helper uses `aes`/`sha2`
+style primitives via its own HMAC-MD5 implementation in `gateway/ntlm.rs`.
 
 ## Dev/browser mode
 
-RDP is desktop-only. Add a stub `vite-plugins/rdpProxy.ts` that returns
-`501 not implemented` for the WS endpoint — keeps `pnpm dev` runnable without
-crashing the dev server when an `rdp:` tab tries to open. Also add an
-`@tauri-apps/*` stub equivalent in `src/stubs/` returning a clear "RDP not
-available in browser mode" error.
+RDP is desktop-only.
+- `vite-plugins/rdpProxy.ts` is registered in `vite.config.ts` (dev only) and
+  returns `501 not implemented` for the bridge endpoint, so `pnpm dev` does not
+  crash when `src/lib/rdp.ts` imports `@tauri-apps/api/core`.
+- **Gap vs. the original plan:** the `src/stubs/tauri-core.ts` IPC stub does
+  **not** yet special-case `rdp_connect` / `rdp_disconnect` /
+  `rdp_test_connection`. They fall through to the `default` branch (warn +
+  return `undefined`) instead of throwing a clear "RDP not available in browser
+  mode" error. This is a small outstanding cleanup item, not a blocker.
 
-## Implementation order
+## Implementation order (as built)
 
 1. `rdp/mod.rs` skeleton + `rdp/ws.rs` + `rdp/transport.rs` (direct only) + IPC
-   plumbing + minimal `RdpPanel` that paints a blank canvas on `connected`.
-2. IronRDP wired up — display + keyboard/mouse only, NLA/CredSSP, autodetect
-   bitmap & RDP 6.0 codecs.
-3. Proxy mode: route through `establish_transport`. Smoke through
-   `qa-ui-auto`.
-4. CLIPRDR: text first, then `CFSTR_FILEGROUPDESCRIPTORW` + `CFSTR_FILECONTENTS`
-   (Windows ↔ Linux ↔ macOS). Add the `text/uri-list` shim for non-Windows.
-5. RDPSND with PCM + Web Audio worklet.
-6. RDPDR with one mapped folder.
-7. RD Gateway (`gateway.rs` + `gateway/ntlm.rs`); biggest single piece.
-8. RemoteFX (RFX) decoder enabled.
-9. Polish: reconnect, status overlay, perf flags surface, error toasts,
-   fullscreen.
+   plumbing + minimal `RdpPanel`. ✅
+2. IronRDP wired up — display + keyboard/mouse, NLA/CredSSP, codec autodetect.
+   ✅ (the active-stage graphics loop is what fixed the original black screen).
+3. Proxy mode via `establish_transport`. ✅
+4. CLIPRDR via IronRDP `CliprdrClient`: Unicode text + file group descriptor /
+   file contents, with the `text/uri-list` shim for non-Windows. ✅
+5. RDPSND via IronRDP `Rdpsnd` + Web Audio playback. ✅
+6. RDPDR with one mapped folder (`LocalDriveBackend`). ✅
+7. RD Gateway (`gateway/{mod,ndr,ntlm,rpch}.rs`) — biggest single piece; unit
+   tested + ignored live smoke (no real RDG env). ✅
+8. RemoteFX — **decoded by IronRDP** (codecs advertised in `build_ironrdp_config`).
+   The standalone `rfx.rs` envelope parser was never finished into a decoder and
+   is unused; this step is satisfied by IronRDP, not by `rfx.rs`.
+9. Polish: reconnect, status overlay, perf flags, error toasts, maximize, and
+   detach-to-window. ✅
 
-Each step is independently testable; CI / `pnpm exec tsc -b --noEmit` + cargo
-build run after each.
-
-## Critical files to be created or modified
+## Critical files (as built)
 
 Created:
-- `src-tauri/src/rdp/{mod,ws,session,frame,transport,gateway,cliprdr,rdpsnd,rdpdr}.rs`
-- `src-tauri/src/rdp/gateway/ntlm.rs`
-- `src/components/rdp/{RdpPanel,RdpToolbar}.tsx`
+- `src-tauri/src/rdp/{mod,ws,session,frame,transport,input,rdpdr,cliprdr,rdpsnd,rfx}.rs`
+  (`cliprdr`/`rdpsnd`/`rfx` and `pdu/*` are leftover framing/codec helpers — see
+  the backend table; only `frame`/`input` and the IronRDP backends are live).
+- `src-tauri/src/rdp/pdu/{mod,tpkt,x224,nego,mcs}.rs` (hand-rolled, unused on the
+  live path).
+- `src-tauri/src/rdp/gateway/{mod,ndr,ntlm,rpch}.rs`.
+- `src/components/rdp/RdpPanel.tsx` (toolbar is inline via `FloatingToolbar`;
+  no separate `RdpToolbar.tsx`).
 - `src/components/session/forms/RdpOptionsForm.tsx`
 - `src/stores/rdpStore.ts`
 - `src/lib/rdp.ts`
 - `src/types/rdp.ts`
 - `vite-plugins/rdpProxy.ts`
-- Tests: `src/lib/rdp.test.ts`, plus rust unit tests inline in `gateway.rs`
-  (RPC PDU encode/decode round-trip) and `cliprdr.rs` (file-descriptor
-  parser). One `qa-ui-auto` testcase: connect to a local FreeRDP test server
-  (xrdp in CI container) and assert canvas paints + clipboard round-trip.
+- Tests: `src/lib/rdp.test.ts` (24 cases); Rust unit tests inline across the
+  `rdp` modules (RPC/NDR/NTLM round-trips in `gateway/*`, CLIPRDR/RFX/RDPSND
+  codec round-trips, RDPDR path-sandbox + IO handlers) plus 5 ignored direct
+  live tests and 1 ignored RDG live smoke. QA: `qa-ui-auto-tests` feature
+  `F9.7` (status `partial`) + `TC-111-rdp-session-scaffold.testcase.yaml`.
 
 Modified:
-- `src-tauri/src/state.rs` — add `rdp_sessions` field.
-- `src-tauri/src/lib.rs` — register the three commands; spawn no autostart.
-- `src-tauri/Cargo.toml` — add IronRDP crates.
-- `src-tauri/src/session/models.rs` — no schema change; document the new
-  `options_json` shape in a comment near `SessionType::RDP`.
-- `src/lib/ipc.ts` — typed wrappers.
-- `src/types/index.ts` — `RdpConnectInfo` + `Tab.rdp?`.
-- `src/layouts/MainLayout.tsx` — RDP open + always-mount block, mirror VNC.
-- `src/components/session/SessionEditor.tsx` — show `RdpOptionsForm` when
-  protocol is RDP.
-- `src/stubs/` — add Tauri-IPC stub for browser mode.
-- `vite.config.ts` — register `rdpProxy` plugin in dev mode.
-- Locale files — `rdp.*` keys.
+- `src-tauri/src/state.rs` — `rdp_sessions` field.
+- `src-tauri/src/lib.rs` — registers the three commands; no autostart.
+- `src-tauri/Cargo.toml` — IronRDP 0.14 crates.
+- `src-tauri/src/config/mod.rs` — `clipboard_read_files` / `clipboard_write_files`
+  reuse the `rdp::cliprdr` URI-list shim.
+- `src/types/index.ts` — `Tab.rdp?`.
+- `src/layouts/MainLayout.tsx` — RDP open + always-mount + detach-to-window.
+- `src/components/session/SessionEditor.tsx` — renders `RdpOptionsForm` for RDP.
+- `vite.config.ts` — registers `rdpProxy` in dev mode.
+- `src/lib/i18n/locales/{en,zh-CN}.ts` — `rdp.*` keys.
+
+Outstanding vs. plan:
+- `src/stubs/tauri-core.ts` — RDP IPC stub case not yet added (see Dev/browser).
+- `src-tauri/src/session/models.rs` — the planned `options_json` doc comment near
+  `SessionType::RDP` was not added.
+- Leftover hand-rolled modules (`pdu/*`, `rfx.rs`, `rdpsnd.rs`, the CLIPRDR codec
+  half of `cliprdr.rs`) are unused and can be pruned.
 
 ## Verification
 
 After each implementation step:
 
 ```bash
-pnpm install                    # if deps changed
-pnpm exec tsc -b --noEmit       # frontend type check
+pnpm install                                              # if deps changed
+.\node_modules\.bin\tsc.CMD -b                            # frontend type check
 cargo check --manifest-path src-tauri/Cargo.toml
-pnpm test src/lib/rdp.test.ts   # unit
-cargo test -p newmob rdp::      # rust unit tests for RPC + CLIPRDR codecs
-pnpm tauri dev                  # manual: open an RDP tab, check canvas
+.\node_modules\.bin\vitest.CMD run src\lib\rdp.test.ts    # frontend unit
+cargo test --manifest-path src-tauri/Cargo.toml rdp::     # rust unit tests
+pnpm tauri dev                                            # manual: open an RDP tab, check canvas
 ```
+
+Live Rust tests are gated behind `#[ignore]` and require
+`NEWMOB_RDP_LIVE_HOST` / `_USER` / `_PASS` (direct) or
+`NEWMOB_RDP_GATEWAY_LIVE_*` (gateway); run them explicitly with
+`cargo test … rdp:: -- --ignored` against a reachable host.
 
 End-to-end matrix to run before merge:
 
@@ -387,6 +475,7 @@ End-to-end matrix to run before merge:
 | RD Gateway | Win Server gateway → Win11 | NLA + Basic gateway auth | display; run when an RDG environment exists |
 | RD Gateway | Win Server gateway → Win11 | NLA + NTLM gateway auth | display + clipboard; run when an RDG environment exists |
 
-`qa-ui-auto` smoke: at minimum a "RDP tab opens and canvas reaches `connected`
-state against a local xrdp container." Add this to
-`qa-ui-auto-tests/testcases/`.
+`qa-ui-auto` smoke: `TC-111-rdp-session-scaffold.testcase.yaml` covers the
+saved-session RDP panel/toolbar route in browser mode. A full
+"canvas reaches `connected`" smoke needs a native run or a live xrdp container
+(browser preview is stubbed and cannot complete a real RDP session).
