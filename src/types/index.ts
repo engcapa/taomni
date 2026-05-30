@@ -2,7 +2,7 @@ import type { SshConnectInfo } from "../components/terminal/TerminalPanel";
 import type { TerminalProfile } from "../lib/terminalProfile";
 import type { RdpOptions } from "./rdp";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis";
 
 export interface VncConnectInfo {
   sessionId: string;
@@ -10,6 +10,29 @@ export interface VncConnectInfo {
   port: number;
   username?: string | null;
   password?: string;
+}
+
+/**
+ * Connection parameters for a database client tab (MySQL / PostgreSQL /
+ * ClickHouse / Redis). Mirrors the Rust `DbConfig` (camelCase). The password
+ * may be a `vault:<id>` reference resolved server-side.
+ */
+export interface DbConnectInfo {
+  sessionId: string;
+  engine: "MySQL" | "PostgreSQL" | "ClickHouse" | "Redis";
+  host: string;
+  port: number;
+  username?: string | null;
+  password?: string;
+  database?: string | null;
+  ssl?: boolean;
+  timeoutSecs?: number | null;
+  /** ClickHouse HTTP port (defaults to 8123). */
+  httpPort?: number | null;
+  /** ClickHouse protocol: "http" (default) or "native". */
+  protocol?: string | null;
+  /** Redis logical DB index (0-15). */
+  dbIndex?: number | null;
 }
 
 export interface RdpConnectInfo {
@@ -42,6 +65,7 @@ export interface Tab {
   sftp?: SftpTabInfo;
   vnc?: VncConnectInfo;
   rdp?: RdpConnectInfo;
+  db?: DbConnectInfo;
   fileBrowser?: FileBrowserTabInfo;
   hasNewOutput?: boolean;
 }

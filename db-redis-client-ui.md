@@ -1,5 +1,18 @@
 # Redis Client UI
 
+> **Status: ✅ Completed (2026-05-30).** `RedisClientTab` (key browser | value
+> viewer + collapsible CLI), `RedisKeyBrowser` (SCAN pagination, prefix folder
+> tree, type badges, auto-refreshing TTL pills), `RedisValuePanel` with
+> String/Hash/List/Set/ZSet/Stream editors + metadata bar (TTL/encoding/memory/
+> delete), `RedisCli` (history, Tab-complete, Monitor toggle), DB-index switcher,
+> and the "New key" dialog are implemented and wired into `MainLayout`
+> (always-mounted). Verified: `pnpm build` succeeds (RedisClientTab code-split),
+> `tsc` + 312 tests pass.
+>
+> Note: the Monitor toggle polls `INFO commandstats` as a stand-in stream rather
+> than holding a long-lived `MONITOR` subscription; List drag-to-reorder is
+> handled via full-list save (LSET semantics) rather than per-item drag.
+
 ## What & Why
 Redis is a fundamentally different database — key-value / data-structure store with no tables or SQL. This task builds a dedicated Redis client UI inside its own `"redis"` tab type, giving users a visual key browser, type-aware value viewer/editor, and an integrated Redis CLI panel. The connection backend is provided by the Database Connection Foundation task.
 

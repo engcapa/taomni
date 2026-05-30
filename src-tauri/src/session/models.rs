@@ -34,6 +34,10 @@ pub enum SessionType {
     Serial,
     LocalShell,
     File,
+    MySQL,
+    PostgreSQL,
+    ClickHouse,
+    Redis,
 }
 
 impl SessionType {
@@ -48,6 +52,10 @@ impl SessionType {
             Self::Serial => "Serial",
             Self::LocalShell => "LocalShell",
             Self::File => "File",
+            Self::MySQL => "MySQL",
+            Self::PostgreSQL => "PostgreSQL",
+            Self::ClickHouse => "ClickHouse",
+            Self::Redis => "Redis",
         }
     }
 
@@ -62,6 +70,10 @@ impl SessionType {
             "Serial" => Self::Serial,
             "LocalShell" => Self::LocalShell,
             "File" => Self::File,
+            "MySQL" => Self::MySQL,
+            "PostgreSQL" => Self::PostgreSQL,
+            "ClickHouse" => Self::ClickHouse,
+            "Redis" => Self::Redis,
             _ => Self::SSH,
         }
     }
@@ -73,6 +85,10 @@ impl SessionType {
             Self::RDP => 3389,
             Self::VNC => 5900,
             Self::FTP => 21,
+            Self::MySQL => 3306,
+            Self::PostgreSQL => 5432,
+            Self::ClickHouse => 9000,
+            Self::Redis => 6379,
             Self::Serial | Self::LocalShell | Self::File => 0,
         }
     }

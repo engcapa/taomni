@@ -1,5 +1,12 @@
 # Database Connection Foundation
 
+> **Status: ✅ Completed (2026-05-30).** All four DB session types, the Rust
+> `database/` module + `db_*`/`redis_*` Tauri commands, `AppState.db_connections`,
+> the `DatabaseSettings` session-editor form with vault-backed passwords + Test
+> connection, browser stubs, and the `database`/`redis` TabKinds are implemented.
+> Verified: `cargo check --all-targets` clean, `pnpm exec tsc -b --noEmit` clean,
+> `pnpm build` succeeds, `pnpm test` 312/312 pass.
+
 ## What & Why
 NewMob currently supports SSH/RDP/VNC terminal sessions. This task adds the foundational backend and session-model layer for database connections — MySQL, PostgreSQL, ClickHouse, and Redis — so they appear as first-class session types alongside SSH in the session tree and session editor. Without this foundation the query UI and key browser have nothing to connect to.
 

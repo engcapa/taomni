@@ -4,6 +4,7 @@ mod appearance;
 mod asr;
 mod chat;
 mod config;
+mod database;
 mod filebrowser;
 mod history;
 pub mod llm;
@@ -189,6 +190,20 @@ pub fn run() {
             rdp::rdp_connect,
             rdp::rdp_disconnect,
             rdp::rdp_test_connection,
+            database::db_connect,
+            database::db_ping,
+            database::db_disconnect,
+            database::db_list_schemas,
+            database::db_list_tables,
+            database::db_describe_table,
+            database::db_list_indexes,
+            database::db_execute,
+            database::db_cancel,
+            database::redis_list_keys,
+            database::redis_get_key,
+            database::redis_set_key,
+            database::redis_del_key,
+            database::redis_exec,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,

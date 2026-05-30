@@ -816,6 +816,25 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       saveTunnels(next);
       return undefined as T;
     }
+    // ---------- Database client commands (desktop-only) ----------
+    case "db_connect":
+    case "db_ping":
+    case "db_disconnect":
+    case "db_list_schemas":
+    case "db_list_tables":
+    case "db_describe_table":
+    case "db_list_indexes":
+    case "db_execute":
+    case "db_cancel":
+    case "redis_list_keys":
+    case "redis_get_key":
+    case "redis_set_key":
+    case "redis_del_key":
+    case "redis_exec": {
+      throw new Error(
+        "Database connections are not available in browser preview. Use the desktop build of NewMob.",
+      );
+    }
     default:
       console.warn(`[tauri-stub] Unknown invoke command: ${cmd}`, args);
       if (cmd === "history_match_prefix" || cmd === "history_list_recent") {

@@ -1617,6 +1617,7 @@ const dict = {
     sectionTerminal: "Terminal settings",
     sectionNetwork: "Network settings",
     sectionBookmark: "Bookmark settings",
+    sectionDatabase: "Database settings",
     fieldX11: "X11-Forwarding",
     enable: "Enable",
     x11DisplayLabel: "Display:",

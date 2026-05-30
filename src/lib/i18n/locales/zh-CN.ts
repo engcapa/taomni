@@ -1614,6 +1614,7 @@ export const zhCN: DeepPartial<typeof en> = {
     sectionTerminal: "终端设置",
     sectionNetwork: "网络设置",
     sectionBookmark: "书签设置",
+    sectionDatabase: "数据库设置",
     fieldX11: "X11 转发",
     enable: "启用",
     x11DisplayLabel: "显示：",

@@ -58,7 +58,7 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo } from "../types";
 import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -87,6 +87,8 @@ import { t as tr, useT } from "../lib/i18n";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 const RdpPanel = lazy(() => import("../components/rdp/RdpPanel"));
+const DbClientTab = lazy(() => import("../components/database/DbClientTab"));
+const RedisClientTab = lazy(() => import("../components/database/RedisClientTab"));
 
 interface PendingAuth {
   session: SessionConfig;
@@ -125,6 +127,39 @@ function passwordRefFromOptions(session: SessionConfig): string | null {
   const opts = parseSessionOptions(session.options_json);
   const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
   return ref && ref.startsWith("vault:") ? ref : null;
+}
+
+/**
+ * Build a {@link DbConnectInfo} from a saved DB session. Engine-specific
+ * options (ClickHouse HTTP port / protocol, Redis DB index, SSL, timeout,
+ * default database) live in `options_json` under the `db*` keys the session
+ * editor writes. `password` is the resolved credential (plaintext or a
+ * `vault:` reference) the connect path already worked out.
+ */
+function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbConnectInfo {
+  const opts = parseSessionOptions(session.options_json);
+  const str = (key: string, fallback = ""): string =>
+    typeof opts[key] === "string" ? (opts[key] as string) : fallback;
+  const num = (key: string): number | null => {
+    const raw = opts[key];
+    const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  const engine = session.session_type as DbConnectInfo["engine"];
+  return {
+    sessionId: session.id,
+    engine,
+    host: session.host,
+    port: session.port,
+    username: session.username,
+    password,
+    database: str("dbDatabase") || null,
+    ssl: opts.dbSsl === true,
+    timeoutSecs: num("dbTimeout"),
+    httpPort: engine === "ClickHouse" ? (num("dbHttpPort") ?? 8123) : null,
+    protocol: engine === "ClickHouse" ? str("dbChProtocol", "HTTP").toLowerCase() : null,
+    dbIndex: engine === "Redis" ? (num("dbRedisIndex") ?? 0) : null,
+  };
 }
 
 export function MainLayout() {
@@ -805,6 +840,22 @@ export function MainLayout() {
     });
   }, [addTab]);
 
+  const openDbTab = useCallback((session: SessionConfig, password?: string) => {
+    const engine = session.session_type as DbConnectInfo["engine"];
+    const isRedis = engine === "Redis";
+    const id = `${isRedis ? "redis" : "database"}-${session.id}-${Date.now()}`;
+    const info = sessionToDbConnectInfo(session, password);
+    addTab({
+      id,
+      type: isRedis ? "redis" : "database",
+      title: session.name || `${session.host}:${session.port}`,
+      sessionId: session.id,
+      closable: true,
+      db: info,
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   // Open a local path or URL: URLs and files always go to the system handler;
   // folders open in an embedded NewMob tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
@@ -991,6 +1042,23 @@ export function MainLayout() {
       }
     } else if (session.session_type === "File") {
       openFileSession(session);
+    } else if (
+      session.session_type === "MySQL" ||
+      session.session_type === "PostgreSQL" ||
+      session.session_type === "ClickHouse" ||
+      session.session_type === "Redis"
+    ) {
+      // DB sessions store the password as a vault: ref in options_json. Many
+      // databases (notably Redis / trust-auth Postgres) connect without one,
+      // so a missing ref just means "no password" — we don't force a prompt.
+      const ref = passwordRefFromOptions(session);
+      if (ref) {
+        const vaultState = useVaultStore.getState().state;
+        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+        openDbTab(session, ref);
+      } else {
+        openDbTab(session, undefined);
+      }
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
@@ -1005,6 +1073,7 @@ export function MainLayout() {
     openUnsupportedTab,
     openVncTab,
     openRdpTab,
+    openDbTab,
     queueVaultUnlock,
   ]);
 
@@ -1247,6 +1316,8 @@ export function MainLayout() {
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
   const rdpTabs = tabs.filter((t) => t.type === "rdp" && t.rdp);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
+  const dbTabs = tabs.filter((t) => t.type === "database" && t.db);
+  const redisTabs = tabs.filter((t) => t.type === "redis" && t.db);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
   const effectiveMultiExecSelectedCount = terminalSplitActive
@@ -1854,6 +1925,41 @@ export function MainLayout() {
                   );
                 })}
 
+                {/* SQL database client tabs — always mounted so long queries
+                    keep running across tab switches. */}
+                {dbTabs.map((tab) => {
+                  if (!tab.db) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <Suspense fallback={<DbLoadingPanel />}>
+                        <DbClientTab tabId={tab.id} info={tab.db} visible={isActive} />
+                      </Suspense>
+                    </div>
+                  );
+                })}
+
+                {/* Redis client tabs — always mounted (CLI/monitor stay alive). */}
+                {redisTabs.map((tab) => {
+                  if (!tab.db) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <Suspense fallback={<DbLoadingPanel />}>
+                        <RedisClientTab tabId={tab.id} info={tab.db} visible={isActive} />
+                      </Suspense>
+                    </div>
+                  );
+                })}
+
                 {activeTab?.type === "nettools" && (
                   <TunnelManager
                     onStatusMessage={setStatusMessage}
@@ -1869,6 +1975,8 @@ export function MainLayout() {
                   activeTab.type !== "vnc" &&
                   activeTab.type !== "rdp" &&
                   activeTab.type !== "file-browser" &&
+                  activeTab.type !== "database" &&
+                  activeTab.type !== "redis" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "nettools" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
@@ -2151,6 +2259,17 @@ function RdpLoadingPanel() {
       style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
     >
       {t("rdp.loading")}
+    </div>
+  );
+}
+
+function DbLoadingPanel() {
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center text-sm"
+      style={{ background: "var(--moba-bg)", color: "var(--moba-text-muted)" }}
+    >
+      Loading database client…
     </div>
   );
 }
