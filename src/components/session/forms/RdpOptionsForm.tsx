@@ -47,8 +47,19 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
   };
 
   return (
-    <div className="rdp-options-form" style={{ display: "grid", gap: 12 }}>
-      <fieldset>
+    <div
+      className="rdp-options-form"
+      style={{
+        // Newspaper-style multi-column flow: pack the variable-height option
+        // groups into as many ~260px columns as the editor width allows,
+        // filling the wide right half instead of stacking them in one narrow
+        // left strip. `break-inside: avoid` on each fieldset keeps a group from
+        // splitting across a column boundary.
+        columnWidth: 260,
+        columnGap: 20,
+      }}
+    >
+      <fieldset style={FIELDSET_STYLE}>
         <legend>{t("rdp.options.title")}</legend>
         <label style={row()}>
           <span>{t("rdp.options.domain")}</span>
@@ -111,7 +122,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         </label>
       </fieldset>
 
-      <fieldset>
+      <fieldset style={FIELDSET_STYLE}>
         <legend>{t("rdp.options.performance")}</legend>
         {(
           [
@@ -134,7 +145,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         ))}
       </fieldset>
 
-      <fieldset>
+      <fieldset style={FIELDSET_STYLE}>
         <legend>{t("rdp.options.audio")}</legend>
         <label style={row()}>
           <input
@@ -156,7 +167,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         </label>
       </fieldset>
 
-      <fieldset>
+      <fieldset style={FIELDSET_STYLE}>
         <legend>{t("rdp.options.clipboard")}</legend>
         <label style={row()}>
           <input
@@ -168,7 +179,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         </label>
       </fieldset>
 
-      <fieldset>
+      <fieldset style={FIELDSET_STYLE}>
         <legend>{t("rdp.options.drive")}</legend>
         <label style={row()}>
           <input
@@ -206,7 +217,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         )}
       </fieldset>
 
-      <fieldset>
+      <fieldset style={FIELDSET_STYLE}>
         <legend>{t("rdp.options.gateway")}</legend>
         <label style={row()}>
           <input
@@ -317,3 +328,14 @@ function row(): React.CSSProperties {
     padding: "4px 0",
   };
 }
+
+// Each option group is a column-flow item: keep it whole (never split across
+// a column boundary) and give the groups breathing room between each other.
+const FIELDSET_STYLE: React.CSSProperties = {
+  breakInside: "avoid",
+  // `inline-block` makes the multi-column layout measure each fieldset as one
+  // atomic block, which keeps `break-inside: avoid` reliable across engines.
+  display: "inline-block",
+  width: "100%",
+  marginBottom: 14,
+};

@@ -155,6 +155,13 @@ export default function DetachedSessionWindow({
       try {
         const w = getCurrentWindow();
         const next = !(await w.isFullscreen());
+        // Borderless windows that are OS-maximized don't cleanly escape the
+        // maximized state on `setFullscreen(true)` (Windows leaves the webview
+        // surface at the work-area height, showing a taskbar-height black
+        // band). Drop maximize first so the surface fills the whole screen.
+        if (next && (await w.isMaximized())) {
+          await w.unmaximize();
+        }
         await w.setFullscreen(next);
         setOsFullscreen(next);
       } catch {
@@ -217,11 +224,12 @@ export default function DetachedSessionWindow({
     }
   }, [kind, id, mergeTerminalReattachState, params, tauri]);
 
-  // Treat OS-close as Reattach. The Tauri close-requested hook fires
-  // before the window is actually destroyed, which lets us
-  // synchronously broadcast the reattach payload. The localStorage
-  // backstop in `broadcastReattach` covers the race where the channel
-  // post hasn't been delivered yet.
+  // Treat OS-close (title-bar X) as Reattach. The Tauri close-requested
+  // hook fires before the window is destroyed; we cancel Tauri's default
+  // JS-side destroy (it lacks the `allow-destroy` capability and would
+  // throw) and route the close through the same Rust command the Reattach
+  // button uses, after publishing the reattach payload. In browser dev we
+  // fall back to beforeunload/pagehide since there is no close-requested.
   useEffect(() => {
     if (!tauri) {
       const handler = () => {
@@ -238,20 +246,44 @@ export default function DetachedSessionWindow({
       };
     }
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     void getCurrentWindow()
-      .onCloseRequested(() => {
-        if (params && !reattachingRef.current) {
-          broadcastReattach(kind, id, mergeTerminalReattachState());
+      .onCloseRequested((event) => {
+        // IMPORTANT: prevent the Tauri JS wrapper from auto-calling
+        // `window.destroy()`. That IPC needs the `core:window:allow-destroy`
+        // capability, which we do NOT grant (only `allow-close`), so it
+        // throws and the window never actually closes — while the reattach
+        // broadcast below has already spawned a tab, leaving the user with
+        // both a stuck window and a duplicate tab. Instead we close through
+        // the Rust `close_current_detached_window` command (same path the
+        // Reattach button uses), which destroys the window unconditionally.
+        event.preventDefault();
+        if (reattachingRef.current) return;
+        if (params) {
+          // Treat OS-close as Reattach: broadcast the payload, then close.
+          void requestReattach();
+          return;
         }
+        // No payload to reattach (e.g. handoff never arrived) — just close.
+        reattachingRef.current = true;
         clearDetachedHandoff(kind, id);
-        // We do NOT prevent the close — the user asked to close, and
-        // the reattach broadcast has already been published.
+        void closeCurrentDetachedWindow().catch(() => undefined);
       })
       .then((fn) => {
+        // Guard the effect-rerun race: if cleanup ran before this resolved,
+        // unlisten immediately so we never leak a stale close-requested
+        // listener across the params null→loaded transition.
+        if (disposed) {
+          fn();
+          return;
+        }
         unlisten = fn;
       });
-    return () => unlisten?.();
-  }, [kind, id, mergeTerminalReattachState, params, tauri]);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [kind, id, mergeTerminalReattachState, params, requestReattach, tauri]);
 
   // Wipe the handoff if the page is unloaded for any other reason
   // (page navigation, reload, app shutdown). Defence-in-depth — the

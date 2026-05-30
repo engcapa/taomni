@@ -18,6 +18,11 @@ import { useAppStore } from "../../stores/appStore";
 import { ExternalLink, Maximize, Maximize2, Minimize, Minimize2, RefreshCw } from "lucide-react";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import {
+  FT_BUTTON_STYLE,
+  FT_ICON_BUTTON_STYLE,
+  FT_SEPARATOR_STYLE,
+} from "../floating-toolbar/floatingToolbarStyles";
 import { captureCanvasPng } from "../../lib/capture";
 import {
   readText as readClipboardText,
@@ -848,15 +853,20 @@ export default function VncPanel({
         position: "relative",
       }}
     >
-      {/* Scaling toolbar */}
-      {showCanvas && (
-        <FloatingToolbar
-          storageKey="mob.vnc.toolbar"
-          defaultTop={4}
-          defaultRight={4}
-          testId="vnc-floating-toolbar"
-        >
-          <CaptureToolbar
+      {/* Floating toolbar. Always rendered — when a VNC tab is maximized all
+          other chrome is hidden, so the maximize/restore toggle here is the
+          only way back. Keeping it mounted after a disconnect means a dropped
+          session can still be restored. The capture + scale controls need the
+          live canvas, so those are gated on the connection state. */}
+      <FloatingToolbar
+        storageKey="mob.vnc.toolbar"
+        defaultTop={4}
+        defaultRight={4}
+        testId="vnc-floating-toolbar"
+      >
+        {showCanvas && (
+          <>
+            <CaptureToolbar
             filenamePrefix={`vnc-${host}`}
             getVisible={async () => {
               if (!canvasRef.current) throw new Error(t("vnc.notReady"));
@@ -874,34 +884,23 @@ export default function VncPanel({
           <button
             data-testid="vnc-scale-toggle"
             onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
-            style={{
-              background: "rgba(0,0,0,0.5)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              borderRadius: 4,
-              padding: 4,
-              cursor: "pointer",
-              color: "#ccc",
-              display: "flex",
-            }}
+            style={FT_ICON_BUTTON_STYLE}
             title={scaleMode === "fit" ? t("vnc.scaleToggleOne") : t("vnc.scaleToggleFit")}
           >
             {scaleMode === "fit" ? <Maximize size={14} /> : <Minimize size={14} />}
           </button>
+          </>
+        )}
+          {(onDetach || onToggleMaximize) && (
+            <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+          )}
           {onDetach && (
             <button
               data-testid="vnc-detach"
               onClick={onDetach}
               title={t("rdp.detach")}
               aria-label={t("rdp.detach")}
-              style={{
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: 4,
-                padding: 4,
-                cursor: "pointer",
-                color: "#ccc",
-                display: "flex",
-              }}
+              style={FT_ICON_BUTTON_STYLE}
             >
               <ExternalLink size={14} />
             </button>
@@ -912,39 +911,20 @@ export default function VncPanel({
               onClick={onToggleMaximize}
               title={maximized ? t("rdp.restore") : t("rdp.maximize")}
               aria-label={maximized ? t("rdp.restore") : t("rdp.maximize")}
-              style={{
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: 4,
-                padding: 4,
-                cursor: "pointer",
-                color: "#ccc",
-                display: "flex",
-              }}
+              style={FT_ICON_BUTTON_STYLE}
             >
               {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
           )}
           {detachedWindowControls && (
             <>
+              <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
               <button
                 data-testid="detached-reattach"
                 onClick={detachedWindowControls.onReattach}
                 title={t("rdp.reattach")}
                 aria-label={t("rdp.reattach")}
-                style={{
-                  background: "rgba(0,0,0,0.5)",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  borderRadius: 4,
-                  padding: "3px 8px",
-                  cursor: "pointer",
-                  color: "#ccc",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 11,
-                  whiteSpace: "nowrap",
-                }}
+                style={FT_BUTTON_STYLE}
               >
                 <ExternalLink size={14} />
                 <span>{t("rdp.reattach")}</span>
@@ -954,22 +934,13 @@ export default function VncPanel({
                 onClick={detachedWindowControls.onToggleOsFullscreen}
                 title={t("rdp.osFullscreen")}
                 aria-label={t("rdp.osFullscreen")}
-                style={{
-                  background: "rgba(0,0,0,0.5)",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  borderRadius: 4,
-                  padding: 4,
-                  cursor: "pointer",
-                  color: "#ccc",
-                  display: "flex",
-                }}
+                style={FT_ICON_BUTTON_STYLE}
               >
                 {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
             </>
           )}
         </FloatingToolbar>
-      )}
 
       {/* Status overlays */}
       {showConnecting && (

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
-  Expand,
+  Bot,
   Fullscreen,
   Maximize2,
   Minimize2,
   PictureInPicture,
   PictureInPicture2,
   RefreshCw,
-  Scan,
 } from "lucide-react";
 
 import {
@@ -43,6 +42,15 @@ import {
   writeText as writeClipboardText,
 } from "../../lib/clipboard";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import {
+  FT_BUTTON_STYLE,
+  FT_BUTTON_ACTIVE_OVERRIDE,
+  FT_ICON_BUTTON_STYLE,
+  FT_SEPARATOR_STYLE,
+} from "../floating-toolbar/floatingToolbarStyles";
+import CaptureToolbar from "../capture/CaptureToolbar";
+import { captureCanvasPng } from "../../lib/capture";
+import { useAppStore } from "../../stores/appStore";
 
 export interface RdpPanelProps {
   tabId: string;
@@ -62,6 +70,12 @@ export interface RdpPanelProps {
    *  canvas still fills its parent — no `position: fixed` shenanigans. */
   onToggleMaximize?: () => void;
   maximized?: boolean;
+  /** When set, the toolbar shows an AI-chat toggle bound to this tab.
+   *  Hidden in detached windows (no ChatDrawer lives there). */
+  chatToggle?: {
+    open: boolean;
+    onToggle: () => void;
+  };
   detachedWindowControls?: {
     onReattach: () => void;
     onToggleOsFullscreen: () => void;
@@ -86,6 +100,7 @@ export default function RdpPanel({
   onDetach,
   onToggleMaximize,
   maximized,
+  chatToggle,
   detachedWindowControls,
 }: RdpPanelProps) {
   const t = useT();
@@ -409,8 +424,23 @@ export default function RdpPanel({
         try {
           const w = getCurrentWindow();
           const next = !(await w.isFullscreen());
+          // On Windows a borderless (decorations:false) window that is
+          // OS-*maximized* does not cleanly escape the maximized state when
+          // `setFullscreen(true)` is called: the window covers the screen but
+          // the webview surface stays at the work-area height (screen minus
+          // taskbar), leaving a black band where the taskbar used to be. Drop
+          // out of maximize first so the surface grows to the true screen
+          // height before we go fullscreen.
+          if (next && (await w.isMaximized())) {
+            await w.unmaximize();
+          }
           await w.setFullscreen(next);
           setOsFullscreen(next);
+          // The surface resize lands a frame or two after setFullscreen
+          // resolves; re-sync the remote desktop to the new viewport so the
+          // RDP session repaints at the full screen size instead of the stale
+          // work-area size.
+          window.setTimeout(() => requestViewportResize(true), 120);
         } catch {
           /* window API unavailable — ignore */
         }
@@ -424,11 +454,12 @@ export default function RdpPanel({
           await document.documentElement.requestFullscreen();
           setOsFullscreen(true);
         }
+        window.setTimeout(() => requestViewportResize(true), 120);
       } catch {
         /* fullscreen request rejected — ignore */
       }
     })();
-  }, [detachedWindowControls]);
+  }, [detachedWindowControls, requestViewportResize]);
 
   const onKey = useCallback(
     (down: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -534,14 +565,6 @@ export default function RdpPanel({
     };
   }, [conn?.status, requestViewportResize, visible]);
 
-  const triggerResize = useCallback(() => {
-    requestViewportResize(true);
-  }, [requestViewportResize]);
-
-  const refreshScreen = useCallback(() => {
-    sendBinary(encodeRefresh());
-  }, [sendBinary]);
-
   const reconnect = useCallback(() => {
     const sid = sessionIdRef.current;
     if (sid) rdpDisconnect(sid).catch(() => {});
@@ -560,6 +583,12 @@ export default function RdpPanel({
   const stage = conn?.stage;
   const dims = conn ? `${conn.width}×${conn.height}` : "";
   const protocol = conn?.protocol ?? "";
+  // The backend emits granular internal stage strings (e.g. "negotiating",
+  // "credssp", "refresh-requested") that are useful as live progress while we
+  // are still connecting, but read as noise once the desktop is up. Show the
+  // stage only during connection so the badge settles to a clean
+  // "Connected · TLS · 1920×1000" once the session is live.
+  const showStage = status === "connecting" && !!stage;
 
   const canvasClass = useMemo(
     () => (scaleMode === "fit" ? "rdp-canvas rdp-canvas-fit" : "rdp-canvas rdp-canvas-one"),
@@ -652,7 +681,7 @@ export default function RdpPanel({
           {t(`rdp.status.${status}`)}
           {protocol && <span style={{ opacity: 0.65 }}>· {protocol}</span>}
           {dims && <span style={{ opacity: 0.65 }}>· {dims}</span>}
-          {stage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
+          {showStage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
         </span>
         <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
         {/* Action group — operations on the live session. */}
@@ -666,17 +695,38 @@ export default function RdpPanel({
         >
           <RefreshCw size={14} />
         </button>
-        <button
-          type="button"
-          data-testid="rdp-refresh-screen"
-          disabled={conn?.status !== "connected"}
-          onClick={refreshScreen}
-          title={t("rdp.refreshScreen")}
-          aria-label={t("rdp.refreshScreen")}
-          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
-        >
-          <Scan size={14} />
-        </button>
+        {status === "connected" && (
+          <CaptureToolbar
+            filenamePrefix={`rdp-${host}`}
+            getVisible={async () => {
+              if (!canvasRef.current) throw new Error(t("rdp.notReady"));
+              return await captureCanvasPng(canvasRef.current);
+            }}
+            getFull={async () => {
+              if (!canvasRef.current) throw new Error(t("rdp.notReady"));
+              return await captureCanvasPng(canvasRef.current);
+            }}
+            getScrollFrame={() => canvasRef.current ?? null}
+            getGifFrame={() => canvasRef.current ?? null}
+            onStatus={(msg) => useAppStore.getState().setStatusMessage(msg)}
+            compact
+          />
+        )}
+        {chatToggle && (
+          <button
+            type="button"
+            data-testid="rdp-chat-toggle"
+            onClick={chatToggle.onToggle}
+            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
+            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
+            style={{
+              ...FT_ICON_BUTTON_STYLE,
+              ...(chatToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
+            }}
+          >
+            <Bot size={14} />
+          </button>
+        )}
         {onDetach && (
           <button
             type="button"
@@ -690,8 +740,11 @@ export default function RdpPanel({
           </button>
         )}
         <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-        {/* View group — everything that changes how the desktop is sized or
-            displayed, kept together so the size controls read at a glance. */}
+        {/* View group — how the desktop is scaled and sized. The remote
+            desktop auto-resizes to the viewport on its own (ResizeObserver
+            below), so there is no manual resize button: scale toggle picks
+            fit-vs-1:1, the cycle button walks normal → maximized →
+            fullscreen. */}
         <button
           type="button"
           data-testid="rdp-scale-toggle"
@@ -700,17 +753,6 @@ export default function RdpPanel({
           style={FT_BUTTON_STYLE}
         >
           {scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
-        </button>
-        <button
-          type="button"
-          data-testid="rdp-resize"
-          disabled={conn?.status !== "connected"}
-          onClick={triggerResize}
-          title={t("rdp.resize")}
-          aria-label={t("rdp.resize")}
-          style={{ ...FT_ICON_BUTTON_STYLE, opacity: conn?.status === "connected" ? 1 : 0.5 }}
-        >
-          <Expand size={14} />
         </button>
         <button
           type="button"
@@ -796,46 +838,6 @@ export default function RdpPanel({
     </div>
   );
 }
-
-const FT_BUTTON_STYLE: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 4,
-  padding: "3px 8px",
-  background: "rgba(0,0,0,0.45)",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 4,
-  fontSize: 11,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
-// Square icon-only button. Slightly larger hit area + centered glyph so the
-// distinct lucide icons (reconnect / refresh-screen / detach / maximize…) are
-// easy to tell apart at a glance.
-const FT_ICON_BUTTON_STYLE: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 26,
-  height: 24,
-  padding: 0,
-  background: "rgba(0,0,0,0.45)",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 4,
-  cursor: "pointer",
-};
-
-// Thin vertical rule that visually groups related toolbar buttons.
-const FT_SEPARATOR_STYLE: React.CSSProperties = {
-  width: 1,
-  alignSelf: "stretch",
-  margin: "2px 2px",
-  background: "rgba(255,255,255,0.18)",
-};
 
 /* ── Canvas helpers ─────────────────────────────────────────────────── */
 
