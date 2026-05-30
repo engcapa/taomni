@@ -63,6 +63,8 @@ import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
+import { ServersDialog } from "../components/servers/ServersDialog";
+import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, type SessionConfig } from "../lib/ipc";
 import {
@@ -600,6 +602,11 @@ export function MainLayout() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        useServersStore.getState().openDialog();
+        return;
+      }
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "m") {
         event.preventDefault();
         toggleCompactMode();
@@ -627,6 +634,12 @@ export function MainLayout() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [toggleCompactMode, toggleGlobalChat, toggleTabChat]);
+
+  // Hydrate server configs + statuses once on mount so the servers dialog
+  // opens with persisted settings and live run state.
+  useEffect(() => {
+    void useServersStore.getState().loadAll();
+  }, []);
 
   const confirmExitWithOpenTabs = useCallback(() => {
     const currentTabs = tabsRef.current;
@@ -1152,6 +1165,8 @@ export function MainLayout() {
         toggleCompactMode();
         break;
       case "servers":
+        useServersStore.getState().openDialog();
+        break;
       case "sessions":
         if (compactMode) {
           setCompactSidebarOpen(true);
@@ -1927,6 +1942,8 @@ export function MainLayout() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+
+      <ServersDialog />
     </div>
   );
 }
