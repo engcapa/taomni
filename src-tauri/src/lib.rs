@@ -12,6 +12,7 @@ mod nettools;
 pub mod perf;
 mod rdp;
 mod serial;
+mod servers;
 mod session;
 mod state;
 mod tab;
@@ -45,6 +46,7 @@ pub fn run() {
             let db_path = app_data.join("newmob.db");
             let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
+            servers::db::init_server_tables(&conn).expect("init server tables");
 
             let vault_path = vault::default_vault_path(app.handle());
             let v = vault::Vault::open(&vault_path).expect("failed to open vault");
@@ -63,6 +65,12 @@ pub fn run() {
             let app_for_autostart = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 tunnel::autostart_tunnels(app_for_autostart).await;
+            });
+
+            // Auto-start any local servers with startOnLaunch=true.
+            let app_for_servers = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                servers::autostart_servers(app_for_servers).await;
             });
 
             if cfg!(debug_assertions) {
@@ -84,6 +92,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             terminal::list_local_shells,
+            terminal::detect_x_server,
             wsl::list_wsl_distros,
             terminal::open_local_shell_as_administrator,
             terminal::create_local_terminal,
@@ -168,6 +177,12 @@ pub fn run() {
             tunnel::test_tunnel,
             tunnel::get_tunnel_status,
             tunnel::list_tunnel_statuses,
+            servers::start_local_server,
+            servers::stop_local_server,
+            servers::get_server_status,
+            servers::list_server_statuses,
+            servers::save_server_config,
+            servers::load_server_configs,
             vnc::vnc_connect,
             vnc::vnc_disconnect,
             vnc::vnc_test_connection,

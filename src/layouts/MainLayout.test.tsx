@@ -179,6 +179,14 @@ vi.mock("../lib/ipc", () => ({
   listWslDistros: vi.fn(async () => []),
   markSessionConnected: vi.fn(async () => 0),
   writeTerminal: vi.fn(async () => undefined),
+  detectXServer: vi.fn(async () => ({
+    available: false,
+    display: "",
+    endpoint: "",
+    hasCookie: false,
+    provider: "unknown",
+    hint: "no-display",
+  })),
   // Vault helpers used by MainLayout's lock-aware connect flow.
   VAULT_LOCKED_EVENT: "vault-locked",
   vaultPut: vi.fn(async () => ({ id: "stub", reference: "vault:stub" })),

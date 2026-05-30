@@ -486,7 +486,7 @@ controls: []   # backend-only — ProxyJump / agent forwarding / keepalive run i
 
 - ProxyJump（跳板机）：`forwards.rs` 实现 direct-tcpip 链路
 - Agent 转发
-- X11 转发（Linux）
+- X11 转发（Linux/macOS/Windows）：`terminal/x11.rs` 解析 `$DISPLAY`/cookie，`terminal/x11_forward.rs` 桥接 SSH x11 通道到本机 X 服务（Xorg/XQuartz/VcXsrv/WSLg），支持信任/非信任 cookie 两种模式；状态栏与 Ribbon 的 X server 指示来自 `detect_x_server` 实时探测
 - Keepalive 定时包
 - 断线检测 + 状态事件
 - 网络代理配置（`network.rs` 入口）

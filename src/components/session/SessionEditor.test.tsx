@@ -136,6 +136,9 @@ describe("SessionEditor SSH settings tabs", () => {
 
     expect(checkboxInLabel("Use SSH compression (slow links)")).toBeChecked();
     expect(checkboxInLabel("Enable")).not.toBeChecked();
+    // X11 is off, so the Trusted sub-option is disabled (can't pick a trust
+    // mode for forwarding that isn't happening).
+    expect(checkboxInLabel("Trusted")).toBeDisabled();
     expect(screen.getByLabelText("Execute command")).toHaveValue("tmux new -A -s main");
     expect(screen.getByLabelText("Do not exit after command ends")).toBeChecked();
     expect(screen.getByDisplayValue("Disabled")).toBeInTheDocument();
@@ -151,6 +154,7 @@ describe("SessionEditor SSH settings tabs", () => {
     const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
     expect(JSON.parse(savedConfig.options_json)).toMatchObject({
       x11: false,
+      x11Trusted: true,
       compression: true,
       startupCmd: "tmux new -A -s main",
       doNotExit: true,

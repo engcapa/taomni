@@ -9,6 +9,7 @@ use crate::ai::AppAiCtx;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::rdp::ws::RdpSession;
+use crate::servers::ServerRegistry;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
@@ -36,6 +37,7 @@ pub struct AppState {
     pub sftp_sessions: Arc<RwLock<HashMap<String, Arc<ActiveSftp>>>>,
     pub transfers: Arc<RwLock<HashMap<String, Arc<TransferHandle>>>>,
     pub tunnels: Arc<TunnelRegistry>,
+    pub servers: Arc<ServerRegistry>,
     pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
     pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
@@ -61,6 +63,7 @@ impl AppState {
             sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
             transfers: Arc::new(RwLock::new(HashMap::new())),
             tunnels: Arc::new(TunnelRegistry::new()),
+            servers: Arc::new(ServerRegistry::new()),
             vnc_sessions: Arc::new(RwLock::new(HashMap::new())),
             rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
             read_handles: Arc::new(Mutex::new(HashMap::new())),
