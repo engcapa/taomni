@@ -15,7 +15,7 @@
 
 use super::engine::{ServerCtx, ServerStarted};
 use super::ServerConfig;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 use super::process;
 
 pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
