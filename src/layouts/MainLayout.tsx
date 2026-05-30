@@ -447,14 +447,38 @@ export function MainLayout() {
    * also drained on subscribe.
    */
   useEffect(() => {
+    // Collapse a single close "burst" into one tab. Closing a detached
+    // window can fan a reattach out across several transports/listeners
+    // (BroadcastChannel + localStorage backstop, leaked onCloseRequested
+    // listeners, beforeunload+pagehide double-fire). They all carry the
+    // same (kind,id) within a few hundred ms, so a short per-(kind,id)
+    // window dedupes them without blocking a legitimate later re-detach.
+    const recentReattach = new Map<string, number>();
+    const BURST_WINDOW_MS = 1500;
     const handle = (msg: ReattachMessage) => {
-      const tsTag = Date.now().toString(36);
+      const burstKey = `${msg.kind}.${msg.id}`;
+      const now = Date.now();
+      const last = recentReattach.get(burstKey);
+      if (last !== undefined && now - last < BURST_WINDOW_MS) {
+        clearReattachHandoff(msg.kind, msg.id);
+        return;
+      }
+      recentReattach.set(burstKey, now);
+      // Idempotent tab identity: derive the tab id from the detachedId so
+      // the same window can never materialize two tabs. If a tab already
+      // exists for this detachedId, just focus it.
+      const reattachTabId = `${msg.kind}-reattach-${msg.id}`;
+      if (tabsRef.current.some((t) => t.id === reattachTabId)) {
+        setActiveTab(reattachTabId);
+        clearReattachHandoff(msg.kind, msg.id);
+        return;
+      }
       switch (msg.kind) {
         case "rdp": {
           const p = msg.payload as DetachedRdpParams | undefined;
           if (!p?.host) return;
           addTab({
-            id: `rdp-reattach-${tsTag}`,
+            id: reattachTabId,
             type: "rdp",
             title: p.title || `${p.host}:${p.port}`,
             sessionId: p.sessionId,
@@ -476,7 +500,7 @@ export function MainLayout() {
           const p = msg.payload as DetachedVncParams | undefined;
           if (!p?.host) return;
           addTab({
-            id: `vnc-reattach-${tsTag}`,
+            id: reattachTabId,
             type: "vnc",
             title: p.title || `${p.host}:${p.port}`,
             sessionId: p.sessionId,
@@ -502,7 +526,7 @@ export function MainLayout() {
               }
             : undefined;
           addTab({
-            id: `term-reattach-${tsTag}`,
+            id: reattachTabId,
             type: "terminal",
             title: p.title || tr("tabs.localTerminal"),
             closable: true,
@@ -525,7 +549,7 @@ export function MainLayout() {
     // before we subscribed.
     drainPendingReattach().forEach(handle);
     return unsub;
-  }, [addTab, setStatusMessage]);
+  }, [addTab, setActiveTab, setStatusMessage]);
 
   useEffect(() => {
     void loadSessions();
@@ -537,10 +561,16 @@ export function MainLayout() {
 
   // Track which tab the AI Chat Drawer should consider "active" when the user
   // types `@terminal:last-N` or hits Send-to-Terminal on a code block.
+  // `setActiveTerminalTab` is terminal-only (that registry pulls xterm
+  // buffers), but a tab-bound chat drawer can belong to any tab kind that
+  // exposes a chat toggle (terminal + rdp), so the drawer-sync gets the
+  // active tab id for those kinds and survives tab switches.
   useEffect(() => {
     const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
     setActiveTerminalTab(terminalTabId);
-    void syncTabChatWithActiveTab(terminalTabId);
+    const chatBoundTabId =
+      activeTab?.type === "terminal" || activeTab?.type === "rdp" ? activeTabId : null;
+    void syncTabChatWithActiveTab(chatBoundTabId);
   }, [activeTabId, activeTab?.type, syncTabChatWithActiveTab]);
 
   useEffect(() => {
@@ -1774,6 +1804,10 @@ export function MainLayout() {
                           onDetach={() => openDetachedRdp(tab.id, tab.rdp!, tab.title)}
                           onToggleMaximize={() => toggleTabMaximized(tab.id)}
                           maximized={tabMaximizedId === tab.id}
+                          chatToggle={!aiFullyDisabled ? {
+                            open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
+                            onToggle: () => void toggleTabChat(tab.id),
+                          } : undefined}
                         />
                       </Suspense>
                     </div>

@@ -155,6 +155,13 @@ export default function DetachedSessionWindow({
       try {
         const w = getCurrentWindow();
         const next = !(await w.isFullscreen());
+        // Borderless windows that are OS-maximized don't cleanly escape the
+        // maximized state on `setFullscreen(true)` (Windows leaves the webview
+        // surface at the work-area height, showing a taskbar-height black
+        // band). Drop maximize first so the surface fills the whole screen.
+        if (next && (await w.isMaximized())) {
+          await w.unmaximize();
+        }
         await w.setFullscreen(next);
         setOsFullscreen(next);
       } catch {

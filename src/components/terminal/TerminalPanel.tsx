@@ -54,6 +54,11 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import {
+  FT_BUTTON_STYLE,
+  FT_BUTTON_ACTIVE_OVERRIDE,
+  FT_ICON_BUTTON_STYLE,
+} from "../floating-toolbar/floatingToolbarStyles";
 import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
 import {
   createInputEchoSuppressor,
@@ -2207,19 +2212,11 @@ export function TerminalPanel({
             onClick={sftpToggle.onToggle}
             title={sftpToggle.open ? t("terminal.sftpFloatingClose") : t("terminal.sftpFloatingOpen")}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "2px 8px",
-              fontSize: 11,
-              borderRadius: 4,
-              background: sftpToggle.open ? "var(--moba-accent)" : "rgba(0,0,0,0.5)",
-              color: sftpToggle.open ? "#fff" : "#ccc",
-              border: "1px solid rgba(255,255,255,0.2)",
-              cursor: "pointer",
+              ...FT_BUTTON_STYLE,
+              ...(sftpToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
             }}
           >
-            <FolderOpen size={12} />
+            <FolderOpen size={14} />
             {t("terminal.sftpFloatingButtonLabel")}
           </button>
         )}
@@ -2231,19 +2228,11 @@ export function TerminalPanel({
             onClick={chatToggle.onToggle}
             title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "2px 8px",
-              fontSize: 11,
-              borderRadius: 4,
-              background: chatToggle.open ? "var(--moba-accent)" : "rgba(0,0,0,0.5)",
-              color: chatToggle.open ? "#fff" : "#ccc",
-              border: "1px solid rgba(255,255,255,0.2)",
-              cursor: "pointer",
+              ...FT_BUTTON_STYLE,
+              ...(chatToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
             }}
           >
-            <Bot size={12} />
+            <Bot size={14} />
             {t("terminal.chatFloatingButtonLabel")}
           </button>
         )}
@@ -2254,19 +2243,9 @@ export function TerminalPanel({
             aria-label={t("rdp.detach")}
             title={t("rdp.detach")}
             onClick={detachToggle.onDetach}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "2px 6px",
-              borderRadius: 4,
-              background: "rgba(0,0,0,0.5)",
-              color: "#ccc",
-              border: "1px solid rgba(255,255,255,0.2)",
-              cursor: "pointer",
-            }}
+            style={FT_ICON_BUTTON_STYLE}
           >
-            <ExternalLink size={12} />
+            <ExternalLink size={14} />
           </button>
         )}
         {maximizeToggle && (
@@ -2276,19 +2255,9 @@ export function TerminalPanel({
             aria-label={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
             title={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
             onClick={maximizeToggle.onToggle}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "2px 6px",
-              borderRadius: 4,
-              background: "rgba(0,0,0,0.5)",
-              color: "#ccc",
-              border: "1px solid rgba(255,255,255,0.2)",
-              cursor: "pointer",
-            }}
+            style={FT_ICON_BUTTON_STYLE}
           >
-            {maximizeToggle.maximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            {maximizeToggle.maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         )}
         {detachedWindowControls && (
@@ -2302,22 +2271,9 @@ export function TerminalPanel({
                 preserveSessionOnUnmountRef.current = true;
                 detachedWindowControls.onReattach(collectReattachState());
               }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-                padding: "2px 6px",
-                borderRadius: 4,
-                background: "rgba(0,0,0,0.5)",
-                color: "#ccc",
-                border: "1px solid rgba(255,255,255,0.2)",
-                cursor: "pointer",
-                fontSize: 11,
-                whiteSpace: "nowrap",
-              }}
+              style={FT_BUTTON_STYLE}
             >
-              <ExternalLink size={12} />
+              <ExternalLink size={14} />
               <span>{t("rdp.reattach")}</span>
             </button>
             <button
@@ -2326,19 +2282,9 @@ export function TerminalPanel({
               aria-label={t("rdp.osFullscreen")}
               title={t("rdp.osFullscreen")}
               onClick={detachedWindowControls.onToggleOsFullscreen}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "2px 6px",
-                borderRadius: 4,
-                background: "rgba(0,0,0,0.5)",
-                color: "#ccc",
-                border: "1px solid rgba(255,255,255,0.2)",
-                cursor: "pointer",
-              }}
+              style={FT_ICON_BUTTON_STYLE}
             >
-              {detachedWindowControls.osFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+              {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
           </>
         )}

@@ -57,7 +57,11 @@ export const DEFAULT_RDP_OPTIONS: RdpOptions = {
   colorDepth: 32,
   screenW: 1920,
   screenH: 1080,
-  nla: false,
+  // Default to Network Level Authentication: CredSSP authenticates with the
+  // saved credentials *before* the Windows logon screen, so they actually
+  // sign the user in instead of landing on "其他用户 / 用户名或密码不正确".
+  // Servers without NLA support can untick the box in the session editor.
+  nla: true,
   performance: DEFAULT_RDP_PERFORMANCE,
   redirectClipboard: true,
   redirectAudio: "play",
@@ -73,7 +77,7 @@ export function parseRdpOptions(optionsJson: string | undefined | null): RdpOpti
   } catch {
     return { ...DEFAULT_RDP_OPTIONS };
   }
-  if (!raw || typeof raw !== "object") return { ...DEFAULT_RDP_OPTIONS };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ...DEFAULT_RDP_OPTIONS };
   const o = raw as Record<string, unknown>;
   const performance = mergePerformance(o.performance);
   const drive = mergeDrive(o.redirectDrive);
