@@ -105,5 +105,6 @@ pub async fn start(
         ServerType::Nfs => super::nfs::start(ctx, config).await,
         ServerType::Cron => super::cron::start(ctx, config).await,
         ServerType::Iperf => super::iperf::start(ctx, config).await,
+        ServerType::Rdp => super::rdp::start(ctx, config).await,
     }
 }
