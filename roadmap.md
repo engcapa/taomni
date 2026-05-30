@@ -25,7 +25,7 @@ NewMob is evolving from a local-first remote connection manager into a **BYO-clo
 
 **Known gaps:**
 - 🔴 **Security:** `check_server_key()` in `terminal/ssh.rs` accepts all host keys (TOFU not enforced)
-- 🟡 RDP, Telnet, Serial, X11 — frameworks exist but not functional
+- 🟡 RDP, Telnet, Serial — frameworks exist but not functional
 - 🟡 No cloud sync, no AI, no team features
 - 🟢 Vault export/import only via copying SQLite files
 

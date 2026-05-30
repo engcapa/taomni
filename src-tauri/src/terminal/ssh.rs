@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::terminal::network::{establish_transport, NetworkSettings};
+use crate::terminal::x11_forward::{self, XForward};
 
 pub struct SshSession {
     pub handle: client::Handle<SshHandler>,
@@ -16,6 +17,9 @@ pub struct SshSession {
 
 pub struct SshHandler {
     pub output_tx: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<Vec<u8>>>>>,
+    /// X11 forwarding config for this session, if enabled. When set, inbound
+    /// `x11` channels opened by the server are bridged to the local X server.
+    pub x11: Option<Arc<XForward>>,
 }
 
 #[async_trait]
@@ -52,6 +56,29 @@ impl client::Handler for SshHandler {
         if let Some(tx) = self.output_tx.lock().await.as_ref() {
             let _ = tx.send(data.to_vec());
         }
+        Ok(())
+    }
+
+    /// The remote opened an X11 channel (a forwarded X client wants to talk to
+    /// our display). Bridge it to the local X server. We spawn the pump as a
+    /// detached task so the SSH event loop keeps servicing other channels; the
+    /// task ends when either side closes, and is torn down with the session.
+    async fn server_channel_open_x11(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        _originator_address: &str,
+        _originator_port: u32,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        if let Some(forward) = self.x11.clone() {
+            tokio::spawn(async move {
+                let stream = channel.into_stream();
+                if let Err(e) = x11_forward::bridge(forward, stream).await {
+                    tracing::debug!("X11 forward bridge ended: {}", e);
+                }
+            });
+        }
+        // If X11 wasn't enabled for this session, dropping `channel` closes it.
         Ok(())
     }
 }
@@ -376,6 +403,7 @@ pub async fn connect_ssh(
     rows: u16,
     network: Option<&NetworkSettings>,
     prompter: Option<&KbdInteractivePrompter>,
+    x11: Option<Arc<XForward>>,
 ) -> Result<
     (
         client::Handle<SshHandler>,
@@ -390,6 +418,7 @@ pub async fn connect_ssh(
 
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(Some(output_tx))),
+        x11: x11.clone(),
     };
 
     let stream = establish_transport(host, port, network).await?;
@@ -416,6 +445,25 @@ pub async fn connect_ssh(
         )
         .await
         .map_err(|e| format!("Failed to request PTY: {}", e))?;
+
+    // Request X11 forwarding on the session channel before the shell starts so
+    // the remote `$DISPLAY` is set for the login shell. A failure here is
+    // non-fatal: we log and continue with a normal (non-X11) shell rather than
+    // aborting the whole connection.
+    if let Some(forward) = &x11 {
+        if let Err(e) = channel
+            .request_x11(
+                false,
+                !forward.trusted, // single_connection in untrusted mode
+                forward.advertised_protocol.clone(),
+                forward.advertised_cookie_hex.clone(),
+                forward.display.screen,
+            )
+            .await
+        {
+            tracing::warn!("X11 forwarding request failed (continuing without): {}", e);
+        }
+    }
 
     channel
         .request_shell(false)
@@ -448,6 +496,7 @@ pub async fn connect_ssh_authenticated_with(
     let config = build_client_config(network);
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
+        x11: None,
     };
 
     let stream = establish_transport(host, port, network).await?;

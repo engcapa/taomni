@@ -2,6 +2,8 @@ pub mod forwards;
 pub mod network;
 pub mod pty;
 pub mod ssh;
+pub mod x11;
+pub mod x11_forward;
 
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
@@ -44,6 +46,14 @@ unsafe impl Sync for ActiveTerminal {}
 #[tauri::command]
 pub fn list_local_shells() -> Vec<pty::LocalShellOption> {
     pty::list_local_shells()
+}
+
+/// Probe the local system X server (Xorg / XQuartz / VcXsrv / WSLg) and report
+/// whether X11 forwarding has somewhere to display. Drives the X-server status
+/// pill and the "install XQuartz/VcXsrv" hints in the UI.
+#[tauri::command]
+pub fn detect_x_server() -> x11::XServerStatus {
+    x11::detect()
 }
 
 #[tauri::command]
@@ -211,6 +221,8 @@ pub async fn create_ssh_terminal(
     cols: u16,
     rows: u16,
     network_settings_json: Option<String>,
+    x11: Option<bool>,
+    x11_trusted: Option<bool>,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
@@ -258,9 +270,39 @@ pub async fn create_ssh_terminal(
         session_id.clone(),
     );
 
-    let connect_result =
-        ssh::connect_ssh(&host, port, &username, auth, cols, rows, network.as_ref(), Some(&prompter))
-            .await;
+    // X11 forwarding: resolve the local X server + cookie if the session has
+    // X11 enabled. Resolution failure (no local display) is non-fatal — we log
+    // and connect without forwarding so the terminal still works.
+    let x11_forward = if x11.unwrap_or(false) {
+        match x11::resolve(None) {
+            Ok(display) => {
+                let trusted = x11_trusted.unwrap_or(true);
+                Some(Arc::new(x11_forward::XForward::new(
+                    Arc::new(display),
+                    trusted,
+                )))
+            }
+            Err(e) => {
+                tracing::warn!("X11 enabled but no local display ({}); connecting without forwarding", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let connect_result = ssh::connect_ssh(
+        &host,
+        port,
+        &username,
+        auth,
+        cols,
+        rows,
+        network.as_ref(),
+        Some(&prompter),
+        x11_forward,
+    )
+    .await;
     // Drop any responder left dangling for this session (e.g. auth failed
     // while a prompt round was still registered) so the map doesn't leak.
     clear_session_auth_responders(&state.ssh_auth_responders, &session_id);
@@ -606,7 +648,7 @@ pub async fn test_ssh_connection(
 
     let start = std::time::Instant::now();
     let (handle, channel, _rx) =
-        ssh::connect_ssh(&host, port, &username, auth, 80, 24, network.as_ref(), None).await?;
+        ssh::connect_ssh(&host, port, &username, auth, 80, 24, network.as_ref(), None, None).await?;
     let elapsed = start.elapsed();
 
     // Close the test connection

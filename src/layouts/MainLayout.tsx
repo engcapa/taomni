@@ -133,6 +133,7 @@ export function MainLayout() {
     sidebarCollapsed,
     compactMode,
     xServerEnabled,
+    refreshXServer,
     addTab,
     removeTab,
     setActiveTab,
@@ -531,6 +532,12 @@ export function MainLayout() {
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  // Probe the local X server once at startup so the status pill reflects
+  // reality (Xorg/XQuartz/VcXsrv/WSLg reachable or not) instead of a guess.
+  useEffect(() => {
+    void refreshXServer();
+  }, [refreshXServer]);
 
   useEffect(() => {
     if (activeTabId) setTabHasNewOutput(activeTabId, false);

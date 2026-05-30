@@ -22,7 +22,7 @@ import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
 export function StatusBar() {
-  const { tabs, activeTabId, xServerEnabled, statusMessage } = useAppStore();
+  const { tabs, activeTabId, xServerEnabled, xServerStatus, statusMessage } = useAppStore();
   const { sessions, selectedSessionId } = useSessionStore();
   const { mode, resolvedTheme } = useAppTheme();
   const [online, setOnline] = useState(navigator.onLine);
@@ -64,8 +64,8 @@ export function StatusBar() {
       <span className="flex items-center gap-1">
         <Wifi className={`w-3 h-3 ${online ? "text-emerald-600" : "text-red-600"}`} /> {online ? t("statusBar.networkOnline") : t("statusBar.networkOffline")}
       </span>
-      <span className="flex items-center gap-1">
-        <Monitor className={`w-3 h-3 ${xServerEnabled ? "text-emerald-600" : "text-slate-500"}`} /> X11: {xServerEnabled ? "127.0.0.1:0.0" : t("statusBar.x11Off")}
+      <span className="flex items-center gap-1" title={xServerStatus?.provider ? `${xServerStatus.provider} · ${xServerStatus.endpoint}` : undefined}>
+        <Monitor className={`w-3 h-3 ${xServerEnabled ? "text-emerald-600" : "text-slate-500"}`} /> X11: {xServerEnabled ? (xServerStatus?.display || xServerStatus?.endpoint || "") : t("statusBar.x11Off")}
       </span>
       <span className="flex items-center gap-1">
         <KeyRound className="w-3 h-3 text-slate-500" /> {t("statusBar.auth")}
