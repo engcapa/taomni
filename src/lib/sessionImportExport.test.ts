@@ -12,6 +12,7 @@ import {
   parseXmlConnectionSessions,
   parseXshellSessions,
   parseXshellZipSessions,
+  parseXshellFile,
   serializeCsvSessions,
   serializeMobaXtermSessions,
   serializeNewMobSessions,
@@ -60,6 +61,17 @@ function session(overrides: Partial<SessionConfig> = {}): SessionConfig {
     sort_order: 0,
     ...overrides,
   };
+}
+
+function encodeUtf16LeWithBom(text: string): Uint8Array {
+  const out = new Uint8Array(2 + text.length * 2);
+  const view = new DataView(out.buffer);
+  view.setUint8(0, 0xff);
+  view.setUint8(1, 0xfe);
+  for (let i = 0; i < text.length; i += 1) {
+    view.setUint16(2 + i * 2, text.charCodeAt(i), true);
+  }
+  return out;
 }
 
 function makeStoredZip(entries: Record<string, string>): Uint8Array {
@@ -408,6 +420,101 @@ describe("third-party session import parsers", () => {
       host: "db.example.com",
       port: 2202,
       username: "dba",
+    });
+  });
+
+  it("imports Xshell public-key auth from the authentication section", () => {
+    const result = parseXshellSessions([
+      "[SessionInfo]",
+      "Version=7",
+      "[CONNECTION]",
+      "Host=10.0.0.9",
+      "Port=22",
+      "Protocol=SSH",
+      "[CONNECTION:AUTHENTICATION]",
+      "Method=Public Key",
+      "UserName=deploy",
+      "UserKeyName=id_rsa",
+    ].join("\n"), { targetFolder: "Imported", now: 6020 });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      host: "10.0.0.9",
+      username: "deploy",
+      auth_method: { PrivateKey: { key_path: "~/.ssh/id_rsa" } },
+    });
+  });
+
+  it("keeps password auth for Xshell sessions without a public key", () => {
+    const result = parseXshellSessions([
+      "[CONNECTION]",
+      "Host=10.0.0.10",
+      "Protocol=SSH",
+      "[CONNECTION:AUTHENTICATION]",
+      "Method=Password",
+      "UserName=ops",
+    ].join("\n"), { now: 6021 });
+
+    expect(result.sessions[0]).toMatchObject({
+      username: "ops",
+      auth_method: "Password",
+    });
+  });
+
+  it("preserves an explicit key path from the authentication section", () => {
+    const result = parseXshellSessions([
+      "[CONNECTION]",
+      "Host=10.0.0.11",
+      "Protocol=SSH",
+      "[CONNECTION:AUTHENTICATION]",
+      "Method=Public Key",
+      "UserName=admin",
+      "UserKeyName=C:\\keys\\prod.pem",
+    ].join("\n"), { now: 6022 });
+
+    expect(result.sessions[0].auth_method).toEqual({
+      PrivateKey: { key_path: "C:\\keys\\prod.pem" },
+    });
+  });
+
+  it("imports a UTF-16 LE .xsh file via parseXshellFile", async () => {
+    const text = [
+      "[CONNECTION]",
+      "Host=utf16.example.com",
+      "Port=22",
+      "Protocol=SSH",
+      "[CONNECTION:AUTHENTICATION]",
+      "UserName=root",
+    ].join("\r\n");
+
+    const result = await parseXshellFile(encodeUtf16LeWithBom(text), { now: 6023 });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      host: "utf16.example.com",
+      username: "root",
+    });
+  });
+
+  it("imports an Xshell .xts export (ZIP) via parseXshellFile", async () => {
+    const zip = makeStoredZip({
+      "Web.xsh": [
+        "[CONNECTION]",
+        "Host=xts.example.com",
+        "Port=22",
+        "Protocol=SSH",
+        "[CONNECTION:AUTHENTICATION]",
+        "UserName=deploy",
+      ].join("\n"),
+    });
+
+    const result = await parseXshellFile(zip, { targetFolder: "Imported", now: 6024 });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Web",
+      host: "xts.example.com",
+      username: "deploy",
     });
   });
 

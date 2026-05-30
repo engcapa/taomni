@@ -1559,7 +1559,7 @@ export const zhCN: DeepPartial<typeof en> = {
     contextImportSecureCrt: "导入 SCRT 会话",
     contextImportRdm: "导入 RDM 会话",
     contextImportCsv: "从 CSV 文件导入会话",
-    fromXshFile: "从 .xsh 文件",
+    fromXshFile: "从 .xsh / .xts 文件",
     fromZipArchive: "从 ZIP 压缩包",
     fromLocalXshell: "从本地 Xshell 配置",
     fromConfigYaml: "从 config.yaml",

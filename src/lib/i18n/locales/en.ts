@@ -1562,7 +1562,7 @@ const dict = {
     contextImportSecureCrt: "Import SCRT sessions",
     contextImportRdm: "Import RDM sessions",
     contextImportCsv: "Import sessions from a CSV file",
-    fromXshFile: "From .xsh file",
+    fromXshFile: "From .xsh / .xts file",
     fromZipArchive: "From ZIP archive",
     fromLocalXshell: "From local Xshell config",
     fromConfigYaml: "From config.yaml",

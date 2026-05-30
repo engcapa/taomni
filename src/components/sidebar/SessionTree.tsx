@@ -57,6 +57,7 @@ import {
   parseXmlConnectionSessions,
   parseXshellSessions,
   parseXshellZipSessions,
+  parseXshellFile,
   createSessionImportResult,
   serializeCsvSessions,
   serializeMobaXtermSessions,
@@ -810,8 +811,21 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     });
   };
 
+  const importXshellFile = (folderPath: string | null) => {
+    openBinaryFile(".xsh,.xts,.zip,application/zip,application/x-zip-compressed,text/plain").then(async (bytes) => {
+      if (!bytes) return;
+      const result = await parseXshellFile(bytes, {
+        targetFolder: folderPath,
+        existingSessions: sessions,
+      });
+      queueImportPreview(result, folderPath, "Xshell");
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
   const importXshellZip = (folderPath: string | null) => {
-    openBinaryFile(".zip,application/zip,application/x-zip-compressed").then(async (bytes) => {
+    openBinaryFile(".zip,.xts,application/zip,application/x-zip-compressed").then(async (bytes) => {
       if (!bytes) return;
       const result = await parseXshellZipSessions(bytes, {
         targetFolder: folderPath,
@@ -942,7 +956,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           {
             label: t("sessionTree.fromXshFile"),
             icon: <FileText className="w-3 h-3" />,
-            onClick: () => importTextSessions(folderPath, "Xshell", ".xsh,text/plain", parseXshellSessions),
+            onClick: () => importXshellFile(folderPath),
           },
           {
             label: t("sessionTree.fromZipArchive"),
