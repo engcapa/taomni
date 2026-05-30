@@ -49,7 +49,10 @@ impl RdpDisplay {
                 }
             }
             Err(e) => {
-                log.line(format!("screen capture unavailable: {} — serving placeholder", e));
+                let msg =
+                    format!("screen capture unavailable: {} — serving placeholder", e);
+                log.line(msg.clone());
+                tracing::warn!("RDP display: {}", msg);
                 (fallback, false)
             }
         };

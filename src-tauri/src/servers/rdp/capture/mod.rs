@@ -43,18 +43,27 @@ pub(crate) trait Capturer {
 pub(crate) fn create_capturer(log: &LogEmitter) -> anyhow::Result<Box<dyn Capturer>> {
     #[cfg(target_os = "linux")]
     {
-        // On a pure-Wayland session the X11/XShm backend can only see XWayland
-        // surfaces, not the real desktop, so route Wayland sessions to the
-        // (portal/PipeWire) Wayland path and let it report what's available.
-        if wayland::is_wayland_session() {
-            match wayland::try_new(log) {
-                Ok(never) => match never {},
-                Err(e) => return Err(e),
+        // Try X11 first whenever an X server is reachable. This is authoritative:
+        // on a real Xorg session it captures the desktop directly, and on a
+        // Wayland session with XWayland it still captures (XWayland exposes the
+        // root window). Only when X11 is genuinely unreachable do we fall back to
+        // the Wayland portal path. (Routing on `is_wayland_session()` first was
+        // wrong: it skipped a perfectly working X11/`DISPLAY=:0` and dropped
+        // straight to the unimplemented Wayland message → synthetic placeholder.)
+        match x11::X11Capturer::new(log) {
+            Ok(cap) => return Ok(Box::new(cap)),
+            Err(x11_err) => {
+                if wayland::is_wayland_session() {
+                    // No usable X11 but we are on Wayland — report the Wayland
+                    // capture status (currently: not built in).
+                    match wayland::try_new(log) {
+                        Ok(never) => match never {},
+                        Err(e) => return Err(e),
+                    }
+                }
+                return Err(x11_err);
             }
         }
-        // X11 (MIT-SHM).
-        let cap = x11::X11Capturer::new(log)?;
-        Ok(Box::new(cap))
     }
 
     #[cfg(target_os = "windows")]

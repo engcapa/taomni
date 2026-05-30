@@ -1,10 +1,14 @@
-//! X11 screen capture via the MIT-SHM (`shm`) extension, using `x11rb`.
+//! X11 screen capture using `x11rb`, with a fast path and a safe fallback.
 //!
-//! Mirrors RustDesk's X11 path (XShm rather than plain `XGetImage`): a shared
-//! memory segment is allocated once, and each frame is a single `shm_get_image`
-//! of the root window directly into that buffer — no per-frame X protocol image
-//! transfer. The root window's pixels are already BGRA on a depth-24/32
-//! TrueColor visual (little-endian Z_PIXMAP), matching `PixelFormat::BgrA32`.
+//! Fast path mirrors RustDesk: MIT-SHM (`shm`) — a shared memory segment is
+//! allocated once and each frame is a single `shm_get_image` of the root window
+//! into that buffer, with no per-frame protocol image transfer. The modern
+//! FD-passing `shm_create_segment` needs MIT-SHM ≥ 1.2, which is not available
+//! everywhere (older Xorg, some remote/forwarded or sandboxed connections), so
+//! when SHM setup fails we fall back to plain `GetImage` (slower — the image
+//! travels over the X connection each frame — but always available on a local
+//! TrueColor display). Either way the root window's pixels are BGRA on a
+//! depth-24/32 visual (little-endian Z_PIXMAP), matching `PixelFormat::BgrA32`.
 
 use std::os::unix::io::OwnedFd;
 use std::ptr::NonNull;
@@ -12,7 +16,7 @@ use std::ptr::NonNull;
 use anyhow::{bail, Context as _};
 use x11rb::connection::{Connection, RequestConnection as _};
 use x11rb::protocol::shm::{self, ConnectionExt as _};
-use x11rb::protocol::xproto::{self, ImageFormat};
+use x11rb::protocol::xproto::{self, ConnectionExt as _, ImageFormat};
 use x11rb::rust_connection::RustConnection;
 
 use super::{Capturer, Frame};
@@ -46,29 +50,27 @@ impl Drop for ShmBuffer {
     }
 }
 
+/// Which grab mechanism the capturer is using.
+enum Backend {
+    /// MIT-SHM fast path: one shared segment, no per-frame transfer.
+    Shm(ShmBuffer),
+    /// Plain `GetImage`: image travels over the X connection each frame.
+    Plain,
+}
+
 pub(crate) struct X11Capturer {
     conn: RustConnection,
     root: xproto::Window,
     width: u16,
     height: u16,
     depth: u8,
-    shm: ShmBuffer,
+    backend: Backend,
 }
 
 impl X11Capturer {
     pub(crate) fn new(log: &LogEmitter) -> anyhow::Result<Self> {
         let (conn, screen_num) =
             x11rb::connect(None).context("cannot connect to X11 display (is DISPLAY set?)")?;
-
-        // MIT-SHM must be present for the fast path.
-        if conn
-            .extension_information(shm::X11_EXTENSION_NAME)
-            .context("querying SHM extension")?
-            .is_none()
-        {
-            bail!("X11 server has no MIT-SHM extension — cannot capture efficiently");
-        }
-        let _ = conn.shm_query_version().context("SHM query_version")?.reply();
 
         let screen = &conn.setup().roots[screen_num];
         let root = screen.root;
@@ -83,12 +85,29 @@ impl X11Capturer {
             ));
         }
 
-        let shm = Self::alloc_shm(&conn, width, height)?;
-
-        log.line(format!(
-            "X11 capture ready: {}x{} depth {} (MIT-SHM)",
-            width, height, depth
-        ));
+        // Try the MIT-SHM fast path; on any failure fall back to plain GetImage
+        // rather than giving up (which would surface the synthetic placeholder).
+        let backend = match Self::try_init_shm(&conn, width, height) {
+            Ok(shm) => {
+                log.line(format!(
+                    "X11 capture ready: {}x{} depth {} (MIT-SHM)",
+                    width, height, depth
+                ));
+                tracing::info!(%width, %height, depth, "X11 capture using MIT-SHM");
+                Backend::Shm(shm)
+            }
+            Err(e) => {
+                // Mirror to BOTH the UI log panel and tracing/stdout so the
+                // reason is visible wherever the operator is looking.
+                let msg = format!(
+                    "MIT-SHM unavailable ({}); falling back to plain GetImage (slower).",
+                    e
+                );
+                log.line(msg.clone());
+                tracing::warn!("X11 capture: {}", msg);
+                Backend::Plain
+            }
+        };
 
         Ok(Self {
             conn,
@@ -96,8 +115,36 @@ impl X11Capturer {
             width,
             height,
             depth,
-            shm,
+            backend,
         })
+    }
+
+    /// Probe MIT-SHM and, if usable, allocate the shared segment. Returns `Err`
+    /// (rather than panicking or bailing the whole capturer) so the caller can
+    /// fall back to plain `GetImage`.
+    fn try_init_shm(conn: &RustConnection, width: u16, height: u16) -> anyhow::Result<ShmBuffer> {
+        if conn
+            .extension_information(shm::X11_EXTENSION_NAME)
+            .context("querying SHM extension")?
+            .is_none()
+        {
+            bail!("X11 server has no MIT-SHM extension");
+        }
+        // `shm_create_segment` (FD passing) needs MIT-SHM >= 1.2. Check the
+        // version so we fail fast on old servers instead of erroring mid-request.
+        let ver = conn
+            .shm_query_version()
+            .context("SHM query_version")?
+            .reply()
+            .context("SHM query_version reply")?;
+        if (ver.major_version, ver.minor_version) < (1, 2) {
+            bail!(
+                "MIT-SHM {}.{} too old for fd-passing (need >= 1.2)",
+                ver.major_version,
+                ver.minor_version
+            );
+        }
+        Self::alloc_shm(conn, width, height)
     }
 
     /// Allocate a SHM segment sized for one BGRA frame and mmap it into our
@@ -148,10 +195,12 @@ impl X11Capturer {
 
 impl Drop for X11Capturer {
     fn drop(&mut self) {
-        // Detach the SHM segment from the X server. The local mapping is freed
-        // by ShmBuffer::drop.
-        let _ = self.conn.shm_detach(self.shm.seg);
-        let _ = self.conn.flush();
+        // Detach the SHM segment from the X server (no-op for the plain backend).
+        // The local mapping is freed by ShmBuffer::drop.
+        if let Backend::Shm(shm) = &self.backend {
+            let _ = self.conn.shm_detach(shm.seg);
+            let _ = self.conn.flush();
+        }
     }
 }
 
@@ -161,28 +210,50 @@ impl Capturer for X11Capturer {
     }
 
     fn capture(&mut self) -> anyhow::Result<Frame> {
-        // Pull the whole root window into the shared segment in one request.
-        let _reply = self
-            .conn
-            .shm_get_image(
-                self.root,
-                0,
-                0,
-                self.width,
-                self.height,
-                !0,
-                ImageFormat::Z_PIXMAP.into(),
-                self.shm.seg,
-                0,
-            )
-            .context("shm_get_image")?
-            .reply()
-            .context("shm_get_image reply")?;
+        let mut data = match &self.backend {
+            Backend::Shm(shm) => {
+                // Pull the whole root window into the shared segment in one request.
+                self.conn
+                    .shm_get_image(
+                        self.root,
+                        0,
+                        0,
+                        self.width,
+                        self.height,
+                        !0,
+                        ImageFormat::Z_PIXMAP.into(),
+                        shm.seg,
+                        0,
+                    )
+                    .context("shm_get_image")?
+                    .reply()
+                    .context("shm_get_image reply")?;
+                // Copy out of the shared buffer (the X server may overwrite it on
+                // the next capture).
+                shm.as_slice().to_vec()
+            }
+            Backend::Plain => {
+                // Image data travels over the X connection in the reply.
+                let reply = self
+                    .conn
+                    .get_image(
+                        ImageFormat::Z_PIXMAP,
+                        self.root,
+                        0,
+                        0,
+                        self.width,
+                        self.height,
+                        !0,
+                    )
+                    .context("get_image")?
+                    .reply()
+                    .context("get_image reply")?;
+                reply.data
+            }
+        };
 
-        // Copy out of the shared buffer (the X server may overwrite it on the
-        // next capture). Depth 24 still arrives as 4 bytes/pixel in Z_PIXMAP on
-        // 32-bpp visuals; the unused byte becomes alpha, which we force opaque.
-        let mut data = self.shm.as_slice().to_vec();
+        // Depth 24 still arrives as 4 bytes/pixel in Z_PIXMAP on 32-bpp visuals;
+        // the unused 4th byte is undefined, so force it opaque for BgrA32.
         if self.depth == 24 {
             for px in data.chunks_exact_mut(4) {
                 px[3] = 0xff;
@@ -258,6 +329,43 @@ mod tests {
             "BGRA buffer length matches geometry"
         );
         let _ = conn.shm_detach(shm.seg);
+    }
+
+    /// The plain `GetImage` fallback must produce a correctly-sized BGRA frame
+    /// on any local TrueColor display, independent of MIT-SHM. This exercises
+    /// the path taken when SHM setup fails (the cause of the placeholder
+    /// rainbow). Skips when no DISPLAY is reachable.
+    #[test]
+    fn plain_get_image_fallback_produces_a_frame() {
+        if std::env::var_os("DISPLAY").is_none() {
+            eprintln!("skipping: no DISPLAY");
+            return;
+        }
+        let (conn, screen_num) = match x11rb::connect(None) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("skipping: cannot connect to X11: {e}");
+                return;
+            }
+        };
+        let screen = &conn.setup().roots[screen_num];
+        let mut cap = X11Capturer {
+            root: screen.root,
+            width: screen.width_in_pixels,
+            height: screen.height_in_pixels,
+            depth: screen.root_depth,
+            backend: Backend::Plain,
+            conn,
+        };
+        let frame = cap.capture().expect("plain GetImage capture");
+        assert_eq!(frame.width, cap.width);
+        assert_eq!(frame.height, cap.height);
+        assert_eq!(
+            frame.data.len(),
+            usize::from(frame.width) * usize::from(frame.height) * 4,
+            "BGRA frame length matches geometry"
+        );
+        assert_eq!(frame.stride, usize::from(frame.width) * 4);
     }
 }
 
