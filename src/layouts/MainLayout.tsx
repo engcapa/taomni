@@ -57,7 +57,7 @@ import {
   type ReattachMessage,
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams } from "../components/detached/DetachedSessionWindow";
-import { Columns2, Grid2X2, Lock, Minimize2, Rows3, Unlock, X } from "lucide-react";
+import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import type { SftpTabInfo, Tab } from "../types";
 import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -155,7 +155,6 @@ export function MainLayout() {
     clearTerminalSplitInputLocks,
     setTabHasNewOutput,
     tabMaximizedId,
-    setTabMaximized,
     toggleTabMaximized,
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession } = useSessionStore();
@@ -1819,40 +1818,11 @@ export function MainLayout() {
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
 
-                {/* Global restore affordance for maximized tabs. RDP panels
-                    already expose their own restore toggle (plus the
-                    Ctrl+Alt+Enter shortcut) in the floating toolbar, so the
-                    redundant top-right button is suppressed for them. */}
-                {isTabMaximized && activeTab?.type !== "rdp" && (
-                  <button
-                    type="button"
-                    data-testid="tab-maximize-restore"
-                    title={tr("rdp.restore")}
-                    aria-label={tr("rdp.restore")}
-                    onClick={() => setTabMaximized(null)}
-                    className="moba-button"
-                    style={{
-                      position: "absolute",
-                      top: 6,
-                      right: 6,
-                      zIndex: 60,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "3px 8px",
-                      fontSize: 11,
-                      borderRadius: 6,
-                      background: "rgba(20,20,28,0.65)",
-                      color: "#eee",
-                      border: "1px solid rgba(255,255,255,0.18)",
-                      backdropFilter: "blur(2px)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Minimize2 size={12} />
-                    {tr("rdp.restore")}
-                  </button>
-                )}
+                {/* Maximized tabs no longer need a standalone restore button.
+                    Terminal, VNC and RDP panels each expose a maximize/restore
+                    toggle in their own floating toolbar (which can also be
+                    dragged to any screen edge when hidden), so the redundant
+                    top-right affordance has been removed for parity. */}
               </div>
             </div>
           </Panel>

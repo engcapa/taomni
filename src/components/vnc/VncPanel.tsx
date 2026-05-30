@@ -848,15 +848,20 @@ export default function VncPanel({
         position: "relative",
       }}
     >
-      {/* Scaling toolbar */}
-      {showCanvas && (
-        <FloatingToolbar
-          storageKey="mob.vnc.toolbar"
-          defaultTop={4}
-          defaultRight={4}
-          testId="vnc-floating-toolbar"
-        >
-          <CaptureToolbar
+      {/* Floating toolbar. Always rendered — when a VNC tab is maximized all
+          other chrome is hidden, so the maximize/restore toggle here is the
+          only way back. Keeping it mounted after a disconnect means a dropped
+          session can still be restored. The capture + scale controls need the
+          live canvas, so those are gated on the connection state. */}
+      <FloatingToolbar
+        storageKey="mob.vnc.toolbar"
+        defaultTop={4}
+        defaultRight={4}
+        testId="vnc-floating-toolbar"
+      >
+        {showCanvas && (
+          <>
+            <CaptureToolbar
             filenamePrefix={`vnc-${host}`}
             getVisible={async () => {
               if (!canvasRef.current) throw new Error(t("vnc.notReady"));
@@ -887,6 +892,8 @@ export default function VncPanel({
           >
             {scaleMode === "fit" ? <Maximize size={14} /> : <Minimize size={14} />}
           </button>
+          </>
+        )}
           {onDetach && (
             <button
               data-testid="vnc-detach"
@@ -969,7 +976,6 @@ export default function VncPanel({
             </>
           )}
         </FloatingToolbar>
-      )}
 
       {/* Status overlays */}
       {showConnecting && (
