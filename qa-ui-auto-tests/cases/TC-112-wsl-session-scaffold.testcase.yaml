@@ -11,7 +11,7 @@ description: |
   discovery is gated on Windows, so on a non-Windows browser-mode runner
   the form falls through to the free-text distro input and the
   "unsupported" hint is asserted.
-covers: [F9.8]
+covers: [F9.8, F6.3]
 tags: [smoke, p1, wsl, scaffolding-only, no-launch]
 modes: [browser]
 fixtures: [reset_db]
@@ -36,6 +36,14 @@ steps:
   - fill:
       selector: '[data-testid="wsl-user"]'
       value: ada
+  # Fill the remaining WSL form fields — these mutate the live argv preview.
+  - fill:
+      selector: '[data-testid="wsl-cwd"]'
+      value: /home/ada
+  - fill:
+      selector: '[data-testid="wsl-initial-cmd"]'
+      value: echo qa-wsl
+  - click: '[data-testid="wsl-admin"]'
   - click: '[data-testid="session-section-bookmark"]'
   - wait_for: '[data-testid="bookmark-settings"]'
   - fill:

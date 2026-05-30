@@ -1,0 +1,30 @@
+id: TC-113
+title: SSH keyboard-interactive MFA prompt scaffold
+description: |
+  Coverage smoke for F-Mfa-1 (keyboard-interactive MFA). The MfaPrompt
+  dialog only mounts when an SSH server issues a keyboard-interactive
+  challenge (MFA/OTP). Our local smoke sshd authenticates with a password
+  and never issues such a challenge, so this case is passive
+  scaffolding-only — same approach as TC-105 (zmodem) / TC-106 (VNC engine).
+
+  It opens a local terminal (proving TerminalPanel — which hosts MfaPrompt —
+  is in the module graph) and asserts the prompt is NOT currently shown.
+  When a real MFA-enabled SSH server is configured as a fixture, the live
+  challenge will exercise mfa-prompt / mfa-answer-0 / mfa-submit / mfa-cancel
+  via the same testids declared on F-Mfa-1.
+covers: [F-Mfa-1]
+tags: [smoke, p1, ssh, mfa, scaffolding-only, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 25
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-open-local-terminal"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 15
+  # No keyboard-interactive challenge on a local terminal — the prompt stays
+  # unmounted. This flags only if MfaPrompt regresses to always-on.
+  - assert_not_visible: '[data-testid="mfa-prompt"]'
+  - screenshot: 113-mfa-prompt-scaffold.png

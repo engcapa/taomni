@@ -1,11 +1,11 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 33,
-    "required": 174,
-    "covered_required": 174,
-    "shallow": 6,
-    "orphans": 93
+    "features_with_controls": 49,
+    "required": 219,
+    "covered_required": 219,
+    "shallow": 21,
+    "orphans": 112
   },
   "features": {
     "F1.2": {
@@ -14,9 +14,9 @@
       "shallow": 0
     },
     "F1.3": {
-      "required": 8,
-      "covered_required": 8,
-      "shallow": 0
+      "required": 10,
+      "covered_required": 10,
+      "shallow": 1
     },
     "F1.4": {
       "required": 3,
@@ -39,8 +39,8 @@
       "shallow": 0
     },
     "F1.8": {
-      "required": 1,
-      "covered_required": 1,
+      "required": 5,
+      "covered_required": 5,
       "shallow": 0
     },
     "F1.9": {
@@ -154,13 +154,23 @@
       "shallow": 0
     },
     "F8.2": {
-      "required": 26,
-      "covered_required": 26,
-      "shallow": 0
+      "required": 28,
+      "covered_required": 28,
+      "shallow": 1
     },
     "F9.6": {
       "required": 2,
       "covered_required": 2,
+      "shallow": 0
+    },
+    "F9.7": {
+      "required": 8,
+      "covered_required": 8,
+      "shallow": 1
+    },
+    "F9.8": {
+      "required": 5,
+      "covered_required": 5,
       "shallow": 0
     },
     "F11.1": {
@@ -171,6 +181,76 @@
     "F12.1": {
       "required": 2,
       "covered_required": 2,
+      "shallow": 0
+    },
+    "F-AI-2.1": {
+      "required": 1,
+      "covered_required": 1,
+      "shallow": 0
+    },
+    "F-AI-2.2": {
+      "required": 4,
+      "covered_required": 4,
+      "shallow": 0
+    },
+    "F-AI-2.3": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 1
+    },
+    "F-AI-2.4": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 3
+    },
+    "F-AI-2.5": {
+      "required": 5,
+      "covered_required": 5,
+      "shallow": 0
+    },
+    "F-AI-2.6": {
+      "required": 9,
+      "covered_required": 9,
+      "shallow": 0
+    },
+    "F-Split-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 3
+    },
+    "F-Confirm-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
+    "F-ImportPreview-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 4
+    },
+    "F-ExternalVault-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
+    "F-FolderName-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
+    "F-I18n-1": {
+      "required": 4,
+      "covered_required": 4,
+      "shallow": 1
+    },
+    "F-Detach-1": {
+      "required": 1,
+      "covered_required": 1,
+      "shallow": 0
+    },
+    "F-Mfa-1": {
+      "required": 0,
+      "covered_required": 0,
       "shallow": 0
     }
   }

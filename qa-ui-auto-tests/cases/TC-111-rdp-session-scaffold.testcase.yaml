@@ -54,4 +54,10 @@ steps:
   - assert_visible: '[data-testid="rdp-view-cycle"]'
   - click: '[data-testid="rdp-view-cycle"]'
   - click: '[data-testid="rdp-reconnect"]'
+  # Detach is wired by MainLayout for every RDP tab. In browser mode this
+  # falls back to window.open + drops the source tab, so it is the LAST
+  # action — same destructive-detach pattern TC-043 uses for SFTP.
+  - assert_visible: '[data-testid="rdp-detach"]'
+  - click: '[data-testid="rdp-detach"]'
+  - wait: 1
   - screenshot: 111-rdp-saved.png

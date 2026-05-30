@@ -76,6 +76,16 @@
 - `[data-testid="compact-sidebar-drawer"]` — display [optional] — F1.2.compact-sidebar-drawer
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 
+## main/detach (F-Detach-1)
+
+- `[data-testid="terminal-floating-toolbar"]` — display — F-Detach-1.terminal-floating-toolbar
+- `[data-testid="terminal-detach"]` — interactive [optional] — F-Detach-1.terminal-detach
+- `[data-testid="terminal-maximize"]` — interactive [optional] — F-Detach-1.terminal-maximize
+- `[data-testid="vnc-detach"]` — interactive [optional] — F-Detach-1.vnc-detach
+- `[data-testid="detached-session-window"]` — display [optional] — F-Detach-1.detached-window
+- `[data-testid="detached-reattach"]` — interactive [optional] — F-Detach-1.detached-reattach
+- `[data-testid="detached-os-fullscreen"]` — interactive [optional] — F-Detach-1.detached-os-fullscreen
+
 ## main/menubar (F1.8)
 
 - `[data-testid="menu-bar"]` — display — F1.8.menu-bar
@@ -107,6 +117,9 @@
 - `[data-testid="tab-title"]` — interactive — F1.5.tab-title
 - `[data-testid="tab-title-input"]` — interactive [optional] — F1.5.tab-title-input
 - `[data-testid="new-local-terminal"]` — interactive — F1.5.new-local-terminal
+- `[data-testid="new-tab-split"]` — display — F1.5.new-tab-split
+- `[data-testid="new-tab-launch-menu"]` — interactive — F1.5.new-tab-launch-menu
+- `[data-testid="launch-menu-new-session"]` — interactive [optional] — F1.5.launch-menu-new-session
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
 - `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
@@ -163,7 +176,7 @@
 ## rdp (F9.7)
 
 - `[data-testid="rdp-panel"]` — display — F9.7.panel-root
-- `[data-testid="rdp-toolbar"]` — display — F9.7.toolbar
+- `[data-testid="rdp-floating-toolbar"]` — display — F9.7.toolbar
 - `[data-testid="rdp-status"]` — display — F9.7.status
 - `[data-testid="rdp-canvas"]` — display — F9.7.canvas
 - `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
@@ -194,6 +207,7 @@
 - `[data-testid="session-proto-mosh"]` — interactive [optional] — F6.3.proto-mosh
 - `[data-testid="session-proto-localshell"]` — interactive [optional] — F6.3.proto-localshell
 - `[data-testid="session-proto-file-browser"]` — interactive [optional] — F6.3.proto-file-browser
+- `[data-testid="session-proto-wsl"]` — interactive [optional] — F6.3.proto-wsl
 - `[data-testid="session-host"]` — interactive — F6.3.host
 - `[data-testid="session-user"]` — interactive — F6.3.user
 - `[data-testid="session-port"]` — interactive — F6.3.port
@@ -461,6 +475,29 @@
 - `[data-testid^="terminal-split-lock-"]` — interactive [optional] — F-Split-1.split-input-lock
 - `[data-testid="terminal-input-locked"]` — display [optional] — F-Split-1.terminal-input-locked
 
+## terminal/ssh (F-Mfa-1)
+
+- `[data-testid="mfa-prompt"]` — display [optional] — F-Mfa-1.prompt
+- `[data-testid="mfa-instructions"]` — display [optional] — F-Mfa-1.instructions
+- `[data-testid="mfa-answer-0"]` — interactive [optional] — F-Mfa-1.answer
+- `[data-testid="mfa-cancel"]` — interactive [optional] — F-Mfa-1.cancel
+- `[data-testid="mfa-submit"]` — interactive [optional] — F-Mfa-1.submit
+- `[data-testid="mfa-close"]` — interactive [optional] — F-Mfa-1.close
+
+## terminal/wsl (F9.8)
+
+- `[data-testid="wsl-distro"]` — interactive [optional] — F9.8.distro-select
+- `[data-testid="wsl-distro-text"]` — interactive [optional] — F9.8.distro-text
+- `[data-testid="wsl-status-unsupported"]` — display [optional] — F9.8.status-unsupported
+- `[data-testid="wsl-user"]` — interactive — F9.8.user
+- `[data-testid="wsl-cwd"]` — interactive — F9.8.cwd
+- `[data-testid="wsl-initial-cmd"]` — interactive — F9.8.initial-cmd
+- `[data-testid="wsl-admin"]` — interactive — F9.8.admin
+- `[data-testid="wsl-argv-preview"]` — display — F9.8.argv-preview
+- `[data-testid="welcome-wsl-card"]` — display [optional] — F9.8.welcome-wsl-card
+- `[data-testid="welcome-wsl-distro"]` — interactive [optional] — F9.8.welcome-wsl-distro
+- `[data-testid="welcome-wsl-open"]` — interactive [optional] — F9.8.welcome-wsl-open
+
 ## tunnel (F8.2)
 
 - `[data-testid="tunnel-manager"]` — display — F8.2.panel-root
@@ -495,6 +532,9 @@
 - `[data-testid="tunnel-editor-save"]` — interactive — F8.2.editor-save
   ↳ `button:has-text("Save")` — alias
 - `[data-testid="tunnel-editor-cancel"]` — interactive [optional] — F8.2.editor-cancel
+- `[data-testid="tunnel-activity-log"]` — display — F8.2.activity-log
+- `[data-testid="tunnel-activity-log-toggle"]` — interactive — F8.2.activity-log-toggle
+- `[data-testid="tunnel-activity-log-clear"]` — interactive [optional] — F8.2.activity-log-clear
 
 ## ui/dialog (F-Confirm-1)
 

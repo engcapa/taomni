@@ -1,0 +1,34 @@
+id: TC-auto-F1-5-tab-launch-menu
+title: Tab bar split-button quick-launch menu opens the session editor
+description: |
+  Coverage smoke for F1.5's "+ ▾" split-button quick launch (Windows
+  Terminal style). Clicks the chevron to open the launch context menu,
+  asserts the menu surface + the "New session…" leaf are visible, then
+  clicks it to confirm the route into the SessionEditor.
+
+  The shell entries (launch-menu-shell-<id>) and recent-session entries
+  (launch-menu-recent-<id>) are dynamic and host-dependent, so this case
+  exercises the stable launch-menu-new-session leaf only.
+covers: [F1.5]
+tags: [auto-generated, smoke, needs-review, tabs, launch-menu]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 25
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="tab-bar"]'
+  - assert_visible: '[data-testid="new-tab-split"]'
+  - assert_visible: '[data-testid="new-local-terminal"]'
+  # Open the quick-launch menu via the chevron half of the split button.
+  - click: '[data-testid="new-tab-launch-menu"]'
+  - wait_for:
+      selector: '[data-testid="context-menu"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="launch-menu-new-session"]'
+  # The "New session…" leaf routes into the SessionEditor.
+  - click: '[data-testid="launch-menu-new-session"]'
+  - wait_for:
+      selector: '[data-testid="session-editor"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="session-editor"]'
+  - screenshot: f1-5-launch-menu.png
