@@ -1770,6 +1770,17 @@ export function TerminalPanel({
             return JSON.stringify(toNetworkSettingsPayload(ns));
           })(),
           handleRawOutput,
+          // X11 forwarding: enabled per-session (defaults on, matching the
+          // SessionEditor default). Trusted mode unless the expert option
+          // explicitly opts into untrusted.
+          (() => {
+            const opts = parseSessionOptions(ssh.optionsJson);
+            return opts.x11 !== false;
+          })(),
+          (() => {
+            const opts = parseSessionOptions(ssh.optionsJson);
+            return opts.x11Trusted !== false;
+          })(),
         ).then<{ sessionId: string; shellId: string | null }>((sessionId) => ({
           sessionId,
           shellId: null,

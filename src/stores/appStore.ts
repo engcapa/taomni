@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Tab } from "../types";
 import { t as tr } from "../lib/i18n";
+import { detectXServer, type XServerStatus } from "../lib/ipc";
 
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
@@ -16,7 +17,15 @@ interface AppState {
   sidebarCollapsed: boolean;
   compactMode: boolean;
   activeSideTab: SideTab;
+  /**
+   * Whether a usable local X server is reachable (Xorg / XQuartz / VcXsrv /
+   * WSLg). This is now backed by real backend detection via
+   * {@link refreshXServer}, not a manual toggle — the value reflects whether
+   * forwarded X11 apps actually have somewhere to display.
+   */
   xServerEnabled: boolean;
+  /** Full detection result for the local X server (null until first probe). */
+  xServerStatus: XServerStatus | null;
   statusMessage: string;
   multiExecActive: boolean;
   multiExecSelectedTabIds: Set<string>;
@@ -47,6 +56,10 @@ interface AppState {
   toggleCompactMode: () => void;
   setCompactMode: (compact: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
+  /** Re-probe the local X server and update {@link xServerStatus}. */
+  refreshXServer: () => Promise<void>;
+  /** @deprecated X server availability is detected, not toggled. Kept as a
+   *  manual re-probe trigger so the existing ribbon/menu command still works. */
   toggleXServer: () => void;
   setStatusMessage: (message: string) => void;
   toggleMultiExec: () => void;
@@ -166,6 +179,7 @@ export const useAppStore = create<AppState>((set) => ({
   compactMode: readCompactMode(),
   activeSideTab: "sessions",
   xServerEnabled: false,
+  xServerStatus: null,
   statusMessage: tr("status.ready"),
   multiExecActive: false,
   multiExecSelectedTabIds: new Set(),
@@ -292,11 +306,28 @@ export const useAppStore = create<AppState>((set) => ({
   },
   setActiveSideTab: (tab) => set({ activeSideTab: tab, sidebarCollapsed: false }),
 
-  toggleXServer: () =>
-    set((s) => ({
-      xServerEnabled: !s.xServerEnabled,
-      statusMessage: !s.xServerEnabled ? tr("status.xServerEnabled") : tr("status.xServerDisabled"),
-    })),
+  refreshXServer: async () => {
+    const status = await detectXServer();
+    set({
+      xServerStatus: status,
+      xServerEnabled: status.available,
+    });
+  },
+
+  // The "X server" ribbon/menu command now means "re-detect", since whether a
+  // local X server exists is a property of the system, not something the app
+  // turns on. We re-probe and report the result in the status line.
+  toggleXServer: () => {
+    void detectXServer().then((status) => {
+      set({
+        xServerStatus: status,
+        xServerEnabled: status.available,
+        statusMessage: status.available
+          ? tr("status.xServerEnabled")
+          : tr("status.xServerDisabled"),
+      });
+    });
+  },
 
   setStatusMessage: (message) => set({ statusMessage: message }),
 

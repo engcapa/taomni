@@ -78,6 +78,8 @@ export async function createSshTerminal(
   rows: number,
   networkSettingsJson: string | null = null,
   onOutput?: (data: Uint8Array) => void,
+  x11: boolean = false,
+  x11Trusted: boolean = true,
 ): Promise<string> {
   return withVaultLockedNotice(() =>
     invoke<string>("create_ssh_terminal", {
@@ -90,9 +92,56 @@ export async function createSshTerminal(
       cols,
       rows,
       networkSettingsJson,
+      x11,
+      x11Trusted,
       onOutput: createBinaryOutputChannel(onOutput ?? (() => undefined)),
     }),
   );
+}
+
+/** Local system X server (Xorg / XQuartz / VcXsrv / WSLg) detection result. */
+export interface XServerStatus {
+  available: boolean;
+  display: string;
+  endpoint: string;
+  hasCookie: boolean;
+  provider: string;
+  hint: string | null;
+}
+
+/**
+ * Probe the local X server so the UI can show honest X11 status and prompt to
+ * install XQuartz/VcXsrv when none is reachable. Returns a safe "unavailable"
+ * status if the backend command is missing (e.g. web preview stub).
+ */
+export async function detectXServer(): Promise<XServerStatus> {
+  try {
+    const raw = await invoke<{
+      available: boolean;
+      display: string;
+      endpoint: string;
+      has_cookie: boolean;
+      provider: string;
+      hint: string | null;
+    }>("detect_x_server");
+    return {
+      available: raw.available,
+      display: raw.display,
+      endpoint: raw.endpoint,
+      hasCookie: raw.has_cookie,
+      provider: raw.provider,
+      hint: raw.hint,
+    };
+  } catch {
+    return {
+      available: false,
+      display: "",
+      endpoint: "",
+      hasCookie: false,
+      provider: "unknown",
+      hint: "no-display",
+    };
+  }
 }
 
 /** A single prompt within a keyboard-interactive (MFA/OTP) auth round. */

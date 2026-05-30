@@ -230,6 +230,18 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       saveGroups(groups.filter((g) => g.id !== (args?.id as string)));
       return undefined as T;
     }
+    case "detect_x_server": {
+      // Web preview has no system X server; report unavailable so the UI shows
+      // honest "no display" status rather than a misleading green pill.
+      return {
+        available: false,
+        display: "",
+        endpoint: "",
+        has_cookie: false,
+        provider: "unknown",
+        hint: "no-display",
+      } as unknown as T;
+    }
     case "list_local_shells": {
       const shells: LocalShellOption[] = [
         {

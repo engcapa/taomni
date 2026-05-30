@@ -172,9 +172,11 @@ function stripDeprecatedCwdOptions(options: Record<string, unknown>): Record<str
 function Checkbox({
   checked,
   onChange,
+  disabled,
 }: {
   checked: boolean;
   onChange?: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <input
@@ -182,6 +184,7 @@ function Checkbox({
       className="moba-checkbox"
       data-checked={checked}
       checked={checked}
+      disabled={disabled}
       onChange={(event) => onChange?.(event.target.checked)}
     />
   );
@@ -257,6 +260,7 @@ function Field({
 function AdvancedSshSettings({
   t,
   x11, setX11,
+  x11Trusted, setX11Trusted,
   compression, setCompression,
   startupCmd, setStartupCmd,
   doNotExit, setDoNotExit,
@@ -279,6 +283,7 @@ function AdvancedSshSettings({
 }: {
   t: TranslateFn;
   x11: boolean; setX11: (v: boolean) => void;
+  x11Trusted: boolean; setX11Trusted: (v: boolean) => void;
   compression: boolean; setCompression: (v: boolean) => void;
   startupCmd: string; setStartupCmd: (v: string) => void;
   doNotExit: boolean; setDoNotExit: (v: boolean) => void;
@@ -306,9 +311,10 @@ function AdvancedSshSettings({
           <Checkbox checked={x11} onChange={setX11} />
           {t("sessionEditor2.enable")}
         </label>
-        <span className="ml-3 text-[var(--moba-text-muted)]">
-          {t("sessionEditor2.x11DisplayLabel")} <span className="moba-mono">localhost:0.0</span>
-        </span>
+        <label className={`flex items-center gap-1.5 ml-3 ${x11 ? "" : "opacity-50"}`} title={t("sessionEditor2.x11TrustedHint")}>
+          <Checkbox checked={x11Trusted} onChange={setX11Trusted} disabled={!x11} />
+          {t("sessionEditor2.x11Trusted")}
+        </label>
       </Field>
 
       <Field label={t("sessionEditor2.fieldCompression")}>
@@ -999,6 +1005,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   /* --- advanced SSH --- */
   const [x11, setX11] = useState(() => optionBoolean(initialOptions, "x11", true));
+  const [x11Trusted, setX11Trusted] = useState(() => optionBoolean(initialOptions, "x11Trusted", true));
   const [compression, setCompression] = useState(() => optionBoolean(initialOptions, "compression", false));
   const [startupCmd, setStartupCmd] = useState(() => optionString(initialOptions, "startupCmd", ""));
   const [doNotExit, setDoNotExit] = useState(() => optionBoolean(initialOptions, "doNotExit", false));
@@ -1167,7 +1174,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
     return JSON.stringify({
       ...previousOptions,
-      x11, compression, startupCmd, jumpHost: jumpHost || "",
+      x11, x11Trusted, compression, startupCmd, jumpHost: jumpHost || "",
       jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
       remoteEnv, sshBrowser, usePrivKey, useJump,
       fileEmbedInTab, fileExtraArgs,
@@ -1346,6 +1353,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setPasswordRef(restoredRef);
     setSaveInVault(!!restoredRef);
     setX11(optionBoolean(nextOptions, "x11", true));
+    setX11Trusted(optionBoolean(nextOptions, "x11Trusted", true));
     setCompression(optionBoolean(nextOptions, "compression", false));
     setStartupCmd(optionString(nextOptions, "startupCmd", ""));
     setDoNotExit(optionBoolean(nextOptions, "doNotExit", false));
@@ -1747,6 +1755,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             <AdvancedSshSettings
               t={t}
               x11={x11} setX11={setX11}
+              x11Trusted={x11Trusted} setX11Trusted={setX11Trusted}
               compression={compression} setCompression={setCompression}
               startupCmd={startupCmd} setStartupCmd={setStartupCmd}
               doNotExit={doNotExit} setDoNotExit={setDoNotExit}
