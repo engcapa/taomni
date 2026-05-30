@@ -10,7 +10,8 @@ export type ServerType =
   | "vnc"
   | "nfs"
   | "cron"
-  | "iperf";
+  | "iperf"
+  | "rdp";
 
 export type ServerRunState = "stopped" | "starting" | "running" | "error";
 
@@ -59,6 +60,7 @@ export const SERVER_DEFS: ServerDef[] = [
   { type: "nfs", labelKey: "servers.types.nfs.label", descKey: "servers.types.nfs.desc", defaultPort: 2049, hasPort: true },
   { type: "cron", labelKey: "servers.types.cron.label", descKey: "servers.types.cron.desc", defaultPort: 0, hasPort: false },
   { type: "iperf", labelKey: "servers.types.iperf.label", descKey: "servers.types.iperf.desc", defaultPort: 5201, hasPort: true },
+  { type: "rdp", labelKey: "servers.types.rdp.label", descKey: "servers.types.rdp.desc", defaultPort: 3389, hasPort: true },
 ];
 
 export const SERVER_ORDER: ServerType[] = SERVER_DEFS.map((d) => d.type);
@@ -97,6 +99,15 @@ export function defaultConfig(type: ServerType): ServerConfig {
       return { ...base, cronExpr: "", command: "", workingDir: "" };
     case "iperf":
       return { ...base, protocol: "tcp", bandwidthLimit: 0 };
+    case "rdp":
+      return {
+        ...base,
+        username: "",
+        password: "",
+        domain: "",
+        securityMode: "hybrid",
+        viewOnly: false,
+      };
     default:
       return base;
   }

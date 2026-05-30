@@ -50,10 +50,20 @@ dirs = "5"
 flate2 = "1"
 tungstenite = "0.24"
 tokio-tungstenite = "0.24"
-ironrdp = { version = "0.14.0", features = ["connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol"] }
+ironrdp = { version = "0.14.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor"] }
 ironrdp-tls = { version = "0.2.0", features = ["rustls"] }
 ironrdp-tokio = { version = "0.8.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# RDP server (servers/rdp.rs): self-signed TLS cert + cross-platform input injection.
+rcgen = "0.13"
+# Input injection for the RDP server. Use the pure-Rust `x11rb` backend (not the
+# default `xdo`, which needs the libxdo C library) and the `wayland` backend so
+# Wayland sessions work without extra system deps. Both features are Linux-only
+# inside enigo; Windows/macOS use their native backends regardless.
+enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
+# RDP server display updates carry pixel data as `bytes::Bytes` (ironrdp-server API).
+bytes = "1"
+anyhow = "1"
 aes = "0.8"
 cbc = "0.1"
 des = "0.8"
@@ -87,6 +97,10 @@ local-llm-fim = ["dep:llama-cpp-2"]
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winbase", "winuser"] }
 winreg = "0.55"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# RDP server X11 screen capture (XShm / MIT-SHM via libxcb).
+x11rb = { version = "0.13", features = ["shm"] }
 
 [dev-dependencies]
 tempfile = "3"

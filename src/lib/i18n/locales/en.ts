@@ -951,6 +951,13 @@ const dict = {
       readOnly: "Read-only export",
       authorizedKeyPath: "Authorized key file",
       shell: "Shell",
+      rdpUsername: "Username",
+      rdpDomain: "Domain",
+      rdpSecurity: "Security",
+      rdpSecHybrid: "NLA (recommended)",
+      rdpSecTls: "TLS only",
+      rdpSecNone: "None (insecure)",
+      optional: "optional",
     },
     notes: {
       telnetSecurity:
@@ -958,6 +965,10 @@ const dict = {
       nfsPrivileges:
         "NFS export requires OS privileges and may prompt for elevation.",
       iperfBandwidth: "Applies to connecting clients (Mbit/s). 0 means unlimited.",
+      rdpSelfSigned:
+        "Uses a self-signed certificate stored in app data; clients will see a trust warning on first connect.",
+      rdpInsecure:
+        "No security means traffic is unencrypted and, without credentials, anyone who can reach the port gets full control. Use only on an isolated network.",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "Secure shell and SFTP file server" },
@@ -969,6 +980,7 @@ const dict = {
       nfs: { label: "NFS", desc: "Network File System export" },
       cron: { label: "Cron", desc: "Scheduled task runner" },
       iperf: { label: "iperf", desc: "Network throughput test server" },
+      rdp: { label: "RDP", desc: "Share this desktop over RDP (mstsc / FreeRDP)" },
     },
   },
   vnc: {
