@@ -110,6 +110,10 @@ function settingKey(engine: string, name: string): string {
   return `newmob.db.${engine}.${name}`;
 }
 
+function settingDefaultMigrationKey(engine: string, name: string): string {
+  return `${settingKey(engine, name)}.defaultsFixed.v1`;
+}
+
 function clampInt(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, Math.round(value)));
@@ -117,8 +121,25 @@ function clampInt(value: number, min: number, max: number): number {
 
 function readIntSetting(engine: string, name: string, fallback: number, min: number, max: number): number {
   try {
-    const raw = Number(localStorage.getItem(settingKey(engine, name)));
-    return Number.isFinite(raw) ? clampInt(raw, min, max) : fallback;
+    const key = settingKey(engine, name);
+    const migrationKey = settingDefaultMigrationKey(engine, name);
+    const rawValue = localStorage.getItem(key);
+    if (rawValue === null || rawValue.trim() === "") {
+      localStorage.setItem(migrationKey, "1");
+      return fallback;
+    }
+    const raw = Number(rawValue);
+    if (!Number.isFinite(raw)) {
+      localStorage.setItem(migrationKey, "1");
+      return fallback;
+    }
+    const clamped = clampInt(raw, min, max);
+    const migrated = localStorage.getItem(migrationKey) === "1";
+    localStorage.setItem(migrationKey, "1");
+    if (!migrated && clamped === min && fallback > min) {
+      return fallback;
+    }
+    return clamped;
   } catch {
     return fallback;
   }
