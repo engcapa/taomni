@@ -163,6 +163,7 @@ pub fn run() {
             config::write_stream_close,
             config::write_stream_abort,
             config::check_file_exists,
+            config::temporary_file_path,
             config::clipboard_read_text,
             config::clipboard_write_text,
             config::clipboard_read_files,

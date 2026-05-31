@@ -10,7 +10,14 @@ export interface QueryRegistryEntry {
   tabId: string;
   title: string;
   engine: string;
-  insertQuery: (sql: string, options?: { run?: boolean }) => void;
+  insertQuery: (
+    sql: string,
+    options?: {
+      run?: boolean;
+      destination?: "current" | "new";
+      position?: "caret" | "first" | "last" | "replaceAll";
+    },
+  ) => void;
 }
 
 interface QueryRegistryShape {

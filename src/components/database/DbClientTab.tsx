@@ -8,7 +8,6 @@ import {
   Clock,
   Plus,
   X,
-  Download,
   Save,
   AlertTriangle,
   Loader2,
@@ -24,16 +23,22 @@ import {
   dbExecute,
   dbExecuteStream,
   dbCancel,
+  dbDescribeTable,
   selectSaveFilePath,
   writeStreamAbort,
   writeStreamAppend,
   writeStreamClose,
   writeStreamOpen,
+  type DbColumnDescription,
   type DbQueryResult,
 } from "../../lib/ipc";
 import { SchemaTree } from "./SchemaTree";
 import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
-import { QueryResultGrid } from "./QueryResultGrid";
+import {
+  QueryResultGrid,
+  type QueryGridCommitPayload,
+  type QueryRefreshMode,
+} from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
 import { useAppStore } from "../../stores/appStore";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
@@ -45,7 +50,6 @@ import {
 } from "../floating-toolbar/floatingToolbarStyles";
 import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../lib/capture";
 import { useT } from "../../lib/i18n";
-import { isTauriRuntime } from "../../lib/runtime";
 import { registerQueryTab } from "../../lib/queryRegistry";
 
 interface DbClientTabProps {
@@ -169,6 +173,48 @@ function schemaSwitchSql(engine: string, schema: string): string {
     return `SET search_path TO ${quoteIdent(engine, schema)}`;
   }
   return `USE ${quoteIdent(engine, schema)}`;
+}
+
+function unquoteIdent(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("`") && trimmed.endsWith("`")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  ) {
+    return trimmed.slice(1, -1).replace(/""/g, '"').replace(/``/g, "`").replace(/]]/g, "]");
+  }
+  return trimmed;
+}
+
+function parseEditableSelectTarget(sql: string): { schema: string | null; table: string } | null {
+  const cleaned = sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--.*$/gm, " ")
+    .trim();
+  if (!/^select\b/i.test(cleaned)) return null;
+  if (/\b(join|union|group\s+by|having)\b/i.test(cleaned)) return null;
+  const ident = String.raw`(?:"[^"]+"|` + "`[^`]+`" + String.raw`|\[[^\]]+\]|[A-Za-z_][\w$]*)`;
+  const match = cleaned.match(new RegExp(String.raw`\bfrom\s+(${ident})(?:\s*\.\s*(${ident}))?`, "i"));
+  if (!match) return null;
+  return match[2]
+    ? { schema: unquoteIdent(match[1]), table: unquoteIdent(match[2]) }
+    : { schema: null, table: unquoteIdent(match[1]) };
+}
+
+function sqlLiteral(value: string | null): string {
+  if (value === null) return "NULL";
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function whereForColumns(engine: string, columns: string[], allColumns: string[], values: (string | null)[]): string {
+  const clauses = columns.map((column) => {
+    const index = allColumns.findIndex((name) => name === column);
+    const value = index >= 0 ? values[index] : null;
+    const ident = quoteIdent(engine, column);
+    return value === null ? `${ident} IS NULL` : `${ident} = ${sqlLiteral(value)}`;
+  });
+  return clauses.length > 0 ? clauses.join(" AND ") : "1 = 0";
 }
 
 function newPanel(): PanelState {
@@ -397,17 +443,49 @@ export default function DbClientTab({
   );
 
   const insertQueryFromOutside = useCallback(
-    (sql: string, options?: { run?: boolean }) => {
+    (
+      sql: string,
+      options?: {
+        run?: boolean;
+        destination?: "current" | "new";
+        position?: "caret" | "first" | "last" | "replaceAll";
+      },
+    ) => {
       const text = sql.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       if (!text.trim()) return;
+      if (options?.destination === "new" && panels.length < MAX_PANELS) {
+        const panel = { ...newPanel(), doc: text, dirty: true };
+        setPanels((prev) => [...prev, panel]);
+        setActivePanelId(panel.id);
+        if (options.run) {
+          void runQuery(panel.id, text);
+        }
+        return;
+      }
       const panelId = activePanelId;
-      editorHandles.current[panelId]?.setValue(text);
-      patchPanel(panelId, { doc: text, dirty: true });
+      const editor = editorHandles.current[panelId];
+      const current = editor?.getValue() ?? panels.find((p) => p.id === panelId)?.doc ?? "";
+      const position = options?.position ?? "replaceAll";
+      const next =
+        position === "first"
+          ? `${text}${current ? `\n${current}` : ""}`
+          : position === "last"
+            ? `${current}${current ? "\n" : ""}${text}`
+            : position === "caret"
+              ? null
+              : text;
+      if (next === null) {
+        editor?.insertText(text);
+        patchPanel(panelId, { doc: editor?.getValue() ?? `${current}${text}`, dirty: true });
+      } else {
+        editor?.setValue(next);
+        patchPanel(panelId, { doc: next, dirty: true });
+      }
       if (options?.run) {
-        void runQuery(panelId, text);
+        void runQuery(panelId, next ?? text);
       }
     },
-    [activePanelId, patchPanel, runQuery],
+    [activePanelId, panels, patchPanel, runQuery],
   );
 
   const queryRegistryTitle = useMemo(() => {
@@ -442,6 +520,151 @@ export default function DbClientTab({
     );
     void dbCancel(sessionId).catch(() => undefined);
   }, [sessionId]);
+
+  const refreshSheet = useCallback(
+    async (panelId: string, sheetId: string, mode: QueryRefreshMode) => {
+      const panel = panels.find((p) => p.id === panelId);
+      const sheet = panel?.sheets.find((candidate) => candidate.id === sheetId);
+      const trimmed = sheet?.sql.trim() ?? "";
+      if (!panel || !sheet || !trimmed) return;
+      if (panel.sheets.some((candidate) => candidate.running)) return;
+
+      const effectiveLimit = mode === "currentLimit" ? rowLimit : sheet.rowLimit;
+      if (timersRef.current[sheetId]) {
+        clearInterval(timersRef.current[sheetId]);
+        delete timersRef.current[sheetId];
+      }
+      patchSheet(panelId, sheetId, {
+        result: mode === "clearView" ? emptyQueryResult() : sheet.result ?? emptyQueryResult(),
+        error: null,
+        warnings: [],
+        running: true,
+        cancelling: false,
+        elapsedMs: 0,
+        rowLimit: effectiveLimit,
+        resultTab: "results",
+      });
+
+      const started = Date.now();
+      const timer = setInterval(() => {
+        patchSheet(panelId, sheetId, { elapsedMs: Date.now() - started });
+      }, 100);
+      timersRef.current[sheetId] = timer;
+      let sawDone = false;
+      try {
+        await dbExecuteStream(sessionId, trimmed, effectiveLimit, (event) => {
+          if (event.kind === "columns") {
+            updateSheet(panelId, sheetId, (current) => {
+              const result = current.result ?? emptyQueryResult();
+              return { ...current, result: { ...result, columns: event.columns, rows: [] } };
+            });
+          } else if (event.kind === "rows") {
+            updateSheet(panelId, sheetId, (current) => {
+              const result = current.result ?? emptyQueryResult();
+              const remaining = Math.max(0, current.rowLimit - result.rows.length);
+              const rows = remaining > 0 ? event.rows.slice(0, remaining) : [];
+              return { ...current, result: { ...result, rows: [...result.rows, ...rows] } };
+            });
+          } else {
+            sawDone = true;
+            const warnings = event.warnings ?? [];
+            updateSheet(panelId, sheetId, (current) => {
+              const result = current.result ?? emptyQueryResult();
+              return {
+                ...current,
+                result: {
+                  ...result,
+                  rowsAffected: event.rowsAffected,
+                  durationMs: event.durationMs,
+                  warnings,
+                },
+                warnings,
+                running: false,
+                cancelling: false,
+                error: null,
+                resultTab: warnings.length > 0 ? "messages" : "results",
+              };
+            });
+          }
+        });
+        if (!sawDone) {
+          patchSheet(panelId, sheetId, { running: false, cancelling: false });
+        }
+      } catch (err) {
+        patchSheet(panelId, sheetId, {
+          running: false,
+          cancelling: false,
+          error: String(err),
+          warnings: [],
+          resultTab: "messages",
+        });
+      } finally {
+        if (timersRef.current[sheetId] === timer) {
+          clearInterval(timer);
+          delete timersRef.current[sheetId];
+        }
+      }
+    },
+    [panels, patchSheet, rowLimit, sessionId, updateSheet],
+  );
+
+  const commitGridChanges = useCallback(
+    async (panelId: string, sheetId: string, payload: QueryGridCommitPayload) => {
+      const panel = panels.find((p) => p.id === panelId);
+      const sheet = panel?.sheets.find((candidate) => candidate.id === sheetId);
+      if (!panel || !sheet) throw new Error("Result sheet is no longer available.");
+      const target = parseEditableSelectTarget(sheet.sql);
+      if (!target) {
+        throw new Error("Grid write-back supports simple SELECT ... FROM table result sheets only.");
+      }
+      const schema = target.schema ?? activeSchema;
+      const tableName = qualifiedName(info.engine, schema, target.table);
+      let described: DbColumnDescription[] = [];
+      try {
+        described = await dbDescribeTable(sessionId, schema, target.table);
+      } catch {
+        described = [];
+      }
+      const resultColumnNames = payload.columns.map((column) => column.name);
+      const primaryKeys = described
+        .filter((column) => column.primaryKey && resultColumnNames.includes(column.name))
+        .map((column) => column.name);
+      const whereColumns = primaryKeys.length > 0 ? primaryKeys : resultColumnNames;
+      const statements: string[] = [];
+      for (const change of payload.changes) {
+        if (change.status === "inserted") {
+          const cols = resultColumnNames.map((name) => quoteIdent(info.engine, name)).join(", ");
+          const values = change.values.map(sqlLiteral).join(", ");
+          statements.push(`INSERT INTO ${tableName} (${cols}) VALUES (${values})`);
+        } else if (change.status === "updated") {
+          if (!change.original) continue;
+          const assignments = resultColumnNames
+            .map((name, index) =>
+              change.values[index] === change.original?.[index]
+                ? null
+                : `${quoteIdent(info.engine, name)} = ${sqlLiteral(change.values[index])}`,
+            )
+            .filter((value): value is string => Boolean(value));
+          if (assignments.length === 0) continue;
+          const where = whereForColumns(info.engine, whereColumns, resultColumnNames, change.original);
+          statements.push(`UPDATE ${tableName} SET ${assignments.join(", ")} WHERE ${where}`);
+        } else if (change.status === "deleted") {
+          if (!change.original) continue;
+          const where = whereForColumns(info.engine, whereColumns, resultColumnNames, change.original);
+          statements.push(`DELETE FROM ${tableName} WHERE ${where}`);
+        }
+      }
+      if (statements.length === 0) return;
+      for (const sql of statements) {
+        await dbExecute(sessionId, sql);
+      }
+      setStatusMessage(
+        `Submitted grid changes: ${payload.counts.inserted} added, ${payload.counts.updated} modified, ${payload.counts.deleted} deleted.`,
+      );
+      await refreshSheet(panelId, sheetId, "clearView");
+    },
+    [activeSchema, info.engine, panels, refreshSheet, sessionId, setStatusMessage],
+  );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
     setSchemaMap((prev) => {
@@ -626,42 +849,6 @@ export default function DbClientTab({
       if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
       showPanelError(panel.id, String(err));
     }
-  };
-
-  const exportCsv = async (panel: PanelState, sheetId?: string) => {
-    const sheet = sheetId
-      ? panel.sheets.find((candidate) => candidate.id === sheetId) ?? null
-      : activeSheet(panel);
-    if (!sheet?.result || sheet.result.columns.length === 0) return;
-    const lines: string[] = [];
-    lines.push(sheet.result.columns.map((c) => csvField(c.name)).join(","));
-    for (const row of sheet.result.rows) {
-      lines.push(row.map(csvField).join(","));
-    }
-    const csv = lines.join("\n");
-    const filename = `query-${Date.now()}.csv`;
-    if (isTauriRuntime()) {
-      const path = await selectSaveFilePath(filename);
-      if (!path) return;
-      let handleId: string | null = null;
-      try {
-        handleId = await writeStreamOpen(path);
-        await writeStreamAppend(handleId, new TextEncoder().encode(csv));
-        await writeStreamClose(handleId);
-      } catch (err) {
-        if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
-        showPanelError(panel.id, String(err));
-      }
-      return;
-    }
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const initialWidth = useMemo(() => {
@@ -926,7 +1113,10 @@ export default function DbClientTab({
                             onSheetSelect={(sheetId) => patchPanel(panel.id, { activeSheetId: sheetId })}
                             onSheetClose={(sheetId) => closeResultSheet(panel.id, sheetId)}
                             onTabChange={(sheetId, tab) => patchSheet(panel.id, sheetId, { resultTab: tab })}
-                            onExportSheet={(sheetId) => void exportCsv(panel, sheetId)}
+                            onRefreshSheet={(sheetId, mode) => void refreshSheet(panel.id, sheetId, mode)}
+                            onCommitGridChanges={(sheetId, payload) => commitGridChanges(panel.id, sheetId, payload)}
+                            onCancel={() => cancelQuery(panel.id)}
+                            onStatus={setStatusMessage}
                           />
                         </Panel>
                       </PanelGroup>
@@ -944,11 +1134,6 @@ export default function DbClientTab({
       </PanelGroup>
     </div>
   );
-}
-
-function csvField(value: string | null): string {
-  if (value === null) return "";
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 function EditorToolbar({
@@ -1097,18 +1282,22 @@ function ResultArea({
   onSheetSelect,
   onSheetClose,
   onTabChange,
-  onExportSheet,
+  onRefreshSheet,
+  onCommitGridChanges,
+  onCancel,
+  onStatus,
 }: {
   panel: PanelState;
   onSheetSelect: (sheetId: string) => void;
   onSheetClose: (sheetId: string) => void;
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
-  onExportSheet: (sheetId: string) => void;
+  onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
+  onCommitGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<void>;
+  onCancel: () => void;
+  onStatus: (message: string) => void;
 }) {
   const sheet = activeSheet(panel);
   const tab = "h-6 px-3 text-[11px] inline-flex items-center";
-  const actionBtn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--moba-hover)] disabled:opacity-40";
-  const canExport = !!sheet?.result && sheet.result.columns.length > 0 && !sheet.running;
   const waitingForFirstResult =
     !!sheet?.running &&
     sheet.result !== null &&
@@ -1179,17 +1368,6 @@ function ResultArea({
           <span className="ml-auto truncate px-2 text-[10px] text-[var(--moba-text-muted)] font-mono" title={sheet.sql}>
             {sheet.sql.replace(/\s+/g, " ")}
           </span>
-          <span className="w-px h-4" style={{ background: "var(--moba-divider)" }} />
-          <button
-            type="button"
-            className={actionBtn}
-            disabled={!canExport}
-            onClick={() => onExportSheet(sheet.id)}
-            title="Export this result sheet to CSV"
-          >
-            <Download className="w-3.5 h-3.5" />
-            CSV
-          </button>
         </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col">
@@ -1204,7 +1382,16 @@ function ResultArea({
             </div>
           ) : sheet.result ? (
             <div className={`flex-1 min-h-0 flex flex-col ${sheet.cancelling ? "opacity-50 pointer-events-none" : ""}`}>
-              <QueryResultGrid result={sheet.result} />
+              <QueryResultGrid
+                result={sheet.result}
+                sourceSql={sheet.sql}
+                running={sheet.running}
+                cancelling={sheet.cancelling}
+                onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
+                onCancel={onCancel}
+                onCommitChanges={(payload) => onCommitGridChanges(sheet.id, payload)}
+                onStatus={onStatus}
+              />
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">

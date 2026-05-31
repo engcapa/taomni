@@ -456,6 +456,10 @@ export async function checkFileExists(path: string): Promise<boolean> {
   return invoke<boolean>("check_file_exists", { path });
 }
 
+export async function temporaryFilePath(defaultName: string): Promise<string> {
+  return invoke<string>("temporary_file_path", { defaultName });
+}
+
 // --- Command history ────────────────────────────────────────────────
 
 export async function historyAppend(

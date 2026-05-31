@@ -1,16 +1,306 @@
-import { useMemo, useRef, useState, useCallback } from "react";
-import { ArrowDown, ArrowUp, Columns2, Copy } from "lucide-react";
-import type { DbQueryResult } from "../../lib/ipc";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Ban,
+  BarChart3,
+  Check,
+  ChevronDown,
+  Columns2,
+  Copy,
+  Download,
+  Edit3,
+  ExternalLink,
+  FileText,
+  FileSpreadsheet,
+  Filter,
+  FolderOpen,
+  List,
+  Loader2,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Search,
+  Sigma,
+  Table2,
+  Trash2,
+} from "lucide-react";
+import type { DbColumn, DbQueryResult } from "../../lib/ipc";
+import {
+  readFileBytes,
+  selectFilePath,
+  selectSaveFilePath,
+  temporaryFilePath,
+  writeStreamAbort,
+  writeStreamAppend,
+  writeStreamClose,
+  writeStreamOpen,
+} from "../../lib/ipc";
+import { writeText } from "../../lib/clipboard";
+import { isTauriRuntime } from "../../lib/runtime";
+import { sftpOpenPath } from "../../lib/sftp";
+import { getActiveQueryTab, listQueryTabs } from "../../lib/queryRegistry";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 
-const ROW_HEIGHT = 24;
+const ROW_HEIGHT = 26;
 const OVERSCAN = 12;
+
+export type QueryRefreshMode = "normal" | "currentLimit" | "clearView";
+
+export interface QueryGridRowChange {
+  status: "inserted" | "updated" | "deleted";
+  originalIndex: number | null;
+  values: (string | null)[];
+  original: (string | null)[] | null;
+}
+
+export interface QueryGridCommitPayload {
+  columns: DbColumn[];
+  changes: QueryGridRowChange[];
+  counts: {
+    inserted: number;
+    updated: number;
+    deleted: number;
+  };
+}
 
 interface QueryResultGridProps {
   result: DbQueryResult;
+  sourceSql?: string;
+  running?: boolean;
+  cancelling?: boolean;
+  onRefresh?: (mode: QueryRefreshMode) => void;
+  onCancel?: () => void;
+  onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
+  onStatus?: (message: string) => void;
 }
 
 type SortDir = "asc" | "desc" | null;
+type ViewMode = "table" | "list" | "chart";
+type RowStatus = "clean" | "inserted" | "updated" | "deleted";
+type ExportTarget = "all" | "selection";
+type OutputFormat = "csv" | "html" | "txt" | "sql" | "xml" | "excel" | "json";
+type TextFunction = "none" | "upper" | "lower" | "trim";
+type QuoteMode = "double" | "single" | "none";
+type Encoding = "utf-8" | "utf-8-bom" | "utf-16le";
+type IncludeOriginalSql = "none" | "top" | "comment";
+type RowDelimiter = "\n" | "\r\n" | "\r";
+type SqlDelimiterMode = "none" | "double" | "backtick" | "bracket";
+type OutputDestinationKind = "file" | "sqlCommander" | "clipboard";
+type SqlCommanderPosition = "caret" | "first" | "last" | "replaceAll";
+
+interface GridRow {
+  id: string;
+  originalIndex: number | null;
+  values: (string | null)[];
+  original: (string | null)[] | null;
+  status: RowStatus;
+}
+
+interface ExportOptions {
+  outputFormat: OutputFormat;
+  encoding: Encoding;
+  dateFormat: string;
+  timeFormat: string;
+  timestampFormat: string;
+  numberFormat: "unformatted" | "grouped";
+  decimalFormat: "unformatted" | "grouped";
+  groupSeparator: string;
+  decimalSeparator: string;
+  booleanTrueText: string;
+  booleanFalseText: string;
+  binaryMode: "dont" | "text" | "length";
+  clobMode: "text" | "dont";
+  nullValueText: string;
+  quoteTextValue: QuoteMode;
+  duplicateEmbedded: boolean;
+  quoteAllValues: boolean;
+  textFunction: TextFunction;
+  maxRows: number;
+  columnDelimiter: string;
+  rowDelimiter: RowDelimiter;
+  includeColumnNames: boolean;
+  useLabels: boolean;
+  removeNewlines: boolean;
+  includeOriginalSql: IncludeOriginalSql;
+  rowCommentIdentifier: string;
+  htmlTitle: string;
+  htmlDescription: string;
+  htmlFooter: string;
+  htmlPerTableHeader: string;
+  htmlConvertCharacters: boolean;
+  txtSpacesBetweenColumns: number;
+  sqlUseQualifier: boolean;
+  sqlQualifier: string;
+  sqlTableName: string;
+  sqlDelimiterMode: SqlDelimiterMode;
+  sqlStatementSeparator: string;
+  sqlIncludeBasicDdl: boolean;
+  sqlAddBefore: string;
+  sqlAddAfter: string;
+  sqlGenerateMultiRow: boolean;
+  sqlRowsPerMultiRow: number;
+  sqlMultiRowType: "multi-insert-sql92";
+  sqlGenerateMerge: boolean;
+  sqlMergeType: "single-merge-sql92";
+  sqlMergeMatchColumns: string;
+  xmlStyle: "dbvis" | "flat";
+  xmlDescription: string;
+  excelFileFormat: "xlsx" | "xls";
+  excelTitle: string;
+  excelDescription: string;
+  excelSheetName: string;
+  excelExportNumberAsText: boolean;
+  excelExportDateTimeAsText: boolean;
+  excelAutoResizeColumns: boolean;
+  jsonStyle: "array" | "object";
+}
+
+interface ExportColumnConfig {
+  id: string;
+  export: boolean;
+  name: string;
+  label: string;
+  type: string;
+  isText: boolean;
+  textFunction: TextFunction;
+  valueTemplate: string;
+}
+
+interface ExportDestination {
+  kind: OutputDestinationKind;
+  filePath: string;
+  sqlCommanderTabId: "active" | "new" | string;
+  sqlCommanderPosition: SqlCommanderPosition;
+}
+
+const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
+  outputFormat: "csv",
+  encoding: "utf-8",
+  dateFormat: "yyyy-MM-dd",
+  timeFormat: "HH:mm:ss",
+  timestampFormat: "yyyy-MM-dd HH:mm:ss",
+  numberFormat: "unformatted",
+  decimalFormat: "unformatted",
+  groupSeparator: ",",
+  decimalSeparator: ".",
+  booleanTrueText: "true",
+  booleanFalseText: "false",
+  binaryMode: "dont",
+  clobMode: "text",
+  nullValueText: "(null)",
+  quoteTextValue: "double",
+  duplicateEmbedded: true,
+  quoteAllValues: false,
+  textFunction: "none",
+  maxRows: 0,
+  columnDelimiter: ",",
+  rowDelimiter: "\n",
+  includeColumnNames: true,
+  useLabels: true,
+  removeNewlines: false,
+  includeOriginalSql: "none",
+  rowCommentIdentifier: "--",
+  htmlTitle: "Query Results",
+  htmlDescription: "",
+  htmlFooter: "Generated by DbVisualizer",
+  htmlPerTableHeader: "<div>Exported ${dbvis-timestamp}</div>",
+  htmlConvertCharacters: true,
+  txtSpacesBetweenColumns: 1,
+  sqlUseQualifier: false,
+  sqlQualifier: "test",
+  sqlTableName: "employee",
+  sqlDelimiterMode: "none",
+  sqlStatementSeparator: ";",
+  sqlIncludeBasicDdl: false,
+  sqlAddBefore: "",
+  sqlAddAfter: "",
+  sqlGenerateMultiRow: false,
+  sqlRowsPerMultiRow: 500,
+  sqlMultiRowType: "multi-insert-sql92",
+  sqlGenerateMerge: false,
+  sqlMergeType: "single-merge-sql92",
+  sqlMergeMatchColumns: "id",
+  xmlStyle: "dbvis",
+  xmlDescription: "",
+  excelFileFormat: "xlsx",
+  excelTitle: "Query Results",
+  excelDescription: "",
+  excelSheetName: "Results",
+  excelExportNumberAsText: false,
+  excelExportDateTimeAsText: false,
+  excelAutoResizeColumns: true,
+  jsonStyle: "array",
+};
+
+const EXPORT_DEFAULTS_KEY = "newmob.db.exportGrid.defaults.v1";
+const EXPORT_HISTORY_KEY = "newmob.db.exportGrid.fileHistory.v1";
+
+function defaultExportColumns(columns: DbColumn[]): ExportColumnConfig[] {
+  return columns.map((column, index) => ({
+    id: `col-${index}-${column.name}`,
+    export: true,
+    name: column.name,
+    label: column.name,
+    type: column.type,
+    isText: /(char|text|clob|string|uuid|json|xml)/i.test(column.type),
+    textFunction: "none",
+    valueTemplate: "${value}$",
+  }));
+}
+
+function readStoredExportOptions(): ExportOptions {
+  try {
+    const raw = localStorage.getItem(EXPORT_DEFAULTS_KEY);
+    if (!raw) return DEFAULT_EXPORT_OPTIONS;
+    return { ...DEFAULT_EXPORT_OPTIONS, ...(JSON.parse(raw) as Partial<ExportOptions>) };
+  } catch {
+    return DEFAULT_EXPORT_OPTIONS;
+  }
+}
+
+function readExportFileHistory(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EXPORT_HISTORY_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeExportFileHistory(paths: string[]): void {
+  try {
+    localStorage.setItem(EXPORT_HISTORY_KEY, JSON.stringify(paths.slice(0, 12)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function makeRows(result: DbQueryResult): GridRow[] {
+  return result.rows.map((values, index) => ({
+    id: `row-${index}-${result.rows.length}`,
+    originalIndex: index,
+    values: [...values],
+    original: [...values],
+    status: "clean",
+  }));
+}
+
+function nextRowId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 /** Detect a numeric column value for right-alignment + numeric sort. */
 function isNumeric(value: string | null): boolean {
@@ -20,46 +310,527 @@ function isNumeric(value: string | null): boolean {
 
 function csvEscape(value: string | null): string {
   if (value === null) return "";
-  if (/[",\n]/.test(value)) {
+  if (/[",\n\r]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
 }
 
-/** A virtualised result grid: only the visible row window is rendered, so
- *  10 000+ rows scroll without layout jank. */
-export function QueryResultGrid({ result }: QueryResultGridProps) {
+function sameValues(a: (string | null)[] | null, b: (string | null)[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function statusAfterValueChange(row: GridRow, values: (string | null)[]): RowStatus {
+  if (row.status === "inserted" || row.status === "deleted") return row.status;
+  return sameValues(row.original, values) ? "clean" : "updated";
+}
+
+function formatDatePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function formatDateWithPattern(value: string, pattern: string, kind: "date" | "time" | "timestamp"): string {
+  if (!pattern.trim()) return value;
+  const source =
+    kind === "time"
+      ? `1970-01-01T${value}`
+      : value.includes("T")
+        ? value
+        : value.includes(" ")
+          ? value.replace(" ", "T")
+          : value;
+  const date = new Date(source);
+  if (Number.isNaN(date.getTime())) return value;
+  return pattern
+    .replace(/yyyy/g, String(date.getFullYear()))
+    .replace(/MM/g, formatDatePart(date.getMonth() + 1))
+    .replace(/dd/g, formatDatePart(date.getDate()))
+    .replace(/HH/g, formatDatePart(date.getHours()))
+    .replace(/mm/g, formatDatePart(date.getMinutes()))
+    .replace(/ss/g, formatDatePart(date.getSeconds()));
+}
+
+function formatNumberText(value: string, groupSeparator: string, decimalSeparator: string): string {
+  if (!/^-?\d+([.,]\d+)?$/.test(value.trim())) return value;
+  const sign = value.startsWith("-") ? "-" : "";
+  const unsigned = sign ? value.slice(1) : value;
+  const [integer, fraction] = unsigned.split(/[.,]/);
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, groupSeparator);
+  return `${sign}${grouped}${fraction !== undefined ? `${decimalSeparator}${fraction}` : ""}`;
+}
+
+function applyTextFunction(value: string, fn: TextFunction): string {
+  switch (fn) {
+    case "upper":
+      return value.toUpperCase();
+    case "lower":
+      return value.toLowerCase();
+    case "trim":
+      return value.trim();
+    default:
+      return value;
+  }
+}
+
+function formatValue(value: string | null, column: DbColumn, options: ExportOptions): string {
+  if (value === null) return options.nullValueText;
+  const type = column.type.toLowerCase();
+  if (/(blob|binary|bytea|varbinary)/.test(type)) {
+    if (options.binaryMode === "dont") return "";
+    if (options.binaryMode === "length") return `${value.length} bytes`;
+  }
+  if (/clob/.test(type) && options.clobMode === "dont") return "";
+  if (/bool/.test(type)) {
+    if (/^(true|t|1)$/i.test(value)) return options.booleanTrueText;
+    if (/^(false|f|0)$/i.test(value)) return options.booleanFalseText;
+  }
+  if (/(timestamp|datetime)/.test(type)) {
+    return applyTextFunction(formatDateWithPattern(value, options.timestampFormat, "timestamp"), options.textFunction);
+  }
+  if (/\bdate\b/.test(type)) {
+    return applyTextFunction(formatDateWithPattern(value, options.dateFormat, "date"), options.textFunction);
+  }
+  if (/\btime\b/.test(type)) {
+    return applyTextFunction(formatDateWithPattern(value, options.timeFormat, "time"), options.textFunction);
+  }
+  if (/(decimal|numeric)/.test(type) && options.decimalFormat === "grouped") {
+    return formatNumberText(value, options.groupSeparator, options.decimalSeparator);
+  }
+  if (/(int|float|double|real|number)/.test(type) && options.numberFormat === "grouped") {
+    return formatNumberText(value, options.groupSeparator, options.decimalSeparator);
+  }
+  return applyTextFunction(value, options.textFunction);
+}
+
+function delimitedField(value: string, options: ExportOptions): string {
+  const quoteChar = options.quoteTextValue === "double" ? '"' : options.quoteTextValue === "single" ? "'" : "";
+  if (!quoteChar) return value;
+  const needsQuote =
+    options.quoteAllValues ||
+    value.includes(options.columnDelimiter) ||
+    value.includes("\n") ||
+    value.includes("\r") ||
+    value.includes(quoteChar);
+  if (!needsQuote) return value;
+  const escaped = options.duplicateEmbedded
+    ? value.split(quoteChar).join(`${quoteChar}${quoteChar}`)
+    : value.split(quoteChar).join(`\\${quoteChar}`);
+  return `${quoteChar}${escaped}${quoteChar}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeXml(value: string): string {
+  return escapeHtml(value).replace(/'/g, "&apos;");
+}
+
+function uniqueColumnNames(columns: DbColumn[]): string[] {
+  const seen = new Map<string, number>();
+  return columns.map((column) => {
+    const base = column.name || "column";
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    return count === 0 ? base : `${base}_${count + 1}`;
+  });
+}
+
+function columnOutputName(column: ExportColumnConfig, options: ExportOptions): string {
+  return options.useLabels ? column.label || column.name : column.name;
+}
+
+function cleanExportText(value: string, options: ExportOptions): string {
+  return options.removeNewlines ? value.replace(/[\r\n]+/g, " ") : value;
+}
+
+function renderTemplate(template: string, value: string): string {
+  return template.replace(/\$\{value\}\$/g, value).replace(/\$\{value\}/g, value);
+}
+
+function quoteSqlIdentifier(name: string, mode: SqlDelimiterMode): string {
+  switch (mode) {
+    case "double":
+      return `"${name.replace(/"/g, '""')}"`;
+    case "backtick":
+      return `\`${name.replace(/`/g, "``")}\``;
+    case "bracket":
+      return `[${name.replace(/]/g, "]]")}]`;
+    default:
+      return name;
+  }
+}
+
+function sqlExportTableName(options: ExportOptions): string {
+  const table = quoteSqlIdentifier(options.sqlTableName || "result_export", options.sqlDelimiterMode);
+  if (!options.sqlUseQualifier || !options.sqlQualifier.trim()) return table;
+  return `${quoteSqlIdentifier(options.sqlQualifier.trim(), options.sqlDelimiterMode)}.${table}`;
+}
+
+function originalSqlBlock(sourceSql: string | undefined, options: ExportOptions, commentPrefix = "--"): string[] {
+  if (!sourceSql?.trim() || options.includeOriginalSql === "none") return [];
+  const lines = sourceSql.trim().split(/\r?\n/).map((line) => `${commentPrefix} ${line}`);
+  return options.includeOriginalSql === "top" ? lines : [`${commentPrefix} Original SQL:`, ...lines];
+}
+
+function serializeResult(
+  columns: DbColumn[],
+  rows: GridRow[],
+  exportColumns: ExportColumnConfig[],
+  options: ExportOptions,
+  sourceSql?: string,
+): { text: string; extension: string; mime: string } {
+  const limitedRows = options.maxRows > 0 ? rows.slice(0, options.maxRows) : rows;
+  const enabledColumns = exportColumns.filter((column) => column.export);
+  const columnByName = new Map(columns.map((column, index) => [column.name, { column, index }]));
+  const rowValues = limitedRows.map((row) =>
+    enabledColumns.map((exportColumn) => {
+      const match = columnByName.get(exportColumn.name);
+      const sourceColumn = match?.column ?? { name: exportColumn.name, type: exportColumn.type };
+      const raw = match ? row.values[match.index] : null;
+      const columnOptions = exportColumn.textFunction === "none" ? options : { ...options, textFunction: exportColumn.textFunction };
+      const formatted = formatValue(raw, sourceColumn, columnOptions);
+      return cleanExportText(renderTemplate(exportColumn.valueTemplate || "${value}$", formatted), options);
+    }),
+  );
+
+  switch (options.outputFormat) {
+    case "html": {
+      const html = (value: string) => (options.htmlConvertCharacters ? escapeHtml(value) : value);
+      const title = html(options.htmlTitle || "Query Results");
+      const description = options.htmlDescription ? `<div>${html(options.htmlDescription)}</div>\n` : "";
+      const footer = options.htmlFooter ? `\n<footer>${html(options.htmlFooter)}</footer>` : "";
+      const headerTemplate = options.htmlPerTableHeader.replace("${dbvis-timestamp}", new Date().toISOString());
+      const sqlBlock = originalSqlBlock(sourceSql, options, "<!--").map((line) => `${line} -->`).join("\n");
+      const header = `<tr>${enabledColumns.map((column) => `<th>${html(columnOutputName(column, options))}</th>`).join("")}</tr>`;
+      const body = rowValues
+        .map((row) => `<tr>${row.map((value) => `<td>${html(value)}</td>`).join("")}</tr>`)
+        .join("\n");
+      const text = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body>\n${sqlBlock}\n<h1>${title}</h1>\n${description}${headerTemplate}\n<table border="1">\n${header}\n${body}\n</table>${footer}\n</body></html>`;
+      return {
+        text,
+        extension: "html",
+        mime: "text/html",
+      };
+    }
+    case "excel": {
+      const title = escapeHtml(options.excelTitle || "Query Results");
+      const description = options.excelDescription ? `<div>${escapeHtml(options.excelDescription)}</div>\n` : "";
+      const sqlBlock = originalSqlBlock(sourceSql, options, "<!--").map((line) => `${line} -->`).join("\n");
+      const numberAsText = options.excelExportNumberAsText || options.excelExportDateTimeAsText;
+      const header = options.includeColumnNames
+        ? `<tr>${enabledColumns.map((column) => `<th>${escapeHtml(columnOutputName(column, options))}</th>`).join("")}</tr>`
+        : "";
+      const body = rowValues
+        .map((row) =>
+          `<tr>${row
+            .map((value) => `<td${numberAsText ? ' style="mso-number-format:\\@"' : ""}>${escapeHtml(value)}</td>`)
+            .join("")}</tr>`,
+        )
+        .join("\n");
+      const text = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body>\n${sqlBlock}\n<h1>${title}</h1>\n${description}<table border="1">\n${header}\n${body}\n</table></body></html>`;
+      return {
+        text,
+        extension: options.excelFileFormat,
+        mime:
+          options.excelFileFormat === "xlsx"
+            ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            : "application/vnd.ms-excel",
+      };
+    }
+    case "csv": {
+      const lines: string[] = [];
+      lines.push(...originalSqlBlock(sourceSql, options, options.rowCommentIdentifier || "#"));
+      if (options.includeColumnNames) {
+        lines.push(enabledColumns.map((column) => delimitedField(columnOutputName(column, options), options)).join(options.columnDelimiter));
+      }
+      for (const row of rowValues) {
+        lines.push(row.map((value) => delimitedField(value, options)).join(options.columnDelimiter));
+      }
+      return {
+        text: lines.join(options.rowDelimiter),
+        extension: "csv",
+        mime: "text/csv",
+      };
+    }
+    case "txt": {
+      const separator = " ".repeat(Math.max(1, options.txtSpacesBetweenColumns));
+      const lines: string[] = [];
+      lines.push(...originalSqlBlock(sourceSql, options, options.rowCommentIdentifier || "#"));
+      if (options.includeColumnNames) {
+        lines.push(enabledColumns.map((column) => columnOutputName(column, options)).join(separator));
+      }
+      for (const row of rowValues) {
+        lines.push(row.join(separator));
+      }
+      return {
+        text: lines.join(options.rowDelimiter),
+        extension: "txt",
+        mime: "text/plain",
+      };
+    }
+    case "json": {
+      const names = uniqueColumnNames(enabledColumns.map((column) => ({ name: columnOutputName(column, options), type: column.type })));
+      const rowsPayload = rowValues.map((row) =>
+        Object.fromEntries(row.map((value, index) => [names[index], value])),
+      );
+      const payload = options.jsonStyle === "object" ? { rows: rowsPayload } : rowsPayload;
+      return { text: JSON.stringify(payload, null, 2), extension: "json", mime: "application/json" };
+    }
+    case "xml": {
+      const description = options.xmlDescription ? `  <description>${escapeXml(options.xmlDescription)}</description>\n` : "";
+      const sql = sourceSql?.trim() && options.includeOriginalSql !== "none" ? `  <sql>${escapeXml(sourceSql.trim())}</sql>\n` : "";
+      const body = rowValues
+        .map((row) => {
+          const cells = row
+            .map((value, index) => {
+              const name = escapeXml(columnOutputName(enabledColumns[index], options));
+              return options.xmlStyle === "flat"
+                ? `    <${name}>${escapeXml(value)}</${name}>`
+                : `    <column name="${name}">${escapeXml(value)}</column>`;
+            })
+            .join("\n");
+          return `  <row>\n${cells}\n  </row>`;
+        })
+        .join("\n");
+      return { text: `<result style="${options.xmlStyle}">\n${description}${sql}${body}\n</result>`, extension: "xml", mime: "application/xml" };
+    }
+    case "sql": {
+      const tableName = sqlExportTableName(options);
+      const quotedColumns = enabledColumns.map((column) => quoteSqlIdentifier(columnOutputName(column, options), options.sqlDelimiterMode)).join(", ");
+      const lines: string[] = [];
+      lines.push(...originalSqlBlock(sourceSql, options, options.rowCommentIdentifier || "--"));
+      if (options.sqlIncludeBasicDdl) {
+        const ddlColumns = enabledColumns
+          .map((column) => `  ${quoteSqlIdentifier(columnOutputName(column, options), options.sqlDelimiterMode)} ${column.type || "TEXT"}`)
+          .join(",\n");
+        lines.push(`CREATE TABLE ${tableName} (\n${ddlColumns}\n)${options.sqlStatementSeparator}`);
+      }
+      if (options.sqlGenerateMerge) {
+        const matchColumns = options.sqlMergeMatchColumns
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+        for (const row of rowValues) {
+          const values = row.map((value) => `'${value.replace(/'/g, "''")}'`).join(", ");
+          const match = matchColumns.length > 0 ? matchColumns.join(", ") : enabledColumns[0]?.name ?? "id";
+          lines.push(`${options.sqlAddBefore}MERGE INTO ${tableName} USING (VALUES (${values})) AS src (${quotedColumns}) ON (${match}) WHEN MATCHED THEN UPDATE SET ${quotedColumns} = ${quotedColumns} WHEN NOT MATCHED THEN INSERT (${quotedColumns}) VALUES (${quotedColumns})${options.sqlStatementSeparator}${options.sqlAddAfter}`);
+        }
+      } else if (options.sqlGenerateMultiRow) {
+        for (let index = 0; index < rowValues.length; index += Math.max(1, options.sqlRowsPerMultiRow)) {
+          const chunk = rowValues.slice(index, index + Math.max(1, options.sqlRowsPerMultiRow));
+          const tuples = chunk
+            .map((row) => `(${row.map((value) => `'${value.replace(/'/g, "''")}'`).join(", ")})`)
+            .join(",\n");
+          lines.push(`${options.sqlAddBefore}INSERT INTO ${tableName} (${quotedColumns}) VALUES\n${tuples}${options.sqlStatementSeparator}${options.sqlAddAfter}`);
+        }
+      } else {
+        for (const row of rowValues) {
+          const values = row.map((value) => `'${value.replace(/'/g, "''")}'`).join(", ");
+          lines.push(`${options.sqlAddBefore}INSERT INTO ${tableName} (${quotedColumns}) VALUES (${values})${options.sqlStatementSeparator}${options.sqlAddAfter}`);
+        }
+      }
+      return { text: lines.filter(Boolean).join("\n"), extension: "sql", mime: "application/sql" };
+    }
+  }
+}
+
+function encodeOutput(text: string, encoding: Encoding): Uint8Array {
+  if (encoding === "utf-8-bom") {
+    const bytes = new TextEncoder().encode(text);
+    const output = new Uint8Array(bytes.length + 3);
+    output.set([0xef, 0xbb, 0xbf], 0);
+    output.set(bytes, 3);
+    return output;
+  }
+  if (encoding === "utf-16le") {
+    const output = new Uint8Array(text.length * 2 + 2);
+    output[0] = 0xff;
+    output[1] = 0xfe;
+    for (let index = 0; index < text.length; index += 1) {
+      const code = text.charCodeAt(index);
+      output[index * 2 + 2] = code & 0xff;
+      output[index * 2 + 3] = code >> 8;
+    }
+    return output;
+  }
+  return new TextEncoder().encode(text);
+}
+
+async function writeBytesToPath(path: string, bytes: Uint8Array): Promise<void> {
+  let handleId: string | null = null;
+  try {
+    handleId = await writeStreamOpen(path);
+    await writeStreamAppend(handleId, bytes);
+    await writeStreamClose(handleId);
+  } catch (err) {
+    if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
+    throw err;
+  }
+}
+
+function browserDownload(bytes: Uint8Array, filename: string, mime: string): void {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const blob = new Blob([buffer], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function browserOpen(bytes: Uint8Array, mime: string): void {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const blob = new Blob([buffer], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    browserDownload(bytes, "query-results.html", mime);
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+function nowDateText(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${formatDatePart(d.getMonth() + 1)}-${formatDatePart(d.getDate())}`;
+}
+
+function nowTimeText(): string {
+  const d = new Date();
+  return `${formatDatePart(d.getHours())}:${formatDatePart(d.getMinutes())}:${formatDatePart(d.getSeconds())}`;
+}
+
+function nowTimestampText(): string {
+  return `${nowDateText()} ${nowTimeText()}`;
+}
+
+/** A virtualised result grid with a compact database-client toolbar. */
+export function QueryResultGrid({
+  result,
+  sourceSql,
+  running = false,
+  cancelling = false,
+  onRefresh,
+  onCancel,
+  onCommitChanges,
+  onStatus,
+}: QueryResultGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [rows, setRows] = useState<GridRow[]>(() => makeRows(result));
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportH, setViewportH] = useState(400);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [autoFit, setAutoFit] = useState(true);
-  const { show: openMenu, render: menu } = useContextMenu();
+  const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+  const [visibleColumns, setVisibleColumns] = useState<Set<number>>(
+    () => new Set(result.columns.map((_, index) => index)),
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [activeCell, setActiveCell] = useState<{ rowId: string; colIdx: number } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ rowId: string; colIdx: number } | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [filterText, setFilterText] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [showStats, setShowStats] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [exportTarget, setExportTarget] = useState<ExportTarget>("all");
+  const [exportOptions, setExportOptions] = useState<ExportOptions>(() => readStoredExportOptions());
+  const [exportColumns, setExportColumns] = useState<ExportColumnConfig[]>(() => defaultExportColumns(result.columns));
+  const [submittingChanges, setSubmittingChanges] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [localNotice, setLocalNotice] = useState("");
+  const { show: openCellMenu, showAt: openMenuAt, render: menu } = useContextMenu();
+
+  useEffect(() => {
+    setRows(makeRows(result));
+    setSelectedIds(new Set());
+    setLastSelectedId(null);
+    setActiveCell(null);
+    setEditingCell(null);
+  }, [result]);
+
+  useEffect(() => {
+    setVisibleColumns(new Set(result.columns.map((_, index) => index)));
+    setColumnWidths({});
+    setExportColumns(defaultExportColumns(result.columns));
+  }, [result.columns]);
+
+  const visibleColumnIndexes = useMemo(
+    () => result.columns.map((_, index) => index).filter((index) => visibleColumns.has(index)),
+    [result.columns, visibleColumns],
+  );
 
   const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
     setViewportH(e.currentTarget.clientHeight);
   }, []);
 
-  // Sorted row index order (stable: only reorders a view, not the data).
+  const rowMatchesFilter = useCallback(
+    (row: GridRow) => {
+      const needle = filterText.trim().toLowerCase();
+      if (!needle) return true;
+      return visibleColumnIndexes.some((index) => (row.values[index] ?? "").toLowerCase().includes(needle));
+    },
+    [filterText, visibleColumnIndexes],
+  );
+
   const order = useMemo(() => {
-    const idx = result.rows.map((_, i) => i);
-    if (sortCol === null || sortDir === null) return idx;
-    const numeric = result.rows.every((r) => isNumeric(r[sortCol]));
-    idx.sort((a, b) => {
-      const va = result.rows[a][sortCol];
-      const vb = result.rows[b][sortCol];
+    const indexes = rows.map((_, index) => index).filter((index) => rowMatchesFilter(rows[index]));
+    if (sortCol === null || sortDir === null) return indexes;
+    const numeric = indexes.every((index) => isNumeric(rows[index].values[sortCol]));
+    indexes.sort((a, b) => {
+      const va = rows[a].values[sortCol];
+      const vb = rows[b].values[sortCol];
       if (va === null && vb === null) return 0;
       if (va === null) return 1;
       if (vb === null) return -1;
-      let cmp: number;
-      if (numeric) cmp = Number(va) - Number(vb);
-      else cmp = va.localeCompare(vb);
+      const cmp = numeric ? Number(va) - Number(vb) : va.localeCompare(vb);
       return sortDir === "asc" ? cmp : -cmp;
     });
-    return idx;
-  }, [result.rows, sortCol, sortDir]);
+    return indexes;
+  }, [rowMatchesFilter, rows, sortCol, sortDir]);
+
+  const orderedRows = useMemo(() => order.map((index) => rows[index]), [order, rows]);
+  const selectedRows = useMemo(
+    () => orderedRows.filter((row) => selectedIds.has(row.id) && row.status !== "deleted"),
+    [orderedRows, selectedIds],
+  );
+  const nonDeletedOrderedRows = useMemo(
+    () => orderedRows.filter((row) => row.status !== "deleted"),
+    [orderedRows],
+  );
+  const changeCounts = useMemo(
+    () => ({
+      inserted: rows.filter((row) => row.status === "inserted").length,
+      updated: rows.filter((row) => row.status === "updated").length,
+      deleted: rows.filter((row) => row.status === "deleted").length,
+    }),
+    [rows],
+  );
+  const pendingChangeCount = changeCounts.inserted + changeCounts.updated + changeCounts.deleted;
+
+  const searchMatchCount = useMemo(() => {
+    const needle = searchText.trim().toLowerCase();
+    if (!needle) return 0;
+    let count = 0;
+    for (const row of orderedRows) {
+      for (const index of visibleColumnIndexes) {
+        if ((row.values[index] ?? "").toLowerCase().includes(needle)) count += 1;
+      }
+    }
+    return count;
+  }, [orderedRows, searchText, visibleColumnIndexes]);
 
   const toggleSort = (col: number) => {
     if (sortCol !== col) {
@@ -73,34 +844,418 @@ export function QueryResultGrid({ result }: QueryResultGridProps) {
     }
   };
 
-  const total = order.length;
+  const setStatus = (message: string) => {
+    setLocalNotice(message);
+    onStatus?.(message);
+  };
+
+  const openDropdown = (event: MouseEvent<HTMLButtonElement>, items: MenuItem[]) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    openMenuAt(rect.left, rect.bottom + 4, items);
+  };
+
+  const columnStyle = (columnIndex: number): CSSProperties => {
+    const width = columnWidths[columnIndex];
+    if (width) {
+      return { flex: `0 0 ${width}px`, minWidth: 56, maxWidth: width };
+    }
+    return autoFit ? { flex: "1 1 140px", minWidth: 88 } : { flex: "0 0 160px", minWidth: 88 };
+  };
+
+  const startColumnResize = (event: MouseEvent<HTMLElement>, columnIndex: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const parent = event.currentTarget.parentElement;
+    const startX = event.clientX;
+    const startWidth = Math.max(56, parent?.getBoundingClientRect().width ?? columnWidths[columnIndex] ?? 160);
+    const onMove = (moveEvent: globalThis.MouseEvent) => {
+      const next = Math.max(56, Math.round(startWidth + moveEvent.clientX - startX));
+      setColumnWidths((current) => ({ ...current, [columnIndex]: next }));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
+  const selectRow = (rowId: string, event: MouseEvent<HTMLElement>) => {
+    const orderedIds = orderedRows.map((row) => row.id);
+    setSelectedIds((current) => {
+      if (event.shiftKey && lastSelectedId && orderedIds.includes(lastSelectedId)) {
+        const from = orderedIds.indexOf(lastSelectedId);
+        const to = orderedIds.indexOf(rowId);
+        const [start, end] = from < to ? [from, to] : [to, from];
+        const next = new Set(current);
+        orderedIds.slice(start, end + 1).forEach((id) => next.add(id));
+        return next;
+      }
+      if (event.ctrlKey || event.metaKey) {
+        const next = new Set(current);
+        if (next.has(rowId)) next.delete(rowId);
+        else next.add(rowId);
+        return next;
+      }
+      return new Set([rowId]);
+    });
+    setLastSelectedId(rowId);
+  };
+
+  const updateCell = (rowId: string, colIdx: number, value: string | null) => {
+    setRows((current) =>
+      current.map((row) => {
+        if (row.id !== rowId || row.status === "deleted") return row;
+        const values = [...row.values];
+        values[colIdx] = value;
+        return { ...row, values, status: statusAfterValueChange(row, values) };
+      }),
+    );
+  };
+
+  const beginEdit = (rowId: string, colIdx: number, currentValue: string | null) => {
+    setActiveCell({ rowId, colIdx });
+    setEditingCell({ rowId, colIdx });
+    setEditValue(currentValue ?? "");
+  };
+
+  const commitEdit = () => {
+    if (!editingCell) return;
+    updateCell(editingCell.rowId, editingCell.colIdx, editValue);
+    setEditingCell(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditValue("");
+  };
+
+  const targetCellPositions = useCallback(() => {
+    if (activeCell) {
+      const targetIds = selectedIds.size > 0 ? selectedIds : new Set([activeCell.rowId]);
+      return rows
+        .filter((row) => targetIds.has(row.id) && row.status !== "deleted")
+        .map((row) => ({ rowId: row.id, colIdx: activeCell.colIdx }));
+    }
+    if (selectedIds.size > 0) {
+      return rows
+        .filter((row) => selectedIds.has(row.id) && row.status !== "deleted")
+        .flatMap((row) => visibleColumnIndexes.map((colIdx) => ({ rowId: row.id, colIdx })));
+    }
+    return [];
+  }, [activeCell, rows, selectedIds, visibleColumnIndexes]);
+
+  const applyValueToTargets = (valueFactory: () => string | null) => {
+    const targets = targetCellPositions();
+    if (targets.length === 0) {
+      setStatus("Select a row or cell before applying an edit value.");
+      return;
+    }
+    setRows((current) =>
+      current.map((row) => {
+        const rowTargets = targets.filter((target) => target.rowId === row.id);
+        if (rowTargets.length === 0 || row.status === "deleted") return row;
+        const values = [...row.values];
+        for (const target of rowTargets) {
+          values[target.colIdx] = valueFactory();
+        }
+        return { ...row, values, status: statusAfterValueChange(row, values) };
+      }),
+    );
+    setStatus(`Edited ${targets.length} cell(s).`);
+  };
+
+  const addRow = () => {
+    const row: GridRow = {
+      id: nextRowId("inserted"),
+      originalIndex: null,
+      values: result.columns.map(() => null),
+      original: null,
+      status: "inserted",
+    };
+    setRows((current) => [...current, row]);
+    setSelectedIds(new Set([row.id]));
+    setActiveCell(result.columns.length > 0 ? { rowId: row.id, colIdx: 0 } : null);
+    setStatus("Added a new grid row.");
+  };
+
+  const duplicateRows = () => {
+    const sources =
+      selectedRows.length > 0
+        ? selectedRows
+        : activeCell
+          ? rows.filter((row) => row.id === activeCell.rowId && row.status !== "deleted")
+          : [];
+    if (sources.length === 0) {
+      setStatus("Select at least one row to duplicate.");
+      return;
+    }
+    const copies = sources.map<GridRow>((row) => ({
+      id: nextRowId("copy"),
+      originalIndex: null,
+      values: [...row.values],
+      original: null,
+      status: "inserted",
+    }));
+    setRows((current) => [...current, ...copies]);
+    setSelectedIds(new Set(copies.map((row) => row.id)));
+    setStatus(`Duplicated ${copies.length} row(s).`);
+  };
+
+  const deleteRows = () => {
+    const targetIds = selectedIds.size > 0 ? selectedIds : activeCell ? new Set([activeCell.rowId]) : new Set<string>();
+    if (targetIds.size === 0) {
+      setStatus("Select at least one row to delete.");
+      return;
+    }
+    setRows((current) =>
+      current
+        .filter((row) => !(targetIds.has(row.id) && row.status === "inserted"))
+        .map((row) => (targetIds.has(row.id) ? { ...row, status: "deleted" } : row)),
+    );
+    setSelectedIds(new Set());
+    setActiveCell(null);
+    setStatus(`Marked ${targetIds.size} row(s) for deletion.`);
+  };
+
+  const undoChanges = () => {
+    setRows(makeRows(result));
+    setSelectedIds(new Set());
+    setActiveCell(null);
+    setEditingCell(null);
+    setStatus("Reverted unsubmitted grid changes.");
+  };
+
+  const submitChanges = async () => {
+    const changes: QueryGridRowChange[] = rows
+      .filter((row) => row.status !== "clean")
+      .map((row) => ({
+        status: row.status as QueryGridRowChange["status"],
+        originalIndex: row.originalIndex,
+        values: [...row.values],
+        original: row.original ? [...row.original] : null,
+      }));
+    if (changes.length === 0) return;
+    const ok = window.confirm(
+      `Apply grid changes to the database?\n\nAdded: ${changeCounts.inserted}\nModified: ${changeCounts.updated}\nDeleted: ${changeCounts.deleted}`,
+    );
+    if (!ok) {
+      setStatus("Grid change submit canceled.");
+      return;
+    }
+    if (!onCommitChanges) {
+      setStatus("This result sheet cannot be written back because no editable table metadata is available.");
+      return;
+    }
+    setSubmittingChanges(true);
+    try {
+      await onCommitChanges({ columns: result.columns, changes, counts: changeCounts });
+      const keptRows = rows.filter((row) => row.status !== "deleted");
+      setRows(
+        keptRows.map((row, index) => ({
+          id: `row-${index}-${keptRows.length}`,
+          originalIndex: index,
+          values: [...row.values],
+          original: [...row.values],
+          status: "clean",
+        })),
+      );
+      setSelectedIds(new Set());
+      setActiveCell(null);
+      setStatus(`Submitted ${changes.length} grid change(s).`);
+    } catch (err) {
+      setStatus(`Submit failed: ${String(err)}`);
+    } finally {
+      setSubmittingChanges(false);
+    }
+  };
+
+  const rowsForTarget = (target: ExportTarget): GridRow[] => {
+    if (target === "selection" && selectedRows.length > 0) return selectedRows;
+    return nonDeletedOrderedRows;
+  };
+
+  const exportWithOptions = async (
+    target: ExportTarget,
+    options: ExportOptions,
+    columns: ExportColumnConfig[],
+    destination?: ExportDestination,
+    openAfter = false,
+  ) => {
+    const rowsToExport = rowsForTarget(target);
+    if (rowsToExport.length === 0 || columns.filter((column) => column.export).length === 0) {
+      setStatus("No result rows are available for export.");
+      return;
+    }
+    try {
+      const serialized = serializeResult(result.columns, rowsToExport, columns, options, sourceSql);
+      const bytes = encodeOutput(serialized.text, options.encoding);
+      const filename = `query-results-${Date.now()}.${serialized.extension}`;
+      if (openAfter && !isTauriRuntime()) {
+        browserOpen(bytes, serialized.mime);
+        return;
+      }
+      if (openAfter && isTauriRuntime()) {
+        const path = await temporaryFilePath(filename);
+        await writeBytesToPath(path, bytes);
+        await sftpOpenPath(path);
+        setStatus(`Opened ${rowsToExport.length} row(s) with the system default application.`);
+        return;
+      }
+      if (destination?.kind === "clipboard") {
+        await writeText(serialized.text);
+        setStatus(`Copied ${rowsToExport.length} exported row(s) to clipboard.`);
+        return;
+      }
+      if (destination?.kind === "sqlCommander") {
+        const targetTab =
+          destination.sqlCommanderTabId === "active"
+            ? getActiveQueryTab()
+            : listQueryTabs().find((entry) => entry.tabId === destination.sqlCommanderTabId) ?? getActiveQueryTab();
+        if (!targetTab) throw new Error("No SQL Commander editor is available.");
+        targetTab.insertQuery(serialized.text, {
+          destination: destination.sqlCommanderTabId === "new" ? "new" : "current",
+          position: destination.sqlCommanderPosition,
+        });
+        setStatus(`Sent ${rowsToExport.length} exported row(s) to SQL Commander.`);
+        return;
+      }
+      if (isTauriRuntime()) {
+        const requestedPath = destination?.kind === "file" ? destination.filePath.trim() : "";
+        const path = requestedPath || (await selectSaveFilePath(filename));
+        if (!path) return;
+        await writeBytesToPath(path, bytes);
+        const nextHistory = [path, ...readExportFileHistory().filter((entry) => entry !== path)];
+        writeExportFileHistory(nextHistory);
+        setStatus(`Exported ${rowsToExport.length} row(s) to ${path}`);
+        return;
+      }
+      browserDownload(bytes, filename, serialized.mime);
+      setStatus(`Exported ${rowsToExport.length} row(s).`);
+    } catch (err) {
+      const message = `${openAfter ? "Open" : "Export"} failed: ${String(err)}`;
+      if (openAfter) window.alert(message);
+      setStatus(message);
+    }
+  };
+
+  const openSpreadsheet = (target: ExportTarget) => {
+    const options: ExportOptions = {
+      ...exportOptions,
+      outputFormat: "excel",
+      includeColumnNames: true,
+      maxRows: 0,
+    };
+    void exportWithOptions(target, options, exportColumns, undefined, true);
+  };
+
+  const openBrowser = (target: ExportTarget) => {
+    const options: ExportOptions = {
+      ...exportOptions,
+      outputFormat: "html",
+      includeColumnNames: true,
+      maxRows: 0,
+    };
+    void exportWithOptions(target, options, exportColumns, undefined, true);
+  };
+
+  const copyRows = async (target: ExportTarget) => {
+    const rowsToCopy = rowsForTarget(target);
+    if (rowsToCopy.length === 0) return;
+    const options = { ...DEFAULT_EXPORT_OPTIONS, outputFormat: "csv" as const, columnDelimiter: "\t" };
+    const visibleExportColumns = exportColumns.filter((_, index) => visibleColumns.has(index));
+    const serialized = serializeResult(result.columns, rowsToCopy, visibleExportColumns, options, sourceSql);
+    try {
+      await writeText(serialized.text);
+      setStatus(`Copied ${rowsToCopy.length} row(s).`);
+    } catch (err) {
+      setStatus(`Copy failed: ${String(err)}`);
+    }
+  };
+
+  const cellMenu = (row: GridRow, colIdx: number): MenuItem[] => [
+    {
+      label: "Copy cell",
+      icon: <Copy className="w-3.5 h-3.5" />,
+      onClick: () => void writeText(row.values[colIdx] ?? ""),
+    },
+    {
+      label: "Copy row",
+      onClick: () => void writeText(row.values.map((cell) => cell ?? "").join("\t")),
+    },
+    {
+      label: "Copy row as CSV",
+      onClick: () => void writeText(row.values.map(csvEscape).join(",")),
+    },
+    { separator: true, label: "edit-separator" },
+    {
+      label: "Edit cell",
+      icon: <Edit3 className="w-3.5 h-3.5" />,
+      onClick: () => beginEdit(row.id, colIdx, row.values[colIdx]),
+      disabled: row.status === "deleted",
+    },
+  ];
+
+  const columnMenu = (): MenuItem[] => [
+    {
+      label: "Show all columns",
+      onClick: () => setVisibleColumns(new Set(result.columns.map((_, index) => index))),
+    },
+    {
+      label: "Hide all columns",
+      onClick: () => setVisibleColumns(new Set()),
+    },
+    { separator: true, label: "column-separator" },
+    ...result.columns.map<MenuItem>((column, index) => ({
+      label: column.name,
+      checked: visibleColumns.has(index),
+      onClick: () =>
+        setVisibleColumns((current) => {
+          const next = new Set(current);
+          if (next.has(index)) next.delete(index);
+          else next.add(index);
+          return next;
+        }),
+    })),
+  ];
+
+  const total = orderedRows.length;
   const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const endRow = Math.min(total, Math.ceil((scrollTop + viewportH) / ROW_HEIGHT) + OVERSCAN);
   const visible = order.slice(startRow, endRow);
-  const colWidthClass = autoFit ? "flex-1 min-w-0" : "flex-[0_0_160px]";
+  const searchNeedle = searchText.trim().toLowerCase();
 
-  const copyText = (text: string) => {
-    void navigator.clipboard?.writeText(text).catch(() => undefined);
-  };
+  const stats = useMemo(() => {
+    return visibleColumnIndexes.map((columnIndex) => {
+      const column = result.columns[columnIndex];
+      const values = nonDeletedOrderedRows.map((row) => row.values[columnIndex]);
+      const nonNull = values.filter((value): value is string => value !== null && value !== "");
+      const numeric = nonNull.map(Number).filter((value) => Number.isFinite(value));
+      return {
+        column,
+        count: values.length,
+        nulls: values.length - nonNull.length,
+        distinct: new Set(nonNull).size,
+        min: numeric.length > 0 ? Math.min(...numeric) : nonNull.slice().sort()[0] ?? "",
+        max: numeric.length > 0 ? Math.max(...numeric) : nonNull.slice().sort().at(-1) ?? "",
+        avg: numeric.length > 0 ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length : null,
+      };
+    });
+  }, [nonDeletedOrderedRows, result.columns, visibleColumnIndexes]);
 
-  const cellMenu = (rowIdx: number, colIdx: number): MenuItem[] => {
-    const row = result.rows[rowIdx];
-    return [
-      {
-        label: "Copy cell",
-        icon: <Copy className="w-3.5 h-3.5" />,
-        onClick: () => copyText(row[colIdx] ?? ""),
-      },
-      {
-        label: "Copy row",
-        onClick: () => copyText(row.map((c) => c ?? "").join("\t")),
-      },
-      {
-        label: "Copy row as CSV",
-        onClick: () => copyText(row.map(csvEscape).join(",")),
-      },
-    ];
-  };
+  const chartData = useMemo(() => {
+    const numericColumn = visibleColumnIndexes.find((index) =>
+      nonDeletedOrderedRows.some((row) => isNumeric(row.values[index])),
+    );
+    if (numericColumn === undefined) return null;
+    const labelColumn = visibleColumnIndexes.find((index) => index !== numericColumn) ?? numericColumn;
+    const points = nonDeletedOrderedRows.slice(0, 50).map((row, index) => ({
+      label: row.values[labelColumn] ?? `Row ${index + 1}`,
+      value: Number(row.values[numericColumn]) || 0,
+    }));
+    const max = Math.max(1, ...points.map((point) => Math.abs(point.value)));
+    return { column: result.columns[numericColumn], points, max };
+  }, [nonDeletedOrderedRows, result.columns, visibleColumnIndexes]);
 
   if (result.columns.length === 0) {
     return (
@@ -114,93 +1269,857 @@ export function QueryResultGrid({ result }: QueryResultGridProps) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col" data-testid="query-result-grid">
-      {/* Header */}
       <div
-        className="flex shrink-0 text-[11px] font-semibold select-none"
+        className="min-h-8 shrink-0 flex flex-wrap items-center gap-1 px-1 py-1"
         style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
       >
+        <ToolButton
+          title="Refresh result"
+          disabled={running || !onRefresh}
+          onClick={() => onRefresh?.("normal")}
+          icon={running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title="Refresh mode"
+          disabled={running || !onRefresh}
+          onClick={(event) =>
+            openDropdown(event, [
+              { label: "Refresh", onClick: () => onRefresh?.("normal") },
+              { label: "Refresh with current row limit", onClick: () => onRefresh?.("currentLimit") },
+              { label: "Clear view and refresh", onClick: () => onRefresh?.("clearView") },
+            ])
+          }
+          icon={<ChevronDown className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title="Stop query"
+          disabled={!running || cancelling || !onCancel}
+          onClick={() => onCancel?.()}
+          icon={cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+        />
+        <Divider />
+        <ToolButton
+          title="Export"
+          onClick={(event) =>
+            openDropdown(event, [
+              {
+                label: "Export...",
+                icon: <Download className="w-3.5 h-3.5" />,
+                onClick: () => {
+                  setExportTarget("all");
+                  setExportDialogOpen(true);
+                },
+              },
+              {
+                label: "Export Selection...",
+                icon: <Download className="w-3.5 h-3.5" />,
+                disabled: selectedRows.length === 0,
+                onClick: () => {
+                  setExportTarget("selection");
+                  setExportDialogOpen(true);
+                },
+              },
+            ])
+          }
+          icon={<Download className="w-3.5 h-3.5" />}
+          suffix={<ChevronDown className="w-3 h-3" />}
+        />
+        <ToolButton
+          title="Open externally"
+          onClick={(event) =>
+            openDropdown(event, [
+              {
+                label: "Open as Spreadsheet...",
+                shortcut: "Ctrl+Alt+X",
+                icon: <FileSpreadsheet className="w-3.5 h-3.5" />,
+                onClick: () => openSpreadsheet("all"),
+              },
+              {
+                label: "Open Selection as Spreadsheet...",
+                icon: <FileSpreadsheet className="w-3.5 h-3.5" />,
+                disabled: selectedRows.length === 0,
+                onClick: () => openSpreadsheet("selection"),
+              },
+              { separator: true, label: "open-separator" },
+              {
+                label: "Open in Web Browser...",
+                icon: <ExternalLink className="w-3.5 h-3.5" />,
+                onClick: () => openBrowser("all"),
+              },
+              {
+                label: "Open Selection in Web Browser...",
+                icon: <ExternalLink className="w-3.5 h-3.5" />,
+                disabled: selectedRows.length === 0,
+                onClick: () => openBrowser("selection"),
+              },
+            ])
+          }
+          icon={<ExternalLink className="w-3.5 h-3.5" />}
+          suffix={<ChevronDown className="w-3 h-3" />}
+        />
+        <Divider />
+        <ToolButton
+          title="Show or hide columns"
+          onClick={(event) => openDropdown(event, columnMenu())}
+          icon={<Columns2 className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title={autoFit ? "Use fixed column width" : "Auto-fit column width"}
+          onClick={() => setAutoFit((value) => !value)}
+          active={autoFit}
+          icon={<Columns2 className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title="Aggregate statistics"
+          onClick={() => setShowStats((value) => !value)}
+          active={showStats}
+          icon={<Sigma className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title="Filter rows"
+          onClick={() => setFilterOpen((value) => !value)}
+          active={filterOpen}
+          icon={<Filter className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title="Copy result"
+          onClick={(event) =>
+            openDropdown(event, [
+              { label: "Copy Results", icon: <Copy className="w-3.5 h-3.5" />, onClick: () => void copyRows("all") },
+              {
+                label: "Copy Selection",
+                icon: <Copy className="w-3.5 h-3.5" />,
+                disabled: selectedRows.length === 0,
+                onClick: () => void copyRows("selection"),
+              },
+            ])
+          }
+          icon={<Copy className="w-3.5 h-3.5" />}
+        />
+        <Divider />
+        <ToolButton title="Add row" onClick={addRow} icon={<Plus className="w-3.5 h-3.5" />} />
+        <ToolButton title="Duplicate row" onClick={duplicateRows} icon={<Copy className="w-3.5 h-3.5" />} />
+        <ToolButton title="Delete row" onClick={deleteRows} icon={<Trash2 className="w-3.5 h-3.5" />} />
+        <ToolButton
+          title="Set value"
+          onClick={(event) =>
+            openDropdown(event, [
+              { label: "Set to Current Date (yyyy-MM-dd)", onClick: () => applyValueToTargets(nowDateText) },
+              { label: "Set to Current Time (HH:mm:ss)", onClick: () => applyValueToTargets(nowTimeText) },
+              { label: "Set to Current Timestamp (yyyy-MM-dd HH:mm:ss)", onClick: () => applyValueToTargets(nowTimestampText) },
+              { label: "Set to UUID (36 chars)", onClick: () => applyValueToTargets(() => crypto.randomUUID?.() ?? nextRowId("uuid")) },
+              { label: "Set to Empty String", onClick: () => applyValueToTargets(() => "") },
+              { label: 'Set to NULL "(null)"', onClick: () => applyValueToTargets(() => null) },
+            ])
+          }
+          icon={<Edit3 className="w-3.5 h-3.5" />}
+          suffix={<ChevronDown className="w-3 h-3" />}
+        />
+        <ToolButton
+          title="Submit grid edits"
+          disabled={pendingChangeCount === 0 || submittingChanges}
+          onClick={() => void submitChanges()}
+          icon={submittingChanges ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        />
+        <ToolButton
+          title="Undo unsubmitted edits"
+          disabled={pendingChangeCount === 0}
+          onClick={undoChanges}
+          icon={<RotateCcw className="w-3.5 h-3.5" />}
+        />
+        <Divider />
+        {filterOpen && (
+          <label className="h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--moba-text-muted)]">
+            <Filter className="w-3.5 h-3.5" />
+            <input
+              value={filterText}
+              onChange={(event) => setFilterText(event.target.value)}
+              className="moba-input h-6 w-[150px] text-[11px]"
+              placeholder="Filter rows"
+              aria-label="Filter rows"
+            />
+          </label>
+        )}
+        <label className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--moba-text-muted)]">
+          <Search className="w-3.5 h-3.5" />
+          <input
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            className="moba-input h-6 w-[150px] text-[11px]"
+            placeholder="Search"
+            aria-label="Search result set"
+          />
+          {searchText && <span className="min-w-6 text-right">{searchMatchCount}</span>}
+        </label>
         <div
-          className="w-12 px-1 py-1 text-[var(--moba-text-muted)] shrink-0 flex items-center justify-between"
-          style={{ borderRight: "1px solid var(--moba-divider)" }}
+          className="h-6 inline-flex items-center rounded"
+          style={{ border: "1px solid var(--moba-divider)", overflow: "hidden" }}
         >
-          <span>#</span>
-          <button
-            type="button"
-            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
-            title={autoFit ? "Use fixed column width" : "Auto-fit columns"}
-            aria-label={autoFit ? "Use fixed column width" : "Auto-fit columns"}
-            onClick={() => setAutoFit((value) => !value)}
-          >
-            <Columns2 className="w-3 h-3" />
-          </button>
+          <ToolButton title="Table view" active={viewMode === "table"} onClick={() => setViewMode("table")} icon={<Table2 className="w-3.5 h-3.5" />} />
+          <ToolButton title="List view" active={viewMode === "list"} onClick={() => setViewMode("list")} icon={<List className="w-3.5 h-3.5" />} />
+          <ToolButton title="Chart view" active={viewMode === "chart"} onClick={() => setViewMode("chart")} icon={<BarChart3 className="w-3.5 h-3.5" />} />
         </div>
-        {result.columns.map((col, c) => (
-          <button
-            key={c}
-            type="button"
-            className={`${colWidthClass} px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--moba-hover)]`}
-            style={{ borderRight: "1px solid var(--moba-divider)" }}
-            onClick={() => toggleSort(c)}
-            title={`${col.name} (${col.type})`}
-          >
-            <span className="truncate flex-1">{col.name}</span>
-            {sortCol === c && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
-            {sortCol === c && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
-          </button>
-        ))}
+        {(pendingChangeCount > 0 || localNotice) && (
+          <span className="max-w-[320px] truncate px-1 text-[10px] text-[var(--moba-text-muted)]" title={localNotice}>
+            {pendingChangeCount > 0
+              ? `${changeCounts.inserted} add / ${changeCounts.updated} edit / ${changeCounts.deleted} delete`
+              : localNotice}
+          </span>
+        )}
       </div>
 
-      {/* Virtualised body */}
-      <div
-        ref={containerRef}
-        className="flex-1 min-h-0 overflow-auto moba-scroll-y"
-        onScroll={onScroll}
-        style={{ fontSize: 12 }}
-      >
-        <div style={{ height: total * ROW_HEIGHT, position: "relative" }}>
-          {visible.map((rowIdx, i) => {
-            const row = result.rows[rowIdx];
-            const top = (startRow + i) * ROW_HEIGHT;
-            return (
-              <div
-                key={rowIdx}
-                className="flex absolute left-0 right-0 hover:bg-[var(--moba-hover)]"
-                style={{ top, height: ROW_HEIGHT, borderBottom: "1px solid var(--moba-divider)" }}
-              >
-                <div
-                  className="w-12 px-1 text-right text-[var(--moba-text-muted)] shrink-0 flex items-center justify-end"
-                  style={{ borderRight: "1px solid var(--moba-divider)" }}
+      {showStats && (
+        <div
+          className="max-h-[132px] shrink-0 overflow-auto moba-scroll-y text-[11px]"
+          style={{ borderBottom: "1px solid var(--moba-divider)", background: "var(--moba-bg)" }}
+        >
+          <div className="min-w-full inline-grid grid-cols-[minmax(120px,1fr)_repeat(6,minmax(70px,auto))]">
+            <StatsCell header>Column</StatsCell>
+            <StatsCell header>Rows</StatsCell>
+            <StatsCell header>Null</StatsCell>
+            <StatsCell header>Distinct</StatsCell>
+            <StatsCell header>Min</StatsCell>
+            <StatsCell header>Max</StatsCell>
+            <StatsCell header>Avg</StatsCell>
+            {stats.map((stat, index) => (
+              <FragmentStats key={`${stat.column.name}-${index}`} stat={stat} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {viewMode === "table" && (
+        <>
+          <div
+            className="flex shrink-0 text-[11px] font-semibold select-none"
+            style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+          >
+            <div
+              className="w-12 px-1 py-1 text-[var(--moba-text-muted)] shrink-0 flex items-center justify-between"
+              style={{ borderRight: "1px solid var(--moba-divider)" }}
+            >
+              <span>#</span>
+              <span className="text-[10px]">{selectedRows.length || ""}</span>
+            </div>
+            {visibleColumnIndexes.map((columnIndex) => {
+              const col = result.columns[columnIndex];
+              return (
+                <button
+                  key={columnIndex}
+                  type="button"
+                  className="relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--moba-hover)]"
+                  style={{ ...columnStyle(columnIndex), borderRight: "1px solid var(--moba-divider)" }}
+                  onClick={() => toggleSort(columnIndex)}
+                  title={`${col.name} (${col.type})`}
                 >
-                  {rowIdx + 1}
-                </div>
-                {row.map((cell, c) => (
+                  <span className="truncate flex-1">{col.name}</span>
+                  {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
+                  {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
+                  <span
+                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--moba-accent)]"
+                    onMouseDown={(event) => startColumnResize(event, columnIndex)}
+                    title="Resize column"
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            ref={containerRef}
+            className="flex-1 min-h-0 overflow-auto moba-scroll-y"
+            onScroll={onScroll}
+            style={{ fontSize: 12 }}
+          >
+            <div style={{ height: total * ROW_HEIGHT, position: "relative" }}>
+              {visible.map((rowIndex, i) => {
+                const row = rows[rowIndex];
+                const top = (startRow + i) * ROW_HEIGHT;
+                const selected = selectedIds.has(row.id);
+                return (
                   <div
-                    key={c}
-                    className={`${colWidthClass} px-2 flex items-center truncate ${
-                      isNumeric(cell) ? "justify-end font-mono" : ""
-                    }`}
-                    style={{ borderRight: "1px solid var(--moba-divider)" }}
-                    title={cell ?? "NULL"}
-                    onContextMenu={(e) => openMenu(e, cellMenu(rowIdx, c))}
+                    key={row.id}
+                    className="flex absolute left-0 right-0"
+                    style={{
+                      top,
+                      height: ROW_HEIGHT,
+                      borderBottom: "1px solid var(--moba-divider)",
+                      background: selected
+                        ? "var(--moba-selected)"
+                        : row.status === "deleted"
+                          ? "rgba(217, 83, 79, 0.12)"
+                          : row.status === "inserted"
+                            ? "rgba(98, 211, 111, 0.10)"
+                            : row.status === "updated"
+                              ? "rgba(230, 168, 23, 0.10)"
+                              : undefined,
+                      opacity: row.status === "deleted" ? 0.65 : undefined,
+                    }}
                   >
-                    {cell === null ? (
-                      <span
-                        className="text-[10px] px-1 rounded"
-                        style={{ background: "var(--moba-divider)", color: "var(--moba-text-muted)" }}
-                      >
-                        NULL
+                    <button
+                      type="button"
+                      className="w-12 px-1 text-right text-[var(--moba-text-muted)] shrink-0 flex items-center justify-end hover:bg-[var(--moba-hover)]"
+                      style={{ borderRight: "1px solid var(--moba-divider)" }}
+                      onClick={(event) => selectRow(row.id, event)}
+                      title={row.status === "clean" ? `Row ${(row.originalIndex ?? rowIndex) + 1}` : row.status}
+                    >
+                      <span className="mr-1 text-[10px]">
+                        {row.status === "inserted" ? "+" : row.status === "updated" ? "~" : row.status === "deleted" ? "-" : ""}
                       </span>
-                    ) : (
-                      <span className="truncate">{cell}</span>
-                    )}
+                      {(row.originalIndex ?? rowIndex) + 1}
+                    </button>
+                    {visibleColumnIndexes.map((columnIndex) => {
+                      const cell = row.values[columnIndex];
+                      const active = activeCell?.rowId === row.id && activeCell.colIdx === columnIndex;
+                      const editing = editingCell?.rowId === row.id && editingCell.colIdx === columnIndex;
+                      const searchHit = !!searchNeedle && (cell ?? "").toLowerCase().includes(searchNeedle);
+                      return (
+                        <div
+                          key={columnIndex}
+                          className={`px-2 flex items-center truncate ${
+                            isNumeric(cell) ? "justify-end font-mono" : ""
+                          }`}
+                          style={{
+                            ...columnStyle(columnIndex),
+                            borderRight: "1px solid var(--moba-divider)",
+                            outline: active ? "1px solid var(--moba-accent)" : undefined,
+                            background: searchHit ? "rgba(230, 168, 23, 0.22)" : undefined,
+                          }}
+                          title={cell ?? "NULL"}
+                          onClick={(event) => {
+                            setActiveCell({ rowId: row.id, colIdx: columnIndex });
+                            selectRow(row.id, event);
+                          }}
+                          onDoubleClick={() => beginEdit(row.id, columnIndex, cell)}
+                          onContextMenu={(event) => openCellMenu(event, cellMenu(row, columnIndex))}
+                        >
+                          {editing ? (
+                            <input
+                              autoFocus
+                              className="moba-input h-5 w-full text-[12px]"
+                              value={editValue}
+                              onChange={(event) => setEditValue(event.target.value)}
+                              onBlur={commitEdit}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") commitEdit();
+                                if (event.key === "Escape") cancelEdit();
+                              }}
+                            />
+                          ) : cell === null ? (
+                            <span
+                              className="text-[10px] px-1 rounded"
+                              style={{ background: "var(--moba-divider)", color: "var(--moba-text-muted)" }}
+                            >
+                              NULL
+                            </span>
+                          ) : (
+                            <span className={row.status === "deleted" ? "truncate line-through" : "truncate"}>{cell}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {viewMode === "list" && (
+        <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-2 text-[12px]">
+          {nonDeletedOrderedRows.map((row, rowIndex) => (
+            <div
+              key={row.id}
+              className="mb-2 rounded p-2"
+              style={{ border: "1px solid var(--moba-divider)", background: "var(--moba-panel-bg)" }}
+            >
+              <div className="mb-1 text-[11px] text-[var(--moba-text-muted)]">Row {(row.originalIndex ?? rowIndex) + 1}</div>
+              <div className="grid grid-cols-[minmax(90px,180px)_1fr] gap-x-3 gap-y-1">
+                {visibleColumnIndexes.map((columnIndex) => (
+                  <div key={columnIndex} className="contents">
+                    <div className="truncate text-[var(--moba-text-muted)]">{result.columns[columnIndex].name}</div>
+                    <div className="min-w-0 truncate">{row.values[columnIndex] ?? <span className="text-[var(--moba-text-muted)]">NULL</span>}</div>
                   </div>
                 ))}
               </div>
-            );
-          })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {viewMode === "chart" && (
+        <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-3 text-[12px]">
+          {!chartData ? (
+            <div className="h-full flex items-center justify-center text-[var(--moba-text-muted)]">
+              No numeric column is available for chart view.
+            </div>
+          ) : (
+            <div className="min-w-[420px]">
+              <div className="mb-2 text-[11px] text-[var(--moba-text-muted)]">
+                {chartData.column.name} (first {chartData.points.length} rows)
+              </div>
+              <div className="space-y-1">
+                {chartData.points.map((point, index) => (
+                  <div key={`${point.label}-${index}`} className="grid grid-cols-[160px_1fr_72px] items-center gap-2">
+                    <div className="truncate text-[var(--moba-text-muted)]" title={point.label}>{point.label}</div>
+                    <div className="h-4" style={{ background: "var(--moba-divider)" }}>
+                      <div
+                        className="h-4"
+                        style={{
+                          width: `${Math.max(2, (Math.abs(point.value) / chartData.max) * 100)}%`,
+                          background: point.value < 0 ? "#d9534f" : "var(--moba-accent)",
+                        }}
+                      />
+                    </div>
+                    <div className="text-right font-mono">{point.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {exportDialogOpen && (
+        <ExportDialog
+          options={exportOptions}
+          columns={exportColumns}
+          target={exportTarget}
+          rowCount={rowsForTarget(exportTarget).length}
+          totalRows={nonDeletedOrderedRows.length}
+          onOptionsChange={setExportOptions}
+          onColumnsChange={setExportColumns}
+          onClose={() => setExportDialogOpen(false)}
+          onExport={(options, columns, destination) => {
+            setExportOptions(options);
+            setExportColumns(columns);
+            setExportDialogOpen(false);
+            void exportWithOptions(exportTarget, options, columns, destination);
+          }}
+        />
+      )}
+      {menu}
+    </div>
+  );
+}
+
+function ToolButton({
+  title,
+  icon,
+  suffix,
+  disabled,
+  active,
+  onClick,
+}: {
+  title: string;
+  icon: ReactNode;
+  suffix?: ReactNode;
+  disabled?: boolean;
+  active?: boolean;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`h-6 ${suffix ? "px-1.5" : "w-6"} inline-flex items-center justify-center gap-0.5 rounded text-[11px] hover:bg-[var(--moba-hover)] disabled:opacity-40`}
+      style={active ? { background: "var(--moba-selected)", color: "var(--moba-accent)" } : undefined}
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {icon}
+      {suffix}
+    </button>
+  );
+}
+
+function Divider() {
+  return <span className="w-px h-4 mx-0.5" style={{ background: "var(--moba-divider)" }} />;
+}
+
+function StatsCell({ children, header = false }: { children: ReactNode; header?: boolean }) {
+  return (
+    <div
+      className={`px-2 py-1 truncate ${header ? "font-semibold text-[var(--moba-text)]" : "text-[var(--moba-text-muted)]"}`}
+      style={{ borderRight: "1px solid var(--moba-divider)", borderBottom: "1px solid var(--moba-divider)" }}
+      title={typeof children === "string" ? children : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FragmentStats({
+  stat,
+}: {
+  stat: {
+    column: DbColumn;
+    count: number;
+    nulls: number;
+    distinct: number;
+    min: string | number;
+    max: string | number;
+    avg: number | null;
+  };
+}) {
+  return (
+    <>
+      <StatsCell>{stat.column.name}</StatsCell>
+      <StatsCell>{stat.count}</StatsCell>
+      <StatsCell>{stat.nulls}</StatsCell>
+      <StatsCell>{stat.distinct}</StatsCell>
+      <StatsCell>{String(stat.min)}</StatsCell>
+      <StatsCell>{String(stat.max)}</StatsCell>
+      <StatsCell>{stat.avg === null ? "" : stat.avg.toFixed(3)}</StatsCell>
+    </>
+  );
+}
+
+function extensionForOptions(options: ExportOptions): string {
+  if (options.outputFormat === "excel") return options.excelFileFormat;
+  return options.outputFormat === "csv"
+    ? "csv"
+    : options.outputFormat === "html"
+      ? "html"
+      : options.outputFormat === "txt"
+        ? "txt"
+        : options.outputFormat === "sql"
+          ? "sql"
+          : options.outputFormat === "xml"
+            ? "xml"
+            : "json";
+}
+
+function ExportDialog({
+  options,
+  columns,
+  target,
+  rowCount,
+  totalRows,
+  onOptionsChange,
+  onColumnsChange,
+  onClose,
+  onExport,
+}: {
+  options: ExportOptions;
+  columns: ExportColumnConfig[];
+  target: ExportTarget;
+  rowCount: number;
+  totalRows: number;
+  onOptionsChange: (options: ExportOptions) => void;
+  onColumnsChange: (columns: ExportColumnConfig[]) => void;
+  onClose: () => void;
+  onExport: (options: ExportOptions, columns: ExportColumnConfig[], destination: ExportDestination) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [fileHistory, setFileHistory] = useState<string[]>(() => readExportFileHistory());
+  const [destination, setDestination] = useState<ExportDestination>({
+    kind: "file",
+    filePath: "",
+    sqlCommanderTabId: "active",
+    sqlCommanderPosition: "caret",
+  });
+  const queryTabs = listQueryTabs();
+  const input = "moba-input h-7 text-[12px]";
+  const label = "flex flex-col gap-1 text-[11px] text-[var(--moba-text-muted)]";
+  const sectionTitle = "mb-2 text-[12px] font-semibold";
+  const update = <K extends keyof ExportOptions>(key: K, value: ExportOptions[K]) => {
+    onOptionsChange({ ...options, [key]: value });
+  };
+  const updateColumn = (id: string, patch: Partial<ExportColumnConfig>) => {
+    onColumnsChange(columns.map((column) => (column.id === id ? { ...column, ...patch } : column)));
+  };
+  const moveColumn = (id: string, direction: -1 | 1) => {
+    const index = columns.findIndex((column) => column.id === id);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= columns.length) return;
+    const next = [...columns];
+    const [item] = next.splice(index, 1);
+    next.splice(nextIndex, 0, item);
+    onColumnsChange(next);
+  };
+  const chooseFilePath = async () => {
+    const path = await selectSaveFilePath(`query-results.${extensionForOptions(options)}`, destination.filePath || undefined);
+    if (!path) return;
+    setDestination((current) => ({ ...current, kind: "file", filePath: path }));
+    const nextHistory = [path, ...fileHistory.filter((entry) => entry !== path)].slice(0, 12);
+    setFileHistory(nextHistory);
+    writeExportFileHistory(nextHistory);
+  };
+  const settingsPayload = () => JSON.stringify({ options, columns }, null, 2);
+  const saveDefaultSettings = () => {
+    localStorage.setItem(EXPORT_DEFAULTS_KEY, JSON.stringify(options));
+    setSettingsOpen(false);
+  };
+  const useDefaultSettings = () => {
+    onOptionsChange(readStoredExportOptions());
+    setSettingsOpen(false);
+  };
+  const removeDefaultSettings = () => {
+    localStorage.removeItem(EXPORT_DEFAULTS_KEY);
+    onOptionsChange(DEFAULT_EXPORT_OPTIONS);
+    setSettingsOpen(false);
+  };
+  const loadSettings = async () => {
+    const path = await selectFilePath();
+    if (!path) return;
+    const text = new TextDecoder().decode(await readFileBytes(path));
+    const parsed = JSON.parse(text) as { options?: Partial<ExportOptions>; columns?: ExportColumnConfig[] };
+    onOptionsChange({ ...DEFAULT_EXPORT_OPTIONS, ...(parsed.options ?? {}) });
+    if (Array.isArray(parsed.columns)) onColumnsChange(parsed.columns);
+    setSettingsOpen(false);
+  };
+  const saveSettingsAs = async () => {
+    const path = await selectSaveFilePath("export-grid-settings.json");
+    if (!path) return;
+    await writeBytesToPath(path, new TextEncoder().encode(settingsPayload()));
+    setSettingsOpen(false);
+  };
+  const copySettings = async () => {
+    await writeText(settingsPayload());
+    setSettingsOpen(false);
+  };
+  const bool = (key: keyof ExportOptions, text: string) => (
+    <label className="h-7 inline-flex items-center gap-2 text-[11px] text-[var(--moba-text-muted)]">
+      <input type="checkbox" checked={Boolean(options[key])} onChange={(event) => update(key as never, event.target.checked as never)} />
+      {text}
+    </label>
+  );
+  const formatOptionFields = () => {
+    if (options.outputFormat === "csv") {
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          <label className={label}>Column Delimiter<select className={input} value={options.columnDelimiter} onChange={(event) => update("columnDelimiter", event.target.value)}><option value={"\t"}>TAB</option><option value=",">Comma (,)</option><option value=";">Semicolon (;)</option><option value="|">Pipe (|)</option></select></label>
+          <label className={label}>Row Delimiter<select className={input} value={options.rowDelimiter} onChange={(event) => update("rowDelimiter", event.target.value as RowDelimiter)}><option value={"\n"}>UNIX LF</option><option value={"\r\n"}>Windows CRLF</option><option value={"\r"}>Mac CR</option></select></label>
+          {bool("includeColumnNames", "Include Column Names")}
+          {bool("useLabels", "Use any Label (Alias)")}
+          {bool("removeNewlines", "Remove Newline Characters")}
+          <label className={label}>Include Original SQL<select className={input} value={options.includeOriginalSql} onChange={(event) => update("includeOriginalSql", event.target.value as IncludeOriginalSql)}><option value="none">Don't Include</option><option value="comment">As Comment</option><option value="top">At Top</option></select></label>
+          <label className={label}>Row Comment Identifier<input className={input} value={options.rowCommentIdentifier} onChange={(event) => update("rowCommentIdentifier", event.target.value)} /></label>
+        </div>
+      );
+    }
+    if (options.outputFormat === "html") {
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          <label className={label}>Title<input className={input} value={options.htmlTitle} onChange={(event) => update("htmlTitle", event.target.value)} /></label>
+          <label className={`${label} col-span-2`}>Description<input className={input} value={options.htmlDescription} onChange={(event) => update("htmlDescription", event.target.value)} /></label>
+          <label className={label}>Footer<input className={input} value={options.htmlFooter} onChange={(event) => update("htmlFooter", event.target.value)} /></label>
+          <label className={`${label} col-span-2`}>Per Table Header<input className={input} value={options.htmlPerTableHeader} onChange={(event) => update("htmlPerTableHeader", event.target.value)} /></label>
+          {bool("htmlConvertCharacters", "Convert HTML characters")}
+          {bool("useLabels", "Use any Label (Alias)")}
+          <label className={label}>Include Original SQL<select className={input} value={options.includeOriginalSql} onChange={(event) => update("includeOriginalSql", event.target.value as IncludeOriginalSql)}><option value="none">Don't Include</option><option value="comment">As Comment</option><option value="top">At Top</option></select></label>
+        </div>
+      );
+    }
+    if (options.outputFormat === "txt") {
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          <label className={label}>Spaces Between Columns<input className={input} type="number" min={1} value={options.txtSpacesBetweenColumns} onChange={(event) => update("txtSpacesBetweenColumns", Math.max(1, Number(event.target.value) || 1))} /></label>
+          <label className={label}>Row Delimiter<select className={input} value={options.rowDelimiter} onChange={(event) => update("rowDelimiter", event.target.value as RowDelimiter)}><option value={"\n"}>UNIX LF</option><option value={"\r\n"}>Windows CRLF</option><option value={"\r"}>Mac CR</option></select></label>
+          {bool("includeColumnNames", "Include Column Names")}
+          {bool("useLabels", "Use any Label (Alias)")}
+          {bool("removeNewlines", "Remove Newline Characters")}
+          <label className={label}>Include Original SQL<select className={input} value={options.includeOriginalSql} onChange={(event) => update("includeOriginalSql", event.target.value as IncludeOriginalSql)}><option value="none">Don't Include</option><option value="comment">As Comment</option><option value="top">At Top</option></select></label>
+        </div>
+      );
+    }
+    if (options.outputFormat === "sql") {
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          {bool("sqlUseQualifier", "Use Qualifier")}
+          <label className={label}>Qualifier<input className={input} value={options.sqlQualifier} onChange={(event) => update("sqlQualifier", event.target.value)} /></label>
+          <label className={label}>Table Name<input className={input} value={options.sqlTableName} onChange={(event) => update("sqlTableName", event.target.value)} /></label>
+          <label className={label}>Delimiters<select className={input} value={options.sqlDelimiterMode} onChange={(event) => update("sqlDelimiterMode", event.target.value as SqlDelimiterMode)}><option value="none">None</option><option value="double">Double Quote</option><option value="backtick">Backtick</option><option value="bracket">Bracket</option></select></label>
+          <label className={label}>Statement Separator<input className={input} value={options.sqlStatementSeparator} onChange={(event) => update("sqlStatementSeparator", event.target.value)} /></label>
+          {bool("sqlIncludeBasicDdl", "Include Basic DDL")}
+          <label className={label}>Include Original SQL<select className={input} value={options.includeOriginalSql} onChange={(event) => update("includeOriginalSql", event.target.value as IncludeOriginalSql)}><option value="none">Don't Include</option><option value="comment">As Comment</option><option value="top">At Top</option></select></label>
+          <label className={label}>Row Comment Identifier<input className={input} value={options.rowCommentIdentifier} onChange={(event) => update("rowCommentIdentifier", event.target.value)} /></label>
+          <label className={label}>Add Before<input className={input} value={options.sqlAddBefore} onChange={(event) => update("sqlAddBefore", event.target.value)} /></label>
+          <label className={label}>Add After<input className={input} value={options.sqlAddAfter} onChange={(event) => update("sqlAddAfter", event.target.value)} /></label>
+          {bool("sqlGenerateMultiRow", "Generate Multi-Row INSERT statements")}
+          <label className={label}>Rows per Multi-Row INSERT<input className={input} type="number" min={1} value={options.sqlRowsPerMultiRow} onChange={(event) => update("sqlRowsPerMultiRow", Math.max(1, Number(event.target.value) || 1))} /></label>
+          <label className={label}>Type<select className={input} value={options.sqlMultiRowType} onChange={(event) => update("sqlMultiRowType", event.target.value as ExportOptions["sqlMultiRowType"])}><option value="multi-insert-sql92">multi-insert-sql92</option></select></label>
+          {bool("sqlGenerateMerge", "Generate MERGE statements")}
+          <label className={label}>Merge Type<select className={input} value={options.sqlMergeType} onChange={(event) => update("sqlMergeType", event.target.value as ExportOptions["sqlMergeType"])}><option value="single-merge-sql92">single-merge-sql92</option></select></label>
+          <label className={`${label} col-span-2`}>The columns to use when matching rows<input className={input} value={options.sqlMergeMatchColumns} onChange={(event) => update("sqlMergeMatchColumns", event.target.value)} /></label>
+        </div>
+      );
+    }
+    if (options.outputFormat === "xml") {
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          <label className={label}>XML Style<select className={input} value={options.xmlStyle} onChange={(event) => update("xmlStyle", event.target.value as ExportOptions["xmlStyle"])}><option value="dbvis">DbVisualizer</option><option value="flat">Flat Elements</option></select></label>
+          <label className={`${label} col-span-2`}>Description<input className={input} value={options.xmlDescription} onChange={(event) => update("xmlDescription", event.target.value)} /></label>
+          <label className={label}>Include Original SQL<select className={input} value={options.includeOriginalSql} onChange={(event) => update("includeOriginalSql", event.target.value as IncludeOriginalSql)}><option value="none">Don't Include</option><option value="comment">As Comment</option><option value="top">At Top</option></select></label>
+          {bool("useLabels", "Use any Label (Alias)")}
+        </div>
+      );
+    }
+    if (options.outputFormat === "excel") {
+      return (
+        <div className="grid grid-cols-4 gap-2">
+          <label className={label}>File Format<select className={input} value={options.excelFileFormat} onChange={(event) => update("excelFileFormat", event.target.value as ExportOptions["excelFileFormat"])}><option value="xlsx">XLSX</option><option value="xls">XLS</option></select></label>
+          <label className={label}>Title<input className={input} value={options.excelTitle} onChange={(event) => update("excelTitle", event.target.value)} /></label>
+          <label className={label}>Description<input className={input} value={options.excelDescription} onChange={(event) => update("excelDescription", event.target.value)} /></label>
+          <label className={label}>Sheet Name<input className={input} value={options.excelSheetName} onChange={(event) => update("excelSheetName", event.target.value)} /></label>
+          {bool("includeColumnNames", "Include Column Names")}
+          {bool("useLabels", "Use any Label (Alias)")}
+          {bool("excelExportNumberAsText", "Export Number as Text")}
+          {bool("excelExportDateTimeAsText", "Export Date/Time as Text")}
+          {bool("excelAutoResizeColumns", "Auto Resize Columns")}
+          <label className={label}>Include Original SQL<select className={input} value={options.includeOriginalSql} onChange={(event) => update("includeOriginalSql", event.target.value as IncludeOriginalSql)}><option value="none">None</option><option value="comment">As Comment</option><option value="top">At Top</option></select></label>
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-4 gap-2">
+        <label className={label}>JSON Style<select className={input} value={options.jsonStyle} onChange={(event) => update("jsonStyle", event.target.value as ExportOptions["jsonStyle"])}><option value="array">Array</option><option value="object">Object with rows</option></select></label>
+        {bool("useLabels", "Use any Label (Alias)")}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45" onMouseDown={onClose}>
+      <div
+        className="w-[920px] max-w-[calc(100vw-24px)] h-[min(760px,calc(100vh-24px))] flex flex-col rounded shadow-xl"
+        style={{ background: "var(--moba-panel-bg)", border: "1px solid var(--moba-divider)", color: "var(--moba-text)" }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="h-11 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
+          <Download className="w-4 h-4" />
+          <div className="font-semibold text-[13px]">Export Grid</div>
+          <div className="ml-3 flex items-center gap-1 text-[11px]">
+            {["Format", "Columns", "Output"].map((name, index) => (
+              <button key={name} type="button" className="h-6 px-2 rounded" style={{ background: step === index ? "var(--moba-selected)" : "transparent", color: step === index ? "var(--moba-accent)" : "var(--moba-text-muted)" }} onClick={() => setStep(index)}>{index + 1}. {name}</button>
+            ))}
+          </div>
+          <div className="ml-auto text-[11px] text-[var(--moba-text-muted)]">{target === "selection" ? "Selection" : "All visible rows"}: {rowCount} / Total Rows in Grid: {totalRows}</div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-3">
+          {step === 0 && (
+            <div className="space-y-3">
+              <section>
+                <div className={sectionTitle}>Output Format</div>
+                <div className="grid grid-cols-4 gap-2">
+                  <label className={label}>Output Format<select className={input} value={options.outputFormat} onChange={(event) => update("outputFormat", event.target.value as OutputFormat)}><option value="csv">CSV</option><option value="html">HTML</option><option value="txt">TXT</option><option value="sql">SQL</option><option value="xml">XML</option><option value="excel">Excel</option><option value="json">JSON</option></select></label>
+                  <label className={label}>Encoding<select className={input} value={options.encoding} onChange={(event) => update("encoding", event.target.value as Encoding)}><option value="utf-8">UTF-8</option><option value="utf-8-bom">UTF-8 BOM</option><option value="utf-16le">UTF-16 LE</option></select></label>
+                  <label className={label}>Max Rows<input className={input} type="number" min={0} value={options.maxRows} onChange={(event) => update("maxRows", Math.max(0, Number(event.target.value) || 0))} /></label>
+                </div>
+              </section>
+              <section>
+                <div className={sectionTitle}>Data Format</div>
+                <div className="grid grid-cols-4 gap-2">
+                  <label className={label}>Date<input className={input} value={options.dateFormat} onChange={(event) => update("dateFormat", event.target.value)} /></label>
+                  <label className={label}>Time<input className={input} value={options.timeFormat} onChange={(event) => update("timeFormat", event.target.value)} /></label>
+                  <label className={label}>Timestamp<input className={input} value={options.timestampFormat} onChange={(event) => update("timestampFormat", event.target.value)} /></label>
+                  <label className={label}>Text Function<select className={input} value={options.textFunction} onChange={(event) => update("textFunction", event.target.value as TextFunction)}><option value="none">None</option><option value="upper">Upper case</option><option value="lower">Lower case</option><option value="trim">Trim</option></select></label>
+                  <label className={label}>Number<select className={input} value={options.numberFormat} onChange={(event) => update("numberFormat", event.target.value as ExportOptions["numberFormat"])}><option value="unformatted">Unformatted</option><option value="grouped">Custom separators</option></select></label>
+                  <label className={label}>Decimal Number<select className={input} value={options.decimalFormat} onChange={(event) => update("decimalFormat", event.target.value as ExportOptions["decimalFormat"])}><option value="unformatted">Unformatted</option><option value="grouped">Custom separators</option></select></label>
+                  <label className={label}>Grouping Separator<input className={input} value={options.groupSeparator} onChange={(event) => update("groupSeparator", event.target.value)} /></label>
+                  <label className={label}>Decimal Separator<input className={input} value={options.decimalSeparator} onChange={(event) => update("decimalSeparator", event.target.value)} /></label>
+                  <label className={label}>Boolean True<input className={input} value={options.booleanTrueText} onChange={(event) => update("booleanTrueText", event.target.value)} /></label>
+                  <label className={label}>Boolean False<input className={input} value={options.booleanFalseText} onChange={(event) => update("booleanFalseText", event.target.value)} /></label>
+                  <label className={label}>Binary/BLOB<select className={input} value={options.binaryMode} onChange={(event) => update("binaryMode", event.target.value as ExportOptions["binaryMode"])}><option value="dont">Don't Export</option><option value="text">Export Text</option><option value="length">Length Text</option></select></label>
+                  <label className={label}>CLOB<select className={input} value={options.clobMode} onChange={(event) => update("clobMode", event.target.value as ExportOptions["clobMode"])}><option value="dont">Don't Export</option><option value="text">Export Text</option></select></label>
+                  <label className={label}>Null Value Text<input className={input} value={options.nullValueText} onChange={(event) => update("nullValueText", event.target.value)} /></label>
+                  <label className={label}>Quote Text Value<select className={input} value={options.quoteTextValue} onChange={(event) => update("quoteTextValue", event.target.value as QuoteMode)}><option value="single">Single</option><option value="double">Double</option><option value="none">None</option></select></label>
+                  {bool("duplicateEmbedded", "Duplicate Embedded")}
+                  {bool("quoteAllValues", "Quote All Values")}
+                </div>
+              </section>
+              <section>
+                <div className={sectionTitle}>Options</div>
+                {formatOptionFields()}
+              </section>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="h-full min-h-[420px] grid grid-cols-[1fr_150px] gap-3">
+              <div className="min-w-0 overflow-auto moba-scroll-y" style={{ border: "1px solid var(--moba-divider)" }}>
+                <div className="min-w-[860px] grid grid-cols-[54px_160px_180px_120px_70px_130px_1fr] text-[11px]" style={{ borderBottom: "1px solid var(--moba-divider)" }}>
+                  {["Export", "Name", "Label (Alias)", "Type", "Is Text", "Text Function", "Value"].map((head) => <div key={head} className="px-2 py-1 font-semibold" style={{ borderRight: "1px solid var(--moba-divider)" }}>{head}</div>)}
+                  {columns.map((column) => (
+                    <div key={column.id} className="contents">
+                      <label className="px-2 py-1"><input type="checkbox" checked={column.export} onChange={(event) => updateColumn(column.id, { export: event.target.checked })} /></label>
+                      <div className="px-2 py-1 truncate">{column.name}</div>
+                      <div className="px-1 py-1"><input className="moba-input h-6 w-full text-[11px]" value={column.label} onChange={(event) => updateColumn(column.id, { label: event.target.value })} /></div>
+                      <div className="px-2 py-1 truncate">{column.type}</div>
+                      <label className="px-2 py-1"><input type="checkbox" checked={column.isText} onChange={(event) => updateColumn(column.id, { isText: event.target.checked })} /></label>
+                      <div className="px-1 py-1"><select className="moba-input h-6 w-full text-[11px]" value={column.textFunction} onChange={(event) => updateColumn(column.id, { textFunction: event.target.value as TextFunction })}><option value="none">None</option><option value="upper">Upper case</option><option value="lower">Lower case</option><option value="trim">Trim</option></select></div>
+                      <div className="px-1 py-1"><input className="moba-input h-6 w-full text-[11px]" value={column.valueTemplate} onChange={(event) => updateColumn(column.id, { valueTemplate: event.target.value })} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <button type="button" className="moba-btn w-full" onClick={() => onColumnsChange([...columns, { id: nextRowId("export-col"), export: true, name: `custom_${columns.length + 1}`, label: `custom_${columns.length + 1}`, type: "String", isText: true, textFunction: "none", valueTemplate: "" }])}>+ Add Column</button>
+                <button type="button" className="moba-btn w-full" onClick={() => onColumnsChange(columns.map((column) => ({ ...column, export: true })))}>Select All</button>
+                <button type="button" className="moba-btn w-full" onClick={() => onColumnsChange(columns.map((column) => ({ ...column, export: false })))}>Select None</button>
+                {columns.map((column) => (
+                  <div key={column.id} className="flex gap-1">
+                    <button type="button" className="moba-btn flex-1 truncate" onClick={() => moveColumn(column.id, -1)}>Up</button>
+                    <button type="button" className="moba-btn flex-1 truncate" onClick={() => moveColumn(column.id, 1)}>Down</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-3 text-[12px]">
+              <label className="flex items-center gap-2"><input type="radio" checked={destination.kind === "file"} onChange={() => setDestination((current) => ({ ...current, kind: "file" }))} />File</label>
+              {destination.kind === "file" && (
+                <div className="grid grid-cols-[1fr_130px] gap-2">
+                  <input className={input} value={destination.filePath} onChange={(event) => setDestination((current) => ({ ...current, filePath: event.target.value }))} placeholder="Output file path" />
+                  <button type="button" className="moba-btn inline-flex items-center justify-center gap-1" onClick={() => void chooseFilePath()}><FolderOpen className="w-3.5 h-3.5" />Browse</button>
+                  <select className={`${input} col-span-2`} value="" onChange={(event) => event.target.value && setDestination((current) => ({ ...current, filePath: event.target.value }))}>
+                    <option value="">History</option>
+                    {fileHistory.map((path) => <option key={path} value={path}>{path}</option>)}
+                  </select>
+                </div>
+              )}
+              <label className="flex items-center gap-2"><input type="radio" checked={destination.kind === "sqlCommander"} onChange={() => setDestination((current) => ({ ...current, kind: "sqlCommander" }))} />SQL Commander</label>
+              {destination.kind === "sqlCommander" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={label}>Editor<select className={input} value={destination.sqlCommanderTabId} onChange={(event) => setDestination((current) => ({ ...current, sqlCommanderTabId: event.target.value }))}><option value="new">New Editor</option><option value="active">Active Editor</option>{queryTabs.map((tab) => <option key={tab.tabId} value={tab.tabId}>{tab.title}</option>)}</select></label>
+                  <label className={label}>Insert Position<select className={input} value={destination.sqlCommanderPosition} onChange={(event) => setDestination((current) => ({ ...current, sqlCommanderPosition: event.target.value as SqlCommanderPosition }))}><option value="caret">At Caret</option><option value="first">First</option><option value="last">Last</option><option value="replaceAll">Replace All</option></select></label>
+                </div>
+              )}
+              <label className="flex items-center gap-2"><input type="radio" checked={destination.kind === "clipboard"} onChange={() => setDestination((current) => ({ ...current, kind: "clipboard" }))} />Clipboard</label>
+            </div>
+          )}
+        </div>
+
+        <div className="relative h-11 flex items-center gap-2 px-3" style={{ borderTop: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
+          <button type="button" className="moba-btn inline-flex items-center gap-1" onClick={() => setSettingsOpen((value) => !value)}><FileText className="w-3.5 h-3.5" />Settings</button>
+          {settingsOpen && (
+            <div className="absolute left-3 bottom-10 z-10 min-w-[230px] rounded shadow-lg p-1 text-[12px]" style={{ background: "var(--moba-panel-bg)", border: "1px solid var(--moba-divider)" }}>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={saveDefaultSettings}>Save As Default Settings</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={useDefaultSettings}>Use Default Settings</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={removeDefaultSettings}>Remove Default Settings</button>
+              <div className="my-1 h-px" style={{ background: "var(--moba-divider)" }} />
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={() => void loadSettings()}>Load...</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={() => void saveSettingsAs()}>Save As...</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={() => void copySettings()}>Copy Settings to Clipboard</button>
+            </div>
+          )}
+          <div className="flex-1" />
+          <button type="button" className="moba-btn inline-flex items-center gap-1" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}><ArrowLeft className="w-3.5 h-3.5" />Back</button>
+          {step < 2 ? (
+            <button type="button" className="moba-btn inline-flex items-center gap-1" data-primary="true" onClick={() => setStep((value) => Math.min(2, value + 1))}>Next<ArrowRight className="w-3.5 h-3.5" /></button>
+          ) : (
+            <button type="button" className="moba-btn inline-flex items-center gap-1" data-primary="true" onClick={() => onExport(options, columns, destination)}><Check className="w-3.5 h-3.5" />Export</button>
+          )}
+          <button type="button" className="moba-btn" onClick={onClose}>Cancel</button>
         </div>
       </div>
-      {menu}
     </div>
   );
 }

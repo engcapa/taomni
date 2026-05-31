@@ -364,6 +364,10 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       writeStreams.delete(handleId);
       return undefined as T;
     }
+    case "temporary_file_path": {
+      const defaultName = ((args as InvokeArgs)?.defaultName as string | undefined) || "query-results.dat";
+      return `/tmp/newmob/query-results/${Date.now()}-${defaultName.replace(/[\\/:*?"<>|]/g, "_")}` as T;
+    }
     case "create_local_terminal": {
       throw new Error(
         "Local terminal is not available in browser preview. Use the Quick connect bar or 'New session' to open an SSH connection (e.g. demo@test.rebex.net).",

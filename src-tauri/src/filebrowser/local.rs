@@ -166,26 +166,71 @@ pub fn dir_size(path: &Path) -> Result<u64, String> {
 }
 
 pub fn open_path(path: &Path) -> Result<(), String> {
-    let cmd: (&str, Vec<&str>);
+    if !path.exists() {
+        return Err(format!("Path does not exist: {}", path.display()));
+    }
+    open_path_platform(path)
+}
+
+#[cfg(target_os = "windows")]
+fn open_path_platform(path: &Path) -> Result<(), String> {
     let path_str = path.to_string_lossy().to_string();
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use std::ptr;
+    use winapi::um::shellapi::ShellExecuteW;
+    use winapi::um::winuser::SW_SHOWNORMAL;
+
+    let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
+    let file: Vec<u16> = OsStr::new(&path_str).encode_wide().chain(Some(0)).collect();
+    let result = unsafe {
+        ShellExecuteW(
+            ptr::null_mut(),
+            operation.as_ptr(),
+            file.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    } as isize;
+    if result <= 32 {
+        return Err(format!(
+            "No default application could open {} (ShellExecute error {})",
+            path.display(),
+            result
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn open_path_platform(path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_string();
+
+    let cmd: (&str, Vec<&str>);
     #[cfg(target_os = "macos")]
     {
         cmd = ("open", vec![path_str.as_str()]);
-    }
-    #[cfg(target_os = "windows")]
-    {
-        cmd = ("cmd", vec!["/c", "start", "", path_str.as_str()]);
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         cmd = ("xdg-open", vec![path_str.as_str()]);
     }
 
-    std::process::Command::new(cmd.0)
+    let status = std::process::Command::new(cmd.0)
         .args(&cmd.1)
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| format!("Failed to open {}: {}", path.display(), e))
+        .status()
+        .map_err(|e| format!("Failed to open {}: {}", path.display(), e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "No default application could open {} ({} exited with {})",
+            path.display(),
+            cmd.0,
+            status
+        ))
+    }
 }
 
 fn entry_for(path: &Path) -> Result<FileEntryDto, String> {
