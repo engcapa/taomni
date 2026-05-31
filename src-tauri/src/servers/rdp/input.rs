@@ -21,6 +21,8 @@
 //!
 //! `view_only` short-circuits all injection.
 
+use std::sync::Mutex;
+
 use enigo::{
     Axis, Button, Coordinate,
     Direction::{Press, Release},
@@ -35,7 +37,9 @@ pub(crate) struct RdpInput {
     view_only: bool,
     /// `None` if enigo failed to initialize (no display / no permission); we log
     /// once and then silently drop input rather than spamming.
-    enigo: Option<Enigo>,
+    /// Wrapped in `Mutex` because `Enigo` on macOS holds a `CGEventSource`
+    /// (`NonNull<…>`) which is not `Send`, but `RdpServerInputHandler` requires it.
+    enigo: Option<Mutex<Enigo>>,
     warned: bool,
 }
 
@@ -45,7 +49,7 @@ impl RdpInput {
             None
         } else {
             match Enigo::new(&Settings::default()) {
-                Ok(e) => Some(e),
+                Ok(e) => Some(Mutex::new(e)),
                 Err(e) => {
                     log.line(format!(
                         "input injection unavailable ({}); connection will be view-only",
@@ -63,40 +67,45 @@ impl RdpInput {
         }
     }
 
-    fn enigo(&mut self) -> Option<&mut Enigo> {
-        if self.view_only {
-            return None;
-        }
-        if self.enigo.is_none() && !self.warned {
+    fn warn_if_missing(&mut self) {
+        if !self.view_only && self.enigo.is_none() && !self.warned {
             self.warned = true;
             self.log.line("input dropped: no injection backend");
         }
-        self.enigo.as_mut()
+    }
+
+    fn with_enigo<F: FnOnce(&mut Enigo)>(&mut self, f: F) {
+        if self.view_only {
+            return;
+        }
+        self.warn_if_missing();
+        if let Some(m) = &self.enigo {
+            f(&mut m.lock().unwrap());
+        }
     }
 }
 
 impl RdpServerInputHandler for RdpInput {
     fn keyboard(&mut self, event: KeyboardEvent) {
-        let Some(enigo) = self.enigo() else { return };
         match event {
             KeyboardEvent::Pressed { code, extended } => {
                 if let Some(raw) = rdp_scancode_to_raw(code, extended) {
-                    let _ = enigo.raw(raw, Press);
+                    self.with_enigo(|e| { let _ = e.raw(raw, Press); });
                 }
             }
             KeyboardEvent::Released { code, extended } => {
                 if let Some(raw) = rdp_scancode_to_raw(code, extended) {
-                    let _ = enigo.raw(raw, Release);
+                    self.with_enigo(|e| { let _ = e.raw(raw, Release); });
                 }
             }
             KeyboardEvent::UnicodePressed(c) => {
                 if let Some(ch) = char::from_u32(u32::from(c)) {
-                    let _ = enigo.key(enigo::Key::Unicode(ch), Press);
+                    self.with_enigo(|e| { let _ = e.key(enigo::Key::Unicode(ch), Press); });
                 }
             }
             KeyboardEvent::UnicodeReleased(c) => {
                 if let Some(ch) = char::from_u32(u32::from(c)) {
-                    let _ = enigo.key(enigo::Key::Unicode(ch), Release);
+                    self.with_enigo(|e| { let _ = e.key(enigo::Key::Unicode(ch), Release); });
                 }
             }
             KeyboardEvent::Synchronize(_flags) => {
@@ -107,83 +116,68 @@ impl RdpServerInputHandler for RdpInput {
     }
 
     fn mouse(&mut self, event: MouseEvent) {
-        let Some(enigo) = self.enigo() else { return };
         match event {
             MouseEvent::Move { x, y } => {
-                let _ = enigo.move_mouse(i32::from(x), i32::from(y), Coordinate::Abs);
+                self.with_enigo(|e| { let _ = e.move_mouse(i32::from(x), i32::from(y), Coordinate::Abs); });
             }
             MouseEvent::LeftPressed => {
-                let _ = enigo.button(Button::Left, Press);
+                self.with_enigo(|e| { let _ = e.button(Button::Left, Press); });
             }
             MouseEvent::LeftReleased => {
-                let _ = enigo.button(Button::Left, Release);
+                self.with_enigo(|e| { let _ = e.button(Button::Left, Release); });
             }
             MouseEvent::RightPressed => {
-                let _ = enigo.button(Button::Right, Press);
+                self.with_enigo(|e| { let _ = e.button(Button::Right, Press); });
             }
             MouseEvent::RightReleased => {
-                let _ = enigo.button(Button::Right, Release);
+                self.with_enigo(|e| { let _ = e.button(Button::Right, Release); });
             }
             MouseEvent::MiddlePressed => {
-                let _ = enigo.button(Button::Middle, Press);
+                self.with_enigo(|e| { let _ = e.button(Button::Middle, Press); });
             }
             MouseEvent::MiddleReleased => {
-                let _ = enigo.button(Button::Middle, Release);
+                self.with_enigo(|e| { let _ = e.button(Button::Middle, Release); });
             }
             MouseEvent::Button4Pressed => {
                 // `Button::Back`/`Forward` don't exist on macOS in enigo 0.3.
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                {
-                    let _ = enigo.button(Button::Back, Press);
-                }
+                self.with_enigo(|e| { let _ = e.button(Button::Back, Press); });
             }
             MouseEvent::Button4Released => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                {
-                    let _ = enigo.button(Button::Back, Release);
-                }
+                self.with_enigo(|e| { let _ = e.button(Button::Back, Release); });
             }
             MouseEvent::Button5Pressed => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                {
-                    let _ = enigo.button(Button::Forward, Press);
-                }
+                self.with_enigo(|e| { let _ = e.button(Button::Forward, Press); });
             }
             MouseEvent::Button5Released => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                {
-                    let _ = enigo.button(Button::Forward, Release);
-                }
+                self.with_enigo(|e| { let _ = e.button(Button::Forward, Release); });
             }
             MouseEvent::VerticalScroll { value } => {
                 // RDP wheel units are 120 per notch; positive = up. enigo's
                 // `scroll` uses positive = down, so invert and normalize.
                 let notches = -(i32::from(value) / 120);
                 let notches = if notches == 0 {
-                    if value > 0 {
-                        -1
-                    } else if value < 0 {
-                        1
-                    } else {
-                        0
-                    }
+                    if value > 0 { -1 } else if value < 0 { 1 } else { 0 }
                 } else {
                     notches
                 };
                 if notches != 0 {
-                    let _ = enigo.scroll(notches, Axis::Vertical);
+                    self.with_enigo(|e| { let _ = e.scroll(notches, Axis::Vertical); });
                 }
             }
             MouseEvent::Scroll { x, y } => {
                 if x != 0 {
-                    let _ = enigo.scroll(x, Axis::Horizontal);
+                    self.with_enigo(|e| { let _ = e.scroll(x, Axis::Horizontal); });
                 }
                 if y != 0 {
-                    let _ = enigo.scroll(y, Axis::Vertical);
+                    self.with_enigo(|e| { let _ = e.scroll(y, Axis::Vertical); });
                 }
             }
             MouseEvent::RelMove { x, y } => {
-                let _ = enigo.move_mouse(x, y, Coordinate::Rel);
+                self.with_enigo(|e| { let _ = e.move_mouse(x, y, Coordinate::Rel); });
             }
         }
     }
