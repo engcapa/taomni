@@ -216,6 +216,30 @@ pub fn check_file_exists(path: String) -> bool {
 }
 
 #[tauri::command]
+pub fn temporary_file_path(default_name: String) -> Result<String, String> {
+    let mut dir = std::env::temp_dir();
+    dir.push("newmob");
+    dir.push("query-results");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create temporary export directory: {}", e))?;
+
+    let safe_name = default_name
+        .chars()
+        .map(|ch| match ch {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => ch,
+        })
+        .collect::<String>();
+    let name = if safe_name.trim().is_empty() {
+        "query-results.dat".to_string()
+    } else {
+        safe_name
+    };
+    dir.push(format!("{}-{}", uuid::Uuid::new_v4(), name));
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn clipboard_read_text(state: State<'_, AppState>) -> Result<String, String> {
     let mut guard = state
         .clipboard

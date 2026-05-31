@@ -18,6 +18,7 @@ import {
   FileText,
   Share2,
   Star,
+  Database,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
@@ -1521,6 +1522,14 @@ function sessionIcon(type: string) {
       return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#0078d4" }} />;
     case "LocalShell":
       return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#62d36f" }} />;
+    case "MySQL":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#00758f" }} />;
+    case "PostgreSQL":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#336791" }} />;
+    case "ClickHouse":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />;
+    case "Redis":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#d82c20" }} />;
     case "File":
       return <FileText className="w-3.5 h-3.5" style={{ color: "var(--moba-text-muted)" }} />;
     default:

@@ -2,7 +2,7 @@
 //!
 //! The original SFTP detach feature used a dedicated
 //! `filebrowser::open_sftp_window` command. We now serve every kind of
-//! detached session (sftp, rdp, vnc, terminal) through a single
+//! detached session (sftp, rdp, vnc, terminal, database) through a single
 //! `open_detached_window` command that carries a `kind` argument and
 //! constructs the window label / URL fragment accordingly.
 //!
@@ -19,6 +19,7 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
     match kind {
         "rdp" | "vnc" => (1280.0, 800.0, 800.0, 480.0),
         "terminal" => (1024.0, 680.0, 640.0, 360.0),
+        "database" => (1280.0, 820.0, 780.0, 480.0),
         // SFTP keeps its historical default so existing user layouts
         // don't shift after the migration.
         "sftp" => (1200.0, 760.0, 720.0, 420.0),
@@ -36,7 +37,7 @@ fn label_for(kind: &str, session_id: &str) -> String {
 
 fn validate_kind(kind: &str) -> Result<(), String> {
     match kind {
-        "sftp" | "rdp" | "vnc" | "terminal" => Ok(()),
+        "sftp" | "rdp" | "vnc" | "terminal" | "database" => Ok(()),
         other => Err(format!("unsupported detached window kind: {}", other)),
     }
 }
@@ -79,6 +80,7 @@ pub async fn open_detached_window(
         "rdp" => format!("RDP — {}", session_id),
         "vnc" => format!("VNC — {}", session_id),
         "terminal" => format!("Terminal — {}", session_id),
+        "database" => format!("Database — {}", session_id),
         _ => session_id.clone(),
     });
     let (default_w, default_h, min_w, min_h) = default_size(&kind);

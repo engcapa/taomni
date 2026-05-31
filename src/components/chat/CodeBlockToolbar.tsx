@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Send, Check, Square, CheckSquare } from "lucide-react";
+import { Check, CheckSquare, Copy, Database, Send, Square } from "lucide-react";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
   getTerminal,
   listTerminals,
   type TerminalRegistryEntry,
 } from "../../lib/terminal/terminalRegistry";
+import {
+  getQueryTab,
+  listQueryTabs,
+  type QueryRegistryEntry,
+} from "../../lib/queryRegistry";
 import { useAppStore } from "../../stores/appStore";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
@@ -20,6 +25,8 @@ interface CodeBlockToolbarProps {
    * back to the currently focused terminal panel.
    */
   preferredTabId?: string | null;
+  /** Query tab preferred by the parent thread, when chat is DB-tab bound. */
+  preferredQueryTabId?: string | null;
 }
 
 /**
@@ -33,7 +40,12 @@ interface CodeBlockToolbarProps {
  * The component renders the code block itself (in addition to the toolbar)
  * so we can interleave per-line checkboxes with the original syntax.
  */
-export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolbarProps) {
+export function CodeBlockToolbar({
+  code,
+  lang,
+  preferredTabId,
+  preferredQueryTabId,
+}: CodeBlockToolbarProps) {
   const t = useT();
   const lines = useMemo(() => code.split("\n"), [code]);
   const lineMeta = useMemo(
@@ -47,6 +59,7 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sentQuery, setSentQuery] = useState(false);
   const [pendingSend, setPendingSend] = useState<PendingTerminalSend | null>(null);
   // Track the focused terminal tab through the appStore so this toolbar
   // re-targets the moment the user switches tabs (the registry itself is
@@ -94,6 +107,20 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
     return null;
   }, [preferredTabId, activeTabId, activeTabType, tick]);
 
+  const queryTargetEntry = useMemo<QueryRegistryEntry | null>(() => {
+    void tick; // force re-evaluation when DB tabs register/unregister
+    if (preferredQueryTabId) {
+      const e = getQueryTab(preferredQueryTabId);
+      if (e) return e;
+    }
+    if (activeTabType === "database" && activeTabId) {
+      const e = getQueryTab(activeTabId);
+      if (e) return e;
+    }
+    const all = listQueryTabs();
+    return all.length === 1 ? all[0] : null;
+  }, [preferredQueryTabId, activeTabId, activeTabType, tick]);
+
   const buildPayload = (): string => {
     if (!selecting) return code;
     return lines
@@ -126,6 +153,15 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
       return;
     }
     commitTerminalSend(entry, payload);
+  };
+
+  const handleSendToQuery = (entry: QueryRegistryEntry | null = queryTargetEntry) => {
+    if (!entry) return;
+    const payload = prepareQueryInput(buildPayload());
+    if (!payload) return;
+    entry.insertQuery(payload);
+    setSentQuery(true);
+    window.setTimeout(() => setSentQuery(false), 1200);
   };
 
   const selectableCount = lineMeta.filter((line) => line.selectable).length;
@@ -166,6 +202,13 @@ export function CodeBlockToolbar({ code, lang, preferredTabId }: CodeBlockToolba
           disabled={selecting && selectedSelectableCount === 0}
           sent={sent}
           onSend={handleSendToTerminal}
+          t={t}
+        />
+        <SendToQueryButton
+          targetEntry={queryTargetEntry}
+          disabled={selecting && selectedSelectableCount === 0}
+          sent={sentQuery}
+          onSend={handleSendToQuery}
           t={t}
         />
       </div>
@@ -336,6 +379,14 @@ export function prepareTerminalInput(payload: string): PreparedTerminalInput | n
   };
 }
 
+export function prepareQueryInput(payload: string): string | null {
+  const normalized = payload
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n+$/g, "");
+  return normalized.trim() ? normalized : null;
+}
+
 interface SendToTerminalButtonProps {
   targetEntry: TerminalRegistryEntry | null;
   disabled: boolean;
@@ -414,6 +465,90 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
             >
               <span className="truncate">{t.title}</span>
               {targetEntry?.tabId === t.tabId && (
+                <span className="ml-1 text-[var(--moba-accent)]">★</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SendToQueryButtonProps {
+  targetEntry: QueryRegistryEntry | null;
+  disabled: boolean;
+  sent: boolean;
+  onSend: (entry: QueryRegistryEntry | null) => void;
+  t: TranslateFn;
+}
+
+function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQueryButtonProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const allQueries = listQueryTabs();
+  if (allQueries.length === 0) return null;
+  const effectiveTarget = targetEntry ?? (allQueries.length === 1 ? allQueries[0] : null);
+  const hasOptions = allQueries.length > 1;
+  const baseDisabled = !effectiveTarget || disabled;
+
+  if (!hasOptions) {
+    return (
+      <button
+        type="button"
+        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-selected)] text-[var(--moba-text)] border border-[var(--moba-divider)] hover:bg-[var(--moba-hover)]"
+        onClick={() => onSend(effectiveTarget)}
+        disabled={baseDisabled}
+        title={
+          effectiveTarget
+            ? t("chat.codeSendQueryTargetTitle", { target: effectiveTarget.title })
+            : t("chat.codeSendQueryNoTarget")
+        }
+      >
+        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Database className="w-2.5 h-2.5" />}
+        <span>{t("chat.codeSendToQuery")}</span>
+      </button>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-selected)] text-[var(--moba-text)] border border-[var(--moba-divider)] hover:bg-[var(--moba-hover)]"
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        title={t("chat.codeSendQueryPickTitle")}
+      >
+        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Database className="w-2.5 h-2.5" />}
+        <span>{t("chat.codeSendToQueryDropdown")}</span>
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-30 min-w-[180px] rounded border border-[var(--moba-divider)] shadow-lg"
+          style={{ background: "var(--moba-panel-bg)" }}
+        >
+          {allQueries.map((query) => (
+            <button
+              key={query.tabId}
+              type="button"
+              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--moba-selected)]"
+              onClick={() => {
+                onSend(query);
+                setOpen(false);
+              }}
+            >
+              <span className="truncate">{query.title}</span>
+              {effectiveTarget?.tabId === query.tabId && (
                 <span className="ml-1 text-[var(--moba-accent)]">★</span>
               )}
             </button>

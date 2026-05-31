@@ -33,12 +33,7 @@ import {
 export async function captureCanvasPng(
   canvas: HTMLCanvasElement,
 ): Promise<Blob> {
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("canvas.toBlob returned null"));
-    }, "image/png");
-  });
+  return await canvasToBlob(canvas);
 }
 
 /** Compose every <canvas> child of a container into one PNG. */
@@ -68,12 +63,366 @@ export async function captureContainerCanvasesPng(
       r.height,
     );
   }
-  return await new Promise<Blob>((resolve, reject) => {
-    out.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("canvas.toBlob returned null"));
-    }, "image/png");
+  return await canvasToBlob(out);
+}
+
+/** Capture a DOM element to PNG using an SVG foreignObject snapshot.
+ *  This is intended for regular DOM surfaces such as database grids. Canvas-
+ *  backed views should keep using their dedicated capture paths. */
+export async function captureElementPng(element: HTMLElement): Promise<Blob> {
+  return await canvasToBlob(await renderElementToCanvas(element));
+}
+
+/** Render a DOM element to a canvas frame, useful for visible screenshots,
+ *  manual scroll capture, and GIF frame sources. */
+export async function renderElementToCanvas(element: HTMLElement): Promise<HTMLCanvasElement> {
+  try {
+    const canvas = await renderElementToCanvasViaSvg(element);
+    assertCanvasReadable(canvas);
+    return canvas;
+  } catch {
+    // WebView2 can taint SVG foreignObject snapshots, which blocks toBlob().
+    return await renderElementToCanvasBasic(element);
+  }
+}
+
+function renderElementToCanvasViaSvg(element: HTMLElement): Promise<HTMLCanvasElement> {
+  const rect = element.getBoundingClientRect();
+  const width = Math.max(1, Math.ceil(rect.width));
+  const height = Math.max(1, Math.ceil(rect.height));
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  inlineComputedStyles(element, clone);
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.margin = "0";
+  clone.style.transform = "none";
+
+  const markup = new XMLSerializer().serializeToString(clone);
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`,
+    `<foreignObject width="100%" height="100%">${markup}</foreignObject>`,
+    "</svg>",
+  ].join("");
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  return (async () => {
+    const image = await loadImage(url);
+    const canvas = document.createElement("canvas");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2D context unavailable");
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = resolvedBackground(element);
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    return canvas;
+  })().finally(() => {
+    URL.revokeObjectURL(url);
   });
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to render DOM snapshot"));
+    image.src = url;
+  });
+}
+
+function inlineComputedStyles(source: Element, target: Element): void {
+  if (target instanceof HTMLElement || target instanceof SVGElement) {
+    const computed = window.getComputedStyle(source);
+    const style = (target as HTMLElement | SVGElement).style;
+    for (let i = 0; i < computed.length; i += 1) {
+      const property = computed.item(i);
+      style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+    }
+  }
+
+  if (source instanceof HTMLInputElement && target instanceof HTMLInputElement) {
+    target.setAttribute("value", source.value);
+    if (source.checked) target.setAttribute("checked", "checked");
+  } else if (source instanceof HTMLTextAreaElement && target instanceof HTMLTextAreaElement) {
+    target.textContent = source.value;
+  } else if (source instanceof HTMLSelectElement && target instanceof HTMLSelectElement) {
+    target.value = source.value;
+    Array.from(target.options).forEach((option) => {
+      if (option.value === source.value) option.setAttribute("selected", "selected");
+      else option.removeAttribute("selected");
+    });
+  }
+
+  const sourceChildren = Array.from(source.children);
+  const targetChildren = Array.from(target.children);
+  for (let i = 0; i < sourceChildren.length; i += 1) {
+    if (targetChildren[i]) inlineComputedStyles(sourceChildren[i], targetChildren[i]);
+  }
+}
+
+function resolvedBackground(element: HTMLElement): string {
+  let cursor: HTMLElement | null = element;
+  while (cursor) {
+    const color = window.getComputedStyle(cursor).backgroundColor;
+    if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+    cursor = cursor.parentElement;
+  }
+  return "#ffffff";
+}
+
+async function renderElementToCanvasBasic(element: HTMLElement): Promise<HTMLCanvasElement> {
+  try {
+    await document.fonts?.ready;
+  } catch {
+    /* Font readiness is best-effort for capture fallback. */
+  }
+
+  const rect = element.getBoundingClientRect();
+  const width = Math.max(1, Math.ceil(rect.width));
+  const height = Math.max(1, Math.ceil(rect.height));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * dpr));
+  canvas.height = Math.max(1, Math.round(height * dpr));
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D context unavailable");
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = resolvedBackground(element);
+  ctx.fillRect(0, 0, width, height);
+  drawDomNodeToCanvas(element, ctx, rect);
+  assertCanvasReadable(canvas);
+  return canvas;
+}
+
+function drawDomNodeToCanvas(
+  node: Node,
+  ctx: CanvasRenderingContext2D,
+  rootRect: DOMRect,
+): void {
+  if (node.nodeType === Node.TEXT_NODE) {
+    drawTextNodeToCanvas(node, ctx, rootRect);
+    return;
+  }
+  if (!(node instanceof Element)) return;
+  if (node instanceof SVGElement) return;
+
+  const style = window.getComputedStyle(node);
+  if (style.display === "none" || style.visibility === "hidden") return;
+
+  const rect = node.getBoundingClientRect();
+  if (!rectIntersectsRoot(rect, rootRect)) return;
+
+  ctx.save();
+  const opacity = Number(style.opacity);
+  if (Number.isFinite(opacity)) ctx.globalAlpha *= Math.max(0, Math.min(1, opacity));
+
+  drawElementBox(ctx, rect, rootRect, style);
+
+  const clipsOverflow =
+    style.overflow !== "visible" ||
+    style.overflowX !== "visible" ||
+    style.overflowY !== "visible";
+  if (clipsOverflow) {
+    clipRect(ctx, rect, rootRect);
+  }
+
+  drawFormControlValue(ctx, node, rect, rootRect, style);
+
+  node.childNodes.forEach((child) => drawDomNodeToCanvas(child, ctx, rootRect));
+  ctx.restore();
+}
+
+function drawTextNodeToCanvas(
+  node: Node,
+  ctx: CanvasRenderingContext2D,
+  rootRect: DOMRect,
+): void {
+  const raw = node.textContent ?? "";
+  if (!raw.trim()) return;
+  const parent = node.parentElement;
+  if (!parent) return;
+  const style = window.getComputedStyle(parent);
+  if (style.display === "none" || style.visibility === "hidden" || colorIsTransparent(style.color)) return;
+
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  const text = raw.replace(/\s+/g, " ");
+  ctx.save();
+  ctx.font = canvasFont(style);
+  ctx.fillStyle = style.color;
+  ctx.textBaseline = "alphabetic";
+  for (const rect of Array.from(range.getClientRects())) {
+    if (!rectIntersectsRoot(rect, rootRect)) continue;
+    const fontSize = parseCssPx(style.fontSize, 12);
+    const x = rect.left - rootRect.left;
+    const baseline = rect.top - rootRect.top + (rect.height + fontSize) / 2 - fontSize * 0.12;
+    ctx.fillText(text, x, baseline, Math.max(1, rect.width));
+  }
+  ctx.restore();
+  range.detach();
+}
+
+function drawElementBox(
+  ctx: CanvasRenderingContext2D,
+  rect: DOMRect,
+  rootRect: DOMRect,
+  style: CSSStyleDeclaration,
+): void {
+  const x = rect.left - rootRect.left;
+  const y = rect.top - rootRect.top;
+  const width = rect.width;
+  const height = rect.height;
+  if (width <= 0 || height <= 0) return;
+
+  if (!colorIsTransparent(style.backgroundColor)) {
+    ctx.fillStyle = style.backgroundColor;
+    ctx.fillRect(x, y, width, height);
+  }
+
+  drawBorderSide(ctx, x, y, width, parseCssPx(style.borderTopWidth), style.borderTopColor, "top");
+  drawBorderSide(ctx, x + width, y, height, parseCssPx(style.borderRightWidth), style.borderRightColor, "right");
+  drawBorderSide(ctx, x, y + height, width, parseCssPx(style.borderBottomWidth), style.borderBottomColor, "bottom");
+  drawBorderSide(ctx, x, y, height, parseCssPx(style.borderLeftWidth), style.borderLeftColor, "left");
+}
+
+function drawBorderSide(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  length: number,
+  width: number,
+  color: string,
+  side: "top" | "right" | "bottom" | "left",
+): void {
+  if (width <= 0 || colorIsTransparent(color)) return;
+  ctx.fillStyle = color;
+  switch (side) {
+    case "top":
+      ctx.fillRect(x, y, length, width);
+      break;
+    case "right":
+      ctx.fillRect(x - width, y, width, length);
+      break;
+    case "bottom":
+      ctx.fillRect(x, y - width, length, width);
+      break;
+    case "left":
+      ctx.fillRect(x, y, width, length);
+      break;
+  }
+}
+
+function drawFormControlValue(
+  ctx: CanvasRenderingContext2D,
+  node: Element,
+  rect: DOMRect,
+  rootRect: DOMRect,
+  style: CSSStyleDeclaration,
+): void {
+  let text = "";
+  if (node instanceof HTMLInputElement) {
+    if (node.type === "checkbox" || node.type === "radio") {
+      drawCheckControl(ctx, node.checked, rect, rootRect, style);
+      return;
+    }
+    text = node.value;
+  } else if (node instanceof HTMLTextAreaElement) {
+    text = node.value;
+  } else if (node instanceof HTMLSelectElement) {
+    text = node.selectedOptions[0]?.textContent ?? node.value;
+  }
+  if (!text || colorIsTransparent(style.color)) return;
+
+  const x = rect.left - rootRect.left + parseCssPx(style.paddingLeft, 2);
+  const y = rect.top - rootRect.top;
+  const fontSize = parseCssPx(style.fontSize, 12);
+  const lineHeight = parseCssPx(style.lineHeight, Math.max(fontSize, rect.height));
+  const baseline = y + Math.min(rect.height, lineHeight) / 2 + fontSize * 0.36;
+  const maxWidth = Math.max(1, rect.width - parseCssPx(style.paddingLeft, 2) - parseCssPx(style.paddingRight, 2));
+  ctx.save();
+  ctx.font = canvasFont(style);
+  ctx.fillStyle = style.color;
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(text, x, baseline, maxWidth);
+  ctx.restore();
+}
+
+function drawCheckControl(
+  ctx: CanvasRenderingContext2D,
+  checked: boolean,
+  rect: DOMRect,
+  rootRect: DOMRect,
+  style: CSSStyleDeclaration,
+): void {
+  const size = Math.max(8, Math.min(rect.width, rect.height));
+  const x = rect.left - rootRect.left + (rect.width - size) / 2;
+  const y = rect.top - rootRect.top + (rect.height - size) / 2;
+  ctx.save();
+  ctx.strokeStyle = colorIsTransparent(style.borderTopColor) ? style.color : style.borderTopColor;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, size, size);
+  if (checked) {
+    ctx.strokeStyle = style.color;
+    ctx.beginPath();
+    ctx.moveTo(x + size * 0.22, y + size * 0.52);
+    ctx.lineTo(x + size * 0.42, y + size * 0.72);
+    ctx.lineTo(x + size * 0.78, y + size * 0.28);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function canvasFont(style: CSSStyleDeclaration): string {
+  const fontStyle = style.fontStyle && style.fontStyle !== "normal" ? `${style.fontStyle} ` : "";
+  const fontVariant = style.fontVariant && style.fontVariant !== "normal" ? `${style.fontVariant} ` : "";
+  const fontWeight = style.fontWeight && style.fontWeight !== "normal" ? `${style.fontWeight} ` : "";
+  const fontSize = style.fontSize || "12px";
+  const fontFamily = style.fontFamily || "sans-serif";
+  return `${fontStyle}${fontVariant}${fontWeight}${fontSize} ${fontFamily}`;
+}
+
+function clipRect(ctx: CanvasRenderingContext2D, rect: DOMRect, rootRect: DOMRect): void {
+  ctx.beginPath();
+  ctx.rect(rect.left - rootRect.left, rect.top - rootRect.top, rect.width, rect.height);
+  ctx.clip();
+}
+
+function rectIntersectsRoot(rect: DOMRect, rootRect: DOMRect): boolean {
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.right > rootRect.left &&
+    rect.bottom > rootRect.top &&
+    rect.left < rootRect.right &&
+    rect.top < rootRect.bottom
+  );
+}
+
+function colorIsTransparent(color: string): boolean {
+  if (!color || color === "transparent") return true;
+  const compact = color.replace(/\s+/g, "").toLowerCase();
+  const rgba = compact.match(/^rgba\([^,]+,[^,]+,[^,]+,([^)]+)\)$/);
+  if (rgba) return Number.parseFloat(rgba[1]) === 0;
+  const slashAlpha = compact.match(/^rgb\([^)]+\/([^)]+)\)$/);
+  if (slashAlpha) return Number.parseFloat(slashAlpha[1]) === 0;
+  return false;
+}
+
+function parseCssPx(value: string, fallback = 0): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function assertCanvasReadable(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D context unavailable");
+  ctx.getImageData(0, 0, 1, 1);
 }
 
 // ── Xterm rendering ────────────────────────────────────────────────────

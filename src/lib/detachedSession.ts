@@ -1,6 +1,6 @@
 /**
  * Generic detach/reattach plumbing shared by every "detach to OS window"
- * tab kind (sftp, rdp, vnc, terminal). The original SFTP-only handoff
+ * tab kind (sftp, rdp, vnc, terminal, database). The original SFTP-only handoff
  * helpers in `components/filebrowser/SftpDetachedWindow.tsx` are now thin
  * wrappers around this module.
  *
@@ -25,7 +25,7 @@
  * sitting in localStorage indefinitely.
  */
 
-export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal";
+export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal" | "database";
 
 const STORAGE_PREFIX = "newmob.detached.";
 const REATTACH_PREFIX = "newmob.reattach.";
@@ -188,7 +188,7 @@ export function detectDetachedRoute():
       }
     }
     const url = new URL(window.location.href);
-    for (const kind of ["sftp", "rdp", "vnc", "terminal"] as const) {
+    for (const kind of ["sftp", "rdp", "vnc", "terminal", "database"] as const) {
       const value = url.searchParams.get(kind);
       if (value) return { kind, id: value };
     }
@@ -203,7 +203,8 @@ function isDetachedKind(value: string): value is DetachedKind {
     value === "sftp" ||
     value === "rdp" ||
     value === "vnc" ||
-    value === "terminal"
+    value === "terminal" ||
+    value === "database"
   );
 }
 
