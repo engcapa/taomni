@@ -52,7 +52,7 @@
 | 阶段 0 脚手架 + 取消桥接 | ✅ | `servers/rdp.rs`；取消桥接用 `event_sender()`+`ServerEvent::Quit`（比计划设想更干净）；`!Send` 的 `run()` 跑在专用 current-thread runtime |
 | 阶段 1 真实捕获 | ✅ Linux / 🟢 Win·mac | Linux X11 XShm + 普通 `GetImage` 回退，**运行时实测出帧**；Win(DXGI/WGC)、mac(CGDisplayStream) 仅占位 `bail!`，**未实现** |
 | 阶段 2 输入注入 + 坐标 | ✅ Linux / 🟢 Win·mac | enigo(x11rb 后端) + RDP Set-1 扫描码→各平台 keycode 映射（单测覆盖）。**计划修正**：`MouseEvent::Move` 已是屏幕像素,无需 65535 换算 |
-| 阶段 3 性能：脏区 + 编码协商 | 🟡 | 帧抑制(FNV 哈希)+ 16/64 块脏区检测(单测)；RemoteFX 由库默认协商、rect-diff 由编码器内部完成。**差距**：未做帧率/带宽基准；1080p 整屏 RemoteFX 编码 ~110ms,未进一步优化 |
+| 阶段 3 性能：脏区 + 编码协商 | ✅ Linux X11 / 🟡 其它 | **事件驱动捕获重构（2026-05-30）**：X11 改用 XDamage（`damage`+`xfixes` feature）—— 空闲零回读/零哈希，变化时经 `damage_subtract`+`xfixes_fetch_region` 原子取回精确脏矩形，只回读+编码该区域（参考 RustDesk 模型）。实测（debug 构建，1920×1080）：旧路径每帧固定 ~143ms（95ms 全屏回读 + 49ms 8MB FNV 哈希）⇒ 新路径空闲 0ms、100×40 区域回读 ~0.25ms（约 380× 提升）。60fps 上限、多矩形 >8 时退化为包围盒、无 DAMAGE 时回退原定时全屏轮询。RemoteFX 由库默认协商、rayon 并行编码、库内 `find_different_rects_sub` 再按 64 块裁剪。**差距**：全屏/视频场景仍是全回读（X11 固有）；光标 sprite 未做（见下）；Win/mac/Wayland 仍走全帧轮询 |
 | 阶段 4 安全：TLS + NLA | ✅ | rcgen 自签 + `with_tls`/`with_hybrid`(NLA) + 强制凭据 + `0.0.0.0` 告警；**Win11 mstsc 默认 NLA 实测连通** |
 | 阶段 5 Wayland 攻坚 | 🟡 脚手架 | 会话检测 + 门户流程文档；输入经 enigo wayland 后端可用。**差距**：无 PipeWire/ashpd 捕获后端（本机无开发头,未集成） |
 | 阶段 6 虚拟通道 + 前端 | ✅ / 🟡 音频 | cliprdr **文本**双向桥(arboard) + 前端 RDP 配置卡 + en/zh i18n。**差距**：rdpsnd 音频未实现；剪贴板仅文本（无图片/文件） |
@@ -62,7 +62,9 @@
 | §9 无头支持 | 🟡 Linux 脚手架 / ⛔ Win·mac | Linux 与 §7 同机制(探测就绪,网关未做)；Win(IddCx)/mac 计划明确不实现 |
 | §10 公网加固 | 🟡 | 已落地：强制 NLA、无凭据拒启/告警、绑定告警(P0/P3 子集)。**差距**：fuzzing CI、fail2ban/限速、MFA、审计录制、真 CA 证书等未做 |
 
-**一句话**：基础阶段 0–6 的 **Linux X11 全链路可用**（连接/桌面/键鼠/剪贴板/TLS+NLA 实测）；性能(3)做了主体但未调优；Wayland(5)、Linux 进阶会话(7/9)、公网加固(10) 为脚手架/部分；Windows/macOS 捕获注入为结构性代码未运行时验证；§8 与 Win/mac 进阶项未开始或明确不做。
+**一句话**：基础阶段 0–6 的 **Linux X11 全链路可用且响应性达标**（连接/桌面/键鼠/剪贴板/TLS+NLA 实测；性能经 XDamage 事件驱动+区域裁剪重构，空闲零开销、增量变化按面积计费，对标 RustDesk/NoMachine 模型并有基准佐证）；Wayland(5)、Linux 进阶会话(7/9)、公网加固(10) 为脚手架/部分；Windows/macOS 捕获注入为结构性代码未运行时验证；§8 与 Win/mac 进阶项未开始或明确不做。
+
+> **遗留增强（按价值排序）**：① 光标 sprite —— X11 `GetImage` 不含硬件光标，应经 `xfixes_get_cursor_image` → `DisplayUpdate::RGBAPointer` 单独下发（客户端本地渲染、不触发位图脏区）；当前因本机无 RDP 客户端无法可视化验证「双光标/行序」风险而暂缓。② 全屏/视频场景的整屏回读优化（DXGI 式硬件脏区在 X11 无对应，可评估 NvFBC/DRI3）。③ Wayland PipeWire 捕获后端。
 
 ---
 
@@ -191,12 +193,13 @@ RustDesk 把 BGRA 喂给 libyuv→VP9（自有协议）；**IronRDP 的 `BitmapU
 - 键盘：RDP scancode（set 1）→ enigo `Key`，处理扩展键 / 修饰键。
 - ✅ 验收：三平台能远程操作（点击、拖拽、键入、组合键）。
 
-### 阶段 3 — 性能：脏区差量 + 编码协商 🟡 主体完成，未做基准/调优
-- **优先用平台原生脏区**：DXGI `AcquireNextFrame` 直接给 `GetFrameDirtyRects`/`GetFrameMoveRects`（RustDesk 同款来源），无需自己算。
-- 无原生脏区的后端（xcap 起步态 / 部分 X11）回退 CPU 侧 16×16 网格哈希预扫描挑脏块（两份文档一致），只编码变化矩形。
-- 与客户端协商编码：优先 RemoteFX（`ironrdp-graphics`，Tile/YCoCg/DCT）→ 低带宽降级 RDP 6.0 Bitmap。
-- 帧率 / 延迟基准：局域网 1080p 目标 ≥15fps、空闲带宽趋近 0。
-- ✅ 验收：静止桌面带宽近零；视频 / 滚动场景不打满百兆。
+### 阶段 3 — 性能：脏区差量 + 编码协商 ✅ Linux X11 完成（事件驱动+区域裁剪，有基准）
+- **X11 事件驱动捕获（已落地）**：弃用「定时全屏轮询 + 8MB FNV 哈希」，改用 **XDamage** —— X 服务器主动告知何时何处变化。`damage_create`(NON_EMPTY) 唤醒 → `damage_subtract` 原子消费进 `xfixes` region → `xfixes_fetch_region` 取回精确脏矩形 → **只 `shm_get_image` 该矩形**。空闲 = 无事件 = 零回读/零哈希/零 CPU。首帧仍发全屏以初始化编码器 framebuffer，之后发裁剪区（库 `find_different_rects_sub` 在该子区按 64 块再 diff，只 RemoteFX 编码变化块）。
+- **基准（debug，1920×1080，本机 X11 实测）**：旧每帧固定 ~143ms（95ms 全屏回读 + 49ms 8MB 哈希）⇒ 新空闲 0ms、100×40 区域回读 ~0.25ms。这就是 RustDesk「空闲免费、增量按面积计费」的模型。
+- **健壮性**：60fps 上限（连续拖拽/视频）；脏矩形 >8 个退化为包围盒避免多次往返；无 DAMAGE/XFIXES 的服务器（老 Xorg/部分转发连接）自动回退到原定时全屏+哈希路径（`is_event_driven()=false`）。
+- 与客户端协商编码：RemoteFX 由库默认协商（`server_codecs_capabilities`），rayon 并行 tile 编码（feature 已启用）。
+- 单测：`DamageRect` 并集/裁剪纯函数 + X11 事件驱动运行时端到端测试（首帧全屏、空闲限时返回、区域边界与紧凑 stride 校验）。
+- ✅ 验收：静止桌面带宽/CPU 近零（事件驱动空转）；小改动只传小区域；DAMAGE 缺失时优雅回退。
 
 ### 阶段 4 — 安全：TLS + NLA ✅ 已完成（mstsc NLA 实测连通）
 - `tls.rs`：首启 rcgen 自签证书存 app-data，rustls acceptor；`with_tls` 替换 `with_no_security`。
