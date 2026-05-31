@@ -5,7 +5,7 @@
 > - ✅ 已完成
 > - 🟡 已部分完成（关键路径可用，仍有未覆盖的能力，列出具体范围）
 > - 未完成的能力不写入本文档（详见各 plan 文档的待办项）
-> 当前对照版本：v0.1.0 → v0.1.36（含本仓库 `package.json` 标识的当前版本）。
+> 当前对照版本：v0.1.0 → v0.1.39（含本仓库 `package.json` 标识的当前版本）。
 
 ---
 
@@ -348,6 +348,9 @@ controls:
   - id: ribbon-sftp
     selector: '[data-testid="ribbon-sftp"]'
     kind: interactive
+  - id: ribbon-servers
+    selector: '[data-testid="ribbon-servers"]'
+    kind: interactive       # opens the Local servers dialog (F-Servers-1)
   - id: ribbon-settings
     selector: '[data-testid="ribbon-settings"]'
     kind: interactive
@@ -1140,6 +1143,22 @@ controls:
     selector: '[data-testid="session-proto-wsl"]'
     kind: interactive
     optional: true        # WSL session type — form body owned by F9.8
+  - id: proto-mysql
+    selector: '[data-testid="session-proto-mysql"]'
+    kind: interactive
+    optional: true        # DB session type — form body owned by F-DB-1
+  - id: proto-postgresql
+    selector: '[data-testid="session-proto-postgresql"]'
+    kind: interactive
+    optional: true        # DB session type — form body owned by F-DB-1
+  - id: proto-clickhouse
+    selector: '[data-testid="session-proto-clickhouse"]'
+    kind: interactive
+    optional: true        # DB session type — form body owned by F-DB-1
+  - id: proto-redis
+    selector: '[data-testid="session-proto-redis"]'
+    kind: interactive
+    optional: true        # Redis session type — form body owned by F-DB-2
   # Top-level connection fields (visible when SSH/SFTP/VNC/RDP)
   - id: host
     selector: '[data-testid="session-host"]'
@@ -1170,6 +1189,10 @@ controls:
   - id: section-network
     selector: '[data-testid="session-section-network"]'
     kind: interactive
+  - id: section-database
+    selector: '[data-testid="session-section-database"]'
+    kind: interactive
+    optional: true        # only present for DB protos; body owned by F-DB-1/F-DB-2
   # Section bodies
   - id: advanced-body
     selector: '[data-testid="advanced-ssh-settings"]'
@@ -2948,6 +2971,280 @@ controls:
 - 多 prompt 挑战渲染多个输入框，可选的 `instructions` / `name` 文案显示在顶部
 - Submit 回填答案续认证；Cancel / Close 中止认证流程
 - **e2e 测试限制**：弹窗只在服务器主动发起 keyboard-interactive 挑战时出现，需要一台配置了 MFA/OTP 的 SSH 服务器作为 fixture；本地 smoke sshd（密码认证）不触发，TC-113 标记 `live-only` + `needs-review`，默认 fixture 下走「无挑战即跳过」的软断言，真实 MFA 行为需配置专用服务器手动回归
+
+---
+
+## 22. 本地服务器管理（Local Servers）
+
+### 22.1 本地服务器管理对话框 `ServersDialog` ✅
+
+<!-- feature
+id: F-Servers-1
+status: done
+area: servers
+components: [ServersDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
+files:
+  - src/components/servers/ServersDialog.tsx
+  - src/components/servers/ServerList.tsx
+  - src/components/servers/ServerRow.tsx
+  - src/components/servers/ServerSettings.tsx
+  - src/components/servers/CommonSettings.tsx
+  - src/components/servers/ServerOutputLog.tsx
+  - src/components/servers/fields.tsx
+  - src/lib/servers.ts
+  - src/stores/serversStore.ts
+controls:
+  # Modal shell — opened by ribbon "servers" button (F1.9) or Ctrl+Shift+S.
+  - id: dialog
+    selector: '[data-testid="servers-dialog"]'
+    kind: display
+    optional: true       # only after openDialog()
+  - id: dialog-close
+    selector: '[data-testid="servers-dialog-close"]'
+    kind: interactive
+    optional: true
+  - id: dialog-cancel
+    selector: '[data-testid="servers-dialog-cancel"]'
+    kind: interactive
+    optional: true
+  - id: dialog-apply
+    selector: '[data-testid="servers-dialog-apply"]'
+    kind: interactive
+    optional: true
+  # Left rail — one selectable row per server type (dynamic: server-row-${type}).
+  - id: server-list
+    selector: '[data-testid="server-list"]'
+    kind: display
+    optional: true
+  - id: server-row-ssh
+    selector: '[data-testid="server-row-ssh"]'
+    kind: interactive
+    optional: true
+  - id: server-row-ftp
+    selector: '[data-testid="server-row-ftp"]'
+    kind: interactive
+    optional: true
+  - id: server-row-http
+    selector: '[data-testid="server-row-http"]'
+    kind: interactive
+    optional: true
+  - id: server-row-rdp
+    selector: '[data-testid="server-row-rdp"]'
+    kind: interactive
+    optional: true
+  # Per-row Start / Stop / Settings actions (dynamic: server-row-${type}-{start,stop,settings}).
+  - id: server-row-ssh-start
+    selector: '[data-testid="server-row-ssh-start"]'
+    kind: interactive
+    optional: true
+  - id: server-row-ssh-stop
+    selector: '[data-testid="server-row-ssh-stop"]'
+    kind: interactive
+    optional: true       # disabled until the server is running/starting
+  - id: server-row-ssh-settings
+    selector: '[data-testid="server-row-ssh-settings"]'
+    kind: interactive
+    optional: true
+  # Right pane — settings form + live console for the selected server.
+  - id: server-settings
+    selector: '[data-testid="server-settings"]'
+    kind: display
+    optional: true
+  - id: server-log
+    selector: '[data-testid="server-log"]'
+    kind: display
+    optional: true
+  - id: server-log-autoscroll
+    selector: '[data-testid="server-log-autoscroll"]'
+    kind: interactive
+    optional: true
+  - id: server-log-clear
+    selector: '[data-testid="server-log-clear"]'
+    kind: interactive
+    optional: true
+-->
+
+- 从 Ribbon `Servers` 按钮（`ribbon-servers`）或 `Ctrl+Shift+S` 打开 `ServersDialog` 模态：渐变标题栏 + 左侧服务器列表 + 右侧设置面板 + Cancel/Apply 页脚，仿 TunnelEditor chrome
+- 支持 9 类本地服务器（`SERVER_DEFS` 顺序）：ssh/sftp、ftp、tftp、http、telnet、vnc、nfs、cron、iperf、rdp；每行（`server-row-${type}`）显示运行状态点 + Start/Stop/Settings 按钮
+- 右栏：`CommonSettings`（监听端口 / 绑定地址 / 自动停止 / 开机自启）+ 每类专属设置表单（`settings/<X>Settings.tsx`，复用 `fields.tsx` 受控原语）+ `ServerOutputLog` 实时输出控制台（自动滚动 `server-log-autoscroll` / 清空 `server-log-clear`）
+- 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
+- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效
+- i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`
+- **e2e 测试限制**：真正 start/stop 一个服务器会绑定真实端口 / 拉起系统二进制，属带副作用操作；浏览器冒烟只验证对话框 chrome（打开 → 选行 → 设置面板/输出控制台挂载 → Cancel 关闭），实际启停留待 native/手动回归
+
+---
+
+## 23. 数据库客户端 — SQL（MySQL / PostgreSQL / ClickHouse）
+
+### 23.1 SQL 客户端 `DbClientTab` ✅
+
+<!-- feature
+id: F-DB-1
+status: done
+area: database/sql
+components: [DbClientTab, SchemaTree, SqlEditorPanel, QueryResultGrid, SessionEditor]
+files:
+  - src/components/database/DbClientTab.tsx
+  - src/components/database/SchemaTree.tsx
+  - src/components/database/SqlEditorPanel.tsx
+  - src/components/database/QueryResultGrid.tsx
+  - src/components/database/formatSql.ts
+  - src/lib/queryRegistry.ts
+  - src/components/session/SessionEditor.tsx
+controls:
+  # SQL DB session form body inside SessionEditor (proto + section TAB selectors are
+  # owned by F6.3). These mount in browser mode and are the smoke-testable surface;
+  # the live tab below only mounts on a successful desktop connection.
+  - id: database-section
+    selector: '[data-testid="session-database-section"]'
+    kind: display
+    optional: true       # only when a DB proto is selected
+  - id: database-settings
+    selector: '[data-testid="database-settings"]'
+    kind: display
+    optional: true
+  - id: db-username
+    selector: 'input[aria-label="Database username"]'
+    kind: interactive
+    optional: true
+  - id: db-password
+    selector: 'input[aria-label="Database password"]'
+    kind: interactive
+    optional: true
+  - id: db-name
+    selector: 'input[aria-label="Database name"]'
+    kind: interactive
+    optional: true       # hidden for Redis; present for MySQL/PostgreSQL/ClickHouse
+  - id: db-save-in-vault
+    selector: '[data-testid="db-save-in-vault"]'
+    kind: interactive
+    optional: true       # only when the vault is initialized
+  # Opened tab — these only mount inside an open SQL DB tab (live desktop connection).
+  - id: schema-tree
+    selector: '[data-testid="schema-tree"]'
+    kind: display
+    optional: true       # only inside an open SQL DB tab
+  - id: sql-editor
+    selector: '[data-testid="sql-editor"]'
+    kind: display
+    optional: true
+  - id: query-result-grid
+    selector: '[data-testid="query-result-grid"]'
+    kind: display
+    optional: true
+  - id: schema-select
+    selector: 'select[aria-label="Schema"]'
+    kind: interactive
+    optional: true       # only when the connection exposes >0 schemas
+  - id: schema-drawer-handle
+    selector: '[data-testid="db-schema-drawer-handle"]'
+    kind: interactive
+    optional: true
+  # Floating toolbar (shared FloatingToolbar infra, F10.1) — chat / maximize / detach.
+  - id: floating-toolbar
+    selector: '[data-testid="db-floating-toolbar"]'
+    kind: display
+    optional: true
+  - id: chat-toggle
+    selector: '[data-testid="db-chat-toggle"]'
+    kind: interactive
+    optional: true
+  - id: maximize
+    selector: '[data-testid="db-maximize"]'
+    kind: interactive
+    optional: true
+  - id: detach
+    selector: '[data-testid="db-detach"]'
+    kind: interactive
+    optional: true       # destructive in browser mode — click LAST (see F-Detach-1)
+  # NB: detached-reattach / detached-os-fullscreen testids are owned by F-Detach-1;
+  # DbClientTab hosts them inside a detached window but does not re-declare them here
+  # (duplicate-selector lint). The SQL editor toolbar buttons (Run/Selection/Cancel/
+  # Format/History/Save) use title= only — no stable testid yet; promote when covered.
+-->
+
+- DB 会话（MySQL/PostgreSQL/ClickHouse）经 `SessionEditor` 创建（proto 选择器 + database section 由 F6.3 拥有），打开后 `MainLayout.openDbTab` 挂载 `DbClientTab`（`type:"database"`），与 SFTP/VNC 一样常驻挂载以便查询跨标签存活
+- 左侧 `SchemaTree`：懒加载 schema→table→column/index 展开（`db-schema-drawer-handle` 抽屉折叠）；右侧查询工作区为多 query 面板（最多 4 个）的 tab 布局
+- `SqlEditorPanel` 封装 CodeMirror 6：按引擎选 dialect、schema-aware 自动补全（`SQLNamespace`），暴露命令式 `SqlEditorHandle`；工具条 Run (F5) / Run selection / Cancel / Format / History / Save / Rows / Sheets / Schema 选择
+- `QueryResultGrid` 为手写虚拟化网格（行高 24 + overscan）：NULL 徽标、数值右对齐、排序、CSV/单元格复制、列显隐、聚合统计、行筛选、Table/List/Chart 视图、增删改行 + 提交/撤销
+- 查询工作区跨会话持久化（`queryRegistry` + `ef0b686`），结果可经 Export Grid 对话框导出
+- 浮动工具条复用共享 `FloatingToolbar`（F10.1，`db-floating-toolbar`）：Chat 入口 / 最大化 / 分离到独立窗口（`db-detach`，分离/重挂载行为属 F-Detach-1）
+- **e2e 测试限制**：实际查询需活的 MySQL/PostgreSQL/ClickHouse fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 DB proto → 填 host/port → 保存 → 打开标签 → schema-tree / sql-editor / query-result-grid 挂载」的路由路径（参照 TC-111 RDP scaffold 模式），真实查询/编辑留待配置 DB fixture 的手动/native 回归
+
+---
+
+## 24. 数据库客户端 — Redis
+
+### 24.1 Redis 客户端 `RedisClientTab` ✅
+
+<!-- feature
+id: F-DB-2
+status: done
+area: database/redis
+components: [RedisClientTab, RedisKeyBrowser, RedisValuePanel, RedisCli, RedisNewKeyDialog]
+files:
+  - src/components/database/RedisClientTab.tsx
+  - src/components/database/RedisKeyBrowser.tsx
+  - src/components/database/RedisValuePanel.tsx
+  - src/components/database/RedisCli.tsx
+  - src/components/database/RedisNewKeyDialog.tsx
+  - src/components/session/SessionEditor.tsx
+controls:
+  # Redis session form body inside SessionEditor (proto + section TAB owned by F6.3;
+  # the shared database-settings / session-database-section containers are declared
+  # by F-DB-1). These Redis-specific fields mount in browser mode and are the
+  # smoke-testable surface. The form's DB-index INPUT is distinct from the tab's
+  # DB-index SELECT below (input[...] vs select[...]), so both can be declared.
+  - id: form-db-index
+    selector: 'input[aria-label="Redis DB index"]'
+    kind: interactive
+    optional: true       # only when Redis proto selected in SessionEditor
+  - id: form-key-prefix
+    selector: 'input[aria-label="Redis key prefix"]'
+    kind: interactive
+    optional: true
+  # Opened tab — only mount inside an open Redis tab (live desktop connection).
+  - id: db-index
+    selector: 'select[aria-label="Redis DB index"]'
+    kind: interactive
+    optional: true       # only inside an open Redis tab
+  - id: key-browser
+    selector: '[data-testid="redis-key-browser"]'
+    kind: display
+    optional: true
+  - id: key-pattern
+    selector: 'input[aria-label="Key pattern"]'
+    kind: interactive
+    optional: true
+  - id: cli
+    selector: '[data-testid="redis-cli"]'
+    kind: display
+    optional: true
+  - id: cli-command
+    selector: 'input[aria-label="Redis command"]'
+    kind: interactive
+    optional: true
+  # RedisNewKeyDialog fields (aria-label only — modal opened by the key browser "Add" button).
+  - id: new-key-name
+    selector: 'input[aria-label="Key name"]'
+    kind: interactive
+    optional: true       # only after Add-key dialog opens
+  - id: new-key-type
+    selector: 'select[aria-label="Key type"]'
+    kind: interactive
+    optional: true
+  - id: new-key-value
+    selector: 'input[aria-label="Initial value"]'
+    kind: interactive
+    optional: true
+-->
+
+- Redis 会话经 `SessionEditor`（`session-proto-redis` 由 F6.3 拥有）创建，打开后挂载 `RedisClientTab`（`type:"redis"`），常驻挂载
+- 左侧 `RedisKeyBrowser`：SCAN 游标分页（Load more…）、`:`-前缀文件夹树、类型徽标、TTL pill（每 10s 自动刷新），顶部 `Key pattern` glob 输入 + Scan，下方 Add/Delete/TTL 操作
+- 右侧 `RedisValuePanel`：按 key 类型分别渲染 String/Hash/List/Set/ZSet/Stream 编辑器 + 元数据栏
+- 底部可折叠 `RedisCli`：命令历史、Tab 补全、Monitor 开关（轮询 `INFO commandstats`）；DB-index 切换（`Redis DB index`）发 `SELECT n`
+- `RedisNewKeyDialog` 模态：Key name / type / 初始值 / TTL 等字段（均 aria-label）
+- **e2e 测试限制**：实际 key 操作需活的 Redis fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 Redis proto → 保存 → 打开标签 → redis-key-browser / redis-cli 挂载」的路由路径，真实 SCAN/读写留待配置 Redis fixture 的手动/native 回归
 
 ---
 

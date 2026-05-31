@@ -1,9 +1,9 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 49,
-    "required": 219,
-    "covered_required": 219,
+    "features_with_controls": 52,
+    "required": 220,
+    "covered_required": 220,
     "shallow": 21,
     "orphans": 112
   },
@@ -44,8 +44,8 @@
       "shallow": 0
     },
     "F1.9": {
-      "required": 5,
-      "covered_required": 5,
+      "required": 6,
+      "covered_required": 6,
       "shallow": 0
     },
     "F2.2": {
@@ -166,7 +166,7 @@
     "F9.7": {
       "required": 8,
       "covered_required": 8,
-      "shallow": 1
+      "shallow": 0
     },
     "F9.8": {
       "required": 5,
@@ -249,6 +249,21 @@
       "shallow": 0
     },
     "F-Mfa-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
+    "F-Servers-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 1
+    },
+    "F-DB-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
+    "F-DB-2": {
       "required": 0,
       "covered_required": 0,
       "shallow": 0

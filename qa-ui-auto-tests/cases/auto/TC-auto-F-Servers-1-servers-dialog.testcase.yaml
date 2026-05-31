@@ -1,0 +1,60 @@
+id: TC-auto-F-Servers-1-servers-dialog
+title: Local servers dialog opens, selects a server, shows settings and console
+description: |
+  Coverage smoke for F-Servers-1 (Local servers manager). Opens the
+  ServersDialog from the Ribbon "Servers" button, verifies the modal chrome
+  (server list + settings pane + output console), selects a couple of server
+  rows, and confirms the per-row Start/Stop/Settings actions and the live
+  console controls are mounted.
+
+  Actually starting/stopping a server binds a real port or spawns a system
+  binary (x11vnc / nfsd / iperf3) — a side-effecting action that browser
+  smoke cannot do safely — so this case does NOT click Start. It only
+  verifies the dialog routes correctly and the controls exist, then closes
+  via Cancel (non-destructive). Real start/stop is left to native/manual
+  regression with the relevant tools installed.
+covers: [F-Servers-1]
+tags: [auto-generated, smoke, needs-review, servers, main]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 30
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon"]'
+  # Ribbon "Servers" button → serversStore.openDialog()
+  - click: '[data-testid="ribbon-servers"]'
+  - wait_for:
+      selector: '[data-testid="servers-dialog"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="server-list"]'
+  - assert_visible: '[data-testid="server-settings"]'
+  # SSH/SFTP is the first row and selected by default. Selecting it is safe
+  # (no side effect); Start is asserted visible but NOT clicked — clicking it
+  # would bind a real port / spawn a system binary, which browser smoke avoids.
+  - assert_visible: '[data-testid="server-row-ssh"]'
+  - click: '[data-testid="server-row-ssh"]'
+  - assert_visible: '[data-testid="server-row-ssh-start"]'
+  # The per-row Settings button just (re)selects the row — safe to click.
+  - click: '[data-testid="server-row-ssh-settings"]'
+  - wait: 0.2
+  # Selecting another row swaps the settings pane (non-destructive).
+  - click: '[data-testid="server-row-http"]'
+  - wait: 0.2
+  - assert_visible: '[data-testid="server-settings"]'
+  - click: '[data-testid="server-row-rdp"]'
+  - wait: 0.2
+  - assert_visible: '[data-testid="server-settings"]'
+  # Live output console + its controls are mounted in the settings pane.
+  - assert_visible: '[data-testid="server-log"]'
+  # Auto-scroll is a non-destructive view toggle — click it (and the Clear
+  # button, which only empties the in-memory log buffer).
+  - assert_visible: '[data-testid="server-log-autoscroll"]'
+  - click: '[data-testid="server-log-autoscroll"]'
+  - click: '[data-testid="server-log-clear"]'
+  - screenshot: servers-1-dialog.png
+  # Cancel closes the dialog without persisting (no edits were made).
+  - click: '[data-testid="servers-dialog-cancel"]'
+  - wait_for:
+      selector: '[data-testid="servers-dialog"]'
+      state: detached
+      timeout_sec: 5

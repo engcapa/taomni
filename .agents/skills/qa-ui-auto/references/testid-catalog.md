@@ -70,6 +70,37 @@
 - `[data-testid="capture-stop-scroll"]` — interactive [optional] — F4.13.stop-scroll-pill
 - `[data-testid="capture-stop-gif"]` — interactive [optional] — F4.13.stop-gif-pill
 
+## database/redis (F-DB-2)
+
+- `input[aria-label="Redis DB index"]` — interactive [optional] — F-DB-2.form-db-index
+- `input[aria-label="Redis key prefix"]` — interactive [optional] — F-DB-2.form-key-prefix
+- `select[aria-label="Redis DB index"]` — interactive [optional] — F-DB-2.db-index
+- `[data-testid="redis-key-browser"]` — display [optional] — F-DB-2.key-browser
+- `input[aria-label="Key pattern"]` — interactive [optional] — F-DB-2.key-pattern
+- `[data-testid="redis-cli"]` — display [optional] — F-DB-2.cli
+- `input[aria-label="Redis command"]` — interactive [optional] — F-DB-2.cli-command
+- `input[aria-label="Key name"]` — interactive [optional] — F-DB-2.new-key-name
+- `select[aria-label="Key type"]` — interactive [optional] — F-DB-2.new-key-type
+- `input[aria-label="Initial value"]` — interactive [optional] — F-DB-2.new-key-value
+
+## database/sql (F-DB-1)
+
+- `[data-testid="session-database-section"]` — display [optional] — F-DB-1.database-section
+- `[data-testid="database-settings"]` — display [optional] — F-DB-1.database-settings
+- `input[aria-label="Database username"]` — interactive [optional] — F-DB-1.db-username
+- `input[aria-label="Database password"]` — interactive [optional] — F-DB-1.db-password
+- `input[aria-label="Database name"]` — interactive [optional] — F-DB-1.db-name
+- `[data-testid="db-save-in-vault"]` — interactive [optional] — F-DB-1.db-save-in-vault
+- `[data-testid="schema-tree"]` — display [optional] — F-DB-1.schema-tree
+- `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
+- `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
+- `select[aria-label="Schema"]` — interactive [optional] — F-DB-1.schema-select
+- `[data-testid="db-schema-drawer-handle"]` — interactive [optional] — F-DB-1.schema-drawer-handle
+- `[data-testid="db-floating-toolbar"]` — display [optional] — F-DB-1.floating-toolbar
+- `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
+- `[data-testid="db-maximize"]` — interactive [optional] — F-DB-1.maximize
+- `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
+
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
@@ -101,6 +132,7 @@
 - `[data-testid="ribbon"]` — display — F1.9.ribbon
 - `[data-testid="ribbon-session"]` — interactive — F1.9.ribbon-session
 - `[data-testid="ribbon-sftp"]` — interactive — F1.9.ribbon-sftp
+- `[data-testid="ribbon-servers"]` — interactive — F1.9.ribbon-servers
 - `[data-testid="ribbon-settings"]` — interactive — F1.9.ribbon-settings
 - `[data-testid="ribbon-tunneling"]` — interactive — F1.9.ribbon-tunneling
 - `[data-testid="ribbon-multiexec"]` — interactive [optional] — F1.9.ribbon-multiexec
@@ -182,8 +214,26 @@
 - `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
 - `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
 - `[data-testid="rdp-detach"]` — interactive — F9.7.detach
-- `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle (normal → maximized → fullscreen)
-- `[data-testid="rdp-chat-toggle"]` — interactive [optional] — F9.7.chat-toggle (AI chat drawer; hidden when AI disabled / in detached window)
+- `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle
+
+## servers (F-Servers-1)
+
+- `[data-testid="servers-dialog"]` — display [optional] — F-Servers-1.dialog
+- `[data-testid="servers-dialog-close"]` — interactive [optional] — F-Servers-1.dialog-close
+- `[data-testid="servers-dialog-cancel"]` — interactive [optional] — F-Servers-1.dialog-cancel
+- `[data-testid="servers-dialog-apply"]` — interactive [optional] — F-Servers-1.dialog-apply
+- `[data-testid="server-list"]` — display [optional] — F-Servers-1.server-list
+- `[data-testid="server-row-ssh"]` — interactive [optional] — F-Servers-1.server-row-ssh
+- `[data-testid="server-row-ftp"]` — interactive [optional] — F-Servers-1.server-row-ftp
+- `[data-testid="server-row-http"]` — interactive [optional] — F-Servers-1.server-row-http
+- `[data-testid="server-row-rdp"]` — interactive [optional] — F-Servers-1.server-row-rdp
+- `[data-testid="server-row-ssh-start"]` — interactive [optional] — F-Servers-1.server-row-ssh-start
+- `[data-testid="server-row-ssh-stop"]` — interactive [optional] — F-Servers-1.server-row-ssh-stop
+- `[data-testid="server-row-ssh-settings"]` — interactive [optional] — F-Servers-1.server-row-ssh-settings
+- `[data-testid="server-settings"]` — display [optional] — F-Servers-1.server-settings
+- `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
+- `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
+- `[data-testid="server-log-clear"]` — interactive [optional] — F-Servers-1.server-log-clear
 
 ## sessions (F6.2)
 
@@ -208,6 +258,10 @@
 - `[data-testid="session-proto-localshell"]` — interactive [optional] — F6.3.proto-localshell
 - `[data-testid="session-proto-file-browser"]` — interactive [optional] — F6.3.proto-file-browser
 - `[data-testid="session-proto-wsl"]` — interactive [optional] — F6.3.proto-wsl
+- `[data-testid="session-proto-mysql"]` — interactive [optional] — F6.3.proto-mysql
+- `[data-testid="session-proto-postgresql"]` — interactive [optional] — F6.3.proto-postgresql
+- `[data-testid="session-proto-clickhouse"]` — interactive [optional] — F6.3.proto-clickhouse
+- `[data-testid="session-proto-redis"]` — interactive [optional] — F6.3.proto-redis
 - `[data-testid="session-host"]` — interactive — F6.3.host
 - `[data-testid="session-user"]` — interactive — F6.3.user
 - `[data-testid="session-port"]` — interactive — F6.3.port
@@ -217,6 +271,7 @@
 - `[data-testid="session-section-advanced"]` — interactive — F6.3.section-advanced
 - `[data-testid="session-section-terminal"]` — interactive — F6.3.section-terminal
 - `[data-testid="session-section-network"]` — interactive — F6.3.section-network
+- `[data-testid="session-section-database"]` — interactive [optional] — F6.3.section-database
 - `[data-testid="advanced-ssh-settings"]` — display — F6.3.advanced-body
 - `[data-testid="terminal-settings"]` — display — F6.3.terminal-body
 - `[data-testid="network-settings"]` — display — F6.3.network-body

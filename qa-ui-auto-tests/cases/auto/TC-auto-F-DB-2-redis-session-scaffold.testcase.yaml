@@ -1,0 +1,60 @@
+id: TC-auto-F-DB-2-redis-session-scaffold
+title: Redis DB session form mounts and saved Redis session round-trips
+description: |
+  Coverage smoke for F-DB-2 (Redis client). Opens SessionEditor, switches to
+  the Redis protocol — which auto-jumps to the Database settings tab — asserts
+  the Redis-specific form fields mount (DB index 0–15 + key prefix, no
+  "Database name" field), fills them, saves the bookmark, and reopens it to
+  confirm the proto=Redis chip round-trips.
+
+  The test does NOT open a live Redis connection: browser preview rejects
+  redis_exec ("Database connections are not available in browser preview"),
+  so the RedisClientTab inner surface (redis-key-browser / redis-cli /
+  value panel) only mounts on a real desktop connection. That live surface
+  is left to native/manual regression against a configured Redis fixture
+  (same scaffold-only pattern as TC-111 RDP and TC-112 WSL).
+covers: [F-DB-2, F6.3]
+tags: [auto-generated, smoke, needs-review, database, redis, scaffolding-only, no-connect]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="sidebar"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  # Selecting the Redis proto auto-switches to the database section.
+  - click: '[data-testid="session-proto-redis"]'
+  - wait_for:
+      selector: '[data-testid="session-database-section"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="database-settings"]'
+  - fill:
+      selector: '[data-testid="session-host"]'
+      value: redis-host.example.test
+  - fill:
+      selector: '[data-testid="session-port"]'
+      value: "6379"
+  # Redis-specific form fields: DB index (0–15) + optional key prefix.
+  - fill:
+      selector: 'input[aria-label="Redis DB index"]'
+      value: "2"
+  - fill:
+      selector: 'input[aria-label="Redis key prefix"]'
+      value: "qa:"
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill:
+      selector: '[data-testid="session-name"]'
+      value: qa-ui-auto-redis
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-redis"]'
+  - screenshot: db-2-redis-saved.png
+  # Round-trip check — reselect, reopen the editor, assert proto=Redis active.
+  - click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-redis"]'
+  - click: '[data-testid="session-edit"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - wait_for:
+      selector: '[data-testid="session-proto-redis"][data-active="true"]'
+      timeout_sec: 5
+  - assert_visible: '[data-testid="database-settings"]'
