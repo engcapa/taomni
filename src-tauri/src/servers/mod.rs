@@ -1,7 +1,7 @@
 //! Local "Servers" feature backend (MobaXterm-style server management).
 //!
-//! Manages a fixed set of nine local server types (SSH, FTP, TFTP, HTTP,
-//! Telnet, VNC, NFS, Cron, iperf). Each running server lives in the
+//! Manages a fixed set of ten local server types (SSH, FTP, TFTP, HTTP,
+//! Telnet, VNC, NFS, Cron, iperf, RDP). Each running server lives in the
 //! [`ServerRegistry`] held by `AppState`; the registry tracks the cancel
 //! token, the supervising task, an optional auto-stop timer, and the last
 //! published [`ServerStatus`].
@@ -23,6 +23,7 @@ pub mod cron;
 pub mod vnc;
 pub mod nfs;
 pub mod iperf;
+pub mod rdp;
 
 use std::collections::HashMap;
 
@@ -49,6 +50,7 @@ pub enum ServerType {
     Nfs,
     Cron,
     Iperf,
+    Rdp,
 }
 
 impl ServerType {
@@ -63,6 +65,7 @@ impl ServerType {
             ServerType::Nfs => "nfs",
             ServerType::Cron => "cron",
             ServerType::Iperf => "iperf",
+            ServerType::Rdp => "rdp",
         }
     }
 
@@ -77,11 +80,12 @@ impl ServerType {
             "nfs" => Some(ServerType::Nfs),
             "cron" => Some(ServerType::Cron),
             "iperf" => Some(ServerType::Iperf),
+            "rdp" => Some(ServerType::Rdp),
             _ => None,
         }
     }
 
-    pub fn all() -> [ServerType; 9] {
+    pub fn all() -> [ServerType; 10] {
         [
             ServerType::Ssh,
             ServerType::Ftp,
@@ -92,6 +96,7 @@ impl ServerType {
             ServerType::Nfs,
             ServerType::Cron,
             ServerType::Iperf,
+            ServerType::Rdp,
         ]
     }
 }
