@@ -149,6 +149,7 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
   const engine = session.session_type as DbConnectInfo["engine"];
   return {
     sessionId: session.id,
+    workspaceSessionId: session.id,
     engine,
     host: session.host,
     port: session.port,
@@ -486,7 +487,11 @@ export function MainLayout() {
         // Give the detached window its own connection handle so the source
         // tab's unmount disconnect cannot race and close the detached query
         // workspace connection.
-        info: { ...info, sessionId: detachedId },
+        info: {
+          ...info,
+          sessionId: detachedId,
+          workspaceSessionId: info.workspaceSessionId ?? info.sessionId,
+        },
       };
       openDetachedGenericWindow("database", tabId, detachedId, payload, title);
     },
@@ -604,6 +609,7 @@ export function MainLayout() {
             db: {
               ...p.info,
               sessionId: reattachTabId,
+              workspaceSessionId: p.info.workspaceSessionId ?? p.info.sessionId,
             },
           });
           setStatusMessage(tr("status.reattached"));

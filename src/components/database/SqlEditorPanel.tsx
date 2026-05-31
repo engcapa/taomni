@@ -112,7 +112,28 @@ export function SqlEditorPanel({
           },
         }),
         EditorView.theme({
-          "&": { height: "100%", fontSize: "13px" },
+          "&": {
+            height: "100%",
+            fontSize: "13px",
+            backgroundColor: "var(--moba-bg)",
+            color: "var(--moba-text)",
+          },
+          ".cm-content": {
+            backgroundColor: "var(--moba-bg)",
+            color: "var(--moba-text)",
+          },
+          ".cm-gutters": {
+            backgroundColor: "var(--moba-bg)",
+            color: "var(--moba-text-muted)",
+            borderRight: "1px solid var(--moba-divider)",
+          },
+          ".cm-activeLineGutter": {
+            backgroundColor: "var(--moba-hover)",
+            color: "var(--moba-text)",
+          },
+          ".cm-activeLine": {
+            backgroundColor: "var(--moba-hover)",
+          },
           ".cm-scroller": { fontFamily: "var(--moba-mono-font, monospace)", overflow: "auto" },
           "&.cm-focused": { outline: "none" },
         }),

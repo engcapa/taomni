@@ -18,13 +18,16 @@ import {
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
+  checkFileExists,
   dbConnect,
   dbDisconnect,
   dbExecute,
   dbExecuteStream,
   dbCancel,
   dbDescribeTable,
+  readFileBytes,
   selectSaveFilePath,
+  temporaryFilePath,
   writeStreamAbort,
   writeStreamAppend,
   writeStreamClose,
@@ -78,6 +81,8 @@ const MAX_RESULT_SHEETS_LIMIT = 200;
 const DEFAULT_ROW_LIMIT = 1000;
 const MIN_ROW_LIMIT = 1;
 const MAX_ROW_LIMIT = 1_000_000;
+const QUERY_WORKSPACE_CACHE_VERSION = 1;
+const QUERY_AUTO_SAVE_MS = 5000;
 
 type ResultSubTab = "results" | "messages";
 
@@ -103,7 +108,21 @@ interface PanelState {
   activeSheetId: string | null;
   filePath: string | null;
   fileName: string | null;
+  cachePath: string | null;
   dirty: boolean;
+}
+
+interface QueryWorkspacePanelCache {
+  id: string;
+  filePath: string | null;
+  fileName: string | null;
+  cachePath: string | null;
+}
+
+interface QueryWorkspaceCache {
+  version: typeof QUERY_WORKSPACE_CACHE_VERSION;
+  activePanelId: string | null;
+  panels: QueryWorkspacePanelCache[];
 }
 
 function widthKey(engine: string): string {
@@ -154,6 +173,89 @@ function writeIntSetting(engine: string, name: string, value: number): void {
     localStorage.setItem(settingKey(engine, name), String(value));
   } catch {
     /* ignore */
+  }
+}
+
+function workspaceKey(sessionId: string): string {
+  return `newmob.db.queryWorkspace.v${QUERY_WORKSPACE_CACHE_VERSION}.${sessionId}`;
+}
+
+function basename(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
+
+function sanitizeFilePart(value: string): string {
+  return value
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function defaultQueryCacheName(info: DbConnectInfo, ordinal: number): string {
+  const database = info.database ? `-${info.database}` : "";
+  const stem = sanitizeFilePart(`${info.engine}-${info.host}-${info.port}${database}`) || "query";
+  return `${stem}-query-${ordinal}.sql`;
+}
+
+function readWorkspaceCache(sessionId: string): QueryWorkspaceCache | null {
+  try {
+    const raw = localStorage.getItem(workspaceKey(sessionId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<QueryWorkspaceCache>;
+    if (parsed.version !== QUERY_WORKSPACE_CACHE_VERSION || !Array.isArray(parsed.panels)) {
+      return null;
+    }
+    return {
+      version: QUERY_WORKSPACE_CACHE_VERSION,
+      activePanelId: typeof parsed.activePanelId === "string" ? parsed.activePanelId : null,
+      panels: parsed.panels
+        .map((panel) => ({
+          id: typeof panel?.id === "string" ? panel.id : "",
+          filePath: typeof panel?.filePath === "string" ? panel.filePath : null,
+          fileName: typeof panel?.fileName === "string" ? panel.fileName : null,
+          cachePath: typeof panel?.cachePath === "string" ? panel.cachePath : null,
+        }))
+        .filter((panel) => panel.id && (panel.filePath || panel.cachePath)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkspaceCache(sessionId: string, panels: PanelState[], activePanelId: string | null): void {
+  try {
+    const cache: QueryWorkspaceCache = {
+      version: QUERY_WORKSPACE_CACHE_VERSION,
+      activePanelId,
+      panels: panels
+        .filter((panel) => panel.filePath || panel.cachePath)
+        .map((panel) => ({
+          id: panel.id,
+          filePath: panel.filePath,
+          fileName: panel.fileName,
+          cachePath: panel.cachePath,
+        })),
+    };
+    localStorage.setItem(workspaceKey(sessionId), JSON.stringify(cache));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function readTextFile(path: string): Promise<string> {
+  return new TextDecoder().decode(await readFileBytes(path));
+}
+
+async function writeTextFile(path: string, text: string): Promise<void> {
+  let handleId: string | null = null;
+  try {
+    handleId = await writeStreamOpen(path);
+    await writeStreamAppend(handleId, new TextEncoder().encode(text));
+    await writeStreamClose(handleId);
+  } catch (err) {
+    if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
+    throw err;
   }
 }
 
@@ -217,7 +319,7 @@ function whereForColumns(engine: string, columns: string[], allColumns: string[]
   return clauses.length > 0 ? clauses.join(" AND ") : "1 = 0";
 }
 
-function newPanel(): PanelState {
+function newPanel(patch: Partial<PanelState> = {}): PanelState {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `panel-${Date.now()}-${Math.random()}`,
     doc: "",
@@ -225,7 +327,9 @@ function newPanel(): PanelState {
     activeSheetId: null,
     filePath: null,
     fileName: null,
+    cachePath: null,
     dirty: false,
+    ...patch,
   };
 }
 
@@ -275,6 +379,7 @@ export default function DbClientTab({
   const [connError, setConnError] = useState<string | null>(null);
   const [panels, setPanels] = useState<PanelState[]>(() => [newPanel()]);
   const [activePanelId, setActivePanelId] = useState<string>(() => panels[0].id);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [rowLimit, setRowLimit] = useState(() =>
     readIntSetting(info.engine, "rowLimit", DEFAULT_ROW_LIMIT, MIN_ROW_LIMIT, MAX_ROW_LIMIT),
   );
@@ -294,11 +399,24 @@ export default function DbClientTab({
   const historyRef = useRef<Record<string, string[]>>({});
   const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const panelsRef = useRef<PanelState[]>(panels);
+  const activePanelIdRef = useRef(activePanelId);
+  const autoSaveInFlightRef = useRef(false);
+  const lastAutoSavedDocRef = useRef<Record<string, string>>({});
   const rootRef = useRef<HTMLDivElement>(null);
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
 
   const sessionId = info.sessionId;
+  const workspaceSessionId = info.workspaceSessionId ?? info.sessionId;
+
+  useEffect(() => {
+    panelsRef.current = panels;
+  }, [panels]);
+
+  useEffect(() => {
+    activePanelIdRef.current = activePanelId;
+  }, [activePanelId]);
 
   // Connect on mount, disconnect on unmount.
   useEffect(() => {
@@ -319,12 +437,77 @@ export default function DbClientTab({
   }, [sessionId]);
 
   useEffect(() => {
+    let cancelled = false;
+    setWorkspaceReady(false);
+    const cache = readWorkspaceCache(workspaceSessionId);
+    if (!cache || cache.panels.length === 0) {
+      setWorkspaceReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      const restored: PanelState[] = [];
+      const restoredDocs: Record<string, string> = {};
+      for (const [index, entry] of cache.panels.entries()) {
+        const path = entry.filePath ?? entry.cachePath;
+        if (!path) continue;
+        const exists = await checkFileExists(path).catch(() => false);
+        if (!exists) continue;
+        const doc = await readTextFile(path).catch(() => null);
+        if (doc === null) continue;
+        restoredDocs[entry.id] = doc;
+        restored.push(
+          newPanel({
+            id: entry.id,
+            doc,
+            filePath: entry.filePath,
+            fileName: entry.filePath ? basename(entry.filePath) : entry.fileName,
+            cachePath: entry.filePath ? null : entry.cachePath,
+            dirty: !entry.filePath,
+          }),
+        );
+        if (restored.length >= MAX_PANELS) break;
+        if (index >= MAX_PANELS - 1) break;
+      }
+      if (cancelled) return;
+      if (restored.length === 0) {
+        setWorkspaceReady(true);
+        return;
+      }
+      lastAutoSavedDocRef.current = restoredDocs;
+      setPanels(restored);
+      setActivePanelId(
+        cache.activePanelId && restored.some((panel) => panel.id === cache.activePanelId)
+          ? cache.activePanelId
+          : restored[0].id,
+      );
+      setWorkspaceReady(true);
+    })().catch((err) => {
+      if (!cancelled) {
+        setStatusMessage(`Query workspace restore failed: ${String(err)}`);
+        setWorkspaceReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setStatusMessage, workspaceSessionId]);
+
+  useEffect(() => {
     writeIntSetting(info.engine, "rowLimit", rowLimit);
   }, [info.engine, rowLimit]);
 
   useEffect(() => {
     writeIntSetting(info.engine, "maxResultSheets", maxResultSheets);
   }, [info.engine, maxResultSheets]);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+    writeWorkspaceCache(workspaceSessionId, panels, activePanelId);
+  }, [activePanelId, panels, workspaceReady, workspaceSessionId]);
 
   const patchPanel = useCallback((id: string, patch: Partial<PanelState>) => {
     setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -350,6 +533,60 @@ export default function DbClientTab({
     },
     [updatePanel],
   );
+
+  const autoSaveWorkspace = useCallback(async () => {
+    if (!workspaceReady || autoSaveInFlightRef.current) return;
+    autoSaveInFlightRef.current = true;
+    try {
+      const currentPanels = panelsRef.current;
+      const patches: Record<string, Partial<PanelState>> = {};
+
+      for (const [index, panel] of currentPanels.entries()) {
+        const doc = editorHandles.current[panel.id]?.getValue() ?? panel.doc;
+        const hasTarget = !!panel.filePath || !!panel.cachePath;
+        if (!hasTarget && !doc.trim()) continue;
+        if (hasTarget && lastAutoSavedDocRef.current[panel.id] === doc) continue;
+
+        let targetPath = panel.filePath ?? panel.cachePath;
+        if (!targetPath) {
+          targetPath = await temporaryFilePath(defaultQueryCacheName(info, index + 1));
+          patches[panel.id] = { ...patches[panel.id], cachePath: targetPath };
+        }
+
+        await writeTextFile(targetPath, doc);
+        lastAutoSavedDocRef.current[panel.id] = doc;
+
+        if (panel.filePath) {
+          patches[panel.id] = { ...patches[panel.id], dirty: false };
+        }
+      }
+
+      const patchedIds = Object.keys(patches);
+      if (patchedIds.length === 0) return;
+      const nextPanels = currentPanels.map((panel) =>
+        patches[panel.id] ? { ...panel, ...patches[panel.id] } : panel,
+      );
+      panelsRef.current = nextPanels;
+      setPanels((prev) => prev.map((panel) =>
+        patches[panel.id] ? { ...panel, ...patches[panel.id] } : panel,
+      ));
+      writeWorkspaceCache(workspaceSessionId, nextPanels, activePanelIdRef.current);
+    } catch (err) {
+      setStatusMessage(`Query auto-save failed: ${String(err)}`);
+    } finally {
+      autoSaveInFlightRef.current = false;
+    }
+  }, [info, setStatusMessage, workspaceReady, workspaceSessionId]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void autoSaveWorkspace();
+    }, QUERY_AUTO_SAVE_MS);
+    return () => {
+      clearInterval(timer);
+      void autoSaveWorkspace();
+    };
+  }, [autoSaveWorkspace]);
 
   const anyRunning = panels.some((p) => p.sheets.some((sheet) => sheet.running));
   useEffect(() => {
@@ -454,7 +691,7 @@ export default function DbClientTab({
       const text = sql.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       if (!text.trim()) return;
       if (options?.destination === "new" && panels.length < MAX_PANELS) {
-        const panel = { ...newPanel(), doc: text, dirty: true };
+        const panel = newPanel({ doc: text, dirty: true });
         setPanels((prev) => [...prev, panel]);
         setActivePanelId(panel.id);
         if (options.run) {
@@ -785,6 +1022,7 @@ export default function DbClientTab({
     });
     delete editorHandles.current[id];
     delete historyRef.current[id];
+    delete lastAutoSavedDocRef.current[id];
   };
 
   const closeResultSheet = (panelId: string, sheetId: string) => {
@@ -835,18 +1073,25 @@ export default function DbClientTab({
     const defaultName = panel.fileName ?? `query-${Date.now()}.sql`;
     const path = await selectSaveFilePath(defaultName, panel.filePath ?? undefined);
     if (!path) return;
-    let handleId: string | null = null;
     try {
-      handleId = await writeStreamOpen(path);
-      await writeStreamAppend(handleId, new TextEncoder().encode(sql));
-      await writeStreamClose(handleId);
+      await writeTextFile(path, sql);
+      lastAutoSavedDocRef.current[panel.id] = sql;
       patchPanel(panel.id, {
         filePath: path,
-        fileName: path.split(/[\\/]/).pop() || defaultName,
+        fileName: basename(path) || defaultName,
+        cachePath: null,
         dirty: false,
       });
+      writeWorkspaceCache(
+        workspaceSessionId,
+        panels.map((candidate) =>
+          candidate.id === panel.id
+            ? { ...candidate, filePath: path, fileName: basename(path) || defaultName, cachePath: null, dirty: false }
+            : candidate,
+        ),
+        activePanelId,
+      );
     } catch (err) {
-      if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
       showPanelError(panel.id, String(err));
     }
   };
@@ -868,6 +1113,17 @@ export default function DbClientTab({
           <div className="font-semibold mb-1">Connection failed</div>
           <div className="text-[12px] text-[var(--moba-text-muted)] break-words">{connError}</div>
         </div>
+      </div>
+    );
+  }
+
+  if (!workspaceReady) {
+    return (
+      <div
+        className="h-full w-full flex items-center justify-center text-sm"
+        style={{ background: "var(--moba-bg)", color: "var(--moba-text-muted)" }}
+      >
+        Loading query workspace...
       </div>
     );
   }

@@ -302,6 +302,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "read_file_bytes": {
       return (await vfsReadBytes((args as InvokeArgs)?.path as string)) as T;
     }
+    case "check_file_exists": {
+      try {
+        await vfsStat((args as InvokeArgs)?.path as string);
+        return true as T;
+      } catch {
+        return false as T;
+      }
+    }
     case "read_plist_session_file": {
       const path = (args as InvokeArgs)?.path as string;
       return {
@@ -366,7 +374,10 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "temporary_file_path": {
       const defaultName = ((args as InvokeArgs)?.defaultName as string | undefined) || "query-results.dat";
-      return `/tmp/newmob/query-results/${Date.now()}-${defaultName.replace(/[\\/:*?"<>|]/g, "_")}` as T;
+      const dir = `${VFS_ROOT}/tmp/query-results`;
+      await vfsMkdir(`${VFS_ROOT}/tmp`).catch(() => undefined);
+      await vfsMkdir(dir).catch(() => undefined);
+      return `${dir}/${Date.now()}-${defaultName.replace(/[\\/:*?"<>|]/g, "_")}` as T;
     }
     case "create_local_terminal": {
       throw new Error(

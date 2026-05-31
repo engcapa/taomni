@@ -19,6 +19,8 @@ export interface VncConnectInfo {
  */
 export interface DbConnectInfo {
   sessionId: string;
+  /** Stable saved-session id used for restoring query workspace files. */
+  workspaceSessionId?: string;
   engine: "MySQL" | "PostgreSQL" | "ClickHouse" | "Redis";
   host: string;
   port: number;
