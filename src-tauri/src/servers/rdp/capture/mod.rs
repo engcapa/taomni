@@ -17,9 +17,15 @@ pub(crate) mod wayland;
 #[cfg(target_os = "linux")]
 pub(crate) mod x11;
 
-/// One captured frame: BGRA8888, `stride` bytes per row, `height` rows.
+/// One captured frame or sub-region: BGRA8888, `stride` bytes per row,
+/// `height` rows. `x`/`y` are the top-left origin of this region within the
+/// desktop (0,0 for a full-screen frame), so the display layer can place a
+/// cropped damage rectangle at the right offset in the client's framebuffer.
 pub(crate) struct Frame {
     pub data: Vec<u8>,
+    /// Region origin within the desktop, in pixels.
+    pub x: u16,
+    pub y: u16,
     pub width: u16,
     pub height: u16,
     /// Bytes per row (`>= width * 4`).
@@ -33,8 +39,34 @@ pub(crate) trait Capturer {
     /// Current desktop size in pixels `(width, height)`.
     fn desktop_size(&self) -> (u16, u16);
 
-    /// Capture the current screen contents into a BGRA [`Frame`]. Blocking.
+    /// Capture the whole screen into a BGRA full-frame [`Frame`]. Blocking.
     fn capture(&mut self) -> anyhow::Result<Frame>;
+
+    /// Whether this backend drives itself off change notifications (e.g. X11
+    /// XDamage) rather than fixed-interval polling. Event-driven backends sleep
+    /// until the screen actually changes and return only the changed regions,
+    /// so the caller must NOT add its own poll interval or frame-dedup hashing.
+    fn is_event_driven(&self) -> bool {
+        false
+    }
+
+    /// Drive one update step and return zero or more BGRA regions to send.
+    ///
+    /// - `first` is true only for the very first call on a fresh connection; an
+    ///   event-driven backend MUST return a single full-screen frame then, so
+    ///   the encoder's framebuffer is initialized before any cropped region is
+    ///   sent (the IronRDP encoder only seeds its framebuffer from a
+    ///   full-desktop bitmap; cropped updates diff against it).
+    /// - An empty result means "idle tick, nothing changed" — the caller can
+    ///   loop again (and check for shutdown) without sending anything.
+    ///
+    /// The default implementation is the polling path: capture one full frame.
+    /// The caller is then responsible for its own interval + dedup. Event-driven
+    /// backends override this to block on change notifications and crop.
+    fn next_updates(&mut self, first: bool) -> anyhow::Result<Vec<Frame>> {
+        let _ = first;
+        Ok(vec![self.capture()?])
+    }
 }
 
 /// Build the best available capturer for this platform, or `Err` with a clear

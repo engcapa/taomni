@@ -99,8 +99,12 @@ winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winba
 winreg = "0.55"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# RDP server X11 screen capture (XShm / MIT-SHM via libxcb).
-x11rb = { version = "0.13", features = ["shm"] }
+# RDP server X11 screen capture (XShm / MIT-SHM via libxcb) plus the DAMAGE
+# extension for event-driven, region-cropped capture (only the rectangles the
+# X server reports as changed are read back and encoded — see capture/x11.rs).
+# The `damage` feature transitively enables `xfixes`, which provides the
+# `xfixes::Region` type that `damage_subtract` takes.
+x11rb = { version = "0.13", features = ["shm", "damage"] }
 
 [dev-dependencies]
 tempfile = "3"

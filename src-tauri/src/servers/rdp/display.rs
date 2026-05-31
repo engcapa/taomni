@@ -21,7 +21,7 @@ use ironrdp::server::{
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 
-use super::capture::{create_capturer, Frame};
+use super::capture::{create_capturer, Capturer, Frame};
 use crate::servers::engine::LogEmitter;
 
 /// Display handler handed to the IronRDP builder. Probes the capture backend to
@@ -122,14 +122,17 @@ impl DisplayUpdatesImpl {
         }
     }
 
-    /// Wrap a captured BGRA frame into a full-screen [`BitmapUpdate`].
+    /// Wrap a captured BGRA frame (full screen or a cropped damage region) into
+    /// a [`BitmapUpdate`] placed at the region's origin. The IronRDP encoder
+    /// diffs it against its framebuffer at that offset and encodes only the
+    /// changed tiles, so a small region costs O(region), not O(screen).
     fn frame_to_bitmap(frame: Frame) -> Option<BitmapUpdate> {
         let width = NonZeroU16::new(frame.width)?;
         let height = NonZeroU16::new(frame.height)?;
         let stride = NonZeroUsize::new(frame.stride)?;
         Some(BitmapUpdate {
-            x: 0,
-            y: 0,
+            x: frame.x,
+            y: frame.y,
             width,
             height,
             format: PixelFormat::BgrA32,
@@ -195,14 +198,21 @@ impl RdpServerDisplayUpdates for DisplayUpdatesImpl {
     }
 }
 
-/// Capture-thread body: create the backend on this thread, then loop capturing
-/// frames and sending them to the display task. Exits when the receiver is
+/// Capture-thread body: create the backend on this thread, then loop producing
+/// updates and sending them to the display task. Exits when the receiver is
 /// dropped (client disconnected) or capture errors out.
 ///
-/// Phase 3 frame-suppression: an unchanged frame (same FNV-1a hash as the last
-/// one sent) is dropped here rather than forwarded, so a static desktop costs
-/// nothing downstream. The ironrdp-server encoder still diffs the frames we DO
-/// send and only encodes changed rectangles, so we don't crop here.
+/// Two regimes, chosen by the backend:
+///
+/// - **Event-driven** (X11 XDamage): the backend blocks until the screen
+///   actually changes and returns only the changed regions (the first frame is
+///   full, to seed the encoder framebuffer). No interval, no hashing — idle
+///   costs nothing and a small change sends a small region.
+/// - **Polling fallback** (synthetic, or X11 without DAMAGE, or other
+///   platforms): capture a full frame on a ~30 fps interval and suppress
+///   byte-identical frames with a cheap FNV-1a hash so a static desktop still
+///   costs near-zero downstream. The IronRDP encoder diffs the frames we DO
+///   send and only encodes changed rectangles.
 fn capture_loop(log: LogEmitter, tx: mpsc::Sender<Frame>) {
     let mut capturer = match create_capturer(&log) {
         Ok(c) => c,
@@ -212,8 +222,51 @@ fn capture_loop(log: LogEmitter, tx: mpsc::Sender<Frame>) {
         }
     };
 
-    // ~30 fps ceiling. The idle case is cheap because identical frames are
-    // suppressed below; only changed frames traverse the channel and encoder.
+    if capturer.is_event_driven() {
+        capture_loop_event_driven(capturer.as_mut(), &tx);
+    } else {
+        capture_loop_polling(capturer.as_mut(), &tx);
+    }
+    log.line("capture thread stopped");
+}
+
+/// Damage-driven loop: forward whatever regions the backend reports. The
+/// backend internally blocks on change notifications and caps the frame rate,
+/// so this loop adds no interval of its own. An empty result is an idle tick;
+/// we use it to notice a disconnected client (closed channel) promptly.
+fn capture_loop_event_driven(capturer: &mut dyn Capturer, tx: &mpsc::Sender<Frame>) {
+    let mut first = true;
+    loop {
+        match capturer.next_updates(first) {
+            Ok(frames) => {
+                first = false;
+                if frames.is_empty() {
+                    // Idle tick: nothing changed within the wait budget. Bail
+                    // out if the client went away, otherwise keep waiting.
+                    if tx.is_closed() {
+                        break;
+                    }
+                    continue;
+                }
+                for frame in frames {
+                    if tx.blocking_send(frame).is_err() {
+                        return;
+                    }
+                }
+            }
+            Err(e) => {
+                let _ = tx; // nothing to send; surface and stop
+                tracing::warn!("RDP capture (damage): {}", e);
+                break;
+            }
+        }
+    }
+}
+
+/// Fixed-interval full-frame loop with FNV-1a dedup (used when the backend is
+/// not event-driven). ~30 fps ceiling; identical frames are suppressed so a
+/// static desktop costs nothing downstream.
+fn capture_loop_polling(capturer: &mut dyn Capturer, tx: &mpsc::Sender<Frame>) {
     let frame_interval = std::time::Duration::from_millis(33);
     let mut last_hash: Option<u64> = None;
     let mut first = true;
@@ -233,7 +286,7 @@ fn capture_loop(log: LogEmitter, tx: mpsc::Sender<Frame>) {
                 }
             }
             Err(e) => {
-                log.line(format!("capture error: {}", e));
+                tracing::warn!("RDP capture (polling): {}", e);
                 break;
             }
         }
@@ -241,5 +294,4 @@ fn capture_loop(log: LogEmitter, tx: mpsc::Sender<Frame>) {
             std::thread::sleep(rem);
         }
     }
-    log.line("capture thread stopped");
 }
