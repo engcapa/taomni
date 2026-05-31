@@ -101,14 +101,21 @@
 | `frame_hash` (FNV-1a) | ✅ | 轮询回退路径去重在用 |
 | `changed_tiles` / `TileRect` 瓦片差量 | 🟡 | 已实现 + 单测，但 **`#[allow(dead_code)]` 未接入**（X11 走 XDamage 取脏区，未用瓦片差量）。供无原生脏区后端将来裁剪用，或后续清理 |
 
-## 8. Linux 虚拟/无头会话 (`session.rs`) — plan §7/§9
+## 8. Linux 多用户独立会话 + 无头会话 (`session.rs`) — plan §7/§9
 
-| 功能 | 状态 | 说明 |
+> **结论先行：Linux 多用户/多会话 = ⬜ 未实现（仅能力探测就绪的脚手架）。**
+> 当前所有平台**只有「console 镜像」一种模式**——把本机当前已登录的物理桌面(`:0`)共享出去；**多个客户端连入的是同一个桌面**，不是各自独立的会话。plan §7 设想的「每连接一个独立无头桌面」（xrdp 模型）尚未落地。§7（多用户独立会话）与 §9（无头）在 Linux 上是**同一套机制**（PAM → fork 每用户无头显示服务器 → 捕获该 `DISPLAY`），故合并追踪，统一由 T-11 推进。
+
+| 能力 | 状态 | 说明 |
 |---|---|---|
-| 能力探测 | ✅ | `probe()` 检测 Xvfb / Xorg(dummy) / weston，`summary()` 输出 |
-| `headlessSession` 配置接入 | 🟡 | `rdp.rs` 读取该 flag → 打印能力并诚实告知「本构建仍镜像 console」，**无 fork 后端** |
-| PAM 网关 + 每用户无头后端 fork | ⬜ | 未做（xrdp sesman 模型）；非 Linux `probe()` 恒空 |
-| Windows / macOS 多会话 | ⛔ | 不做（客户端 SKU EULA / 单 GUI 会话） |
+| **console 镜像（单共享桌面）** | ✅ Linux X11 | 当前唯一可用模式：共享物理 `:0`，多客户端看到同一桌面、共享同一光标/输入 |
+| **多用户独立会话（每连接独立桌面）** | ⬜ | xrdp sesman 模型**未实现**。缺 PAM 认证网关 + 按用户 fork 无头后端 + 会话隔离/回收（见 T-11） |
+| **无头会话（无显示器/无显示服务）** | ⬜ | 与上同一机制；后端探测就绪但**无实跑 fork**（见 T-11） |
+| 能力探测（前置件，已完成） | ✅ | `probe()` 检测 Xvfb / Xorg(dummy) / weston，`summary()` 输出；纯 PATH 探测不起进程 |
+| `headlessSession` 配置接入 | 🟡 | `rdp.rs` 读取该 flag → 打印探测到的能力并**诚实告知「本构建仍镜像 console」**，不假装提供独立会话 |
+| Windows / macOS 多用户多会话 | ⛔ | 不做（Windows 客户端 SKU EULA + termsrv 单会话硬限；macOS 单 GUI 会话）。非 Linux `probe()` 恒空 |
+
+> 📌 **一句话**：多用户/多会话目前**没有实现**，只镜像单一 console 桌面。Linux 是唯一可行平台，能力探测脚手架已就绪，真正的 sesman 网关是 **T-11**（性价比最高的进阶项，一步同时拿下 §7 独立会话 + §8 无锁屏隔离问题 + §9 无头）。
 
 ## 9. 音频 (rdpsnd)
 
@@ -243,7 +250,7 @@
 | `rdp/input.rs` | 315 | enigo 键鼠注入 + 扫描码映射(三平台) |
 | `rdp/clipboard.rs` | 276 | CLIPRDR 文本双向桥 |
 | `rdp/diff.rs` | 175 | frame_hash(在用) + changed_tiles(dead_code) |
-| `rdp/session.rs` | 121 | Linux 无头会话能力探测（脚手架） |
+| `rdp/session.rs` | 121 | Linux 多用户/无头会话能力探测（脚手架，未实现 fork 网关） |
 | `rdp/capture/mod.rs` | 128 | `Capturer` trait + 平台路由 |
 | `rdp/capture/x11.rs` | 828 | X11 SHM/GetImage + XDamage 事件驱动 + 区域裁剪 |
 | `rdp/capture/wayland.rs` | 56 | Wayland 检测 + 门户流程文档（无后端） |
