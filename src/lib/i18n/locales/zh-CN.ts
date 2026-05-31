@@ -950,11 +950,21 @@ export const zhCN: DeepPartial<typeof en> = {
       readOnly: "只读导出",
       authorizedKeyPath: "授权密钥文件",
       shell: "Shell",
+      rdpUsername: "用户名",
+      rdpDomain: "域",
+      rdpSecurity: "安全模式",
+      rdpSecHybrid: "NLA（推荐）",
+      rdpSecTls: "仅 TLS",
+      rdpSecNone: "无（不安全）",
+      optional: "可选",
     },
     notes: {
       telnetSecurity: "Telnet 以明文传输凭据和数据，请仅在可信网络中使用。",
       nfsPrivileges: "NFS 导出需要操作系统权限，可能会提示提权。",
       iperfBandwidth: "应用于连接的客户端（Mbit/s）。0 表示不限制。",
+      rdpSelfSigned: "使用存储在应用数据中的自签名证书；客户端首次连接时会看到信任警告。",
+      rdpInsecure:
+        "无安全模式意味着流量不加密；若未设置凭据，任何能访问该端口的人都可完全控制本机桌面。请仅在隔离网络中使用。",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "安全外壳与 SFTP 文件服务器" },
@@ -966,6 +976,7 @@ export const zhCN: DeepPartial<typeof en> = {
       nfs: { label: "NFS", desc: "网络文件系统导出" },
       cron: { label: "Cron", desc: "计划任务执行器" },
       iperf: { label: "iperf", desc: "网络吞吐测试服务器" },
+      rdp: { label: "RDP", desc: "通过 RDP 共享本机桌面（mstsc / FreeRDP）" },
     },
   },
   vnc: {

@@ -13,6 +13,7 @@ import { VncSettings } from "./settings/VncSettings";
 import { NfsSettings } from "./settings/NfsSettings";
 import { CronSettings } from "./settings/CronSettings";
 import { IperfSettings } from "./settings/IperfSettings";
+import { RdpSettings } from "./settings/RdpSettings";
 
 /**
  * Right-hand panel: a header describing the selected server, the shared
@@ -76,6 +77,8 @@ function renderSpecificForm(
       return <CronSettings config={config} onChange={onChange} />;
     case "iperf":
       return <IperfSettings config={config} onChange={onChange} />;
+    case "rdp":
+      return <RdpSettings config={config} onChange={onChange} />;
     default:
       return null;
   }
