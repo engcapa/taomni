@@ -21,66 +21,162 @@
 //!
 //! `view_only` short-circuits all injection.
 
-use std::sync::Mutex;
+use std::sync::mpsc::{self, Sender};
 
 use enigo::{
-    Axis, Button, Coordinate,
+    Axis, Button, Coordinate, Direction,
     Direction::{Press, Release},
-    Enigo, Keyboard, Mouse, Settings,
+    Enigo, Key, Keyboard, Mouse, Settings,
 };
 use ironrdp::server::{KeyboardEvent, MouseEvent, RdpServerInputHandler};
 
 use crate::servers::engine::LogEmitter;
 
+/// A single input action to replay on the local desktop. Every field is plain
+/// `Send` data (ints / `Copy` enums / `char`), so the command — and the
+/// `Sender` that carries it — is `Send` on every platform.
+enum InputCmd {
+    Raw { code: u16, dir: Direction },
+    Key { key: Key, dir: Direction },
+    Button { button: Button, dir: Direction },
+    MoveMouse { x: i32, y: i32, coord: Coordinate },
+    Scroll { length: i32, axis: Axis },
+}
+
+/// RDP server input handler.
+///
+/// `Enigo` is **not `Send`** on macOS (it holds a `CGEventSource`, a thread-affine
+/// `NonNull` pointer), yet `RdpServerInputHandler: Send` and `ironrdp-server`
+/// actually moves the handler onto `spawn_blocking` worker threads. Wrapping the
+/// `Enigo` in a `Mutex` does *not* help — `Mutex<T>: Send` still requires
+/// `T: Send`. So instead of holding the `Enigo` directly, we own it on a single
+/// dedicated thread (the actor) and keep only an `mpsc::Sender<InputCmd>` here.
+/// `Sender<InputCmd>` is `Send` (because `InputCmd` is), which makes `RdpInput`
+/// `Send` uniformly across platforms — no `unsafe impl Send`, no per-OS `cfg`.
+/// As a bonus, all CGEvent posting happens on one consistent thread.
 pub(crate) struct RdpInput {
     log: LogEmitter,
     view_only: bool,
-    /// `None` if enigo failed to initialize (no display / no permission); we log
-    /// once and then silently drop input rather than spamming.
-    /// Wrapped in `Mutex` because `Enigo` on macOS holds a `CGEventSource`
-    /// (`NonNull<…>`) which is not `Send`, but `RdpServerInputHandler` requires it.
-    enigo: Option<Mutex<Enigo>>,
+    /// `None` if enigo failed to initialize (no display / no permission) or the
+    /// actor thread has exited; we log once and then silently drop input.
+    tx: Option<Sender<InputCmd>>,
     warned: bool,
 }
 
 impl RdpInput {
     pub(crate) fn new(log: LogEmitter, view_only: bool) -> Self {
-        let enigo = if view_only {
+        let tx = if view_only {
             None
         } else {
-            match Enigo::new(&Settings::default()) {
-                Ok(e) => Some(Mutex::new(e)),
-                Err(e) => {
-                    log.line(format!(
-                        "input injection unavailable ({}); connection will be view-only",
-                        e
-                    ));
-                    None
-                }
-            }
+            Self::spawn_actor(&log)
         };
         Self {
             log,
             view_only,
-            enigo,
+            tx,
             warned: false,
         }
     }
 
+    /// Spawn the dedicated input thread that owns the `Enigo`. Returns the
+    /// command sender, or `None` if enigo could not be initialized (no display
+    /// / no accessibility permission) — in which case the connection stays
+    /// view-only. `Enigo::new` runs *inside* the thread because the resulting
+    /// value is `!Send` on macOS and so cannot be constructed here and moved in.
+    fn spawn_actor(log: &LogEmitter) -> Option<Sender<InputCmd>> {
+        let (tx, rx) = mpsc::channel::<InputCmd>();
+        // Bootstrap channel: the thread reports back whether `Enigo::new`
+        // succeeded so `new()` can decide view-only vs interactive synchronously.
+        let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
+        let log = log.clone();
+
+        let spawned = std::thread::Builder::new()
+            .name("rdp-input".to_string())
+            .spawn(move || {
+                let mut enigo = match Enigo::new(&Settings::default()) {
+                    Ok(e) => {
+                        let _ = ready_tx.send(Ok(()));
+                        e
+                    }
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(e.to_string()));
+                        return;
+                    }
+                };
+                drop(ready_tx);
+
+                // Drain commands until all senders drop (server shutdown).
+                while let Ok(cmd) = rx.recv() {
+                    apply(&mut enigo, cmd);
+                }
+            });
+
+        if let Err(e) = spawned {
+            log.line(format!(
+                "input injection unavailable (cannot start input thread: {e}); connection will be view-only"
+            ));
+            return None;
+        }
+
+        match ready_rx.recv() {
+            Ok(Ok(())) => Some(tx),
+            Ok(Err(e)) => {
+                log.line(format!(
+                    "input injection unavailable ({e}); connection will be view-only"
+                ));
+                None
+            }
+            Err(_) => {
+                // Thread died before reporting — treat as unavailable.
+                log.line("input injection unavailable (input thread exited during init); connection will be view-only");
+                None
+            }
+        }
+    }
+
     fn warn_if_missing(&mut self) {
-        if !self.view_only && self.enigo.is_none() && !self.warned {
+        if !self.view_only && self.tx.is_none() && !self.warned {
             self.warned = true;
             self.log.line("input dropped: no injection backend");
         }
     }
 
-    fn with_enigo<F: FnOnce(&mut Enigo)>(&mut self, f: F) {
+    /// Send one command to the actor thread. Drops the sender (and warns once)
+    /// if the actor has exited so a dead thread doesn't silently swallow input.
+    fn send(&mut self, cmd: InputCmd) {
         if self.view_only {
             return;
         }
         self.warn_if_missing();
-        if let Some(m) = &self.enigo {
-            f(&mut m.lock().unwrap());
+        if let Some(tx) = &self.tx {
+            if tx.send(cmd).is_err() {
+                // Actor thread is gone; stop trying and warn once.
+                self.tx = None;
+                self.warned = false;
+                self.warn_if_missing();
+            }
+        }
+    }
+}
+
+/// Replay a single command on the thread-owned `Enigo`. Errors are ignored
+/// (best-effort injection) exactly as before.
+fn apply(enigo: &mut Enigo, cmd: InputCmd) {
+    match cmd {
+        InputCmd::Raw { code, dir } => {
+            let _ = enigo.raw(code, dir);
+        }
+        InputCmd::Key { key, dir } => {
+            let _ = enigo.key(key, dir);
+        }
+        InputCmd::Button { button, dir } => {
+            let _ = enigo.button(button, dir);
+        }
+        InputCmd::MoveMouse { x, y, coord } => {
+            let _ = enigo.move_mouse(x, y, coord);
+        }
+        InputCmd::Scroll { length, axis } => {
+            let _ = enigo.scroll(length, axis);
         }
     }
 }
@@ -90,22 +186,22 @@ impl RdpServerInputHandler for RdpInput {
         match event {
             KeyboardEvent::Pressed { code, extended } => {
                 if let Some(raw) = rdp_scancode_to_raw(code, extended) {
-                    self.with_enigo(|e| { let _ = e.raw(raw, Press); });
+                    self.send(InputCmd::Raw { code: raw, dir: Press });
                 }
             }
             KeyboardEvent::Released { code, extended } => {
                 if let Some(raw) = rdp_scancode_to_raw(code, extended) {
-                    self.with_enigo(|e| { let _ = e.raw(raw, Release); });
+                    self.send(InputCmd::Raw { code: raw, dir: Release });
                 }
             }
             KeyboardEvent::UnicodePressed(c) => {
                 if let Some(ch) = char::from_u32(u32::from(c)) {
-                    self.with_enigo(|e| { let _ = e.key(enigo::Key::Unicode(ch), Press); });
+                    self.send(InputCmd::Key { key: Key::Unicode(ch), dir: Press });
                 }
             }
             KeyboardEvent::UnicodeReleased(c) => {
                 if let Some(ch) = char::from_u32(u32::from(c)) {
-                    self.with_enigo(|e| { let _ = e.key(enigo::Key::Unicode(ch), Release); });
+                    self.send(InputCmd::Key { key: Key::Unicode(ch), dir: Release });
                 }
             }
             KeyboardEvent::Synchronize(_flags) => {
@@ -118,42 +214,46 @@ impl RdpServerInputHandler for RdpInput {
     fn mouse(&mut self, event: MouseEvent) {
         match event {
             MouseEvent::Move { x, y } => {
-                self.with_enigo(|e| { let _ = e.move_mouse(i32::from(x), i32::from(y), Coordinate::Abs); });
+                self.send(InputCmd::MoveMouse {
+                    x: i32::from(x),
+                    y: i32::from(y),
+                    coord: Coordinate::Abs,
+                });
             }
             MouseEvent::LeftPressed => {
-                self.with_enigo(|e| { let _ = e.button(Button::Left, Press); });
+                self.send(InputCmd::Button { button: Button::Left, dir: Press });
             }
             MouseEvent::LeftReleased => {
-                self.with_enigo(|e| { let _ = e.button(Button::Left, Release); });
+                self.send(InputCmd::Button { button: Button::Left, dir: Release });
             }
             MouseEvent::RightPressed => {
-                self.with_enigo(|e| { let _ = e.button(Button::Right, Press); });
+                self.send(InputCmd::Button { button: Button::Right, dir: Press });
             }
             MouseEvent::RightReleased => {
-                self.with_enigo(|e| { let _ = e.button(Button::Right, Release); });
+                self.send(InputCmd::Button { button: Button::Right, dir: Release });
             }
             MouseEvent::MiddlePressed => {
-                self.with_enigo(|e| { let _ = e.button(Button::Middle, Press); });
+                self.send(InputCmd::Button { button: Button::Middle, dir: Press });
             }
             MouseEvent::MiddleReleased => {
-                self.with_enigo(|e| { let _ = e.button(Button::Middle, Release); });
+                self.send(InputCmd::Button { button: Button::Middle, dir: Release });
             }
             MouseEvent::Button4Pressed => {
                 // `Button::Back`/`Forward` don't exist on macOS in enigo 0.3.
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.with_enigo(|e| { let _ = e.button(Button::Back, Press); });
+                self.send(InputCmd::Button { button: Button::Back, dir: Press });
             }
             MouseEvent::Button4Released => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.with_enigo(|e| { let _ = e.button(Button::Back, Release); });
+                self.send(InputCmd::Button { button: Button::Back, dir: Release });
             }
             MouseEvent::Button5Pressed => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.with_enigo(|e| { let _ = e.button(Button::Forward, Press); });
+                self.send(InputCmd::Button { button: Button::Forward, dir: Press });
             }
             MouseEvent::Button5Released => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.with_enigo(|e| { let _ = e.button(Button::Forward, Release); });
+                self.send(InputCmd::Button { button: Button::Forward, dir: Release });
             }
             MouseEvent::VerticalScroll { value } => {
                 // RDP wheel units are 120 per notch; positive = up. enigo's
@@ -165,19 +265,19 @@ impl RdpServerInputHandler for RdpInput {
                     notches
                 };
                 if notches != 0 {
-                    self.with_enigo(|e| { let _ = e.scroll(notches, Axis::Vertical); });
+                    self.send(InputCmd::Scroll { length: notches, axis: Axis::Vertical });
                 }
             }
             MouseEvent::Scroll { x, y } => {
                 if x != 0 {
-                    self.with_enigo(|e| { let _ = e.scroll(x, Axis::Horizontal); });
+                    self.send(InputCmd::Scroll { length: x, axis: Axis::Horizontal });
                 }
                 if y != 0 {
-                    self.with_enigo(|e| { let _ = e.scroll(y, Axis::Vertical); });
+                    self.send(InputCmd::Scroll { length: y, axis: Axis::Vertical });
                 }
             }
             MouseEvent::RelMove { x, y } => {
-                self.with_enigo(|e| { let _ = e.move_mouse(x, y, Coordinate::Rel); });
+                self.send(InputCmd::MoveMouse { x, y, coord: Coordinate::Rel });
             }
         }
     }
@@ -278,6 +378,16 @@ fn macos_scancode_to_keycode(scancode: u8) -> Option<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `RdpServerInputHandler: Send` and `ironrdp-server` moves the handler onto
+    /// `spawn_blocking` threads, so `RdpInput` MUST be `Send` on every platform —
+    /// including macOS, where `Enigo` is `!Send`. This static assertion fails to
+    /// compile if someone reintroduces a non-`Send` field (e.g. holding `Enigo`
+    /// directly again), catching the macOS-only build break on every platform.
+    const _: fn() = || {
+        fn assert_send<T: Send>() {}
+        assert_send::<RdpInput>();
+    };
 
     #[test]
     fn main_block_is_scancode_plus_eight() {
