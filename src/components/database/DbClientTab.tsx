@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
 import {
   Play,
   SquareDashedMousePointer,
@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Maximize2,
   Minimize2,
+  ChevronRight,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -406,6 +407,9 @@ export default function DbClientTab({
   const autoSaveInFlightRef = useRef(false);
   const lastAutoSavedDocRef = useRef<Record<string, string>>({});
   const rootRef = useRef<HTMLDivElement>(null);
+  const schemaPanelRef = useRef<ImperativePanelHandle | null>(null);
+  const lastVisibleSchemaWidthRef = useRef(24);
+  const [schemaCollapsed, setSchemaCollapsed] = useState(false);
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
 
@@ -1199,6 +1203,36 @@ export default function DbClientTab({
 
   const activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0];
 
+  useEffect(() => {
+    setSchemaCollapsed(initialWidth === 0);
+    if (initialWidth > 0) {
+      lastVisibleSchemaWidthRef.current = initialWidth;
+    }
+  }, [initialWidth]);
+
+  const expandSchemaPanel = () => {
+    const nextSize = clampInt(lastVisibleSchemaWidthRef.current || 24, 12, 50);
+    schemaPanelRef.current?.resize(nextSize);
+    setSchemaCollapsed(false);
+    try {
+      localStorage.setItem(widthKey(info.engine), String(nextSize));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleSchemaResize = (size: number) => {
+    if (size > 0) {
+      lastVisibleSchemaWidthRef.current = size;
+    }
+    setSchemaCollapsed(size === 0);
+    try {
+      localStorage.setItem(widthKey(info.engine), String(size));
+    } catch {
+      /* ignore */
+    }
+  };
+
   if (connError) {
     return (
       <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
@@ -1315,20 +1349,37 @@ export default function DbClientTab({
           </>
         )}
       </FloatingToolbar>
+      {schemaCollapsed && (
+        <button
+          type="button"
+          data-testid="db-schema-drawer-handle"
+          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--moba-hover)]"
+          style={{
+            background: "var(--moba-panel-bg)",
+            borderColor: "var(--moba-divider)",
+            color: "var(--moba-text-muted)",
+          }}
+          title="Show database objects"
+          aria-label="Show database objects"
+          onClick={expandSchemaPanel}
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+          <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>
+            Objects
+          </span>
+        </button>
+      )}
       <PanelGroup direction="horizontal" autoSaveId={`db-client-${info.engine}`} className="flex-1 min-h-0">
         <Panel
+          ref={schemaPanelRef}
           defaultSize={initialWidth}
           minSize={12}
           collapsedSize={0}
           collapsible
           maxSize={50}
-          onResize={(size) => {
-            try {
-              localStorage.setItem(widthKey(info.engine), String(size));
-            } catch {
-              /* ignore */
-            }
-          }}
+          onCollapse={() => setSchemaCollapsed(true)}
+          onExpand={() => setSchemaCollapsed(false)}
+          onResize={handleSchemaResize}
         >
           <div className="h-full" style={{ borderRight: "1px solid var(--moba-divider)" }}>
             {connected && (
@@ -1437,17 +1488,22 @@ export default function DbClientTab({
               )}
               <PanelGroup direction="vertical" className="flex-1 min-h-0">
                 <Panel defaultSize={45} minSize={15}>
-                  <SqlEditorPanel
-                    engine={info.engine}
-                    initialDoc={activePanel.doc}
-                    schema={schemaMap}
-                    handleRef={(h) => {
-                      editorHandles.current[activePanel.id] = h;
-                    }}
-                    onDocChange={(doc) => patchPanel(activePanel.id, { doc, dirty: true })}
-                    onFocus={() => setActivePanelId(activePanel.id)}
-                    onRun={(sql) => runQuery(activePanel.id, sql)}
-                  />
+                  <div
+                    className="h-full w-full"
+                    onContextMenu={(event) => openPanelMenu(event, activePanel)}
+                  >
+                    <SqlEditorPanel
+                      engine={info.engine}
+                      initialDoc={activePanel.doc}
+                      schema={schemaMap}
+                      handleRef={(h) => {
+                        editorHandles.current[activePanel.id] = h;
+                      }}
+                      onDocChange={(doc) => patchPanel(activePanel.id, { doc, dirty: true })}
+                      onFocus={() => setActivePanelId(activePanel.id)}
+                      onRun={(sql) => runQuery(activePanel.id, sql)}
+                    />
+                  </div>
                 </Panel>
                 <PanelResizeHandle className="h-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-row-resize" />
                 <Panel minSize={15}>
