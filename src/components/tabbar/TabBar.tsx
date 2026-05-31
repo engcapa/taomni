@@ -12,6 +12,7 @@ import {
   Trash2,
   FileText,
   Pencil,
+  Database as DatabaseIcon,
   ChevronFirst,
   ChevronLast,
   ChevronLeft,
@@ -30,7 +31,7 @@ import {
   useCustomDropTarget,
   type CustomDragData,
 } from "../../lib/customDnD";
-import type { Tab, TabKind, LocalShellSelection } from "../../types";
+import type { Tab, LocalShellSelection } from "../../types";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import {
   listLocalShells,
@@ -401,13 +402,31 @@ export function TabBar({
   );
 }
 
-function TabIcon({ kind, ssh }: { kind: TabKind; ssh?: boolean }) {
-  if (kind === "terminal" && ssh) {
+function dbEngineColor(engine?: string): string {
+  switch (engine) {
+    case "MySQL":
+      return "#00758f";
+    case "PostgreSQL":
+      return "#336791";
+    case "ClickHouse":
+      return "#e6a817";
+    case "Redis":
+      return "#d82c20";
+    default:
+      return "#2b5d8b";
+  }
+}
+
+function TabIcon({ tab }: { tab: Tab }) {
+  if (tab.type === "terminal" && tab.ssh) {
     return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }
-  switch (kind) {
+  switch (tab.type) {
     case "terminal":
       return <TerminalIcon className="w-3 h-3" style={{ color: "#62d36f" }} />;
+    case "database":
+    case "redis":
+      return <DatabaseIcon className="w-3 h-3" style={{ color: dbEngineColor(tab.db?.engine) }} />;
     case "sftp":
       return <Folder className="w-3 h-3" style={{ color: "#3b7ac2" }} />;
     case "rdp":
@@ -570,7 +589,7 @@ function TabItem(props: TabItemProps) {
         </button>
       )}
       <div className="relative flex-shrink-0">
-        <TabIcon kind={tab.type} ssh={!!tab.ssh} />
+        <TabIcon tab={tab} />
         {tab.hasNewOutput && (
           <span
             className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 pointer-events-none"

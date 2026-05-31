@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Network,
   HelpCircle,
+  Database,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
@@ -29,12 +30,14 @@ import {
   selectFolderPath,
   selectPrivateKeyFile,
   testSshConnection,
+  dbTestConnection,
   vaultPut,
   isVaultReference,
   isVaultLockedError,
   listWslDistros,
   type WslDistro,
 } from "../../lib/ipc";
+import type { DbConnectInfo } from "../../types";
 import { getAppPlatform } from "../../lib/runtime";
 import {
   getSessionNetworkSettings,
@@ -83,9 +86,10 @@ import { useT, type TranslateFn } from "../../lib/i18n";
 
 type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
-  | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL";
+  | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
+  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Redis";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp";
+type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -102,13 +106,20 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "Mosh",    icon: <Server className="w-7 h-7" />,       color: "#7a3d9d" },
   { id: "S3",      icon: <Cloud className="w-7 h-7" />,        color: "#cc6f00" },
   { id: "WSL",     icon: <TerminalIcon className="w-7 h-7" />, color: "#0078d4" },
+  { id: "MySQL",      icon: <Database className="w-7 h-7" />, color: "#00758f" },
+  { id: "PostgreSQL", icon: <Database className="w-7 h-7" />, color: "#336791" },
+  { id: "ClickHouse", icon: <Database className="w-7 h-7" />, color: "#e6a817" },
+  { id: "Redis",      icon: <Database className="w-7 h-7" />, color: "#d82c20" },
 ];
 
 const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22, Telnet: 23, Rlogin: 513, RDP: 3389, VNC: 5900,
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
+  MySQL: 3306, PostgreSQL: 5432, ClickHouse: 9000, Redis: 6379,
 };
+
+const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Redis"];
 
 /** Map UI proto to the backend session_type string. */
 function protoToSessionType(p: Proto): string {
@@ -940,9 +951,178 @@ function BookmarkSettings({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Main component                                                     */
+/*  Database settings sub-form                                         */
 /* ------------------------------------------------------------------ */
 
+function DatabaseSettings({
+  proto,
+  username, setUsername,
+  password, setPassword,
+  passwordRef, clearPasswordRef,
+  showPwd, setShowPwd,
+  saveInVault, setSaveInVault,
+  vaultState,
+  database, setDatabase,
+  ssl, setSsl,
+  timeoutSecs, setTimeoutSecs,
+  httpPort, setHttpPort,
+  chProtocol, setChProtocol,
+  redisDbIndex, setRedisDbIndex,
+}: {
+  proto: Proto;
+  username: string; setUsername: (v: string) => void;
+  password: string; setPassword: (v: string) => void;
+  passwordRef: string; clearPasswordRef: () => void;
+  showPwd: boolean; setShowPwd: (v: boolean) => void;
+  saveInVault: boolean; setSaveInVault: (v: boolean) => void;
+  vaultState: "empty" | "locked" | "unlocked";
+  database: string; setDatabase: (v: string) => void;
+  ssl: boolean; setSsl: (v: boolean) => void;
+  timeoutSecs: string; setTimeoutSecs: (v: string) => void;
+  httpPort: string; setHttpPort: (v: string) => void;
+  chProtocol: string; setChProtocol: (v: string) => void;
+  redisDbIndex: string; setRedisDbIndex: (v: string) => void;
+}) {
+  const isRedis = proto === "Redis";
+  const isClickHouse = proto === "ClickHouse";
+  return (
+    <div data-testid="database-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <Field label="Username">
+        <input
+          className="moba-input w-64"
+          value={username}
+          aria-label="Database username"
+          placeholder={isRedis ? "(optional — ACL user)" : "database user"}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+      </Field>
+
+      <Field label="Password">
+        <div className="relative">
+          <input
+            className="moba-input pr-7 w-64"
+            type={showPwd ? "text" : "password"}
+            value={password}
+            aria-label="Database password"
+            placeholder={passwordRef ? "•••••• (saved in vault)" : ""}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordRef) clearPasswordRef();
+            }}
+          />
+          <button
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
+            onClick={() => setShowPwd(!showPwd)}
+            title="Show / hide password"
+            type="button"
+          >
+            {showPwd
+              ? <EyeOff className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />
+              : <Eye className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />}
+          </button>
+        </div>
+        <label
+          className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+          title={vaultState === "empty" ? "Set up the vault first to save passwords" : "Encrypt and store this password in the vault"}
+        >
+          <input
+            type="checkbox"
+            className="moba-checkbox"
+            data-testid="db-save-in-vault"
+            checked={saveInVault}
+            onChange={(e) => setSaveInVault(e.target.checked)}
+            disabled={vaultState === "empty"}
+          />
+          Save in vault
+        </label>
+        <span className="moba-pill">
+          <Shield className="w-3 h-3" /> Encrypted
+        </span>
+      </Field>
+
+      {!isRedis && (
+        <Field label="Database">
+          <input
+            className="moba-input w-64"
+            value={database}
+            aria-label="Database name"
+            placeholder="database / schema name"
+            onChange={(e) => setDatabase(e.target.value)}
+          />
+        </Field>
+      )}
+
+      {isRedis && (
+        <>
+          <Field label="DB index">
+            <input
+              className="moba-input w-20"
+              type="number"
+              min={0}
+              max={15}
+              value={redisDbIndex}
+              aria-label="Redis DB index"
+              onChange={(e) => setRedisDbIndex(e.target.value)}
+            />
+            <span className="ml-2 text-[var(--moba-text-muted)]">0–15</span>
+          </Field>
+          <Field label="Key prefix">
+            <input
+              className="moba-input w-64"
+              value={database}
+              aria-label="Redis key prefix"
+              placeholder="(optional) default SCAN prefix"
+              onChange={(e) => setDatabase(e.target.value)}
+            />
+          </Field>
+        </>
+      )}
+
+      {isClickHouse && (
+        <>
+          <Field label="HTTP port">
+            <input
+              className="moba-input w-24"
+              value={httpPort}
+              aria-label="ClickHouse HTTP port"
+              placeholder="8123"
+              onChange={(e) => setHttpPort(e.target.value)}
+            />
+          </Field>
+          <Field label="Protocol">
+            <Select
+              value={chProtocol}
+              className="w-40"
+              options={["HTTP", "Native"]}
+              onChange={setChProtocol}
+            />
+          </Field>
+        </>
+      )}
+
+      <Field label="SSL / TLS">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={ssl} onChange={setSsl} />
+          Use encrypted connection
+        </label>
+      </Field>
+
+      <Field label="Timeout">
+        <input
+          className="moba-input w-20"
+          value={timeoutSecs}
+          aria-label="Connection timeout seconds"
+          onChange={(e) => setTimeoutSecs(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--moba-text-muted)]">seconds</span>
+      </Field>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
 interface SessionEditorProps {
   session?: SessionConfig;
   defaultGroupPath?: string | null;
@@ -1035,6 +1215,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
   const [fileExtraArgs, setFileExtraArgs] = useState(() => optionString(initialOptions, "fileExtraArgs", ""));
 
+  /* --- database session options (MySQL/PostgreSQL/ClickHouse/Redis) --- */
+  const [dbDatabase, setDbDatabase] = useState(() => optionString(initialOptions, "dbDatabase", ""));
+  const [dbSsl, setDbSsl] = useState(() => optionBoolean(initialOptions, "dbSsl", false));
+  const [dbTimeout, setDbTimeout] = useState(() => optionString(initialOptions, "dbTimeout", "15"));
+  const [dbHttpPort, setDbHttpPort] = useState(() => optionString(initialOptions, "dbHttpPort", "8123"));
+  const [dbChProtocol, setDbChProtocol] = useState(() => optionString(initialOptions, "dbChProtocol", "HTTP"));
+  const [dbRedisIndex, setDbRedisIndex] = useState(() => optionString(initialOptions, "dbRedisIndex", "0"));
+
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
@@ -1100,6 +1288,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const needsHost = !["Serial", "File", "Shell", "WSL"].includes(proto);
   const isSSH = ["SSH", "SFTP"].includes(proto);
   const isRdp = proto === "RDP";
+  const isDb = DB_PROTOS.includes(proto);
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -1129,6 +1318,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // For File proto only the Bookmark sub-tab is meaningful; jump there so
     // the user lands on the relevant content.
     if (p === "File") setSection("bookmark");
+    // DB protos open straight to the dedicated Database settings tab.
+    if (DB_PROTOS.includes(p)) setSection("database");
   };
 
   /* Keep authMethod in sync with the radio group */
@@ -1171,6 +1362,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       proto === "RDP"
         ? (JSON.parse(serializeRdpOptions(rdpOptions)) as Record<string, unknown>)
         : {};
+    const dbOverrides: Record<string, unknown> = isDb
+      ? {
+          dbDatabase,
+          dbSsl,
+          dbTimeout,
+          dbHttpPort,
+          dbChProtocol,
+          dbRedisIndex,
+        }
+      : {};
 
     return JSON.stringify({
       ...previousOptions,
@@ -1192,6 +1393,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         : { ...networkSettingsValue, proxyPass: "" },
       ...wslOverrides,
       ...rdpOverrides,
+      ...dbOverrides,
     });
   };
 
@@ -1244,21 +1446,22 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
     setSaveError(null);
 
-    // If the user wants to remember the SSH password and typed a fresh
-    // plaintext into the password field, push it into the vault first and
-    // capture the resulting `vault:<id>` reference. We do this *before*
+    // If the user wants to remember the SSH/database password and typed a
+    // fresh plaintext into the password field, push it into the vault first
+    // and capture the resulting `vault:<id>` reference. We do this *before*
     // building the config so the reference lands in options_json.
     let nextPasswordRef = passwordRef;
     if (
-      isSSH &&
-      authMethod === "Password" &&
+      (isSSH || isDb) &&
+      (isDb || authMethod === "Password") &&
       saveInVault &&
       vaultState !== "empty" &&
       password.length > 0
     ) {
       try {
+        const kind = isDb ? "db-password" : "ssh-password";
         const label = `${username || "user"}@${host || "?"}:${port}`;
-        const result = await vaultPut("ssh-password", label, password);
+        const result = await vaultPut(kind, label, password);
         nextPasswordRef = result.reference;
         setPasswordRef(result.reference);
         setPassword("");
@@ -1369,6 +1572,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setTags(optionString(nextOptions, "tags", ""));
     setFileEmbedInTab(optionBoolean(nextOptions, "fileEmbedInTab", true));
     setFileExtraArgs(optionString(nextOptions, "fileExtraArgs", ""));
+    setDbDatabase(optionString(nextOptions, "dbDatabase", ""));
+    setDbSsl(optionBoolean(nextOptions, "dbSsl", false));
+    setDbTimeout(optionString(nextOptions, "dbTimeout", "15"));
+    setDbHttpPort(optionString(nextOptions, "dbHttpPort", "8123"));
+    setDbChProtocol(optionString(nextOptions, "dbChProtocol", "HTTP"));
+    setDbRedisIndex(optionString(nextOptions, "dbRedisIndex", "0"));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -1473,8 +1682,48 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
+  /** Build a one-shot `DbConnectInfo` from the current editor state. The
+   *  password prefers the freshly-typed plaintext, falling back to a saved
+   *  vault reference (resolved server-side). */
+  const buildDbConnectInfo = (): DbConnectInfo => ({
+    sessionId: session?.id ?? "db-editor-test",
+    engine: proto as DbConnectInfo["engine"],
+    host,
+    port: parseInt(port) || DEFAULT_PORTS[proto] || 0,
+    username: username || null,
+    password: password || passwordRef || undefined,
+    database: dbDatabase || null,
+    ssl: dbSsl,
+    timeoutSecs: parseInt(dbTimeout) || null,
+    httpPort: proto === "ClickHouse" ? parseInt(dbHttpPort) || 8123 : null,
+    protocol: proto === "ClickHouse" ? dbChProtocol.toLowerCase() : null,
+    dbIndex: proto === "Redis" ? parseInt(dbRedisIndex) || 0 : null,
+  });
+
+  const handleTestDbConnection = async () => {
+    if (!host) {
+      setTestResult({ ok: false, msg: t("sessionEditor2.errHostRequired") });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const msg = await dbTestConnection(buildDbConnectInfo());
+      setTestResult({ ok: true, msg });
+    } catch (err) {
+      setTestResult({ ok: false, msg: String(err) });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = proto === "File"
     ? [
+        { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+      ]
+    : isDb
+    ? [
+        { id: "database", label: t("sessionEditor2.sectionDatabase"), icon: <Database className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : [
@@ -1492,17 +1741,21 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   /* If we switched away from SSH and were on the advanced tab, fall back.
    * Likewise default RDP to its own options tab and bounce non-RDP protos
-   * off the rdp tab. */
+   * off the rdp tab, and DB protos onto the database tab. */
   const activeSection =
     proto === "File"
       ? "bookmark"
-      : section === "advanced" && !isSSH
-        ? (isRdp ? "rdp" : "terminal")
-        : section === "rdp" && !isRdp
-          ? "terminal"
-          : section === "terminal" && isRdp
-            ? "rdp"
-            : section;
+      : isDb
+        ? (section === "database" || section === "bookmark" ? section : "database")
+        : section === "advanced" && !isSSH
+          ? (isRdp ? "rdp" : "terminal")
+          : section === "rdp" && !isRdp
+            ? "terminal"
+            : section === "terminal" && isRdp
+              ? "rdp"
+              : section === "database"
+                ? "terminal"
+                : section;
 
   return (
     <div
@@ -1792,6 +2045,25 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               <RdpOptionsForm options={rdpOptions} onChange={setRdpOptions} />
             </div>
           )}
+          {activeSection === "database" && isDb && (
+            <div data-testid="session-database-section">
+              <DatabaseSettings
+                proto={proto}
+                username={username} setUsername={(v) => { setUsername(v); setSpecifyUser(true); }}
+                password={password} setPassword={setPassword}
+                passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
+                showPwd={showPwd} setShowPwd={setShowPwd}
+                saveInVault={saveInVault} setSaveInVault={setSaveInVault}
+                vaultState={vaultState}
+                database={dbDatabase} setDatabase={setDbDatabase}
+                ssl={dbSsl} setSsl={setDbSsl}
+                timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
+                httpPort={dbHttpPort} setHttpPort={setDbHttpPort}
+                chProtocol={dbChProtocol} setChProtocol={setDbChProtocol}
+                redisDbIndex={dbRedisIndex} setRedisDbIndex={setDbRedisIndex}
+              />
+            </div>
+          )}
           {activeSection === "network" && (
             <NetworkSettings
               t={t}
@@ -1826,6 +2098,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             <button
               className="moba-btn flex items-center gap-1.5"
               onClick={handleTestConnection}
+              disabled={testing}
+              type="button"
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
+            </button>
+          )}
+          {isDb && (
+            <button
+              className="moba-btn flex items-center gap-1.5"
+              data-testid="db-test-connection"
+              onClick={() => void handleTestDbConnection()}
               disabled={testing}
               type="button"
             >

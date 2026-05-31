@@ -1,5 +1,5 @@
 // DetachedSessionWindow — universal route renderer for any session kind
-// (rdp/vnc/terminal) opened in its own OS window via the Tauri
+// (rdp/vnc/terminal/database) opened in its own OS window via the Tauri
 // `open_detached_window` command. SFTP retains its dedicated route
 // (`SftpDetachedWindow`) for backward compatibility.
 //
@@ -35,6 +35,7 @@ import {
 } from "../../lib/detachedSession";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import type { RdpOptions } from "../../types/rdp";
+import type { DbConnectInfo } from "../../types";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
@@ -49,6 +50,7 @@ import { useAppStore } from "../../stores/appStore";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
 const VncPanel = lazy(() => import("../vnc/VncPanel"));
+const DbClientTab = lazy(() => import("../database/DbClientTab"));
 
 /* ── Handoff payload shapes ──────────────────────────────────────────── */
 
@@ -78,6 +80,11 @@ export interface DetachedTerminalParams {
   localShell?: LocalShellSelection | null;
   terminalProfile?: TerminalProfile | null;
   reattach?: TerminalReattachState;
+}
+
+export interface DetachedDbParams {
+  title?: string;
+  info: DbConnectInfo;
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
@@ -440,6 +447,19 @@ function renderInner(
           onDetachedStateChange={onTerminalStateChange}
           visible
         />
+      );
+    }
+    case "database": {
+      const p = params as DetachedDbParams;
+      return (
+        <Suspense fallback={<LoadingScreen label={tr("rdp.status.connecting")} />}>
+          <DbClientTab
+            tabId={`detached-db-${id}`}
+            info={p.info}
+            visible
+            detachedWindowControls={detachedWindowControls}
+          />
+        </Suspense>
       );
     }
     default:

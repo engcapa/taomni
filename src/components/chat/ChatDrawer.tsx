@@ -10,6 +10,7 @@ import { NewThreadFormatPicker } from "./NewThreadFormatPicker";
 import {
   getTerminal,
 } from "../../lib/terminal/terminalRegistry";
+import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import { useT } from "../../lib/i18n";
 
@@ -63,6 +64,13 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
   const activeThread = threads.find((t) => t.id === activeThreadId);
+  const linkedTabTitle = activeThread?.linked_session_id
+    ? (
+        getTerminal(activeThread.linked_session_id)?.title
+        ?? getQueryTab(activeThread.linked_session_id)?.title
+        ?? activeThread.linked_session_id.slice(0, 8)
+      )
+    : null;
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiProviders = useAiStore((s) => s.config?.llm.providers);
@@ -348,12 +356,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             {activeThread.linked_session_id ? (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-accent)]/10 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30"
-                title={t("chat.boundToTerminal", { id: activeThread.linked_session_id })}
+                title={t("chat.boundToTab", { id: activeThread.linked_session_id })}
               >
                 <Link2 className="w-2.5 h-2.5" />
                 <span className="truncate max-w-[100px]">
-                  {getTerminal(activeThread.linked_session_id)?.title
-                    ?? activeThread.linked_session_id.slice(0, 8)}
+                  {linkedTabTitle}
                 </span>
               </span>
             ) : (
@@ -435,6 +442,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               message={msg}
               format={effectiveFormat}
               preferredTerminalTabId={activeThread?.linked_session_id ?? null}
+              preferredQueryTabId={activeThread?.linked_session_id ?? null}
             />
           ))}
           {sending && (

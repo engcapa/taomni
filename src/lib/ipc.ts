@@ -1,5 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { DbConnectInfo } from "../types";
 
 export interface LocalShellOption {
   id: string;
@@ -455,6 +456,10 @@ export async function checkFileExists(path: string): Promise<boolean> {
   return invoke<boolean>("check_file_exists", { path });
 }
 
+export async function temporaryFilePath(defaultName: string): Promise<string> {
+  return invoke<string>("temporary_file_path", { defaultName });
+}
+
 // --- Command history ────────────────────────────────────────────────
 
 export async function historyAppend(
@@ -671,4 +676,215 @@ export async function tabbyDecryptVault(
   return invoke<TabbyDecryptVaultResponse>("tabby_decrypt_vault", {
     args: { yamlText, masterPassword },
   });
+}
+
+// --- Database client (MySQL / PostgreSQL / ClickHouse / Redis) ---
+
+/** Strip the frontend-only `sessionId` to build the Rust `DbConfig` payload. */
+function toDbConfigPayload(info: DbConnectInfo): Record<string, unknown> {
+  return {
+    engine: info.engine,
+    host: info.host,
+    port: info.port,
+    username: info.username ?? null,
+    password: info.password ?? null,
+    database: info.database ?? null,
+    ssl: info.ssl ?? false,
+    timeoutSecs: info.timeoutSecs ?? null,
+    httpPort: info.httpPort ?? null,
+    protocol: info.protocol ?? null,
+    dbIndex: info.dbIndex ?? null,
+  };
+}
+
+export interface DbConnectResult {
+  ok: boolean;
+}
+
+export async function dbConnect(info: DbConnectInfo): Promise<DbConnectResult> {
+  return withVaultLockedNotice(() =>
+    invoke<DbConnectResult>("db_connect", {
+      sessionId: info.sessionId,
+      config: toDbConfigPayload(info),
+    }),
+  );
+}
+
+export async function dbPing(sessionId: string): Promise<string> {
+  return invoke<string>("db_ping", { sessionId });
+}
+
+/**
+ * One-shot connection health check used by the "Test connection" button in the
+ * session editor. Opens a throwaway connection, pings it, then disconnects so
+ * no handle lingers in `AppState`.
+ */
+export async function dbTestConnection(info: DbConnectInfo): Promise<string> {
+  const probeId = `db-test-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+  const probe: DbConnectInfo = { ...info, sessionId: probeId };
+  await dbConnect(probe);
+  try {
+    return await dbPing(probeId);
+  } finally {
+    await dbDisconnect(probeId).catch(() => undefined);
+  }
+}
+
+export async function dbDisconnect(sessionId: string): Promise<void> {
+  return invoke("db_disconnect", { sessionId });
+}
+
+export interface DbSchema {
+  name: string;
+}
+
+export interface DbTable {
+  name: string;
+  kind: "table" | "view" | "materialized_view";
+  rowCount?: number | null;
+}
+
+export interface DbColumnDescription {
+  name: string;
+  type: string;
+  nullable: boolean;
+  default: string | null;
+  primaryKey: boolean;
+}
+
+export interface DbIndex {
+  name: string;
+  columns: string[];
+  unique: boolean;
+}
+
+export interface DbColumn {
+  name: string;
+  type: string;
+}
+
+export interface DbQueryResult {
+  columns: DbColumn[];
+  rows: (string | null)[][];
+  rowsAffected: number;
+  durationMs: number;
+  warnings: string[];
+}
+
+export type DbQueryStreamEvent =
+  | { kind: "columns"; columns: DbColumn[] }
+  | { kind: "rows"; rows: (string | null)[][] }
+  | { kind: "done"; rowsAffected: number; durationMs: number; warnings: string[] };
+
+export async function dbListSchemas(sessionId: string): Promise<DbSchema[]> {
+  return invoke<DbSchema[]>("db_list_schemas", { sessionId });
+}
+
+export async function dbListTables(
+  sessionId: string,
+  schema?: string | null,
+): Promise<DbTable[]> {
+  return invoke<DbTable[]>("db_list_tables", { sessionId, schema: schema ?? null });
+}
+
+export async function dbDescribeTable(
+  sessionId: string,
+  schema: string | null,
+  table: string,
+): Promise<DbColumnDescription[]> {
+  return invoke<DbColumnDescription[]>("db_describe_table", {
+    sessionId,
+    schema: schema ?? null,
+    table,
+  });
+}
+
+export async function dbListIndexes(
+  sessionId: string,
+  schema: string | null,
+  table: string,
+): Promise<DbIndex[]> {
+  return invoke<DbIndex[]>("db_list_indexes", {
+    sessionId,
+    schema: schema ?? null,
+    table,
+  });
+}
+
+export async function dbExecute(sessionId: string, sql: string): Promise<DbQueryResult> {
+  return invoke<DbQueryResult>("db_execute", { sessionId, sql });
+}
+
+export async function dbExecuteStream(
+  sessionId: string,
+  sql: string,
+  maxRows: number | null,
+  onEvent: (event: DbQueryStreamEvent) => void,
+): Promise<void> {
+  const channel = new Channel<DbQueryStreamEvent>();
+  channel.onmessage = onEvent;
+  return invoke("db_execute_stream", { sessionId, sql, maxRows: maxRows ?? null, onEvent: channel });
+}
+
+export async function dbCancel(sessionId: string): Promise<void> {
+  return invoke("db_cancel", { sessionId });
+}
+
+// --- Redis ---
+
+export interface RedisKeyEntry {
+  key: string;
+  type: "string" | "hash" | "list" | "set" | "zset" | "stream" | "none";
+  /** TTL seconds: -1 persistent, -2 missing, else seconds remaining. */
+  ttl: number;
+}
+
+export interface RedisScanPage {
+  cursor: string;
+  keys: RedisKeyEntry[];
+}
+
+export interface RedisValue {
+  kind: "string" | "hash" | "list" | "set" | "zset" | "stream" | "none";
+  /** Shape depends on kind — see Rust `RedisValue` doc. */
+  value: unknown;
+  ttl: number;
+  encoding: string | null;
+  memoryUsage: number | null;
+}
+
+export async function redisListKeys(
+  sessionId: string,
+  pattern: string,
+  cursor: string,
+  count: number,
+): Promise<RedisScanPage> {
+  return invoke<RedisScanPage>("redis_list_keys", {
+    sessionId,
+    pattern,
+    cursor,
+    count,
+  });
+}
+
+export async function redisGetKey(sessionId: string, key: string): Promise<RedisValue> {
+  return invoke<RedisValue>("redis_get_key", { sessionId, key });
+}
+
+export async function redisSetKey(
+  sessionId: string,
+  key: string,
+  kind: string,
+  value: unknown,
+  ttl?: number | null,
+): Promise<void> {
+  return invoke("redis_set_key", { sessionId, key, kind, value, ttl: ttl ?? null });
+}
+
+export async function redisDelKey(sessionId: string, key: string): Promise<void> {
+  return invoke("redis_del_key", { sessionId, key });
+}
+
+export async function redisExec(sessionId: string, rawCommand: string): Promise<string> {
+  return invoke<string>("redis_exec", { sessionId, rawCommand });
 }
