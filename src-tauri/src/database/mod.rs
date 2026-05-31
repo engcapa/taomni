@@ -13,9 +13,12 @@ pub mod sql;
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::ipc::Channel;
 use tauri::State;
 use tokio::sync::Mutex as AsyncMutex;
+use tokio::task::JoinHandle;
+use tokio::time::MissedTickBehavior;
 use tokio_util::sync::CancellationToken;
 
 use crate::state::AppState;
@@ -193,13 +196,19 @@ pub enum DbHandle {
 pub struct DbSession {
     pub handle: DbHandle,
     pub cancel: AsyncMutex<CancellationToken>,
+    shutdown: CancellationToken,
+    keepalive: Option<JoinHandle<()>>,
 }
 
 impl DbSession {
     fn new(handle: DbHandle) -> Self {
+        let shutdown = CancellationToken::new();
+        let keepalive = start_keepalive(&handle, shutdown.clone());
         Self {
             handle,
             cancel: AsyncMutex::new(CancellationToken::new()),
+            shutdown,
+            keepalive,
         }
     }
 
@@ -210,6 +219,75 @@ impl DbSession {
         let token = CancellationToken::new();
         *guard = token.clone();
         token
+    }
+}
+
+fn start_keepalive(handle: &DbHandle, shutdown: CancellationToken) -> Option<JoinHandle<()>> {
+    const KEEPALIVE_INTERVAL_SECS: u64 = 30;
+
+    match handle {
+        DbHandle::MySql(pool) => {
+            let pool = pool.clone();
+            Some(tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(Duration::from_secs(KEEPALIVE_INTERVAL_SECS));
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        _ = shutdown.cancelled() => break,
+                        _ = interval.tick() => {
+                            let _ = sql::ping_mysql(&pool).await;
+                        }
+                    }
+                }
+            }))
+        }
+        DbHandle::Postgres(pool) => {
+            let pool = pool.clone();
+            Some(tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(Duration::from_secs(KEEPALIVE_INTERVAL_SECS));
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        _ = shutdown.cancelled() => break,
+                        _ = interval.tick() => {
+                            let _ = sql::ping_postgres(&pool).await;
+                        }
+                    }
+                }
+            }))
+        }
+        DbHandle::ClickHouse(client) => {
+            let client = client.clone();
+            Some(tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(Duration::from_secs(KEEPALIVE_INTERVAL_SECS));
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        _ = shutdown.cancelled() => break,
+                        _ = interval.tick() => {
+                            let _ = clickhouse::ping(&client).await;
+                        }
+                    }
+                }
+            }))
+        }
+        DbHandle::Redis(_) => None,
+    }
+}
+
+async fn close_session(session: Arc<DbSession>) {
+    session.shutdown.cancel();
+    if let Some(task) = &session.keepalive {
+        task.abort();
+    }
+    session.cancel.lock().await.cancel();
+    match &session.handle {
+        DbHandle::MySql(pool) => pool.close().await,
+        DbHandle::Postgres(pool) => pool.close().await,
+        DbHandle::ClickHouse(_) | DbHandle::Redis(_) => {}
     }
 }
 
@@ -263,9 +341,14 @@ pub async fn db_connect(
         other => return Err(format!("Unsupported database engine: {other}")),
     };
     let session = Arc::new(DbSession::new(handle));
-    let mut map = state.db_connections.write().await;
-    // If a stale session exists under this id, drop it first.
-    map.insert(session_id, session);
+    let previous = {
+        let mut map = state.db_connections.write().await;
+        // If a stale session exists under this id, close it after releasing the map lock.
+        map.insert(session_id, session)
+    };
+    if let Some(previous) = previous {
+        close_session(previous).await;
+    }
     Ok(DbConnectResult { ok: true })
 }
 
@@ -287,13 +370,7 @@ pub async fn db_disconnect(state: State<'_, AppState>, session_id: String) -> Re
         map.remove(&session_id)
     };
     if let Some(session) = removed {
-        // Trip any in-flight query, then close the underlying pool.
-        session.cancel.lock().await.cancel();
-        match &session.handle {
-            DbHandle::MySql(pool) => pool.close().await,
-            DbHandle::Postgres(pool) => pool.close().await,
-            DbHandle::ClickHouse(_) | DbHandle::Redis(_) => {}
-        }
+        close_session(session).await;
     }
     Ok(())
 }
@@ -390,17 +467,20 @@ pub async fn db_execute_stream(
     state: State<'_, AppState>,
     session_id: String,
     sql: String,
+    max_rows: Option<u64>,
     on_event: QueryStreamChannel,
 ) -> Result<(), String> {
     let session = get_session(&state, &session_id).await?;
     let token = session.fresh_cancel_token().await;
     match &session.handle {
-        DbHandle::MySql(pool) => sql::execute_mysql_stream(pool, &sql, &token, &on_event).await,
+        DbHandle::MySql(pool) => {
+            sql::execute_mysql_stream(pool, &sql, max_rows, &token, &on_event).await
+        }
         DbHandle::Postgres(pool) => {
-            sql::execute_postgres_stream(pool, &sql, &token, &on_event).await
+            sql::execute_postgres_stream(pool, &sql, max_rows, &token, &on_event).await
         }
         DbHandle::ClickHouse(client) => {
-            clickhouse::execute_stream(client, &sql, &token, &on_event).await
+            clickhouse::execute_stream(client, &sql, max_rows, &token, &on_event).await
         }
         DbHandle::Redis(_) => Err("Use redis_exec for Redis commands".into()),
     }

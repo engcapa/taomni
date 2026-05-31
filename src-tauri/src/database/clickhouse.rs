@@ -243,29 +243,33 @@ struct ClickHouseStreamState {
     names: Option<Vec<String>>,
     columns_sent: bool,
     row_count: u64,
+    max_rows: Option<u64>,
+    limit_reached: bool,
     batch: Vec<Vec<Option<String>>>,
 }
 
 impl ClickHouseStreamState {
-    fn new() -> Self {
+    fn new(max_rows: Option<u64>) -> Self {
         Self {
             names: None,
             columns_sent: false,
             row_count: 0,
+            max_rows: max_rows.filter(|value| *value > 0),
+            limit_reached: false,
             batch: Vec::with_capacity(STREAM_BATCH_ROWS),
         }
     }
 
-    fn process_line(&mut self, line: &[u8], on_event: &QueryStreamChannel) -> Result<(), String> {
+    fn process_line(&mut self, line: &[u8], on_event: &QueryStreamChannel) -> Result<bool, String> {
         let line = trim_json_line(line);
         if line.is_empty() {
-            return Ok(());
+            return Ok(true);
         }
         let values: Vec<serde_json::Value> = serde_json::from_slice(line)
             .map_err(|e| format!("ClickHouse stream parse failed: {e}"))?;
         if !self.columns_sent && self.names.is_none() {
             self.names = Some(values.into_iter().map(json_value_label).collect());
-            return Ok(());
+            return Ok(true);
         }
         if !self.columns_sent {
             let names = self.names.take().unwrap_or_default();
@@ -280,12 +284,20 @@ impl ClickHouseStreamState {
                 .collect();
             send_query_stream_event(on_event, QueryStreamEvent::Columns { columns })?;
             self.columns_sent = true;
-            return Ok(());
+            return Ok(true);
+        }
+
+        if self.max_rows.is_some_and(|limit| self.row_count >= limit) {
+            self.limit_reached = true;
+            return Ok(false);
         }
 
         self.batch
             .push(values.iter().map(json_cell_to_string).collect());
         self.row_count += 1;
+        if self.max_rows.is_some_and(|limit| self.row_count >= limit) {
+            self.limit_reached = true;
+        }
         if self.batch.len() >= STREAM_BATCH_ROWS {
             send_query_stream_event(
                 on_event,
@@ -294,7 +306,7 @@ impl ClickHouseStreamState {
                 },
             )?;
         }
-        Ok(())
+        Ok(!self.limit_reached)
     }
 
     fn finish(self, on_event: &QueryStreamChannel, duration_ms: u64) -> Result<(), String> {
@@ -306,7 +318,10 @@ impl ClickHouseStreamState {
             QueryStreamEvent::Done {
                 rows_affected: self.row_count,
                 duration_ms,
-                warnings: Vec::new(),
+                warnings: match (self.limit_reached, self.max_rows) {
+                    (true, Some(limit)) => vec![format!("Result limited to {limit} rows")],
+                    _ => Vec::new(),
+                },
             },
         )
     }
@@ -329,6 +344,7 @@ fn json_value_label(v: serde_json::Value) -> String {
 pub async fn execute_stream(
     client: &ClickHouseClient,
     sql: &str,
+    max_rows: Option<u64>,
     token: &CancellationToken,
     on_event: &QueryStreamChannel,
 ) -> Result<(), String> {
@@ -344,7 +360,7 @@ pub async fn execute_stream(
         let resp = post_sql_response(client, &query, token).await?;
         let mut stream = resp.bytes_stream();
         let mut pending = Vec::<u8>::new();
-        let mut state = ClickHouseStreamState::new();
+        let mut state = ClickHouseStreamState::new(max_rows);
 
         loop {
             let next = tokio::select! {
@@ -358,7 +374,10 @@ pub async fn execute_stream(
             pending.extend_from_slice(&chunk);
             while let Some(pos) = pending.iter().position(|b| *b == b'\n') {
                 let line: Vec<u8> = pending.drain(..=pos).collect();
-                state.process_line(&line, on_event)?;
+                if !state.process_line(&line, on_event)? {
+                    pending.clear();
+                    return state.finish(on_event, start.elapsed().as_millis() as u64);
+                }
             }
         }
 

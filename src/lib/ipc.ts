@@ -814,11 +814,12 @@ export async function dbExecute(sessionId: string, sql: string): Promise<DbQuery
 export async function dbExecuteStream(
   sessionId: string,
   sql: string,
+  maxRows: number | null,
   onEvent: (event: DbQueryStreamEvent) => void,
 ): Promise<void> {
   const channel = new Channel<DbQueryStreamEvent>();
   channel.onmessage = onEvent;
-  return invoke("db_execute_stream", { sessionId, sql, onEvent: channel });
+  return invoke("db_execute_stream", { sessionId, sql, maxRows: maxRows ?? null, onEvent: channel });
 }
 
 export async function dbCancel(sessionId: string): Promise<void> {

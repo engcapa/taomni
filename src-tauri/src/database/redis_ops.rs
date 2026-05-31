@@ -229,7 +229,10 @@ pub async fn set_key(
     let mut c = conn.lock().await;
     match kind {
         "string" => {
-            let s = value.as_str().map(|s| s.to_string()).unwrap_or_else(|| value.to_string());
+            let s = value
+                .as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| value.to_string());
             redis::cmd("SET")
                 .arg(key)
                 .arg(s)
@@ -239,14 +242,21 @@ pub async fn set_key(
         }
         "hash" => {
             // Replace the whole hash: DEL then HSET field/value pairs.
-            redis::cmd("DEL").arg(key).query_async::<i64>(&mut *c).await.ok();
-            let pairs = value.as_array().ok_or("hash value must be an array of [field,value]")?;
+            redis::cmd("DEL")
+                .arg(key)
+                .query_async::<i64>(&mut *c)
+                .await
+                .ok();
+            let pairs = value
+                .as_array()
+                .ok_or("hash value must be an array of [field,value]")?;
             if !pairs.is_empty() {
                 let mut cmd = redis::cmd("HSET");
                 cmd.arg(key);
                 for pair in pairs {
                     let p = pair.as_array().ok_or("hash entry must be [field,value]")?;
-                    cmd.arg(json_str(&p[0])).arg(json_str(p.get(1).unwrap_or(&json!(""))));
+                    cmd.arg(json_str(&p[0]))
+                        .arg(json_str(p.get(1).unwrap_or(&json!(""))));
                 }
                 cmd.query_async::<()>(&mut *c)
                     .await
@@ -254,7 +264,11 @@ pub async fn set_key(
             }
         }
         "list" => {
-            redis::cmd("DEL").arg(key).query_async::<i64>(&mut *c).await.ok();
+            redis::cmd("DEL")
+                .arg(key)
+                .query_async::<i64>(&mut *c)
+                .await
+                .ok();
             let items = value.as_array().ok_or("list value must be an array")?;
             if !items.is_empty() {
                 let mut cmd = redis::cmd("RPUSH");
@@ -268,7 +282,11 @@ pub async fn set_key(
             }
         }
         "set" => {
-            redis::cmd("DEL").arg(key).query_async::<i64>(&mut *c).await.ok();
+            redis::cmd("DEL")
+                .arg(key)
+                .query_async::<i64>(&mut *c)
+                .await
+                .ok();
             let members = value.as_array().ok_or("set value must be an array")?;
             if !members.is_empty() {
                 let mut cmd = redis::cmd("SADD");
@@ -282,14 +300,21 @@ pub async fn set_key(
             }
         }
         "zset" => {
-            redis::cmd("DEL").arg(key).query_async::<i64>(&mut *c).await.ok();
-            let pairs = value.as_array().ok_or("zset value must be an array of [score,member]")?;
+            redis::cmd("DEL")
+                .arg(key)
+                .query_async::<i64>(&mut *c)
+                .await
+                .ok();
+            let pairs = value
+                .as_array()
+                .ok_or("zset value must be an array of [score,member]")?;
             if !pairs.is_empty() {
                 let mut cmd = redis::cmd("ZADD");
                 cmd.arg(key);
                 for pair in pairs {
                     let p = pair.as_array().ok_or("zset entry must be [score,member]")?;
-                    cmd.arg(json_str(&p[0])).arg(json_str(p.get(1).unwrap_or(&json!(""))));
+                    cmd.arg(json_str(&p[0]))
+                        .arg(json_str(p.get(1).unwrap_or(&json!(""))));
                 }
                 cmd.query_async::<()>(&mut *c)
                     .await
@@ -334,15 +359,14 @@ pub async fn exec(
     for arg in &parts[1..] {
         cmd.arg(arg);
     }
-    let value: Value = cmd
-        .query_async(&mut *c)
-        .await
-        .map_err(|e| format!("{e}"))?;
+    let value: Value = cmd.query_async(&mut *c).await.map_err(|e| format!("{e}"))?;
     Ok(value_to_string(&value).unwrap_or_default())
 }
 
 fn json_str(v: &serde_json::Value) -> String {
-    v.as_str().map(|s| s.to_string()).unwrap_or_else(|| v.to_string())
+    v.as_str()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| v.to_string())
 }
 
 /// Split a raw CLI line into tokens, honouring single/double quotes.
@@ -424,6 +448,10 @@ fn value_to_string(value: &Value) -> Option<String> {
                 .collect::<Vec<_>>()
                 .join("\n"),
         ),
-        Value::ServerError(e) => Some(format!("(error) {} {}", e.code(), e.details().unwrap_or(""))),
+        Value::ServerError(e) => Some(format!(
+            "(error) {} {}",
+            e.code(),
+            e.details().unwrap_or("")
+        )),
     }
 }

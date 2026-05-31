@@ -76,6 +76,103 @@ export async function captureContainerCanvasesPng(
   });
 }
 
+/** Capture a DOM element to PNG using an SVG foreignObject snapshot.
+ *  This is intended for regular DOM surfaces such as database grids. Canvas-
+ *  backed views should keep using their dedicated capture paths. */
+export async function captureElementPng(element: HTMLElement): Promise<Blob> {
+  return await canvasToBlob(await renderElementToCanvas(element));
+}
+
+/** Render a DOM element to a canvas frame, useful for visible screenshots,
+ *  manual scroll capture, and GIF frame sources. */
+export async function renderElementToCanvas(element: HTMLElement): Promise<HTMLCanvasElement> {
+  const rect = element.getBoundingClientRect();
+  const width = Math.max(1, Math.ceil(rect.width));
+  const height = Math.max(1, Math.ceil(rect.height));
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  inlineComputedStyles(element, clone);
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.margin = "0";
+  clone.style.transform = "none";
+
+  const markup = new XMLSerializer().serializeToString(clone);
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`,
+    `<foreignObject width="100%" height="100%">${markup}</foreignObject>`,
+    "</svg>",
+  ].join("");
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = await loadImage(url);
+    const canvas = document.createElement("canvas");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2D context unavailable");
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = resolvedBackground(element);
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to render DOM snapshot"));
+    image.src = url;
+  });
+}
+
+function inlineComputedStyles(source: Element, target: Element): void {
+  if (target instanceof HTMLElement || target instanceof SVGElement) {
+    const computed = window.getComputedStyle(source);
+    const style = (target as HTMLElement | SVGElement).style;
+    for (let i = 0; i < computed.length; i += 1) {
+      const property = computed.item(i);
+      style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+    }
+  }
+
+  if (source instanceof HTMLInputElement && target instanceof HTMLInputElement) {
+    target.setAttribute("value", source.value);
+    if (source.checked) target.setAttribute("checked", "checked");
+  } else if (source instanceof HTMLTextAreaElement && target instanceof HTMLTextAreaElement) {
+    target.textContent = source.value;
+  } else if (source instanceof HTMLSelectElement && target instanceof HTMLSelectElement) {
+    target.value = source.value;
+    Array.from(target.options).forEach((option) => {
+      if (option.value === source.value) option.setAttribute("selected", "selected");
+      else option.removeAttribute("selected");
+    });
+  }
+
+  const sourceChildren = Array.from(source.children);
+  const targetChildren = Array.from(target.children);
+  for (let i = 0; i < sourceChildren.length; i += 1) {
+    if (targetChildren[i]) inlineComputedStyles(sourceChildren[i], targetChildren[i]);
+  }
+}
+
+function resolvedBackground(element: HTMLElement): string {
+  let cursor: HTMLElement | null = element;
+  while (cursor) {
+    const color = window.getComputedStyle(cursor).backgroundColor;
+    if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+    cursor = cursor.parentElement;
+  }
+  return "#ffffff";
+}
+
 // ── Xterm rendering ────────────────────────────────────────────────────
 
 export interface XtermCaptureTheme {

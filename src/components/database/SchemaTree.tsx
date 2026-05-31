@@ -28,8 +28,9 @@ interface SchemaTreeProps {
   onSelectTable?: (schema: string | null, table: string) => void;
   /** Called when a table is double-clicked — inserts its name into the editor. */
   onInsertTable?: (table: string) => void;
-  /** "Select top 1000 rows" context action. */
+  /** "Select top N rows" context action. */
   onQuickSelect?: (schema: string | null, table: string) => void;
+  quickSelectLimit?: number;
   /** Bubble up schema names for the editor toolbar selector. */
   onSchemasLoaded?: (schemas: string[]) => void;
   /** Bubble up the loaded schema → tables/columns for editor autocomplete. */
@@ -56,6 +57,7 @@ export function SchemaTree({
   onSelectTable,
   onInsertTable,
   onQuickSelect,
+  quickSelectLimit = 1000,
   onSchemasLoaded,
   onSchemaLoaded,
 }: SchemaTreeProps) {
@@ -142,7 +144,7 @@ export function SchemaTree({
 
   const tableMenu = (schema: string, table: string): MenuItem[] => [
     {
-      label: "Select top 1000 rows",
+      label: `Select top ${quickSelectLimit} rows`,
       onClick: () => onQuickSelect?.(schema, table),
     },
     {

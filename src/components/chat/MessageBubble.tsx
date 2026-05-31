@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../../stores/chatStore";
-import { Check, Copy, Send, ShieldAlert } from "lucide-react";
+import { Check, Copy, Database, Send, ShieldAlert } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "../agent/ActionCard";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { renderFormatted, type ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import {
   CodeBlockToolbar,
+  prepareQueryInput,
   prepareTerminalInput,
   splitFencedBlocks,
   type PreparedTerminalInput,
@@ -16,6 +17,10 @@ import {
   getTerminal,
   type TerminalRegistryEntry,
 } from "../../lib/terminal/terminalRegistry";
+import {
+  getQueryTab,
+  type QueryRegistryEntry,
+} from "../../lib/queryRegistry";
 import { useT } from "../../lib/i18n";
 
 interface MessageBubbleProps {
@@ -28,6 +33,8 @@ interface MessageBubbleProps {
    * global threads — the toolbars fall back to the active terminal.
    */
   preferredTerminalTabId?: string | null;
+  /** Query tab the parent thread is bound to, when applicable. */
+  preferredQueryTabId?: string | null;
 }
 
 interface InlineToolCall {
@@ -76,12 +83,18 @@ function parseInlineToolCalls(text: string): { stripped: string; toolCalls: Inli
   return { stripped, toolCalls };
 }
 
-export function MessageBubble({ message, format = "md", preferredTerminalTabId }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  format = "md",
+  preferredTerminalTabId,
+  preferredQueryTabId,
+}: MessageBubbleProps) {
   const t = useT();
   const isUser = message.role === "user";
   const [executed, setExecuted] = useState<Record<number, "approved" | "denied">>({});
   const [copied, setCopied] = useState(false);
   const [sentAll, setSentAll] = useState(false);
+  const [sentAllQuery, setSentAllQuery] = useState(false);
   const [pendingSendAll, setPendingSendAll] = useState<PendingMessageTerminalSend | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -101,6 +114,17 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
     }
     return null;
   }, [preferredTerminalTabId, activeTabId, activeTabType]);
+
+  const queryTargetEntry = useMemo<QueryRegistryEntry | null>(() => {
+    if (preferredQueryTabId) {
+      const e = getQueryTab(preferredQueryTabId);
+      if (e) return e;
+    }
+    if (activeTabType === "database" && activeTabId) {
+      return getQueryTab(activeTabId);
+    }
+    return null;
+  }, [preferredQueryTabId, activeTabId, activeTabType]);
 
   const { stripped, toolCalls } = isUser
     ? { stripped: message.content, toolCalls: [] as InlineToolCall[] }
@@ -152,10 +176,8 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
   };
 
   // Decorate every inline `<code>` (i.e., NOT inside a <pre>) in the rendered
-  // body with a click-to-send affordance. The user can shift+click an inline
-  // command to push it into the active terminal — useful when the assistant
-  // hands back things like "run `git pull`" without a fenced block. Visual
-  // hint comes from a CSS class that surfaces a tiny ▶ on hover.
+  // body with a click-to-send affordance. Inline snippets go to the active
+  // terminal when available, otherwise to the active DB query tab.
   useEffect(() => {
     if (isUser) return;
     const root = bodyRef.current;
@@ -167,15 +189,27 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
       // dedicated CodeBlockToolbar. We only target true inline code.
       if (codeEl.closest("pre")) return;
       codeEl.classList.add("ai-chat-inline-code");
-      codeEl.title = t("chat.inlineCodeTitle");
+      codeEl.title = targetEntry
+        ? t("chat.inlineCodeTitle")
+        : queryTargetEntry
+          ? t("chat.inlineCodeQueryTitle")
+          : t("chat.inlineCodeNoTargetTitle");
       const onClick = (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
         const text = codeEl.textContent ?? "";
-        if (!text || !targetEntry) return;
-        const payload = prepareTerminalInput(text);
-        if (!payload) return;
-        targetEntry.writeInput(payload.text);
+        if (!text) return;
+        if (targetEntry) {
+          const payload = prepareTerminalInput(text);
+          if (!payload) return;
+          targetEntry.writeInput(payload.text);
+        } else if (queryTargetEntry) {
+          const payload = prepareQueryInput(text);
+          if (!payload) return;
+          queryTargetEntry.insertQuery(payload);
+        } else {
+          return;
+        }
         codeEl.classList.add("ai-chat-inline-code-sent");
         window.setTimeout(() => codeEl.classList.remove("ai-chat-inline-code-sent"), 800);
       };
@@ -184,8 +218,8 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
     });
     return () => cleanups.forEach((fn) => fn());
     // Re-run when the rendered HTML structure changes (new tokens during
-    // streaming) or when the target terminal flips.
-  }, [isUser, stripped, format, targetEntry]);
+    // streaming) or when the target terminal/query tab flips.
+  }, [isUser, stripped, format, targetEntry, queryTargetEntry, t]);
 
   // Collect every fenced code block in this assistant message. Used by the
   // header's "全部发送" button — common case is the assistant proposing a
@@ -212,6 +246,15 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
       return;
     }
     commitSendAll(targetEntry, payload);
+  };
+
+  const handleSendAllToQuery = () => {
+    if (!queryTargetEntry || codeBlocks.length === 0) return;
+    const payload = prepareQueryInput(codeBlocks.join("\n\n"));
+    if (!payload) return;
+    queryTargetEntry.insertQuery(payload);
+    setSentAllQuery(true);
+    window.setTimeout(() => setSentAllQuery(false), 1200);
   };
 
   return (
@@ -250,6 +293,22 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
               <span>{t("chat.sendAllLabel")}</span>
             </button>
           )}
+          {!isUser && codeBlocks.length > 0 && queryTargetEntry && (
+            <button
+              type="button"
+              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] text-[10px] text-[var(--moba-text)] hover:bg-[var(--moba-hover)]"
+              onClick={handleSendAllToQuery}
+              title={t("chat.sendAllToQuery", { count: codeBlocks.length, target: queryTargetEntry.title })}
+              aria-label={t("chat.sendAllQueryAria")}
+            >
+              {sentAllQuery ? (
+                <Check className="w-3 h-3 text-green-400" />
+              ) : (
+                <Database className="w-3 h-3" />
+              )}
+              <span>{t("chat.sendAllQueryLabel")}</span>
+            </button>
+          )}
           <button
             type="button"
             className="h-5 w-5 p-0 inline-flex items-center justify-center rounded border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]"
@@ -276,6 +335,7 @@ export function MessageBubble({ message, format = "md", preferredTerminalTabId }
                     code={seg.value}
                     lang={seg.lang}
                     preferredTabId={preferredTerminalTabId}
+                    preferredQueryTabId={preferredQueryTabId}
                   />
                 );
               }

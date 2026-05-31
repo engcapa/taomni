@@ -83,6 +83,7 @@ import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
+import { setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
@@ -636,7 +637,7 @@ export function MainLayout() {
   }, [activeTabId, setTabHasNewOutput]);
 
   // Track which tab the AI Chat Drawer should consider "active" when the user
-  // types `@terminal:last-N` or hits Send-to-Terminal on a code block.
+  // types `@terminal:last-N` or sends generated SQL back to a query tab.
   // `setActiveTerminalTab` is terminal-only (that registry pulls xterm
   // buffers), but a tab-bound chat drawer can belong to any tab kind that
   // exposes a chat toggle (terminal + rdp + database), so the drawer-sync gets the
@@ -644,6 +645,7 @@ export function MainLayout() {
   useEffect(() => {
     const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
     setActiveTerminalTab(terminalTabId);
+    setActiveQueryTab(activeTab?.type === "database" ? activeTabId : null);
     const chatBoundTabId =
       activeTab?.type === "terminal" || activeTab?.type === "rdp" || activeTab?.type === "database"
         ? activeTabId

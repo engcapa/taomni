@@ -2,7 +2,10 @@
 //! based on the column's SQL type so the frontend grid can render them as text
 //! with a distinct NULL badge.
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time::{Duration, Instant},
+};
 
 use futures::TryStreamExt;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode};
@@ -51,6 +54,7 @@ pub async fn connect_mysql(config: &DbConfig, password: Option<&str>) -> Result<
     let pool = MySqlPoolOptions::new()
         .max_connections(1)
         .acquire_timeout(timeout(config))
+        .test_before_acquire(true)
         .connect_with(opts)
         .await
         .map_err(|e| format!("MySQL connect failed: {e}"))?;
@@ -80,6 +84,7 @@ pub async fn connect_postgres(
     let pool = PgPoolOptions::new()
         .max_connections(1)
         .acquire_timeout(timeout(config))
+        .test_before_acquire(true)
         .connect_with(opts)
         .await
         .map_err(|e| format!("PostgreSQL connect failed: {e}"))?;
@@ -215,6 +220,13 @@ fn is_query(sql: &str) -> bool {
     )
 }
 
+fn limit_warning(limit_reached: bool, max_rows: Option<u64>) -> Vec<String> {
+    match (limit_reached, max_rows) {
+        (true, Some(limit)) => vec![format!("Result limited to {limit} rows")],
+        _ => Vec::new(),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Execute
 // ---------------------------------------------------------------------------
@@ -332,6 +344,7 @@ pub async fn execute_postgres(
 pub async fn execute_mysql_stream(
     pool: &sqlx::Pool<sqlx::MySql>,
     sql: &str,
+    max_rows: Option<u64>,
     token: &CancellationToken,
     on_event: &QueryStreamChannel,
 ) -> Result<(), String> {
@@ -339,9 +352,16 @@ pub async fn execute_mysql_stream(
     if is_query(sql) {
         let mut stream = sqlx::query(sql).fetch(pool);
         let mut columns_sent = false;
+        let mut row_count = 0_u64;
+        let max_rows = max_rows.filter(|value| *value > 0);
+        let mut limit_reached = false;
         let mut batch: Vec<Vec<Option<String>>> = Vec::with_capacity(STREAM_BATCH_ROWS);
 
         loop {
+            if max_rows.is_some_and(|limit| row_count >= limit) {
+                limit_reached = true;
+                break;
+            }
             let next = tokio::select! {
                 _ = token.cancelled() => return Err("Query cancelled".into()),
                 r = stream.try_next() => r.map_err(|e| format!("Query failed: {e}"))?,
@@ -368,6 +388,7 @@ pub async fn execute_mysql_stream(
                 vals.push(mysql_value_to_string(&row, i));
             }
             batch.push(vals);
+            row_count += 1;
             if batch.len() >= STREAM_BATCH_ROWS {
                 send_query_stream_event(
                     on_event,
@@ -386,7 +407,7 @@ pub async fn execute_mysql_stream(
             QueryStreamEvent::Done {
                 rows_affected: 0,
                 duration_ms: start.elapsed().as_millis() as u64,
-                warnings: Vec::new(),
+                warnings: limit_warning(limit_reached, max_rows),
             },
         )
     } else {
@@ -409,6 +430,7 @@ pub async fn execute_mysql_stream(
 pub async fn execute_postgres_stream(
     pool: &sqlx::Pool<sqlx::Postgres>,
     sql: &str,
+    max_rows: Option<u64>,
     token: &CancellationToken,
     on_event: &QueryStreamChannel,
 ) -> Result<(), String> {
@@ -416,9 +438,16 @@ pub async fn execute_postgres_stream(
     if is_query(sql) {
         let mut stream = sqlx::query(sql).fetch(pool);
         let mut columns_sent = false;
+        let mut row_count = 0_u64;
+        let max_rows = max_rows.filter(|value| *value > 0);
+        let mut limit_reached = false;
         let mut batch: Vec<Vec<Option<String>>> = Vec::with_capacity(STREAM_BATCH_ROWS);
 
         loop {
+            if max_rows.is_some_and(|limit| row_count >= limit) {
+                limit_reached = true;
+                break;
+            }
             let next = tokio::select! {
                 _ = token.cancelled() => return Err("Query cancelled".into()),
                 r = stream.try_next() => r.map_err(|e| format!("Query failed: {e}"))?,
@@ -445,6 +474,7 @@ pub async fn execute_postgres_stream(
                 vals.push(pg_value_to_string(&row, i));
             }
             batch.push(vals);
+            row_count += 1;
             if batch.len() >= STREAM_BATCH_ROWS {
                 send_query_stream_event(
                     on_event,
@@ -463,7 +493,7 @@ pub async fn execute_postgres_stream(
             QueryStreamEvent::Done {
                 rows_affected: 0,
                 duration_ms: start.elapsed().as_millis() as u64,
-                warnings: Vec::new(),
+                warnings: limit_warning(limit_reached, max_rows),
             },
         )
     } else {
@@ -487,20 +517,190 @@ pub async fn execute_postgres_stream(
 // Schema introspection — MySQL
 // ---------------------------------------------------------------------------
 
+fn quote_mysql_ident(ident: &str) -> String {
+    format!("`{}`", ident.replace('`', "``"))
+}
+
+fn quote_mysql_table(schema: Option<&str>, table: &str) -> String {
+    match schema {
+        Some(schema) => format!("{}.{}", quote_mysql_ident(schema), quote_mysql_ident(table)),
+        None => quote_mysql_ident(table),
+    }
+}
+
+fn add_mysql_schema_name(names: &mut BTreeSet<String>, name: Option<String>) {
+    if let Some(name) = name.map(|n| n.trim().to_string()) {
+        if !name.is_empty() {
+            names.insert(name);
+        }
+    }
+}
+
+async fn current_mysql_database(
+    pool: &sqlx::Pool<sqlx::MySql>,
+) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query("SELECT DATABASE()")
+        .fetch_optional(pool)
+        .await?
+        .and_then(|r| r.try_get::<Option<String>, _>(0).ok().flatten())
+        .map_or(Ok(None), |db| Ok(Some(db)))
+}
+
+async fn list_schemas_mysql_show(
+    pool: &sqlx::Pool<sqlx::MySql>,
+) -> Result<Vec<String>, sqlx::Error> {
+    let rows = sqlx::query("SHOW DATABASES").fetch_all(pool).await?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| mysql_value_to_string(r, 0))
+        .collect())
+}
+
+fn mysql_table_kind(table_type: &str) -> String {
+    if table_type.eq_ignore_ascii_case("VIEW") {
+        "view".to_string()
+    } else {
+        "table".to_string()
+    }
+}
+
+fn mysql_non_unique_is_unique(row: &sqlx::mysql::MySqlRow, index: usize) -> bool {
+    if let Ok(v) = row.try_get::<i64, _>(index) {
+        return v == 0;
+    }
+    if let Ok(v) = row.try_get::<u64, _>(index) {
+        return v == 0;
+    }
+    false
+}
+
+async fn list_tables_mysql_show(
+    pool: &sqlx::Pool<sqlx::MySql>,
+    schema: Option<&str>,
+) -> Result<Vec<TableInfo>, sqlx::Error> {
+    let sql = match schema {
+        Some(schema) => format!("SHOW FULL TABLES FROM {}", quote_mysql_ident(schema)),
+        None => "SHOW FULL TABLES".to_string(),
+    };
+    let rows = sqlx::query(&sql).fetch_all(pool).await?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            let name = mysql_value_to_string(r, 0)?;
+            let table_type = mysql_value_to_string(r, 1).unwrap_or_default();
+            Some(TableInfo {
+                name,
+                kind: mysql_table_kind(&table_type),
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
+async fn describe_table_mysql_show(
+    pool: &sqlx::Pool<sqlx::MySql>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ColumnDescription>, sqlx::Error> {
+    let sql = format!(
+        "SHOW FULL COLUMNS FROM {}",
+        quote_mysql_table(schema, table)
+    );
+    let rows = sqlx::query(&sql).fetch_all(pool).await?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            let name = mysql_value_to_string(r, 0)?;
+            let type_name = mysql_value_to_string(r, 1).unwrap_or_default();
+            let nullable = mysql_value_to_string(r, 3).unwrap_or_default();
+            let key = mysql_value_to_string(r, 4).unwrap_or_default();
+            let default = mysql_value_to_string(r, 5);
+            Some(ColumnDescription {
+                name,
+                type_name,
+                nullable: nullable.eq_ignore_ascii_case("YES"),
+                default,
+                primary_key: key.eq_ignore_ascii_case("PRI"),
+            })
+        })
+        .collect())
+}
+
+async fn list_indexes_mysql_show(
+    pool: &sqlx::Pool<sqlx::MySql>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<IndexInfo>, sqlx::Error> {
+    let sql = format!("SHOW INDEX FROM {}", quote_mysql_table(schema, table));
+    let rows = sqlx::query(&sql).fetch_all(pool).await?;
+    let mut parsed: Vec<(String, i64, String, bool)> = rows
+        .iter()
+        .filter_map(|r| {
+            let name = mysql_value_to_string(r, 2)?;
+            let seq: i64 = r
+                .try_get::<i64, _>(3)
+                .ok()
+                .or_else(|| {
+                    r.try_get::<u64, _>(3)
+                        .ok()
+                        .and_then(|v| i64::try_from(v).ok())
+                })
+                .unwrap_or(0);
+            let col = mysql_value_to_string(r, 4).unwrap_or_default();
+            Some((name, seq, col, mysql_non_unique_is_unique(r, 1)))
+        })
+        .collect();
+    parsed.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    Ok(group_indexes(
+        parsed
+            .into_iter()
+            .map(|(name, _seq, col, unique)| (name, col, unique)),
+    ))
+}
+
 pub async fn list_schemas_mysql(pool: &sqlx::Pool<sqlx::MySql>) -> Result<Vec<SchemaInfo>, String> {
-    let rows = sqlx::query(
+    let mut names = BTreeSet::new();
+    let mut errors = Vec::new();
+
+    match sqlx::query(
         "SELECT schema_name FROM information_schema.schemata \
-         WHERE schema_name NOT IN ('mysql','sys','performance_schema') \
+         WHERE schema_name NOT IN ('information_schema','mysql','sys','performance_schema') \
          ORDER BY schema_name",
     )
     .fetch_all(pool)
     .await
-    .map_err(|e| format!("list schemas failed: {e}"))?;
-    Ok(rows
-        .iter()
-        .filter_map(|r| r.try_get::<String, _>(0).ok())
-        .map(|name| SchemaInfo { name })
-        .collect())
+    {
+        Ok(rows) => {
+            for row in &rows {
+                add_mysql_schema_name(&mut names, mysql_value_to_string(row, 0));
+            }
+        }
+        Err(err) => errors.push(format!("information_schema.schemata: {err}")),
+    }
+
+    match list_schemas_mysql_show(pool).await {
+        Ok(show_names) => {
+            for name in show_names {
+                add_mysql_schema_name(&mut names, Some(name));
+            }
+        }
+        Err(err) => {
+            if names.is_empty() {
+                errors.push(format!("SHOW DATABASES: {err}"));
+            }
+        }
+    }
+
+    match current_mysql_database(pool).await {
+        Ok(current) => add_mysql_schema_name(&mut names, current),
+        Err(err) => errors.push(format!("SELECT DATABASE(): {err}")),
+    }
+
+    if names.is_empty() && !errors.is_empty() {
+        return Err(format!("list schemas failed: {}", errors.join("; ")));
+    }
+
+    Ok(names.into_iter().map(|name| SchemaInfo { name }).collect())
 }
 
 pub async fn list_tables_mysql(
@@ -518,33 +718,55 @@ pub async fn list_tables_mysql(
     if let Some(s) = schema {
         query = query.bind(s);
     }
-    let rows = query
-        .fetch_all(pool)
-        .await
-        .map_err(|e| format!("list tables failed: {e}"))?;
-    Ok(rows
-        .iter()
-        .filter_map(|r| {
-            let name: String = r.try_get(0).ok()?;
-            let t: String = r.try_get(1).unwrap_or_default();
-            let row_count = r.try_get::<Option<i64>, _>(2).ok().flatten().or_else(|| {
-                r.try_get::<Option<u64>, _>(2)
-                    .ok()
-                    .flatten()
-                    .and_then(|v| i64::try_from(v).ok())
-            });
-            let kind = if t.eq_ignore_ascii_case("VIEW") {
-                "view"
-            } else {
-                "table"
-            };
-            Some(TableInfo {
-                name,
-                kind: kind.to_string(),
-                row_count,
-            })
-        })
-        .collect())
+    let mut tables = BTreeMap::<String, TableInfo>::new();
+    let mut errors = Vec::new();
+
+    match query.fetch_all(pool).await {
+        Ok(rows) => {
+            for r in &rows {
+                if let Some(name) = mysql_value_to_string(r, 0) {
+                    let table_type = mysql_value_to_string(r, 1).unwrap_or_default();
+                    let row_count = r.try_get::<Option<i64>, _>(2).ok().flatten().or_else(|| {
+                        r.try_get::<Option<u64>, _>(2)
+                            .ok()
+                            .flatten()
+                            .and_then(|v| i64::try_from(v).ok())
+                            .or_else(|| {
+                                mysql_value_to_string(r, 2).and_then(|v| v.parse::<i64>().ok())
+                            })
+                    });
+                    tables.insert(
+                        name.clone(),
+                        TableInfo {
+                            name,
+                            kind: mysql_table_kind(&table_type),
+                            row_count,
+                        },
+                    );
+                }
+            }
+        }
+        Err(err) => errors.push(format!("information_schema.tables: {err}")),
+    }
+
+    match list_tables_mysql_show(pool, schema).await {
+        Ok(show_tables) => {
+            for table in show_tables {
+                tables.entry(table.name.clone()).or_insert(table);
+            }
+        }
+        Err(err) => {
+            if tables.is_empty() {
+                errors.push(format!("SHOW FULL TABLES: {err}"));
+            }
+        }
+    }
+
+    if tables.is_empty() && !errors.is_empty() {
+        return Err(format!("list tables failed: {}", errors.join("; ")));
+    }
+
+    Ok(tables.into_values().collect())
 }
 
 pub async fn describe_table_mysql(
@@ -556,20 +778,36 @@ pub async fn describe_table_mysql(
              FROM information_schema.columns \
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ? \
              ORDER BY ordinal_position";
-    let rows = sqlx::query(q)
+    let rows = match sqlx::query(q)
         .bind(schema)
         .bind(table)
         .fetch_all(pool)
         .await
-        .map_err(|e| format!("describe table failed: {e}"))?;
+    {
+        Ok(rows) if !rows.is_empty() => rows,
+        Ok(_) => {
+            return describe_table_mysql_show(pool, schema, table)
+                .await
+                .map_err(|e| format!("describe table failed: {e}"))
+        }
+        Err(err) => {
+            return describe_table_mysql_show(pool, schema, table)
+                .await
+                .map_err(|show_err| {
+                    format!(
+                        "describe table failed: information_schema.columns: {err}; SHOW FULL COLUMNS: {show_err}"
+                    )
+                });
+        }
+    };
     Ok(rows
         .iter()
         .filter_map(|r| {
-            let name: String = r.try_get(0).ok()?;
-            let type_name: String = r.try_get(1).unwrap_or_default();
-            let nullable: String = r.try_get(2).unwrap_or_default();
-            let default: Option<String> = r.try_get(3).ok().flatten();
-            let key: String = r.try_get(4).unwrap_or_default();
+            let name = mysql_value_to_string(r, 0)?;
+            let type_name = mysql_value_to_string(r, 1).unwrap_or_default();
+            let nullable = mysql_value_to_string(r, 2).unwrap_or_default();
+            let default = mysql_value_to_string(r, 3);
+            let key = mysql_value_to_string(r, 4).unwrap_or_default();
             Some(ColumnDescription {
                 name,
                 type_name,
@@ -590,18 +828,33 @@ pub async fn list_indexes_mysql(
              FROM information_schema.statistics \
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ? \
              ORDER BY index_name, seq_in_index";
-    let rows = sqlx::query(q)
+    let rows = match sqlx::query(q)
         .bind(schema)
         .bind(table)
         .fetch_all(pool)
         .await
-        .map_err(|e| format!("list indexes failed: {e}"))?;
+    {
+        Ok(rows) if !rows.is_empty() => rows,
+        Ok(_) => {
+            return list_indexes_mysql_show(pool, schema, table)
+                .await
+                .map_err(|e| format!("list indexes failed: {e}"))
+        }
+        Err(err) => {
+            return list_indexes_mysql_show(pool, schema, table)
+                .await
+                .map_err(|show_err| {
+                    format!(
+                        "list indexes failed: information_schema.statistics: {err}; SHOW INDEX: {show_err}"
+                    )
+                });
+        }
+    };
     Ok(group_indexes(rows.iter().filter_map(|r| {
-        let name: String = r.try_get(0).ok()?;
-        let col: String = r.try_get(1).unwrap_or_default();
+        let name = mysql_value_to_string(r, 0)?;
+        let col = mysql_value_to_string(r, 1).unwrap_or_default();
         // non_unique is 0 for unique indexes.
-        let non_unique: i64 = r.try_get(2).unwrap_or(1);
-        Some((name, col, non_unique == 0))
+        Some((name, col, mysql_non_unique_is_unique(r, 2)))
     })))
 }
 
@@ -773,4 +1026,44 @@ fn group_indexes(rows: impl Iterator<Item = (String, String, bool)>) -> Vec<Inde
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mysql_schema_names_include_visible_databases_and_deduplicate() {
+        let mut names = BTreeSet::new();
+        add_mysql_schema_name(&mut names, Some("mysql".into()));
+        add_mysql_schema_name(&mut names, Some(" information_schema ".into()));
+        add_mysql_schema_name(&mut names, Some("test".into()));
+        add_mysql_schema_name(&mut names, Some("test".into()));
+        add_mysql_schema_name(&mut names, Some("app".into()));
+
+        assert_eq!(
+            names.into_iter().collect::<Vec<_>>(),
+            vec![
+                "app".to_string(),
+                "information_schema".to_string(),
+                "mysql".to_string(),
+                "test".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn mysql_identifier_quoting_escapes_backticks() {
+        assert_eq!(quote_mysql_ident("te`st"), "`te``st`");
+        assert_eq!(
+            quote_mysql_table(Some("db`1"), "ta`ble"),
+            "`db``1`.`ta``ble`"
+        );
+    }
+
+    #[test]
+    fn mysql_table_kind_maps_views() {
+        assert_eq!(mysql_table_kind("VIEW"), "view");
+        assert_eq!(mysql_table_kind("BASE TABLE"), "table");
+    }
 }
