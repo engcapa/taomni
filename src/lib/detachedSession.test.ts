@@ -103,6 +103,11 @@ describe("detectDetachedRoute", () => {
     expect(detectDetachedRoute()).toEqual({ kind: "vnc", id: "session-2" });
   });
 
+  it("parses database detached routes", () => {
+    window.history.replaceState(null, "", "/index.html#database=db-session");
+    expect(detectDetachedRoute()).toEqual({ kind: "database", id: "db-session" });
+  });
+
   it("ignores unknown kinds", () => {
     window.history.replaceState(null, "", "/index.html#bogus=oops");
     expect(detectDetachedRoute()).toBeNull();

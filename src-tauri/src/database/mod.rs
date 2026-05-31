@@ -13,6 +13,7 @@ pub mod sql;
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tauri::ipc::Channel;
 use tauri::State;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
@@ -76,6 +77,69 @@ pub struct QueryResult {
     pub warnings: Vec<String>,
 }
 
+/// Incremental query result event sent over a Tauri Channel. Query commands
+/// send column metadata first, then row batches, then one final completion
+/// event with timing and warning information.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum QueryStreamEvent {
+    Columns {
+        columns: Vec<ColumnInfo>,
+    },
+    Rows {
+        rows: Vec<Vec<Option<String>>>,
+    },
+    Done {
+        #[serde(rename = "rowsAffected")]
+        rows_affected: u64,
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+        #[serde(default)]
+        warnings: Vec<String>,
+    },
+}
+
+pub type QueryStreamChannel = Channel<QueryStreamEvent>;
+
+pub(crate) fn send_query_stream_event(
+    on_event: &QueryStreamChannel,
+    event: QueryStreamEvent,
+) -> Result<(), String> {
+    on_event
+        .send(event)
+        .map_err(|e| format!("Query stream event failed: {e}"))
+}
+
+pub(crate) fn emit_query_result_stream(
+    on_event: &QueryStreamChannel,
+    result: QueryResult,
+) -> Result<(), String> {
+    if !result.columns.is_empty() {
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Columns {
+                columns: result.columns,
+            },
+        )?;
+    }
+    for rows in result.rows.chunks(100) {
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Rows {
+                rows: rows.to_vec(),
+            },
+        )?;
+    }
+    send_query_stream_event(
+        on_event,
+        QueryStreamEvent::Done {
+            rows_affected: result.rows_affected,
+            duration_ms: result.duration_ms,
+            warnings: result.warnings,
+        },
+    )
+}
+
 /// A schema/database node.
 #[derive(Debug, Clone, Serialize)]
 pub struct SchemaInfo {
@@ -88,6 +152,10 @@ pub struct TableInfo {
     pub name: String,
     /// "table" | "view" | "materialized_view".
     pub kind: String,
+    /// Best-effort row count from engine catalog metadata. This may be
+    /// approximate for engines that only expose estimates.
+    #[serde(rename = "rowCount")]
+    pub row_count: Option<i64>,
 }
 
 /// A column in a table description.
@@ -148,7 +216,10 @@ impl DbSession {
 /// Resolve a possibly-`vault:`-prefixed secret to plaintext. Returns the
 /// original string when it is not a vault reference (backwards compatible with
 /// inline plaintext passwords).
-fn resolve_secret(state: &State<'_, AppState>, value: Option<&str>) -> Result<Option<String>, String> {
+fn resolve_secret(
+    state: &State<'_, AppState>,
+    value: Option<&str>,
+) -> Result<Option<String>, String> {
     match value {
         Some(v) if !v.is_empty() => match state.vault.resolve(v)? {
             Some(z) => Ok(Some((*z).clone())),
@@ -199,10 +270,7 @@ pub async fn db_connect(
 }
 
 #[tauri::command]
-pub async fn db_ping(
-    state: State<'_, AppState>,
-    session_id: String,
-) -> Result<String, String> {
+pub async fn db_ping(state: State<'_, AppState>, session_id: String) -> Result<String, String> {
     let session = get_session(&state, &session_id).await?;
     match &session.handle {
         DbHandle::MySql(pool) => sql::ping_mysql(pool).await,
@@ -213,10 +281,7 @@ pub async fn db_ping(
 }
 
 #[tauri::command]
-pub async fn db_disconnect(
-    state: State<'_, AppState>,
-    session_id: String,
-) -> Result<(), String> {
+pub async fn db_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
     let removed = {
         let mut map = state.db_connections.write().await;
         map.remove(&session_id)
@@ -316,6 +381,27 @@ pub async fn db_execute(
         DbHandle::MySql(pool) => sql::execute_mysql(pool, &sql, &token).await,
         DbHandle::Postgres(pool) => sql::execute_postgres(pool, &sql, &token).await,
         DbHandle::ClickHouse(client) => clickhouse::execute(client, &sql, &token).await,
+        DbHandle::Redis(_) => Err("Use redis_exec for Redis commands".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn db_execute_stream(
+    state: State<'_, AppState>,
+    session_id: String,
+    sql: String,
+    on_event: QueryStreamChannel,
+) -> Result<(), String> {
+    let session = get_session(&state, &session_id).await?;
+    let token = session.fresh_cancel_token().await;
+    match &session.handle {
+        DbHandle::MySql(pool) => sql::execute_mysql_stream(pool, &sql, &token, &on_event).await,
+        DbHandle::Postgres(pool) => {
+            sql::execute_postgres_stream(pool, &sql, &token, &on_event).await
+        }
+        DbHandle::ClickHouse(client) => {
+            clickhouse::execute_stream(client, &sql, &token, &on_event).await
+        }
         DbHandle::Redis(_) => Err("Use redis_exec for Redis commands".into()),
     }
 }

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useCallback } from "react";
-import { ArrowDown, ArrowUp, Copy } from "lucide-react";
+import { ArrowDown, ArrowUp, Columns2, Copy } from "lucide-react";
 import type { DbQueryResult } from "../../lib/ipc";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 
@@ -34,6 +34,7 @@ export function QueryResultGrid({ result }: QueryResultGridProps) {
   const [viewportH, setViewportH] = useState(400);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [autoFit, setAutoFit] = useState(true);
   const { show: openMenu, render: menu } = useContextMenu();
 
   const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -76,6 +77,7 @@ export function QueryResultGrid({ result }: QueryResultGridProps) {
   const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const endRow = Math.min(total, Math.ceil((scrollTop + viewportH) / ROW_HEIGHT) + OVERSCAN);
   const visible = order.slice(startRow, endRow);
+  const colWidthClass = autoFit ? "flex-1 min-w-0" : "flex-[0_0_160px]";
 
   const copyText = (text: string) => {
     void navigator.clipboard?.writeText(text).catch(() => undefined);
@@ -117,12 +119,26 @@ export function QueryResultGrid({ result }: QueryResultGridProps) {
         className="flex shrink-0 text-[11px] font-semibold select-none"
         style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
       >
-        <div className="w-12 px-1 py-1 text-right text-[var(--moba-text-muted)] shrink-0" style={{ borderRight: "1px solid var(--moba-divider)" }}>#</div>
+        <div
+          className="w-12 px-1 py-1 text-[var(--moba-text-muted)] shrink-0 flex items-center justify-between"
+          style={{ borderRight: "1px solid var(--moba-divider)" }}
+        >
+          <span>#</span>
+          <button
+            type="button"
+            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+            title={autoFit ? "Use fixed column width" : "Auto-fit columns"}
+            aria-label={autoFit ? "Use fixed column width" : "Auto-fit columns"}
+            onClick={() => setAutoFit((value) => !value)}
+          >
+            <Columns2 className="w-3 h-3" />
+          </button>
+        </div>
         {result.columns.map((col, c) => (
           <button
             key={c}
             type="button"
-            className="flex-1 min-w-[120px] px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--moba-hover)]"
+            className={`${colWidthClass} px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--moba-hover)]`}
             style={{ borderRight: "1px solid var(--moba-divider)" }}
             onClick={() => toggleSort(c)}
             title={`${col.name} (${col.type})`}
@@ -160,7 +176,7 @@ export function QueryResultGrid({ result }: QueryResultGridProps) {
                 {row.map((cell, c) => (
                   <div
                     key={c}
-                    className={`flex-1 min-w-[120px] px-2 flex items-center truncate ${
+                    className={`${colWidthClass} px-2 flex items-center truncate ${
                       isNumeric(cell) ? "justify-end font-mono" : ""
                     }`}
                     style={{ borderRight: "1px solid var(--moba-divider)" }}

@@ -21,6 +21,7 @@ interface SqlEditorPanelProps {
   onDocChange?: (doc: string) => void;
   /** Run callback receives selection if any text is selected, else full doc. */
   onRun?: (sql: string) => void;
+  onFocus?: () => void;
 }
 
 function dialectFor(engine: string): SQLDialect {
@@ -53,6 +54,7 @@ export function SqlEditorPanel({
   schema,
   onDocChange,
   onRun,
+  onFocus,
   handleRef,
 }: SqlEditorPanelProps & { handleRef?: (h: SqlEditorHandle | null) => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -60,8 +62,10 @@ export function SqlEditorPanel({
   const langCompartment = useRef(new Compartment());
   const onRunRef = useRef(onRun);
   const onDocChangeRef = useRef(onDocChange);
+  const onFocusRef = useRef(onFocus);
   onRunRef.current = onRun;
   onDocChangeRef.current = onDocChange;
+  onFocusRef.current = onFocus;
 
   // Build editor once on mount.
   useEffect(() => {
@@ -81,6 +85,7 @@ export function SqlEditorPanel({
       extensions: [
         lineNumbers(),
         highlightActiveLine(),
+        EditorState.allowMultipleSelections.of(true),
         history(),
         bracketMatching(),
         closeBrackets(),
@@ -99,6 +104,12 @@ export function SqlEditorPanel({
         ]),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onDocChangeRef.current?.(u.state.doc.toString());
+        }),
+        EditorView.domEventHandlers({
+          focus: () => {
+            onFocusRef.current?.();
+            return false;
+          },
         }),
         EditorView.theme({
           "&": { height: "100%", fontSize: "13px" },

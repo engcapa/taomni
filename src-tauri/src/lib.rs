@@ -198,6 +198,7 @@ pub fn run() {
             database::db_describe_table,
             database::db_list_indexes,
             database::db_execute,
+            database::db_execute_stream,
             database::db_cancel,
             database::redis_list_keys,
             database::redis_get_key,

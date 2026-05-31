@@ -56,7 +56,7 @@ import {
   type DetachedKind,
   type ReattachMessage,
 } from "../lib/detachedSession";
-import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams } from "../components/detached/DetachedSessionWindow";
+import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import type { SftpTabInfo, Tab, DbConnectInfo } from "../types";
 import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
@@ -477,6 +477,21 @@ export function MainLayout() {
     [openDetachedGenericWindow],
   );
 
+  const openDetachedDatabase = useCallback(
+    (tabId: string, info: NonNullable<Tab["db"]>, title: string) => {
+      const detachedId = `${tabId}__detached`;
+      const payload: DetachedDbParams = {
+        title,
+        // Give the detached window its own connection handle so the source
+        // tab's unmount disconnect cannot race and close the detached query
+        // workspace connection.
+        info: { ...info, sessionId: detachedId },
+      };
+      openDetachedGenericWindow("database", tabId, detachedId, payload, title);
+    },
+    [openDetachedGenericWindow],
+  );
+
   /**
    * Subscribe to reattach messages broadcast by detached windows. Each
    * time a detached window asks to come back, recreate the equivalent
@@ -576,6 +591,23 @@ export function MainLayout() {
           setStatusMessage(tr("status.reattached"));
           break;
         }
+        case "database": {
+          const p = msg.payload as DetachedDbParams | undefined;
+          if (!p?.info) return;
+          addTab({
+            id: reattachTabId,
+            type: "database",
+            title: p.title || `${p.info.engine} ${p.info.host}`,
+            sessionId: reattachTabId,
+            closable: true,
+            db: {
+              ...p.info,
+              sessionId: reattachTabId,
+            },
+          });
+          setStatusMessage(tr("status.reattached"));
+          break;
+        }
         default:
           /* SFTP reattach not wired — SFTP detach is co-existing, not exclusive. */
           break;
@@ -607,13 +639,15 @@ export function MainLayout() {
   // types `@terminal:last-N` or hits Send-to-Terminal on a code block.
   // `setActiveTerminalTab` is terminal-only (that registry pulls xterm
   // buffers), but a tab-bound chat drawer can belong to any tab kind that
-  // exposes a chat toggle (terminal + rdp), so the drawer-sync gets the
+  // exposes a chat toggle (terminal + rdp + database), so the drawer-sync gets the
   // active tab id for those kinds and survives tab switches.
   useEffect(() => {
     const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
     setActiveTerminalTab(terminalTabId);
     const chatBoundTabId =
-      activeTab?.type === "terminal" || activeTab?.type === "rdp" ? activeTabId : null;
+      activeTab?.type === "terminal" || activeTab?.type === "rdp" || activeTab?.type === "database"
+        ? activeTabId
+        : null;
     void syncTabChatWithActiveTab(chatBoundTabId);
   }, [activeTabId, activeTab?.type, syncTabChatWithActiveTab]);
 
@@ -845,10 +879,11 @@ export function MainLayout() {
     const isRedis = engine === "Redis";
     const id = `${isRedis ? "redis" : "database"}-${session.id}-${Date.now()}`;
     const info = sessionToDbConnectInfo(session, password);
+    const title = `${engine} ${session.host}:${session.port}${info.database ? `/${info.database}` : ""}`;
     addTab({
       id,
       type: isRedis ? "redis" : "database",
-      title: session.name || `${session.host}:${session.port}`,
+      title,
       sessionId: session.id,
       closable: true,
       db: info,
@@ -1937,7 +1972,18 @@ export function MainLayout() {
                       style={{ display: isActive ? "block" : "none" }}
                     >
                       <Suspense fallback={<DbLoadingPanel />}>
-                        <DbClientTab tabId={tab.id} info={tab.db} visible={isActive} />
+                        <DbClientTab
+                          tabId={tab.id}
+                          info={tab.db}
+                          visible={isActive}
+                          onDetach={() => openDetachedDatabase(tab.id, tab.db!, tab.title)}
+                          onToggleMaximize={() => toggleTabMaximized(tab.id)}
+                          maximized={tabMaximizedId === tab.id}
+                          chatToggle={!aiFullyDisabled ? {
+                            open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
+                            onToggle: () => void toggleTabChat(tab.id),
+                          } : undefined}
+                        />
                       </Suspense>
                     </div>
                   );

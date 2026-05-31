@@ -4,17 +4,19 @@
 
 use std::time::{Duration, Instant};
 
+use futures::TryStreamExt;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use sqlx::{Column, Row, TypeInfo};
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    ColumnDescription, ColumnInfo, DbConfig, DbHandle, IndexInfo, QueryResult, SchemaInfo,
-    TableInfo,
+    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, IndexInfo,
+    QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
+const STREAM_BATCH_ROWS: usize = 100;
 
 fn timeout(config: &DbConfig) -> Duration {
     Duration::from_secs(match config.timeout_secs {
@@ -59,9 +61,7 @@ pub async fn connect_postgres(
     config: &DbConfig,
     password: Option<&str>,
 ) -> Result<DbHandle, String> {
-    let mut opts = PgConnectOptions::new()
-        .host(&config.host)
-        .port(config.port);
+    let mut opts = PgConnectOptions::new().host(&config.host).port(config.port);
     if let Some(user) = config.username.as_deref().filter(|u| !u.is_empty()) {
         opts = opts.username(user);
     }
@@ -203,7 +203,15 @@ fn is_query(sql: &str) -> bool {
         .to_uppercase();
     matches!(
         head.as_str(),
-        "SELECT" | "SHOW" | "DESCRIBE" | "DESC" | "EXPLAIN" | "WITH" | "TABLE" | "VALUES" | "PRAGMA"
+        "SELECT"
+            | "SHOW"
+            | "DESCRIBE"
+            | "DESC"
+            | "EXPLAIN"
+            | "WITH"
+            | "TABLE"
+            | "VALUES"
+            | "PRAGMA"
     )
 }
 
@@ -321,6 +329,160 @@ pub async fn execute_postgres(
     }
 }
 
+pub async fn execute_mysql_stream(
+    pool: &sqlx::Pool<sqlx::MySql>,
+    sql: &str,
+    token: &CancellationToken,
+    on_event: &QueryStreamChannel,
+) -> Result<(), String> {
+    let start = Instant::now();
+    if is_query(sql) {
+        let mut stream = sqlx::query(sql).fetch(pool);
+        let mut columns_sent = false;
+        let mut batch: Vec<Vec<Option<String>>> = Vec::with_capacity(STREAM_BATCH_ROWS);
+
+        loop {
+            let next = tokio::select! {
+                _ = token.cancelled() => return Err("Query cancelled".into()),
+                r = stream.try_next() => r.map_err(|e| format!("Query failed: {e}"))?,
+            };
+            let Some(row) = next else {
+                break;
+            };
+
+            if !columns_sent {
+                let columns = row
+                    .columns()
+                    .iter()
+                    .map(|c| ColumnInfo {
+                        name: c.name().to_string(),
+                        type_name: c.type_info().name().to_string(),
+                    })
+                    .collect();
+                send_query_stream_event(on_event, QueryStreamEvent::Columns { columns })?;
+                columns_sent = true;
+            }
+
+            let mut vals = Vec::with_capacity(row.columns().len());
+            for i in 0..row.columns().len() {
+                vals.push(mysql_value_to_string(&row, i));
+            }
+            batch.push(vals);
+            if batch.len() >= STREAM_BATCH_ROWS {
+                send_query_stream_event(
+                    on_event,
+                    QueryStreamEvent::Rows {
+                        rows: std::mem::take(&mut batch),
+                    },
+                )?;
+            }
+        }
+
+        if !batch.is_empty() {
+            send_query_stream_event(on_event, QueryStreamEvent::Rows { rows: batch })?;
+        }
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: 0,
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
+            },
+        )
+    } else {
+        let exec = sqlx::query(sql).execute(pool);
+        let res = tokio::select! {
+            _ = token.cancelled() => return Err("Query cancelled".into()),
+            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
+        };
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: res.rows_affected(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
+            },
+        )
+    }
+}
+
+pub async fn execute_postgres_stream(
+    pool: &sqlx::Pool<sqlx::Postgres>,
+    sql: &str,
+    token: &CancellationToken,
+    on_event: &QueryStreamChannel,
+) -> Result<(), String> {
+    let start = Instant::now();
+    if is_query(sql) {
+        let mut stream = sqlx::query(sql).fetch(pool);
+        let mut columns_sent = false;
+        let mut batch: Vec<Vec<Option<String>>> = Vec::with_capacity(STREAM_BATCH_ROWS);
+
+        loop {
+            let next = tokio::select! {
+                _ = token.cancelled() => return Err("Query cancelled".into()),
+                r = stream.try_next() => r.map_err(|e| format!("Query failed: {e}"))?,
+            };
+            let Some(row) = next else {
+                break;
+            };
+
+            if !columns_sent {
+                let columns = row
+                    .columns()
+                    .iter()
+                    .map(|c| ColumnInfo {
+                        name: c.name().to_string(),
+                        type_name: c.type_info().name().to_string(),
+                    })
+                    .collect();
+                send_query_stream_event(on_event, QueryStreamEvent::Columns { columns })?;
+                columns_sent = true;
+            }
+
+            let mut vals = Vec::with_capacity(row.columns().len());
+            for i in 0..row.columns().len() {
+                vals.push(pg_value_to_string(&row, i));
+            }
+            batch.push(vals);
+            if batch.len() >= STREAM_BATCH_ROWS {
+                send_query_stream_event(
+                    on_event,
+                    QueryStreamEvent::Rows {
+                        rows: std::mem::take(&mut batch),
+                    },
+                )?;
+            }
+        }
+
+        if !batch.is_empty() {
+            send_query_stream_event(on_event, QueryStreamEvent::Rows { rows: batch })?;
+        }
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: 0,
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
+            },
+        )
+    } else {
+        let exec = sqlx::query(sql).execute(pool);
+        let res = tokio::select! {
+            _ = token.cancelled() => return Err("Query cancelled".into()),
+            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
+        };
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: res.rows_affected(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
+            },
+        )
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Schema introspection — MySQL
 // ---------------------------------------------------------------------------
@@ -346,10 +508,10 @@ pub async fn list_tables_mysql(
     schema: Option<&str>,
 ) -> Result<Vec<TableInfo>, String> {
     let q = if schema.is_some() {
-        "SELECT table_name, table_type FROM information_schema.tables \
+        "SELECT table_name, table_type, table_rows FROM information_schema.tables \
          WHERE table_schema = ? ORDER BY table_name"
     } else {
-        "SELECT table_name, table_type FROM information_schema.tables \
+        "SELECT table_name, table_type, table_rows FROM information_schema.tables \
          WHERE table_schema = DATABASE() ORDER BY table_name"
     };
     let mut query = sqlx::query(q);
@@ -365,6 +527,12 @@ pub async fn list_tables_mysql(
         .filter_map(|r| {
             let name: String = r.try_get(0).ok()?;
             let t: String = r.try_get(1).unwrap_or_default();
+            let row_count = r.try_get::<Option<i64>, _>(2).ok().flatten().or_else(|| {
+                r.try_get::<Option<u64>, _>(2)
+                    .ok()
+                    .flatten()
+                    .and_then(|v| i64::try_from(v).ok())
+            });
             let kind = if t.eq_ignore_ascii_case("VIEW") {
                 "view"
             } else {
@@ -373,6 +541,7 @@ pub async fn list_tables_mysql(
             Some(TableInfo {
                 name,
                 kind: kind.to_string(),
+                row_count,
             })
         })
         .collect())
@@ -464,8 +633,12 @@ pub async fn list_tables_postgres(
 ) -> Result<Vec<TableInfo>, String> {
     let schema = schema.unwrap_or("public");
     let rows = sqlx::query(
-        "SELECT table_name, table_type FROM information_schema.tables \
-         WHERE table_schema = $1 ORDER BY table_name",
+        "SELECT t.table_name, t.table_type, \
+                CASE WHEN c.reltuples >= 0 THEN c.reltuples::bigint ELSE NULL END AS row_count \
+         FROM information_schema.tables t \
+         LEFT JOIN pg_namespace n ON n.nspname = t.table_schema \
+         LEFT JOIN pg_class c ON c.relname = t.table_name AND c.relnamespace = n.oid \
+         WHERE t.table_schema = $1 ORDER BY t.table_name",
     )
     .bind(schema)
     .fetch_all(pool)
@@ -476,6 +649,7 @@ pub async fn list_tables_postgres(
         .filter_map(|r| {
             let name: String = r.try_get(0).ok()?;
             let t: String = r.try_get(1).unwrap_or_default();
+            let row_count: Option<i64> = r.try_get(2).ok().flatten();
             let kind = if t.eq_ignore_ascii_case("VIEW") {
                 "view"
             } else {
@@ -484,6 +658,7 @@ pub async fn list_tables_postgres(
             Some(TableInfo {
                 name,
                 kind: kind.to_string(),
+                row_count,
             })
         })
         .collect();
@@ -498,6 +673,7 @@ pub async fn list_tables_postgres(
                 out.push(TableInfo {
                     name,
                     kind: "materialized_view".to_string(),
+                    row_count: None,
                 });
             }
         }

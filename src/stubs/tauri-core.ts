@@ -825,6 +825,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "db_describe_table":
     case "db_list_indexes":
     case "db_execute":
+    case "db_execute_stream":
     case "db_cancel":
     case "redis_list_keys":
     case "redis_get_key":

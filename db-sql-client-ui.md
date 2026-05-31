@@ -1,17 +1,14 @@
 # SQL Database Client UI
 
-> **Status: ✅ Completed (2026-05-30).** `DbClientTab` (schema tree + query
+> **Status: ✅ Completed (2026-05-31).** `DbClientTab` (schema tree + query
 > workspace), `SchemaTree`, CodeMirror 6 `SqlEditorPanel` with dialect +
 > schema autocomplete, virtualised `QueryResultGrid` (sort/copy/CSV/NULL badge),
 > up to 4 editor panels, query history, status bar + Messages tab, Cancel,
 > "Select top 1000 rows", and CSV export are implemented and wired into
-> `MainLayout` (always-mounted, spinner badge). Verified: `pnpm build` succeeds
-> (DbClientTab code-split into its own chunk), `tsc` + 312 tests pass.
->
-> Note: `db_execute` returns the full result set in one call (the grid
-> virtualises 10k+ rows client-side) rather than streaming partial rows over a
-> Tauri Channel; cancel is honoured server-side via a per-session
-> `CancellationToken`.
+> `MainLayout` (always-mounted, spinner badge). Query execution uses
+> `db_execute_stream` over a Tauri Channel so columns, row batches, and final
+> status are delivered incrementally; `db_execute` remains for compatibility and
+> small control statements such as schema switching.
 
 ## What & Why
 With the connection backend in place (Task: Database Connection Foundation), this task builds the full interactive SQL client interface for MySQL, PostgreSQL, and ClickHouse — a DBeaver/DataGrip-style workspace inside a NewMob tab. The goal is a productive query environment that feels native to the app's existing dark-panel aesthetic.

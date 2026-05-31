@@ -4,14 +4,17 @@
 
 use std::time::{Duration, Instant};
 
+use futures::StreamExt;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    ColumnDescription, ColumnInfo, DbConfig, DbHandle, QueryResult, SchemaInfo, TableInfo,
+    emit_query_result_stream, send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig,
+    DbHandle, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
+const STREAM_BATCH_ROWS: usize = 100;
 
 /// A configured ClickHouse HTTP endpoint plus credentials.
 #[derive(Clone)]
@@ -33,8 +36,7 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
         .is_some_and(|p| p.eq_ignore_ascii_case("native"))
     {
         return Err(
-            "ClickHouse native protocol is not supported yet — switch the protocol to HTTP."
-                .into(),
+            "ClickHouse native protocol is not supported yet — switch the protocol to HTTP.".into(),
         );
     }
     let scheme = if config.ssl { "https" } else { "http" };
@@ -65,12 +67,7 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
     Ok(DbHandle::ClickHouse(ch))
 }
 
-/// POST a raw SQL string to the HTTP interface and return the response body.
-async fn post_sql(
-    client: &ClickHouseClient,
-    sql: &str,
-    token: Option<&CancellationToken>,
-) -> Result<String, String> {
+fn sql_request(client: &ClickHouseClient, sql: &str) -> reqwest::RequestBuilder {
     let mut req = client
         .client
         .post(&client.base_url)
@@ -82,13 +79,24 @@ async fn post_sql(
     if let Some(pw) = &client.password {
         req = req.header("X-ClickHouse-Key", pw);
     }
-    let send = req.send();
+    req
+}
+
+/// POST a raw SQL string to the HTTP interface and return the response body.
+async fn post_sql(
+    client: &ClickHouseClient,
+    sql: &str,
+    token: Option<&CancellationToken>,
+) -> Result<String, String> {
+    let send = sql_request(client, sql).send();
     let resp = match token {
         Some(t) => tokio::select! {
             _ = t.cancelled() => return Err("Query cancelled".into()),
             r = send => r.map_err(|e| format!("ClickHouse request failed: {e}"))?,
         },
-        None => send.await.map_err(|e| format!("ClickHouse request failed: {e}"))?,
+        None => send
+            .await
+            .map_err(|e| format!("ClickHouse request failed: {e}"))?,
     };
     let status = resp.status();
     let body = resp
@@ -99,6 +107,27 @@ async fn post_sql(
         return Err(format!("ClickHouse error ({status}): {}", body.trim()));
     }
     Ok(body)
+}
+
+async fn post_sql_response(
+    client: &ClickHouseClient,
+    sql: &str,
+    token: &CancellationToken,
+) -> Result<reqwest::Response, String> {
+    let send = sql_request(client, sql).send();
+    let resp = tokio::select! {
+        _ = token.cancelled() => return Err("Query cancelled".into()),
+        r = send => r.map_err(|e| format!("ClickHouse request failed: {e}"))?,
+    };
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| format!("ClickHouse response read failed: {e}"))?;
+        return Err(format!("ClickHouse error ({status}): {}", body.trim()));
+    }
+    Ok(resp)
 }
 
 pub async fn ping(client: &ClickHouseClient) -> Result<String, String> {
@@ -210,9 +239,154 @@ pub async fn execute(
     }
 }
 
+struct ClickHouseStreamState {
+    names: Option<Vec<String>>,
+    columns_sent: bool,
+    row_count: u64,
+    batch: Vec<Vec<Option<String>>>,
+}
+
+impl ClickHouseStreamState {
+    fn new() -> Self {
+        Self {
+            names: None,
+            columns_sent: false,
+            row_count: 0,
+            batch: Vec::with_capacity(STREAM_BATCH_ROWS),
+        }
+    }
+
+    fn process_line(&mut self, line: &[u8], on_event: &QueryStreamChannel) -> Result<(), String> {
+        let line = trim_json_line(line);
+        if line.is_empty() {
+            return Ok(());
+        }
+        let values: Vec<serde_json::Value> = serde_json::from_slice(line)
+            .map_err(|e| format!("ClickHouse stream parse failed: {e}"))?;
+        if !self.columns_sent && self.names.is_none() {
+            self.names = Some(values.into_iter().map(json_value_label).collect());
+            return Ok(());
+        }
+        if !self.columns_sent {
+            let names = self.names.take().unwrap_or_default();
+            let types: Vec<String> = values.into_iter().map(json_value_label).collect();
+            let columns = names
+                .into_iter()
+                .enumerate()
+                .map(|(i, name)| ColumnInfo {
+                    name,
+                    type_name: types.get(i).cloned().unwrap_or_else(|| "String".into()),
+                })
+                .collect();
+            send_query_stream_event(on_event, QueryStreamEvent::Columns { columns })?;
+            self.columns_sent = true;
+            return Ok(());
+        }
+
+        self.batch
+            .push(values.iter().map(json_cell_to_string).collect());
+        self.row_count += 1;
+        if self.batch.len() >= STREAM_BATCH_ROWS {
+            send_query_stream_event(
+                on_event,
+                QueryStreamEvent::Rows {
+                    rows: std::mem::take(&mut self.batch),
+                },
+            )?;
+        }
+        Ok(())
+    }
+
+    fn finish(self, on_event: &QueryStreamChannel, duration_ms: u64) -> Result<(), String> {
+        if !self.batch.is_empty() {
+            send_query_stream_event(on_event, QueryStreamEvent::Rows { rows: self.batch })?;
+        }
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: self.row_count,
+                duration_ms,
+                warnings: Vec::new(),
+            },
+        )
+    }
+}
+
+fn trim_json_line(mut line: &[u8]) -> &[u8] {
+    while matches!(line.last(), Some(b'\n' | b'\r')) {
+        line = &line[..line.len() - 1];
+    }
+    line
+}
+
+fn json_value_label(v: serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s,
+        other => json_cell_to_string(&other).unwrap_or_default(),
+    }
+}
+
+pub async fn execute_stream(
+    client: &ClickHouseClient,
+    sql: &str,
+    token: &CancellationToken,
+    on_event: &QueryStreamChannel,
+) -> Result<(), String> {
+    let start = Instant::now();
+    if is_select(sql) {
+        let has_format = sql.to_uppercase().contains("FORMAT ");
+        if has_format {
+            let result = execute(client, sql, token).await?;
+            return emit_query_result_stream(on_event, result);
+        }
+
+        let query = format!("{sql} FORMAT JSONCompactEachRowWithNamesAndTypes");
+        let resp = post_sql_response(client, &query, token).await?;
+        let mut stream = resp.bytes_stream();
+        let mut pending = Vec::<u8>::new();
+        let mut state = ClickHouseStreamState::new();
+
+        loop {
+            let next = tokio::select! {
+                _ = token.cancelled() => return Err("Query cancelled".into()),
+                r = stream.next() => r,
+            };
+            let Some(chunk) = next else {
+                break;
+            };
+            let chunk = chunk.map_err(|e| format!("ClickHouse response stream failed: {e}"))?;
+            pending.extend_from_slice(&chunk);
+            while let Some(pos) = pending.iter().position(|b| *b == b'\n') {
+                let line: Vec<u8> = pending.drain(..=pos).collect();
+                state.process_line(&line, on_event)?;
+            }
+        }
+
+        if !pending.is_empty() {
+            state.process_line(&pending, on_event)?;
+        }
+        state.finish(on_event, start.elapsed().as_millis() as u64)
+    } else {
+        post_sql(client, sql, Some(token)).await?;
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: 0,
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
+            },
+        )
+    }
+}
+
 pub async fn list_schemas(client: &ClickHouseClient) -> Result<Vec<SchemaInfo>, String> {
     let token = CancellationToken::new();
-    let res = execute(client, "SELECT name FROM system.databases ORDER BY name", &token).await?;
+    let res = execute(
+        client,
+        "SELECT name FROM system.databases ORDER BY name",
+        &token,
+    )
+    .await?;
     Ok(res
         .rows
         .into_iter()
@@ -227,7 +401,7 @@ pub async fn list_tables(
 ) -> Result<Vec<TableInfo>, String> {
     let db = schema.unwrap_or(&client.database);
     let sql = format!(
-        "SELECT name, engine FROM system.tables WHERE database = '{}' ORDER BY name",
+        "SELECT name, engine, total_rows FROM system.tables WHERE database = '{}' ORDER BY name",
         db.replace('\'', "''")
     );
     let token = CancellationToken::new();
@@ -235,9 +409,14 @@ pub async fn list_tables(
     Ok(res
         .rows
         .into_iter()
-        .filter_map(|mut r| {
+        .filter_map(|r| {
             let name = r.first().cloned().flatten()?;
-            let engine = r.drain(..).nth(1).flatten().unwrap_or_default();
+            let engine = r.get(1).cloned().flatten().unwrap_or_default();
+            let row_count = r
+                .get(2)
+                .cloned()
+                .flatten()
+                .and_then(|value| value.parse::<i64>().ok());
             let kind = if engine.contains("MaterializedView") {
                 "materialized_view"
             } else if engine.contains("View") {
@@ -248,6 +427,7 @@ pub async fn list_tables(
             Some(TableInfo {
                 name,
                 kind: kind.to_string(),
+                row_count,
             })
         })
         .collect())

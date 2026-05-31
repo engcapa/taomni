@@ -737,6 +737,7 @@ export interface DbSchema {
 export interface DbTable {
   name: string;
   kind: "table" | "view" | "materialized_view";
+  rowCount?: number | null;
 }
 
 export interface DbColumnDescription {
@@ -765,6 +766,11 @@ export interface DbQueryResult {
   durationMs: number;
   warnings: string[];
 }
+
+export type DbQueryStreamEvent =
+  | { kind: "columns"; columns: DbColumn[] }
+  | { kind: "rows"; rows: (string | null)[][] }
+  | { kind: "done"; rowsAffected: number; durationMs: number; warnings: string[] };
 
 export async function dbListSchemas(sessionId: string): Promise<DbSchema[]> {
   return invoke<DbSchema[]>("db_list_schemas", { sessionId });
@@ -803,6 +809,16 @@ export async function dbListIndexes(
 
 export async function dbExecute(sessionId: string, sql: string): Promise<DbQueryResult> {
   return invoke<DbQueryResult>("db_execute", { sessionId, sql });
+}
+
+export async function dbExecuteStream(
+  sessionId: string,
+  sql: string,
+  onEvent: (event: DbQueryStreamEvent) => void,
+): Promise<void> {
+  const channel = new Channel<DbQueryStreamEvent>();
+  channel.onmessage = onEvent;
+  return invoke("db_execute_stream", { sessionId, sql, onEvent: channel });
 }
 
 export async function dbCancel(sessionId: string): Promise<void> {

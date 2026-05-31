@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import {
   Play,
@@ -11,13 +11,23 @@ import {
   Download,
   AlertTriangle,
   Loader2,
+  Bot,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
   dbConnect,
   dbDisconnect,
   dbExecute,
+  dbExecuteStream,
   dbCancel,
+  selectSaveFilePath,
+  writeStreamAbort,
+  writeStreamAppend,
+  writeStreamClose,
+  writeStreamOpen,
   type DbQueryResult,
 } from "../../lib/ipc";
 import { SchemaTree } from "./SchemaTree";
@@ -25,11 +35,31 @@ import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
 import { QueryResultGrid } from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
 import { useAppStore } from "../../stores/appStore";
+import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import {
+  FT_BUTTON_STYLE,
+  FT_BUTTON_ACTIVE_OVERRIDE,
+  FT_ICON_BUTTON_STYLE,
+} from "../floating-toolbar/floatingToolbarStyles";
+import { useT } from "../../lib/i18n";
+import { isTauriRuntime } from "../../lib/runtime";
 
 interface DbClientTabProps {
   tabId: string;
   info: DbConnectInfo;
   visible: boolean;
+  onDetach?: () => void;
+  onToggleMaximize?: () => void;
+  maximized?: boolean;
+  chatToggle?: {
+    open: boolean;
+    onToggle: () => void;
+  };
+  detachedWindowControls?: {
+    onReattach: () => void;
+    onToggleOsFullscreen: () => void;
+    osFullscreen: boolean;
+  };
 }
 
 const MAX_HISTORY = 200;
@@ -42,12 +72,31 @@ interface PanelState {
   error: string | null;
   warnings: string[];
   running: boolean;
+  cancelling: boolean;
   elapsedMs: number;
   resultTab: "results" | "messages";
 }
 
 function widthKey(engine: string): string {
   return `newmob.db.schemaWidth.${engine}`;
+}
+
+function quoteIdent(engine: string, ident: string): string {
+  if (engine === "PostgreSQL") return `"${ident.replace(/"/g, "\"\"")}"`;
+  return `\`${ident.replace(/`/g, "``")}\``;
+}
+
+function qualifiedName(engine: string, schema: string | null, table: string): string {
+  return schema
+    ? `${quoteIdent(engine, schema)}.${quoteIdent(engine, table)}`
+    : quoteIdent(engine, table);
+}
+
+function schemaSwitchSql(engine: string, schema: string): string {
+  if (engine === "PostgreSQL") {
+    return `SET search_path TO ${quoteIdent(engine, schema)}`;
+  }
+  return `USE ${quoteIdent(engine, schema)}`;
 }
 
 function newPanel(): PanelState {
@@ -58,21 +107,45 @@ function newPanel(): PanelState {
     error: null,
     warnings: [],
     running: false,
+    cancelling: false,
     elapsedMs: 0,
     resultTab: "results",
   };
 }
 
-export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) {
+function emptyQueryResult(): DbQueryResult {
+  return {
+    columns: [],
+    rows: [],
+    rowsAffected: 0,
+    durationMs: 0,
+    warnings: [],
+  };
+}
+
+export default function DbClientTab({
+  tabId,
+  info,
+  visible,
+  onDetach,
+  onToggleMaximize,
+  maximized,
+  chatToggle,
+  detachedWindowControls,
+}: DbClientTabProps) {
+  const t = useT();
   const [connected, setConnected] = useState(false);
   const [connError, setConnError] = useState<string | null>(null);
   const [panels, setPanels] = useState<PanelState[]>(() => [newPanel()]);
   const [activePanelId, setActivePanelId] = useState<string>(() => panels[0].id);
+  const [schemas, setSchemas] = useState<string[]>([]);
+  const [activeSchema, setActiveSchema] = useState<string | null>(info.database ?? null);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
-  const [showHistory, setShowHistory] = useState(false);
-  const historyRef = useRef<string[]>([]);
+  const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
+  const historyRef = useRef<Record<string, string[]>>({});
   const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const queryRunIdsRef = useRef<Record<string, number>>({});
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
 
   const sessionId = info.sessionId;
@@ -99,6 +172,10 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
     setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }, []);
 
+  const updatePanel = useCallback((id: string, updater: (panel: PanelState) => PanelState) => {
+    setPanels((prev) => prev.map((p) => (p.id === id ? updater(p) : p)));
+  }, []);
+
   const anyRunning = panels.some((p) => p.running);
   useEffect(() => {
     setTabHasNewOutput(tabId, anyRunning && !visible);
@@ -109,39 +186,89 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
       const trimmed = sqlText.trim();
       if (!trimmed) return;
       // Record history (newest first, dedup consecutive).
-      if (historyRef.current[0] !== trimmed) {
-        historyRef.current = [trimmed, ...historyRef.current].slice(0, MAX_HISTORY);
+      const panelHistory = historyRef.current[panelId] ?? [];
+      if (panelHistory[0] !== trimmed) {
+        historyRef.current[panelId] = [trimmed, ...panelHistory].slice(0, MAX_HISTORY);
       }
-      patchPanel(panelId, { running: true, error: null, elapsedMs: 0, resultTab: "results" });
+      const runId = (queryRunIdsRef.current[panelId] ?? 0) + 1;
+      queryRunIdsRef.current[panelId] = runId;
+      if (timersRef.current[panelId]) {
+        clearInterval(timersRef.current[panelId]);
+      }
+      patchPanel(panelId, {
+        running: true,
+        cancelling: false,
+        error: null,
+        warnings: [],
+        elapsedMs: 0,
+        result: emptyQueryResult(),
+        resultTab: "results",
+      });
       const started = Date.now();
-      timersRef.current[panelId] = setInterval(() => {
+      const timer = setInterval(() => {
         patchPanel(panelId, { elapsedMs: Date.now() - started });
       }, 100);
+      timersRef.current[panelId] = timer;
+      let sawDone = false;
       try {
-        const result = await dbExecute(sessionId, trimmed);
-        patchPanel(panelId, {
-          result,
-          warnings: result.warnings,
-          running: false,
-          error: null,
-          resultTab: result.warnings.length > 0 ? "messages" : "results",
+        await dbExecuteStream(sessionId, trimmed, (event) => {
+          if (queryRunIdsRef.current[panelId] !== runId) return;
+          if (event.kind === "columns") {
+            updatePanel(panelId, (panel) => {
+              const result = panel.result ?? emptyQueryResult();
+              return { ...panel, result: { ...result, columns: event.columns } };
+            });
+          } else if (event.kind === "rows") {
+            updatePanel(panelId, (panel) => {
+              const result = panel.result ?? emptyQueryResult();
+              return { ...panel, result: { ...result, rows: [...result.rows, ...event.rows] } };
+            });
+          } else {
+            sawDone = true;
+            const warnings = event.warnings ?? [];
+            updatePanel(panelId, (panel) => {
+              const result = panel.result ?? emptyQueryResult();
+              return {
+                ...panel,
+                result: {
+                  ...result,
+                  rowsAffected: event.rowsAffected,
+                  durationMs: event.durationMs,
+                  warnings,
+                },
+                warnings,
+                running: false,
+                cancelling: false,
+                error: null,
+                resultTab: warnings.length > 0 ? "messages" : "results",
+              };
+            });
+          }
         });
+        if (!sawDone && queryRunIdsRef.current[panelId] === runId) {
+          patchPanel(panelId, { running: false, cancelling: false });
+        }
       } catch (err) {
+        if (queryRunIdsRef.current[panelId] !== runId) return;
         patchPanel(panelId, {
           running: false,
+          cancelling: false,
           error: String(err),
           warnings: [],
           resultTab: "messages",
         });
       } finally {
-        clearInterval(timersRef.current[panelId]);
-        delete timersRef.current[panelId];
+        if (timersRef.current[panelId] === timer) {
+          clearInterval(timer);
+          delete timersRef.current[panelId];
+        }
       }
     },
-    [sessionId, patchPanel],
+    [sessionId, patchPanel, updatePanel],
   );
 
   const cancelQuery = useCallback(() => {
+    setPanels((prev) => prev.map((p) => (p.running ? { ...p, cancelling: true } : p)));
     void dbCancel(sessionId).catch(() => undefined);
   }, [sessionId]);
 
@@ -149,11 +276,44 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
     setSchemaMap((prev) => {
       const next = { ...prev };
       for (const [name, cols] of tables) {
-        if (!next[name]) next[name] = cols;
+        if (!next[name] || cols.length > 0) next[name] = cols;
       }
       return next;
     });
   }, []);
+
+  const onSchemasLoaded = useCallback((names: string[]) => {
+    setSchemas(names);
+    setActiveSchema((current) => {
+      if (current && names.includes(current)) return current;
+      if (info.database && names.includes(info.database)) return info.database;
+      return names[0] ?? null;
+    });
+  }, [info.database]);
+
+  const switchSchema = useCallback(
+    async (schema: string) => {
+      if (!schema || schema === activeSchema) return;
+      const panelId = activePanelId;
+      try {
+        const result = await dbExecute(sessionId, schemaSwitchSql(info.engine, schema));
+        setActiveSchema(schema);
+        patchPanel(panelId, {
+          result,
+          error: null,
+          warnings: result.warnings,
+          resultTab: result.warnings.length > 0 ? "messages" : "results",
+        });
+      } catch (err) {
+        patchPanel(panelId, {
+          error: String(err),
+          warnings: [],
+          resultTab: "messages",
+        });
+      }
+    },
+    [activePanelId, activeSchema, info.engine, patchPanel, sessionId],
+  );
 
   const insertIntoActive = useCallback(
     (text: string) => {
@@ -164,12 +324,12 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
 
   const quickSelect = useCallback(
     (schema: string | null, table: string) => {
-      const qualified = schema ? `${schema}.${table}` : table;
+      const qualified = qualifiedName(info.engine, schema ?? activeSchema, table);
       const sql = `SELECT * FROM ${qualified} LIMIT 1000`;
       editorHandles.current[activePanelId]?.setValue(sql);
       void runQuery(activePanelId, sql);
     },
-    [activePanelId, runQuery],
+    [activePanelId, activeSchema, info.engine, runQuery],
   );
 
   const addPanel = () => {
@@ -187,20 +347,43 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
       return next;
     });
     delete editorHandles.current[id];
+    delete historyRef.current[id];
+    if (timersRef.current[id]) {
+      clearInterval(timersRef.current[id]);
+      delete timersRef.current[id];
+    }
+    delete queryRunIdsRef.current[id];
   };
 
-  const exportCsv = (panel: PanelState) => {
+  const exportCsv = async (panel: PanelState) => {
     if (!panel.result || panel.result.columns.length === 0) return;
     const lines: string[] = [];
     lines.push(panel.result.columns.map((c) => csvField(c.name)).join(","));
     for (const row of panel.result.rows) {
       lines.push(row.map(csvField).join(","));
     }
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const csv = lines.join("\n");
+    const filename = `query-${Date.now()}.csv`;
+    if (isTauriRuntime()) {
+      const path = await selectSaveFilePath(filename);
+      if (!path) return;
+      let handleId: string | null = null;
+      try {
+        handleId = await writeStreamOpen(path);
+        await writeStreamAppend(handleId, new TextEncoder().encode(csv));
+        await writeStreamClose(handleId);
+      } catch (err) {
+        if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
+        patchPanel(panel.id, { error: String(err), resultTab: "messages" });
+      }
+      return;
+    }
+
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `query-${Date.now()}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -227,7 +410,78 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
   }
 
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
+    <div className="h-full w-full flex flex-col relative" style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
+      <FloatingToolbar
+        storageKey={`mob.db.toolbar.${info.engine}`}
+        defaultTop={4}
+        defaultRight={4}
+        testId="db-floating-toolbar"
+      >
+        {chatToggle && (
+          <button
+            type="button"
+            data-testid="db-chat-toggle"
+            onClick={chatToggle.onToggle}
+            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
+            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
+            style={{
+              ...FT_ICON_BUTTON_STYLE,
+              ...(chatToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
+            }}
+          >
+            <Bot size={14} />
+          </button>
+        )}
+        {onDetach && (
+          <button
+            type="button"
+            data-testid="db-detach"
+            onClick={onDetach}
+            title={t("rdp.detach")}
+            aria-label={t("rdp.detach")}
+            style={FT_ICON_BUTTON_STYLE}
+          >
+            <ExternalLink size={14} />
+          </button>
+        )}
+        {onToggleMaximize && (
+          <button
+            type="button"
+            data-testid="db-maximize"
+            onClick={onToggleMaximize}
+            title={maximized ? t("rdp.restore") : t("rdp.maximize")}
+            aria-label={maximized ? t("rdp.restore") : t("rdp.maximize")}
+            style={FT_ICON_BUTTON_STYLE}
+          >
+            {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+        )}
+        {detachedWindowControls && (
+          <>
+            <button
+              type="button"
+              data-testid="detached-reattach"
+              onClick={detachedWindowControls.onReattach}
+              title={t("rdp.reattach")}
+              aria-label={t("rdp.reattach")}
+              style={FT_BUTTON_STYLE}
+            >
+              <ExternalLink size={14} />
+              <span>{t("rdp.reattach")}</span>
+            </button>
+            <button
+              type="button"
+              data-testid="detached-os-fullscreen"
+              onClick={detachedWindowControls.onToggleOsFullscreen}
+              title={t("rdp.osFullscreen")}
+              aria-label={t("rdp.osFullscreen")}
+              style={FT_ICON_BUTTON_STYLE}
+            >
+              {detachedWindowControls.osFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          </>
+        )}
+      </FloatingToolbar>
       <PanelGroup direction="horizontal" autoSaveId={`db-client-${info.engine}`} className="flex-1 min-h-0">
         <Panel
           defaultSize={initialWidth}
@@ -248,6 +502,7 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
                 engine={info.engine}
                 onInsertTable={insertIntoActive}
                 onQuickSelect={quickSelect}
+                onSchemasLoaded={onSchemasLoaded}
                 onSchemaLoaded={onSchemaLoaded}
               />
             )}
@@ -297,61 +552,79 @@ export default function DbClientTab({ tabId, info, visible }: DbClientTabProps) 
               )}
             </div>
 
-            {/* Active panel body */}
-            <div className="flex-1 min-h-0 relative">
-              {panels.map((panel) => (
-                <div
-                  key={panel.id}
-                  className="absolute inset-0 flex flex-col"
-                  style={{ display: panel.id === activePanelId ? "flex" : "none" }}
-                >
-                  <EditorToolbar
-                    engine={info.engine}
-                    running={panel.running}
-                    showHistory={showHistory}
-                    onRun={() => runQuery(panel.id, editorHandles.current[panel.id]?.getValue() ?? "")}
-                    onRunSelection={() =>
-                      runQuery(panel.id, editorHandles.current[panel.id]?.getSelectionOrAll() ?? "")
-                    }
-                    onCancel={cancelQuery}
-                    onFormat={() => {
-                      const h = editorHandles.current[panel.id];
-                      if (h) h.setValue(formatSql(h.getValue()));
-                    }}
-                    onToggleHistory={() => setShowHistory((v) => !v)}
-                    onExport={() => exportCsv(panel)}
-                    canExport={!!panel.result && panel.result.columns.length > 0}
-                  />
-                  {showHistory && (
-                    <HistoryDropdown
-                      history={historyRef.current}
-                      onPick={(sql) => {
-                        editorHandles.current[panel.id]?.setValue(sql);
-                        setShowHistory(false);
+            {/* Query panels are visible side-by-side so multiple independent
+                editors can run and compare results in the same tab. */}
+            <PanelGroup direction="horizontal" className="flex-1 min-h-0">
+              {panels.map((panel, index) => (
+                <Fragment key={panel.id}>
+                  <Panel minSize={18}>
+                    <div
+                      className="h-full flex flex-col min-w-0 relative"
+                      data-active={panel.id === activePanelId || undefined}
+                      onMouseDown={() => setActivePanelId(panel.id)}
+                      style={{
+                        borderLeft: panel.id === activePanelId ? "1px solid var(--moba-accent)" : undefined,
                       }}
-                      onClose={() => setShowHistory(false)}
-                    />
-                  )}
-                  <PanelGroup direction="vertical" className="flex-1 min-h-0">
-                    <Panel defaultSize={45} minSize={15}>
-                      <SqlEditorPanel
+                    >
+                      <EditorToolbar
                         engine={info.engine}
-                        schema={schemaMap}
-                        handleRef={(h) => {
-                          editorHandles.current[panel.id] = h;
+                        schemas={schemas}
+                        activeSchema={activeSchema}
+                        running={panel.running}
+                        onRun={() => runQuery(panel.id, editorHandles.current[panel.id]?.getValue() ?? "")}
+                        onRunSelection={() =>
+                          runQuery(panel.id, editorHandles.current[panel.id]?.getSelectionOrAll() ?? "")
+                        }
+                        onCancel={cancelQuery}
+                        onFormat={() => {
+                          const h = editorHandles.current[panel.id];
+                          if (h) h.setValue(formatSql(h.getValue()));
                         }}
-                        onRun={(sql) => runQuery(panel.id, sql)}
+                        onToggleHistory={() =>
+                          setHistoryPanelId((current) => (current === panel.id ? null : panel.id))
+                        }
+                        onSchemaChange={(schema) => void switchSchema(schema)}
+                        onExport={() => void exportCsv(panel)}
+                        canExport={!!panel.result && panel.result.columns.length > 0}
                       />
-                    </Panel>
-                    <PanelResizeHandle className="h-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-row-resize" />
-                    <Panel minSize={15}>
-                      <ResultArea panel={panel} onTabChange={(t) => patchPanel(panel.id, { resultTab: t })} />
-                    </Panel>
-                  </PanelGroup>
-                  <StatusBar panel={panel} />
-                </div>
+                      {historyPanelId === panel.id && (
+                        <HistoryDropdown
+                          history={historyRef.current[panel.id] ?? []}
+                          onPick={(sql) => {
+                            editorHandles.current[panel.id]?.setValue(sql);
+                            setHistoryPanelId(null);
+                          }}
+                          onClose={() => setHistoryPanelId(null)}
+                        />
+                      )}
+                      <PanelGroup direction="vertical" className="flex-1 min-h-0">
+                        <Panel defaultSize={45} minSize={15}>
+                          <SqlEditorPanel
+                            engine={info.engine}
+                            initialDoc={panel.doc}
+                            schema={schemaMap}
+                            handleRef={(h) => {
+                              editorHandles.current[panel.id] = h;
+                            }}
+                            onDocChange={(doc) => patchPanel(panel.id, { doc })}
+                            onFocus={() => setActivePanelId(panel.id)}
+                            onRun={(sql) => runQuery(panel.id, sql)}
+                          />
+                        </Panel>
+                        <PanelResizeHandle className="h-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-row-resize" />
+                        <Panel minSize={15}>
+                          <ResultArea panel={panel} onTabChange={(t) => patchPanel(panel.id, { resultTab: t })} />
+                        </Panel>
+                      </PanelGroup>
+                      <StatusBar panel={panel} />
+                    </div>
+                  </Panel>
+                  {index < panels.length - 1 && (
+                    <PanelResizeHandle className="w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize" />
+                  )}
+                </Fragment>
               ))}
-            </div>
+            </PanelGroup>
           </div>
         </Panel>
       </PanelGroup>
@@ -366,23 +639,28 @@ function csvField(value: string | null): string {
 
 function EditorToolbar({
   engine,
+  schemas,
+  activeSchema,
   running,
   onRun,
   onRunSelection,
   onCancel,
   onFormat,
   onToggleHistory,
+  onSchemaChange,
   onExport,
   canExport,
 }: {
   engine: string;
+  schemas: string[];
+  activeSchema: string | null;
   running: boolean;
-  showHistory: boolean;
   onRun: () => void;
   onRunSelection: () => void;
   onCancel: () => void;
   onFormat: () => void;
   onToggleHistory: () => void;
+  onSchemaChange: (schema: string) => void;
   onExport: () => void;
   canExport: boolean;
 }) {
@@ -412,6 +690,21 @@ function EditorToolbar({
         <Download className="w-3.5 h-3.5" /> CSV
       </button>
       <div className="flex-1" />
+      {schemas.length > 0 && (
+        <select
+          className="moba-input h-6 max-w-[180px] text-[11px]"
+          value={activeSchema ?? ""}
+          aria-label="Schema"
+          title="Schema / database"
+          onChange={(event) => onSchemaChange(event.target.value)}
+        >
+          {schemas.map((schema) => (
+            <option key={schema} value={schema}>
+              {schema}
+            </option>
+          ))}
+        </select>
+      )}
       <span className="text-[10px] text-[var(--moba-text-muted)]">{engine}</span>
     </div>
   );
@@ -461,6 +754,8 @@ function ResultArea({
   onTabChange: (tab: "results" | "messages") => void;
 }) {
   const tab = "h-6 px-3 text-[11px] inline-flex items-center";
+  const waitingForFirstResult =
+    panel.running && panel.result !== null && panel.result.columns.length === 0 && panel.result.rows.length === 0;
   return (
     <div className="h-full flex flex-col min-h-0" style={{ background: "var(--moba-bg)" }}>
       <div className="h-7 shrink-0 flex items-center gap-1 px-1" style={{ borderBottom: "1px solid var(--moba-divider)" }}>
@@ -483,8 +778,14 @@ function ResultArea({
       </div>
       <div className="flex-1 min-h-0 flex flex-col">
         {panel.resultTab === "results" ? (
-          panel.result ? (
-            <QueryResultGrid result={panel.result} />
+          waitingForFirstResult ? (
+            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+              {panel.cancelling ? "Cancelling…" : "Running…"}
+            </div>
+          ) : panel.result ? (
+            <div className={`flex-1 min-h-0 flex flex-col ${panel.cancelling ? "opacity-50 pointer-events-none" : ""}`}>
+              <QueryResultGrid result={panel.result} />
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
               {panel.running ? "Running…" : "Run a query to see results."}
@@ -517,7 +818,8 @@ function StatusBar({ panel }: { panel: PanelState }) {
     >
       {panel.running ? (
         <span className="inline-flex items-center gap-1">
-          <Loader2 className="w-3 h-3 animate-spin" /> {(panel.elapsedMs / 1000).toFixed(1)}s
+          <Loader2 className="w-3 h-3 animate-spin" /> {panel.cancelling ? "Cancelling" : "Running"}{" "}
+          {(panel.elapsedMs / 1000).toFixed(1)}s
         </span>
       ) : r ? (
         <>
