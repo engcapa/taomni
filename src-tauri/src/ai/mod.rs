@@ -31,7 +31,7 @@ impl AppAiCtx {
         let asr = AsrManager::new(cfg.asr.warm_on_startup);
 
         // Best-effort: if the active ASR provider is the sherpa engine and a
-        // model dir exists under <cache>/newmob/models/<id>/, plug it in.
+        // model dir exists under <cache>/taomni/models/<id>/, plug it in.
         // We don't fail startup if the model is missing — AsrManager remains
         // on StubAsr, the UI will show "未下载" and trigger the download.
         if let Some(active) = cfg.asr.providers.get(&cfg.asr.active) {

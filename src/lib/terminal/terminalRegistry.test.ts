@@ -11,7 +11,7 @@ beforeEach(() => {
   // Reset the singleton between tests so leakage from one case doesn't make
   // the next one's "list is empty" assertions flaky.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete (globalThis as any).__newmob_terminal_registry__;
+  delete (globalThis as any).__taomni_terminal_registry__;
 });
 
 function makeEntry(tabId: string, sessionId: string) {

@@ -88,13 +88,13 @@ export function ModelsAdvancedPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Globe2 className="w-4 h-4 text-[var(--moba-accent)]" />
+        <Globe2 className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="text-[13px] font-semibold flex-1">{t("aiSettings.modelsTitle")}</div>
       </div>
 
       {/* Mirror preference */}
       <div>
-        <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("aiSettings.modelsDownloadSource")}</div>
+        <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.modelsDownloadSource")}</div>
         <div className="space-y-1">
           {PREF_OPTIONS.map(({ value, label, desc }) => (
             <label key={value} className="flex items-start gap-2 cursor-pointer">
@@ -104,11 +104,11 @@ export function ModelsAdvancedPanel() {
                 value={value}
                 checked={mirror.preference === value}
                 onChange={() => updateMirror({ preference: value })}
-                className="mt-0.5 accent-[var(--moba-accent)]"
+                className="mt-0.5 accent-[var(--taomni-accent)]"
               />
               <div>
                 <div className="text-[12px]">{label}</div>
-                <div className="text-[11px] text-[var(--moba-text-muted)]">{desc}</div>
+                <div className="text-[11px] text-[var(--taomni-text-muted)]">{desc}</div>
               </div>
             </label>
           ))}
@@ -116,7 +116,7 @@ export function ModelsAdvancedPanel() {
         {mirror.preference === "custom" && (
           <input
             type="text"
-            className="moba-input h-7 w-full text-[12px] mt-2"
+            className="taomni-input h-7 w-full text-[12px] mt-2"
             placeholder={t("aiSettings.modelsCustomPlaceholder")}
             value={mirror.custom_base ?? ""}
             onChange={(e) => updateMirror({ custom_base: e.target.value || null })}
@@ -126,24 +126,24 @@ export function ModelsAdvancedPanel() {
 
       {/* CUDA pack */}
       {!isMac && (
-        <div className="pt-3 border-t border-[var(--moba-divider)]">
+        <div className="pt-3 border-t border-[var(--taomni-divider)]">
           <div className="flex items-center gap-2 mb-1.5">
-            <Cpu className="w-3.5 h-3.5 text-[var(--moba-accent)]" />
+            <Cpu className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
             <div className="text-[12px] font-semibold flex-1">{t("aiSettings.modelsCudaTitle")}</div>
             {pack && (
-              <span className={`text-[10px] ${pack.installed ? "text-green-400" : "text-[var(--moba-text-muted)]"}`}>
+              <span className={`text-[10px] ${pack.installed ? "text-green-400" : "text-[var(--taomni-text-muted)]"}`}>
                 {pack.installed ? t("aiSettings.modelsCudaInstalled", { size: pack.size_mb }) : t("aiSettings.modelsCudaNotInstalled")}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug mb-2">
+          <p className="text-[11px] text-[var(--taomni-text-muted)] leading-snug mb-2">
             {t("aiSettings.modelsCudaDesc")}
           </p>
           <div className="flex gap-2">
             {pack?.installed ? (
               <button
                 type="button"
-                className="moba-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
+                className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
                 onClick={uninstallCuda}
                 disabled={!!busy}
               >
@@ -153,7 +153,7 @@ export function ModelsAdvancedPanel() {
             ) : (
               <button
                 type="button"
-                className="moba-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
+                className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
                 onClick={installCuda}
                 disabled={!!busy}
               >
@@ -166,7 +166,7 @@ export function ModelsAdvancedPanel() {
       )}
 
       {status && (
-        <div className="text-[11px] text-[var(--moba-accent)] rounded border border-[var(--moba-divider)] bg-[var(--moba-bg)] px-2 py-1.5">
+        <div className="text-[11px] text-[var(--taomni-accent)] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5">
           {status}
         </div>
       )}

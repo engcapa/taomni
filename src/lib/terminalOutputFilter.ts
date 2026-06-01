@@ -179,10 +179,10 @@ export function createInputEchoSuppressor(
   ttlMs = 5000,
   now = Date.now(),
 ): InputEchoSuppressor {
-  if (text.includes("__newmob_cwd_sync_done")) {
+  if (text.includes("__taomni_cwd_sync_done")) {
     return new MarkerInputEchoSuppressor(
       "printf '\\033]7;file://%s%s\\033\\\\'",
-      ": __newmob_cwd_sync_done",
+      ": __taomni_cwd_sync_done",
       ttlMs,
       now,
     );

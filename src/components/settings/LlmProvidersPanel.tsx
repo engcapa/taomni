@@ -42,8 +42,8 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
     <div
       className={`rounded border transition-colors ${
         isActive
-          ? "border-[var(--moba-accent)] bg-[var(--moba-accent)]/5"
-          : "border-[var(--moba-divider)] bg-[var(--moba-bg)]"
+          ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/5"
+          : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
       }`}
     >
       <div
@@ -51,14 +51,14 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
         onClick={() => setExpanded((e) => !e)}
       >
         {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 text-[var(--moba-text-muted)] shrink-0" />
+          <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)] shrink-0" />
         ) : (
-          <ChevronRight className="w-3.5 h-3.5 text-[var(--moba-text-muted)] shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)] shrink-0" />
         )}
 
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-medium">{PROVIDER_LABELS[id] ?? id}</div>
-          <div className="text-[11px] text-[var(--moba-text-muted)] truncate">
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
             {PROVIDER_NOTES[id] ?? provider.base_url}
           </div>
         </div>
@@ -71,7 +71,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 
         <button
           type="button"
-          className={`moba-btn h-6 px-2 text-[11px] shrink-0 ${isActive ? "opacity-50 cursor-default" : ""}`}
+          className={`taomni-btn h-6 px-2 text-[11px] shrink-0 ${isActive ? "opacity-50 cursor-default" : ""}`}
           onClick={(e) => { e.stopPropagation(); if (!isActive) onActivate(); }}
           disabled={isActive}
         >
@@ -80,13 +80,13 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
       </div>
 
       {expanded && (
-        <div className="px-3 pb-3 border-t border-[var(--moba-divider)] pt-2 space-y-2">
+        <div className="px-3 pb-3 border-t border-[var(--taomni-divider)] pt-2 space-y-2">
           {id !== "local" && (
             <div>
-              <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
+              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
               <input
                 type="password"
-                className="moba-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-[12px]"
                 placeholder={t("aiSettings.llmApiKeyPlaceholder")}
                 value={provider.api_key}
                 onChange={(e) => onChange({ ...provider, api_key: e.target.value })}
@@ -94,19 +94,19 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
             </div>
           )}
           <div>
-            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
+            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
             <input
               type="text"
-              className="moba-input h-7 w-full text-[12px]"
+              className="taomni-input h-7 w-full text-[12px]"
               value={provider.model}
               onChange={(e) => onChange({ ...provider, model: e.target.value })}
             />
           </div>
           <div>
-            <label className="text-[11px] text-[var(--moba-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
+            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
             <input
               type="text"
-              className="moba-input h-7 w-full text-[12px]"
+              className="taomni-input h-7 w-full text-[12px]"
               value={provider.base_url}
               onChange={(e) => onChange({ ...provider, base_url: e.target.value })}
             />
@@ -114,7 +114,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
           <div className="flex items-center gap-2 pt-1">
             <button
               type="button"
-              className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
               onClick={onTest}
               disabled={testing}
             >
@@ -218,7 +218,7 @@ export function LlmProvidersPanel() {
   }, [vaultState]);
 
   if (loading || !config) {
-    return <div className="text-[12px] text-[var(--moba-text-muted)] p-3">{t("aiSettings.loading")}</div>;
+    return <div className="text-[12px] text-[var(--taomni-text-muted)] p-3">{t("aiSettings.loading")}</div>;
   }
 
   const handleSave = () => {
@@ -250,7 +250,7 @@ export function LlmProvidersPanel() {
       <div className="flex items-center justify-between mb-1">
         <div>
           <div className="text-[13px] font-semibold">{t("aiSettings.llmTitle")}</div>
-          <div className="text-[11px] text-[var(--moba-text-muted)]">
+          <div className="text-[11px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.llmActiveLine", {
               active: config.llm.active,
               fallback: config.llm.fallback.enabled
@@ -261,7 +261,7 @@ export function LlmProvidersPanel() {
         </div>
         <button
           type="button"
-          className="moba-btn h-7 px-3 text-[12px]"
+          className="taomni-btn h-7 px-3 text-[12px]"
           onClick={handleSave}
           disabled={saving}
         >
@@ -274,14 +274,14 @@ export function LlmProvidersPanel() {
           role="alert"
           className="flex items-start gap-2 text-[12px] rounded px-2.5 py-2"
           style={{
-            background: "var(--moba-warning-bg)",
-            border: "1px solid var(--moba-warning-border)",
-            color: "var(--moba-warning-text)",
+            background: "var(--taomni-warning-bg)",
+            border: "1px solid var(--taomni-warning-border)",
+            color: "var(--taomni-warning-text)",
           }}
         >
           <AlertTriangle
             className="w-3.5 h-3.5 shrink-0 mt-0.5"
-            style={{ color: "var(--moba-warning-icon)" }}
+            style={{ color: "var(--taomni-warning-icon)" }}
           />
           <span className="leading-relaxed">{saveError}</span>
         </div>
@@ -292,14 +292,14 @@ export function LlmProvidersPanel() {
           role="status"
           className="flex items-center gap-2 text-[12px] rounded px-2.5 py-2"
           style={{
-            background: "var(--moba-success-bg)",
-            border: "1px solid var(--moba-success-border)",
-            color: "var(--moba-success-text)",
+            background: "var(--taomni-success-bg)",
+            border: "1px solid var(--taomni-success-border)",
+            color: "var(--taomni-success-text)",
           }}
         >
           <CheckCircle
             className="w-3.5 h-3.5 shrink-0"
-            style={{ color: "var(--moba-success-icon)" }}
+            style={{ color: "var(--taomni-success-icon)" }}
           />
           <span>{t("aiSettings.llmSaved")}</span>
         </div>

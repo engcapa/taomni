@@ -44,7 +44,7 @@ pub struct CcSendRequest {
     /// Optional thread workspace root. Forwarded to CC via `--add-dir` so the
     /// CLI is constrained to read only that directory tree (in addition to
     /// the deny list configured in settings.json). Per the plan §9.5.5, CC
-    /// must not be able to walk `~/.ssh`, the vault, or the NewMob config
+    /// must not be able to walk `~/.ssh`, the vault, or the Taomni config
     /// directory; combining `--add-dir` (allow) with the deny list double-
     /// gates these critical paths.
     #[serde(default)]
@@ -91,7 +91,7 @@ pub async fn cc_send_message(
     };
 
     // Write temp config files.
-    let tmp_dir = std::env::temp_dir().join(format!("newmob-cc-{}", &req.thread_id[..8]));
+    let tmp_dir = std::env::temp_dir().join(format!("taomni-cc-{}", &req.thread_id[..8]));
     let settings_path = tmp_dir.join("settings.json");
     let mcp_path = tmp_dir.join(".mcp.json");
 
@@ -121,8 +121,8 @@ pub async fn cc_send_message(
         config.cc_bridge.max_turns.to_string(),
         "--settings".into(),
         settings_path.to_string_lossy().to_string(),
-        // §36/37: route every tool call through NewMob's permission prompt
-        // and expose NewMob's tool surface back to CC via --mcp-config.
+        // §36/37: route every tool call through Taomni's permission prompt
+        // and expose Taomni's tool surface back to CC via --mcp-config.
         "--mcp-config".into(),
         mcp_path.to_string_lossy().to_string(),
         "--permission-prompt-tool".into(),
@@ -225,7 +225,7 @@ pub async fn cc_stream_message(
         config.cc_bridge.binary.clone()
     };
 
-    let tmp_dir = std::env::temp_dir().join(format!("newmob-cc-{}", &req.thread_id[..8]));
+    let tmp_dir = std::env::temp_dir().join(format!("taomni-cc-{}", &req.thread_id[..8]));
     let settings_path = tmp_dir.join("settings.json");
     let mcp_path = tmp_dir.join(".mcp.json");
     write_temp_settings(

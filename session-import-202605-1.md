@@ -29,9 +29,9 @@
 
 ### B. 导入预览支持逐行选择（默认全选）
 
-> 范围：`SessionImportPreview` 是所有第三方导入共用的预览对话框，所以这一改对 Tabby/MobaXterm/Xshell/WindTerm/SecureCRT/iTerm2/Terminal.app/Exceed/RDM/CSV/NewMob 自家格式都自动生效。
+> 范围：`SessionImportPreview` 是所有第三方导入共用的预览对话框，所以这一改对 Tabby/MobaXterm/Xshell/WindTerm/SecureCRT/iTerm2/Terminal.app/Exceed/RDM/CSV/Taomni 自家格式都自动生效。
 
-- B1 [x] **`SessionImportPreview.tsx` 加 checkbox 列** — 表头主 checkbox + 行内 checkbox；复用现有 `moba-checkbox` 样式（与 `SessionEditor.tsx` 一致）。
+- B1 [x] **`SessionImportPreview.tsx` 加 checkbox 列** — 表头主 checkbox + 行内 checkbox；复用现有 `taomni-checkbox` 样式（与 `SessionEditor.tsx` 一致）。
 - B2 [x] **初始化默认全选** — `useState` 初值是所有 session id 的 Set；`useEffect` 在 `result` 引用变化时重置。
 - B3 [x] **`onConfirm` 携带选中集合** — prop 改为 `(selectedIds: ReadonlySet<string>) => void`；`disabled` 改用 `selectedIds.size === 0`。
 - B4 [x] **新增 testid** — `session-import-preview-select-all` / `session-import-preview-row-select-${id}` / `session-import-preview-summary`；既有 testid 全部保留。
@@ -84,7 +84,7 @@
 
 ## Reused Utilities
 
-- `moba-checkbox` 样式与 `Checkbox` 组件 — 见 `src/components/session/SessionEditor.tsx:150-166`
+- `taomni-checkbox` 样式与 `Checkbox` 组件 — 见 `src/components/session/SessionEditor.tsx:150-166`
 - `data-testid` 命名风格 — 沿用现有 `session-import-preview-*`
 - `prepareImportResultForSave` 中 standalone secret 与 password→passwordRef 写入逻辑 — 不动，仅在它前面把不该传进去的 sessionId 剔掉
 - `enrichTabbyResult` / `lookupTabbyKeychain` / `mergeTabbySecrets` — 不动，A1 修了 keyring 之后它们就开始返回真实数据

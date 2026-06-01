@@ -25,7 +25,7 @@ import {
 } from "../../lib/customDnD";
 import { useT } from "../../lib/i18n";
 
-const CROSS_PANE_DRAG_MIME = "newmob/sftp-files";
+const CROSS_PANE_DRAG_MIME = "taomni/sftp-files";
 
 interface CrossPaneDragPayload {
   sessionId: string;
@@ -42,7 +42,7 @@ interface ColWidths {
 const DEFAULT_COL_WIDTHS: ColWidths = { name: 280, size: 80, mtime: 150, type: 90 };
 const MIN_COL_WIDTH = 40;
 const MAX_COL_WIDTH = 800;
-const COL_KEY_PREFIX = "newmob.sftp.cols.";
+const COL_KEY_PREFIX = "taomni.sftp.cols.";
 
 function loadColWidths(side: PaneSide): ColWidths {
   try {
@@ -304,7 +304,7 @@ export function FilePanel({
 
   if (!pane) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+      <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
         {t("fileBrowser.paneNotInitialized")}
       </div>
     );
@@ -419,12 +419,12 @@ export function FilePanel({
     <div data-testid={`sftp-${side}-pane`} className="h-full w-full min-w-0 flex flex-col min-h-0">
       <div
         className="h-7 flex items-center px-2 text-[11px] border-b shrink-0 gap-2"
-        style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+        style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span
           className="px-1.5 py-[1px] text-[10px] font-bold tracking-wider rounded shrink-0"
           style={{
-            background: side === "remote" ? "var(--moba-accent)" : "var(--moba-text-muted)",
+            background: side === "remote" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
             color: "#fff",
             letterSpacing: "0.08em",
           }}
@@ -434,7 +434,7 @@ export function FilePanel({
         {subtitle && (
           <span
             className="truncate text-[11px]"
-            style={{ color: "var(--moba-text-muted)" }}
+            style={{ color: "var(--taomni-text-muted)" }}
             title={subtitle}
           >
             {subtitle}
@@ -447,11 +447,11 @@ export function FilePanel({
             value={filterText ?? ""}
             placeholder={t("fileBrowser.filterPlaceholder")}
             onChange={(e) => onFilterTextChange(e.target.value)}
-            className="moba-input h-5 px-1.5 text-[11px] w-[140px] rounded shrink-0"
+            className="taomni-input h-5 px-1.5 text-[11px] w-[140px] rounded shrink-0"
             style={{
-              background: "var(--moba-input-bg)",
-              border: "1px solid var(--moba-input-border)",
-              color: "var(--moba-text)",
+              background: "var(--taomni-input-bg)",
+              border: "1px solid var(--taomni-input-border)",
+              color: "var(--taomni-text)",
             }}
           />
         )}
@@ -546,7 +546,7 @@ export function FilePanel({
         onDetach={detachable ? onDetach : undefined}
       />
       <div className="h-6 flex items-center gap-1 px-1 border-b shrink-0"
-        style={{ borderColor: "var(--moba-divider)" }}>
+        style={{ borderColor: "var(--taomni-divider)" }}>
         {showDrivesPicker && (
           <DrivesPicker
             onSelect={(p) => void navigate(sessionId, side, p)}
@@ -571,15 +571,15 @@ export function FilePanel({
         onDrop={handleDrop}
         onContextMenu={handleEmptyContext}
         onClick={handleEmptyClick}
-        style={{ background: "var(--moba-bg)" }}
+        style={{ background: "var(--taomni-bg)" }}
       >
         {ctx.render}
         {draggingOver && (
           <div
             className="absolute inset-0 pointer-events-none border-2 border-dashed z-10 flex items-center justify-center"
-            style={{ borderColor: "var(--moba-accent)", background: "rgba(43,93,139,0.08)" }}
+            style={{ borderColor: "var(--taomni-accent)", background: "rgba(43,93,139,0.08)" }}
           >
-            <span className="text-xs font-semibold text-[var(--moba-accent)]">
+            <span className="text-xs font-semibold text-[var(--taomni-accent)]">
               {t("fileBrowser.dropToCopy")}
             </span>
           </div>
@@ -602,8 +602,8 @@ export function FilePanel({
             <col style={{ width: colWidths.mtime }} />
             <col style={{ width: colWidths.type }} />
           </colgroup>
-          <thead className="sticky top-0 z-10" style={{ background: "var(--moba-quick-bg)" }}>
-            <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--moba-text-muted)" }}>
+          <thead className="sticky top-0 z-10" style={{ background: "var(--taomni-quick-bg)" }}>
+            <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--taomni-text-muted)" }}>
               <SortHeader
                 label={t("fileBrowser.sortName")}
                 active={sortKey === "name"}
@@ -658,7 +658,7 @@ export function FilePanel({
             )}
             {sortedEntries.length === 0 && !pane.loading && !pane.error && (
               <tr>
-                <td colSpan={4} className="px-2 py-3 text-center text-[var(--moba-text-muted)]">
+                <td colSpan={4} className="px-2 py-3 text-center text-[var(--taomni-text-muted)]">
                   {t("fileBrowser.emptyDirectory")}
                 </td>
               </tr>
@@ -671,7 +671,7 @@ export function FilePanel({
                 className="cursor-default select-none"
                 style={{
                   background: pane.selection.includes(entry.path)
-                    ? "var(--moba-selected)"
+                    ? "var(--taomni-selected)"
                     : undefined,
                 }}
                 onClick={(e) => handleRowClick(entry, e)}
@@ -684,17 +684,17 @@ export function FilePanel({
                     <FileTypeIcon entry={entry} />
                     <span className="truncate">{entry.name}</span>
                     {entry.symlinkTarget && (
-                      <span className="truncate text-[10px] text-[var(--moba-text-muted)]">→ {entry.symlinkTarget}</span>
+                      <span className="truncate text-[10px] text-[var(--taomni-text-muted)]">→ {entry.symlinkTarget}</span>
                     )}
                   </div>
                 </td>
-                <td className="px-1.5 py-0.5 text-right text-[var(--moba-text-muted)] truncate">
+                <td className="px-1.5 py-0.5 text-right text-[var(--taomni-text-muted)] truncate">
                   {entry.fileType === "dir" ? "" : formatBytes(entry.size)}
                 </td>
-                <td className="px-1.5 py-0.5 text-[var(--moba-text-muted)] truncate">
+                <td className="px-1.5 py-0.5 text-[var(--taomni-text-muted)] truncate">
                   {entry.mtime ? new Date(entry.mtime * 1000).toLocaleString() : ""}
                 </td>
-                <td className="px-1.5 py-0.5 text-[var(--moba-text-muted)] truncate">
+                <td className="px-1.5 py-0.5 text-[var(--taomni-text-muted)] truncate">
                   {entry.fileType === "dir"
                     ? t("fileBrowser.typeFolder")
                     : (entry.name.split(".").pop() ?? "").toLowerCase()}
@@ -705,7 +705,7 @@ export function FilePanel({
         </table>
       </div>
       <div className="h-5 px-2 text-[11px] flex items-center border-t shrink-0"
-        style={{ borderColor: "var(--moba-divider)", background: "var(--moba-status-bg)", color: "var(--moba-status-text)" }}>
+        style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-status-bg)", color: "var(--taomni-status-text)" }}>
         {pane.loading
           ? t("fileBrowser.statusLoading")
           : pane.selection.length > 0
@@ -757,7 +757,7 @@ function SortHeader({
     <th
       data-testid={`col-header-${slug}`}
       className={`text-left px-1.5 py-0.5 cursor-pointer select-none border-b relative ${className ?? ""}`}
-      style={{ borderColor: "var(--moba-divider)" }}
+      style={{ borderColor: "var(--taomni-divider)" }}
       onClick={onClick}
     >
       <span className="truncate inline-block align-bottom max-w-full">
@@ -786,7 +786,7 @@ function SortHeader({
             e.stopPropagation();
             onResizeReset?.();
           }}
-          className="absolute top-0 right-0 h-full w-[5px] cursor-col-resize hover:bg-[var(--moba-accent)]"
+          className="absolute top-0 right-0 h-full w-[5px] cursor-col-resize hover:bg-[var(--taomni-accent)]"
           style={{ zIndex: 1 }}
         />
       )}
@@ -830,9 +830,9 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
       <button
         type="button"
         title={t("fileBrowser.drivesSwitchTitle")}
-        className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--moba-hover)] text-[11px]"
+        className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--taomni-hover)] text-[11px]"
         onClick={() => setOpen((v) => !v)}
-        style={{ color: "var(--moba-text-muted)" }}
+        style={{ color: "var(--taomni-text-muted)" }}
       >
         <HardDrive className="w-3 h-3" />
         <ChevronDown className="w-3 h-3" />
@@ -841,16 +841,16 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
         <div
           className="absolute top-full left-0 mt-0.5 z-50 min-w-[160px] py-1 text-[12px] shadow-lg rounded"
           style={{
-            background: "var(--moba-bg)",
-            border: "1px solid var(--moba-divider)",
-            color: "var(--moba-text)",
+            background: "var(--taomni-bg)",
+            border: "1px solid var(--taomni-divider)",
+            color: "var(--taomni-text)",
           }}
         >
           {loading && (
-            <div className="px-2 py-1 text-[var(--moba-text-muted)]">{t("fileBrowser.drivesLoading")}</div>
+            <div className="px-2 py-1 text-[var(--taomni-text-muted)]">{t("fileBrowser.drivesLoading")}</div>
           )}
           {!loading && drives && drives.length === 0 && (
-            <div className="px-2 py-1 text-[var(--moba-text-muted)]">
+            <div className="px-2 py-1 text-[var(--taomni-text-muted)]">
               {t("fileBrowser.drivesNoneReported")}
             </div>
           )}
@@ -859,7 +859,7 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
               <button
                 key={d.id}
                 type="button"
-                className="w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)] flex items-center gap-1.5"
+                className="w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)] flex items-center gap-1.5"
                 onClick={() => {
                   onSelect(d.path);
                   setOpen(false);
@@ -870,7 +870,7 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
                 <span className="truncate">{d.label}</span>
                 <span
                   className="ml-auto text-[10px]"
-                  style={{ color: "var(--moba-text-muted)" }}
+                  style={{ color: "var(--taomni-text-muted)" }}
                 >
                   {d.path}
                 </span>
@@ -884,8 +884,8 @@ function DrivesPicker({ onSelect }: { onSelect: (path: string) => void }) {
 
 function FileTypeIcon({ entry }: { entry: FileEntry }) {
   if (entry.fileType === "dir") return <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: "#dab760" }} />;
-  if (entry.fileType === "symlink") return <LinkIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--moba-accent)" }} />;
-  return <FileIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--moba-text-muted)" }} />;
+  if (entry.fileType === "symlink") return <LinkIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-accent)" }} />;
+  return <FileIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-text-muted)" }} />;
 }
 
 export function isPreviewable(entry: FileEntry): boolean {

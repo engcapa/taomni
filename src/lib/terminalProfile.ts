@@ -70,7 +70,7 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   commonCommandsShortcut: "Ctrl+Shift+P",
 };
 
-const TERMINAL_PROFILE_STORAGE_KEY = "newmob.terminalProfile.v1";
+const TERMINAL_PROFILE_STORAGE_KEY = "taomni.terminalProfile.v1";
 
 export function parseSessionOptions(optionsJson: string | null | undefined): Record<string, unknown> {
   if (!optionsJson?.trim()) return {};

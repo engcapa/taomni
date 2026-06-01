@@ -30,7 +30,7 @@ use flate2::Compression;
 use std::io::{Read, Write};
 
 pub const ENCODING_EXTENDED_CLIPBOARD: i32 = 0xC0A1_E5CEu32 as i32;
-// Older NewMob builds advertised this incorrect value. Keeping it in the
+// Older Taomni builds advertised this incorrect value. Keeping it in the
 // SetEncodings list is harmless for conforming servers and lets us keep
 // talking to any test servers that copied the old draft value.
 pub const ENCODING_EXTENDED_CLIPBOARD_LEGACY: i32 = -1063;

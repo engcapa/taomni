@@ -124,10 +124,10 @@ export function PttButton() {
       data-testid="ptt-button"
       data-state={state}
       disabled={isUnsupported}
-      className={`moba-titlebar-tray-btn h-full w-10 inline-flex items-center justify-center transition-colors ${
+      className={`taomni-titlebar-tray-btn h-full w-10 inline-flex items-center justify-center transition-colors ${
         state === "recording" ? "bg-red-500/30 text-red-300" : ""
-      } ${isUnsupported ? "opacity-40 cursor-not-allowed" : "hover:bg-[var(--moba-hover)]"}`}
-      style={{ color: "var(--moba-text)" }}
+      } ${isUnsupported ? "opacity-40 cursor-not-allowed" : "hover:bg-[var(--taomni-hover)]"}`}
+      style={{ color: "var(--taomni-text)" }}
       onMouseDown={() => void startRecording()}
       onMouseUp={() => void stopRecording()}
       onMouseLeave={() => { if (state === "recording") void stopRecording(); }}

@@ -6,7 +6,7 @@
 app:
   base_url: http://localhost:5000   # Vite dev server in browser mode
   mode: browser                     # browser | native
-  # native_binary: ./src-tauri/target/debug/newmob.exe   # used when mode=native on Windows
+  # native_binary: ./src-tauri/target/debug/taomni.exe   # used when mode=native on Windows
 
 worker:
   parallel: 4                       # max browser worker processes (browser mode only)

@@ -115,8 +115,8 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
         style={{
           width: "min(900px, 96vw)",
           height: panelHeight,
-          background: "var(--moba-bg)",
-          border: "1px solid var(--moba-divider)",
+          background: "var(--taomni-bg)",
+          border: "1px solid var(--taomni-divider)",
           borderBottom: "none",
           borderRadius: "6px 6px 0 0",
         }}
@@ -127,8 +127,8 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
           style={{
             height: 6,
             cursor: "ns-resize",
-            background: "var(--moba-chrome-bg)",
-            borderBottom: "1px solid var(--moba-divider)",
+            background: "var(--taomni-chrome-bg)",
+            borderBottom: "1px solid var(--taomni-divider)",
           }}
           onMouseDown={handleResizeMouseDown}
           title={t("multiExec.dragResize")}
@@ -138,7 +138,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
               width: 32,
               height: 3,
               borderRadius: 2,
-              background: "var(--moba-divider)",
+              background: "var(--taomni-divider)",
             }}
           />
         </div>
@@ -147,20 +147,20 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
         <div
           className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0"
           style={{
-            background: "var(--moba-chrome-bg)",
-            borderBottom: "1px solid var(--moba-divider)",
+            background: "var(--taomni-chrome-bg)",
+            borderBottom: "1px solid var(--taomni-divider)",
           }}
         >
           <Users className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
-          <span className="text-xs font-semibold" style={{ color: "var(--moba-text)" }}>
+          <span className="text-xs font-semibold" style={{ color: "var(--taomni-text)" }}>
             {t("multiExec.editorTitle")}
           </span>
-          <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
+          <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
             {t("multiExec.editorHint")}
           </span>
           <div className="flex-1" />
           <button
-            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
             onClick={onClose}
             type="button"
             title={t("multiExec.closeEsc")}
@@ -175,7 +175,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
           <div className="flex flex-col flex-1 min-w-0 p-2 gap-2">
             <textarea
               ref={textareaRef}
-              className="moba-input flex-1 resize-none leading-5 p-2 font-mono text-xs"
+              className="taomni-input flex-1 resize-none leading-5 p-2 font-mono text-xs"
               style={{ height: "100%", minHeight: 0 }}
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -191,7 +191,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
             />
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                className="moba-btn flex items-center gap-1"
+                className="taomni-btn flex items-center gap-1"
                 data-primary="true"
                 onClick={handleSend}
                 disabled={!value.trim()}
@@ -201,7 +201,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                 {lineCount > 1 ? t("multiExec.sendLinesLong", { lines: lineCount }) : t("multiExec.send")}
               </button>
               <button
-                className="moba-btn flex items-center gap-1"
+                className="taomni-btn flex items-center gap-1"
                 onClick={handleApply}
                 type="button"
                 title={t("multiExec.applyToBarTitle")}
@@ -209,7 +209,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                 <CornerDownLeft className="w-3 h-3" />
                 {t("multiExec.applyToBar")}
               </button>
-              <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
+              <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
                 {lineCount === 1 ? t("multiExec.lineCount", { count: lineCount }) : t("multiExec.lineCountPlural", { count: lineCount })}
               </span>
             </div>
@@ -219,20 +219,20 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
           {history.length > 0 && (
             <div
               className="flex flex-col flex-shrink-0 overflow-hidden"
-              style={{ width: 240, borderLeft: "1px solid var(--moba-divider)" }}
+              style={{ width: 240, borderLeft: "1px solid var(--taomni-divider)" }}
             >
               <div
                 className="px-2 py-1 text-[11px] font-semibold flex-shrink-0"
                 style={{
-                  background: "var(--moba-chrome-bg)",
-                  borderBottom: "1px solid var(--moba-divider)",
-                  color: "var(--moba-text-muted)",
+                  background: "var(--taomni-chrome-bg)",
+                  borderBottom: "1px solid var(--taomni-divider)",
+                  color: "var(--taomni-text-muted)",
                 }}
               >
                 <Clock className="w-3 h-3 inline mr-1" />
                 {t("multiExec.historyHeader", { count: history.length })}
               </div>
-              <div className="flex-1 overflow-y-auto moba-scroll-y">
+              <div className="flex-1 overflow-y-auto taomni-scroll-y">
                 {[...history].reverse().map((cmd, i) => {
                   const originalIdx = history.length - 1 - i;
                   const isSelected = selectedIdx === originalIdx;
@@ -243,11 +243,11 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                       type="button"
                       className="w-full text-left px-2 py-1.5 flex flex-col gap-0.5"
                       style={{
-                        background: isSelected ? "var(--moba-selected)" : undefined,
-                        borderBottom: "1px solid var(--moba-divider)",
+                        background: isSelected ? "var(--taomni-selected)" : undefined,
+                        borderBottom: "1px solid var(--taomni-divider)",
                       }}
                       onMouseEnter={(e) => {
-                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = "var(--moba-hover)";
+                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = "var(--taomni-hover)";
                       }}
                       onMouseLeave={(e) => {
                         if (!isSelected) (e.currentTarget as HTMLElement).style.background = "";
@@ -256,11 +256,11 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                     >
                       <span
                         className="text-[11px] font-mono truncate block"
-                        style={{ color: "var(--moba-text)" }}
+                        style={{ color: "var(--taomni-text)" }}
                       >
                         {preview}
                       </span>
-                      <span className="text-[10px]" style={{ color: "var(--moba-text-muted)" }}>
+                      <span className="text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
                         #{originalIdx + 1}
                       </span>
                     </button>
@@ -410,8 +410,8 @@ export function MultiExecBar({
         data-testid="multiexec-bar"
         style={{
           minHeight: 34,
-          background: "var(--moba-chrome-bg)",
-          borderTop: "1px solid var(--moba-divider)",
+          background: "var(--taomni-chrome-bg)",
+          borderTop: "1px solid var(--taomni-divider)",
         }}
       >
         <Users
@@ -422,7 +422,7 @@ export function MultiExecBar({
           <textarea
             ref={textareaRef}
             data-testid="multiexec-input"
-            className="moba-input flex-1 resize-none leading-5 py-0.5"
+            className="taomni-input flex-1 resize-none leading-5 py-0.5"
             style={{ minHeight: 22, maxHeight: 100, overflow: "auto" }}
             rows={1}
             placeholder={t("multiExec.placeholderBar")}
@@ -435,8 +435,8 @@ export function MultiExecBar({
           <div className="flex flex-col flex-shrink-0" style={{ marginTop: 1 }}>
             <button
               type="button"
-              className="w-4 h-3.5 inline-flex items-center justify-center rounded-t hover:bg-[var(--moba-hover)] disabled:opacity-30"
-              style={{ border: "1px solid var(--moba-divider)", borderBottom: "none", background: "var(--moba-button-to)" }}
+              className="w-4 h-3.5 inline-flex items-center justify-center rounded-t hover:bg-[var(--taomni-hover)] disabled:opacity-30"
+              style={{ border: "1px solid var(--taomni-divider)", borderBottom: "none", background: "var(--taomni-button-to)" }}
               onClick={() => navigateHistory("up")}
               disabled={history.length === 0}
               title={t("multiExec.historyPrev")}
@@ -445,8 +445,8 @@ export function MultiExecBar({
             </button>
             <button
               type="button"
-              className="w-4 h-3.5 inline-flex items-center justify-center rounded-b hover:bg-[var(--moba-hover)] disabled:opacity-30"
-              style={{ border: "1px solid var(--moba-divider)", background: "var(--moba-button-to)" }}
+              className="w-4 h-3.5 inline-flex items-center justify-center rounded-b hover:bg-[var(--taomni-hover)] disabled:opacity-30"
+              style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-button-to)" }}
               onClick={() => navigateHistory("down")}
               disabled={historyIdx === null}
               title={t("multiExec.historyNext")}
@@ -457,8 +457,8 @@ export function MultiExecBar({
           {/* Expand button */}
           <button
             type="button"
-            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)] flex-shrink-0 mt-0.5"
-            style={{ border: "1px solid var(--moba-divider)" }}
+            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] flex-shrink-0 mt-0.5"
+            style={{ border: "1px solid var(--taomni-divider)" }}
             onClick={() => setExpanded(true)}
             title={t("multiExec.expand")}
           >
@@ -467,7 +467,7 @@ export function MultiExecBar({
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
           <button
-            className="moba-btn flex items-center"
+            className="taomni-btn flex items-center"
             data-primary="true"
             onClick={handleSend}
             disabled={!value.trim()}
@@ -477,12 +477,12 @@ export function MultiExecBar({
             <Send className="w-3 h-3 mr-1" />
             {lineCount > 1 ? t("multiExec.sendLines", { lines: lineCount }) : t("multiExec.send")}
           </button>
-          <span className="moba-pill flex-shrink-0" style={{ fontSize: 11 }}>
+          <span className="taomni-pill flex-shrink-0" style={{ fontSize: 11 }}>
             {selectedCount} / {totalTerminalCount}
           </span>
           <button
-            className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--moba-hover)] flex-shrink-0"
-            style={{ color: "var(--moba-text-muted)" }}
+            className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
+            style={{ color: "var(--taomni-text-muted)" }}
             onClick={onSelectAll}
             type="button"
             title={t("multiExec.selectAll")}
@@ -490,8 +490,8 @@ export function MultiExecBar({
             {t("multiExec.selectAllShort")}
           </button>
           <button
-            className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--moba-hover)] flex-shrink-0"
-            style={{ color: "var(--moba-text-muted)" }}
+            className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
+            style={{ color: "var(--taomni-text-muted)" }}
             onClick={onClearSelection}
             type="button"
             title={t("multiExec.clearSelection")}
@@ -499,7 +499,7 @@ export function MultiExecBar({
             {t("multiExec.clearShort")}
           </button>
           <button
-            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)] flex-shrink-0"
+            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
             onClick={onClose}
             type="button"
             title={t("multiExec.closeBar")}

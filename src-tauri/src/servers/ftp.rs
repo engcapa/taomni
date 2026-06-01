@@ -167,7 +167,7 @@ impl Session {
         let mut reader = BufReader::new(read_half);
 
         write_half
-            .write_all(b"220 NewMob FTP server ready.\r\n")
+            .write_all(b"220 Taomni FTP server ready.\r\n")
             .await?;
 
         loop {

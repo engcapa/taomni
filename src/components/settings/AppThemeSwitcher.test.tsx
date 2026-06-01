@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setAppThemeMode } from "../../lib/appTheme";
 import { AppThemeIconButton, AppThemeSwitcher } from "./AppThemeSwitcher";
 
-const APP_THEME_STORAGE_KEY = "newmob.appTheme.v1";
+const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
 
 describe("AppThemeSwitcher", () => {
   beforeEach(() => {

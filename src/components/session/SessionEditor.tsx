@@ -100,7 +100,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "FTP",     icon: <Folder className="w-7 h-7" />,       color: "#7a4f1a" },
   { id: "SFTP",    icon: <Folder className="w-7 h-7" />,       color: "#1e6db8" },
   { id: "Serial",  icon: <Wifi className="w-7 h-7" />,         color: "#236a98" },
-  { id: "File",    icon: <FileText className="w-7 h-7" />,     color: "var(--moba-text-muted)" },
+  { id: "File",    icon: <FileText className="w-7 h-7" />,     color: "var(--taomni-text-muted)" },
   { id: "Shell",   icon: <TerminalIcon className="w-7 h-7" />, color: "#62d36f" },
   { id: "Browser", icon: <Globe className="w-7 h-7" />,        color: "#1e5fa8" },
   { id: "Mosh",    icon: <Server className="w-7 h-7" />,       color: "#7a3d9d" },
@@ -192,7 +192,7 @@ function Checkbox({
   return (
     <input
       type="checkbox"
-      className="moba-checkbox"
+      className="taomni-checkbox"
       data-checked={checked}
       checked={checked}
       disabled={disabled}
@@ -211,7 +211,7 @@ function Radio({
   return (
     <input
       type="radio"
-      className="moba-radio"
+      className="taomni-radio"
       checked={checked}
       onChange={onChange}
     />
@@ -232,7 +232,7 @@ function Select({
   return (
     <span className="relative inline-flex items-center">
       <select
-        className={`moba-input pr-6 appearance-none ${className || "w-[260px]"}`}
+        className={`taomni-input pr-6 appearance-none ${className || "w-[260px]"}`}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
       >
@@ -240,7 +240,7 @@ function Select({
           <option key={o}>{o}</option>
         ))}
       </select>
-      <ChevronDown className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--moba-text-muted)]" />
+      <ChevronDown className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--taomni-text-muted)]" />
     </span>
   );
 }
@@ -254,7 +254,7 @@ function Field({
 }) {
   return (
     <>
-      <div className="col-span-3 text-[12px] text-right pt-1 text-[var(--moba-text)]">
+      <div className="col-span-3 text-[12px] text-right pt-1 text-[var(--taomni-text)]">
         {label}
       </div>
       <div className="col-span-9 flex items-center flex-wrap gap-1">
@@ -353,7 +353,7 @@ function AdvancedSshSettings({
 
       <Field label={t("sessionEditor2.fieldExecuteCommand")}>
         <input
-          className="moba-input flex-1"
+          className="taomni-input flex-1"
           placeholder={t("sessionEditor2.executeCommandPlaceholder")}
           value={startupCmd}
           aria-label={t("sessionEditor2.executeCommandAria")}
@@ -399,10 +399,10 @@ function AdvancedSshSettings({
             ))}
           </div>
           <div className="flex items-center gap-2 pl-1">
-            <span className="text-[var(--moba-text-muted)]">{t("sessionEditor2.passwordLabel")}</span>
+            <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.passwordLabel")}</span>
             <div className="relative">
               <input
-                className="moba-input pr-7"
+                className="taomni-input pr-7"
                 type={showPwd ? "text" : "password"}
                 value={password}
                 aria-label={t("sessionEditor2.passwordAria")}
@@ -419,8 +419,8 @@ function AdvancedSshSettings({
                 type="button"
               >
                 {showPwd
-                  ? <EyeOff className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />
-                  : <Eye className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />}
+                  ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+                  : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
               </button>
             </div>
             <label
@@ -433,7 +433,7 @@ function AdvancedSshSettings({
             >
               <input
                 type="checkbox"
-                className="moba-checkbox"
+                className="taomni-checkbox"
                 data-testid="session-save-in-vault"
                 checked={saveInVault}
                 onChange={(e) => setSaveInVault(e.target.checked)}
@@ -441,7 +441,7 @@ function AdvancedSshSettings({
               />
               {t("sessionEditor2.saveInVault")}
             </label>
-            <span className="moba-pill">
+            <span className="taomni-pill">
               <Shield className="w-3 h-3" /> {t("sessionEditor2.encryptedPill")}
             </span>
           </div>
@@ -451,17 +451,17 @@ function AdvancedSshSettings({
       <Field label={t("sessionEditor2.fieldPrivateKey")}>
         <Checkbox checked={usePrivKey} onChange={setUsePrivKey} />
         <input
-          className="moba-input flex-1 ml-2"
+          className="taomni-input flex-1 ml-2"
           value={keyPath}
           onChange={(e) => setKeyPath(e.target.value)}
           disabled={!usePrivKey}
           aria-label={t("sessionEditor2.privateKeyAria")}
           placeholder={t("sessionEditor2.privateKeyPlaceholder")}
         />
-        <button className="moba-btn ml-1" disabled={!usePrivKey} onClick={onBrowseKey} type="button">
+        <button className="taomni-btn ml-1" disabled={!usePrivKey} onClick={onBrowseKey} type="button">
           {t("sessionEditor2.browse")}
         </button>
-        <button className="moba-btn ml-1" disabled type="button" title={t("sessionEditor2.generateTitle")}>
+        <button className="taomni-btn ml-1" disabled type="button" title={t("sessionEditor2.generateTitle")}>
           {t("sessionEditor2.generate")}
         </button>
       </Field>
@@ -475,31 +475,31 @@ function AdvancedSshSettings({
             className="flex items-center gap-2 pl-1"
             style={{ opacity: useJump ? 1 : 0.5 }}
           >
-            <span className="text-[var(--moba-text-muted)] w-16 text-right">{t("sessionEditor2.jumpGateway")}</span>
+            <span className="text-[var(--taomni-text-muted)] w-16 text-right">{t("sessionEditor2.jumpGateway")}</span>
             <input
-              className="moba-input w-56"
+              className="taomni-input w-56"
               value={jumpHost}
               onChange={(e) => setJumpHost(e.target.value)}
               disabled={!useJump}
               aria-label={t("sessionEditor2.jumpHostAria")}
             />
-            <span className="text-[var(--moba-text-muted)]">{t("sessionEditor2.jumpUserLabel")}</span>
+            <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.jumpUserLabel")}</span>
             <input
-              className="moba-input w-32"
+              className="taomni-input w-32"
               value={jumpUser}
               onChange={(e) => setJumpUser(e.target.value)}
               disabled={!useJump}
               aria-label={t("sessionEditor2.jumpUserAria")}
             />
-            <span className="text-[var(--moba-text-muted)]">{t("sessionEditor2.jumpPortLabel")}</span>
+            <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.jumpPortLabel")}</span>
             <input
-              className="moba-input w-16"
+              className="taomni-input w-16"
               value={jumpPort}
               onChange={(e) => setJumpPort(e.target.value)}
               disabled={!useJump}
               aria-label={t("sessionEditor2.jumpPortAria")}
             />
-            <button className="moba-btn" disabled type="button" title={t("sessionEditor2.testChainTitle")}>
+            <button className="taomni-btn" disabled type="button" title={t("sessionEditor2.testChainTitle")}>
               {t("sessionEditor2.testChain")}
             </button>
           </div>
@@ -507,8 +507,8 @@ function AdvancedSshSettings({
       </Field>
 
       <Field label={t("sessionEditor2.fieldExpertSsh")}>
-        <button className="moba-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
-        <span className="ml-2 text-[var(--moba-text-muted)]">
+        <button className="taomni-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
+        <span className="ml-2 text-[var(--taomni-text-muted)]">
           {t("sessionEditor2.expertDesc")}
         </span>
       </Field>
@@ -569,8 +569,8 @@ function NetworkSettings({
         [`${detail.local}->${detail.remote}`]: detail.message,
       }));
     };
-    window.addEventListener("newmob:forward-error", onErr as EventListener);
-    return () => window.removeEventListener("newmob:forward-error", onErr as EventListener);
+    window.addEventListener("taomni:forward-error", onErr as EventListener);
+    return () => window.removeEventListener("taomni:forward-error", onErr as EventListener);
   }, [sessionConfigId]);
 
   const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
@@ -635,15 +635,15 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldProxyHost")}>
         <input
-          className="moba-input w-64"
+          className="taomni-input w-64"
           placeholder={t("sessionEditor2.proxyHostPlaceholder")}
           value={proxyHost}
           aria-label={t("sessionEditor2.proxyHostAria")}
           onChange={(e) => setProxyHost(e.target.value)}
         />
-        <span className="text-[var(--moba-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
+        <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
         <input
-          className="moba-input w-16 ml-1"
+          className="taomni-input w-16 ml-1"
           placeholder={t("sessionEditor2.proxyPortPlaceholder")}
           value={proxyPort}
           aria-label={t("sessionEditor2.proxyPortAria")}
@@ -653,14 +653,14 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldProxyAuth")}>
         <input
-          className="moba-input w-32"
+          className="taomni-input w-32"
           placeholder={t("sessionEditor2.proxyUserPlaceholder")}
           value={proxyUser}
           aria-label={t("sessionEditor2.proxyUserAria")}
           onChange={(e) => setProxyUser(e.target.value)}
         />
         <input
-          className="moba-input w-40 ml-1"
+          className="taomni-input w-40 ml-1"
           type="password"
           placeholder={t("sessionEditor2.proxyPassPlaceholder")}
           value={proxyPass}
@@ -678,7 +678,7 @@ function NetworkSettings({
           {t("sessionEditor2.keepAliveSend")}
         </label>
         <input
-          className="moba-input w-16 ml-1"
+          className="taomni-input w-16 ml-1"
           value={keepAliveInterval}
           aria-label={t("sessionEditor2.keepAliveAria")}
           onChange={(e) => setKeepAliveInterval(e.target.value)}
@@ -711,7 +711,7 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldLocalForwarding")}>
         <div className="flex flex-col gap-1 w-full">
-          <div className="flex items-center gap-1.5 text-[var(--moba-text-muted)]">
+          <div className="flex items-center gap-1.5 text-[var(--taomni-text-muted)]">
             <span className="w-32">{t("sessionEditor2.forwardLocalHeader")}</span>
             <span className="w-32">{t("sessionEditor2.forwardRemoteHeader")}</span>
             <span>{t("sessionEditor2.forwardDescHeader")}</span>
@@ -723,7 +723,7 @@ function NetworkSettings({
               <div key={forward.id} className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5">
                   <input
-                    className="moba-input w-32"
+                    className="taomni-input w-32"
                     value={forward.local}
                     aria-label={t("sessionEditor2.forwardLocalAria")}
                     onChange={(e) =>
@@ -733,7 +733,7 @@ function NetworkSettings({
                     }
                   />
                   <input
-                    className="moba-input w-40"
+                    className="taomni-input w-40"
                     value={forward.remote}
                     aria-label={t("sessionEditor2.forwardRemoteAria")}
                     onChange={(e) =>
@@ -743,7 +743,7 @@ function NetworkSettings({
                     }
                   />
                   <input
-                    className="moba-input flex-1"
+                    className="taomni-input flex-1"
                     value={forward.desc}
                     aria-label={t("sessionEditor2.forwardDescAria")}
                     onChange={(e) =>
@@ -752,7 +752,7 @@ function NetworkSettings({
                       )
                     }
                   />
-                  <button className="moba-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
+                  <button className="taomni-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
                     {t("sessionEditor2.forwardRemove")}
                   </button>
                 </div>
@@ -769,10 +769,10 @@ function NetworkSettings({
             );
           })}
           <div className="flex items-center gap-1.5">
-            <input className="moba-input w-32" placeholder={t("sessionEditor2.forwardLocalPlaceholder")} value={newFwdLocal} aria-label={t("sessionEditor2.forwardLocalNewAria")} onChange={(e) => setNewFwdLocal(e.target.value)} />
-            <input className="moba-input w-40" placeholder={t("sessionEditor2.forwardRemotePlaceholder")} value={newFwdRemote} aria-label={t("sessionEditor2.forwardRemoteNewAria")} onChange={(e) => setNewFwdRemote(e.target.value)} />
-            <input className="moba-input flex-1" placeholder={t("sessionEditor2.forwardDescPlaceholder")} value={newFwdDesc} aria-label={t("sessionEditor2.forwardDescNewAria")} onChange={(e) => setNewFwdDesc(e.target.value)} />
-            <button className="moba-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>{t("sessionEditor2.forwardAdd")}</button>
+            <input className="taomni-input w-32" placeholder={t("sessionEditor2.forwardLocalPlaceholder")} value={newFwdLocal} aria-label={t("sessionEditor2.forwardLocalNewAria")} onChange={(e) => setNewFwdLocal(e.target.value)} />
+            <input className="taomni-input w-40" placeholder={t("sessionEditor2.forwardRemotePlaceholder")} value={newFwdRemote} aria-label={t("sessionEditor2.forwardRemoteNewAria")} onChange={(e) => setNewFwdRemote(e.target.value)} />
+            <input className="taomni-input flex-1" placeholder={t("sessionEditor2.forwardDescPlaceholder")} value={newFwdDesc} aria-label={t("sessionEditor2.forwardDescNewAria")} onChange={(e) => setNewFwdDesc(e.target.value)} />
+            <button className="taomni-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>{t("sessionEditor2.forwardAdd")}</button>
           </div>
         </div>
       </Field>
@@ -817,12 +817,12 @@ function BookmarkSettings({
       <Field label={t("sessionEditor2.fieldSessionName")}>
         <input
           data-testid="session-name"
-          className="moba-input w-72"
+          className="taomni-input w-72"
           value={name}
           aria-label={t("sessionEditor2.sessionNameAria")}
           onChange={(e) => setName(e.target.value)}
         />
-        <span className="ml-2 text-[var(--moba-text-muted)]">{t("sessionEditor2.sessionNameHint")}</span>
+        <span className="ml-2 text-[var(--taomni-text-muted)]">{t("sessionEditor2.sessionNameHint")}</span>
       </Field>
 
       <Field label={t("sessionEditor2.fieldSessionFolder")}>
@@ -832,7 +832,7 @@ function BookmarkSettings({
           options={folderOptions}
           onChange={(value) => setGroupPath(value === "User sessions" ? "" : value)}
         />
-        <button className="moba-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
+        <button className="taomni-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
           <FolderPlus className="w-3 h-3" /> {t("sessionEditor2.newFolderBtn")}
         </button>
       </Field>
@@ -840,26 +840,26 @@ function BookmarkSettings({
       <Field label={t("sessionEditor2.fieldSessionIcon")}>
         <span
           className="inline-flex items-center gap-1 px-2 py-1 rounded border"
-          style={{ borderColor: "var(--moba-input-border)", background: "var(--moba-input-bg)" }}
+          style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-input-bg)" }}
         >
           <TerminalIcon className="w-4 h-4" style={{ color: "#2b5d8b" }} />
           {proto.toLowerCase()}
         </span>
-        <button className="moba-btn ml-2" type="button" disabled title={t("sessionEditor2.customIconTitle")}>{t("sessionEditor2.customIconChange")}</button>
+        <button className="taomni-btn ml-2" type="button" disabled title={t("sessionEditor2.customIconTitle")}>{t("sessionEditor2.customIconChange")}</button>
       </Field>
 
       <Field label={t("sessionEditor2.fieldBackgroundImage")}>
         <input
-          className="moba-input flex-1"
+          className="taomni-input flex-1"
           placeholder={t("sessionEditor2.backgroundImagePlaceholder")}
           value={bgImage}
           aria-label={t("sessionEditor2.backgroundImageAria")}
           onChange={(e) => setBgImage(e.target.value)}
         />
-        <button className="moba-btn ml-1" type="button" disabled title={t("sessionEditor2.backgroundImageTitle")}>{t("sessionEditor2.backgroundImageBrowse")}</button>
-        <span className="ml-2 text-[var(--moba-text-muted)]">{t("sessionEditor2.backgroundImageOpacity")}</span>
+        <button className="taomni-btn ml-1" type="button" disabled title={t("sessionEditor2.backgroundImageTitle")}>{t("sessionEditor2.backgroundImageBrowse")}</button>
+        <span className="ml-2 text-[var(--taomni-text-muted)]">{t("sessionEditor2.backgroundImageOpacity")}</span>
         <input
-          className="moba-input w-16 ml-1"
+          className="taomni-input w-16 ml-1"
           value={bgOpacity}
           aria-label={t("sessionEditor2.backgroundOpacityAria")}
           onChange={(e) => setBgOpacity(e.target.value)}
@@ -868,7 +868,7 @@ function BookmarkSettings({
 
       <Field label={t("sessionEditor2.fieldDescriptionNotes")}>
         <textarea
-          className="moba-input flex-1"
+          className="taomni-input flex-1"
           style={{ height: 56, padding: 6 }}
           value={description}
           aria-label={t("sessionEditor2.descriptionAria")}
@@ -879,7 +879,7 @@ function BookmarkSettings({
 
       <Field label={t("sessionEditor2.fieldTags")}>
         <input
-          className="moba-input flex-1"
+          className="taomni-input flex-1"
           value={tags}
           aria-label={t("sessionEditor2.tagsAria")}
           onChange={(e) => setTags(e.target.value)}
@@ -892,7 +892,7 @@ function BookmarkSettings({
           <Checkbox checked={disableAiWrite} onChange={setDisableAiWrite} />
           {t("sessionEditor2.disableAiWriteLabel")}
         </label>
-        <span className="ml-2 text-[var(--moba-text-muted)]">
+        <span className="ml-2 text-[var(--taomni-text-muted)]">
           {t("sessionEditor2.disableAiWriteHint")}
         </span>
       </Field>
@@ -907,7 +907,7 @@ function BookmarkSettings({
           </Field>
           <Field label={t("sessionEditor2.fieldAdditionalParameters")}>
             <input
-              className="moba-input flex-1"
+              className="taomni-input flex-1"
               value={fileExtraArgs}
               aria-label={t("sessionEditor2.additionalParametersAria")}
               onChange={(e) => setFileExtraArgs(e.target.value)}
@@ -936,13 +936,13 @@ function BookmarkSettings({
 
       <Field label={t("sessionEditor2.fieldKeyboardShortcut")}>
         <input
-          className="moba-input w-40"
+          className="taomni-input w-40"
           value={shortcut}
           aria-label={t("sessionEditor2.keyboardShortcutAria")}
           onChange={(e) => setShortcut(e.target.value)}
           placeholder={t("sessionEditor2.keyboardShortcutPlaceholder")}
         />
-        <span className="ml-2 text-[var(--moba-text-muted)]">
+        <span className="ml-2 text-[var(--taomni-text-muted)]">
           {t("sessionEditor2.keyboardShortcutHint")}
         </span>
       </Field>
@@ -989,7 +989,7 @@ function DatabaseSettings({
     <div data-testid="database-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label="Username">
         <input
-          className="moba-input w-64"
+          className="taomni-input w-64"
           value={username}
           aria-label="Database username"
           placeholder={isRedis ? "(optional — ACL user)" : "database user"}
@@ -1000,7 +1000,7 @@ function DatabaseSettings({
       <Field label="Password">
         <div className="relative">
           <input
-            className="moba-input pr-7 w-64"
+            className="taomni-input pr-7 w-64"
             type={showPwd ? "text" : "password"}
             value={password}
             aria-label="Database password"
@@ -1017,8 +1017,8 @@ function DatabaseSettings({
             type="button"
           >
             {showPwd
-              ? <EyeOff className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />
-              : <Eye className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />}
+              ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+              : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
           </button>
         </div>
         <label
@@ -1027,7 +1027,7 @@ function DatabaseSettings({
         >
           <input
             type="checkbox"
-            className="moba-checkbox"
+            className="taomni-checkbox"
             data-testid="db-save-in-vault"
             checked={saveInVault}
             onChange={(e) => setSaveInVault(e.target.checked)}
@@ -1035,7 +1035,7 @@ function DatabaseSettings({
           />
           Save in vault
         </label>
-        <span className="moba-pill">
+        <span className="taomni-pill">
           <Shield className="w-3 h-3" /> Encrypted
         </span>
       </Field>
@@ -1043,7 +1043,7 @@ function DatabaseSettings({
       {!isRedis && (
         <Field label="Database">
           <input
-            className="moba-input w-64"
+            className="taomni-input w-64"
             value={database}
             aria-label="Database name"
             placeholder="database / schema name"
@@ -1056,7 +1056,7 @@ function DatabaseSettings({
         <>
           <Field label="DB index">
             <input
-              className="moba-input w-20"
+              className="taomni-input w-20"
               type="number"
               min={0}
               max={15}
@@ -1064,11 +1064,11 @@ function DatabaseSettings({
               aria-label="Redis DB index"
               onChange={(e) => setRedisDbIndex(e.target.value)}
             />
-            <span className="ml-2 text-[var(--moba-text-muted)]">0–15</span>
+            <span className="ml-2 text-[var(--taomni-text-muted)]">0–15</span>
           </Field>
           <Field label="Key prefix">
             <input
-              className="moba-input w-64"
+              className="taomni-input w-64"
               value={database}
               aria-label="Redis key prefix"
               placeholder="(optional) default SCAN prefix"
@@ -1082,7 +1082,7 @@ function DatabaseSettings({
         <>
           <Field label="HTTP port">
             <input
-              className="moba-input w-24"
+              className="taomni-input w-24"
               value={httpPort}
               aria-label="ClickHouse HTTP port"
               placeholder="8123"
@@ -1109,12 +1109,12 @@ function DatabaseSettings({
 
       <Field label="Timeout">
         <input
-          className="moba-input w-20"
+          className="taomni-input w-20"
           value={timeoutSecs}
           aria-label="Connection timeout seconds"
           onChange={(e) => setTimeoutSecs(e.target.value)}
         />
-        <span className="ml-1 text-[var(--moba-text-muted)]">seconds</span>
+        <span className="ml-1 text-[var(--taomni-text-muted)]">seconds</span>
       </Field>
     </div>
   );
@@ -1765,7 +1765,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       <div
         data-testid="session-editor"
         className="w-[1020px] max-w-[96%] max-h-[92vh] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{ background: "var(--moba-panel-bg)", borderColor: "var(--moba-chrome-border)", color: "var(--moba-text)" }}
+        style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         {/* Modal title bar */}
         <div
@@ -1803,21 +1803,21 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         {/* Protocol picker */}
         <div
           className="px-3 pt-3 pb-2 border-b shrink-0"
-          style={{ borderColor: "var(--moba-divider)" }}
+          style={{ borderColor: "var(--taomni-divider)" }}
         >
           <div className="flex flex-wrap gap-1">
             {PROTOS.map((p) => (
               <button
                 key={p.id}
                 data-testid={`session-proto-${p.id.toLowerCase()}`}
-                className="moba-proto-btn"
+                className="taomni-proto-btn"
                 data-active={proto === p.id}
                 onClick={() => handleProtoChange(p.id)}
                 type="button"
               >
                 <span
                   style={{
-                    color: proto === p.id ? "var(--moba-accent)" : p.color,
+                    color: proto === p.id ? "var(--taomni-accent)" : p.color,
                   }}
                 >
                   {p.icon}
@@ -1832,11 +1832,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         {needsHost && (
           <div
             className="px-4 py-3 border-b shrink-0"
-            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+            style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
               className="text-[12px] font-semibold mb-2 flex items-center gap-2"
-              style={{ color: "var(--moba-accent)" }}
+              style={{ color: "var(--taomni-accent)" }}
             >
               <TerminalIcon className="w-3.5 h-3.5" />
               {t("sessionEditor2.basicTitle", { proto })}
@@ -1848,7 +1848,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               <div className="col-span-5 flex items-center gap-1">
                 <input
                   data-testid="session-host"
-                  className="moba-input flex-1"
+                  className="taomni-input flex-1"
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
                   onBlur={handleHostLookup}
@@ -1857,7 +1857,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 />
                 <button
                   title={t("sessionEditor2.lookup")}
-                  className="moba-btn px-2"
+                  className="taomni-btn px-2"
                   onClick={handleHostLookup}
                   type="button"
                 >
@@ -1870,7 +1870,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               </label>
               <input
                 data-testid="session-user"
-                className="moba-input col-span-2"
+                className="taomni-input col-span-2"
                 value={username}
                 disabled={!specifyUser}
                 onChange={(e) => setUsername(e.target.value)}
@@ -1881,12 +1881,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               <label className="col-span-2 text-[12px] text-right">{t("sessionEditor2.portLabel")}</label>
               <input
                 data-testid="session-port"
-                className="moba-input col-span-2"
+                className="taomni-input col-span-2"
                 value={port}
                 aria-label={t("sessionEditor2.portAria")}
                 onChange={(e) => setPort(e.target.value)}
               />
-              <div className="col-span-8 text-[11px] text-[var(--moba-text-muted)]">
+              <div className="col-span-8 text-[11px] text-[var(--taomni-text-muted)]">
                 {(() => {
                   const tip = t("sessionEditor2.autofillTip", { snippet: "%SNIPPET%" });
                   const [before, after] = tip.split("%SNIPPET%");
@@ -1894,8 +1894,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                     <>
                       {before}
                       <span
-                        className="moba-mono px-1 border rounded"
-                        style={{ background: "var(--moba-input-bg)", borderColor: "var(--moba-divider)" }}
+                        className="taomni-mono px-1 border rounded"
+                        style={{ background: "var(--taomni-input-bg)", borderColor: "var(--taomni-divider)" }}
                       >
                         user@host:port
                       </span>
@@ -1912,11 +1912,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         {proto === "File" && (
           <div
             className="px-4 py-3 border-b shrink-0"
-            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+            style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
               className="text-[12px] font-semibold mb-2 flex items-center gap-2"
-              style={{ color: "var(--moba-accent)" }}
+              style={{ color: "var(--taomni-accent)" }}
             >
               <FileText className="w-3.5 h-3.5" />
               {t("sessionEditor2.basicFileTitle")}
@@ -1928,7 +1928,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               <div className="col-span-10 flex items-center gap-1">
                 <input
                   data-testid="session-file-target"
-                  className="moba-input flex-1"
+                  className="taomni-input flex-1"
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
                   aria-label={t("sessionEditor2.fileTargetAria")}
@@ -1936,7 +1936,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 />
                 <button
                   title={t("sessionEditor2.browseFolder")}
-                  className="moba-btn px-2"
+                  className="taomni-btn px-2"
                   onClick={() => void handleBrowseFolderTarget()}
                   type="button"
                 >
@@ -1944,14 +1944,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 </button>
                 <button
                   title={t("sessionEditor2.browseFile")}
-                  className="moba-btn px-2"
+                  className="taomni-btn px-2"
                   onClick={() => void handleBrowseFileTarget()}
                   type="button"
                 >
                   <FileText className="w-3.5 h-3.5 inline -mt-0.5" />
                 </button>
               </div>
-              <div className="col-span-12 text-[11px] text-[var(--moba-text-muted)]">
+              <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)]">
                 {t("sessionEditor2.fileTargetHint")}
               </div>
             </div>
@@ -1963,11 +1963,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           <div
             data-testid="session-wsl-section"
             className="px-4 py-3 border-b shrink-0"
-            style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+            style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
               className="text-[12px] font-semibold mb-2 flex items-center gap-2"
-              style={{ color: "var(--moba-accent)" }}
+              style={{ color: "var(--taomni-accent)" }}
             >
               <TerminalIcon className="w-3.5 h-3.5" />
               {t("wsl.options.title")}
@@ -1987,7 +1987,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             <button
               key={t.id}
               data-testid={`session-section-${t.id}`}
-              className="moba-section-tab"
+              className="taomni-section-tab"
               data-active={activeSection === t.id}
               onClick={() => setSection(t.id)}
               type="button"
@@ -1996,13 +1996,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               {t.label}
             </button>
           ))}
-          <div className="flex-1 border-b" style={{ borderColor: "var(--moba-input-border)" }} />
+          <div className="flex-1 border-b" style={{ borderColor: "var(--taomni-input-border)" }} />
         </div>
 
         {/* Section body */}
         <div
           className="flex-1 min-h-0 overflow-auto px-4 py-3 border-x border-b"
-          style={{ borderColor: "var(--moba-input-border)", background: "var(--moba-bg)" }}
+          style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-bg)" }}
         >
           {activeSection === "advanced" && isSSH && (
             <AdvancedSshSettings
@@ -2092,11 +2092,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         {/* Footer */}
         <div
           className="h-12 flex items-center px-3 gap-2 border-t shrink-0"
-          style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}
+          style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
         >
           {isSSH && needsHost && (
             <button
-              className="moba-btn flex items-center gap-1.5"
+              className="taomni-btn flex items-center gap-1.5"
               onClick={handleTestConnection}
               disabled={testing}
               type="button"
@@ -2107,7 +2107,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           )}
           {isDb && (
             <button
-              className="moba-btn flex items-center gap-1.5"
+              className="taomni-btn flex items-center gap-1.5"
               data-testid="db-test-connection"
               onClick={() => void handleTestDbConnection()}
               disabled={testing}
@@ -2117,10 +2117,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
             </button>
           )}
-          <button className="moba-btn flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>
+          <button className="taomni-btn flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>
             <Save className="w-3.5 h-3.5" /> {t("sessionEditor2.saveTemplate")}
           </button>
-          <button className="moba-btn flex items-center gap-1.5" type="button" onClick={handleReset}>
+          <button className="taomni-btn flex items-center gap-1.5" type="button" onClick={handleReset}>
             <RotateCcw className="w-3.5 h-3.5" /> {t("sessionEditor2.reset")}
           </button>
 
@@ -2133,9 +2133,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             </span>
           )}
 
-          <span className="ml-2 text-[11px] text-[var(--moba-text-muted)]">
+          <span className="ml-2 text-[11px] text-[var(--taomni-text-muted)]">
             {t("sessionEditor2.willBeSavedTo")}{" "}
-            <span className="moba-mono">
+            <span className="taomni-mono">
               {groupPath ? folderOptionLabel(groupPath) : SESSION_ROOT_LABEL} / {name || host || "..."}
             </span>
           </span>
@@ -2144,7 +2144,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
           {isEdit && (
             <button
-              className="moba-btn"
+              className="taomni-btn"
               onClick={handleDelete}
               type="button"
               style={{ color: "#b22222" }}
@@ -2152,11 +2152,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               {t("sessionEditor2.delete")}
             </button>
           )}
-          <button className="moba-btn" onClick={onClose} type="button">
+          <button className="taomni-btn" onClick={onClose} type="button">
             {t("sessionEditor2.cancel")}
           </button>
           <button
-            className="moba-btn"
+            className="taomni-btn"
             data-testid="session-save"
             data-primary="true"
             onClick={handleSave}

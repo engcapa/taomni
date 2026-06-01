@@ -5,7 +5,7 @@
 //! is not asserted because `recorded_at` is a Unix-second timestamp; the
 //! production caller cares only about "is this new entry retrievable".
 
-use newmob_lib::perf::{baseline_path, read_recent, record_now};
+use taomni_lib::perf::{baseline_path, read_recent, record_now};
 
 #[test]
 fn record_and_read_back_round_trips() {

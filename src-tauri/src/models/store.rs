@@ -1,19 +1,19 @@
 use super::manifest::{ModelKind, ModelMeta};
 use std::path::PathBuf;
 
-/// Where downloaded models live: `<cache>/newmob/models/`.
+/// Where downloaded models live: `<cache>/taomni/models/`.
 pub fn models_root() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("newmob")
+        .join("taomni")
         .join("models")
 }
 
-/// Where downloaded sidecar binaries live: `<cache>/newmob/binaries/`.
+/// Where downloaded sidecar binaries live: `<cache>/taomni/binaries/`.
 pub fn sidecars_root() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("newmob")
+        .join("taomni")
         .join("binaries")
 }
 

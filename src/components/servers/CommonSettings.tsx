@@ -46,7 +46,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
         <FormRow label="">
           <input
             type="number"
-            className="moba-input"
+            className="taomni-input"
             style={{ width: 90 }}
             min={1}
             value={Number.isFinite(config.autoStopSeconds) ? config.autoStopSeconds : ""}
@@ -55,7 +55,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
               onChange({ autoStopSeconds: Number.isNaN(parsed) ? 0 : parsed });
             }}
           />
-          <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
+          <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
             {t("servers.fields.autoStopSeconds")}
           </span>
         </FormRow>

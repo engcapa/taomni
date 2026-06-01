@@ -84,7 +84,7 @@ pub enum TabbySecret {
 }
 
 /// Decrypt `vault:` block in a Tabby `config.yaml` and extract the
-/// secrets we know how to map onto NewMob sessions.
+/// secrets we know how to map onto Taomni sessions.
 pub fn decrypt_vault_yaml(yaml: &str, password: &str) -> Result<Vec<TabbySecret>, TabbyVaultError> {
     let doc: YamlValue = serde_yaml::from_str(yaml)
         .map_err(|e| TabbyVaultError::MalformedHeader(format!("yaml parse: {e}")))?;

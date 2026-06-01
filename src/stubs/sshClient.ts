@@ -1,6 +1,6 @@
 import { emit } from "./tauri-event";
 
-const BRIDGE_PATH = "/__newmob/ssh-bridge";
+const BRIDGE_PATH = "/__taomni/ssh-bridge";
 const HANDSHAKE_TIMEOUT_MS = 20000;
 const OPEN_TIMEOUT_MS = 8000;
 

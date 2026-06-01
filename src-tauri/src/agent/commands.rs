@@ -17,7 +17,7 @@ fn build_registry(state: &AppState, app: AppHandle) -> ToolRegistry {
             crate::ai::config::default_ai_config_path()
                 .parent()
                 .unwrap_or(std::path::Path::new("."))
-                .join("newmob.db"),
+                .join("taomni.db"),
         )
         .unwrap_or_else(|_| rusqlite::Connection::open_in_memory().unwrap()),
     ));
@@ -90,7 +90,7 @@ pub async fn agent_plan_tool(
         .await
         .ok_or("No LLM provider configured")?;
 
-    let system = "你是 NewMob 终端管理器的 AI 助手。根据用户请求，选择合适的工具执行操作。";
+    let system = "你是 Taomni 终端管理器的 AI 助手。根据用户请求，选择合适的工具执行操作。";
     let call = agent.plan_single_tool(system, &request).await?;
 
     if let Some(c) = call {
@@ -147,6 +147,6 @@ pub async fn agent_run(
         .await
         .ok_or("No LLM provider configured")?;
 
-    let system = "你是 NewMob 终端管理器的 AI 助手。帮助用户管理 SSH 会话、执行命令、分析错误。每次只调用一个工具，等待结果后再继续。";
+    let system = "你是 Taomni 终端管理器的 AI 助手。帮助用户管理 SSH 会话、执行命令、分析错误。每次只调用一个工具，等待结果后再继续。";
     Ok(agent.run_steps(system, &request).await)
 }

@@ -15,7 +15,7 @@ function text(data: Uint8Array): string {
 describe("terminal output filtering", () => {
   const clearLine = "\r\x1b[2K";
   const cwdQueryCommand =
-    " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __newmob_cwd_sync_done";
+    " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
 
   it("removes the echoed one-shot terminal cwd query command", () => {
     const suppressor = createInputEchoSuppressor(cwdQueryCommand, 5000, 100);

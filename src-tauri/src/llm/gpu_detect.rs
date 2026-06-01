@@ -84,7 +84,7 @@ fn enumerate_via_ash() -> Option<GpuBackend> {
         // loader DLL/SO). The returned Entry is owned and dropped on return.
         let entry = unsafe { ash::Entry::load().ok()? };
 
-        let app_name = std::ffi::CString::new("NewMob").ok()?;
+        let app_name = std::ffi::CString::new("Taomni").ok()?;
         let app_info = vk::ApplicationInfo::default()
             .application_name(&app_name)
             .api_version(vk::API_VERSION_1_3);
@@ -143,7 +143,7 @@ fn vulkan_loader_present() -> bool {
 #[cfg(not(target_os = "macos"))]
 fn detect_cuda_pack() -> Option<GpuBackend> {
     let cache = dirs::cache_dir()?;
-    let cuda_dir = cache.join("newmob").join("sidecar-cuda");
+    let cuda_dir = cache.join("taomni").join("sidecar-cuda");
     if !cuda_dir.exists() {
         return None;
     }

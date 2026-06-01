@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Full AI configuration persisted to ~/.config/newmob/ai.json
+/// Full AI configuration persisted to ~/.config/taomni/ai.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiConfig {
     pub asr: AsrConfig,
@@ -217,7 +217,7 @@ pub struct FallbackConfig {
 pub fn default_ai_config_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("newmob")
+        .join("taomni")
         .join("ai.json")
 }
 

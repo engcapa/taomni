@@ -245,8 +245,8 @@ const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   jsonStyle: "array",
 };
 
-const EXPORT_DEFAULTS_KEY = "newmob.db.exportGrid.defaults.v1";
-const EXPORT_HISTORY_KEY = "newmob.db.exportGrid.fileHistory.v1";
+const EXPORT_DEFAULTS_KEY = "taomni.db.exportGrid.defaults.v1";
+const EXPORT_HISTORY_KEY = "taomni.db.exportGrid.fileHistory.v1";
 
 function defaultExportColumns(columns: DbColumn[]): ExportColumnConfig[] {
   return columns.map((column, index) => ({
@@ -1259,7 +1259,7 @@ export function QueryResultGrid({
 
   if (result.columns.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+      <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
         {result.rowsAffected > 0
           ? `${result.rowsAffected} row(s) affected`
           : "Statement executed. No result set."}
@@ -1271,7 +1271,7 @@ export function QueryResultGrid({
     <div className="flex-1 min-h-0 flex flex-col" data-testid="query-result-grid">
       <div
         className="min-h-8 shrink-0 flex flex-wrap items-center gap-1 px-1 py-1"
-        style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+        style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
         <ToolButton
           title="Refresh result"
@@ -1429,23 +1429,23 @@ export function QueryResultGrid({
         />
         <Divider />
         {filterOpen && (
-          <label className="h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--moba-text-muted)]">
+          <label className="h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
             <Filter className="w-3.5 h-3.5" />
             <input
               value={filterText}
               onChange={(event) => setFilterText(event.target.value)}
-              className="moba-input h-6 w-[150px] text-[11px]"
+              className="taomni-input h-6 w-[150px] text-[11px]"
               placeholder="Filter rows"
               aria-label="Filter rows"
             />
           </label>
         )}
-        <label className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--moba-text-muted)]">
+        <label className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
           <Search className="w-3.5 h-3.5" />
           <input
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            className="moba-input h-6 w-[150px] text-[11px]"
+            className="taomni-input h-6 w-[150px] text-[11px]"
             placeholder="Search"
             aria-label="Search result set"
           />
@@ -1453,14 +1453,14 @@ export function QueryResultGrid({
         </label>
         <div
           className="h-6 inline-flex items-center rounded"
-          style={{ border: "1px solid var(--moba-divider)", overflow: "hidden" }}
+          style={{ border: "1px solid var(--taomni-divider)", overflow: "hidden" }}
         >
           <ToolButton title="Table view" active={viewMode === "table"} onClick={() => setViewMode("table")} icon={<Table2 className="w-3.5 h-3.5" />} />
           <ToolButton title="List view" active={viewMode === "list"} onClick={() => setViewMode("list")} icon={<List className="w-3.5 h-3.5" />} />
           <ToolButton title="Chart view" active={viewMode === "chart"} onClick={() => setViewMode("chart")} icon={<BarChart3 className="w-3.5 h-3.5" />} />
         </div>
         {(pendingChangeCount > 0 || localNotice) && (
-          <span className="max-w-[320px] truncate px-1 text-[10px] text-[var(--moba-text-muted)]" title={localNotice}>
+          <span className="max-w-[320px] truncate px-1 text-[10px] text-[var(--taomni-text-muted)]" title={localNotice}>
             {pendingChangeCount > 0
               ? `${changeCounts.inserted} add / ${changeCounts.updated} edit / ${changeCounts.deleted} delete`
               : localNotice}
@@ -1470,8 +1470,8 @@ export function QueryResultGrid({
 
       {showStats && (
         <div
-          className="max-h-[132px] shrink-0 overflow-auto moba-scroll-y text-[11px]"
-          style={{ borderBottom: "1px solid var(--moba-divider)", background: "var(--moba-bg)" }}
+          className="max-h-[132px] shrink-0 overflow-auto taomni-scroll-y text-[11px]"
+          style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-bg)" }}
         >
           <div className="min-w-full inline-grid grid-cols-[minmax(120px,1fr)_repeat(6,minmax(70px,auto))]">
             <StatsCell header>Column</StatsCell>
@@ -1492,11 +1492,11 @@ export function QueryResultGrid({
         <>
           <div
             className="flex shrink-0 text-[11px] font-semibold select-none"
-            style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+            style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
           >
             <div
-              className="w-12 px-1 py-1 text-[var(--moba-text-muted)] shrink-0 flex items-center justify-between"
-              style={{ borderRight: "1px solid var(--moba-divider)" }}
+              className="w-12 px-1 py-1 text-[var(--taomni-text-muted)] shrink-0 flex items-center justify-between"
+              style={{ borderRight: "1px solid var(--taomni-divider)" }}
             >
               <span>#</span>
               <span className="text-[10px]">{selectedRows.length || ""}</span>
@@ -1507,8 +1507,8 @@ export function QueryResultGrid({
                 <button
                   key={columnIndex}
                   type="button"
-                  className="relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--moba-hover)]"
-                  style={{ ...columnStyle(columnIndex), borderRight: "1px solid var(--moba-divider)" }}
+                  className="relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--taomni-hover)]"
+                  style={{ ...columnStyle(columnIndex), borderRight: "1px solid var(--taomni-divider)" }}
                   onClick={() => toggleSort(columnIndex)}
                   title={`${col.name} (${col.type})`}
                 >
@@ -1516,7 +1516,7 @@ export function QueryResultGrid({
                   {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
                   {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
                   <span
-                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--moba-accent)]"
+                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--taomni-accent)]"
                     onMouseDown={(event) => startColumnResize(event, columnIndex)}
                     title="Resize column"
                   />
@@ -1527,7 +1527,7 @@ export function QueryResultGrid({
 
           <div
             ref={containerRef}
-            className="flex-1 min-h-0 overflow-auto moba-scroll-y"
+            className="flex-1 min-h-0 overflow-auto taomni-scroll-y"
             onScroll={onScroll}
             style={{ fontSize: 12 }}
           >
@@ -1543,9 +1543,9 @@ export function QueryResultGrid({
                     style={{
                       top,
                       height: ROW_HEIGHT,
-                      borderBottom: "1px solid var(--moba-divider)",
+                      borderBottom: "1px solid var(--taomni-divider)",
                       background: selected
-                        ? "var(--moba-selected)"
+                        ? "var(--taomni-selected)"
                         : row.status === "deleted"
                           ? "rgba(217, 83, 79, 0.12)"
                           : row.status === "inserted"
@@ -1558,8 +1558,8 @@ export function QueryResultGrid({
                   >
                     <button
                       type="button"
-                      className="w-12 px-1 text-right text-[var(--moba-text-muted)] shrink-0 flex items-center justify-end hover:bg-[var(--moba-hover)]"
-                      style={{ borderRight: "1px solid var(--moba-divider)" }}
+                      className="w-12 px-1 text-right text-[var(--taomni-text-muted)] shrink-0 flex items-center justify-end hover:bg-[var(--taomni-hover)]"
+                      style={{ borderRight: "1px solid var(--taomni-divider)" }}
                       onClick={(event) => selectRow(row.id, event)}
                       title={row.status === "clean" ? `Row ${(row.originalIndex ?? rowIndex) + 1}` : row.status}
                     >
@@ -1581,8 +1581,8 @@ export function QueryResultGrid({
                           }`}
                           style={{
                             ...columnStyle(columnIndex),
-                            borderRight: "1px solid var(--moba-divider)",
-                            outline: active ? "1px solid var(--moba-accent)" : undefined,
+                            borderRight: "1px solid var(--taomni-divider)",
+                            outline: active ? "1px solid var(--taomni-accent)" : undefined,
                             background: searchHit ? "rgba(230, 168, 23, 0.22)" : undefined,
                           }}
                           title={cell ?? "NULL"}
@@ -1596,7 +1596,7 @@ export function QueryResultGrid({
                           {editing ? (
                             <input
                               autoFocus
-                              className="moba-input h-5 w-full text-[12px]"
+                              className="taomni-input h-5 w-full text-[12px]"
                               value={editValue}
                               onChange={(event) => setEditValue(event.target.value)}
                               onBlur={commitEdit}
@@ -1608,7 +1608,7 @@ export function QueryResultGrid({
                           ) : cell === null ? (
                             <span
                               className="text-[10px] px-1 rounded"
-                              style={{ background: "var(--moba-divider)", color: "var(--moba-text-muted)" }}
+                              style={{ background: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
                             >
                               NULL
                             </span>
@@ -1627,19 +1627,19 @@ export function QueryResultGrid({
       )}
 
       {viewMode === "list" && (
-        <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-2 text-[12px]">
+        <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 text-[12px]">
           {nonDeletedOrderedRows.map((row, rowIndex) => (
             <div
               key={row.id}
               className="mb-2 rounded p-2"
-              style={{ border: "1px solid var(--moba-divider)", background: "var(--moba-panel-bg)" }}
+              style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
             >
-              <div className="mb-1 text-[11px] text-[var(--moba-text-muted)]">Row {(row.originalIndex ?? rowIndex) + 1}</div>
+              <div className="mb-1 text-[11px] text-[var(--taomni-text-muted)]">Row {(row.originalIndex ?? rowIndex) + 1}</div>
               <div className="grid grid-cols-[minmax(90px,180px)_1fr] gap-x-3 gap-y-1">
                 {visibleColumnIndexes.map((columnIndex) => (
                   <div key={columnIndex} className="contents">
-                    <div className="truncate text-[var(--moba-text-muted)]">{result.columns[columnIndex].name}</div>
-                    <div className="min-w-0 truncate">{row.values[columnIndex] ?? <span className="text-[var(--moba-text-muted)]">NULL</span>}</div>
+                    <div className="truncate text-[var(--taomni-text-muted)]">{result.columns[columnIndex].name}</div>
+                    <div className="min-w-0 truncate">{row.values[columnIndex] ?? <span className="text-[var(--taomni-text-muted)]">NULL</span>}</div>
                   </div>
                 ))}
               </div>
@@ -1649,26 +1649,26 @@ export function QueryResultGrid({
       )}
 
       {viewMode === "chart" && (
-        <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-3 text-[12px]">
+        <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3 text-[12px]">
           {!chartData ? (
-            <div className="h-full flex items-center justify-center text-[var(--moba-text-muted)]">
+            <div className="h-full flex items-center justify-center text-[var(--taomni-text-muted)]">
               No numeric column is available for chart view.
             </div>
           ) : (
             <div className="min-w-[420px]">
-              <div className="mb-2 text-[11px] text-[var(--moba-text-muted)]">
+              <div className="mb-2 text-[11px] text-[var(--taomni-text-muted)]">
                 {chartData.column.name} (first {chartData.points.length} rows)
               </div>
               <div className="space-y-1">
                 {chartData.points.map((point, index) => (
                   <div key={`${point.label}-${index}`} className="grid grid-cols-[160px_1fr_72px] items-center gap-2">
-                    <div className="truncate text-[var(--moba-text-muted)]" title={point.label}>{point.label}</div>
-                    <div className="h-4" style={{ background: "var(--moba-divider)" }}>
+                    <div className="truncate text-[var(--taomni-text-muted)]" title={point.label}>{point.label}</div>
+                    <div className="h-4" style={{ background: "var(--taomni-divider)" }}>
                       <div
                         className="h-4"
                         style={{
                           width: `${Math.max(2, (Math.abs(point.value) / chartData.max) * 100)}%`,
-                          background: point.value < 0 ? "#d9534f" : "var(--moba-accent)",
+                          background: point.value < 0 ? "#d9534f" : "var(--taomni-accent)",
                         }}
                       />
                     </div>
@@ -1722,8 +1722,8 @@ function ToolButton({
   return (
     <button
       type="button"
-      className={`h-6 ${suffix ? "px-1.5" : "w-6"} inline-flex items-center justify-center gap-0.5 rounded text-[11px] hover:bg-[var(--moba-hover)] disabled:opacity-40`}
-      style={active ? { background: "var(--moba-selected)", color: "var(--moba-accent)" } : undefined}
+      className={`h-6 ${suffix ? "px-1.5" : "w-6"} inline-flex items-center justify-center gap-0.5 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40`}
+      style={active ? { background: "var(--taomni-selected)", color: "var(--taomni-accent)" } : undefined}
       title={title}
       aria-label={title}
       disabled={disabled}
@@ -1736,14 +1736,14 @@ function ToolButton({
 }
 
 function Divider() {
-  return <span className="w-px h-4 mx-0.5" style={{ background: "var(--moba-divider)" }} />;
+  return <span className="w-px h-4 mx-0.5" style={{ background: "var(--taomni-divider)" }} />;
 }
 
 function StatsCell({ children, header = false }: { children: ReactNode; header?: boolean }) {
   return (
     <div
-      className={`px-2 py-1 truncate ${header ? "font-semibold text-[var(--moba-text)]" : "text-[var(--moba-text-muted)]"}`}
-      style={{ borderRight: "1px solid var(--moba-divider)", borderBottom: "1px solid var(--moba-divider)" }}
+      className={`px-2 py-1 truncate ${header ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}
+      style={{ borderRight: "1px solid var(--taomni-divider)", borderBottom: "1px solid var(--taomni-divider)" }}
       title={typeof children === "string" ? children : undefined}
     >
       {children}
@@ -1823,8 +1823,8 @@ function ExportDialog({
     sqlCommanderPosition: "caret",
   });
   const queryTabs = listQueryTabs();
-  const input = "moba-input h-7 text-[12px]";
-  const label = "flex flex-col gap-1 text-[11px] text-[var(--moba-text-muted)]";
+  const input = "taomni-input h-7 text-[12px]";
+  const label = "flex flex-col gap-1 text-[11px] text-[var(--taomni-text-muted)]";
   const sectionTitle = "mb-2 text-[12px] font-semibold";
   const update = <K extends keyof ExportOptions>(key: K, value: ExportOptions[K]) => {
     onOptionsChange({ ...options, [key]: value });
@@ -1883,7 +1883,7 @@ function ExportDialog({
     setSettingsOpen(false);
   };
   const bool = (key: keyof ExportOptions, text: string) => (
-    <label className="h-7 inline-flex items-center gap-2 text-[11px] text-[var(--moba-text-muted)]">
+    <label className="h-7 inline-flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
       <input type="checkbox" checked={Boolean(options[key])} onChange={(event) => update(key as never, event.target.checked as never)} />
       {text}
     </label>
@@ -1987,21 +1987,21 @@ function ExportDialog({
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45" onMouseDown={onClose}>
       <div
         className="w-[920px] max-w-[calc(100vw-24px)] h-[min(760px,calc(100vh-24px))] flex flex-col rounded shadow-xl"
-        style={{ background: "var(--moba-panel-bg)", border: "1px solid var(--moba-divider)", color: "var(--moba-text)" }}
+        style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="h-11 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
+        <div className="h-11 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <Download className="w-4 h-4" />
           <div className="font-semibold text-[13px]">Export Grid</div>
           <div className="ml-3 flex items-center gap-1 text-[11px]">
             {["Format", "Columns", "Output"].map((name, index) => (
-              <button key={name} type="button" className="h-6 px-2 rounded" style={{ background: step === index ? "var(--moba-selected)" : "transparent", color: step === index ? "var(--moba-accent)" : "var(--moba-text-muted)" }} onClick={() => setStep(index)}>{index + 1}. {name}</button>
+              <button key={name} type="button" className="h-6 px-2 rounded" style={{ background: step === index ? "var(--taomni-selected)" : "transparent", color: step === index ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }} onClick={() => setStep(index)}>{index + 1}. {name}</button>
             ))}
           </div>
-          <div className="ml-auto text-[11px] text-[var(--moba-text-muted)]">{target === "selection" ? "Selection" : "All visible rows"}: {rowCount} / Total Rows in Grid: {totalRows}</div>
+          <div className="ml-auto text-[11px] text-[var(--taomni-text-muted)]">{target === "selection" ? "Selection" : "All visible rows"}: {rowCount} / Total Rows in Grid: {totalRows}</div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-3">
+        <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3">
           {step === 0 && (
             <div className="space-y-3">
               <section>
@@ -2042,30 +2042,30 @@ function ExportDialog({
 
           {step === 1 && (
             <div className="h-full min-h-[420px] grid grid-cols-[1fr_150px] gap-3">
-              <div className="min-w-0 overflow-auto moba-scroll-y" style={{ border: "1px solid var(--moba-divider)" }}>
-                <div className="min-w-[860px] grid grid-cols-[54px_160px_180px_120px_70px_130px_1fr] text-[11px]" style={{ borderBottom: "1px solid var(--moba-divider)" }}>
-                  {["Export", "Name", "Label (Alias)", "Type", "Is Text", "Text Function", "Value"].map((head) => <div key={head} className="px-2 py-1 font-semibold" style={{ borderRight: "1px solid var(--moba-divider)" }}>{head}</div>)}
+              <div className="min-w-0 overflow-auto taomni-scroll-y" style={{ border: "1px solid var(--taomni-divider)" }}>
+                <div className="min-w-[860px] grid grid-cols-[54px_160px_180px_120px_70px_130px_1fr] text-[11px]" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
+                  {["Export", "Name", "Label (Alias)", "Type", "Is Text", "Text Function", "Value"].map((head) => <div key={head} className="px-2 py-1 font-semibold" style={{ borderRight: "1px solid var(--taomni-divider)" }}>{head}</div>)}
                   {columns.map((column) => (
                     <div key={column.id} className="contents">
                       <label className="px-2 py-1"><input type="checkbox" checked={column.export} onChange={(event) => updateColumn(column.id, { export: event.target.checked })} /></label>
                       <div className="px-2 py-1 truncate">{column.name}</div>
-                      <div className="px-1 py-1"><input className="moba-input h-6 w-full text-[11px]" value={column.label} onChange={(event) => updateColumn(column.id, { label: event.target.value })} /></div>
+                      <div className="px-1 py-1"><input className="taomni-input h-6 w-full text-[11px]" value={column.label} onChange={(event) => updateColumn(column.id, { label: event.target.value })} /></div>
                       <div className="px-2 py-1 truncate">{column.type}</div>
                       <label className="px-2 py-1"><input type="checkbox" checked={column.isText} onChange={(event) => updateColumn(column.id, { isText: event.target.checked })} /></label>
-                      <div className="px-1 py-1"><select className="moba-input h-6 w-full text-[11px]" value={column.textFunction} onChange={(event) => updateColumn(column.id, { textFunction: event.target.value as TextFunction })}><option value="none">None</option><option value="upper">Upper case</option><option value="lower">Lower case</option><option value="trim">Trim</option></select></div>
-                      <div className="px-1 py-1"><input className="moba-input h-6 w-full text-[11px]" value={column.valueTemplate} onChange={(event) => updateColumn(column.id, { valueTemplate: event.target.value })} /></div>
+                      <div className="px-1 py-1"><select className="taomni-input h-6 w-full text-[11px]" value={column.textFunction} onChange={(event) => updateColumn(column.id, { textFunction: event.target.value as TextFunction })}><option value="none">None</option><option value="upper">Upper case</option><option value="lower">Lower case</option><option value="trim">Trim</option></select></div>
+                      <div className="px-1 py-1"><input className="taomni-input h-6 w-full text-[11px]" value={column.valueTemplate} onChange={(event) => updateColumn(column.id, { valueTemplate: event.target.value })} /></div>
                     </div>
                   ))}
                 </div>
               </div>
               <div className="space-y-2">
-                <button type="button" className="moba-btn w-full" onClick={() => onColumnsChange([...columns, { id: nextRowId("export-col"), export: true, name: `custom_${columns.length + 1}`, label: `custom_${columns.length + 1}`, type: "String", isText: true, textFunction: "none", valueTemplate: "" }])}>+ Add Column</button>
-                <button type="button" className="moba-btn w-full" onClick={() => onColumnsChange(columns.map((column) => ({ ...column, export: true })))}>Select All</button>
-                <button type="button" className="moba-btn w-full" onClick={() => onColumnsChange(columns.map((column) => ({ ...column, export: false })))}>Select None</button>
+                <button type="button" className="taomni-btn w-full" onClick={() => onColumnsChange([...columns, { id: nextRowId("export-col"), export: true, name: `custom_${columns.length + 1}`, label: `custom_${columns.length + 1}`, type: "String", isText: true, textFunction: "none", valueTemplate: "" }])}>+ Add Column</button>
+                <button type="button" className="taomni-btn w-full" onClick={() => onColumnsChange(columns.map((column) => ({ ...column, export: true })))}>Select All</button>
+                <button type="button" className="taomni-btn w-full" onClick={() => onColumnsChange(columns.map((column) => ({ ...column, export: false })))}>Select None</button>
                 {columns.map((column) => (
                   <div key={column.id} className="flex gap-1">
-                    <button type="button" className="moba-btn flex-1 truncate" onClick={() => moveColumn(column.id, -1)}>Up</button>
-                    <button type="button" className="moba-btn flex-1 truncate" onClick={() => moveColumn(column.id, 1)}>Down</button>
+                    <button type="button" className="taomni-btn flex-1 truncate" onClick={() => moveColumn(column.id, -1)}>Up</button>
+                    <button type="button" className="taomni-btn flex-1 truncate" onClick={() => moveColumn(column.id, 1)}>Down</button>
                   </div>
                 ))}
               </div>
@@ -2078,7 +2078,7 @@ function ExportDialog({
               {destination.kind === "file" && (
                 <div className="grid grid-cols-[1fr_130px] gap-2">
                   <input className={input} value={destination.filePath} onChange={(event) => setDestination((current) => ({ ...current, filePath: event.target.value }))} placeholder="Output file path" />
-                  <button type="button" className="moba-btn inline-flex items-center justify-center gap-1" onClick={() => void chooseFilePath()}><FolderOpen className="w-3.5 h-3.5" />Browse</button>
+                  <button type="button" className="taomni-btn inline-flex items-center justify-center gap-1" onClick={() => void chooseFilePath()}><FolderOpen className="w-3.5 h-3.5" />Browse</button>
                   <select className={`${input} col-span-2`} value="" onChange={(event) => event.target.value && setDestination((current) => ({ ...current, filePath: event.target.value }))}>
                     <option value="">History</option>
                     {fileHistory.map((path) => <option key={path} value={path}>{path}</option>)}
@@ -2097,27 +2097,27 @@ function ExportDialog({
           )}
         </div>
 
-        <div className="relative h-11 flex items-center gap-2 px-3" style={{ borderTop: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
-          <button type="button" className="moba-btn inline-flex items-center gap-1" onClick={() => setSettingsOpen((value) => !value)}><FileText className="w-3.5 h-3.5" />Settings</button>
+        <div className="relative h-11 flex items-center gap-2 px-3" style={{ borderTop: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
+          <button type="button" className="taomni-btn inline-flex items-center gap-1" onClick={() => setSettingsOpen((value) => !value)}><FileText className="w-3.5 h-3.5" />Settings</button>
           {settingsOpen && (
-            <div className="absolute left-3 bottom-10 z-10 min-w-[230px] rounded shadow-lg p-1 text-[12px]" style={{ background: "var(--moba-panel-bg)", border: "1px solid var(--moba-divider)" }}>
-              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={saveDefaultSettings}>Save As Default Settings</button>
-              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={useDefaultSettings}>Use Default Settings</button>
-              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={removeDefaultSettings}>Remove Default Settings</button>
-              <div className="my-1 h-px" style={{ background: "var(--moba-divider)" }} />
-              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={() => void loadSettings()}>Load...</button>
-              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={() => void saveSettingsAs()}>Save As...</button>
-              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--moba-hover)]" onClick={() => void copySettings()}>Copy Settings to Clipboard</button>
+            <div className="absolute left-3 bottom-10 z-10 min-w-[230px] rounded shadow-lg p-1 text-[12px]" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={saveDefaultSettings}>Save As Default Settings</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={useDefaultSettings}>Use Default Settings</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={removeDefaultSettings}>Remove Default Settings</button>
+              <div className="my-1 h-px" style={{ background: "var(--taomni-divider)" }} />
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={() => void loadSettings()}>Load...</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={() => void saveSettingsAs()}>Save As...</button>
+              <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={() => void copySettings()}>Copy Settings to Clipboard</button>
             </div>
           )}
           <div className="flex-1" />
-          <button type="button" className="moba-btn inline-flex items-center gap-1" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}><ArrowLeft className="w-3.5 h-3.5" />Back</button>
+          <button type="button" className="taomni-btn inline-flex items-center gap-1" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}><ArrowLeft className="w-3.5 h-3.5" />Back</button>
           {step < 2 ? (
-            <button type="button" className="moba-btn inline-flex items-center gap-1" data-primary="true" onClick={() => setStep((value) => Math.min(2, value + 1))}>Next<ArrowRight className="w-3.5 h-3.5" /></button>
+            <button type="button" className="taomni-btn inline-flex items-center gap-1" data-primary="true" onClick={() => setStep((value) => Math.min(2, value + 1))}>Next<ArrowRight className="w-3.5 h-3.5" /></button>
           ) : (
-            <button type="button" className="moba-btn inline-flex items-center gap-1" data-primary="true" onClick={() => onExport(options, columns, destination)}><Check className="w-3.5 h-3.5" />Export</button>
+            <button type="button" className="taomni-btn inline-flex items-center gap-1" data-primary="true" onClick={() => onExport(options, columns, destination)}><Check className="w-3.5 h-3.5" />Export</button>
           )}
-          <button type="button" className="moba-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="taomni-btn" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>

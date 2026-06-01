@@ -27,7 +27,7 @@ export interface RdpPerformanceFlags {
 
 export interface RdpDriveRedirect {
   enabled: boolean;
-  /** 8-character ASCII drive label (default `"NEWMOB"`). */
+  /** 8-character ASCII drive label (default `"TAOMNI"`). */
   label: string;
   /** Local folder to expose. Empty when `enabled` is false. */
   path: string;
@@ -65,7 +65,7 @@ export const DEFAULT_RDP_OPTIONS: RdpOptions = {
   performance: DEFAULT_RDP_PERFORMANCE,
   redirectClipboard: true,
   redirectAudio: "play",
-  redirectDrive: { enabled: false, label: "NEWMOB", path: "" },
+  redirectDrive: { enabled: false, label: "TAOMNI", path: "" },
 };
 
 /** Parse RDP options from a session's `options_json`. Defaults fill in. */
@@ -154,7 +154,7 @@ function mergeDrive(raw: unknown): RdpDriveRedirect {
     label:
       typeof o.label === "string" && o.label.length > 0
         ? o.label.slice(0, 8)
-        : "NEWMOB",
+        : "TAOMNI",
     path: typeof o.path === "string" ? o.path : "",
   };
 }
@@ -191,5 +191,5 @@ function normalizeGatewayForStorage(
 
 function sanitizeDriveLabel(label: string): string {
   const trimmed = label.trim();
-  return (trimmed || "NEWMOB").slice(0, 8);
+  return (trimmed || "TAOMNI").slice(0, 8);
 }

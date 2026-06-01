@@ -73,13 +73,13 @@ export function VaultSettings() {
       style={{
         background:
           state === "unlocked"
-            ? "var(--moba-accent)"
+            ? "var(--taomni-accent)"
             : state === "locked"
-              ? "var(--moba-hover)"
+              ? "var(--taomni-hover)"
               : "transparent",
-        color: state === "unlocked" ? "white" : "var(--moba-text-muted)",
+        color: state === "unlocked" ? "white" : "var(--taomni-text-muted)",
         border:
-          state === "empty" ? "1px dashed var(--moba-card-border)" : "1px solid transparent",
+          state === "empty" ? "1px dashed var(--taomni-card-border)" : "1px solid transparent",
       }}
     >
       {state}
@@ -93,7 +93,7 @@ export function VaultSettings() {
         {stateBadge}
       </div>
 
-      <div className="text-[12px] mb-4" style={{ color: "var(--moba-text-muted)" }}>
+      <div className="text-[12px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
         {t("vaultSettings.description")}
       </div>
 
@@ -103,7 +103,7 @@ export function VaultSettings() {
             type="button"
             data-testid="vault-init-button"
             className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={() => setAction("init")}
           >
             {t("vaultSettings.setMasterPassword")}
@@ -114,7 +114,7 @@ export function VaultSettings() {
             type="button"
             data-testid="vault-unlock-button"
             className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={() => setAction("unlock")}
           >
             {t("vaultSettings.unlock")}
@@ -125,7 +125,7 @@ export function VaultSettings() {
             <button
               type="button"
               data-testid="vault-lock-button"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => void lock()}
             >
               {t("vaultSettings.lockNow")}
@@ -133,7 +133,7 @@ export function VaultSettings() {
             <button
               type="button"
               data-testid="vault-change-master-button"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => {
                 setAction("change-master");
                 setError(null);
@@ -149,7 +149,7 @@ export function VaultSettings() {
       {action === "change-master" && (
         <div
           className="mb-4 p-3 rounded"
-          style={{ border: "1px solid var(--moba-card-border)" }}
+          style={{ border: "1px solid var(--taomni-card-border)" }}
           data-testid="vault-change-master-form"
         >
           <div className="text-[12px] font-semibold mb-2">{t("vaultSettings.changeMasterPassword")}</div>
@@ -158,7 +158,7 @@ export function VaultSettings() {
             value={oldPw}
             onChange={(e) => setOldPw(e.target.value)}
             placeholder={t("vaultSettings.currentPassword")}
-            className="moba-input w-full mb-2"
+            className="taomni-input w-full mb-2"
             autoComplete="current-password"
             data-testid="vault-change-master-old"
           />
@@ -167,7 +167,7 @@ export function VaultSettings() {
             value={newPw1}
             onChange={(e) => setNewPw1(e.target.value)}
             placeholder={t("vaultSettings.newPassword")}
-            className="moba-input w-full mb-2"
+            className="taomni-input w-full mb-2"
             autoComplete="new-password"
             data-testid="vault-change-master-new1"
           />
@@ -176,24 +176,24 @@ export function VaultSettings() {
             value={newPw2}
             onChange={(e) => setNewPw2(e.target.value)}
             placeholder={t("vaultSettings.confirmNewPassword")}
-            className="moba-input w-full mb-2"
+            className="taomni-input w-full mb-2"
             autoComplete="new-password"
             data-testid="vault-change-master-new2"
           />
           {error && (
-            <div className="text-[12px] mb-2" style={{ color: "var(--moba-error, #c33)" }}>
+            <div className="text-[12px] mb-2" style={{ color: "var(--taomni-error, #c33)" }}>
               {error}
             </div>
           )}
           {info && (
-            <div className="text-[12px] mb-2" style={{ color: "var(--moba-accent)" }}>
+            <div className="text-[12px] mb-2" style={{ color: "var(--taomni-accent)" }}>
               {info}
             </div>
           )}
           <div className="flex gap-2 justify-end">
             <button
               type="button"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => {
                 setAction(null);
                 setError(null);
@@ -206,7 +206,7 @@ export function VaultSettings() {
             <button
               type="button"
               className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-              style={{ background: "var(--moba-accent)" }}
+              style={{ background: "var(--taomni-accent)" }}
               onClick={() => void handleChangeMaster()}
               disabled={busy}
               data-testid="vault-change-master-submit"
@@ -223,7 +223,7 @@ export function VaultSettings() {
             {t("vaultSettings.savedEntries", { count: entries.length })}
           </div>
           {entries.length === 0 ? (
-            <div className="text-[12px]" style={{ color: "var(--moba-text-muted)" }}>
+            <div className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
               {t("vaultSettings.noEntries")}
             </div>
           ) : (
@@ -233,13 +233,13 @@ export function VaultSettings() {
                   key={e.id}
                   data-testid={`vault-entry-${e.id}`}
                   className="flex items-center gap-2 text-[12px] px-2 py-1 rounded"
-                  style={{ border: "1px solid var(--moba-card-border)" }}
+                  style={{ border: "1px solid var(--taomni-card-border)" }}
                 >
                   <span className="flex-1">{e.label}</span>
-                  <span style={{ color: "var(--moba-text-muted)" }}>{e.kind}</span>
+                  <span style={{ color: "var(--taomni-text-muted)" }}>{e.kind}</span>
                   <button
                     type="button"
-                    className="px-2 py-0.5 rounded hover:bg-[var(--moba-hover)]"
+                    className="px-2 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
                     onClick={() => {
                       if (
                         window.confirm(

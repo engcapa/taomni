@@ -1,9 +1,9 @@
 ---
 name: qa-ui-auto
-description: "Use for NewMob UI end-to-end automation: audit test health/coverage/diff impact/gates, fix one surfaced gap by drafting or patching cases/controls/catalog entries, run existing YAML testcases, or explore the app interactively. Covers functional and control-level e2e for browser mode primarily, with native Tauri WebDriver smoke support. Trigger when the user asks to run or smoke UI tests, audit coverage, repair tests after UI/code changes, draft missing testcase coverage, find uncovered controls, regenerate feature/testid catalogs, explore a feature area, or mentions qa-ui-auto, feature-list.md, qa-ui-auto-tests, testcase YAML, or automated UI testing."
+description: "Use for Taomni UI end-to-end automation: audit test health/coverage/diff impact/gates, fix one surfaced gap by drafting or patching cases/controls/catalog entries, run existing YAML testcases, or explore the app interactively. Covers functional and control-level e2e for browser mode primarily, with native Tauri WebDriver smoke support. Trigger when the user asks to run or smoke UI tests, audit coverage, repair tests after UI/code changes, draft missing testcase coverage, find uncovered controls, regenerate feature/testid catalogs, explore a feature area, or mentions qa-ui-auto, feature-list.md, qa-ui-auto-tests, testcase YAML, or automated UI testing."
 ---
 
-# qa-ui-auto — NewMob UI E2E
+# qa-ui-auto — Taomni UI E2E
 
 This skill exposes **four task-oriented commands** for the parent agent (Claude Code):
 
@@ -213,7 +213,7 @@ Free-form exploratory testing — drive the UI, surface anomalies, write a repor
 
 1. **Bound the run**: `--area sftp|terminal|tunnel|settings`; `--duration 10m` (default 10 min, hard cap); action cap default 200 actions.
 2. **Preflight**: browser mode only. Confirm Vite is up. Prefer `mcp__playwright__*` tools; otherwise `playwright-cli`.
-3. **Drive**: cycles of snapshot → action → check console.error / pageerror / unhandledrejection / network 4xx/5xx on `/__newmob/ssh-bridge` and `/__newmob/sftp-bridge`.
+3. **Drive**: cycles of snapshot → action → check console.error / pageerror / unhandledrejection / network 4xx/5xx on `/__taomni/ssh-bridge` and `/__taomni/sftp-bridge`.
 4. **Stay scoped**: don't drift outside `--area` unless a bug trail leads there. Don't touch `~/.ssh/config` or other user files.
 5. **Write report** to `qa-ui-auto-report/exploratory-<YYYYMMDD-HHMM>.md`: actions, anomalies, repro, screenshot paths, suggested next steps (which feature each anomaly touches).
 6. **Don't add to cases/**. Tell the user "if anomaly N is real, run `fix tests F.x` to lock in regression coverage."

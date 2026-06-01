@@ -3,8 +3,8 @@
 
 mod support;
 
-use newmob_lib::llm::router::{FallbackConfig, LlmRouter};
-use newmob_lib::llm::{ChatRequest, TaskKind};
+use taomni_lib::llm::router::{FallbackConfig, LlmRouter};
+use taomni_lib::llm::{ChatRequest, TaskKind};
 use std::sync::Arc;
 use std::time::Duration;
 use support::mock_provider::{MockEvent, MockLlm};

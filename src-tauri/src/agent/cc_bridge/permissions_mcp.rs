@@ -1,9 +1,9 @@
 //! Stdio MCP server for Claude Code's `--permission-prompt-tool`.
 //!
-//! When CC spawns NewMob with `--mcp-server permissions`, this loop reads
+//! When CC spawns Taomni with `--mcp-server permissions`, this loop reads
 //! NDJSON requests from stdin and writes NDJSON responses to stdout. CC
 //! invokes the `permission_prompt` tool every time it wants to call any
-//! other tool; our implementation runs the request through NewMob's
+//! other tool; our implementation runs the request through Taomni's
 //! existing safety pipeline (`agent::safety::check_tool_call`) so the
 //! shell-command blacklist (§5.3) catches `rm -rf /` even when CC drives
 //! the call.
@@ -14,7 +14,7 @@
 //!   - `tools/call` (name=permission_prompt) → returns `{behavior: allow|deny}`
 //!
 //! We intentionally avoid pulling in a full MCP SDK here — the wire shape
-//! is tiny and stable, and shipping a 50-line stdio loop keeps NewMob's
+//! is tiny and stable, and shipping a 50-line stdio loop keeps Taomni's
 //! release binary footprint flat. Once `rmcp` is in the dep tree this
 //! module becomes a thin wrapper around it.
 
@@ -85,7 +85,7 @@ fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             id: req.id,
             result: Some(serde_json::json!({
                 "protocolVersion": "2024-11-05",
-                "serverInfo": { "name": "newmob-permissions", "version": env!("CARGO_PKG_VERSION") },
+                "serverInfo": { "name": "taomni-permissions", "version": env!("CARGO_PKG_VERSION") },
                 "capabilities": { "tools": {} }
             })),
             error: None,
@@ -96,7 +96,7 @@ fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             result: Some(serde_json::json!({
                 "tools": [{
                     "name": "permission_prompt",
-                    "description": "Approve or deny a tool call from Claude Code based on NewMob's safety rules (blacklist + per-session disable).",
+                    "description": "Approve or deny a tool call from Claude Code based on Taomni's safety rules (blacklist + per-session disable).",
                     "inputSchema": {
                         "type": "object",
                         "properties": {

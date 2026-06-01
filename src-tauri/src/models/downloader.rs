@@ -140,7 +140,7 @@ pub async fn download_model(
 ) -> Result<(), String> {
     let client = Client::builder()
         .timeout(Duration::from_secs(60))
-        .user_agent("NewMob/0.1 (model-downloader)")
+        .user_agent("Taomni/0.1 (model-downloader)")
         .build()
         .map_err(|e| e.to_string())?;
 

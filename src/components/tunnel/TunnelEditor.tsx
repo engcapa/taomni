@@ -180,7 +180,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
       <div
         data-testid="tunnel-editor"
         className="w-[940px] max-w-[96%] max-h-[92vh] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{ background: "var(--moba-panel-bg)", borderColor: "var(--moba-chrome-border)", color: "var(--moba-text)" }}
+        style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         {/* Title bar */}
         <div
@@ -200,27 +200,27 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         </div>
 
         {/* Mode picker */}
-        <div className="px-4 py-3 border-b shrink-0 grid grid-cols-3 gap-3" style={{ borderColor: "var(--moba-divider)" }}>
+        <div className="px-4 py-3 border-b shrink-0 grid grid-cols-3 gap-3" style={{ borderColor: "var(--taomni-divider)" }}>
           {KIND_OPTION_KEYS.map((opt) => (
             <label
               key={opt.id}
               className="flex items-start gap-2 cursor-pointer p-2 rounded border"
               style={{
-                borderColor: draft.kind === opt.id ? "var(--moba-accent)" : "var(--moba-divider)",
-                background: draft.kind === opt.id ? "var(--moba-selected)" : "transparent",
+                borderColor: draft.kind === opt.id ? "var(--taomni-accent)" : "var(--taomni-divider)",
+                background: draft.kind === opt.id ? "var(--taomni-selected)" : "transparent",
               }}
             >
               <input
                 type="radio"
-                className="moba-radio mt-0.5"
+                className="taomni-radio mt-0.5"
                 checked={draft.kind === opt.id}
                 onChange={() => update("kind", opt.id)}
               />
               <div className="text-[12px] leading-tight">
-                <div className="font-semibold" style={{ color: draft.kind === opt.id ? "var(--moba-accent)" : "var(--moba-text)" }}>
+                <div className="font-semibold" style={{ color: draft.kind === opt.id ? "var(--taomni-accent)" : "var(--taomni-text)" }}>
                   {t(opt.label)}
                 </div>
-                <div className="text-[11px] mt-0.5" style={{ color: "var(--moba-text-muted)" }}>
+                <div className="text-[11px] mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
                   {t(opt.description)}
                 </div>
               </div>
@@ -231,20 +231,20 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         {/* Diagram */}
         <div
           className="flex-1 min-h-0 overflow-auto px-4 py-4"
-          style={{ background: "var(--moba-bg)" }}
+          style={{ background: "var(--taomni-bg)" }}
         >
           {/* Name / saved-session row */}
           <div className="flex items-center gap-2 mb-4">
             <label className="text-[12px] w-28 text-right">{t("tunnels.editor.tunnelNameRequired")}</label>
             <input
-              className="moba-input w-64"
+              className="taomni-input w-64"
               placeholder={t("tunnels.editor.namePlaceholder")}
               value={draft.name}
               onChange={(e) => update("name", e.target.value)}
             />
             <label className="text-[12px] w-32 text-right ml-3">{t("tunnels.editor.useSavedSession")}</label>
             <select
-              className="moba-input w-64 appearance-none"
+              className="taomni-input w-64 appearance-none"
               value={draft.sshSessionId ?? ""}
               onChange={(e) => pickSshSession(e.target.value)}
             >
@@ -270,31 +270,31 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             >
               <Field label={forwardedLabel}>
                 <input
-                  className="moba-input w-24"
+                  className="taomni-input w-24"
                   type="number"
                   placeholder="0"
                   value={draft.listenPort || ""}
                   onChange={(e) => update("listenPort", parseInt(e.target.value || "0", 10) || 0)}
                 />
-                <span className="text-[11px] ml-1" style={{ color: "var(--moba-text-muted)" }}>
+                <span className="text-[11px] ml-1" style={{ color: "var(--taomni-text-muted)" }}>
                   {isRemote ? t("tunnels.editor.serverBindHint") : t("tunnels.editor.listenHint")}
                 </span>
               </Field>
               <Field label={isRemote ? t("tunnels.editor.bindAddress") : t("tunnels.editor.listenAddress")}>
                 <input
-                  className="moba-input w-32"
+                  className="taomni-input w-32"
                   placeholder={isRemote ? "0.0.0.0" : "127.0.0.1"}
                   value={draft.listenHost}
                   onChange={(e) => update("listenHost", e.target.value)}
                 />
               </Field>
               {isRemote && (
-                <div className="text-[11px] mt-2" style={{ color: "var(--moba-text-muted)" }}>
+                <div className="text-[11px] mt-2" style={{ color: "var(--taomni-text-muted)" }}>
                   {t("tunnels.editor.remoteListenNote")}
                 </div>
               )}
               <div className="flex items-center justify-end mt-2">
-                <ArrowRight className="w-5 h-5" style={{ color: "var(--moba-accent)" }} />
+                <ArrowRight className="w-5 h-5" style={{ color: "var(--taomni-accent)" }} />
               </div>
             </DiagramCard>
 
@@ -306,7 +306,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             >
               <Field label={t("tunnels.editor.sshServerRequired")}>
                 <input
-                  className="moba-input w-44"
+                  className="taomni-input w-44"
                   placeholder="ssh.example.com"
                   value={draft.ssh.host}
                   onChange={(e) => updateSsh("host", e.target.value)}
@@ -314,7 +314,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               </Field>
               <Field label={t("tunnels.editor.sshLoginRequired")}>
                 <input
-                  className="moba-input w-32"
+                  className="taomni-input w-32"
                   placeholder="user"
                   value={draft.ssh.username}
                   onChange={(e) => updateSsh("username", e.target.value)}
@@ -322,7 +322,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               </Field>
               <Field label={t("tunnels.editor.sshPort")}>
                 <input
-                  className="moba-input w-20"
+                  className="taomni-input w-20"
                   type="number"
                   placeholder="22"
                   value={draft.ssh.port || ""}
@@ -331,7 +331,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               </Field>
               <Field label={t("tunnels.editor.auth")}>
                 <select
-                  className="moba-input w-32 appearance-none"
+                  className="taomni-input w-32 appearance-none"
                   value={draft.ssh.authMethod}
                   onChange={(e) => updateSsh("authMethod", e.target.value as "Password" | "PrivateKey" | "Agent")}
                 >
@@ -346,7 +346,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               >
                 <input
                   id="tunnel-editor-auth-data"
-                  className="moba-input w-44"
+                  className="taomni-input w-44"
                   type={draft.ssh.authMethod === "Password" ? "password" : "text"}
                   placeholder={
                     draft.ssh.authMethod === "PrivateKey"
@@ -377,7 +377,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 >
                   <input
                     type="checkbox"
-                    className="moba-checkbox"
+                    className="taomni-checkbox"
                     checked={!!draft.ssh.saveAuth}
                     onChange={(e) => updateSsh("saveAuth", e.target.checked)}
                     disabled={
@@ -416,14 +416,14 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               }
             >
               <div className="flex items-center justify-start mb-1">
-                <ArrowLeft className="w-5 h-5" style={{ color: "var(--moba-accent)" }} />
+                <ArrowLeft className="w-5 h-5" style={{ color: "var(--taomni-accent)" }} />
               </div>
               <Field
                 label={isRemote ? t("tunnels.editor.localTargetRequired") : t("tunnels.editor.remoteServerRequired", { label: destLabel })}
                 disabled={isDynamic}
               >
                 <input
-                  className="moba-input w-44"
+                  className="taomni-input w-44"
                   placeholder={isRemote ? "127.0.0.1" : "db.internal"}
                   value={draft.destHost}
                   onChange={(e) => update("destHost", e.target.value)}
@@ -435,7 +435,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 disabled={isDynamic}
               >
                 <input
-                  className="moba-input w-20"
+                  className="taomni-input w-20"
                   type="number"
                   placeholder="5432"
                   value={draft.destPort || ""}
@@ -444,7 +444,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 />
               </Field>
               {isDynamic && (
-                <div className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
+                <div className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
                   {t("tunnels.editor.dynamicHintPrefix")}{" "}
                   <strong>
                     socks5://{draft.listenHost || "127.0.0.1"}:{draft.listenPort || "<port>"}
@@ -459,7 +459,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
           <div className="mt-4 grid grid-cols-12 gap-3 items-center">
             <label className="col-span-2 text-[12px] text-right">{t("tunnels.editor.description")}</label>
             <input
-              className="moba-input col-span-7"
+              className="taomni-input col-span-7"
               placeholder={t("tunnels.editor.descriptionPlaceholder")}
               value={draft.description ?? ""}
               onChange={(e) => update("description", e.target.value)}
@@ -467,7 +467,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             <label className="col-span-3 flex items-center gap-1.5 text-[12px] justify-end">
               <input
                 type="checkbox"
-                className="moba-checkbox"
+                className="taomni-checkbox"
                 checked={!!draft.autostart}
                 onChange={(e) => update("autostart", e.target.checked)}
               />
@@ -488,11 +488,11 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         {/* Footer */}
         <div
           className="h-12 flex items-center justify-center gap-3 border-t shrink-0"
-          style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}
+          style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
         >
           <button
             type="button"
-            className="moba-btn flex items-center gap-1.5"
+            className="taomni-btn flex items-center gap-1.5"
             data-testid="tunnel-editor-save"
             data-primary="true"
             onClick={handleSave}
@@ -500,7 +500,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
           >
             <SaveIcon className="w-3.5 h-3.5" /> {busy ? t("tunnels.editor.saving") : t("tunnels.editor.save")}
           </button>
-          <button type="button" className="moba-btn flex items-center gap-1.5" data-testid="tunnel-editor-cancel" onClick={onCancel} disabled={busy}>
+          <button type="button" className="taomni-btn flex items-center gap-1.5" data-testid="tunnel-editor-cancel" onClick={onCancel} disabled={busy}>
             <XCircle className="w-3.5 h-3.5" /> {t("tunnels.editor.cancel")}
           </button>
         </div>
@@ -523,13 +523,13 @@ function DiagramCard({
   return (
     <div
       className="rounded-md border p-3 flex flex-col gap-1.5"
-      style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}
+      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
         {icon}
         <div>
           <div className="text-[12px] font-semibold">{title}</div>
-          <div className="text-[10.5px]" style={{ color: "var(--moba-text-muted)" }}>{subtitle}</div>
+          <div className="text-[10.5px]" style={{ color: "var(--taomni-text-muted)" }}>{subtitle}</div>
         </div>
       </div>
       {children}
@@ -551,7 +551,7 @@ function Field({
       className="flex items-center gap-2 text-[12px]"
       style={{ opacity: disabled ? 0.45 : 1 }}
     >
-      <label className="w-24 text-right shrink-0" style={{ color: "var(--moba-text-muted)" }}>{label}</label>
+      <label className="w-24 text-right shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{label}</label>
       <div className="flex items-center gap-1 flex-wrap">{children}</div>
     </div>
   );

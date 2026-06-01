@@ -25,7 +25,7 @@ interface QueryRegistryShape {
   activeTabId: string | null;
 }
 
-const KEY = "__newmob_query_registry__";
+const KEY = "__taomni_query_registry__";
 
 function ensureRegistry(): QueryRegistryShape {
   const g = globalThis as unknown as Record<string, unknown>;

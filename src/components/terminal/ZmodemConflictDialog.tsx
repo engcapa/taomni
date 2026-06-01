@@ -40,13 +40,13 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
         aria-modal="true"
         data-testid="zmodem-conflict"
         className="w-[400px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-1">{title}</div>
         <div
           className="text-[12px] mb-4 break-all"
-          style={{ color: "var(--moba-text-muted)" }}
+          style={{ color: "var(--taomni-text-muted)" }}
           title={fileName}
         >
           {fileName}
@@ -59,7 +59,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
               type="button"
               data-testid="zmodem-overwrite"
               className="w-full px-3 py-1.5 text-[12px] rounded text-left hover:opacity-90"
-              style={{ background: "var(--moba-accent)", color: "#fff" }}
+              style={{ background: "var(--taomni-accent)", color: "#fff" }}
               onClick={() => resolve("overwrite")}
             >
               {t("terminal.zmodemOverwrite")}
@@ -71,9 +71,9 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
             data-testid="zmodem-rename"
             className="w-full px-3 py-1.5 text-[12px] rounded text-left"
             style={{
-              background: mode === "send" ? "var(--moba-accent)" : "var(--moba-input-bg)",
-              border: mode === "send" ? "none" : "1px solid var(--moba-input-border)",
-              color: mode === "send" ? "#fff" : "var(--moba-text)",
+              background: mode === "send" ? "var(--taomni-accent)" : "var(--taomni-input-bg)",
+              border: mode === "send" ? "none" : "1px solid var(--taomni-input-border)",
+              color: mode === "send" ? "#fff" : "var(--taomni-text)",
             }}
             onClick={() => resolve("rename")}
           >
@@ -84,9 +84,9 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
             data-testid="zmodem-skip"
             className="w-full px-3 py-1.5 text-[12px] rounded text-left"
             style={{
-              background: "var(--moba-input-bg)",
-              border: "1px solid var(--moba-input-border)",
-              color: "var(--moba-text)",
+              background: "var(--taomni-input-bg)",
+              border: "1px solid var(--taomni-input-border)",
+              color: "var(--taomni-text)",
             }}
             onClick={() => resolve("skip")}
           >

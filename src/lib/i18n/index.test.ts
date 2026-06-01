@@ -11,7 +11,7 @@ describe("i18n core", () => {
   afterEach(() => {
     setLocale(original);
     try {
-      window.localStorage.removeItem("newmob.locale.v1");
+      window.localStorage.removeItem("taomni.locale.v1");
     } catch {
       /* ignore */
     }

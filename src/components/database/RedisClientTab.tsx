@@ -58,30 +58,30 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
 
   if (connError) {
     return (
-      <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
+      <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
         <div className="max-w-md text-center">
           <AlertTriangle className="w-6 h-6 mx-auto mb-2" style={{ color: "#d9534f" }} />
           <div className="font-semibold mb-1">Connection failed</div>
-          <div className="text-[12px] text-[var(--moba-text-muted)] break-words">{connError}</div>
+          <div className="text-[12px] text-[var(--taomni-text-muted)] break-words">{connError}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
+    <div className="h-full w-full flex flex-col" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
       {/* Toolbar: DB index switcher */}
       <div
         className="h-7 shrink-0 flex items-center gap-2 px-2 text-[11px]"
-        style={{ background: "var(--moba-chrome-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+        style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
-        <span className="font-semibold" style={{ color: "var(--moba-accent)" }}>
+        <span className="font-semibold" style={{ color: "var(--taomni-accent)" }}>
           {info.host}:{info.port}
         </span>
-        <span className="text-[var(--moba-text-muted)]">DB</span>
+        <span className="text-[var(--taomni-text-muted)]">DB</span>
         <div className="relative inline-flex items-center">
           <select
-            className="moba-input pr-5 appearance-none"
+            className="taomni-input pr-5 appearance-none"
             style={{ height: 20, paddingTop: 0, paddingBottom: 0 }}
             value={dbIndex}
             aria-label="Redis DB index"
@@ -91,7 +91,7 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
               <option key={i} value={i}>{i}</option>
             ))}
           </select>
-          <ChevronDown className="w-3 h-3 absolute right-1 pointer-events-none text-[var(--moba-text-muted)]" />
+          <ChevronDown className="w-3 h-3 absolute right-1 pointer-events-none text-[var(--taomni-text-muted)]" />
         </div>
       </div>
 
@@ -99,7 +99,7 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
         <Panel defaultSize={cliCollapsed ? 92 : 70} minSize={30}>
           <PanelGroup direction="horizontal" autoSaveId="redis-client" className="h-full">
             <Panel defaultSize={32} minSize={18} maxSize={55}>
-              <div className="h-full" style={{ borderRight: "1px solid var(--moba-divider)" }}>
+              <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
                 {connected && (
                   <RedisKeyBrowser
                     sessionId={sessionId}
@@ -127,7 +127,7 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
                 )}
               </div>
             </Panel>
-            <PanelResizeHandle className="w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize" />
+            <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
             <Panel>
               <RedisValuePanel
                 sessionId={sessionId}
@@ -142,7 +142,7 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
           </PanelGroup>
         </Panel>
         {!cliCollapsed && (
-          <PanelResizeHandle className="h-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-row-resize" />
+          <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
         )}
         <Panel defaultSize={cliCollapsed ? 8 : 30} minSize={cliCollapsed ? 4 : 12} maxSize={cliCollapsed ? 8 : 70}>
           <RedisCli

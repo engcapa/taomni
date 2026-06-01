@@ -14,14 +14,14 @@ describe("osFileDrop", () => {
   it("detects OS file drags and ignores app-internal drags", () => {
     expect(isOsFileDrag({ types: ["Files"] })).toBe(true);
     expect(isOsFileDrag({ types: ["text/uri-list"] })).toBe(true);
-    expect(isOsFileDrag({ types: ["application/x-newmob-files", "text/plain"] })).toBe(false);
+    expect(isOsFileDrag({ types: ["application/x-taomni-files", "text/plain"] })).toBe(false);
   });
 
   it("prevents default navigation only for OS file drags", () => {
     const preventDefault = vi.fn();
     preventDefaultForOsFileDrag({ dataTransfer: { types: ["Files"] }, preventDefault });
     preventDefaultForOsFileDrag({
-      dataTransfer: { types: ["application/x-newmob-files"] },
+      dataTransfer: { types: ["application/x-taomni-files"] },
       preventDefault,
     });
 

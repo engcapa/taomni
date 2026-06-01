@@ -1,6 +1,6 @@
 //! Cross-platform X11 forwarding support.
 //!
-//! NewMob does not ship its own X server (writing an X11 display server is a
+//! Taomni does not ship its own X server (writing an X11 display server is a
 //! multi-year effort and an explicit non-goal). Instead it forwards the remote
 //! application's X11 traffic — tunneled back over the SSH connection — into a
 //! *system* X server the user already runs:

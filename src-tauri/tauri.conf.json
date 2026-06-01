@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "NewMob",
+  "productName": "Taomni",
   "version": "../package.json",
-  "identifier": "com.newmob.app",
+  "identifier": "com.taomni.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "create": false,
-        "title": "NewMob",
+        "title": "Taomni",
         "width": 1280,
         "height": 800,
         "minWidth": 800,

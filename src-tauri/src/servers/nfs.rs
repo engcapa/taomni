@@ -26,7 +26,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
 
         if has_exportfs || has_nfsd {
             for line in [
-                "NFS export requires root and OS configuration; NewMob cannot start it directly.".to_string(),
+                "NFS export requires root and OS configuration; Taomni cannot start it directly.".to_string(),
                 "To export a directory over NFS on Linux:".to_string(),
                 format!("  1. Add to /etc/exports:  {} *(rw,sync,no_subtree_check)", export_dir),
                 "  2. Apply exports:        sudo exportfs -ra".to_string(),
@@ -51,7 +51,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     #[cfg(target_os = "macos")]
     {
         for line in [
-            "NFS export on macOS requires root and OS configuration; NewMob cannot start it directly.".to_string(),
+            "NFS export on macOS requires root and OS configuration; Taomni cannot start it directly.".to_string(),
             "To export a directory over NFS on macOS:".to_string(),
             format!("  1. Add to /etc/exports:  {} -network 0.0.0.0 -mask 0.0.0.0", export_dir),
             "  2. Restart nfsd:          sudo nfsd restart".to_string(),
@@ -71,7 +71,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         for line in [
             "Windows does not ship an NFS server in most editions.",
             "Enable it via: Settings > Optional Features, or 'Services for NFS' on Windows Server,",
-            "then configure an NFS share through Server Manager. NewMob cannot start it directly.",
+            "then configure an NFS share through Server Manager. Taomni cannot start it directly.",
         ] {
             ctx.log.line(line.to_string());
         }

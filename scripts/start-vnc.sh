@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-BIN="src-tauri/target/debug/newmob"
+BIN="src-tauri/target/debug/taomni"
 DISPLAY_NUM=0
 RFB_PORT=5901       # raw RFB (Xvnc, localhost only)
 WS_PORT=5900        # WebSocket port that Replit's Tools->VNC connects to (wss)

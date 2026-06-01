@@ -36,7 +36,7 @@ steps:
   - assert_visible: 'text="Import WindTerm sessions"'
   - press: Escape
   # MenuBar route — Sessions → Import sessions submenu lists the four
-  # MenuBar-level formats (NewMob / MobaXterm / CSV / OpenSSH).
+  # MenuBar-level formats (Taomni / MobaXterm / CSV / OpenSSH).
   - click: '[data-testid="menu-sessions"]'
   - wait_for: '[data-testid="context-menu"]'
   - hover: '[data-testid="context-menu"] >> text="Import sessions"'

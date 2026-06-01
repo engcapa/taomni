@@ -218,7 +218,7 @@ pub fn check_file_exists(path: String) -> bool {
 #[tauri::command]
 pub fn temporary_file_path(default_name: String) -> Result<String, String> {
     let mut dir = std::env::temp_dir();
-    dir.push("newmob");
+    dir.push("taomni");
     dir.push("query-results");
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create temporary export directory: {}", e))?;

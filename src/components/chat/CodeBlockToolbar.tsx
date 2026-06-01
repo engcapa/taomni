@@ -172,13 +172,13 @@ export function CodeBlockToolbar({
   const allSelected = selecting && selectableCount > 0 && selectedSelectableCount === selectableCount;
 
   return (
-    <div className="rounded border border-[var(--moba-divider)] my-2 overflow-hidden">
-      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--moba-divider)]/40 text-[10px] text-[var(--moba-text-muted)]">
+    <div className="rounded border border-[var(--taomni-divider)] my-2 overflow-hidden">
+      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--taomni-divider)]/40 text-[10px] text-[var(--taomni-text-muted)]">
         <span className="font-mono uppercase tracking-wide">{lang || t("chat.codeLangFallback")}</span>
         <span className="flex-1" />
         <button
           type="button"
-          className={`moba-btn h-5 px-1.5 inline-flex items-center gap-1 ${selecting ? "bg-[var(--moba-selected)]" : ""}`}
+          className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 ${selecting ? "bg-[var(--taomni-selected)]" : ""}`}
           onClick={() => {
             setSelecting((v) => !v);
             setPicked(new Set());
@@ -190,7 +190,7 @@ export function CodeBlockToolbar({
         </button>
         <button
           type="button"
-          className="moba-btn h-5 px-1.5 inline-flex items-center gap-1"
+          className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1"
           onClick={handleCopy}
           title={t("chat.codeCopyTitle")}
         >
@@ -212,7 +212,7 @@ export function CodeBlockToolbar({
           t={t}
         />
       </div>
-      <pre className="m-0 p-2 text-[11px] leading-snug overflow-x-auto bg-[var(--moba-bg)]">
+      <pre className="m-0 p-2 text-[11px] leading-snug overflow-x-auto bg-[var(--taomni-bg)]">
         <code>
           {selecting
             ? lineMeta.map((line, i) => {
@@ -223,7 +223,7 @@ export function CodeBlockToolbar({
                 return (
                   <div
                     key={i}
-                    className="flex items-start gap-2 px-1 -mx-1 rounded text-[var(--moba-text-muted)]"
+                    className="flex items-start gap-2 px-1 -mx-1 rounded text-[var(--taomni-text-muted)]"
                   >
                     <span className="mt-0.5 w-[13px] shrink-0" aria-hidden="true" />
                     {content}
@@ -233,7 +233,7 @@ export function CodeBlockToolbar({
               return (
                 <label
                   key={i}
-                  className="flex items-start gap-2 cursor-pointer hover:bg-[var(--moba-selected)]/40 px-1 -mx-1 rounded"
+                  className="flex items-start gap-2 cursor-pointer hover:bg-[var(--taomni-selected)]/40 px-1 -mx-1 rounded"
                 >
                   <input
                     type="checkbox"
@@ -421,7 +421,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
     return (
       <button
         type="button"
-        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-accent)]/15 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30 hover:bg-[var(--moba-accent)]/25"
+        className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30 hover:bg-[var(--taomni-accent)]/25"
         onClick={() => onSend(targetEntry)}
         disabled={baseDisabled}
         title={
@@ -440,7 +440,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
     <div ref={ref} className="relative inline-block">
       <button
         type="button"
-        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-accent)]/15 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30 hover:bg-[var(--moba-accent)]/25"
+        className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30 hover:bg-[var(--taomni-accent)]/25"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled || allTerminals.length === 0}
         title={t("chat.codeSendPickTitle")}
@@ -450,14 +450,14 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[160px] rounded border border-[var(--moba-divider)] shadow-lg"
-          style={{ background: "var(--moba-panel-bg)" }}
+          className="absolute right-0 top-full mt-1 z-30 min-w-[160px] rounded border border-[var(--taomni-divider)] shadow-lg"
+          style={{ background: "var(--taomni-panel-bg)" }}
         >
           {allTerminals.map((t) => (
             <button
               key={t.tabId}
               type="button"
-              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--moba-selected)]"
+              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-selected)]"
               onClick={() => {
                 onSend(t);
                 setOpen(false);
@@ -465,7 +465,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
             >
               <span className="truncate">{t.title}</span>
               {targetEntry?.tabId === t.tabId && (
-                <span className="ml-1 text-[var(--moba-accent)]">★</span>
+                <span className="ml-1 text-[var(--taomni-accent)]">★</span>
               )}
             </button>
           ))}
@@ -505,7 +505,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
     return (
       <button
         type="button"
-        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-selected)] text-[var(--moba-text)] border border-[var(--moba-divider)] hover:bg-[var(--moba-hover)]"
+        className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--taomni-selected)] text-[var(--taomni-text)] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
         onClick={() => onSend(effectiveTarget)}
         disabled={baseDisabled}
         title={
@@ -524,7 +524,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
     <div ref={ref} className="relative inline-block">
       <button
         type="button"
-        className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--moba-selected)] text-[var(--moba-text)] border border-[var(--moba-divider)] hover:bg-[var(--moba-hover)]"
+        className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 disabled:opacity-50 bg-[var(--taomni-selected)] text-[var(--taomni-text)] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
         title={t("chat.codeSendQueryPickTitle")}
@@ -534,14 +534,14 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[180px] rounded border border-[var(--moba-divider)] shadow-lg"
-          style={{ background: "var(--moba-panel-bg)" }}
+          className="absolute right-0 top-full mt-1 z-30 min-w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg"
+          style={{ background: "var(--taomni-panel-bg)" }}
         >
           {allQueries.map((query) => (
             <button
               key={query.tabId}
               type="button"
-              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--moba-selected)]"
+              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-selected)]"
               onClick={() => {
                 onSend(query);
                 setOpen(false);
@@ -549,7 +549,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
             >
               <span className="truncate">{query.title}</span>
               {effectiveTarget?.tabId === query.tabId && (
-                <span className="ml-1 text-[var(--moba-accent)]">★</span>
+                <span className="ml-1 text-[var(--taomni-accent)]">★</span>
               )}
             </button>
           ))}

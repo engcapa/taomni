@@ -27,14 +27,14 @@
 
 export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal" | "database";
 
-const STORAGE_PREFIX = "newmob.detached.";
-const REATTACH_PREFIX = "newmob.reattach.";
+const STORAGE_PREFIX = "taomni.detached.";
+const REATTACH_PREFIX = "taomni.reattach.";
 export const HANDOFF_TTL_MS = 60_000;
-const REATTACH_CHANNEL_NAME = "newmob.detach.sync";
+const REATTACH_CHANNEL_NAME = "taomni.detach.sync";
 
 // Legacy SFTP key; still consumed for back-compat with handoffs written by
 // older builds before the generic prefix existed.
-const LEGACY_SFTP_PREFIX = "newmob.sftp.detached.";
+const LEGACY_SFTP_PREFIX = "taomni.sftp.detached.";
 
 interface HandoffEnvelope<T> {
   payload: T;

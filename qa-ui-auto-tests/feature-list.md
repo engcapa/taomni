@@ -1,4 +1,4 @@
-# NewMob 已完成功能清单
+# Taomni 已完成功能清单
 
 > 本文档基于当前仓库代码 + `IMPLEMENTATION_PLAN.md` / `TERMINAL_EXPERIENCE_PLAN.md` / `TERMINAL_APPEARANCE_PLAN.md` / `ipc-improve-plan.md` / `replit.md` 的标记，**仅记录已实现并接入主流程的功能**。
 > 标记说明：
@@ -130,7 +130,7 @@ controls:
       - '[aria-label="Show sessions drawer"]'
 -->
 
-- 默认布局 vs 紧凑布局可一键切换，状态持久化到 `localStorage` (`newmob.compactMode`)
+- 默认布局 vs 紧凑布局可一键切换，状态持久化到 `localStorage` (`taomni.compactMode`)
 - 紧凑模式下使用 `CompactTitleBar`：主菜单按钮 + 标签栏 + 托盘控件统一在一行
 - 标题栏内置主菜单：新建本地/远程会话、新建 SFTP、关闭活动标签、Sessions、View、Tunneling、Settings、Help、Exit
 - 快捷键 Ctrl+Shift+M 切换紧凑模式
@@ -511,7 +511,7 @@ controls: []   # OSC 7 is an in-pty protocol; the terminal pane surface is owned
 - 高级设置中可按会话开关 OSC 7 自动注入
 
 ### 3.4 浏览器预览模式下的 SSH 桥接（开发用）✅
-- Vite 插件 `sshProxy.ts` + WebSocket `/__newmob/ssh-bridge`
+- Vite 插件 `sshProxy.ts` + WebSocket `/__taomni/ssh-bridge`
 - 浏览器内连接真实 SSH 服务器（仅密码与内联私钥）
 - 仅 dev 模式启用，不进入 desktop release 包
 
@@ -1025,7 +1025,7 @@ controls:
     optional: true       # AppThemeIconButton — currently unused outside the title-bar tray
 -->
 
-- `localStorage` key `newmob.appTheme.v1`
+- `localStorage` key `taomni.appTheme.v1`
 - `data-app-theme` 应用到 root document
 - Follow system 监听 `prefers-color-scheme` 变化
 - 全局 Settings、Welcome、顶部菜单、会话设置标题栏均可快速切换主题
@@ -1049,8 +1049,8 @@ controls: []   # backend-only — SQLite persistence + dev-mode IPC stubs; sideb
 
 - 表：`sessions` + `session_groups`
 - 命令：`list_sessions / get_session / save_session / delete_session / mark_session_connected / list_session_groups / save_session_group / delete_session_group`
-- 应用启动时初始化于 `app_data_dir/newmob.db`
-- 浏览器预览模式回退到 `localStorage`（key `newmob.sessions.v1` / `newmob.groups.v1`）
+- 应用启动时初始化于 `app_data_dir/taomni.db`
+- 浏览器预览模式回退到 `localStorage`（key `taomni.sessions.v1` / `taomni.groups.v1`）
 
 ### 6.2 会话树 `SessionTree` ✅
 
@@ -1490,10 +1490,10 @@ controls:
 - 操作：暂停 / 恢复 / 取消 / 重试
 - 暂停事件 `sftp-paused-{id}` 即时反馈
 - 文件夹传输：双向 `sftp_upload_dir` / `sftp_download_dir`（预先 dir_size 计算总量，按文件聚合进度）
-- 跨窗口同步：`BroadcastChannel newmob.sftp.sync` 镜像同源窗口的传输队列
+- 跨窗口同步：`BroadcastChannel taomni.sftp.sync` 镜像同源窗口的传输队列
 - 入队时记录 `kind: file | dir`，重试路由到正确命令
 - 批量上传 / 下载吞吐优化：合并复制粘贴和拖拽路径，减少多文件场景下的 IPC 抖动
-- 复制粘贴：跨面板复制粘贴文件（参考 OS 行为，配合 `application/x-newmob-files` MIME）
+- 复制粘贴：跨面板复制粘贴文件（参考 OS 行为，配合 `application/x-taomni-files` MIME）
 
 ### 7.4 SFTP 入口（三种）✅
 
@@ -1533,7 +1533,7 @@ controls:
   - Tauri：通过 `open_sftp_window` 打开真实 OS WebviewWindow
   - 浏览器：`window.open` 兜底
   - 使用独立 sessionId（`__detached`）避免与父窗口共享 SFTP channel
-  - 通过 `localStorage` `newmob.sftp.detached.<sid>` 传递凭证
+  - 通过 `localStorage` `taomni.sftp.detached.<sid>` 传递凭证
   - 父窗口 OSC 7 cwd 通过 `BroadcastChannel` 同步给分离窗口
 
 ### 7.5 面板交互 ✅
@@ -1679,11 +1679,11 @@ controls:
   - 远程：Download to local、Rename、Permissions（chmod）、Delete、New folder、New file
   - 本地：对应操作
 - chmod 对话框：Owner / Group / Other 三组权限位 + Apply
-- 跨面板拖拽（REMOTE↔LOCAL）：`customDnD` 指针驱动层 + `application/x-newmob-files` MIME，支持多选与文件夹
+- 跨面板拖拽（REMOTE↔LOCAL）：`customDnD` 指针驱动层 + `application/x-taomni-files` MIME，支持多选与文件夹
 - OS 文件拖入远程面板 → 直接上传到当前远程目录
   - Linux/macOS：通过 Tauri `onDragDropEvent` 拿到绝对路径，前端 `sftpStat(side="local") → controller.upload`
   - Windows：通过 webview HTML5 `dataTransfer.files`（拿不到绝对路径，按 File blob 上传）
-  - 与跨面板拖拽并存：根据 `dataTransfer.types` 区分 OS drop（`Files` / `text/uri-list`）vs 内部 drop（`application/x-newmob-files`）
+  - 与跨面板拖拽并存：根据 `dataTransfer.types` 区分 OS drop（`Files` / `text/uri-list`）vs 内部 drop（`application/x-taomni-files`）
   - 主窗口 + 分离 SFTP 窗口 `dragDropEnabled=true`，仅 Windows `disable_drag_drop_handler()`
   - **e2e 测试限制**：依赖真实 OS 拖拽产生的 `DataTransfer.types=Files`/`text/uri-list` 或 Tauri `onDragDropEvent`，Playwright `drag_to` 与 `tauri-driver` 都无法合成此 payload；当前 verb-catalog 也禁止 `dispatchEvent`/`new DataTransfer`。覆盖由单元测试 `src/lib/osFileDrop.test.ts` + `FileToolbarWiring.test.tsx` 承担，平台行为（Win/macOS/Linux）需手动回归
 - 双击文件：下载后用系统编辑器打开（"先下载"确认）
@@ -1691,7 +1691,7 @@ controls:
 
 ### 7.6 同步与方向控制 ✅
 - 终端 cwd → 远程面板：一次性首次同步 + 手动 Sync 按钮（不再连续追踪）
-- Pane orientation：横向/纵向布局切换 + per-scope 持久化（`newmob.sftp.orientation.<scope>`）
+- Pane orientation：横向/纵向布局切换 + per-scope 持久化（`taomni.sftp.orientation.<scope>`）
 - 附加侧边栏默认 vertical，全标签/分离窗口默认 horizontal
 
 ### 7.7 浏览器预览模式 SFTP 桥接（开发用）✅
@@ -2694,7 +2694,7 @@ controls:
     optional: true
 -->
 
-- 第三方会话 / NewMob JSON / MobaXterm / CSV / OpenSSH / Tabby / Xshell / WindTerm / iTerm2 / Terminal.app / Termius / PuTTYCM / SuperPuTTY / mRemote / Exceed / SecureCRT / RDM / WSL / PuTTY / External Bash 等导入入口共用的预览对话框
+- 第三方会话 / Taomni JSON / MobaXterm / CSV / OpenSSH / Tabby / Xshell / WindTerm / iTerm2 / Terminal.app / Termius / PuTTYCM / SuperPuTTY / mRemote / Exceed / SecureCRT / RDM / WSL / PuTTY / External Bash 等导入入口共用的预览对话框
 - 支持每行勾选 + 全选 / 反选；前 80 条出现在表格预览中，剩余仍按选择应用
 - Cancel 走遮罩点击 / Esc / Cancel 按钮；Confirm 在没有选中行时禁用
 - 摘要区列出待写入 vault 的密码数与 standalone secret 数
@@ -2736,7 +2736,7 @@ controls:
     optional: true
 -->
 
-- 通用 prop 驱动的第三方主密码输入框（与 NewMob 自身的 `VaultUnlockDialog` 区分，避免误导）
+- 通用 prop 驱动的第三方主密码输入框（与 Taomni 自身的 `VaultUnlockDialog` 区分，避免误导）
 - 用于 Tabby vault 解密：错误密码后保留对话框并显示内联错误（`tabby_vault_bad_password` → "Incorrect Tabby master password (attempt N)"）
 - 「Skip」按钮跳过 vault 解密但仍继续走 OS keychain 回退
 
@@ -2863,7 +2863,7 @@ controls:
 
 - 标题栏 `LanguageSwitcher`（地球图标 + EN / 中 缩写）打开 locale 选择上下文菜单
 - 设置面板 `LanguageSection` 提供同样的切换入口（适合不熟悉托盘的用户）
-- locale 持久化到 `localStorage` (`newmob.locale.v1`)；默认 `en`，已保存的偏好最优先
+- locale 持久化到 `localStorage` (`taomni.locale.v1`)；默认 `en`，已保存的偏好最优先
 - 切换时 `document.documentElement.lang` 同步更新
 - 字典覆盖范围：menu / ribbon / quick connect / session editor / settings / capture / SFTP toolbar / chat drawer / agent / file browser / tunnel manager / vault / about dialog 等所有用户可见入口
 - 未翻译键自动回落到英文，缺失键直接显示 key 路径（便于发现缺漏）

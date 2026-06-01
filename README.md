@@ -1,6 +1,6 @@
-# NewMob
+# Taomni
 
-NewMob 是一个基于 Tauri 2 + React + TypeScript 的跨平台远程连接管理工具，目标是提供类似 MobaXterm 的桌面体验。
+Taomni 是一款为开发者精心打造的 AI 原生远程工作台，基于 Tauri 2 + React + TypeScript 构建，跨 Linux / macOS / Windows 运行。功能齐全却小巧精致：本地终端、SSH、SFTP、RDP/VNC、隧道、数据库客户端一应俱全，并将 AI 能力贯穿日常工作流。
 
 当前工程已包含本地终端、SSH 终端、会话/分组管理、OpenSSH 配置导入等基础能力；RDP、VNC、SFTP 等协议入口已在界面中预留。
 

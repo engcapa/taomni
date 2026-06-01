@@ -18,7 +18,7 @@ steps:
   - wait: 1
   - click: "button[aria-label=\"Cycle application theme\"]"
   - wait: 1
-  - assert_localstorage: {key: "newmob.appTheme.v1", exists: true}
+  - assert_localstorage: {key: "taomni.appTheme.v1", exists: true}
   - reload: null
   - wait_for: "[data-testid=\"status-bar\"]"
   - eval_readonly:

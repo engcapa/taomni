@@ -1,4 +1,4 @@
-# NewMob Roadmap
+# Taomni Roadmap
 
 > **Status:** Living document. Last updated 2026-05-24.
 > **Current version:** v0.1.22
@@ -8,15 +8,15 @@
 
 ## TL;DR
 
-NewMob is evolving from a local-first remote connection manager into a **BYO-cloud-synced, AI-augmented terminal** while preserving its security-first, offline-capable foundation. Two strategic themes drive the next 12 months: **(1) Cloud Vault** — user-configured sync to storage *you* own, not a NewMob-operated service — and **(2) AI-Native features** that make the terminal smarter without compromising privacy.
+Taomni is evolving from a local-first remote connection manager into a **BYO-cloud-synced, AI-augmented terminal** while preserving its security-first, offline-capable foundation. Two strategic themes drive the next 12 months: **(1) Cloud Vault** — user-configured sync to storage *you* own, not a Taomni-operated service — and **(2) AI-Native features** that make the terminal smarter without compromising privacy.
 
-> **No SaaS, ever.** NewMob will not host a sync service, will not require an account, and will not see your data. You bring the storage (S3 bucket, R2, MinIO, WebDAV server, etc.); the app talks to it directly with credentials only on your device. If NewMob the project disappears tomorrow, your data stays where you put it, in the format you can read.
+> **No SaaS, ever.** Taomni will not host a sync service, will not require an account, and will not see your data. You bring the storage (S3 bucket, R2, MinIO, WebDAV server, etc.); the app talks to it directly with credentials only on your device. If Taomni the project disappears tomorrow, your data stays where you put it, in the format you can read.
 
 ## Strategic Themes
 
 | Theme | Why now | Success looks like |
 |-------|---------|--------------------|
-| **Cloud Vault (BYO)** | Users have multiple devices; teams need shared session pools; the existing vault is already E2E-encrypted, making BYO-storage sync low-risk | A user points NewMob at their own S3 bucket / WebDAV server, installs on a new device, unlocks with master password, and has their entire session library + credentials available within 60 seconds — without any NewMob-operated server in the path |
+| **Cloud Vault (BYO)** | Users have multiple devices; teams need shared session pools; the existing vault is already E2E-encrypted, making BYO-storage sync low-risk | A user points Taomni at their own S3 bucket / WebDAV server, installs on a new device, unlocks with master password, and has their entire session library + credentials available within 60 seconds — without any Taomni-operated server in the path |
 | **AI-Native** | Terminal AI is reaching maturity (Warp, Wave, Cursor); local LLMs (Ollama) make privacy-preserving inference viable; opportunity to differentiate on host-key/credential-aware intelligence | A user describes a task in natural language and executes it safely; error messages explain themselves; history feels like an extension of memory |
 
 ## Current State (Phase 0) — v0.1.22
@@ -31,11 +31,11 @@ NewMob is evolving from a local-first remote connection manager into a **BYO-clo
 
 ## Non-Goals (Through v1.0 — and Beyond)
 
-To prevent scope creep and preserve the project's architectural promises, NewMob will **not** pursue:
+To prevent scope creep and preserve the project's architectural promises, Taomni will **not** pursue:
 
 **Permanent non-goals (architectural commitments):**
-- ❌ **A "NewMob Cloud" SaaS.** No project-operated sync service, no managed tier, no "free + paid storage" upsell, ever. The cloud vault is **BYO-storage**: the user chooses and configures the backend, owns the bucket/server, and pays the provider directly. NewMob ships a *client*, never a *service*.
-- ❌ **User accounts on a NewMob server.** No signup, no login, no email verification, no password reset flow operated by us. The master password is your only identity, and it never leaves your device.
+- ❌ **A "Taomni Cloud" SaaS.** No project-operated sync service, no managed tier, no "free + paid storage" upsell, ever. The cloud vault is **BYO-storage**: the user chooses and configures the backend, owns the bucket/server, and pays the provider directly. Taomni ships a *client*, never a *service*.
+- ❌ **User accounts on a Taomni server.** No signup, no login, no email verification, no password reset flow operated by us. The master password is your only identity, and it never leaves your device.
 - ❌ **Project-controlled key escrow.** We cannot decrypt your vault, recover your master password, or reset your credentials. By design.
 - ❌ **Telemetry that identifies users or syncs without consent.** Any telemetry is opt-in, anonymous, and disclosed.
 - ❌ **Vendor-locked AI.** Every AI feature must work with at least one local backend (Ollama). Cloud AI is always optional.
@@ -60,7 +60,7 @@ To prevent scope creep and preserve the project's architectural promises, NewMob
 │  (laptop)    │◀───────▶│  (you choose,       │◀───────▶│  (desktop)   │
 │              │         │   you configure,    │         │              │
 │ vault.db     │  PUT/   │   you pay for it)   │  GET/   │ vault.db     │
-│ newmob.db    │  GET    │                     │  PUT    │ newmob.db    │
+│ taomni.db    │  GET    │                     │  PUT    │ taomni.db    │
 │ (encrypted)  │         │  • AWS S3           │         │ (encrypted)  │
 └──────────────┘         │  • Cloudflare R2    │         └──────────────┘
        │                 │  • Backblaze B2     │                │
@@ -75,7 +75,7 @@ To prevent scope creep and preserve the project's architectural promises, NewMob
                   ▲
                   │
        ┌──────────┴──────────┐
-       │  No NewMob server   │
+       │  No Taomni server   │
        │  in this picture.   │
        │  We don't proxy,    │
        │  relay, or escrow.  │
@@ -84,7 +84,7 @@ To prevent scope creep and preserve the project's architectural promises, NewMob
 
 ### Supported Storage Backends (User-Chosen)
 
-NewMob ships protocol clients, not backends. The user picks one and configures it themselves.
+Taomni ships protocol clients, not backends. The user picks one and configures it themselves.
 
 | Backend | Type | Cost to user | Notes |
 |---------|------|--------------|-------|
@@ -98,10 +98,10 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 | **SeaweedFS** | Self-hosted | Free (your hardware) | S3-compatible distributed store |
 | **Nextcloud** | Self-hosted or managed | Free or pay provider | Via WebDAV; popular with privacy-focused users |
 | **ownCloud** | Self-hosted | Free (your hardware) | Via WebDAV |
-| **Any S3-compatible** | Either | Varies | If it speaks S3 API v4, NewMob speaks to it |
+| **Any S3-compatible** | Either | Varies | If it speaks S3 API v4, Taomni speaks to it |
 | **Any WebDAV server** | Either | Varies | nginx-dav, Apache mod_dav, Caddy WebDAV plugin, etc. |
 
-**What NewMob does not provide:**
+**What Taomni does not provide:**
 - A managed/hosted storage option
 - Account creation or SSO with any of these providers
 - Bucket provisioning automation (you create the bucket; we PUT/GET to it)
@@ -110,7 +110,7 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 **Onboarding helpers (we do provide):**
 - Setup guides in the docs site for the most common providers (R2, S3, MinIO, Nextcloud)
 - "Test connection" button that verifies credentials, bucket access, and round-trip integrity before first sync
-- Sample IAM policy snippets for AWS S3 (least-privilege: only the bucket and prefix NewMob needs)
+- Sample IAM policy snippets for AWS S3 (least-privilege: only the bucket and prefix Taomni needs)
 - Migration tool: re-target sync to a new backend without losing history
 
 ### Design Decisions (with rationale)
@@ -122,7 +122,7 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 | **Encryption** | Reuse existing AES-256-GCM + Argon2id, all client-side | Vault is already E2E-encrypted at rest; no new crypto to audit; works regardless of backend's own encryption claims | Trust the backend's server-side encryption (defeats purpose, ties us to provider claims), age/PGP envelope (more deps, no benefit) |
 | **Conflict model** | Last-write-wins + sidecar manifest (v0.2), row-level 3-way merge (v0.3) | Single-user multi-device is 95% of use; LWW is simple and shippable | CRDT (overkill for low write rate), git-style merge UI (UX is worse for non-devs) |
 | **Sync trigger** | On change + interval (1/5/15min) + manual | Matches user mental model from Dropbox/iCloud | Real-time websocket sync (server complexity, no benefit for SQLite) |
-| **Identity** | Master password = device key; no accounts on any NewMob-operated server | Preserves "no account, no service" promise; works offline; nothing to lose if the project disappears | OAuth/OIDC (requires our own service), passkey/WebAuthn (no Tauri support yet, also implies a server) |
+| **Identity** | Master password = device key; no accounts on any Taomni-operated server | Preserves "no account, no service" promise; works offline; nothing to lose if the project disappears | OAuth/OIDC (requires our own service), passkey/WebAuthn (no Tauri support yet, also implies a server) |
 | **Credential storage** | Backend access keys stored as entries in the vault itself | Reuses E2E encryption; sync credentials never written in plaintext | OS keychain (platform fragmentation), config file (plaintext on disk) |
 
 ### v0.2.0 — Cloud Vault Foundation
@@ -131,9 +131,9 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 
 **User flow (BYO storage):**
 1. User obtains storage credentials independently (creates an R2 bucket, runs MinIO at home, etc.)
-2. In NewMob: Settings → Cloud Vault → "Add Backend" → picks provider type (S3-compatible / WebDAV)
+2. In Taomni: Settings → Cloud Vault → "Add Backend" → picks provider type (S3-compatible / WebDAV)
 3. Enters endpoint URL, bucket/path, access key, secret key (stored in vault, never plaintext on disk)
-4. Clicks "Test Connection" — NewMob verifies reachability, auth, write permission, and round-trip integrity
+4. Clicks "Test Connection" — Taomni verifies reachability, auth, write permission, and round-trip integrity
 5. On success, sync is enabled; on failure, error message points at the specific check that failed (auth, network, permissions)
 
 **Features:**
@@ -143,7 +143,7 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 - "Test Connection" button: HEAD bucket → small PUT/GET round-trip → DELETE; reports each step
 - Status bar sync indicator (`idle | syncing | conflict | error`)
 - Manual "Sync Now" + "Pull from Cloud" buttons
-- `.newmob-vault` encrypted backup export/import (offline transport — no backend required)
+- `.taomni-vault` encrypted backup export/import (offline transport — no backend required)
 - Conflict prompt: "Remote is newer (modified on Device-Foo at 2026-05-22 14:30) — Keep Local / Pull Remote / Cancel"
 - "Forget this backend" action: removes credentials locally; **does not** touch remote data (user's bucket, user's call)
 
@@ -340,7 +340,7 @@ NewMob ships protocol clients, not backends. The user picks one and configures i
 
 **Technical approach:**
 - Schema: `ALTER TABLE command_history ADD COLUMN cwd_context TEXT`
-- `history_append` accepts `cwd_context: Option<String>`; populated from existing OSC 7 tracking (`__newmob_cwd_sync_done`)
+- `history_append` accepts `cwd_context: Option<String>`; populated from existing OSC 7 tracking (`__taomni_cwd_sync_done`)
 - Fuzzy match in frontend against in-memory cache (`cacheRef` in `useCommandHistory`) — zero IPC overhead
 - Ranking formula: `score = recency × frequency × (cwd_match ? 2.0 : 1.0)`
 
@@ -569,7 +569,7 @@ These came from `ai-native-plan.md` and have no analogue in the original Theme 2
 - **Three-tier model distribution** (ModelScope primary / gh-proxy.com secondary / GitHub canonical, per-model SHA-256, Range-resume, concurrent HEAD probe, user-controllable mirror selection) — § 十一.
 - **MCP-style JSON-RPC bridge** (`agent/mcp_server.rs`, 127.0.0.1 random port + bearer token, default off) plus Claude Code `permissions_mcp` + `tools_mcp` reverse exposure — v2.3 + v2.6.
 - **Web Search dual-track**: ProviderCaps-aware native passthrough (OpenAI / Anthropic / Gemini / Grok / Mistral / GLM / Qwen / Perplexity native search) + client-side `deep_search` (SearXNG default with 30-day public-instance availability rotation, plus BYOK Tavily / Serper / Brave / Exa / Google CSE stored in OS keyring). Three-tier per-call confirmation state machine. SSRF defense in `web_fetch`. — v2.5.
-- **Claude Code CLI integration** (detection + version probe + workspace `--add-dir` whitelist + deny list for `~/.ssh` + `~/.config/newmob`, `--resume <session_id>`, NDJSON streaming with `--include-partial-messages`, watchdog with 3-strike circuit breaker) — v2.6.
+- **Claude Code CLI integration** (detection + version probe + workspace `--add-dir` whitelist + deny list for `~/.ssh` + `~/.config/taomni`, `--resume <session_id>`, NDJSON streaming with `--include-partial-messages`, watchdog with 3-strike circuit breaker) — v2.6.
 - **Full-local mode toggle** (Tauri http allowlist tightened to `127.0.0.1:*` at runtime, hides Claude Code provider, blocks all cloud calls) — § 1.5.
 - **Master AI off switch** (`fully_disabled` flag hides Drawer / suppresses Ctrl+L / collapses StatusBar to "AI: off") — § 十.
 - **30-day chat retention + JSON archive export, per-thread provider switching, ToolCall ActionCard inline rendering** — v2.4.
@@ -615,7 +615,7 @@ For v1.0 (Q1 2027), the AI surface needs:
 - First-run wizard: vault → optional sync (with backend picker + setup guide links) → optional AI → optional import
 - Documentation site:
   - User guide
-  - Security & threat model (what NewMob protects, what it doesn't)
+  - Security & threat model (what Taomni protects, what it doesn't)
   - AI privacy guide (data flows for each AI feature)
   - **BYO storage setup guides** — step-by-step for R2, AWS S3, Backblaze B2, MinIO, Garage, Nextcloud/WebDAV; sample IAM policies; sample `docker-compose.yml` for self-hosters
   - "Migrating between backends" guide
@@ -696,7 +696,7 @@ Disabled by default; toggle in Settings; clearly disclosed in onboarding wizard.
 | v0.4.x | Q1 2027 | AI | Smart SFTP + Runbooks + Health | Medium-High |
 | v1.0 | Q1 2027 | Both | Production release | Medium |
 
-> ETAs are aspirational. NewMob is volunteer-developed; ship dates flex based on contribution capacity.
+> ETAs are aspirational. Taomni is volunteer-developed; ship dates flex based on contribution capacity.
 
 ---
 

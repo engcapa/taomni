@@ -34,7 +34,7 @@ fn resolve_output_format(thread: &store::ChatThread, config: &AiConfig) -> Strin
 /// extra paragraph instructs the assistant to format its replies as Markdown,
 /// raw HTML, or plain text — matching what the renderer is expecting.
 fn build_system_prompt(format: &str) -> String {
-    let base = "You are the AI assistant inside the NewMob terminal manager. \
+    let base = "You are the AI assistant inside the Taomni terminal manager. \
                 Help the user manage SSH sessions, analyse terminal output, and craft shell commands. \
                 Reply in the same language the user writes in (default Chinese), and stay concise.";
     let format_clause = match format {

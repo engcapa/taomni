@@ -79,33 +79,33 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       <div
         className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
           enabled
-            ? "border-[var(--moba-accent)]/40 bg-[var(--moba-accent)]/5"
-            : "border-[var(--moba-divider)] bg-[var(--moba-bg)]"
+            ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"
+            : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
         }`}
         onClick={onToggle}
       >
-        <Terminal className={`w-4 h-4 shrink-0 ${enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
+        <Terminal className={`w-4 h-4 shrink-0 ${enabled ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">
             {t("aiSettings.aiShellTitle")}{" "}
             <span
               className="text-[10px] ml-1 rounded px-1.5 py-0.5 align-middle"
               style={{
-                background: "var(--moba-badge-warning-bg)",
-                color: "var(--moba-badge-warning-text)",
-                border: "1px solid var(--moba-badge-warning-border)",
+                background: "var(--taomni-badge-warning-bg)",
+                color: "var(--taomni-badge-warning-text)",
+                border: "1px solid var(--taomni-badge-warning-border)",
               }}
             >
               {t("aiSettings.aiShellExperimental")}
             </span>
           </div>
-          <div className="text-[11px] text-[var(--moba-text-muted)]">
+          <div className="text-[11px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.aiShellDescription")}
           </div>
         </div>
         <div
           className={`w-9 h-5 rounded-full transition-colors relative ${
-            enabled ? "bg-[var(--moba-accent)]" : "bg-[var(--moba-divider)]"
+            enabled ? "bg-[var(--taomni-accent)]" : "bg-[var(--taomni-divider)]"
           }`}
         >
           <div
@@ -119,13 +119,13 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       {/* Demo input (only shown when enabled) */}
       {enabled && (
         <div className="space-y-2">
-          <div className="text-[11px] text-[var(--moba-text-muted)]">
+          <div className="text-[11px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.aiShellTest")}
           </div>
           <div className="flex gap-2">
             <input
               type="text"
-              className="moba-input h-8 flex-1 text-[12px]"
+              className="taomni-input h-8 flex-1 text-[12px]"
               placeholder={t("aiSettings.aiShellPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -133,7 +133,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
             />
             <button
               type="button"
-              className="moba-btn h-8 px-3 text-[12px] inline-flex items-center gap-1.5 shrink-0"
+              className="taomni-btn h-8 px-3 text-[12px] inline-flex items-center gap-1.5 shrink-0"
               onClick={handleGenerate}
               disabled={loading || !description.trim()}
             >

@@ -271,12 +271,12 @@ describe("FileToolbar wiring through FilePanel", () => {
     seedSession();
     const { unmount } = renderRemote();
     const remoteBadge = screen.getByText("REMOTE");
-    expect(remoteBadge).toHaveStyle({ background: "var(--moba-accent)" });
+    expect(remoteBadge).toHaveStyle({ background: "var(--taomni-accent)" });
     unmount();
 
     renderLocal();
     const localBadge = screen.getByText("LOCAL");
-    expect(localBadge).toHaveStyle({ background: "var(--moba-text-muted)" });
+    expect(localBadge).toHaveStyle({ background: "var(--taomni-text-muted)" });
   });
 
   it("hides side-only buttons when their callbacks are not provided", () => {

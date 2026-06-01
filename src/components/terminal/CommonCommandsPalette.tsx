@@ -183,17 +183,17 @@ export function CommonCommandsPalette({
         data-testid="commands-palette"
         className="w-[560px] max-w-[92vw] rounded shadow-lg flex flex-col"
         style={{
-          background: "var(--moba-panel-bg)",
-          border: "1px solid var(--moba-divider)",
+          background: "var(--taomni-panel-bg)",
+          border: "1px solid var(--taomni-divider)",
           maxHeight: "60vh",
         }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="p-2 border-b" style={{ borderColor: "var(--moba-divider)" }}>
+        <div className="p-2 border-b" style={{ borderColor: "var(--taomni-divider)" }}>
           <input
             ref={inputRef}
             data-testid="commands-search"
-            className="moba-input w-full"
+            className="taomni-input w-full"
             placeholder={t("terminal.commandPaletteSearchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -205,7 +205,7 @@ export function CommonCommandsPalette({
           {filtered.length === 0 ? (
             <div
               className="px-3 py-4 text-[12px]"
-              style={{ color: "var(--moba-text-muted)" }}
+              style={{ color: "var(--taomni-text-muted)" }}
             >
               {t("terminal.commandPaletteEmpty")}
             </div>
@@ -218,7 +218,7 @@ export function CommonCommandsPalette({
                   aria-selected={i === selectedIndex}
                   className="px-3 py-1.5 cursor-pointer flex items-baseline gap-2"
                   style={{
-                    background: i === selectedIndex ? "var(--moba-hover)" : "transparent",
+                    background: i === selectedIndex ? "var(--taomni-hover)" : "transparent",
                   }}
                   onMouseEnter={() => setSelectedIndex(i)}
                   onMouseDown={(e) => {
@@ -228,13 +228,13 @@ export function CommonCommandsPalette({
                     onPick(c.command);
                   }}
                 >
-                  <span className="font-mono whitespace-pre" style={{ color: "var(--moba-text)" }}>
+                  <span className="font-mono whitespace-pre" style={{ color: "var(--taomni-text)" }}>
                     {c.command}
                   </span>
                   {c.description && (
                     <span
                       className="truncate flex-1"
-                      style={{ color: "var(--moba-text-muted)" }}
+                      style={{ color: "var(--taomni-text-muted)" }}
                       title={c.description}
                     >
                       {c.description}
@@ -243,9 +243,9 @@ export function CommonCommandsPalette({
                   <span
                     className="ml-auto shrink-0 px-1.5 py-0 rounded text-[10px]"
                     style={{
-                      background: "var(--moba-card-bg)",
-                      color: "var(--moba-text-muted)",
-                      border: "1px solid var(--moba-divider)",
+                      background: "var(--taomni-card-bg)",
+                      color: "var(--taomni-text-muted)",
+                      border: "1px solid var(--taomni-divider)",
                     }}
                   >
                     {sourceLabel[c.source]}
@@ -258,8 +258,8 @@ export function CommonCommandsPalette({
         <div
           className="px-3 py-1.5 text-[11px] border-t"
           style={{
-            color: "var(--moba-text-muted)",
-            borderColor: "var(--moba-divider)",
+            color: "var(--taomni-text-muted)",
+            borderColor: "var(--taomni-divider)",
           }}
         >
           {t("terminal.commandPaletteFooter")}

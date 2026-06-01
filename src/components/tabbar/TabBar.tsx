@@ -43,7 +43,7 @@ import { getAppPlatform } from "../../lib/runtime";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 
-const TAB_DRAG_MIME = "newmob/tab";
+const TAB_DRAG_MIME = "taomni/tab";
 
 interface TabBarProps {
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
@@ -311,8 +311,8 @@ export function TabBar({
     <div
       data-testid="tab-bar"
       data-compact={compactMode}
-      className="moba-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0"
-      style={{ background: "linear-gradient(to bottom, var(--moba-tab-inactive), var(--moba-chrome-bg))" }}
+      className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0"
+      style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
       {ctx.render}
       {tabs.map((tab) => {
@@ -373,7 +373,7 @@ export function TabBar({
       <div className="flex items-end" data-testid="new-tab-split">
         <button
           data-testid="new-local-terminal"
-          className="moba-tab"
+          className="taomni-tab"
           style={{ paddingRight: 4, borderTopRightRadius: 0 }}
           data-active={false}
           onClick={handleQuickLaunch}
@@ -383,7 +383,7 @@ export function TabBar({
         </button>
         <button
           data-testid="new-tab-launch-menu"
-          className="moba-tab"
+          className="taomni-tab"
           style={{ paddingLeft: 2, paddingRight: 4, borderTopLeftRadius: 0, marginLeft: -1 }}
           data-active={false}
           onClick={handleOpenLaunchMenu}
@@ -435,7 +435,7 @@ function TabIcon({ tab }: { tab: Tab }) {
     case "nettools":
       return <NetworkIcon className="w-3 h-3" style={{ color: "#236a98" }} />;
     case "file-browser":
-      return <FileText className="w-3 h-3" style={{ color: "var(--moba-text-muted)" }} />;
+      return <FileText className="w-3 h-3" style={{ color: "var(--taomni-text-muted)" }} />;
     default:
       return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }
@@ -462,8 +462,8 @@ function IconBtn({
       title={title}
       aria-label={title}
       data-active={active || undefined}
-      className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)] disabled:opacity-40 disabled:cursor-default"
-      style={active ? { background: "var(--moba-selected)", color: "var(--moba-accent)" } : undefined}
+      className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-default"
+      style={active ? { background: "var(--taomni-selected)", color: "var(--taomni-accent)" } : undefined}
       onClick={onClick}
       disabled={disabled}
       type="button"
@@ -553,7 +553,7 @@ function TabItem(props: TabItemProps) {
       data-multiexec-selected={multiExecSelected || undefined}
       data-dragging={dragging || undefined}
       data-drop-side={dropSide}
-      className="moba-tab relative"
+      className="taomni-tab relative"
       data-active={active}
       onClick={() => onActivate(tab)}
       onMouseDown={(e) => {
@@ -574,10 +574,10 @@ function TabItem(props: TabItemProps) {
           title={multiExecSelected ? t("tabs.multiExecRemove") : t("tabs.multiExecAdd")}
           className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full border flex items-center justify-center z-10 flex-shrink-0"
           style={{
-            background: multiExecSelected ? "var(--moba-accent)" : "var(--moba-chrome-bg)",
-            borderColor: multiExecSelected ? "var(--moba-accent)" : "var(--moba-divider)",
+            background: multiExecSelected ? "var(--taomni-accent)" : "var(--taomni-chrome-bg)",
+            borderColor: multiExecSelected ? "var(--taomni-accent)" : "var(--taomni-divider)",
             fontSize: 7,
-            color: multiExecSelected ? "#fff" : "var(--moba-text-muted)",
+            color: multiExecSelected ? "#fff" : "var(--taomni-text-muted)",
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -628,7 +628,7 @@ function TabItem(props: TabItemProps) {
             }}
             onFocus={(e) => e.currentTarget.select()}
             onBlur={onCommitRename}
-            className="bg-transparent border-b border-[var(--moba-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+            className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
             style={{ color: "inherit", font: "inherit" }}
           />
         ) : (

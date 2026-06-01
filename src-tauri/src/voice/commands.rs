@@ -87,7 +87,7 @@ pub async fn voice_stop_and_transcribe(
     let req = ChatRequest {
         messages: vec![
             ChatMessage::system(
-                "你是 NewMob 终端管理器的语音意图分类器。把用户的语音转写映射到一个工具调用。\n\
+                "你是 Taomni 终端管理器的语音意图分类器。把用户的语音转写映射到一个工具调用。\n\
                  工具列表：list_sessions、switch_tab、search_history、explain_error、\n\
                  generate_shell_command、none（普通对话）。\n\
                  只返回一段 JSON：{\"tool\":\"<name>\",\"args\":{...}}。",

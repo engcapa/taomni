@@ -164,7 +164,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
     return (
       <div
         className="w-full h-full flex items-center justify-center text-[12px]"
-        style={{ background: "var(--moba-bg)", color: "var(--moba-text-muted)" }}
+        style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
       >
         {t("fileBrowser.localBrowserLoading")}
       </div>
@@ -172,7 +172,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
   }
 
   return (
-    <div className="w-full h-full flex flex-col" style={{ background: "var(--moba-bg)" }}>
+    <div className="w-full h-full flex flex-col" style={{ background: "var(--taomni-bg)" }}>
       <FilePanel
         sessionId={tabId}
         side="local"

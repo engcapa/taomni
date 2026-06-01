@@ -91,7 +91,7 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
       <button
         type="button"
         className="h-7 shrink-0 w-full flex items-center gap-2 px-2 text-[11px]"
-        style={{ background: "var(--moba-quick-bg)", borderTop: "1px solid var(--moba-divider)" }}
+        style={{ background: "var(--taomni-quick-bg)", borderTop: "1px solid var(--taomni-divider)" }}
         onClick={onToggleCollapse}
       >
         <ChevronUp className="w-3.5 h-3.5" /> Redis CLI
@@ -103,7 +103,7 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
     <div className="h-full flex flex-col min-h-0" data-testid="redis-cli">
       <div
         className="h-7 shrink-0 flex items-center gap-2 px-2 text-[11px]"
-        style={{ background: "var(--moba-quick-bg)", borderTop: "1px solid var(--moba-divider)", borderBottom: "1px solid var(--moba-divider)" }}
+        style={{ background: "var(--taomni-quick-bg)", borderTop: "1px solid var(--taomni-divider)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
         <button type="button" className="inline-flex items-center gap-1" onClick={onToggleCollapse}>
           <ChevronDown className="w-3.5 h-3.5" /> Redis CLI
@@ -111,8 +111,8 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
         <div className="flex-1" />
         <button
           type="button"
-          className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--moba-hover)]"
-          style={{ color: monitoring ? "#d9534f" : "var(--moba-text-muted)" }}
+          className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)]"
+          style={{ color: monitoring ? "#d9534f" : "var(--taomni-text-muted)" }}
           onClick={toggleMonitor}
           title="Toggle MONITOR"
         >
@@ -120,27 +120,27 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--moba-hover)]"
+          className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)]"
           onClick={() => setLines([])}
           title="Clear output"
         >
           <Trash2 className="w-3.5 h-3.5" /> Clear
         </button>
       </div>
-      <div ref={outputRef} className="flex-1 min-h-0 overflow-auto moba-scroll-y p-2 font-mono text-[12px]" style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}>
+      <div ref={outputRef} className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 font-mono text-[12px]" style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}>
         {lines.map((line, i) => (
           <div key={i}>
-            {line.cmd && <div style={{ color: "var(--moba-accent)" }}>&gt; {line.cmd}</div>}
+            {line.cmd && <div style={{ color: "var(--taomni-accent)" }}>&gt; {line.cmd}</div>}
             <pre className="whitespace-pre-wrap" style={{ color: line.error ? "#ff6b6b" : undefined, margin: 0 }}>
               {line.reply}
             </pre>
           </div>
         ))}
       </div>
-      <div className="shrink-0 flex items-center gap-1 px-2 py-1" style={{ borderTop: "1px solid var(--moba-divider)" }}>
-        <span className="text-[var(--moba-accent)] font-mono text-[12px]">&gt;</span>
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1" style={{ borderTop: "1px solid var(--taomni-divider)" }}>
+        <span className="text-[var(--taomni-accent)] font-mono text-[12px]">&gt;</span>
         <input
-          className="moba-input flex-1 font-mono"
+          className="taomni-input flex-1 font-mono"
           value={input}
           placeholder="Type a Redis command and press Enter"
           aria-label="Redis command"

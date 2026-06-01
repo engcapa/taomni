@@ -69,19 +69,19 @@ export function FolderNameDialog({
         aria-modal="true"
         data-testid="folder-name-dialog"
         className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
 
         <div
           className="flex items-stretch text-[12px] rounded overflow-hidden"
-          style={{ border: "1px solid var(--moba-input-border)", background: "var(--moba-input-bg)" }}
+          style={{ border: "1px solid var(--taomni-input-border)", background: "var(--taomni-input-bg)" }}
         >
           <span
             data-testid="folder-name-dialog-parent"
             className="px-2 py-1 select-none whitespace-nowrap"
-            style={{ background: "var(--moba-hover)", color: "var(--moba-text-muted)" }}
+            style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}
             title={parentLabel}
           >
             {parentLabel} /
@@ -94,7 +94,7 @@ export function FolderNameDialog({
             onChange={(event) => setName(event.target.value)}
             placeholder={t("sidebar.folderNamePlaceholder")}
             className="flex-1 min-w-0 px-2 py-1 outline-none"
-            style={{ background: "transparent", color: "var(--moba-text)" }}
+            style={{ background: "transparent", color: "var(--taomni-text)" }}
             aria-label={t("sidebar.folderNamePlaceholder")}
           />
         </div>
@@ -103,7 +103,7 @@ export function FolderNameDialog({
           <button
             type="button"
             data-testid="folder-name-dialog-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
           >
             {t("common.cancel")}
@@ -112,7 +112,7 @@ export function FolderNameDialog({
             type="button"
             data-testid="folder-name-dialog-confirm"
             className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={handleSubmit}
             disabled={!valid}
           >

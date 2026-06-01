@@ -119,7 +119,7 @@ pub async fn web_search_execute(
 /// OWN native web search (OpenAI / Claude / Gemini / Grok / Mistral / GLM /
 /// Qwen / Perplexity). The frontend renames the "extra" client search button
 /// to "Deep search" so the user can still trigger an explicit second-pass
-/// search via NewMob's mirror — clearly distinguished from the provider's
+/// search via Taomni's mirror — clearly distinguished from the provider's
 /// implicit/tool search.
 #[tauri::command]
 pub async fn deep_search_execute(

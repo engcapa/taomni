@@ -1,4 +1,4 @@
-# NewMob RDP 服务端 · 功能清单与任务追踪
+# Taomni RDP 服务端 · 功能清单与任务追踪
 
 > 用途：替代 `rust_rdp_server_dev_plan.md` 做**功能盘点 + 任务追踪**（plan 偏决策/论证，不适合追踪进度）。
 > 基线：以源码 `src-tauri/src/servers/rdp/` + 前端 `src/components/servers/settings/RdpSettings.tsx` 为准，对照 plan 实查校正。

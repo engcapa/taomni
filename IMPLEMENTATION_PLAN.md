@@ -1,4 +1,4 @@
-# NewMob 实施计划
+# Taomni 实施计划
 
 > 基于 DESIGN.md 拆分的可执行任务清单，每个任务独立可交付，适合逐个交给 AI coding agent 执行。
 
@@ -14,7 +14,7 @@
 1. 使用 `cargo create-tauri-app` 创建项目，选择 React + TypeScript + Vite
 2. 安装前端依赖：tailwindcss, zustand, lucide-react, react-resizable-panels
 3. 配置 TailwindCSS（tailwind.config.js + index.css）
-4. 配置 tauri.conf.json（窗口尺寸 1280×800，最小 800×600，productName: NewMob）
+4. 配置 tauri.conf.json（窗口尺寸 1280×800，最小 800×600，productName: Taomni）
 5. 创建 Rust 端目录结构：`src-tauri/src/{terminal,session,filebrowser,tunnel,nettools,serial,config}/`
 6. 添加 Rust 依赖到 Cargo.toml（tokio, serde, serde_json, uuid, tracing）
 7. 创建 `src-tauri/src/state.rs` 定义 AppState 骨架
@@ -40,7 +40,7 @@
 3. 创建 `src/components/tabbar/TabBar.tsx` — 标签栏（新建/关闭/切换）
 4. 创建 `src/components/statusbar/StatusBar.tsx` — 底部状态栏
 5. 创建 `src/stores/appStore.ts` — Zustand store（tabs, activeTabId, sidebarWidth）
-6. 从 mob-design 原型提取 CSS 变量到 `src/index.css`（--moba-* 变量体系）
+6. 从 mob-design 原型提取 CSS 变量到 `src/index.css`（--taomni-* 变量体系）
 7. 实现标签页基础交互：点击切换、中键关闭、+ 按钮新建
 
 **参考原型：** `mob-design/.../MainWindow.tsx` 的整体布局结构
@@ -175,7 +175,7 @@
    - `list_groups()` → Vec<SessionGroup>
 4. 创建 `src-tauri/src/session/mod.rs` — 暴露 Tauri commands
 5. 修改 `src-tauri/src/state.rs` — AppState 增加 db 字段
-6. 在 app setup 中初始化数据库（路径：`app_data_dir/newmob.db`）
+6. 在 app setup 中初始化数据库（路径：`app_data_dir/taomni.db`）
 
 **产出文件：**
 - `src-tauri/src/session/mod.rs`
@@ -691,7 +691,7 @@ Phase 6 (Phase 2 完成后):
 每次执行一个 Task 时，向 agent 提供：
 
 ```
-请实现 NewMob 项目的 Task [X.Y]。
+请实现 Taomni 项目的 Task [X.Y]。
 
 项目技术栈：Tauri 2 + React 18 + TypeScript + Vite + Rust
 参考文档：DESIGN.md 第 [对应章节] 节

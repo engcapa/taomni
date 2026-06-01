@@ -4,7 +4,7 @@
 app:
   base_url: http://localhost:5000
   mode: browser
-  # native_binary: ./src-tauri/target/debug/newmob
+  # native_binary: ./src-tauri/target/debug/taomni
 
 webdriver:
   host: 127.0.0.1

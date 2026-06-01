@@ -1,16 +1,16 @@
-//! Stdio MCP server that reverse-exposes NewMob tools to Claude Code via
-//! `--mcp-config`. CC spawns NewMob with `--mcp-server tools`, reads the
+//! Stdio MCP server that reverse-exposes Taomni tools to Claude Code via
+//! `--mcp-config`. CC spawns Taomni with `--mcp-server tools`, reads the
 //! tools list, and can invoke them as if they were native CC tools.
 //!
-//! Only the subset of NewMob tools that don't need an AppHandle/DB are
+//! Only the subset of Taomni tools that don't need an AppHandle/DB are
 //! reachable from this stdio server, because each invocation is a fresh
 //! subprocess with no Tauri state. That covers the four most useful tools
 //! for CC's "explain + remediate" workflow:
 //!
-//!   - `explain_error`   — pass-through, lets CC pull a NewMob explanation
+//!   - `explain_error`   — pass-through, lets CC pull a Taomni explanation
 //!   - `web_search`      — runs through the same SearXNG/BYOK path
 //!   - `web_fetch`       — same SSRF defenses as the in-app path
-//!   - `redact_text`     — surface NewMob's redactor as a CC tool
+//!   - `redact_text`     — surface Taomni's redactor as a CC tool
 //!
 //! Stateful tools (`run_in_terminal`, `sftp_upload`, `read_terminal_tail`,
 //! …) stay confined to the in-app path where AppHandle is available.
@@ -85,7 +85,7 @@ async fn handle(req: JsonRpcRequest) -> JsonRpcResponse {
             id: req.id,
             result: Some(serde_json::json!({
                 "protocolVersion": "2024-11-05",
-                "serverInfo": { "name": "newmob-tools", "version": env!("CARGO_PKG_VERSION") },
+                "serverInfo": { "name": "taomni-tools", "version": env!("CARGO_PKG_VERSION") },
                 "capabilities": { "tools": {} }
             })),
             error: None,
@@ -153,7 +153,7 @@ fn tools_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "web_search",
-            "description": "Search the web through NewMob's configured provider. Returns a JSON array of {title,url,snippet}.",
+            "description": "Search the web through Taomni's configured provider. Returns a JSON array of {title,url,snippet}.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

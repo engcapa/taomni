@@ -27,7 +27,7 @@ def native_binary(cfg: dict) -> Path:
     explicit = cfg.get("app", {}).get("native_binary")
     if explicit:
         return Path(explicit).expanduser()
-    name = "newmob.exe" if platform.system() == "Windows" else "newmob"
+    name = "taomni.exe" if platform.system() == "Windows" else "taomni"
     return ROOT / "src-tauri" / "target" / "debug" / name
 
 

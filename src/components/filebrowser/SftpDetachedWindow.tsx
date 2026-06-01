@@ -41,7 +41,7 @@ interface DetachedSftpParams {
 // Re-export TTL so callers expecting the previous symbol still work.
 export { HANDOFF_TTL_MS } from "../../lib/detachedSession";
 
-const STORAGE_PREFIX = "newmob.sftp.detached.";
+const STORAGE_PREFIX = "taomni.sftp.detached.";
 
 /**
  * Read the credential handoff for `sessionId` without deleting it. We
@@ -105,14 +105,14 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const { mode, resolvedTheme } = useAppTheme();
   const [uiFontFamily, setUiFontFamily] = useState(() => {
     try {
-      return localStorage.getItem("newmob.uiFontFamily") || "Inter";
+      return localStorage.getItem("taomni.uiFontFamily") || "Inter";
     } catch {
       return "Inter";
     }
   });
   const [uiFontSize, setUiFontSize] = useState<number>(() => {
     try {
-      const val = localStorage.getItem("newmob.uiFontSize");
+      const val = localStorage.getItem("taomni.uiFontSize");
       if (val) {
         const parsed = parseInt(val, 10);
         if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) return parsed;
@@ -142,9 +142,9 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     const handler = (event: StorageEvent) => {
-      if (event.key === "newmob.uiFontFamily" && event.newValue) {
+      if (event.key === "taomni.uiFontFamily" && event.newValue) {
         setUiFontFamily(event.newValue);
-      } else if (event.key === "newmob.uiFontSize" && event.newValue) {
+      } else if (event.key === "taomni.uiFontSize" && event.newValue) {
         const parsed = parseInt(event.newValue, 10);
         if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) {
           setUiFontSize(parsed);
@@ -165,8 +165,8 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--moba-ui-font-family", uiFontFamily);
-    root.style.setProperty("--moba-ui-font-size", `${uiFontSize}px`);
+    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
+    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
   }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => {
@@ -280,11 +280,11 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
     <div
       data-testid="sftp-detached-window"
       className="w-screen h-screen flex flex-col"
-      style={{ background: "var(--moba-chrome-bg)", color: "var(--moba-text)" }}
+      style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}
     >
       <div
         className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0"
-        style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+        style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span className="truncate">{title}</span>
       </div>

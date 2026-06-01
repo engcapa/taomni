@@ -51,6 +51,6 @@ export const FT_SEPARATOR_STYLE: CSSProperties = {
 /** Accent override merged onto FT_BUTTON_STYLE for active toggle buttons
  *  (e.g. terminal SFTP / chat toggles when open). */
 export const FT_BUTTON_ACTIVE_OVERRIDE: CSSProperties = {
-  background: "var(--moba-accent)",
+  background: "var(--taomni-accent)",
   color: "#fff",
 };

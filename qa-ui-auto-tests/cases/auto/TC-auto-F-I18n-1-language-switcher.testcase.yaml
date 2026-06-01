@@ -4,7 +4,7 @@ description: |
   F-I18n-1: tests the bilingual UI introduced in v0.1.32. Default locale
   is English; opening the title-bar globe button reveals every supported
   locale (currently English + 简体中文). Selecting 简体中文 must persist
-  across reloads (`localStorage.newmob.locale.v1`) and update the
+  across reloads (`localStorage.taomni.locale.v1`) and update the
   document language attribute. Settings → Language section mirrors the
   same set of options for users who don't notice the tray button.
 covers: [F-I18n-1]
@@ -28,7 +28,7 @@ steps:
       state: detached
       timeout_sec: 5
   - assert_localstorage:
-      key: newmob.locale.v1
+      key: taomni.locale.v1
       contains: 'zh-CN'
   # Settings panel exposes the same picker.
   - click: '[data-testid="ribbon-settings"]'
@@ -38,10 +38,10 @@ steps:
   - assert_visible: '[data-testid="settings-language-zh-CN"]'
   - click: '[data-testid="settings-language-zh-CN"]'
   - assert_localstorage:
-      key: newmob.locale.v1
+      key: taomni.locale.v1
       contains: 'zh-CN'
   - click: '[data-testid="settings-language-en"]'
   - assert_localstorage:
-      key: newmob.locale.v1
+      key: taomni.locale.v1
       contains: 'en'
   - screenshot: i18n-language-switcher.png

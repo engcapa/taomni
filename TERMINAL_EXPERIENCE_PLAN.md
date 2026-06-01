@@ -1,4 +1,4 @@
-# NewMob Terminal Experience Plan
+# Taomni Terminal Experience Plan
 
 > 目标：让 local terminal 与 SSH session terminal 共用同一套接近 MobaXterm 的终端渲染、右键菜单、常规操作和配置模型。本文档基于 MobaXterm SSH terminal 右键菜单截图制定。
 

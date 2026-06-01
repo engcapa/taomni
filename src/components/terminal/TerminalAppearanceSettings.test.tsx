@@ -94,7 +94,7 @@ describe("TerminalAppearanceSettings", () => {
 
     const cursor = await screen.findByTestId("terminal-preview-cursor");
     expect(cursor).toHaveStyle({ borderBottom: expect.stringContaining("solid") });
-    expect(cursor).not.toHaveClass("moba-blink");
+    expect(cursor).not.toHaveClass("taomni-blink");
   });
 
   it("updates the remote OSC 52 clipboard setting", async () => {

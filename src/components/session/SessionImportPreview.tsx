@@ -104,28 +104,28 @@ export function SessionImportPreview({
         aria-modal="true"
         data-testid="session-import-preview"
         className="w-[760px] max-w-[94vw] max-h-[86vh] flex flex-col rounded shadow-lg"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div
           className="px-4 py-3 border-b"
-          style={{ borderColor: "var(--moba-divider)" }}
+          style={{ borderColor: "var(--taomni-divider)" }}
         >
           <div className="text-sm font-semibold">{t("importPreviewExt.titleSource", { source })}</div>
           <div
-            className="text-[12px] text-[var(--moba-text-muted)] mt-1"
+            className="text-[12px] text-[var(--taomni-text-muted)] mt-1"
             data-testid="session-import-preview-summary"
           >
             {selectedCount} of {total} session{total === 1 ? "" : "s"} will be imported into {target}
             {result.skipped ? `, ${result.skipped} skipped` : ""}.
           </div>
           {sessionPasswordCount > 0 && (
-            <div className="text-[12px] text-[var(--moba-text-muted)] mt-1">
-              {sessionPasswordCount} saved password{sessionPasswordCount === 1 ? "" : "s"} will be stored in the NewMob credential vault.
+            <div className="text-[12px] text-[var(--taomni-text-muted)] mt-1">
+              {sessionPasswordCount} saved password{sessionPasswordCount === 1 ? "" : "s"} will be stored in the Taomni credential vault.
             </div>
           )}
           {standaloneSecretCount > 0 && (
-            <div className="text-[12px] text-[var(--moba-text-muted)] mt-1">
+            <div className="text-[12px] text-[var(--taomni-text-muted)] mt-1">
               + {standaloneSecretCount} standalone secret{standaloneSecretCount === 1 ? "" : "s"} (e.g. private-key passphrases) will be saved as separate vault entries.
             </div>
           )}
@@ -144,7 +144,7 @@ export function SessionImportPreview({
               ))}
             </ul>
             {result.warnings.length > 6 && (
-              <div className="mt-1 text-[var(--moba-text-muted)]">
+              <div className="mt-1 text-[var(--taomni-text-muted)]">
                 {t("importPreviewExt.warningsMore", { count: result.warnings.length - 6, plural: result.warnings.length - 6 === 1 ? "" : "s" })}
               </div>
             )}
@@ -158,23 +158,23 @@ export function SessionImportPreview({
               className="w-full border-collapse text-[12px]"
             >
               <thead>
-                <tr style={{ background: "var(--moba-hover)" }}>
-                  <th className="px-2 py-1 border w-8" style={{ borderColor: "var(--moba-divider)" }}>
+                <tr style={{ background: "var(--taomni-hover)" }}>
+                  <th className="px-2 py-1 border w-8" style={{ borderColor: "var(--taomni-divider)" }}>
                     <input
                       ref={masterRef}
                       type="checkbox"
-                      className="moba-checkbox"
+                      className="taomni-checkbox"
                       data-testid="session-import-preview-select-all"
                       aria-label={allSelected ? t("importPreviewExt.deselectAll") : t("importPreviewExt.selectAll")}
                       checked={allSelected}
                       onChange={toggleAll}
                     />
                   </th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnName")}</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnType")}</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnHost")}</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnPort")}</th>
-                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{t("importPreviewExt.columnFolder")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{t("importPreviewExt.columnName")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{t("importPreviewExt.columnType")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{t("importPreviewExt.columnHost")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{t("importPreviewExt.columnPort")}</th>
+                  <th className="text-left px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{t("importPreviewExt.columnFolder")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,10 +182,10 @@ export function SessionImportPreview({
                   const checked = selected.has(session.id);
                   return (
                     <tr key={session.id}>
-                      <td className="px-2 py-1 border text-center" style={{ borderColor: "var(--moba-divider)" }}>
+                      <td className="px-2 py-1 border text-center" style={{ borderColor: "var(--taomni-divider)" }}>
                         <input
                           type="checkbox"
-                          className="moba-checkbox"
+                          className="taomni-checkbox"
                           data-testid={`session-import-preview-row-select-${session.id}`}
                           data-checked={checked}
                           aria-label={t("importPreviewExt.toggleRow", { name: session.name })}
@@ -193,15 +193,15 @@ export function SessionImportPreview({
                           onChange={() => toggleRow(session.id)}
                         />
                       </td>
-                      <td className="px-2 py-1 border max-w-[180px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.name}>
+                      <td className="px-2 py-1 border max-w-[180px] truncate" style={{ borderColor: "var(--taomni-divider)" }} title={session.name}>
                         {session.name}
                       </td>
-                      <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{sessionTypeLabel(session.session_type, session.options_json)}</td>
-                      <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={session.host}>
+                      <td className="px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{sessionTypeLabel(session.session_type, session.options_json)}</td>
+                      <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--taomni-divider)" }} title={session.host}>
                         {session.host || "-"}
                       </td>
-                      <td className="px-2 py-1 border" style={{ borderColor: "var(--moba-divider)" }}>{session.port}</td>
-                      <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--moba-divider)" }} title={folderOptionLabel(session.group_path)}>
+                      <td className="px-2 py-1 border" style={{ borderColor: "var(--taomni-divider)" }}>{session.port}</td>
+                      <td className="px-2 py-1 border max-w-[220px] truncate" style={{ borderColor: "var(--taomni-divider)" }} title={folderOptionLabel(session.group_path)}>
                         {folderOptionLabel(session.group_path)}
                       </td>
                     </tr>
@@ -210,12 +210,12 @@ export function SessionImportPreview({
               </tbody>
             </table>
           ) : (
-            <div className="text-[12px] text-[var(--moba-text-muted)]">
+            <div className="text-[12px] text-[var(--taomni-text-muted)]">
               {t("importPreviewExt.noImportable")}
             </div>
           )}
           {remaining > 0 && (
-            <div className="mt-2 text-[12px] text-[var(--moba-text-muted)]">
+            <div className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
               {t("importPreviewExt.moreNotShown", { count: remaining, plural: remaining === 1 ? "" : "s" })}
             </div>
           )}
@@ -223,12 +223,12 @@ export function SessionImportPreview({
 
         <div
           className="flex items-center justify-end gap-2 px-4 py-3 border-t"
-          style={{ borderColor: "var(--moba-divider)" }}
+          style={{ borderColor: "var(--taomni-divider)" }}
         >
           <button
             type="button"
             data-testid="session-import-preview-cancel"
-            className="moba-btn h-8 px-3"
+            className="taomni-btn h-8 px-3"
             onClick={onCancel}
           >
             {t("importPreview.cancel")}
@@ -236,7 +236,7 @@ export function SessionImportPreview({
           <button
             type="button"
             data-testid="session-import-preview-confirm"
-            className="moba-btn h-8 px-3"
+            className="taomni-btn h-8 px-3"
             data-primary="true"
             disabled={noneSelected}
             onClick={handleConfirm}

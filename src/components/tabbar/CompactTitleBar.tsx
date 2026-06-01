@@ -88,7 +88,7 @@ export function CompactTitleBar({
   return (
     <div
       data-testid="compact-titlebar"
-      className="moba-compact-titlebar h-8 flex items-center min-w-0"
+      className="taomni-compact-titlebar h-8 flex items-center min-w-0"
       onMouseDown={startDrag}
     >
       {ctx.render}
@@ -127,7 +127,7 @@ function TitleBarButton({
       type="button"
       title={title}
       aria-label={title}
-      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
       onClick={onClick}
     >
       {icon}

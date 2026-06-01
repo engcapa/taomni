@@ -54,29 +54,29 @@ pub fn write_temp_settings(
 }
 
 /// Generate a temporary `.mcp.json` for CC. Wires up two stdio MCP servers
-/// that re-invoke the NewMob binary with `--mcp-server <name>`:
+/// that re-invoke the Taomni binary with `--mcp-server <name>`:
 ///
-///   - `newmob_permissions` — exposes `permission_prompt`, used via
-///     `--permission-prompt-tool mcp__newmob_permissions__permission_prompt`
-///     so every tool call CC wants to make routes through NewMob's safety
+///   - `taomni_permissions` — exposes `permission_prompt`, used via
+///     `--permission-prompt-tool mcp__taomni_permissions__permission_prompt`
+///     so every tool call CC wants to make routes through Taomni's safety
 ///     pipeline (blacklist + per-session disable).
-///   - `newmob_tools` — exposes the four stateless NewMob tools so CC can
+///   - `taomni_tools` — exposes the four stateless Taomni tools so CC can
 ///     call them as if they were native (`web_search`, `web_fetch`,
 ///     `explain_error`, `redact_text`).
 pub fn write_temp_mcp_config(out_path: &PathBuf) -> std::io::Result<()> {
     // Resolve the current binary path so the spawned subprocess is always
-    // the same NewMob version that wrote the config.
+    // the same Taomni version that wrote the config.
     let exe = std::env::current_exe()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "newmob".to_string());
+        .unwrap_or_else(|_| "taomni".to_string());
 
     let mcp = serde_json::json!({
         "mcpServers": {
-            "newmob_permissions": {
+            "taomni_permissions": {
                 "command": exe,
                 "args": ["--mcp-server", "permissions"]
             },
-            "newmob_tools": {
+            "taomni_tools": {
                 "command": exe,
                 "args": ["--mcp-server", "tools"]
             }
@@ -90,7 +90,7 @@ pub fn write_temp_mcp_config(out_path: &PathBuf) -> std::io::Result<()> {
 
 /// Permission prompt tool name CC needs via `--permission-prompt-tool`.
 /// Format follows MCP convention: `mcp__<server-name>__<tool-name>`.
-pub const PERMISSION_PROMPT_TOOL: &str = "mcp__newmob_permissions__permission_prompt";
+pub const PERMISSION_PROMPT_TOOL: &str = "mcp__taomni_permissions__permission_prompt";
 
 /// Directories that CC must never access.
 pub fn sensitive_deny_dirs() -> Vec<PathBuf> {
@@ -99,7 +99,7 @@ pub fn sensitive_deny_dirs() -> Vec<PathBuf> {
         dirs.push(home.join(".ssh"));
     }
     if let Some(config) = dirs::config_dir() {
-        dirs.push(config.join("newmob"));
+        dirs.push(config.join("taomni"));
     }
     dirs
 }

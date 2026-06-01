@@ -92,7 +92,7 @@ export function FileToolbar(props: FileToolbarProps) {
   return (
     <div
       className="h-7 flex items-center gap-0.5 px-1 border-b shrink-0 overflow-x-auto"
-      style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
     >
       <ToolBtn testId={`sftp-${side}-back`} title={t("fileBrowser.back")} disabled={!canBack} onClick={onBack}>
         <ArrowLeft className="w-3.5 h-3.5" />
@@ -233,7 +233,7 @@ function Sep() {
   return (
     <span
       className="inline-block h-4 mx-0.5 shrink-0"
-      style={{ width: 1, background: "var(--moba-divider)" }}
+      style={{ width: 1, background: "var(--taomni-divider)" }}
     />
   );
 }
@@ -262,9 +262,9 @@ function ToolBtn({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="w-6 h-6 inline-flex items-center justify-center rounded shrink-0 hover:bg-[var(--moba-hover)] disabled:opacity-30 disabled:cursor-default"
+      className="w-6 h-6 inline-flex items-center justify-center rounded shrink-0 hover:bg-[var(--taomni-hover)] disabled:opacity-30 disabled:cursor-default"
       style={{
-        background: active ? "var(--moba-selected)" : undefined,
+        background: active ? "var(--taomni-selected)" : undefined,
         color: danger && !disabled ? "#c0392b" : undefined,
       }}
     >

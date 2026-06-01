@@ -2,8 +2,8 @@
 //! 5 default providers + ASR provider list, and that build_router is willing
 //! to register them all when neither full_local_mode nor fully_disabled is on.
 
-use newmob_lib::ai::config::AiConfig;
-use newmob_lib::llm::router::build_router;
+use taomni_lib::ai::config::AiConfig;
+use taomni_lib::llm::router::build_router;
 
 #[test]
 fn default_config_lists_canonical_providers() {

@@ -1,5 +1,5 @@
 export type ShellQuoteStyle = "unix" | "powershell" | "cmd";
-export const NATIVE_FILE_DROP_EVENT = "newmob:native-file-drop";
+export const NATIVE_FILE_DROP_EVENT = "taomni:native-file-drop";
 
 export interface NativeFileDropDetail {
   paths: string[];

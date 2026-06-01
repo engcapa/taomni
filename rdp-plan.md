@@ -22,7 +22,7 @@
 
 ## Context
 
-NewMob already supports SSH/SFTP/Telnet and a hand-rolled VNC client with a
+Taomni already supports SSH/SFTP/Telnet and a hand-rolled VNC client with a
 React canvas viewer. RDP is the next protocol on the list and the obvious
 analog of VNC: a Rust-side proxy maintains the protocol session and exposes a
 local WebSocket that an always-mounted React canvas tab consumes. This branch
@@ -149,7 +149,7 @@ framing/codec helpers + tests):
 |---|---|
 | `mod.rs` | Public Tauri commands `rdp_connect`, `rdp_disconnect`, `rdp_test_connection`; the `RdpOptions`/`GatewayOpt`/`PerformanceFlags`/`DriveRedirectOpt` config structs parsed from `options_json`; vault secret resolution; session-credential reuse for the gateway. |
 | `ws.rs` | Bind a `127.0.0.1:0` listener, return `ws_port`, accept one WS upgrade, run the relay (outgoing→WS pump, WS→control reader, session driver, idle watchdog). Owns the binary WS tag protocol and `parse_binary_control`. |
-| `session.rs` | Drives IronRDP end-to-end: `ClientConnector` → TLS upgrade → CredSSP/NLA finalize → `ActiveStage` loop. Attaches the IronRDP `CliprdrClient`, `Rdpsnd`, `Rdpdr`, and `DisplayControlClient` (via `DrdynvcClient`) backends; converts fast-path input; handles `DeactivateAll` reactivation and the resize-reconnect fallback. Also hosts the `ClipboardBridge` and the `RdpsndWsBackend`/`NewMobCliprdrBackend` adapters. |
+| `session.rs` | Drives IronRDP end-to-end: `ClientConnector` → TLS upgrade → CredSSP/NLA finalize → `ActiveStage` loop. Attaches the IronRDP `CliprdrClient`, `Rdpsnd`, `Rdpdr`, and `DisplayControlClient` (via `DrdynvcClient`) backends; converts fast-path input; handles `DeactivateAll` reactivation and the resize-reconnect fallback. Also hosts the `ClipboardBridge` and the `RdpsndWsBackend`/`TaomniCliprdrBackend` adapters. |
 | `transport.rs` | The `RdpStream` enum (`Tcp` / `Gateway`) and `open_transport` async constructor returning a unified `AsyncRead + AsyncWrite` (direct / proxy / gateway). |
 | `frame.rs` | The stable RGBA tile wire format (`TileHeader` / `DecodedTile`), tile validation, and color helpers. IronRDP performs the actual bitmap/RemoteFX/surface decode into a framebuffer; `session.rs` slices tiles out of it. |
 | `input.rs` | `KeyEvent` / `PointerEvent` / `PointerWheelEvent` types shared by `ws.rs` and `session.rs`, plus a minimal `code_to_scancode` table for tests. |
@@ -248,7 +248,7 @@ path right now.
 **CLIPRDR with multi-file copy/paste** (IronRDP `CliprdrClient`, glue in
 `session.rs`)
 - The IronRDP `CliprdrClient` owns CLIPRDR caps negotiation and PDU framing.
-  `session.rs` provides a `NewMobCliprdrBackend` implementing IronRDP's
+  `session.rs` provides a `TaomniCliprdrBackend` implementing IronRDP's
   `CliprdrBackend` trait and a `ClipboardBridge` that queues actions
   (advertise formats, request remote data, submit data/file-contents).
 - Client caps advertised: `STREAM_FILECLIP_ENABLED | FILECLIP_NO_FILE_PATHS`.
@@ -326,7 +326,7 @@ no migration needed):
   },
   "redirect_clipboard": true,
   "redirect_audio": "play",          // "play" | "off"
-  "redirect_drive": { "enabled": false, "label": "NEWMOB", "path": "" },
+  "redirect_drive": { "enabled": false, "label": "TAOMNI", "path": "" },
   "gateway": {                        // optional; when present, overrides direct/proxy path
     "host": "rdg.example.com",
     "port": 443,
@@ -469,8 +469,8 @@ pnpm tauri dev                                            # manual: open an RDP 
 ```
 
 Live Rust tests are gated behind `#[ignore]` and require
-`NEWMOB_RDP_LIVE_HOST` / `_USER` / `_PASS` (direct) or
-`NEWMOB_RDP_GATEWAY_LIVE_*` (gateway); run them explicitly with
+`TAOMNI_RDP_LIVE_HOST` / `_USER` / `_PASS` (direct) or
+`TAOMNI_RDP_GATEWAY_LIVE_*` (gateway); run them explicitly with
 `cargo test … rdp:: -- --ignored` against a reachable host.
 
 End-to-end matrix to run before merge:

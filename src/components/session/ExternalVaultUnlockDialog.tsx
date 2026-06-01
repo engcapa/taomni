@@ -16,7 +16,7 @@ export interface ExternalVaultUnlockDialogProps {
 /**
  * Generic, prop-driven master-password prompt for unlocking a third-party
  * tool's encrypted secret vault during session import. Distinct from
- * `VaultUnlockDialog` (which unlocks NewMob's own vault) so users can tell
+ * `VaultUnlockDialog` (which unlocks Taomni's own vault) so users can tell
  * the two prompts apart.
  */
 export function ExternalVaultUnlockDialog({
@@ -83,22 +83,22 @@ export function ExternalVaultUnlockDialog({
         data-testid="external-vault-unlock-dialog"
         className="w-[460px] rounded shadow-lg p-4"
         style={{
-          background: "var(--moba-bg)",
-          border: "1px solid var(--moba-card-border)",
-          borderLeft: "3px solid var(--moba-accent)",
+          background: "var(--taomni-bg)",
+          border: "1px solid var(--taomni-card-border)",
+          borderLeft: "3px solid var(--taomni-accent)",
         }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-1">{t("externalVault.title", { tool: toolName })}</div>
         <div
           className="text-[12px] mb-3"
-          style={{ color: "var(--moba-text-muted)" }}
+          style={{ color: "var(--taomni-text-muted)" }}
           data-testid="external-vault-unlock-description"
         >
           {description}
         </div>
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
+        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("externalVault.masterPasswordLabel", { tool: toolName })}
         </label>
         <input
@@ -107,14 +107,14 @@ export function ExternalVaultUnlockDialog({
           type="password"
           value={pw}
           onChange={(event) => setPw(event.target.value)}
-          className="moba-input w-full"
+          className="taomni-input w-full"
           autoComplete="off"
         />
 
         {localError && (
           <div
             className="mt-2 text-[12px]"
-            style={{ color: "var(--moba-error, #c33)" }}
+            style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="external-vault-unlock-error"
           >
             {localError}
@@ -125,7 +125,7 @@ export function ExternalVaultUnlockDialog({
           <button
             type="button"
             data-testid="external-vault-unlock-skip"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onSkip}
             disabled={busy}
           >
@@ -135,7 +135,7 @@ export function ExternalVaultUnlockDialog({
             type="button"
             data-testid="external-vault-unlock-confirm"
             className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >

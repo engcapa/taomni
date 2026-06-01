@@ -97,14 +97,14 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
     <div data-testid="sidebar" className="h-full flex">
       <div
         className="w-[26px] flex flex-col shrink-0"
-        style={{ background: "var(--moba-tab-inactive)", borderRight: "1px solid var(--moba-sidebar-border)" }}
+        style={{ background: "var(--taomni-tab-inactive)", borderRight: "1px solid var(--taomni-sidebar-border)" }}
       >
         {(["sessions", "tools", "macros"] as const).map((tab) => {
           const label = labelForSideTab(t, tab);
           return (
             <div
               key={tab}
-              className="moba-side-tab"
+              className="taomni-side-tab"
               data-active={activeSideTab === tab && !compact}
               onClick={() => handleSideTabClick(tab)}
               onDoubleClick={handleSideTabCollapse}
@@ -119,22 +119,22 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
       </div>
       {compact && null}
       {!compact && (
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--moba-sidebar-bg)", borderRight: "1px solid var(--moba-sidebar-border)" }}>
-        <div className="h-7 flex items-center gap-1 px-1.5 border-b shrink-0" style={{ borderColor: "var(--moba-divider)" }}>
+      <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}>
+        <div className="h-7 flex items-center gap-1 px-1.5 border-b shrink-0" style={{ borderColor: "var(--taomni-divider)" }}>
           <IconBtn testId="session-new" title={t("sidebar.newSessionTitle")} icon={<Plus className="w-3.5 h-3.5" />} onClick={() => onNewSession?.()} />
           <IconBtn testId="session-edit" title={t("sidebar.editTitle")} icon={<Edit3 className="w-3.5 h-3.5" />} onClick={() => selectedSession && onEditSession?.(selectedSession)} disabled={!selectedSession} />
           <IconBtn testId="session-duplicate" title={t("sidebar.duplicateTitle")} icon={<Copy className="w-3.5 h-3.5" />} onClick={() => selectedSession && void duplicateSession(selectedSession.id)} disabled={!selectedSession} />
           <IconBtn testId="session-delete" title={t("sidebar.deleteTitle")} icon={<Trash2 className="w-3.5 h-3.5" />} onClick={handleDelete} disabled={!selectedSession} />
-          <span className="moba-divider-v h-4 mx-1" />
+          <span className="taomni-divider-v h-4 mx-1" />
           <IconBtn title={t("sidebar.refreshTitle")} icon={<RefreshCw className="w-3.5 h-3.5" />} onClick={() => void loadSessions()} />
           <IconBtn title={t("sidebar.favoriteTitle")} icon={<Star className="w-3.5 h-3.5" />} onClick={handleFavorite} disabled={!selectedSession} />
           <div className="flex-1" />
           <div className="relative">
-            <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--moba-text-muted)]" />
+            <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
             <input
               data-testid="session-search"
               aria-label={t("sidebar.searchSessions")}
-              className="moba-input pl-6 w-[140px]"
+              className="taomni-input pl-6 w-[140px]"
               style={{ paddingLeft: "24px" }}
               placeholder={t("sidebar.searchPlaceholder")}
               value={searchQuery}
@@ -147,9 +147,9 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
         ) : (
           <UtilityPanel tab={activeSideTab} />
         )}
-        <div className="h-[160px] border-t flex flex-col shrink-0" style={{ borderColor: "var(--moba-sidebar-border)", background: "var(--moba-panel-bg)" }}>
-          <div className="h-6 flex items-center px-2 font-semibold border-b" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)", borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
-            <Clock className="w-3.5 h-3.5 mr-1 text-[var(--moba-text-muted)]" />
+        <div className="h-[160px] border-t flex flex-col shrink-0" style={{ borderColor: "var(--taomni-sidebar-border)", background: "var(--taomni-panel-bg)" }}>
+          <div className="h-6 flex items-center px-2 font-semibold border-b" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 1px)", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
+            <Clock className="w-3.5 h-3.5 mr-1 text-[var(--taomni-text-muted)]" />
             {t("sidebar.recentConnections")}
             <div className="ml-auto flex items-center gap-1">
               {onNewSftpSession && (
@@ -162,14 +162,14 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
               <IconBtn title={t("sidebar.refreshTitle")} icon={<RefreshCw className="w-3 h-3" />} onClick={() => void loadSessions()} />
             </div>
           </div>
-          <div className="flex-1 moba-scroll-y py-1" style={{ fontSize: "var(--moba-ui-font-size)" }}>
+          <div className="flex-1 taomni-scroll-y py-1" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
             {recentSessions.length === 0 ? (
-              <div className="px-2 py-2 text-[var(--moba-text-muted)]" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)" }}>
+              <div className="px-2 py-2 text-[var(--taomni-text-muted)]" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 1px)" }}>
                 {t("sidebar.noRecent")}
                 {onNewSftpSession && (
                   <button
                     type="button"
-                    className="block mt-1 underline text-[var(--moba-accent)]"
+                    className="block mt-1 underline text-[var(--taomni-accent)]"
                     onClick={() => onNewSftpSession()}
                   >
                     {t("sidebar.sftpBrowserCta")}
@@ -182,14 +182,14 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
                 return (
                 <button
                   key={session.id}
-                  className="moba-tree-row w-full text-left"
+                  className="taomni-tree-row w-full text-left"
                   onClick={() => onConnectSession?.(session)}
                   title={`${session.name} (${typeLabel})`}
                   type="button"
                 >
-                  <TerminalIcon className="w-3 h-3 text-[var(--moba-accent)]" />
+                  <TerminalIcon className="w-3 h-3 text-[var(--taomni-accent)]" />
                   <span className="flex-1 truncate">{session.name}</span>
-                  <span className="text-slate-500" style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)" }}>{typeLabel}</span>
+                  <span className="text-slate-500" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>{typeLabel}</span>
                 </button>
                 );
               })
@@ -225,8 +225,8 @@ function UtilityPanel({ tab }: { tab: Exclude<SideTab, "sessions"> }) {
   }[tab];
 
   return (
-    <div className="flex-1 p-3 text-[var(--moba-text-muted)]" style={{ fontSize: "var(--moba-ui-font-size)" }}>
-      <div className="flex items-center gap-2 font-semibold text-[var(--moba-text)] mb-2" style={{ fontSize: "var(--moba-ui-font-size)" }}>
+    <div className="flex-1 p-3 text-[var(--taomni-text-muted)]" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
+      <div className="flex items-center gap-2 font-semibold text-[var(--taomni-text)] mb-2" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
         {meta.icon}
         {meta.title}
       </div>
@@ -254,7 +254,7 @@ function IconBtn({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)] disabled:opacity-40 disabled:cursor-default"
+      className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-default"
       type="button"
     >
       {icon}

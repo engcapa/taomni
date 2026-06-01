@@ -46,7 +46,7 @@ export function ActionCard({
       className={`rounded-lg border p-3 shadow-md max-w-md w-full ${
         isWrite
           ? "border-yellow-500/40 bg-yellow-500/5"
-          : "border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]"
+          : "border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
@@ -60,29 +60,29 @@ export function ActionCard({
         )}
         <button
           type="button"
-          className="ml-auto text-[var(--moba-text-muted)] hover:text-[var(--moba-text)]"
+          className="ml-auto text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
           onClick={() => onDecide("deny")}
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="text-[11px] text-[var(--moba-text-muted)] mb-2">{description}</div>
+      <div className="text-[11px] text-[var(--taomni-text-muted)] mb-2">{description}</div>
 
       {preview && (
-        <pre className="font-mono text-[11px] bg-[var(--moba-bg)] rounded px-2 py-1.5 mb-2 overflow-x-auto whitespace-pre-wrap break-all">
+        <pre className="font-mono text-[11px] bg-[var(--taomni-bg)] rounded px-2 py-1.5 mb-2 overflow-x-auto whitespace-pre-wrap break-all">
           {preview}
         </pre>
       )}
 
       <div className="flex items-center gap-2">
         {executing ? (
-          <Loader2 className="w-4 h-4 animate-spin text-[var(--moba-accent)]" />
+          <Loader2 className="w-4 h-4 animate-spin text-[var(--taomni-accent)]" />
         ) : (
           <>
             <button
               type="button"
-              className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
               onClick={() => onDecide("allow")}
             >
               <CheckCircle className="w-3.5 h-3.5" />
@@ -90,7 +90,7 @@ export function ActionCard({
             </button>
             <button
               type="button"
-              className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
               onClick={() => onDecide("allow-session")}
               title={t("agent.actionAllowSessionTitle")}
             >
@@ -98,7 +98,7 @@ export function ActionCard({
             </button>
             <button
               type="button"
-              className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 text-[var(--moba-text-muted)]"
+              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 text-[var(--taomni-text-muted)]"
               onClick={() => onDecide("deny")}
             >
               <XCircle className="w-3.5 h-3.5" />

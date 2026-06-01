@@ -67,11 +67,11 @@ impl ModelManifest {
 }
 
 /// Load the manifest. Tries the on-disk override at
-/// `<config>/newmob/models.manifest.json` first; falls back to the bundled
+/// `<config>/taomni/models.manifest.json` first; falls back to the bundled
 /// canonical copy.
 pub fn load_manifest() -> Result<ModelManifest, String> {
     if let Some(cfg) = dirs::config_dir() {
-        let override_path = cfg.join("newmob").join("models.manifest.json");
+        let override_path = cfg.join("taomni").join("models.manifest.json");
         if let Ok(text) = std::fs::read_to_string(&override_path) {
             return serde_json::from_str(&text).map_err(|e| e.to_string());
         }

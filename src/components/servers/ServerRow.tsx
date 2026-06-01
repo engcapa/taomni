@@ -45,15 +45,15 @@ export function ServerRow({
       data-testid={`server-row-${def.type}`}
       className="flex items-center gap-2 h-10 px-2 cursor-pointer select-none"
       style={{
-        background: selected ? "var(--moba-selected)" : "transparent",
+        background: selected ? "var(--taomni-selected)" : "transparent",
         borderLeft: selected
-          ? "3px solid var(--moba-accent)"
+          ? "3px solid var(--taomni-accent)"
           : "3px solid transparent",
-        color: "var(--moba-text)",
+        color: "var(--taomni-text)",
       }}
       onClick={onSelect}
       onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.background = "var(--moba-hover)";
+        if (!selected) e.currentTarget.style.background = "var(--taomni-hover)";
       }}
       onMouseLeave={(e) => {
         if (!selected) e.currentTarget.style.background = "transparent";
@@ -77,7 +77,7 @@ export function ServerRow({
         <button
           type="button"
           data-testid={`server-row-${def.type}-start`}
-          className="flex items-center justify-center rounded hover:bg-[var(--moba-hover)] disabled:opacity-30 disabled:cursor-default"
+          className="flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30 disabled:cursor-default"
           style={{ width: 22, height: 22 }}
           title={t("servers.start")}
           aria-label={`${t("servers.start")} ${name}`}
@@ -87,12 +87,12 @@ export function ServerRow({
             onStart();
           }}
         >
-          <Play className="w-3.5 h-3.5" style={{ color: busy ? "var(--moba-text-muted)" : "#16a34a" }} />
+          <Play className="w-3.5 h-3.5" style={{ color: busy ? "var(--taomni-text-muted)" : "#16a34a" }} />
         </button>
         <button
           type="button"
           data-testid={`server-row-${def.type}-stop`}
-          className="flex items-center justify-center rounded hover:bg-[var(--moba-hover)] disabled:opacity-30 disabled:cursor-default"
+          className="flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30 disabled:cursor-default"
           style={{ width: 22, height: 22 }}
           title={t("servers.stop")}
           aria-label={`${t("servers.stop")} ${name}`}
@@ -102,12 +102,12 @@ export function ServerRow({
             onStop();
           }}
         >
-          <Square className="w-3.5 h-3.5" style={{ color: busy ? "#dc2626" : "var(--moba-text-muted)" }} />
+          <Square className="w-3.5 h-3.5" style={{ color: busy ? "#dc2626" : "var(--taomni-text-muted)" }} />
         </button>
         <button
           type="button"
           data-testid={`server-row-${def.type}-settings`}
-          className="flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+          className="flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           style={{ width: 22, height: 22 }}
           title={t("servers.settings")}
           aria-label={`${t("servers.settings")} ${name}`}
@@ -116,7 +116,7 @@ export function ServerRow({
             onSettings();
           }}
         >
-          <Settings2 className="w-3.5 h-3.5" style={{ color: "var(--moba-accent)" }} />
+          <Settings2 className="w-3.5 h-3.5" style={{ color: "var(--taomni-accent)" }} />
         </button>
       </div>
     </div>

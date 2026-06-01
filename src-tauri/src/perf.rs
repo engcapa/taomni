@@ -1,7 +1,7 @@
 //! Performance baseline persistence (Layer 2 §16.9 metrics).
 //!
 //! Implements a tiny structured-log layer that JSON-serializes a
-//! `LatencyMetric` to `<config>/newmob/perf-baseline.jsonl` so consumers
+//! `LatencyMetric` to `<config>/taomni/perf-baseline.jsonl` so consumers
 //! (CI dashboards, manual review) can plot regressions over time. The shape
 //! is borrowed from vLLM/Anyscale conventions:
 //!
@@ -29,12 +29,12 @@ pub struct LatencyMetric {
     pub recorded_at: i64,
 }
 
-/// Where the baseline lives. `<cache>/newmob/perf-baseline.jsonl`. The cache
+/// Where the baseline lives. `<cache>/taomni/perf-baseline.jsonl`. The cache
 /// dir is the right home — this file is regenerable telemetry, not user data.
 pub fn baseline_path() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("newmob")
+        .join("taomni")
         .join("perf-baseline.jsonl")
 }
 

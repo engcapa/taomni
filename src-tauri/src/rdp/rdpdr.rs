@@ -687,7 +687,7 @@ impl LocalDriveBackend {
                         file_system_attributes: efs::FileSystemAttributes::FILE_CASE_PRESERVED_NAMES
                             | efs::FileSystemAttributes::FILE_UNICODE_ON_DISK,
                         max_component_name_len: 255,
-                        file_system_name: "NEWMOB".to_owned(),
+                        file_system_name: "TAOMNI".to_owned(),
                     },
                 ))
             }
@@ -862,7 +862,7 @@ fn local_computer_name() -> String {
         .or_else(|_| std::env::var("HOSTNAME"))
         .ok()
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "newmob".to_owned())
+        .unwrap_or_else(|| "taomni".to_owned())
 }
 
 fn sanitize_drive_label(label: &str, root: &Path) -> String {
@@ -871,7 +871,7 @@ fn sanitize_drive_label(label: &str, root: &Path) -> String {
         .file_name()
         .and_then(|s| s.to_str())
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or("newmob");
+        .unwrap_or("taomni");
     let source = if raw.is_empty() { fallback } else { raw };
     let sanitized: String = source
         .chars()
@@ -879,7 +879,7 @@ fn sanitize_drive_label(label: &str, root: &Path) -> String {
         .take(32)
         .collect();
     if sanitized.is_empty() {
-        "newmob".to_owned()
+        "taomni".to_owned()
     } else {
         sanitized
     }
@@ -1197,7 +1197,7 @@ mod tests {
         let dev = AnnouncedDevice {
             device_id: 1,
             device_type: RDPDR_DTYP_FILESYSTEM,
-            preferred_dos_name: "NEWMOB".into(),
+            preferred_dos_name: "TAOMNI".into(),
             device_data: b"shared\0".to_vec(),
         };
         let buf = build_device_list_announce(&[dev.clone()]).unwrap();
@@ -1241,7 +1241,7 @@ mod tests {
 
     #[test]
     fn safe_join_blocks_dot_dot() {
-        let root = Path::new("/var/lib/newmob");
+        let root = Path::new("/var/lib/taomni");
         assert!(safe_join(root, "../etc/passwd").is_err());
         assert!(safe_join(root, "/../etc/passwd").is_err());
         assert!(safe_join(root, "subdir/../../escape").is_err());

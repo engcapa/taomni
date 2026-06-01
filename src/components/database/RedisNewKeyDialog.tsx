@@ -58,7 +58,7 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.4)" }}>
       <div
         className="w-[440px] rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{ background: "var(--moba-panel-bg)", borderColor: "var(--moba-chrome-border)", color: "var(--moba-text)" }}
+        style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         <div className="h-7 flex items-center px-2 text-[12px] font-semibold" style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "#fff" }}>
           New Redis key
@@ -68,10 +68,10 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
         </div>
         <div className="p-3 grid grid-cols-4 gap-2 items-center text-[12px]">
           <label className="text-right">Key</label>
-          <input className="moba-input col-span-3" value={key} onChange={(e) => setKey(e.target.value)} aria-label="Key name" autoFocus />
+          <input className="taomni-input col-span-3" value={key} onChange={(e) => setKey(e.target.value)} aria-label="Key name" autoFocus />
 
           <label className="text-right">Type</label>
-          <select className="moba-input col-span-3" value={kind} onChange={(e) => setKind(e.target.value as Kind)} aria-label="Key type">
+          <select className="taomni-input col-span-3" value={kind} onChange={(e) => setKind(e.target.value as Kind)} aria-label="Key type">
             <option value="string">String</option>
             <option value="hash">Hash</option>
             <option value="list">List</option>
@@ -82,27 +82,27 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
           {kind === "hash" && (
             <>
               <label className="text-right">Field</label>
-              <input className="moba-input col-span-3" value={field} onChange={(e) => setField(e.target.value)} aria-label="Initial field" />
+              <input className="taomni-input col-span-3" value={field} onChange={(e) => setField(e.target.value)} aria-label="Initial field" />
             </>
           )}
           {kind === "zset" && (
             <>
               <label className="text-right">Score</label>
-              <input className="moba-input col-span-3" value={score} onChange={(e) => setScore(e.target.value)} aria-label="Initial score" />
+              <input className="taomni-input col-span-3" value={score} onChange={(e) => setScore(e.target.value)} aria-label="Initial score" />
             </>
           )}
 
           <label className="text-right">{kind === "zset" ? "Member" : "Value"}</label>
-          <input className="moba-input col-span-3" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Initial value" />
+          <input className="taomni-input col-span-3" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Initial value" />
 
           <label className="text-right">TTL (s)</label>
-          <input className="moba-input col-span-3" value={ttl} placeholder="(optional)" onChange={(e) => setTtl(e.target.value)} aria-label="TTL seconds" />
+          <input className="taomni-input col-span-3" value={ttl} placeholder="(optional)" onChange={(e) => setTtl(e.target.value)} aria-label="TTL seconds" />
 
           {error && <div className="col-span-4 text-[11px]" style={{ color: "#d9534f" }}>{error}</div>}
         </div>
-        <div className="flex items-center justify-end gap-2 px-3 py-2" style={{ borderTop: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
-          <button type="button" className="moba-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="moba-btn" data-primary="true" disabled={saving} onClick={() => void submit()}>
+        <div className="flex items-center justify-end gap-2 px-3 py-2" style={{ borderTop: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
+          <button type="button" className="taomni-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="taomni-btn" data-primary="true" disabled={saving} onClick={() => void submit()}>
             {saving ? "Creating…" : "Create"}
           </button>
         </div>

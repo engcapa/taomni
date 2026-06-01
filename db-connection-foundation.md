@@ -8,7 +8,7 @@
 > `pnpm build` succeeds, `pnpm test` 312/312 pass.
 
 ## What & Why
-NewMob currently supports SSH/RDP/VNC terminal sessions. This task adds the foundational backend and session-model layer for database connections — MySQL, PostgreSQL, ClickHouse, and Redis — so they appear as first-class session types alongside SSH in the session tree and session editor. Without this foundation the query UI and key browser have nothing to connect to.
+Taomni currently supports SSH/RDP/VNC terminal sessions. This task adds the foundational backend and session-model layer for database connections — MySQL, PostgreSQL, ClickHouse, and Redis — so they appear as first-class session types alongside SSH in the session tree and session editor. Without this foundation the query UI and key browser have nothing to connect to.
 
 ## Done looks like
 - Four new session types exist in the Rust enum and the frontend `Proto` picker: `MySQL`, `PostgreSQL`, `ClickHouse`, `Redis`. Each has a distinct icon (matching the existing colored icon grid) and sensible default port (3306 / 5432 / 9000 / 6379).

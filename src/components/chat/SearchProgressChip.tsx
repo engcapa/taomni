@@ -22,13 +22,13 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
   }, [done]);
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] px-2.5 py-1 text-[11px]">
+    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-2.5 py-1 text-[11px]">
       {done ? (
         <Globe className="w-3 h-3 text-green-400 shrink-0" />
       ) : (
-        <Loader2 className="w-3 h-3 animate-spin text-[var(--moba-accent)] shrink-0" />
+        <Loader2 className="w-3 h-3 animate-spin text-[var(--taomni-accent)] shrink-0" />
       )}
-      <span className="text-[var(--moba-text-muted)]">
+      <span className="text-[var(--taomni-text-muted)]">
         {done
           ? t("chat.searchChipDoneCount", { count: resultCount ?? 0, provider })
           : t("chat.searchChipPending", {
@@ -41,7 +41,7 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
       {!done && onCancel && (
         <button
           type="button"
-          className="text-[var(--moba-text-muted)] hover:text-[var(--moba-text)] ml-0.5"
+          className="text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] ml-0.5"
           onClick={onCancel}
           title={t("chat.searchChipCancel")}
         >

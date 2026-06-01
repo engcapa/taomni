@@ -41,16 +41,16 @@ export function TitleBarTrayControls() {
   const chatAria = chatOpenForGlobal ? t("titlebar.closeGlobalChatAria") : t("titlebar.openGlobalChatAria");
 
   return (
-    <div className="moba-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
+    <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
       {/* Voice group */}
-      <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
+      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <PttButton />
       </div>
 
       <TrayGroupSeparator />
 
       {/* View group */}
-      <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
+      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
           testId="theme-cycle"
           title={t("titlebar.cycleTheme", {
@@ -77,7 +77,7 @@ export function TitleBarTrayControls() {
       <TrayGroupSeparator />
 
       {/* Terminal layout group */}
-      <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
+      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
           testId="tab-split-view"
           title={splitTitle}
@@ -102,7 +102,7 @@ export function TitleBarTrayControls() {
         <>
           <TrayGroupSeparator />
           {/* AI chat group */}
-          <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
+          <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
             <TrayButton
               testId="ai-chat-drawer-toggle"
               title={chatTitle}
@@ -121,7 +121,7 @@ export function TitleBarTrayControls() {
       {/* Language switcher — anchored to the rightmost tray slot so it always
           sits at the top-right of the title bar, in both regular and compact
           layouts. */}
-      <div className="moba-titlebar-tray-group flex items-stretch self-stretch">
+      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <LanguageSwitcher />
       </div>
     </div>
@@ -132,7 +132,7 @@ function TrayGroupSeparator() {
   return (
     <div
       aria-hidden="true"
-      className="moba-titlebar-tray-group-sep self-stretch shrink-0"
+      className="taomni-titlebar-tray-group-sep self-stretch shrink-0"
     />
   );
 }
@@ -159,8 +159,8 @@ function TrayButton({
       aria-label={ariaLabel}
       data-testid={testId}
       data-active={active || undefined}
-      className="moba-titlebar-tray-btn h-full w-10 inline-flex items-center justify-center hover:bg-[var(--moba-hover)]"
-      style={{ color: "var(--moba-text)" }}
+      className="taomni-titlebar-tray-btn h-full w-10 inline-flex items-center justify-center hover:bg-[var(--taomni-hover)]"
+      style={{ color: "var(--taomni-text)" }}
       onClick={onClick}
     >
       {children}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://newmob.local/qa-ui-auto/testcase.schema.json",
+  "$id": "https://taomni.local/qa-ui-auto/testcase.schema.json",
   "title": "qa-ui-auto Test Case",
   "description": "Typed YAML test case consumed by .agents/skills/qa-ui-auto/scripts/runner.py. Authored by humans or by Claude Code via the qa-ui-auto skill. Inline JS is forbidden; only verbs from the controlled step library are allowed.",
   "type": "object",

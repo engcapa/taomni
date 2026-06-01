@@ -6,10 +6,10 @@ import { detectXServer, type XServerStatus } from "../lib/ipc";
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
-const COMPACT_MODE_KEY = "newmob.compactMode";
-const UI_FONT_FAMILY_KEY = "newmob.uiFontFamily";
-const UI_FONT_SIZE_KEY = "newmob.uiFontSize";
-const TERMINAL_SPLIT_LAYOUT_KEY = "newmob.terminalSplitLayout";
+const COMPACT_MODE_KEY = "taomni.compactMode";
+const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
+const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
+const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
 
 interface AppState {
   tabs: Tab[];

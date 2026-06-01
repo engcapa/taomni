@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Public SearXNG instances to probe on startup.
-/// Ordered by historical reliability. NewMob probes all concurrently and picks the fastest.
+/// Ordered by historical reliability. Taomni probes all concurrently and picks the fastest.
 pub const PUBLIC_INSTANCES: &[&str] = &[
     "https://searx.be",
     "https://search.inetol.net",

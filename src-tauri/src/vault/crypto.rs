@@ -6,6 +6,10 @@ use zeroize::Zeroizing;
 
 /// Constant plaintext encrypted under the root key on init. Successful
 /// decryption proves the user supplied the correct master password.
+///
+/// NOTE: this value is baked into every existing vault on disk. It must NOT
+/// be renamed during the NewMob → Taomni rebrand — changing it would make all
+/// previously created vaults fail the verifier check and become undecryptable.
 pub const VERIFIER_PLAINTEXT: &[u8] = b"newmob-vault-v1";
 
 pub const SALT_LEN: usize = 16;

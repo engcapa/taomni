@@ -713,7 +713,7 @@ fn build_ntlm_negotiate_authorization(username: &str) -> String {
 
 fn build_ntlm_negotiate_message(username: &str) -> Vec<u8> {
     let (domain, _user) = split_ntlm_domain_user(username);
-    ntlm::build_negotiate(domain, "NEWMOB")
+    ntlm::build_negotiate(domain, "TAOMNI")
 }
 
 fn build_ntlm_authenticate_authorization(
@@ -729,7 +729,7 @@ fn build_ntlm_authenticate_authorization(
     let mut auth = ntlm::build_authenticate(&ntlm::AuthenticateInputs {
         user,
         domain,
-        workstation: "NEWMOB",
+        workstation: "TAOMNI",
         password,
         challenge,
         client_challenge,
@@ -975,7 +975,7 @@ pub async fn open_tunnel(
     let tunnel = ndr::parse_create_tunnel_response_stub(&create_tunnel)?;
     ensure_rpc_return_zero(tunnel.return_value, "TsProxyCreateTunnel")?;
 
-    let authorize = ndr::build_authorize_tunnel_request(3, &tunnel.tunnel_context, "NEWMOB", &[])?;
+    let authorize = ndr::build_authorize_tunnel_request(3, &tunnel.tunnel_context, "TAOMNI", &[])?;
     in_stream
         .write_all(&authorize)
         .await
@@ -2163,33 +2163,33 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires NEWMOB_RDP_GATEWAY_LIVE_* env vars and a reachable Windows RD Gateway"]
+    #[ignore = "requires TAOMNI_RDP_GATEWAY_LIVE_* env vars and a reachable Windows RD Gateway"]
     async fn live_rdg_tunnel_opens() {
-        let Some(host) = env_nonempty("NEWMOB_RDP_GATEWAY_LIVE_HOST") else {
-            eprintln!("skipping live RDG test: NEWMOB_RDP_GATEWAY_LIVE_HOST is not set");
+        let Some(host) = env_nonempty("TAOMNI_RDP_GATEWAY_LIVE_HOST") else {
+            eprintln!("skipping live RDG test: TAOMNI_RDP_GATEWAY_LIVE_HOST is not set");
             return;
         };
-        let Some(username) = env_nonempty("NEWMOB_RDP_GATEWAY_LIVE_USER") else {
-            eprintln!("skipping live RDG test: NEWMOB_RDP_GATEWAY_LIVE_USER is not set");
+        let Some(username) = env_nonempty("TAOMNI_RDP_GATEWAY_LIVE_USER") else {
+            eprintln!("skipping live RDG test: TAOMNI_RDP_GATEWAY_LIVE_USER is not set");
             return;
         };
-        let Some(password) = env_nonempty("NEWMOB_RDP_GATEWAY_LIVE_PASS") else {
-            eprintln!("skipping live RDG test: NEWMOB_RDP_GATEWAY_LIVE_PASS is not set");
+        let Some(password) = env_nonempty("TAOMNI_RDP_GATEWAY_LIVE_PASS") else {
+            eprintln!("skipping live RDG test: TAOMNI_RDP_GATEWAY_LIVE_PASS is not set");
             return;
         };
-        let Some(target_host) = env_nonempty("NEWMOB_RDP_GATEWAY_LIVE_TARGET_HOST") else {
-            eprintln!("skipping live RDG test: NEWMOB_RDP_GATEWAY_LIVE_TARGET_HOST is not set");
+        let Some(target_host) = env_nonempty("TAOMNI_RDP_GATEWAY_LIVE_TARGET_HOST") else {
+            eprintln!("skipping live RDG test: TAOMNI_RDP_GATEWAY_LIVE_TARGET_HOST is not set");
             return;
         };
         let gateway = GatewayOpt {
             host,
-            port: env_u16("NEWMOB_RDP_GATEWAY_LIVE_PORT", 443),
+            port: env_u16("TAOMNI_RDP_GATEWAY_LIVE_PORT", 443),
             username,
             password: Some(password),
-            auth: env_nonempty("NEWMOB_RDP_GATEWAY_LIVE_AUTH").unwrap_or_else(|| "ntlm".into()),
+            auth: env_nonempty("TAOMNI_RDP_GATEWAY_LIVE_AUTH").unwrap_or_else(|| "ntlm".into()),
             use_session_creds: false,
         };
-        let target_port = env_u16("NEWMOB_RDP_GATEWAY_LIVE_TARGET_PORT", 3389);
+        let target_port = env_u16("TAOMNI_RDP_GATEWAY_LIVE_TARGET_PORT", 3389);
 
         let _stream = open_tunnel(&gateway, &target_host, target_port)
             .await

@@ -134,12 +134,12 @@ describe("SFTP file-list column width persistence", () => {
     fireEvent(window, new MouseEvent("mouseup"));
 
     const stored = JSON.parse(
-      localStorage.getItem("newmob.sftp.cols.local") ?? "{}",
+      localStorage.getItem("taomni.sftp.cols.local") ?? "{}",
     );
     expect(stored.size).toBeGreaterThan(80);
 
     // The remote pane key must remain untouched (per-side independence).
-    expect(localStorage.getItem("newmob.sftp.cols.remote")).toBeNull();
+    expect(localStorage.getItem("taomni.sftp.cols.remote")).toBeNull();
 
     unmount();
 
@@ -153,7 +153,7 @@ describe("SFTP file-list column width persistence", () => {
       />,
     );
     const reloaded = JSON.parse(
-      localStorage.getItem("newmob.sftp.cols.local") ?? "{}",
+      localStorage.getItem("taomni.sftp.cols.local") ?? "{}",
     );
     expect(reloaded.size).toBe(stored.size);
   });
@@ -177,7 +177,7 @@ describe("SFTP file-list column width persistence", () => {
     fireEvent(window, new MouseEvent("mousemove", { clientX: 260 }));
     fireEvent(window, new MouseEvent("mouseup"));
     const localStored = JSON.parse(
-      localStorage.getItem("newmob.sftp.cols.local") ?? "{}",
+      localStorage.getItem("taomni.sftp.cols.local") ?? "{}",
     );
     expect(localStored.size).toBeGreaterThanOrEqual(140);
     unmountLocal();
@@ -201,13 +201,13 @@ describe("SFTP file-list column width persistence", () => {
     fireEvent(window, new MouseEvent("mousemove", { clientX: 360 }));
     fireEvent(window, new MouseEvent("mouseup"));
     const remoteStored = JSON.parse(
-      localStorage.getItem("newmob.sftp.cols.remote") ?? "{}",
+      localStorage.getItem("taomni.sftp.cols.remote") ?? "{}",
     );
     expect(remoteStored.size).toBeGreaterThanOrEqual(240);
 
     // Local key is untouched after editing the remote pane.
     const localAfter = JSON.parse(
-      localStorage.getItem("newmob.sftp.cols.local") ?? "{}",
+      localStorage.getItem("taomni.sftp.cols.local") ?? "{}",
     );
     expect(localAfter.size).toBe(localStored.size);
     expect(remoteStored.size).not.toBe(localStored.size);
@@ -231,7 +231,7 @@ describe("SFTP file-list column width persistence", () => {
     fireEvent(window, new MouseEvent("mousemove", { clientX: 100 }));
     fireEvent(window, new MouseEvent("mouseup"));
     expect(
-      JSON.parse(localStorage.getItem("newmob.sftp.cols.local") ?? "{}").size,
+      JSON.parse(localStorage.getItem("taomni.sftp.cols.local") ?? "{}").size,
     ).toBe(localStored.size);
     cleanup();
 
@@ -251,7 +251,7 @@ describe("SFTP file-list column width persistence", () => {
     fireEvent(window, new MouseEvent("mousemove", { clientX: 100 }));
     fireEvent(window, new MouseEvent("mouseup"));
     expect(
-      JSON.parse(localStorage.getItem("newmob.sftp.cols.remote") ?? "{}").size,
+      JSON.parse(localStorage.getItem("taomni.sftp.cols.remote") ?? "{}").size,
     ).toBe(remoteStored.size);
   });
 
@@ -259,7 +259,7 @@ describe("SFTP file-list column width persistence", () => {
     seed();
     // Pre-seed all four columns with a non-default width.
     localStorage.setItem(
-      "newmob.sftp.cols.remote",
+      "taomni.sftp.cols.remote",
       JSON.stringify({ name: 400, size: 240, mtime: 240, type: 240 }),
     );
 
@@ -279,7 +279,7 @@ describe("SFTP file-list column width persistence", () => {
     fireEvent.doubleClick(sizeHandle);
 
     const stored = JSON.parse(
-      localStorage.getItem("newmob.sftp.cols.remote") ?? "{}",
+      localStorage.getItem("taomni.sftp.cols.remote") ?? "{}",
     );
     // Each handle resets ITS OWN column. Size default is 80.
     expect(stored.size).toBe(80);

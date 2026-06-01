@@ -268,26 +268,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     >
       {/* Resize handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--moba-accent)] transition-colors z-10"
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--taomni-accent)] transition-colors z-10"
         onMouseDown={handleResizeStart}
       />
 
       <div
-        className="flex flex-col w-full border-l border-[var(--moba-divider)]"
-        style={{ background: "var(--moba-sidebar-bg)" }}
+        className="flex flex-col w-full border-l border-[var(--taomni-divider)]"
+        style={{ background: "var(--taomni-sidebar-bg)" }}
       >
         {/* Header */}
         <div
-          className="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--moba-divider)] shrink-0"
-          style={{ background: "var(--moba-panel-bg)" }}
+          className="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0"
+          style={{ background: "var(--taomni-panel-bg)" }}
         >
-          <Bot className="w-4 h-4 text-[var(--moba-accent)] shrink-0" />
+          <Bot className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
           <span className="text-[13px] font-semibold flex-1 truncate">
             {activeThread?.title ?? t("chat.drawerTitle")}
           </span>
           <button
             type="button"
-            className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={copyAllToClipboard}
             disabled={!activeThreadId || activeMessages.length === 0}
             title={t("chat.copyAllTitle")}
@@ -301,7 +301,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
           <button
             type="button"
-            className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={handleNewGlobalThread}
             title={t("chat.newGlobalTitle")}
             aria-label={t("chat.newGlobalAria")}
@@ -310,7 +310,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
           <button
             type="button"
-            className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={handleNewThread}
             title={t("chat.newChatTitle")}
             aria-label={t("chat.newChatAria")}
@@ -319,7 +319,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
           <button
             type="button"
-            className={`moba-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--moba-selected)]" : ""}`}
+            className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--taomni-selected)]" : ""}`}
             onClick={() => setShowHistory((v) => !v)}
             title={t("chat.historyTitle")}
           >
@@ -327,7 +327,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
           <button
             type="button"
-            className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
             onClick={toggleDrawer}
             title={drawerScope === "tab" ? t("chat.closeShortcutTab") : t("chat.closeShortcutGlobal")}
           >
@@ -337,7 +337,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
         {/* History panel */}
         {showHistory && (
-          <div className="h-48 shrink-0 border-b border-[var(--moba-divider)] overflow-hidden">
+          <div className="h-48 shrink-0 border-b border-[var(--taomni-divider)] overflow-hidden">
             <ChatThreadList
               threads={threads}
               activeThreadId={activeThreadId}
@@ -350,12 +350,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
         {/* Provider badge / switcher */}
         {activeThread && (
-          <div className="px-2 py-1 text-[10px] text-[var(--moba-text-muted)] border-b border-[var(--moba-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
+          <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
             {/* Scope badge: shows whether this thread is bound to a specific
                 terminal or is a global conversation. */}
             {activeThread.linked_session_id ? (
               <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-accent)]/10 text-[var(--moba-accent)] border border-[var(--moba-accent)]/30"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
                 title={t("chat.boundToTab", { id: activeThread.linked_session_id })}
               >
                 <Link2 className="w-2.5 h-2.5" />
@@ -365,7 +365,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               </span>
             ) : (
               <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--moba-divider)]/30 border border-[var(--moba-divider)]"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-divider)]/30 border border-[var(--taomni-divider)]"
                 title={t("chat.globalScopeTooltip")}
               >
                 <Globe className="w-2.5 h-2.5" />
@@ -375,7 +375,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             <span>{t("chat.providerLabel")}</span>
             {providerIds.length > 0 ? (
               <select
-                className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
+                className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
                 value={activeThread.provider_id}
                 aria-label={t("chat.threadProviderAria")}
                 onChange={(e) => {
@@ -387,20 +387,20 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                 ))}
               </select>
             ) : (
-              <span className="text-[var(--moba-accent)]">{activeThread.provider_id}</span>
+              <span className="text-[var(--taomni-accent)]">{activeThread.provider_id}</span>
             )}
             <span className="ml-2">{t("chat.formatLabel")}</span>
             {formatLocked ? (
               // Locked once the thread has any messages — issue #3.
               <span
-                className="text-[var(--moba-accent)] px-1"
+                className="text-[var(--taomni-accent)] px-1"
                 title={t("chat.formatLockedTooltip")}
               >
                 {activeThread.output_format ?? t("chat.inheritFormat", { format: globalOutputFormat })}
               </span>
             ) : (
               <select
-                className="moba-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--moba-accent)]"
+                className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
                 value={activeThread.output_format ?? ""}
                 aria-label={t("chat.formatAria")}
                 title={t("chat.formatEffectiveTooltip", { format: effectiveFormat, global: globalOutputFormat })}
@@ -417,7 +417,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             )}
             <button
               type="button"
-              className="moba-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
+              className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
               onClick={cycleRenderFormat}
               title={t("chat.convertCycleTitle", { format: effectiveFormat })}
               aria-label={t("chat.convertVisibleAria")}
@@ -431,7 +431,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
           {activeMessages.length === 0 && !sending && (
-            <div className="text-[11px] text-[var(--moba-text-muted)] text-center py-8">
+            <div className="text-[11px] text-[var(--taomni-text-muted)] text-center py-8">
               <Bot className="w-8 h-8 mx-auto mb-2 opacity-30" />
               {t("chat.emptyHint")}
             </div>
@@ -446,12 +446,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             />
           ))}
           {sending && (
-            <div className="flex items-center gap-2 text-[11px] text-[var(--moba-text-muted)]">
+            <div className="flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
               <div className="flex gap-0.5">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-[var(--moba-accent)] animate-bounce"
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-accent)] animate-bounce"
                     style={{ animationDelay: `${i * 150}ms` }}
                   />
                 ))}

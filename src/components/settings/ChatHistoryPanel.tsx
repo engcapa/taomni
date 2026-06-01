@@ -11,7 +11,7 @@ import { useT } from "../../lib/i18n";
  *   trigger it manually here and adjust the keep window.
  * - Export writes a JSON archive of every thread + message to a user-chosen
  *   path. The frontend goes through the existing select_save_file_path
- *   command so the dialog matches the rest of NewMob.
+ *   command so the dialog matches the rest of Taomni.
  */
 export function ChatHistoryPanel() {
   const t = useT();
@@ -43,7 +43,7 @@ export function ChatHistoryPanel() {
     setStatus(null);
     try {
       const path = await invoke<string | null>("select_save_file_path", {
-        defaultName: `newmob-chat-${new Date().toISOString().slice(0, 10)}.json`,
+        defaultName: `taomni-chat-${new Date().toISOString().slice(0, 10)}.json`,
         currentPath: null,
       });
       if (!path) {
@@ -62,15 +62,15 @@ export function ChatHistoryPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <History className="w-4 h-4 text-[var(--moba-accent)]" />
+        <History className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="text-[13px] font-semibold flex-1">{t("aiSettings.chatHistoryTitle")}</div>
       </div>
 
       <div className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px] items-end">
         <label className="col-span-6">
-          <span className="block mb-1 text-[var(--moba-text-muted)]">{t("aiSettings.chatHistoryRetention")}</span>
+          <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("aiSettings.chatHistoryRetention")}</span>
           <input
-            className="moba-input h-7 w-24"
+            className="taomni-input h-7 w-24"
             type="number"
             min={1}
             max={365}
@@ -86,7 +86,7 @@ export function ChatHistoryPanel() {
         <div className="col-span-6 flex justify-end gap-2">
           <button
             type="button"
-            className="moba-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
             onClick={handlePurge}
             disabled={purging}
           >
@@ -96,7 +96,7 @@ export function ChatHistoryPanel() {
 
           <button
             type="button"
-            className="moba-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
             onClick={handleExport}
             disabled={exporting}
           >
@@ -106,12 +106,12 @@ export function ChatHistoryPanel() {
         </div>
       </div>
 
-      <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug">
+      <p className="text-[11px] text-[var(--taomni-text-muted)] leading-snug">
         {t("aiSettings.chatHistoryDescription")}
       </p>
 
       {status && (
-        <div className="text-[11px] text-[var(--moba-accent)] rounded border border-[var(--moba-divider)] bg-[var(--moba-bg)] px-2 py-1.5">
+        <div className="text-[11px] text-[var(--taomni-accent)] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5">
           {status}
         </div>
       )}

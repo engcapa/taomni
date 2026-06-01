@@ -17,9 +17,9 @@ export function AppThemeSwitcher({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <label className="inline-flex items-center gap-1.5 text-[11px]">
-        <span className="text-[var(--moba-text-muted)]">{t("settings.themeLabel")}</span>
+        <span className="text-[var(--taomni-text-muted)]">{t("settings.themeLabel")}</span>
         <select
-          className="moba-input h-6 w-[122px]"
+          className="taomni-input h-6 w-[122px]"
           aria-label={t("titlebar.appThemeAria")}
           value={mode}
           title={t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
@@ -36,7 +36,7 @@ export function AppThemeSwitcher({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="inline-flex rounded-md border border-[var(--moba-input-border)] overflow-hidden">
+    <div className="inline-flex rounded-md border border-[var(--taomni-input-border)] overflow-hidden">
       {THEME_MODES.map((item) => (
         <ThemeModeButton
           key={item.mode}
@@ -61,11 +61,11 @@ export function AppThemeIconButton() {
   return (
     <button
       type="button"
-      className="h-6 px-2 inline-flex items-center gap-1.5 rounded border text-[11px] hover:bg-[var(--moba-control-hover)]"
+      className="h-6 px-2 inline-flex items-center gap-1.5 rounded border text-[11px] hover:bg-[var(--taomni-control-hover)]"
       style={{
-        borderColor: "var(--moba-input-border)",
-        background: "var(--moba-input-bg)",
-        color: "var(--moba-text)",
+        borderColor: "var(--taomni-input-border)",
+        background: "var(--taomni-input-bg)",
+        color: "var(--taomni-text)",
       }}
       title={t("titlebar.cycleTheme", { mode: themeLabel(mode), resolved: resolvedTheme, next: themeLabel(next.mode) })}
       aria-label={t("titlebar.cycleThemeAria")}
@@ -96,10 +96,10 @@ function ThemeModeButton({
       data-testid={`app-theme-${mode}`}
       type="button"
       aria-pressed={selected}
-      className="h-9 px-3 inline-flex items-center gap-2 text-[12px] border-r last:border-r-0 border-[var(--moba-input-border)]"
+      className="h-9 px-3 inline-flex items-center gap-2 text-[12px] border-r last:border-r-0 border-[var(--taomni-input-border)]"
       style={{
-        background: selected ? "var(--moba-selected)" : "var(--moba-input-bg)",
-        color: selected ? "var(--moba-accent)" : "var(--moba-text)",
+        background: selected ? "var(--taomni-selected)" : "var(--taomni-input-bg)",
+        color: selected ? "var(--taomni-accent)" : "var(--taomni-text)",
         fontWeight: selected ? 600 : 400,
       }}
       onClick={() => onSelect(mode)}
