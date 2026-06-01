@@ -113,8 +113,8 @@ pub struct KbdInteractiveRequest {
 /// surface the prompts to the user and resolve with one response per prompt,
 /// or `None` if the user cancelled (which aborts the connection). The terminal
 /// connect path wires this to a Tauri event + `submit_ssh_auth_response`
-/// round-trip; callers without a UI (SFTP, tunnels) pass `None` and simply
-/// can't satisfy interactive MFA.
+/// round-trip; non-interactive callers (tunnels) pass `None` and simply can't
+/// satisfy interactive MFA.
 pub type KbdInteractivePrompter = Arc<
     dyn Fn(KbdInteractiveRequest) -> Pin<Box<dyn Future<Output = Option<Vec<String>>> + Send>>
         + Send
@@ -493,6 +493,19 @@ pub async fn connect_ssh_authenticated_with(
     auth: SshAuth,
     network: Option<&NetworkSettings>,
 ) -> Result<client::Handle<SshHandler>, String> {
+    connect_ssh_authenticated_with_prompter(host, port, username, auth, network, None).await
+}
+
+/// Same as `connect_ssh_authenticated_with` but lets UI callers surface
+/// keyboard-interactive auth prompts (MFA/OTP) during the auth exchange.
+pub async fn connect_ssh_authenticated_with_prompter(
+    host: &str,
+    port: u16,
+    username: &str,
+    auth: SshAuth,
+    network: Option<&NetworkSettings>,
+    prompter: Option<&KbdInteractivePrompter>,
+) -> Result<client::Handle<SshHandler>, String> {
     let config = build_client_config(network);
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
@@ -504,6 +517,6 @@ pub async fn connect_ssh_authenticated_with(
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
 
-    authenticate(&mut handle, username, auth, None).await?;
+    authenticate(&mut handle, username, auth, prompter).await?;
     Ok(handle)
 }

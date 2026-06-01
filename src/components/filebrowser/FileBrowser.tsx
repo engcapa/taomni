@@ -20,7 +20,13 @@ import { ChmodDialog } from "./ChmodDialog";
 import { useSftpStore, type PaneSide } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
 import { joinPath, basename, sftpStat, effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
+import {
+  listenSshAuthPrompt,
+  submitSshAuthResponse,
+  type SshAuthPromptPayload,
+} from "../../lib/ipc";
 import type { MenuItem } from "../ContextMenu";
+import { MfaPrompt } from "../session/MfaPrompt";
 import { useAppStore } from "../../stores/appStore";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
@@ -85,6 +91,7 @@ export function FileBrowser(props: FileBrowserProps) {
   const [downloadPrompt, setDownloadPrompt] = useState<FileEntry | null>(null);
   const [previewing, setPreviewing] = useState<{ entry: FileEntry; side: FsSide; text: string } | null>(null);
   const [chmodPrompt, setChmodPrompt] = useState<{ entries: FileEntry[]; side: FsSide } | null>(null);
+  const [mfaPrompt, setMfaPrompt] = useState<SshAuthPromptPayload | null>(null);
   // Per-pane filter strings (case-insensitive substring match).
   const [localFilter, setLocalFilter] = useState("");
   const [remoteFilter, setRemoteFilter] = useState("");
@@ -102,6 +109,8 @@ export function FileBrowser(props: FileBrowserProps) {
   );
 
   const pendingTerminalSyncRef = useRef(false);
+  const pendingMfaRequestIdRef = useRef<string | null>(null);
+  const authPromptReadyRef = useRef<Promise<unknown>>(Promise.resolve());
   const requestedCwdVersionRef = useRef(props.cwdHintVersion ?? 0);
   const terminalSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -112,8 +121,50 @@ export function FileBrowser(props: FileBrowserProps) {
   }, []);
 
   useEffect(() => {
+    let destroyed = false;
+    let unlistenAuthPrompt: (() => void) | null = null;
+    const sid = props.sessionId;
+
+    setMfaPrompt(null);
+    pendingMfaRequestIdRef.current = null;
+
+    const ready = listenSshAuthPrompt(sid, (payload) => {
+      if (destroyed) {
+        void submitSshAuthResponse(payload.requestId, null).catch(() => {});
+        return;
+      }
+      pendingMfaRequestIdRef.current = payload.requestId;
+      setMfaPrompt(payload);
+    })
+      .then((unlisten) => {
+        if (destroyed) {
+          unlisten();
+        } else {
+          unlistenAuthPrompt = unlisten;
+        }
+      })
+      .catch(() => undefined);
+
+    authPromptReadyRef.current = ready;
+
+    return () => {
+      destroyed = true;
+      unlistenAuthPrompt?.();
+      if (pendingMfaRequestIdRef.current) {
+        void submitSshAuthResponse(pendingMfaRequestIdRef.current, null).catch(() => {});
+        pendingMfaRequestIdRef.current = null;
+      }
+    };
+  }, [props.sessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
     ensureSession(props.sessionId);
-    if (!session?.attached && !session?.attaching) {
+    void (async () => {
+      await authPromptReadyRef.current.catch(() => undefined);
+      if (cancelled) return;
+      const current = useSftpStore.getState().sessions[props.sessionId];
+      if (current?.attached || current?.attaching) return;
       attach({
         sessionId: props.sessionId,
         host: props.host,
@@ -123,12 +174,19 @@ export function FileBrowser(props: FileBrowserProps) {
         authData: props.authData,
       })
         .then(() => {
-          if (props.initialPath) {
+          if (!cancelled && props.initialPath) {
             void navigate(props.sessionId, "remote", props.initialPath);
           }
         })
-        .catch((err) => setStatus(t("fileBrowser.statusSftpConnectFailed", { error: String(err) })));
-    }
+        .catch((err) => {
+          if (!cancelled) {
+            setStatus(t("fileBrowser.statusSftpConnectFailed", { error: String(err) }));
+          }
+        });
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.sessionId]);
 
@@ -775,6 +833,24 @@ export function FileBrowser(props: FileBrowserProps) {
           name={previewing.entry.name}
           text={previewing.text}
           onClose={() => setPreviewing(null)}
+        />
+      )}
+
+      {mfaPrompt && (
+        <MfaPrompt
+          host={props.host}
+          username={props.username}
+          request={mfaPrompt}
+          onSubmit={(responses) => {
+            void submitSshAuthResponse(mfaPrompt.requestId, responses).catch(() => {});
+            pendingMfaRequestIdRef.current = null;
+            setMfaPrompt(null);
+          }}
+          onCancel={() => {
+            void submitSshAuthResponse(mfaPrompt.requestId, null).catch(() => {});
+            pendingMfaRequestIdRef.current = null;
+            setMfaPrompt(null);
+          }}
         />
       )}
     </div>
