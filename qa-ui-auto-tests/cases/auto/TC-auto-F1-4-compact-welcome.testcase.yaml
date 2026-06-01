@@ -27,7 +27,7 @@ steps:
   - assert_not_visible: '[data-testid="quick-connect"]'
   # Welcome panel is still mounted with the same key content.
   - assert_visible: '[data-testid="welcome-panel"]'
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Welcome to NewMob'}
+  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Welcome to Taomni'}
   - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Start local terminal'}
   - assert_visible: '[data-testid="welcome-open-local-terminal"]'
   - assert_visible: '[data-testid="tab-bar"]'

@@ -73,14 +73,14 @@ describe("appStore.uiAppearance", () => {
     const font = "Outfit, sans-serif";
     useAppStore.getState().setUiFontFamily(font);
     expect(useAppStore.getState().uiFontFamily).toBe(font);
-    expect(window.localStorage.getItem("newmob.uiFontFamily")).toBe(font);
+    expect(window.localStorage.getItem("taomni.uiFontFamily")).toBe(font);
   });
 
   it("allows setting and persisting uiFontSize", () => {
     const size = 14;
     useAppStore.getState().setUiFontSize(size);
     expect(useAppStore.getState().uiFontSize).toBe(size);
-    expect(window.localStorage.getItem("newmob.uiFontSize")).toBe("14");
+    expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("14");
   });
 });
 
@@ -114,7 +114,7 @@ describe("appStore.terminalSplit", () => {
     useAppStore.getState().setTerminalSplitLayout("grid");
 
     expect(useAppStore.getState().terminalSplitLayout).toBe("grid");
-    expect(window.localStorage.getItem("newmob.terminalSplitLayout")).toBe("grid");
+    expect(window.localStorage.getItem("taomni.terminalSplitLayout")).toBe("grid");
   });
 
   it("toggles pane input locks", () => {

@@ -36,20 +36,20 @@ export function PrivacyToggle() {
       className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
         isLocalMode
           ? "border-purple-500/50 bg-purple-500/10"
-          : "border-[var(--moba-divider)] bg-[var(--moba-bg)]"
+          : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
       }`}
       onClick={toggle}
     >
       {isLocalMode ? (
         <Shield className="w-5 h-5 text-purple-400 shrink-0" />
       ) : (
-        <ShieldOff className="w-5 h-5 text-[var(--moba-text-muted)] shrink-0" />
+        <ShieldOff className="w-5 h-5 text-[var(--taomni-text-muted)] shrink-0" />
       )}
       <div className="flex-1">
         <div className="text-[13px] font-semibold">
           {t("aiSettings.fullLocal")} {isLocalMode ? t("aiSettings.disabledSuffix") : ""}
         </div>
-        <div className="text-[11px] text-[var(--moba-text-muted)]">
+        <div className="text-[11px] text-[var(--taomni-text-muted)]">
           {isLocalMode
             ? t("aiSettings.fullLocalEnabledDesc")
             : t("aiSettings.fullLocalDisabledDesc")}
@@ -57,7 +57,7 @@ export function PrivacyToggle() {
       </div>
       <div
         className={`w-9 h-5 rounded-full transition-colors relative ${
-          isLocalMode ? "bg-purple-500" : "bg-[var(--moba-divider)]"
+          isLocalMode ? "bg-purple-500" : "bg-[var(--taomni-divider)]"
         }`}
       >
         <div

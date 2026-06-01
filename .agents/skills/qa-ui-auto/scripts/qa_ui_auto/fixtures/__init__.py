@@ -2,7 +2,7 @@
 
 Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 
-* reset_db        - clears NewMob persistent state for this worker before the case
+* reset_db        - clears Taomni persistent state for this worker before the case
 * ssh_required    - probe the configured ssh.host:port over TCP; skip case otherwise
 * sftp_required   - probe the configured sftp.host:port over TCP; skip case otherwise
 

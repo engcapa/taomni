@@ -2,7 +2,7 @@ id: TC-101
 title: Compact mode toggle persists across reload
 description: |
   Smoke test for F1.4 (compact UI mode). Click the compact-toggle, verify
-  newmob.compactMode flips in localStorage, that the compact main-menu
+  taomni.compactMode flips in localStorage, that the compact main-menu
   affordance is reachable in compact mode, then reload and confirm the
   mode sticks.
 covers: [F1.4]
@@ -13,10 +13,10 @@ timeout_sec: 30
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="titlebar-tray"]'
-  - assert_localstorage: { key: "newmob.compactMode", exists: false }
+  - assert_localstorage: { key: "taomni.compactMode", exists: false }
   - click: '[data-testid="compact-toggle"]'
   - wait: 0.5
-  - assert_localstorage: { key: "newmob.compactMode", exists: true }
+  - assert_localstorage: { key: "taomni.compactMode", exists: true }
   - wait_for: '[data-testid="compact-titlebar"]'
   # Compact main-menu opens the unified context menu and dismisses cleanly
   - click: '[data-testid="compact-main-menu"]'
@@ -29,5 +29,5 @@ steps:
       timeout_sec: 5
   - reload:
   - wait_for: '[data-testid="titlebar-tray"]'
-  - assert_localstorage: { key: "newmob.compactMode", exists: true }
+  - assert_localstorage: { key: "taomni.compactMode", exists: true }
   - screenshot: 101-compact-mode.png

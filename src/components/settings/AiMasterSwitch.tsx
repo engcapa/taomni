@@ -27,18 +27,18 @@ export function AiMasterSwitch() {
       className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
         disabled
           ? "border-yellow-500/50 bg-yellow-500/10"
-          : "border-[var(--moba-divider)] bg-[var(--moba-bg)]"
+          : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
       }`}
       onClick={toggle}
     >
       <Power
-        className={`w-5 h-5 shrink-0 ${disabled ? "text-yellow-300" : "text-[var(--moba-text-muted)]"}`}
+        className={`w-5 h-5 shrink-0 ${disabled ? "text-yellow-300" : "text-[var(--taomni-text-muted)]"}`}
       />
       <div className="flex-1">
         <div className="text-[13px] font-semibold">
           {t("aiSettings.disableAi")} {disabled ? t("aiSettings.disabledSuffix") : ""}
         </div>
-        <div className="text-[11px] text-[var(--moba-text-muted)]">
+        <div className="text-[11px] text-[var(--taomni-text-muted)]">
           {disabled
             ? t("aiSettings.disabledOnDesc")
             : t("aiSettings.disabledOffDesc")}
@@ -46,7 +46,7 @@ export function AiMasterSwitch() {
       </div>
       <div
         className={`w-9 h-5 rounded-full transition-colors relative ${
-          disabled ? "bg-yellow-500" : "bg-[var(--moba-divider)]"
+          disabled ? "bg-yellow-500" : "bg-[var(--taomni-divider)]"
         }`}
       >
         <div

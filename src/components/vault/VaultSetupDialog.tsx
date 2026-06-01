@@ -61,15 +61,15 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         aria-modal="true"
         data-testid="vault-setup-dialog"
         className="w-[440px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-1">{t("vault.setupTitleSet")}</div>
-        <div className="text-[12px] mb-3" style={{ color: "var(--moba-text-muted)" }}>
+        <div className="text-[12px] mb-3" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.setupDescription")}
         </div>
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
+        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.masterPasswordHint")}
         </label>
         <input
@@ -78,12 +78,12 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
           type="password"
           value={pw1}
           onChange={(event) => setPw1(event.target.value)}
-          className="moba-input w-full mb-2"
+          className="taomni-input w-full mb-2"
           autoComplete="new-password"
           aria-invalid={tooShort ? true : undefined}
         />
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
+        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.confirmLabel")}
         </label>
         <input
@@ -91,7 +91,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
           type="password"
           value={pw2}
           onChange={(event) => setPw2(event.target.value)}
-          className="moba-input w-full"
+          className="taomni-input w-full"
           autoComplete="new-password"
           aria-invalid={mismatch ? true : undefined}
         />
@@ -99,7 +99,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         {tooShort && (
           <div
             className="mt-2 text-[12px]"
-            style={{ color: "var(--moba-error, #c33)" }}
+            style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-setup-too-short"
           >
             {t("vault.tooShort")}
@@ -108,7 +108,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         {mismatch && (
           <div
             className="mt-2 text-[12px]"
-            style={{ color: "var(--moba-error, #c33)" }}
+            style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-setup-mismatch"
           >
             {t("vault.mismatchLong")}
@@ -117,7 +117,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         {error && (
           <div
             className="mt-2 text-[12px]"
-            style={{ color: "var(--moba-error, #c33)" }}
+            style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-setup-error"
           >
             {error}
@@ -128,7 +128,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
           <button
             type="button"
             data-testid="vault-setup-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
             disabled={busy}
           >
@@ -138,7 +138,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
             type="button"
             data-testid="vault-setup-confirm"
             className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >

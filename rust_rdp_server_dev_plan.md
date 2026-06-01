@@ -1,4 +1,4 @@
-# NewMob RDP 服务端开发计划
+# Taomni RDP 服务端开发计划
 
 
 > *生成时间：2026-05-30 · 基于 ironrdp 0.14 / ironrdp-server 0.10 实查校正，捕获/注入选型参考 RustDesk `libs/scrap`*
@@ -153,7 +153,7 @@ RustDesk 把 BGRA 喂给 libyuv→VP9（自有协议）；**IronRDP 的 `BitmapU
 ### 为什么不能直接依赖 RustDesk 代码（硬约束）
 
 1. **未发布**：RustDesk 的 `scrap` **不在 crates.io**；crates.io 上的 `scrap` 是 2018 年原版（quadrupleslap），**不含** DXGI/Wayland/codec。
-2. **🔴 许可证红线**：RustDesk 仓库根是 **AGPL-3.0**（`libs/scrap/Cargo.toml` 虽写 MIT，但与仓库 AGPL 存在歧义、且未单独发布）。**NewMob 是 MIT 项目，禁止 vendor AGPL 仓库源码。** 输入注入层在主 app，同为 AGPL。
+2. **🔴 许可证红线**：RustDesk 仓库根是 **AGPL-3.0**（`libs/scrap/Cargo.toml` 虽写 MIT，但与仓库 AGPL 存在歧义、且未单独发布）。**Taomni 是 MIT 项目，禁止 vendor AGPL 仓库源码。** 输入注入层在主 app，同为 AGPL。
 3. 结论：**只读架构、不抄代码**。
 
 ### 我们的实际依赖（干净许可、专门维护）

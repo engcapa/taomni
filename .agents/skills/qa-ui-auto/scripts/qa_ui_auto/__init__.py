@@ -1,4 +1,4 @@
-"""qa_ui_auto — typed YAML driven E2E runner for NewMob.
+"""qa_ui_auto — typed YAML driven E2E runner for Taomni.
 
 The package is invoked from the qa-ui-auto skill:
 

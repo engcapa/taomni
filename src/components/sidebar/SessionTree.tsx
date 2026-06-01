@@ -50,7 +50,7 @@ import {
   parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
-  parseNewMobSessions,
+  parseTaomniSessions,
   parseSecureCrtSessions,
   parseTabbySessions,
   parseTerminalAppProfiles,
@@ -62,7 +62,7 @@ import {
   createSessionImportResult,
   serializeCsvSessions,
   serializeMobaXtermSessions,
-  serializeNewMobSessions,
+  serializeTaomniSessions,
   type SessionExportResult,
   type SessionImportOptions,
   type SessionImportResult,
@@ -87,7 +87,7 @@ import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog"
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useT } from "../../lib/i18n";
 
-const SESSION_DRAG_MIME = "newmob/session";
+const SESSION_DRAG_MIME = "taomni/session";
 
 interface SessionDragPayload {
   sessionId: string;
@@ -281,9 +281,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   const exportFolder = (folderPath: string | null) => {
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const label = folderOptionLabel(folderPath);
-    const result = serializeNewMobSessions(folderSessions, folderPath);
+    const result = serializeTaomniSessions(folderSessions, folderPath);
     downloadTextFile(result.filename, result.text, result.mimeType);
-    reportExportResult("NewMob", result, folderSessions.length, label);
+    reportExportResult("Taomni", result, folderSessions.length, label);
   };
 
   const exportMobaFolder = (folderPath: string | null) => {
@@ -311,10 +311,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const importJson = (folderPath: string | null) => {
-    openTextFile(".json,.newmob-sessions.json,application/json").then((text) => {
+    openTextFile(".json,.taomni-sessions.json,.newmob-sessions.json,application/json").then((text) => {
       if (!text) return;
-      const result = parseNewMobSessions(text, { targetFolder: folderPath, existingSessions: sessions });
-      queueImportPreview(result, folderPath, "NewMob");
+      const result = parseTaomniSessions(text, { targetFolder: folderPath, existingSessions: sessions });
+      queueImportPreview(result, folderPath, "Taomni");
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));
     });
@@ -1147,10 +1147,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       { label: t("sessionTree.contextDeleteFolder"), icon: <Trash2 className="w-3 h-3" />, danger: true, disabled: isRoot, onClick: () => { if (normalized) deleteFolder(normalized); } },
       { label: t("sessionTree.contextCreateDesktopShortcut"), icon: <Star className="w-3 h-3" />, onClick: () => unavailable(t("sessionTree.contextCreateDesktopShortcut")) },
       { label: "", separator: true },
-      { label: t("sessionTree.contextImportNewMob"), icon: <Upload className="w-3 h-3" />, onClick: () => importJson(folderPath) },
+      { label: t("sessionTree.contextImportTaomni"), icon: <Upload className="w-3 h-3" />, onClick: () => importJson(folderPath) },
       { label: t("sessionTree.contextImportThirdParty"), icon: <Upload className="w-3 h-3" />, children: importChildren },
       { label: "", separator: true },
-      { label: t("sessionTree.contextExportNewMob"), icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportFolder(folderPath) },
+      { label: t("sessionTree.contextExportTaomni"), icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportFolder(folderPath) },
       { label: t("sessionTree.contextExportMoba"), icon: <Download className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportMobaFolder(folderPath) },
       { label: t("sessionTree.contextExportCsv"), icon: <FileText className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => exportCsvFolder(folderPath) },
       { label: t("sessionTree.contextGenerateHtml"), icon: <FileText className="w-3 h-3" />, disabled: folderSessions.length === 0, onClick: () => generateHtml(folderPath) },
@@ -1245,7 +1245,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       )}
       <div
         data-testid="session-tree"
-        className="flex-1 moba-scroll-y"
+        className="flex-1 taomni-scroll-y"
         onContextMenu={(event) => folderContextMenu(event, null)}
       >
         {ctx.render}
@@ -1276,7 +1276,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
             onConnectSession={onConnectSession}
           />
           {filteredSessions.length === 0 && !loading && (
-            <div className="pl-6 py-2 text-[var(--moba-text-muted)]" style={{ fontSize: "calc(var(--moba-ui-font-size) - 1px)" }}>
+            <div className="pl-6 py-2 text-[var(--taomni-text-muted)]" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 1px)" }}>
               {searchQuery ? t("sessionTree.emptyNoMatching") : t("sessionTree.emptyNoSessions")}
             </div>
           )}
@@ -1411,9 +1411,9 @@ function TreeFolder({
     <div>
       <div
         ref={headerRef}
-        className="moba-tree-row"
+        className="taomni-tree-row"
         data-drag-over={dragOver}
-        style={dragOver ? { background: "var(--moba-selected)" } : undefined}
+        style={dragOver ? { background: "var(--taomni-selected)" } : undefined}
         onClick={onToggle}
         onContextMenu={onContextMenu}
       >
@@ -1429,7 +1429,7 @@ function TreeFolder({
         )}
         <span className="flex-1 font-medium truncate">{node.name}</span>
         {count !== undefined && hasChildren && (
-          <span className="text-slate-500" style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)" }}>({count})</span>
+          <span className="text-slate-500" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>({count})</span>
         )}
       </div>
       {open && <div className="pl-4">{children}</div>}
@@ -1476,10 +1476,10 @@ function SessionItem({
       data-session-id={session.id}
       data-session-name={session.name}
       data-session-type={typeLabel}
-      className="moba-tree-row group"
+      className="taomni-tree-row group"
       data-selected={selected}
       aria-selected={selected}
-      style={selected ? { background: "var(--moba-selected)" } : undefined}
+      style={selected ? { background: "var(--taomni-selected)" } : undefined}
       onPointerDown={handlePointerDown}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
@@ -1490,14 +1490,14 @@ function SessionItem({
       <span className="flex-1 truncate">
         {session.name}
         {session.username && session.host && (
-          <span className="text-[var(--moba-text-muted)]">
+          <span className="text-[var(--taomni-text-muted)]">
             {" "}({session.username}@{session.host})
           </span>
         )}
       </span>
       <span
         className="px-1 rounded"
-        style={{ fontSize: "calc(var(--moba-ui-font-size) - 2px)", background: "#e1ecfa", color: "#1e3a5f" }}
+        style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)", background: "#e1ecfa", color: "#1e3a5f" }}
       >
         {typeLabel}
       </span>
@@ -1531,7 +1531,7 @@ function sessionIcon(type: string) {
     case "Redis":
       return <Database className="w-3.5 h-3.5" style={{ color: "#d82c20" }} />;
     case "File":
-      return <FileText className="w-3.5 h-3.5" style={{ color: "var(--moba-text-muted)" }} />;
+      return <FileText className="w-3.5 h-3.5" style={{ color: "var(--taomni-text-muted)" }} />;
     default:
       return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#2b5d8b" }} />;
   }

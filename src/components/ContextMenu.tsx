@@ -86,9 +86,9 @@ const MenuSurface = forwardRef<HTMLDivElement, {
       data-testid="context-menu"
       className="min-w-[220px] py-1 rounded shadow-lg border text-[12px]"
       style={{
-        background: "var(--moba-panel-bg)",
-        borderColor: "var(--moba-divider)",
-        color: "var(--moba-text)",
+        background: "var(--taomni-panel-bg)",
+        borderColor: "var(--taomni-divider)",
+        color: "var(--taomni-text)",
         ...style,
         ...scrollStyle,
       }}
@@ -130,7 +130,7 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
   if (item.separator) {
-    return <div className="h-px mx-2 my-1" style={{ background: "var(--moba-divider)" }} />;
+    return <div className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
   }
 
   const hasChildren = !!item.children?.length || !!item.customPanel;
@@ -139,9 +139,9 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
       <span className="w-4 flex-shrink-0 text-center">{item.checked ? "✓" : item.icon}</span>
       <span className="flex-1 truncate">{item.label}</span>
       {item.shortcut && (
-        <span className="ml-6 flex-shrink-0 text-[11px] text-[var(--moba-text-muted)]">{item.shortcut}</span>
+        <span className="ml-6 flex-shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{item.shortcut}</span>
       )}
-      {hasChildren && <ChevronRight className="w-3 h-3 text-[var(--moba-text-muted)]" />}
+      {hasChildren && <ChevronRight className="w-3 h-3 text-[var(--taomni-text-muted)]" />}
     </>
   );
 
@@ -155,7 +155,7 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
       >
         <button
           data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
-          className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] disabled:opacity-40"
+          className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] disabled:opacity-40"
           style={item.danger ? { color: "#b22222" } : undefined}
           disabled={item.disabled}
           onClick={item.openOnClick ? () => setIsOpen(!isOpen) : undefined}
@@ -179,7 +179,7 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
   return (
     <button
       data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
-      className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] disabled:opacity-40"
+      className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] disabled:opacity-40"
       style={item.danger ? { color: "#b22222" } : undefined}
       onClick={() => {
         item.onClick?.();

@@ -11,7 +11,7 @@
 > small control statements such as schema switching.
 
 ## What & Why
-With the connection backend in place (Task: Database Connection Foundation), this task builds the full interactive SQL client interface for MySQL, PostgreSQL, and ClickHouse — a DBeaver/DataGrip-style workspace inside a NewMob tab. The goal is a productive query environment that feels native to the app's existing dark-panel aesthetic.
+With the connection backend in place (Task: Database Connection Foundation), this task builds the full interactive SQL client interface for MySQL, PostgreSQL, and ClickHouse — a DBeaver/DataGrip-style workspace inside a Taomni tab. The goal is a productive query environment that feels native to the app's existing dark-panel aesthetic.
 
 ## Done looks like
 - Opening a MySQL/PostgreSQL/ClickHouse session from the session tree opens a new `"database"` tab. The tab title shows the DB engine icon + host + database name.
@@ -41,7 +41,7 @@ With the connection backend in place (Task: Database Connection Foundation), thi
 ## Steps
 1. **Install CodeMirror 6** — Add `@codemirror/lang-sql`, `@codemirror/view`, `@codemirror/state`, `@codemirror/commands`, `@codemirror/autocomplete` to `package.json`. Confirm no conflicts with existing xterm deps.
 2. **`DbClientTab` component shell** — Create `src/components/database/DbClientTab.tsx` with a resizable split (schema tree | query workspace) using `react-resizable-panels`. Wire it into `MainLayout` / the tab renderer so opening a `"database"` tab renders it. Accept `DbConnectInfo` as a prop, call `db_connect` on mount, `db_disconnect` on unmount.
-3. **Schema browser tree** — Implement `SchemaTree` component: calls `db_list_schemas`, `db_list_tables`, `db_describe_table`, `db_list_indexes` lazily as nodes expand. Style with the existing `var(--moba-*)` CSS tokens (same tree look as `SessionTree`).
+3. **Schema browser tree** — Implement `SchemaTree` component: calls `db_list_schemas`, `db_list_tables`, `db_describe_table`, `db_list_indexes` lazily as nodes expand. Style with the existing `var(--taomni-*)` CSS tokens (same tree look as `SessionTree`).
 4. **CodeMirror SQL editor panel** — Implement `SqlEditorPanel` wrapping a CodeMirror 6 view. SQL dialect is selected based on DB type (MySQL / PostgreSQL / standard SQL for ClickHouse). Autocomplete extension pulls table/column names from the schema tree state. Toolbar: Run, Run selection, Cancel, Format SQL, panel-close (if >1 panel open).
 5. **Result grid** — Implement `QueryResultGrid` using a virtualised list (`@tanstack/react-virtual` or hand-rolled with `react-resizable-panels`). Support column sort, cell copy, CSV export. Show `NULL` badge, right-align numbers. Wire to streamed results from `db_execute` via Tauri Channel.
 6. **Multi-panel layout** — Add panel management: a tab strip within the query workspace for opening/closing multiple editor panels; each panel carries its own editor + result state.

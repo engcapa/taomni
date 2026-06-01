@@ -35,6 +35,6 @@ steps:
 
   - click: '[data-testid="app-theme-system"]'
   - wait: 0.5
-  - assert_localstorage: { key: "newmob.appTheme.v1", exists: true }
+  - assert_localstorage: { key: "taomni.appTheme.v1", exists: true }
 
   - screenshot: F5.5-theme-switcher.png

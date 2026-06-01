@@ -10,5 +10,5 @@ steps:
   - wait_for: "[data-testid=\"settings-panel\"]"
   - click: 'input[aria-label="Enable font ligatures"]'
   - wait: 1
-  - assert_localstorage: {key: "newmob.terminalProfile.v1", contains: "fontLigatures"}
+  - assert_localstorage: {key: "taomni.terminalProfile.v1", contains: "fontLigatures"}
   - screenshot: 060-terminal-font-ligatures.png

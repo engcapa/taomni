@@ -147,9 +147,9 @@ function ServersDialogInner() {
           minHeight: 420,
           maxWidth: "96%",
           maxHeight: "92vh",
-          background: "var(--moba-panel-bg)",
-          borderColor: "var(--moba-chrome-border)",
-          color: "var(--moba-text)",
+          background: "var(--taomni-panel-bg)",
+          borderColor: "var(--taomni-chrome-border)",
+          color: "var(--taomni-text)",
         }}
       >
         {/* Title bar */}
@@ -182,12 +182,12 @@ function ServersDialogInner() {
         {/* Footer */}
         <div
           className="h-9 flex items-center justify-end gap-2 px-3 border-t shrink-0"
-          style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}
+          style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
         >
           <button
             type="button"
             data-testid="servers-dialog-cancel"
-            className="moba-btn"
+            className="taomni-btn"
             onClick={attemptClose}
           >
             {t("servers.cancel")}
@@ -195,7 +195,7 @@ function ServersDialogInner() {
           <button
             type="button"
             data-testid="servers-dialog-apply"
-            className="moba-btn"
+            className="taomni-btn"
             data-primary="true"
             onClick={() => void handleApply()}
           >

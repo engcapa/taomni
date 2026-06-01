@@ -1,13 +1,13 @@
 // Model manifest + downloader.
 //
 // Bundles the canonical manifest at compile time (resources/models.manifest.json),
-// and at runtime tries to fetch a fresher one from https://newmob.app/models.manifest.json
+// and at runtime tries to fetch a fresher one from https://taomni.app/models.manifest.json
 // (best-effort; falls back silently). Each model entry lists 2-3 mirror URLs probed
 // in parallel — the first to return 200 wins. Downloads support Range-resume and
 // are SHA-256 verified after completion.
 //
-// Models live under `dirs::cache_dir()/newmob/models/<id>/<filename>`.
-// Sidecar binaries live under `.../newmob/binaries/<id>/<filename>`.
+// Models live under `dirs::cache_dir()/taomni/models/<id>/<filename>`.
+// Sidecar binaries live under `.../taomni/binaries/<id>/<filename>`.
 
 pub mod downloader;
 pub mod manifest;
@@ -91,7 +91,7 @@ pub async fn models_verify(id: String) -> Result<bool, String> {
 fn cuda_pack_dir() -> std::path::PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("newmob")
+        .join("taomni")
         .join("sidecar-cuda")
 }
 
@@ -130,7 +130,7 @@ pub async fn cuda_pack_status() -> Result<CudaPackStatus, String> {
 /// Install the optional CUDA pack. Looks up the manifest entry whose id
 /// starts with `sidecar_llama_server_cuda_<triple>`; if no such entry is
 /// published yet, returns a clear error instructing the user to provide
-/// a manual pack path. The pack lands under `<cache>/newmob/sidecar-cuda/`.
+/// a manual pack path. The pack lands under `<cache>/taomni/sidecar-cuda/`.
 #[tauri::command]
 pub async fn cuda_pack_install(app: tauri::AppHandle) -> Result<String, String> {
     use tauri::Emitter;
@@ -149,7 +149,7 @@ pub async fn cuda_pack_install(app: tauri::AppHandle) -> Result<String, String> 
         .cloned()
         .ok_or_else(|| {
             "No CUDA pack published in the manifest yet. Drop a custom build into \
-             ~/.cache/newmob/sidecar-cuda/ to enable it manually."
+             ~/.cache/taomni/sidecar-cuda/ to enable it manually."
                 .to_string()
         })?;
 
@@ -202,12 +202,12 @@ impl Default for MirrorPreference {
 }
 
 /// Persistent mirror preference (§11.4). Stored at
-/// `<config_dir>/newmob/mirror.json` so the model downloader can consult it
+/// `<config_dir>/taomni/mirror.json` so the model downloader can consult it
 /// without round-tripping through ai.json.
 fn mirror_pref_path() -> std::path::PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("newmob")
+        .join("taomni")
         .join("mirror.json")
 }
 

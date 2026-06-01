@@ -63,21 +63,21 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
         aria-modal="true"
         data-testid="vault-unlock-dialog"
         className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-1">{t("vault.unlockTitle")}</div>
         {reason && (
           <div
             className="text-[12px] mb-3"
-            style={{ color: "var(--moba-text-muted)" }}
+            style={{ color: "var(--taomni-text-muted)" }}
             data-testid="vault-unlock-reason"
           >
             {reason}
           </div>
         )}
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text-muted)" }}>
+        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.masterPassword")}
         </label>
         <input
@@ -86,14 +86,14 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
           type="password"
           value={pw}
           onChange={(event) => setPw(event.target.value)}
-          className="moba-input w-full"
+          className="taomni-input w-full"
           autoComplete="current-password"
         />
 
         {error && (
           <div
             className="mt-2 text-[12px]"
-            style={{ color: "var(--moba-error, #c33)" }}
+            style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-unlock-error"
           >
             {error}
@@ -104,7 +104,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
           <button
             type="button"
             data-testid="vault-unlock-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
             disabled={busy}
           >
@@ -114,7 +114,7 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
             type="button"
             data-testid="vault-unlock-confirm"
             className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >

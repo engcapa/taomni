@@ -71,7 +71,7 @@ export function PathBreadcrumb({
         data-testid={testId}
         aria-label={testId}
         autoFocus
-        className="moba-input flex-1 h-6"
+        className="taomni-input flex-1 h-6"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleEnter}
@@ -90,7 +90,7 @@ export function PathBreadcrumb({
     <div
       data-testid={testId}
       className="flex-1 h-6 flex items-center gap-0.5 px-1.5 overflow-x-auto text-[12px] cursor-text"
-      style={{ background: "var(--moba-input-bg)", border: "1px solid var(--moba-input-border)", borderRadius: 2 }}
+      style={{ background: "var(--taomni-input-bg)", border: "1px solid var(--taomni-input-border)", borderRadius: 2 }}
       onClick={() => setEditing(true)}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -101,7 +101,7 @@ export function PathBreadcrumb({
       {homePath && homePath !== path && (
         <button
           type="button"
-          className="px-1 hover:bg-[var(--moba-hover)] rounded shrink-0"
+          className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onNavigate(homePath);
@@ -115,7 +115,7 @@ export function PathBreadcrumb({
         <button
           type="button"
           data-testid="breadcrumb-drives-root"
-          className="px-1 hover:bg-[var(--moba-hover)] rounded shrink-0"
+          className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onNavigate("\\\\");
@@ -130,7 +130,7 @@ export function PathBreadcrumb({
           {i > 0 && <ChevronRight className="w-3 h-3 opacity-50" />}
           <button
             type="button"
-            className="px-1 hover:bg-[var(--moba-hover)] rounded shrink-0"
+            className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
             onClick={(e) => {
               e.stopPropagation();
               onNavigate(seg.path);

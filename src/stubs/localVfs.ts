@@ -6,7 +6,7 @@
 
 import type { FileEntry, FileType } from "../lib/sftp";
 
-const DB_NAME = "newmob-vfs";
+const DB_NAME = "taomni-vfs";
 const STORE = "files";
 const DB_VERSION = 1;
 

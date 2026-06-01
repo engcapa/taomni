@@ -22,7 +22,7 @@ const RESTART_COOLDOWN_SECS: u64 = 60;
 ///   opens and `ensure_running` returns an error that the caller surfaces to
 ///   the user (so they know to fall back to the secondary provider).
 /// - The breaker auto-resets after the cooldown so a transiently-flapping CLI
-///   can recover without a NewMob restart.
+///   can recover without a Taomni restart.
 pub struct CcProcess {
     binary: String,
     args: Vec<String>,
@@ -120,7 +120,7 @@ impl CcProcess {
         // Circuit breaker: refuse to keep respawning a binary that just won't
         // come up. We auto-reset the counter once RESTART_COOLDOWN_SECS have
         // passed since the last failure — that lets a transiently-broken CLI
-        // recover without forcing a NewMob restart.
+        // recover without forcing a Taomni restart.
         let count = self.restart_count.load(Ordering::SeqCst);
         if count >= MAX_RESTART_ATTEMPTS {
             let last = *self.last_failure_at.lock().await;

@@ -99,7 +99,7 @@ impl Asr for SherpaOnnxAsr {
                 return Ok("[silence]".to_string());
             }
             Err(AsrError::Transcription(
-                "ASR feature not built. Rebuild NewMob with --features asr-sherpa-onnx to decode audio."
+                "ASR feature not built. Rebuild Taomni with --features asr-sherpa-onnx to decode audio."
                     .into(),
             ))
         }

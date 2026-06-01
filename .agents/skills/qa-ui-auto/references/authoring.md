@@ -78,7 +78,7 @@ Run `python -m qa_ui_auto.lint` after.
 
 ## Adding a new feature to the catalog
 
-When NewMob ships a new feature in `feature-list.md`, add a matching entry to `qa-ui-auto-tests/feature-list.md`:
+When Taomni ships a new feature in `feature-list.md`, add a matching entry to `qa-ui-auto-tests/feature-list.md`:
 
 ```yaml
 - id: F<chapter>.<seq>

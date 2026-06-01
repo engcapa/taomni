@@ -19,7 +19,7 @@ export function AppTitleBar() {
   return (
     <div
       data-testid="app-titlebar"
-      className="moba-app-titlebar h-7 flex items-center min-w-0"
+      className="taomni-app-titlebar h-7 flex items-center min-w-0"
       onMouseDown={startDrag}
       onDoubleClick={toggleMaximize}
     >

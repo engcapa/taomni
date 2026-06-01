@@ -1,6 +1,6 @@
 import { emit } from "./tauri-event";
 
-const BRIDGE_PATH = "/__newmob/sftp-bridge";
+const BRIDGE_PATH = "/__taomni/sftp-bridge";
 const HANDSHAKE_TIMEOUT_MS = 20000;
 const COMMAND_TIMEOUT_MS = 60000;
 

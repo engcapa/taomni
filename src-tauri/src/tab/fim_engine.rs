@@ -7,7 +7,7 @@
 //
 // When the `local-llm-fim` feature is enabled at compile time, this module
 // links `llama-cpp-2` directly, loads the Qwen3-0.6B Q4_K_M weights from
-// `<cache>/newmob/models/llm_qwen3_0_6b_q4_k_m/`, and serves FIM in-process.
+// `<cache>/taomni/models/llm_qwen3_0_6b_q4_k_m/`, and serves FIM in-process.
 // That eliminates the 30–80ms HTTP roundtrip and is the recommended path for
 // users who care about absolute keystroke latency.
 
@@ -74,7 +74,7 @@ pub async fn resolve() -> Option<InProcFim> {
             model_path: existing.model_path.clone(),
         });
     }
-    // Look for the canonical FIM model id under <cache>/newmob/models/.
+    // Look for the canonical FIM model id under <cache>/taomni/models/.
     let manifest = crate::models::manifest::load_manifest().ok()?;
     let id = "llm_qwen3_0_6b_q4_k_m";
     let meta = manifest.models.get(id)?;

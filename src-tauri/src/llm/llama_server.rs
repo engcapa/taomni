@@ -58,7 +58,7 @@ impl LlamaServer {
         &self.config
     }
 
-    /// Resolve the binary path under `<cache>/newmob/binaries/<id>/<filename>`.
+    /// Resolve the binary path under `<cache>/taomni/binaries/<id>/<filename>`.
     fn binary_path(&self) -> Option<PathBuf> {
         let dir = sidecars_root().join(&self.config.sidecar_id);
         if !dir.exists() {

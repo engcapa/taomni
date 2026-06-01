@@ -140,8 +140,8 @@ export default function DetachedSessionWindow({
   }, [mode, resolvedTheme]);
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--moba-ui-font-family", uiFontFamily);
-    root.style.setProperty("--moba-ui-font-size", `${uiFontSize}px`);
+    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
+    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
   }, [uiFontFamily, uiFontSize]);
 
   const title = useMemo(() => {
@@ -373,7 +373,7 @@ export default function DetachedSessionWindow({
       data-detached-kind={kind}
       data-detached-id={id}
       className="w-screen h-screen relative"
-      style={{ background: "#000", color: "var(--moba-text)" }}
+      style={{ background: "#000", color: "var(--taomni-text)" }}
     >
       {inner}
     </div>

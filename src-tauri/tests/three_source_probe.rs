@@ -4,7 +4,7 @@
 //! a multi-server fixture; instead we assert the manifest schema parses
 //! and that every entry has at least one URL.
 
-use newmob_lib::models::manifest::load_manifest;
+use taomni_lib::models::manifest::load_manifest;
 
 #[test]
 fn manifest_has_three_sources_per_entry() {
@@ -24,7 +24,7 @@ fn manifest_has_three_sources_per_entry() {
 
 #[test]
 fn manifest_includes_asr_and_llm_kinds() {
-    use newmob_lib::models::manifest::ModelKind;
+    use taomni_lib::models::manifest::ModelKind;
     let manifest = load_manifest().expect("models manifest must load");
     let has_asr = manifest
         .models

@@ -213,7 +213,7 @@ interface TerminalPanelProps {
 
 const DEFAULT_FONT_SIZE = 14;
 const CWD_QUERY_COMMAND =
-  " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __newmob_cwd_sync_done";
+  " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
 const OSC52_MAX_DECODED_BYTES = 1024 * 1024;
 
 interface SearchMatch {
@@ -1851,7 +1851,7 @@ export function TerminalPanel({
           );
           if (ssh?.sessionId) {
             window.dispatchEvent(
-              new CustomEvent("newmob:forward-error", {
+              new CustomEvent("taomni:forward-error", {
                 detail: {
                   sessionConfigId: ssh.sessionId,
                   local: err.local,
@@ -2133,7 +2133,7 @@ export function TerminalPanel({
       className={panelClasses}
       style={{
         background: resolvedTheme.background ?? "#1d1f21",
-        ...(isMultiExecTarget ? { borderTop: "2px solid var(--moba-accent)" } : {}),
+        ...(isMultiExecTarget ? { borderTop: "2px solid var(--taomni-accent)" } : {}),
       }}
       onWheel={(event) => {
         if (!event.ctrlKey) return;
@@ -2304,7 +2304,7 @@ export function TerminalPanel({
       {isMultiExecTarget && (
         <div
           className="absolute top-1 left-1 z-40 px-1.5 py-0.5 rounded pointer-events-none"
-          style={{ background: "var(--moba-accent)", color: "#fff", opacity: 0.85, fontSize: 10, fontWeight: 600 }}
+          style={{ background: "var(--taomni-accent)", color: "#fff", opacity: 0.85, fontSize: 10, fontWeight: 600 }}
         >
           ⊕ {t("terminal.multiExecBadge")}
         </div>
@@ -2381,7 +2381,7 @@ export function TerminalPanel({
         >
           <input
             ref={searchInputRef}
-            className="moba-input h-7 w-56"
+            className="taomni-input h-7 w-56"
             value={searchValue}
             placeholder={t("terminal.findPlaceholder")}
             onChange={(event) => {
@@ -2400,13 +2400,13 @@ export function TerminalPanel({
               }
             }}
           />
-          <button className="moba-btn h-7 px-2" type="button" onClick={() => runSearch("previous")}>
+          <button className="taomni-btn h-7 px-2" type="button" onClick={() => runSearch("previous")}>
             {t("terminal.findPrev")}
           </button>
-          <button className="moba-btn h-7 px-2" type="button" onClick={() => runSearch("next")}>
+          <button className="taomni-btn h-7 px-2" type="button" onClick={() => runSearch("next")}>
             {t("terminal.findNext")}
           </button>
-          <button className="moba-btn h-7 px-2" type="button" onClick={closeSearch}>
+          <button className="taomni-btn h-7 px-2" type="button" onClick={closeSearch}>
             {t("terminal.findClose")}
           </button>
           {searchStatus && <span className="px-1 text-[11px] text-[#b22222]">{searchStatus}</span>}
@@ -2422,7 +2422,7 @@ export function TerminalPanel({
         >
           <div className="h-8 flex items-center px-3 border-b bg-slate-100">
             <span className="font-semibold">{t("terminal.eventLogTitle")}</span>
-            <button className="moba-btn ml-auto h-6 px-2" type="button" onClick={() => setEventLogOpen(false)}>
+            <button className="taomni-btn ml-auto h-6 px-2" type="button" onClick={() => setEventLogOpen(false)}>
               {t("terminal.eventLogClose")}
             </button>
           </div>
@@ -2434,7 +2434,7 @@ export function TerminalPanel({
                 <tbody>
                   {eventLog.map((entry) => (
                     <tr key={entry.id} className="border-b border-slate-100">
-                      <td className="w-20 px-2 py-1 text-slate-500 moba-mono">{entry.time}</td>
+                      <td className="w-20 px-2 py-1 text-slate-500 taomni-mono">{entry.time}</td>
                       <td className="w-24 px-2 py-1 font-semibold">{entry.type}</td>
                       <td className="px-2 py-1">{entry.detail}</td>
                     </tr>
@@ -2453,7 +2453,7 @@ export function TerminalPanel({
           </span>
           {zmodemProgress && (
             <>
-              <span className="text-slate-600 moba-mono">{zmodemProgress.fileName}</span>
+              <span className="text-slate-600 taomni-mono">{zmodemProgress.fileName}</span>
               <span className="text-slate-500">
                 {formatZmodemBytes(zmodemProgress.bytesTransferred)}
                 {zmodemProgress.fileSize > 0 && ` / ${formatZmodemBytes(zmodemProgress.fileSize)}`}
@@ -2572,7 +2572,7 @@ function formatSshInfoBanner(ssh: SshConnectInfo): string {
   const sshBrowser = typeof options.sshBrowser === "string" ? options.sshBrowser : "SFTP protocol (recommended)";
   const sshBrowserEnabled = sshBrowser !== "Disabled";
   const rows = [
-    "NewMob SSH terminal",
+    "Taomni SSH terminal",
     "SSH session to " + ssh.username + "@" + ssh.host,
     "Direct SSH      : " + checkMark(true),
     "SSH compression : " + checkMark(compression),

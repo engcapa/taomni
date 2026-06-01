@@ -1,6 +1,6 @@
 //! Local MCP-compatible JSON-RPC bridge (§7.4 / §15).
 //!
-//! Exposes NewMob's agent tool registry over a 127.0.0.1 HTTP listener with
+//! Exposes Taomni's agent tool registry over a 127.0.0.1 HTTP listener with
 //! token-based auth so an external MCP client (Claude Desktop, Goose, Cursor,
 //! …) can drive `list_sessions`, `run_in_terminal`, etc.
 //!

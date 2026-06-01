@@ -44,9 +44,9 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
         onSubmit={handleSubmit}
         className="w-[420px] rounded-md shadow-2xl border overflow-hidden"
         style={{
-          background: "var(--moba-panel-bg)",
-          borderColor: "var(--moba-chrome-border)",
-          color: "var(--moba-text)",
+          background: "var(--taomni-panel-bg)",
+          borderColor: "var(--taomni-chrome-border)",
+          color: "var(--taomni-text)",
         }}
       >
         <div
@@ -70,14 +70,14 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
         </div>
 
         <div className="p-4">
-          <div className="text-[12px] mb-2 text-[var(--moba-text-muted)]">
+          <div className="text-[12px] mb-2 text-[var(--taomni-text-muted)]">
             {t("mfaPrompt.subtitle", { user: username, host })}
           </div>
           {request.instructions?.trim() && (
             <div
               data-testid="mfa-instructions"
               className="text-[12px] mb-3 whitespace-pre-wrap"
-              style={{ color: "var(--moba-text)" }}
+              style={{ color: "var(--taomni-text)" }}
             >
               {request.instructions}
             </div>
@@ -85,7 +85,7 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
 
           {request.prompts.map((p, idx) => (
             <div key={idx} className={idx > 0 ? "mt-3" : undefined}>
-              <label className="block text-[12px] mb-1" style={{ color: "var(--moba-text)" }}>
+              <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text)" }}>
                 {p.prompt?.trim() ? p.prompt : t("mfaPrompt.defaultPrompt")}
               </label>
               <input
@@ -95,7 +95,7 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
                 autoFocus={idx === 0}
                 value={answers[idx] ?? ""}
                 onChange={(e) => setAnswer(idx, e.target.value)}
-                className="moba-input w-full h-8 text-[13px]"
+                className="taomni-input w-full h-8 text-[13px]"
                 autoComplete="one-time-code"
               />
             </div>
@@ -104,15 +104,15 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
 
         <div
           className="h-12 flex items-center justify-end px-3 gap-2 border-t"
-          style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}
+          style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
         >
-          <button data-testid="mfa-cancel" type="button" onClick={onCancel} className="moba-btn">
+          <button data-testid="mfa-cancel" type="button" onClick={onCancel} className="taomni-btn">
             {t("mfaPrompt.cancel")}
           </button>
           <button
             type="submit"
             data-testid="mfa-submit"
-            className="moba-btn font-semibold"
+            className="taomni-btn font-semibold"
             data-primary="true"
           >
             {t("mfaPrompt.submit")}

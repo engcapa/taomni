@@ -345,7 +345,7 @@ export function MainLayout() {
     }
     const url = detachedWindowUrl(detachedSessionId);
     const features = "width=1200,height=760,resizable=yes,scrollbars=yes";
-    const handle = window.open(url, `newmob_sftp_${detachedSessionId}`, features);
+    const handle = window.open(url, `taomni_sftp_${detachedSessionId}`, features);
     if (!handle) {
       // Pop-up blocked — clean up the credential blob right away so it
       // doesn't linger in localStorage waiting for a window that never
@@ -359,7 +359,7 @@ export function MainLayout() {
    * Hand off the credentials of a non-SFTP tab to a new OS window and
    * remove the source tab from this window. The new window opens its own
    * backend session of the same kind. Reattach reverses the move via the
-   * `BroadcastChannel('newmob.detach.sync')` subscriber wired below.
+   * `BroadcastChannel('taomni.detach.sync')` subscriber wired below.
    */
   const openDetachedGenericWindow = useCallback(
     <T,>(
@@ -395,7 +395,7 @@ export function MainLayout() {
       }
       const url = detachedGenericUrl(kind, detachedId);
       const features = "width=1280,height=800,resizable=yes,scrollbars=yes";
-      const handle = window.open(url, `newmob_${kind}_${detachedId}`, features);
+      const handle = window.open(url, `taomni_${kind}_${detachedId}`, features);
       if (!handle) {
         clearGenericHandoff(kind, detachedId);
         if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
@@ -900,7 +900,7 @@ export function MainLayout() {
   }, [addTab, markConnected]);
 
   // Open a local path or URL: URLs and files always go to the system handler;
-  // folders open in an embedded NewMob tab when `embedFolder` is true, otherwise
+  // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
   const handleOpenLocalPath = useCallback(async (
     target: string,
@@ -1492,8 +1492,8 @@ export function MainLayout() {
     <div
       data-compact-mode={compactMode}
       data-tab-maximized={isTabMaximized ? "true" : undefined}
-      className={`relative w-full h-full flex flex-col${compactMode ? " moba-compact-root" : ""}`}
-      style={{ background: "var(--moba-chrome-bg)" }}
+      className={`relative w-full h-full flex flex-col${compactMode ? " taomni-compact-root" : ""}`}
+      style={{ background: "var(--taomni-chrome-bg)" }}
     >
       <WindowResizeHandles />
       {!compactMode && !chromeHidden && <AppTitleBar />}
@@ -1571,7 +1571,7 @@ export function MainLayout() {
 
           <PanelResizeHandle
             data-testid="main-sidebar-resize-handle"
-            className={compactMode || sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize"}
+            className={compactMode || sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
           />
 
           <Panel>
@@ -1729,7 +1729,7 @@ export function MainLayout() {
                           data-input-locked={inputLocked || undefined}
                           className={
                             terminalSplitVisible
-                              ? "relative min-w-0 min-h-0 flex flex-col overflow-hidden border-r border-b border-[var(--moba-divider)]"
+                              ? "relative min-w-0 min-h-0 flex flex-col overflow-hidden border-r border-b border-[var(--taomni-divider)]"
                               : "absolute inset-0"
                           }
                           style={terminalSplitVisible
@@ -1751,9 +1751,9 @@ export function MainLayout() {
                             className="h-7 shrink-0 items-center gap-2 px-2 text-[11px]"
                             style={{
                               display: terminalSplitVisible ? "flex" : "none",
-                              background: isActive ? "var(--moba-selected)" : "var(--moba-chrome-bg)",
-                              borderBottom: "1px solid var(--moba-divider)",
-                              color: "var(--moba-text)",
+                              background: isActive ? "var(--taomni-selected)" : "var(--taomni-chrome-bg)",
+                              borderBottom: "1px solid var(--taomni-divider)",
+                              color: "var(--taomni-text)",
                             }}
                           >
                             <button
@@ -1769,8 +1769,8 @@ export function MainLayout() {
                               data-testid={`terminal-split-lock-${tab.id}`}
                               aria-label={inputLocked ? t("terminalSplit.unlockInput", { title: tab.title }) : t("terminalSplit.lockInput", { title: tab.title })}
                               title={inputLocked ? t("terminalSplit.unlockTitle") : t("terminalSplit.lockTitle")}
-                              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
-                              style={inputLocked ? { color: "var(--moba-accent)" } : undefined}
+                              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+                              style={inputLocked ? { color: "var(--taomni-accent)" } : undefined}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 toggleTerminalSplitInputLock(tab.id);
@@ -1791,7 +1791,7 @@ export function MainLayout() {
                               </Panel>
                               {sftpSidebarNode && (
                                 <>
-                                  <PanelResizeHandle className="w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize" />
+                                  <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
                                   <Panel
                                     defaultSize={38}
                                     minSize={20}
@@ -1801,8 +1801,8 @@ export function MainLayout() {
                                     <div
                                       className="h-full"
                                       style={{
-                                        borderLeft: "1px solid var(--moba-divider)",
-                                        background: "var(--moba-bg)",
+                                        borderLeft: "1px solid var(--taomni-divider)",
+                                        background: "var(--taomni-bg)",
                                       }}
                                     >
                                       {sftpSidebarNode}
@@ -1819,8 +1819,8 @@ export function MainLayout() {
                             data-orientation={terminalSplitLayout}
                             className={
                               terminalSplitLayout === "horizontal"
-                                ? "w-1.5 shrink-0 cursor-col-resize bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors"
-                                : "h-1.5 shrink-0 cursor-row-resize bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors"
+                                ? "w-1.5 shrink-0 cursor-col-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors"
+                                : "h-1.5 shrink-0 cursor-row-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors"
                             }
                             onPointerDown={(event) => startLinearSplitResize(index, event)}
                             role="separator"
@@ -1837,7 +1837,7 @@ export function MainLayout() {
                           <div
                             key={`grid-col-${index}`}
                             data-testid="terminal-split-grid-column-resize-handle"
-                            className="absolute top-0 bottom-0 z-30 w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--moba-accent)]/70"
+                            className="absolute top-0 bottom-0 z-30 w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
                             style={{ left: `${cumulativeWeightPercent(splitGridColumnWeightsForLayout, index)}%` }}
                             onPointerDown={(event) => startGridSplitResize("column", index, event)}
                             role="separator"
@@ -1849,7 +1849,7 @@ export function MainLayout() {
                           <div
                             key={`grid-row-${index}`}
                             data-testid="terminal-split-grid-row-resize-handle"
-                            className="absolute left-0 right-0 z-30 h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--moba-accent)]/70"
+                            className="absolute left-0 right-0 z-30 h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
                             style={{ top: `${cumulativeWeightPercent(splitGridRowWeightsForLayout, index)}%` }}
                             onPointerDown={(event) => startGridSplitResize("row", index, event)}
                             role="separator"
@@ -2182,8 +2182,8 @@ function TerminalSplitToolbar({
       data-testid="terminal-split-toolbar"
       className="h-8 shrink-0 flex items-center gap-1 px-2"
       style={{
-        background: "var(--moba-chrome-bg)",
-        borderBottom: "1px solid var(--moba-divider)",
+        background: "var(--taomni-chrome-bg)",
+        borderBottom: "1px solid var(--taomni-divider)",
       }}
     >
       {options.map((option) => (
@@ -2194,20 +2194,20 @@ function TerminalSplitToolbar({
           aria-label={option.label}
           title={option.label}
           data-active={layout === option.id || undefined}
-          className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
-          style={layout === option.id ? { background: "var(--moba-selected)", color: "var(--moba-accent)" } : undefined}
+          className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+          style={layout === option.id ? { background: "var(--taomni-selected)", color: "var(--taomni-accent)" } : undefined}
           onClick={() => onLayoutChange(option.id)}
         >
           {option.icon}
         </button>
       ))}
-      <span className="moba-pill ml-1" style={{ fontSize: 11 }}>
+      <span className="taomni-pill ml-1" style={{ fontSize: 11 }}>
         {t("terminalSplit.locked", { count: lockedCount })}
       </span>
       <button
         type="button"
-        className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--moba-hover)] disabled:opacity-40"
-        style={{ color: "var(--moba-text-muted)" }}
+        className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40"
+        style={{ color: "var(--taomni-text-muted)" }}
         disabled={lockedCount === 0}
         onClick={onClearLocks}
       >
@@ -2218,7 +2218,7 @@ function TerminalSplitToolbar({
         type="button"
         aria-label={t("terminalSplit.closeView")}
         title={t("terminalSplit.closeView")}
-        className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+        className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
         onClick={onClose}
       >
         <X className="w-3.5 h-3.5" />
@@ -2260,20 +2260,20 @@ function CompactSidebarDrawer({
       <div
         className="absolute left-0 top-0 bottom-0 w-[min(380px,calc(100vw-44px))] pointer-events-auto shadow-xl"
         style={{
-          background: "var(--moba-sidebar-bg)",
-          borderRight: "1px solid var(--moba-sidebar-border)",
+          background: "var(--taomni-sidebar-bg)",
+          borderRight: "1px solid var(--taomni-sidebar-border)",
         }}
       >
         <div
           className="h-7 flex items-center px-2 border-b text-[12px] font-semibold"
-          style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           {t("sidebar.headerTitle")}
           <button
             type="button"
             title={t("sidebar.closeDrawer")}
             aria-label={t("sidebar.closeDrawer")}
-            className="ml-auto h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+            className="ml-auto h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
             onClick={onClose}
           >
             <X className="w-3.5 h-3.5" />
@@ -2298,7 +2298,7 @@ function VncLoadingPanel() {
   return (
     <div
       className="w-full h-full flex items-center justify-center text-sm"
-      style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
+      style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
     >
       {t("vnc.loading")}
     </div>
@@ -2310,7 +2310,7 @@ function RdpLoadingPanel() {
   return (
     <div
       className="w-full h-full flex items-center justify-center text-sm"
-      style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
+      style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
     >
       {t("rdp.loading")}
     </div>
@@ -2321,7 +2321,7 @@ function DbLoadingPanel() {
   return (
     <div
       className="w-full h-full flex items-center justify-center text-sm"
-      style={{ background: "var(--moba-bg)", color: "var(--moba-text-muted)" }}
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
     >
       Loading database client…
     </div>
@@ -2333,7 +2333,7 @@ function UnavailablePanel({ title, message }: { title: string; message?: string 
   return (
     <div
       className="w-full h-full flex items-center justify-center text-sm p-6"
-      style={{ background: "var(--moba-term-bg)", color: "var(--moba-term-text)" }}
+      style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
     >
       <div className="max-w-md text-center">
         <div className="text-lg font-semibold mb-2">{title}</div>

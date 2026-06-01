@@ -42,9 +42,9 @@ import {
 } from "./localVfs";
 import { emit } from "./tauri-event";
 
-const SESSION_STORAGE_KEY = "newmob.sessions.v1";
-const GROUP_STORAGE_KEY = "newmob.groups.v1";
-const TUNNEL_STORAGE_KEY = "newmob.tunnels.v1";
+const SESSION_STORAGE_KEY = "taomni.sessions.v1";
+const GROUP_STORAGE_KEY = "taomni.groups.v1";
+const TUNNEL_STORAGE_KEY = "taomni.tunnels.v1";
 
 interface StubTunnelStatus {
   id: string;
@@ -701,7 +701,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const features = "width=1200,height=760,resizable=yes,scrollbars=yes";
       const handle = window.open(
         url.toString(),
-        `newmob_sftp_${sessionId}`,
+        `taomni_sftp_${sessionId}`,
         features,
       );
       if (!handle) {
@@ -726,7 +726,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const features = `width=${width},height=${height},resizable=yes,scrollbars=yes`;
       const handle = window.open(
         url.toString(),
-        `newmob_${kind}_${sessionId}`,
+        `taomni_${kind}_${sessionId}`,
         features,
       );
       if (!handle) {
@@ -741,7 +741,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "rdp_disconnect":
     case "rdp_test_connection": {
       throw new Error(
-        "RDP is only available in the desktop build of NewMob, not in browser preview.",
+        "RDP is only available in the desktop build of Taomni, not in browser preview.",
       );
     }
     case "sftp_open_path": {
@@ -775,7 +775,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       tunnelStatuses[id] = {
         id,
         status: "error",
-        error: "Tunnels can only be opened in the desktop build of NewMob.",
+        error: "Tunnels can only be opened in the desktop build of Taomni.",
       };
       void emit("tunnel-status", tunnelStatuses[id]);
       return tunnelStatuses[id] as T;
@@ -848,7 +848,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "redis_del_key":
     case "redis_exec": {
       throw new Error(
-        "Database connections are not available in browser preview. Use the desktop build of NewMob.",
+        "Database connections are not available in browser preview. Use the desktop build of Taomni.",
       );
     }
     default:

@@ -1,4 +1,4 @@
-"""High-level NewMob-specific verbs that bundle common UI flows.
+"""High-level Taomni-specific verbs that bundle common UI flows.
 
 These exist so testcases stay short and selector knowledge is centralised
 here. When the UI changes, edit these helpers — not 60 testcases.

@@ -60,14 +60,14 @@ export function ConfirmDialog({
         aria-modal="true"
         data-testid="confirm-dialog"
         className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
         <div
           data-testid="confirm-dialog-message"
           className="text-[12px] mb-4 whitespace-pre-line"
-          style={{ color: "var(--moba-text)" }}
+          style={{ color: "var(--taomni-text)" }}
         >
           {message}
         </div>
@@ -75,7 +75,7 @@ export function ConfirmDialog({
           <button
             type="button"
             data-testid="confirm-dialog-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
           >
             {resolvedCancel}
@@ -85,7 +85,7 @@ export function ConfirmDialog({
             type="button"
             data-testid="confirm-dialog-confirm"
             className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: danger ? "#b22222" : "var(--moba-accent)" }}
+            style={{ background: danger ? "#b22222" : "var(--taomni-accent)" }}
             onClick={onConfirm}
           >
             {resolvedConfirm}

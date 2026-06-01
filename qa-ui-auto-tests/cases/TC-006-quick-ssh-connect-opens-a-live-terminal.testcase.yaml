@@ -13,7 +13,7 @@ steps:
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - wait: 4
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: NewMob SSH terminal}
+  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: Taomni SSH terminal}
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: SSH-browser}
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: X11-forwarding}
   - click: "[data-testid=\"terminal-pane\"]"

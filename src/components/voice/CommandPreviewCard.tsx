@@ -84,7 +84,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
   return (
     <div
       className={`rounded-lg border ${risk.border} ${risk.bg} p-4 shadow-lg max-w-xl w-full`}
-      style={{ background: "var(--moba-panel-bg)" }}
+      style={{ background: "var(--taomni-panel-bg)" }}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
@@ -95,7 +95,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         </span>
         <button
           type="button"
-          className="text-[var(--moba-text-muted)] hover:text-[var(--moba-text)] transition-colors"
+          className="text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] transition-colors"
           onClick={() => onCancel(preview.audit_id)}
           title={t("voice.cardCancelTitle")}
         >
@@ -108,7 +108,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         <div className="mb-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
           {t("voice.cardBlockedPrefix", { reason: preview.blocked_reason ?? "" })}
           <br />
-          <span className="text-[11px] text-[var(--moba-text-muted)]">{t("voice.cardBlockedHint")}</span>
+          <span className="text-[11px] text-[var(--taomni-text-muted)]">{t("voice.cardBlockedHint")}</span>
         </div>
       )}
 
@@ -117,20 +117,20 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         {editing ? (
           <textarea
             ref={textareaRef}
-            className="moba-input w-full font-mono text-[12px] p-2 resize-none min-h-[80px]"
+            className="taomni-input w-full font-mono text-[12px] p-2 resize-none min-h-[80px]"
             value={editedCommand}
             onChange={(e) => { setEditedCommand(e.target.value); setEdited(true); }}
             spellCheck={false}
           />
         ) : (
-          <pre className="font-mono text-[12px] bg-[var(--moba-bg)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+          <pre className="font-mono text-[12px] bg-[var(--taomni-bg)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
             {preview.command}
           </pre>
         )}
       </div>
 
       {/* Explanation */}
-      <div className="mb-3 text-[12px] text-[var(--moba-text-muted)]">
+      <div className="mb-3 text-[12px] text-[var(--taomni-text-muted)]">
         {preview.explanation}
       </div>
 
@@ -163,7 +163,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         {!preview.blocked && (
           <button
             type="button"
-            className={`moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 transition-opacity ${
+            className={`taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 transition-opacity ${
               executeReady ? "" : "opacity-40 cursor-not-allowed"
             }`}
             onClick={() => executeReady && onExecute(command, preview.audit_id, edited)}
@@ -178,7 +178,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         {!editing ? (
           <button
             type="button"
-            className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
             onClick={() => setEditing(true)}
             title={t("voice.cardEditTitle")}
           >
@@ -188,7 +188,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         ) : (
           <button
             type="button"
-            className="moba-btn h-7 px-3 text-[12px]"
+            className="taomni-btn h-7 px-3 text-[12px]"
             onClick={() => setEditing(false)}
           >
             {t("voice.cardEditDone")}
@@ -197,7 +197,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
         <button
           type="button"
-          className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+          className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
           onClick={handleCopy}
         >
           <Copy className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
         <button
           type="button"
-          className="moba-btn h-7 px-3 text-[12px] text-[var(--moba-text-muted)]"
+          className="taomni-btn h-7 px-3 text-[12px] text-[var(--taomni-text-muted)]"
           onClick={() => onCancel(preview.audit_id)}
           title={t("voice.cardCancelTitle")}
         >

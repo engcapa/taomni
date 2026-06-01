@@ -56,11 +56,11 @@ export function StatusBar() {
   );
 
   return (
-    <div data-testid="status-bar" className="moba-status h-6 flex items-center px-2 gap-3">
+    <div data-testid="status-bar" className="taomni-status h-6 flex items-center px-2 gap-3">
       <span className="flex items-center gap-1">
         <Eye className="w-3 h-3" /> {t("statusBar.sessions", { count: sessions.length })} • {selected ? selected.name : t("statusBar.none")}
       </span>
-      <span className="moba-divider-v h-3" />
+      <span className="taomni-divider-v h-3" />
       <span className="flex items-center gap-1">
         <Wifi className={`w-3 h-3 ${online ? "text-emerald-600" : "text-red-600"}`} /> {online ? t("statusBar.networkOnline") : t("statusBar.networkOffline")}
       </span>
@@ -73,7 +73,7 @@ export function StatusBar() {
 
       {!fullyDisabled && (
         <>
-          <span className="moba-divider-v h-3" />
+          <span className="taomni-divider-v h-3" />
 
           {/* ASR segment */}
           <span
@@ -88,7 +88,7 @@ export function StatusBar() {
           {/* LLM segment */}
           <button
             type="button"
-            className={`flex items-center gap-1 text-[11px] hover:text-[var(--moba-accent)] transition-colors ${drawerOpen && drawerScope === "global" ? "text-[var(--moba-accent)]" : ""}`}
+            className={`flex items-center gap-1 text-[11px] hover:text-[var(--taomni-accent)] transition-colors ${drawerOpen && drawerScope === "global" ? "text-[var(--taomni-accent)]" : ""}`}
             onClick={() => void toggleGlobalChat()}
             title={t("statusBar.globalChatTitle")}
           >
@@ -136,7 +136,7 @@ export function StatusBar() {
 
       {fullyDisabled && (
         <>
-          <span className="moba-divider-v h-3" />
+          <span className="taomni-divider-v h-3" />
           <span
             className="flex items-center gap-1 text-[11px] text-yellow-300"
             title={t("statusBar.aiOffTooltip")}
@@ -149,16 +149,16 @@ export function StatusBar() {
 
       <div className="flex-1" />
       <span className="truncate max-w-[260px]">{statusMessage}</span>
-      <span className="moba-divider-v h-3" />
+      <span className="taomni-divider-v h-3" />
       <span className="flex items-center gap-1">
         {resolvedTheme === "dark" ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />}
         {t("statusBar.themeLabel", { mode: themeLabel(mode) })}
       </span>
-      <span className="moba-divider-v h-3" />
-      <span className="moba-mono">
+      <span className="taomni-divider-v h-3" />
+      <span className="taomni-mono">
         {activeTab?.type ?? t("statusBar.activeTabNone")} • {t("statusBar.terminalsCount", { count: tabs.filter((tab) => tab.type === "terminal").length })}
       </span>
-      <span className="moba-divider-v h-3" />
+      <span className="taomni-divider-v h-3" />
       <span>{t("statusBar.versionTag", { version: "0.1.0" })}</span>
     </div>
   );

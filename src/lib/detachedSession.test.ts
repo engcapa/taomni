@@ -42,7 +42,7 @@ describe("detachedSession handoff round-trip", () => {
 
   it("expires handoffs older than the TTL", () => {
     writeDetachedHandoff("vnc", "tab-2", { v: 1 });
-    const key = "newmob.detached.vnc.tab-2";
+    const key = "taomni.detached.vnc.tab-2";
     const env = JSON.parse(localStorage.getItem(key)!);
     env.createdAt = Date.now() - HANDOFF_TTL_MS - 1_000;
     localStorage.setItem(key, JSON.stringify(env));
@@ -57,11 +57,11 @@ describe("detachedSession handoff round-trip", () => {
 
   it("falls back to the legacy SFTP key for sftp kind", () => {
     // Older builds wrote a bare params blob (no createdAt envelope) to
-    // newmob.sftp.detached.<id>. Make sure the new helpers still consume
+    // taomni.sftp.detached.<id>. Make sure the new helpers still consume
     // it so users with stale entries don't lose their SFTP credentials
     // across an upgrade.
     localStorage.setItem(
-      "newmob.sftp.detached.legacy",
+      "taomni.sftp.detached.legacy",
       JSON.stringify({ host: "h", port: 22 }),
     );
     expect(
@@ -72,7 +72,7 @@ describe("detachedSession handoff round-trip", () => {
   it("sweepExpiredHandoffs removes only expired entries", () => {
     writeDetachedHandoff("rdp", "fresh", { a: 1 });
     writeDetachedHandoff("rdp", "stale", { b: 2 });
-    const staleKey = "newmob.detached.rdp.stale";
+    const staleKey = "taomni.detached.rdp.stale";
     const env = JSON.parse(localStorage.getItem(staleKey)!);
     env.createdAt = Date.now() - HANDOFF_TTL_MS - 1_000;
     localStorage.setItem(staleKey, JSON.stringify(env));
@@ -129,27 +129,27 @@ describe("reattach pipeline", () => {
       payload: { host: "h", port: 22 },
       createdAt: Date.now(),
     };
-    localStorage.setItem("newmob.reattach.terminal.tab-9", JSON.stringify(env));
+    localStorage.setItem("taomni.reattach.terminal.tab-9", JSON.stringify(env));
     const drained = drainPendingReattach();
     expect(drained).toHaveLength(1);
     expect(drained[0].kind).toBe("terminal");
     expect(drained[0].id).toBe("tab-9");
     expect(drained[0].payload).toEqual({ host: "h", port: 22 });
-    expect(localStorage.getItem("newmob.reattach.terminal.tab-9")).toBeNull();
+    expect(localStorage.getItem("taomni.reattach.terminal.tab-9")).toBeNull();
   });
 
   it("clearReattachHandoff removes the entry without throwing", () => {
     localStorage.setItem(
-      "newmob.reattach.rdp.tab-10",
+      "taomni.reattach.rdp.tab-10",
       JSON.stringify({ payload: {}, createdAt: Date.now() }),
     );
     clearReattachHandoff("rdp", "tab-10");
-    expect(localStorage.getItem("newmob.reattach.rdp.tab-10")).toBeNull();
+    expect(localStorage.getItem("taomni.reattach.rdp.tab-10")).toBeNull();
   });
 
   it("broadcastReattach writes a localStorage backstop", () => {
     broadcastReattach("rdp", "tab-11", { host: "win", port: 3389 });
-    const raw = localStorage.getItem("newmob.reattach.rdp.tab-11");
+    const raw = localStorage.getItem("taomni.reattach.rdp.tab-11");
     expect(raw).toBeTruthy();
     const env = JSON.parse(raw!);
     expect(env.payload).toEqual({ host: "win", port: 3389 });

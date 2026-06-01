@@ -262,9 +262,9 @@ export function MessageBubble({
       <div
         className={`relative max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed break-words ${
           isUser
-            ? "bg-[var(--moba-accent)] text-white rounded-br-sm whitespace-pre-wrap"
-            : `bg-[var(--moba-panel-bg)] border border-[var(--moba-divider)] rounded-bl-sm ${
-                renderedHtml || segments ? "moba-chat-md" : "whitespace-pre-wrap"
+            ? "bg-[var(--taomni-accent)] text-white rounded-br-sm whitespace-pre-wrap"
+            : `bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] rounded-bl-sm ${
+                renderedHtml || segments ? "taomni-chat-md" : "whitespace-pre-wrap"
               }`
         }`}
       >
@@ -275,7 +275,7 @@ export function MessageBubble({
           {!isUser && codeBlocks.length > 0 && (
             <button
               type="button"
-              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--moba-accent)]/40 bg-[var(--moba-panel-bg)] text-[10px] text-[var(--moba-accent)] hover:bg-[var(--moba-accent)]/10 disabled:opacity-50"
+              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--taomni-accent)]/40 bg-[var(--taomni-panel-bg)] text-[10px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50"
               onClick={handleSendAll}
               disabled={!targetEntry}
               title={
@@ -296,7 +296,7 @@ export function MessageBubble({
           {!isUser && codeBlocks.length > 0 && queryTargetEntry && (
             <button
               type="button"
-              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] text-[10px] text-[var(--moba-text)] hover:bg-[var(--moba-hover)]"
+              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[10px] text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
               onClick={handleSendAllToQuery}
               title={t("chat.sendAllToQuery", { count: codeBlocks.length, target: queryTargetEntry.title })}
               aria-label={t("chat.sendAllQueryAria")}
@@ -311,7 +311,7 @@ export function MessageBubble({
           )}
           <button
             type="button"
-            className="h-5 w-5 p-0 inline-flex items-center justify-center rounded border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]"
+            className="h-5 w-5 p-0 inline-flex items-center justify-center rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
             onClick={handleCopyMessage}
             title={t("chat.copyMessageTitle")}
             aria-label={t("chat.copyMessageAria")}
@@ -319,7 +319,7 @@ export function MessageBubble({
             {copied ? (
               <Check className="w-3 h-3 text-green-400" />
             ) : (
-              <Copy className="w-3 h-3 text-[var(--moba-text-muted)]" />
+              <Copy className="w-3 h-3 text-[var(--taomni-text-muted)]" />
             )}
           </button>
         </div>
@@ -362,11 +362,11 @@ export function MessageBubble({
       {toolCalls.map((call, i) => (
         <div key={i} className="max-w-[90%] mt-1">
           {executed[i] === "denied" ? (
-            <div className="text-[11px] text-[var(--moba-text-muted)] italic">
+            <div className="text-[11px] text-[var(--taomni-text-muted)] italic">
               {t("chat.toolDenied", { tool: call.tool })}
             </div>
           ) : executed[i] === "approved" ? (
-            <div className="text-[11px] text-[var(--moba-accent)]">
+            <div className="text-[11px] text-[var(--taomni-accent)]">
               {t("chat.toolApproved", { tool: call.tool })}
             </div>
           ) : (
@@ -384,9 +384,9 @@ export function MessageBubble({
         <div
           className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 self-start"
           style={{
-            background: "var(--moba-badge-warning-bg)",
-            color: "var(--moba-badge-warning-text)",
-            border: "1px solid var(--moba-badge-warning-border)",
+            background: "var(--taomni-badge-warning-bg)",
+            color: "var(--taomni-badge-warning-text)",
+            border: "1px solid var(--taomni-badge-warning-border)",
           }}
         >
           <ShieldAlert className="w-3 h-3" />

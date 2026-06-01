@@ -22,7 +22,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   const { icon, label } = describe(attachment, t);
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--moba-divider)] bg-[var(--moba-bg)] text-[10px] text-[var(--moba-text-muted)]"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[10px] text-[var(--taomni-text-muted)]"
       title={label}
       data-testid="attachment-chip"
     >

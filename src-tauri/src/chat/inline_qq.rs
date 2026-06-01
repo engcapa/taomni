@@ -44,7 +44,7 @@ pub async fn inline_qq_stream(
     let req = ChatRequest {
         messages: vec![
             ChatMessage::system(
-                "你是 NewMob 终端内联助手。用户在终端里直接问你问题，请简洁回答；\
+                "你是 Taomni 终端内联助手。用户在终端里直接问你问题，请简洁回答；\
                  不要使用 markdown 标记（终端是纯文本），直接给出答案。\
                  如果建议命令，请用反引号包起来。",
             ),

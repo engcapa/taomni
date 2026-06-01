@@ -69,23 +69,23 @@ export function SettingsPanel() {
     <div
       data-testid="settings-panel"
       className="h-full overflow-auto"
-      style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       <div className="mx-auto max-w-5xl p-5">
         <div className="mb-4">
           <div className="text-[18px] font-semibold">{t("settings.title")}</div>
-          <div className="text-[12px] text-[var(--moba-text-muted)]">
+          <div className="text-[12px] text-[var(--taomni-text-muted)]">
             {t("settings.subtitle")}
           </div>
         </div>
 
         <LanguageSection />
 
-        <section className="mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+        <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
           <div className="mb-2 flex items-center gap-3">
             <div>
               <div className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</div>
-              <div className="text-[12px] text-[var(--moba-text-muted)]">
+              <div className="text-[12px] text-[var(--taomni-text-muted)]">
                 {t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
               </div>
             </div>
@@ -93,20 +93,20 @@ export function SettingsPanel() {
           <AppThemeSwitcher />
         </section>
 
-        <section className="mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+        <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
           <div className="mb-3 flex items-center gap-3">
             <div>
               <div className="text-[14px] font-semibold flex items-center gap-2">
-                <Type className="w-4 h-4 text-[var(--moba-accent)]" />
+                <Type className="w-4 h-4 text-[var(--taomni-accent)]" />
                 {t("settings.globalUiTitle")}
               </div>
-              <div className="text-[12px] text-[var(--moba-text-muted)]">
+              <div className="text-[12px] text-[var(--taomni-text-muted)]">
                 {t("settings.globalUiSubtitle")}
               </div>
             </div>
             <button
               type="button"
-              className="moba-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+              className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
               onClick={() => {
                 setUiFontFamily('"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
                 setUiFontSize(12);
@@ -118,14 +118,14 @@ export function SettingsPanel() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--moba-divider)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--moba-text-muted)]">
+              <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
                 {t("settings.fontFamilyLabel")}
               </label>
               <select
                 id="ui-font-family-select"
-                className="moba-input h-8 w-full"
+                className="taomni-input h-8 w-full"
                 value={currentSelectValue}
                 onChange={(e) => setUiFontFamily(e.target.value)}
               >
@@ -152,14 +152,14 @@ export function SettingsPanel() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center text-[12px] font-medium text-[var(--moba-text-muted)]">
+              <div className="flex justify-between items-center text-[12px] font-medium text-[var(--taomni-text-muted)]">
                 <label htmlFor="ui-font-size-slider">{t("settings.fontSizeLabel")}</label>
-                <span className="font-mono bg-[var(--moba-selected)] text-[var(--moba-accent)] px-1.5 py-0.5 rounded text-[11px] font-semibold">
+                <span className="font-mono bg-[var(--taomni-selected)] text-[var(--taomni-accent)] px-1.5 py-0.5 rounded text-[11px] font-semibold">
                   {uiFontSize}px
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-[10px] text-[var(--moba-text-muted)]">A</span>
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">A</span>
                 <input
                   id="ui-font-size-slider"
                   type="range"
@@ -168,9 +168,9 @@ export function SettingsPanel() {
                   step="1"
                   value={uiFontSize}
                   onChange={(e) => setUiFontSize(parseInt(e.target.value, 10))}
-                  className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer accent-[var(--moba-accent)] bg-[var(--moba-divider)]"
+                  className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer accent-[var(--taomni-accent)] bg-[var(--taomni-divider)]"
                 />
-                <span className="text-[14px] font-semibold text-[var(--moba-text-muted)]">A</span>
+                <span className="text-[14px] font-semibold text-[var(--taomni-text-muted)]">A</span>
               </div>
             </div>
           </div>
@@ -179,11 +179,11 @@ export function SettingsPanel() {
         <div className="mb-4 flex items-center gap-3">
           <div>
             <div className="text-[18px] font-semibold">{t("settings.terminalAppearanceTitle")}</div>
-            <div className="text-[12px] text-[var(--moba-text-muted)]">{t("settings.terminalAppearanceSubtitle")}</div>
+            <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.terminalAppearanceSubtitle")}</div>
           </div>
           <button
             data-testid="settings-reset-terminal-profile"
-            className="moba-btn ml-auto h-8 inline-flex items-center gap-1.5"
+            className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
             type="button"
             onClick={() => setProfile(DEFAULT_TERMINAL_PROFILE)}
           >
@@ -193,16 +193,16 @@ export function SettingsPanel() {
         </div>
         <TerminalAppearanceSettings profile={profile} onProfileChange={setProfile} showCustomColors />
 
-        <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)]">
+        <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]">
           <VaultSettings />
         </section>
 
-        <section className="mt-6 mb-5 rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+        <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
           <div className="mb-3 flex items-center gap-2">
-            <Bot className="w-4 h-4 text-[var(--moba-accent)]" />
+            <Bot className="w-4 h-4 text-[var(--taomni-accent)]" />
             <div>
               <div className="text-[14px] font-semibold">{t("settings.aiSection")}</div>
-              <div className="text-[11px] text-[var(--moba-text-muted)]">
+              <div className="text-[11px] text-[var(--taomni-text-muted)]">
                 {t("settings.aiSubtitle")}
               </div>
             </div>
@@ -216,32 +216,32 @@ export function SettingsPanel() {
             <PrivacyToggle />
           </div>
 
-          <div className="mb-3 pt-3 border-t border-[var(--moba-divider)]">
+          <div className="mb-3 pt-3 border-t border-[var(--taomni-divider)]">
             <AiShellPanel enabled={voiceShellEnabled} onToggle={toggleVoiceShell} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--moba-divider)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--taomni-divider)]">
             <AsrPanel />
             <LlmProvidersPanel />
           </div>
 
-          <div className="pt-3 border-t border-[var(--moba-divider)]">
+          <div className="pt-3 border-t border-[var(--taomni-divider)]">
             <WebSearchPanel />
           </div>
 
-          <div className="pt-3 border-t border-[var(--moba-divider)]">
+          <div className="pt-3 border-t border-[var(--taomni-divider)]">
             <ClaudeCodePanel />
           </div>
 
-          <div className="pt-3 border-t border-[var(--moba-divider)]">
+          <div className="pt-3 border-t border-[var(--taomni-divider)]">
             <ChatOutputFormatPanel />
           </div>
 
-          <div className="pt-3 border-t border-[var(--moba-divider)]">
+          <div className="pt-3 border-t border-[var(--taomni-divider)]">
             <ChatHistoryPanel />
           </div>
 
-          <div className="pt-3 border-t border-[var(--moba-divider)]">
+          <div className="pt-3 border-t border-[var(--taomni-divider)]">
             <ModelsAdvancedPanel />
           </div>
         </section>

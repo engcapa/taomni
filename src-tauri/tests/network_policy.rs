@@ -1,6 +1,6 @@
 //! Verifies the network-policy gate (full-local mode).
 
-use newmob_lib::ai::network_policy::{is_local_runtime, is_local_url, reject_if_remote};
+use taomni_lib::ai::network_policy::{is_local_runtime, is_local_url, reject_if_remote};
 
 #[test]
 fn local_url_recognition() {

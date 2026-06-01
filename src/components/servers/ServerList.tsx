@@ -21,8 +21,8 @@ export function ServerList() {
       className="h-full overflow-y-auto shrink-0"
       style={{
         width: 220,
-        borderRight: "1px solid var(--moba-divider)",
-        background: "var(--moba-chrome-bg)",
+        borderRight: "1px solid var(--taomni-divider)",
+        background: "var(--taomni-chrome-bg)",
       }}
     >
       {SERVER_DEFS.map((def) => (

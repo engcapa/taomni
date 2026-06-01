@@ -10,11 +10,11 @@ fn main() {
     if args.len() >= 3 && args[1] == "--mcp-server" {
         match args[2].as_str() {
             "permissions" => {
-                let _ = newmob_lib::agent::cc_bridge::permissions_mcp::run_stdio();
+                let _ = taomni_lib::agent::cc_bridge::permissions_mcp::run_stdio();
                 std::process::exit(0);
             }
             "tools" => {
-                let _ = newmob_lib::agent::cc_bridge::tools_mcp::run_stdio();
+                let _ = taomni_lib::agent::cc_bridge::tools_mcp::run_stdio();
                 std::process::exit(0);
             }
             other => {
@@ -23,5 +23,5 @@ fn main() {
             }
         }
     }
-    newmob_lib::run();
+    taomni_lib::run();
 }

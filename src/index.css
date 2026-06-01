@@ -15,81 +15,81 @@
 @tailwind utilities;
 
 :root {
-  --moba-bg: #f8fafc;
-  --moba-chrome-bg: #f1f5f9;
-  --moba-chrome-border: #cbd5e1;
-  --moba-titlebar-from: #e2e8f0;
-  --moba-titlebar-to: #cbd5e1;
-  --moba-menubar-bg: #f8fafc;
-  --moba-quick-bg: #f1f5f9;
-  --moba-accent: #1e40af; /* More premium Royal Indigo Blue */
-  --moba-accent-soft: #3b82f6;
-  --moba-tab-active: #ffffff;
-  --moba-tab-inactive: #e2e8f0;
-  --moba-tab-border: #cbd5e1;
-  --moba-sidebar-bg: #f8fafc;
-  --moba-sidebar-border: #e2e8f0;
-  --moba-panel-bg: #f8fafc;
-  --moba-card-bg: #ffffff;
-  --moba-card-border: #e2e8f0;
-  --moba-status-bg: #f1f5f9;
-  --moba-status-text: #1e293b;
-  --moba-text: #0f172a;
-  --moba-text-muted: #64748b;
-  --moba-divider: #e2e8f0;
-  --moba-hover: #f1f5f9;
-  --moba-selected: #dbeafe;
-  --moba-selected-border: #93c5fd;
-  --moba-control-hover: rgba(15, 23, 42, 0.05);
-  --moba-input-bg: #ffffff;
-  --moba-input-border: #cbd5e1;
-  --moba-button-from: #ffffff;
-  --moba-button-to: #f1f5f9;
-  --moba-button-hover-from: #ffffff;
-  --moba-button-hover-to: #e2e8f0;
-  --moba-button-disabled: #f1f5f9;
-  --moba-scrollbar-track: #f8fafc;
-  --moba-scrollbar-thumb: #cbd5e1;
-  --moba-scrollbar-thumb-hover: #94a3b8;
-  --moba-term-bg: #0f172a;
-  --moba-term-text: #f8fafc;
-  --moba-term-prompt: #10b981;
-  --moba-term-path: #3b82f6;
-  --moba-link: #2563eb;
-  --moba-ribbon-from: #f8fafc;
-  --moba-ribbon-to: #e2e8f0;
-  --moba-ribbon-border: #cbd5e1;
+  --taomni-bg: #f8fafc;
+  --taomni-chrome-bg: #f1f5f9;
+  --taomni-chrome-border: #cbd5e1;
+  --taomni-titlebar-from: #e2e8f0;
+  --taomni-titlebar-to: #cbd5e1;
+  --taomni-menubar-bg: #f8fafc;
+  --taomni-quick-bg: #f1f5f9;
+  --taomni-accent: #1e40af; /* More premium Royal Indigo Blue */
+  --taomni-accent-soft: #3b82f6;
+  --taomni-tab-active: #ffffff;
+  --taomni-tab-inactive: #e2e8f0;
+  --taomni-tab-border: #cbd5e1;
+  --taomni-sidebar-bg: #f8fafc;
+  --taomni-sidebar-border: #e2e8f0;
+  --taomni-panel-bg: #f8fafc;
+  --taomni-card-bg: #ffffff;
+  --taomni-card-border: #e2e8f0;
+  --taomni-status-bg: #f1f5f9;
+  --taomni-status-text: #1e293b;
+  --taomni-text: #0f172a;
+  --taomni-text-muted: #64748b;
+  --taomni-divider: #e2e8f0;
+  --taomni-hover: #f1f5f9;
+  --taomni-selected: #dbeafe;
+  --taomni-selected-border: #93c5fd;
+  --taomni-control-hover: rgba(15, 23, 42, 0.05);
+  --taomni-input-bg: #ffffff;
+  --taomni-input-border: #cbd5e1;
+  --taomni-button-from: #ffffff;
+  --taomni-button-to: #f1f5f9;
+  --taomni-button-hover-from: #ffffff;
+  --taomni-button-hover-to: #e2e8f0;
+  --taomni-button-disabled: #f1f5f9;
+  --taomni-scrollbar-track: #f8fafc;
+  --taomni-scrollbar-thumb: #cbd5e1;
+  --taomni-scrollbar-thumb-hover: #94a3b8;
+  --taomni-term-bg: #0f172a;
+  --taomni-term-text: #f8fafc;
+  --taomni-term-prompt: #10b981;
+  --taomni-term-path: #3b82f6;
+  --taomni-link: #2563eb;
+  --taomni-ribbon-from: #f8fafc;
+  --taomni-ribbon-to: #e2e8f0;
+  --taomni-ribbon-border: #cbd5e1;
 
   /* Warning banner tokens — readable on the light panel surface */
-  --moba-warning-bg: #fef3c7;
-  --moba-warning-border: #f59e0b;
-  --moba-warning-text: #78350f;
-  --moba-warning-icon: #b45309;
+  --taomni-warning-bg: #fef3c7;
+  --taomni-warning-border: #f59e0b;
+  --taomni-warning-text: #78350f;
+  --taomni-warning-icon: #b45309;
 
   /* Success banner + inline accent tokens — readable on light panels */
-  --moba-success-bg: #dcfce7;
-  --moba-success-border: #16a34a;
-  --moba-success-text: #14532d;
-  --moba-success-icon: #15803d;
+  --taomni-success-bg: #dcfce7;
+  --taomni-success-border: #16a34a;
+  --taomni-success-text: #14532d;
+  --taomni-success-icon: #15803d;
 
   /* Inline "experimental"/"redacted" badge tokens with strong contrast */
-  --moba-badge-warning-bg: #fef3c7;
-  --moba-badge-warning-text: #92400e;
-  --moba-badge-warning-border: #f59e0b;
+  --taomni-badge-warning-bg: #fef3c7;
+  --taomni-badge-warning-text: #92400e;
+  --taomni-badge-warning-border: #f59e0b;
 
   /* Premium Multi-Level Shadows */
-  --moba-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --moba-shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.02);
-  --moba-shadow-lg: 0 16px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
-  --moba-transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --taomni-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --taomni-shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.02);
+  --taomni-shadow-lg: 0 16px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+  --taomni-transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Global UI font variables with system fallbacks */
-  --moba-ui-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-  --moba-ui-font-size: 12px;
+  --taomni-ui-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --taomni-ui-font-size: 12px;
 
-  font-family: var(--moba-ui-font-family);
-  font-size: var(--moba-ui-font-size);
-  color: var(--moba-text);
+  font-family: var(--taomni-ui-font-family);
+  font-size: var(--taomni-ui-font-size);
+  color: var(--taomni-text);
 }
 
 /* Cross-platform typography smoothing options */
@@ -111,74 +111,74 @@ button, input, select, textarea, optgroup {
 }
 
 html[data-app-theme="dark"] {
-  --moba-bg: #0b0f19; /*星空暗夜深蓝色调和底色*/
-  --moba-chrome-bg: #0f172a; 
-  --moba-chrome-border: #1e293b;
-  --moba-titlebar-from: #1e293b;
-  --moba-titlebar-to: #0f172a;
-  --moba-menubar-bg: #0b0f19;
-  --moba-quick-bg: #1e293b;
-  --moba-accent: #60a5fa;
-  --moba-accent-soft: #93c5fd;
-  --moba-tab-active: #0b0f19;
-  --moba-tab-inactive: #1e293b;
-  --moba-tab-border: #334155;
-  --moba-sidebar-bg: #0b0f19;
-  --moba-sidebar-border: #1e293b;
-  --moba-panel-bg: #0f172a;
-  --moba-card-bg: #1e293b;
-  --moba-card-border: #334155;
-  --moba-status-bg: #0b0f19;
-  --moba-status-text: #cbd5e1;
-  --moba-text: #f8fafc;
-  --moba-text-muted: #94a3b8;
-  --moba-divider: #1e293b;
-  --moba-hover: #1e293b;
-  --moba-selected: #1e3a8a;
-  --moba-selected-border: #3b82f6;
-  --moba-control-hover: rgba(255, 255, 255, 0.05);
-  --moba-input-bg: #0b0f19;
-  --moba-input-border: #334155;
-  --moba-button-from: #1e293b;
-  --moba-button-to: #0f172a;
-  --moba-button-hover-from: #334155;
-  --moba-button-hover-to: #1e293b;
-  --moba-button-disabled: #0f172a;
-  --moba-scrollbar-track: #0b0f19;
-  --moba-scrollbar-thumb: #334155;
-  --moba-scrollbar-thumb-hover: #475569;
-  --moba-link: #60a5fa;
-  --moba-ribbon-from: #0f172a;
-  --moba-ribbon-to: #0b0f19;
-  --moba-ribbon-border: #1e293b;
+  --taomni-bg: #0b0f19; /*星空暗夜深蓝色调和底色*/
+  --taomni-chrome-bg: #0f172a; 
+  --taomni-chrome-border: #1e293b;
+  --taomni-titlebar-from: #1e293b;
+  --taomni-titlebar-to: #0f172a;
+  --taomni-menubar-bg: #0b0f19;
+  --taomni-quick-bg: #1e293b;
+  --taomni-accent: #60a5fa;
+  --taomni-accent-soft: #93c5fd;
+  --taomni-tab-active: #0b0f19;
+  --taomni-tab-inactive: #1e293b;
+  --taomni-tab-border: #334155;
+  --taomni-sidebar-bg: #0b0f19;
+  --taomni-sidebar-border: #1e293b;
+  --taomni-panel-bg: #0f172a;
+  --taomni-card-bg: #1e293b;
+  --taomni-card-border: #334155;
+  --taomni-status-bg: #0b0f19;
+  --taomni-status-text: #cbd5e1;
+  --taomni-text: #f8fafc;
+  --taomni-text-muted: #94a3b8;
+  --taomni-divider: #1e293b;
+  --taomni-hover: #1e293b;
+  --taomni-selected: #1e3a8a;
+  --taomni-selected-border: #3b82f6;
+  --taomni-control-hover: rgba(255, 255, 255, 0.05);
+  --taomni-input-bg: #0b0f19;
+  --taomni-input-border: #334155;
+  --taomni-button-from: #1e293b;
+  --taomni-button-to: #0f172a;
+  --taomni-button-hover-from: #334155;
+  --taomni-button-hover-to: #1e293b;
+  --taomni-button-disabled: #0f172a;
+  --taomni-scrollbar-track: #0b0f19;
+  --taomni-scrollbar-thumb: #334155;
+  --taomni-scrollbar-thumb-hover: #475569;
+  --taomni-link: #60a5fa;
+  --taomni-ribbon-from: #0f172a;
+  --taomni-ribbon-to: #0b0f19;
+  --taomni-ribbon-border: #1e293b;
 
   /* Warning banner tokens — readable on the dark panel surface */
-  --moba-warning-bg: rgba(245, 158, 11, 0.18);
-  --moba-warning-border: #f59e0b;
-  --moba-warning-text: #fde68a;
-  --moba-warning-icon: #fbbf24;
+  --taomni-warning-bg: rgba(245, 158, 11, 0.18);
+  --taomni-warning-border: #f59e0b;
+  --taomni-warning-text: #fde68a;
+  --taomni-warning-icon: #fbbf24;
 
   /* Success banner + inline accent tokens — readable on dark panels */
-  --moba-success-bg: rgba(34, 197, 94, 0.18);
-  --moba-success-border: #22c55e;
-  --moba-success-text: #bbf7d0;
-  --moba-success-icon: #4ade80;
+  --taomni-success-bg: rgba(34, 197, 94, 0.18);
+  --taomni-success-border: #22c55e;
+  --taomni-success-text: #bbf7d0;
+  --taomni-success-icon: #4ade80;
 
   /* Inline badge tokens (e.g. "Experimental", "Redacted") on dark theme */
-  --moba-badge-warning-bg: rgba(245, 158, 11, 0.18);
-  --moba-badge-warning-text: #fcd34d;
-  --moba-badge-warning-border: #b45309;
+  --taomni-badge-warning-bg: rgba(245, 158, 11, 0.18);
+  --taomni-badge-warning-text: #fcd34d;
+  --taomni-badge-warning-border: #b45309;
 
   /* Ambient shadows optimized for night theme */
-  --moba-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --moba-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
-  --moba-shadow-lg: 0 16px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(0, 0, 0, 0.25);
+  --taomni-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --taomni-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+  --taomni-shadow-lg: 0 16px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(0, 0, 0, 0.25);
 }
 
 body {
   margin: 0;
   overflow: hidden;
-  background: var(--moba-chrome-bg);
+  background: var(--taomni-chrome-bg);
 }
 
 #root {
@@ -191,12 +191,12 @@ body {
 }
 
 /* Ribbon toolbar */
-.moba-ribbon {
-  background: linear-gradient(to bottom, var(--moba-ribbon-from), var(--moba-ribbon-to));
-  border-bottom: 1px solid var(--moba-ribbon-border);
+.taomni-ribbon {
+  background: linear-gradient(to bottom, var(--taomni-ribbon-from), var(--taomni-ribbon-to));
+  border-bottom: 1px solid var(--taomni-ribbon-border);
 }
 
-.moba-ribbon-btn {
+.taomni-ribbon-btn {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -206,182 +206,182 @@ body {
   cursor: pointer;
   user-select: none;
   min-width: 56px;
-  font-size: calc(var(--moba-ui-font-size) - 1px);
-  color: var(--moba-text);
+  font-size: calc(var(--taomni-ui-font-size) - 1px);
+  color: var(--taomni-text);
   background: transparent;
   border: none;
-  transition: var(--moba-transition);
+  transition: var(--taomni-transition);
 }
-.moba-ribbon-btn:hover {
-  background: var(--moba-control-hover);
-  outline: 1px solid var(--moba-tab-border);
+.taomni-ribbon-btn:hover {
+  background: var(--taomni-control-hover);
+  outline: 1px solid var(--taomni-tab-border);
 }
 
 /* Vertical side tabs */
-.moba-side-tab {
+.taomni-side-tab {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   padding: 12px 4px;
-  font-size: calc(var(--moba-ui-font-size) - 1px);
+  font-size: calc(var(--taomni-ui-font-size) - 1px);
   letter-spacing: 0.04em;
-  color: var(--moba-text);
-  border-bottom: 1px solid var(--moba-sidebar-border);
+  color: var(--taomni-text);
+  border-bottom: 1px solid var(--taomni-sidebar-border);
   cursor: pointer;
   user-select: none;
-  transition: var(--moba-transition);
+  transition: var(--taomni-transition);
 }
 /* CJK reads naturally top-to-bottom in vertical-rl; skip the 180° flip that
    keeps Latin readable head-tilt-left so Chinese characters stay upright. */
-.moba-side-tab:lang(zh) {
+.taomni-side-tab:lang(zh) {
   transform: none;
   letter-spacing: 0.08em;
 }
-.moba-side-tab[data-active="true"] {
-  background: var(--moba-tab-active);
-  color: var(--moba-accent);
+.taomni-side-tab[data-active="true"] {
+  background: var(--taomni-tab-active);
+  color: var(--taomni-accent);
   font-weight: 600;
-  border-right: 2px solid var(--moba-accent);
+  border-right: 2px solid var(--taomni-accent);
 }
-.moba-side-tab[data-active="true"]:lang(zh) {
+.taomni-side-tab[data-active="true"]:lang(zh) {
   border-right: none;
-  border-left: 2px solid var(--moba-accent);
+  border-left: 2px solid var(--taomni-accent);
 }
 
 /* Pill badge */
-.moba-pill {
+.taomni-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: calc(var(--moba-ui-font-size) - 1px);
+  font-size: calc(var(--taomni-ui-font-size) - 1px);
   padding: 1px 6px;
   border-radius: 9999px;
-  background: var(--moba-selected);
-  color: var(--moba-text);
-  border: 1px solid var(--moba-selected-border);
+  background: var(--taomni-selected);
+  color: var(--taomni-text);
+  border: 1px solid var(--taomni-selected-border);
 }
 
 /* Scrollbar */
-.moba-scroll-y { overflow-y: auto; }
-.moba-scroll-y::-webkit-scrollbar { width: 14px; }
-.moba-scroll-y::-webkit-scrollbar-track { background: var(--moba-scrollbar-track); border-left: 1px solid var(--moba-divider); }
-.moba-scroll-y::-webkit-scrollbar-thumb { background: var(--moba-scrollbar-thumb); border: 2px solid var(--moba-scrollbar-track); border-radius: 2px; }
-.moba-scroll-y::-webkit-scrollbar-thumb:hover { background: var(--moba-scrollbar-thumb-hover); }
+.taomni-scroll-y { overflow-y: auto; }
+.taomni-scroll-y::-webkit-scrollbar { width: 14px; }
+.taomni-scroll-y::-webkit-scrollbar-track { background: var(--taomni-scrollbar-track); border-left: 1px solid var(--taomni-divider); }
+.taomni-scroll-y::-webkit-scrollbar-thumb { background: var(--taomni-scrollbar-thumb); border: 2px solid var(--taomni-scrollbar-track); border-radius: 2px; }
+.taomni-scroll-y::-webkit-scrollbar-thumb:hover { background: var(--taomni-scrollbar-thumb-hover); }
 
 /* Form inputs */
-.moba-input {
+.taomni-input {
   height: 22px;
-  font-size: var(--moba-ui-font-size);
+  font-size: var(--taomni-ui-font-size);
   padding: 0 6px;
-  border: 1px solid var(--moba-input-border);
-  background: var(--moba-input-bg);
-  color: var(--moba-text);
+  border: 1px solid var(--taomni-input-border);
+  background: var(--taomni-input-bg);
+  color: var(--taomni-text);
   border-radius: 2px;
   outline: none;
-  transition: var(--moba-transition);
+  transition: var(--taomni-transition);
 }
-.moba-input:focus {
-  border-color: var(--moba-accent);
+.taomni-input:focus {
+  border-color: var(--taomni-accent);
   box-shadow: 0 0 0 2px rgba(43, 93, 139, 0.18);
 }
-.moba-input:disabled {
+.taomni-input:disabled {
   opacity: 0.62;
-  background: var(--moba-button-disabled);
-  color: var(--moba-text-muted);
+  background: var(--taomni-button-disabled);
+  color: var(--taomni-text-muted);
 }
 
-.moba-mono {
+.taomni-mono {
   font-family: 'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace;
 }
 
-.moba-titlebar {
-  background: linear-gradient(to bottom, var(--moba-titlebar-from), var(--moba-titlebar-to));
-  border-bottom: 1px solid var(--moba-chrome-border);
+.taomni-titlebar {
+  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
+  border-bottom: 1px solid var(--taomni-chrome-border);
 }
 
 /* PLACEHOLDER_CSS_MORE */
 
-.moba-tab {
+.taomni-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px 4px 10px;
-  font-size: var(--moba-ui-font-size);
-  border: 1px solid var(--moba-tab-border);
+  font-size: var(--taomni-ui-font-size);
+  border: 1px solid var(--taomni-tab-border);
   border-bottom: none;
-  background: var(--moba-tab-inactive);
-  color: var(--moba-text);
+  background: var(--taomni-tab-inactive);
+  color: var(--taomni-text);
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
   margin-right: -1px;
   cursor: pointer;
   height: 24px;
   line-height: 1;
-  transition: var(--moba-transition);
+  transition: var(--taomni-transition);
 }
-.moba-tab[data-active="true"] {
-  background: var(--moba-tab-active);
+.taomni-tab[data-active="true"] {
+  background: var(--taomni-tab-active);
   font-weight: 600;
   z-index: 2;
-  box-shadow: 0 -2px 0 0 var(--moba-accent) inset;
+  box-shadow: 0 -2px 0 0 var(--taomni-accent) inset;
 }
-.moba-tab:hover:not([data-active="true"]) {
-  background: var(--moba-hover);
+.taomni-tab:hover:not([data-active="true"]) {
+  background: var(--taomni-hover);
 }
-.moba-tab[data-multiexec-selected="true"] {
-  border-left: 2px solid var(--moba-accent);
-  background: color-mix(in srgb, var(--moba-accent) 12%, var(--moba-tab-inactive));
+.taomni-tab[data-multiexec-selected="true"] {
+  border-left: 2px solid var(--taomni-accent);
+  background: color-mix(in srgb, var(--taomni-accent) 12%, var(--taomni-tab-inactive));
 }
-.moba-tab[data-multiexec-selected="true"][data-active="true"] {
-  background: color-mix(in srgb, var(--moba-accent) 12%, var(--moba-tab-active));
+.taomni-tab[data-multiexec-selected="true"][data-active="true"] {
+  background: color-mix(in srgb, var(--taomni-accent) 12%, var(--taomni-tab-active));
 }
-.moba-tab[data-dragging="true"] {
+.taomni-tab[data-dragging="true"] {
   opacity: 0.5;
 }
-.moba-tab[data-drop-side]::after {
+.taomni-tab[data-drop-side]::after {
   content: "";
   position: absolute;
   top: 2px;
   bottom: 2px;
   width: 2px;
-  background: var(--moba-accent);
+  background: var(--taomni-accent);
   border-radius: 1px;
   pointer-events: none;
   z-index: 3;
 }
-.moba-tab[data-drop-side="before"]::after {
+.taomni-tab[data-drop-side="before"]::after {
   left: -2px;
 }
-.moba-tab[data-drop-side="after"]::after {
+.taomni-tab[data-drop-side="after"]::after {
   right: -2px;
 }
 
-.moba-app-titlebar {
-  background: linear-gradient(to bottom, var(--moba-titlebar-from), var(--moba-titlebar-to));
-  border-bottom: 1px solid var(--moba-chrome-border);
-  color: var(--moba-text);
+.taomni-app-titlebar {
+  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
+  border-bottom: 1px solid var(--taomni-chrome-border);
+  color: var(--taomni-text);
   user-select: none;
 }
 
-.moba-compact-root .moba-tabbar {
+.taomni-compact-root .taomni-tabbar {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--moba-divider);
+  border-bottom: 1px solid var(--taomni-divider);
 }
 
-.moba-compact-titlebar {
+.taomni-compact-titlebar {
   /* Pin to a fixed pixel height: the global :root font-size is 12px, so
      Tailwind's h-8 (2rem) collapses to 24px and the inner tabbar (32px)
      would spill into the terminal area below. flex-shrink: 0 keeps the
      parent flex column from compressing it further. */
   height: 32px;
   flex-shrink: 0;
-  background: linear-gradient(to bottom, var(--moba-titlebar-from), var(--moba-titlebar-to));
-  border-bottom: 1px solid var(--moba-chrome-border);
-  color: var(--moba-text);
+  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
+  border-bottom: 1px solid var(--taomni-chrome-border);
+  color: var(--taomni-text);
   user-select: none;
 }
 
-.moba-compact-titlebar .moba-tabbar {
+.taomni-compact-titlebar .taomni-tabbar {
   height: 32px;
   padding-top: 5px;
   background: transparent !important;
@@ -391,224 +391,224 @@ body {
   overflow: hidden;
 }
 
-.moba-compact-titlebar .moba-tab {
+.taomni-compact-titlebar .taomni-tab {
   height: 25px;
 }
 
-.moba-window-controls {
-  border-left: 1px solid color-mix(in srgb, var(--moba-divider) 80%, transparent);
+.taomni-window-controls {
+  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 80%, transparent);
 }
 
-.moba-window-controls button[data-danger="true"]:hover {
+.taomni-window-controls button[data-danger="true"]:hover {
   background: #c42b1c;
   color: #fff;
 }
 
-.moba-titlebar-tray {
-  border-left: 1px solid color-mix(in srgb, var(--moba-divider) 80%, transparent);
+.taomni-titlebar-tray {
+  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 80%, transparent);
 }
 
 /* Visually separate tray groups (voice / view / terminal layout / AI). The
    separator is a thin vertical hairline with breathing room so adjacent
    icons inside a group sit flush, while groups read as distinct clusters. */
-.moba-titlebar-tray-group-sep {
+.taomni-titlebar-tray-group-sep {
   width: 1px;
   margin: 4px 4px;
-  background: color-mix(in srgb, var(--moba-divider) 80%, transparent);
+  background: color-mix(in srgb, var(--taomni-divider) 80%, transparent);
 }
 
-.moba-titlebar-tray-btn[data-active="true"] {
-  background: color-mix(in srgb, var(--moba-accent) 15%, transparent);
-  color: var(--moba-accent);
+.taomni-titlebar-tray-btn[data-active="true"] {
+  background: color-mix(in srgb, var(--taomni-accent) 15%, transparent);
+  color: var(--taomni-accent);
 }
 
-.moba-compact-root .moba-tab {
+.taomni-compact-root .taomni-tab {
   max-width: min(220px, 28vw);
 }
 
-.moba-tree-row {
+.taomni-tree-row {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 3px 6px 3px 4px;
-  font-size: var(--moba-ui-font-size);
-  font-family: var(--moba-ui-font-family);
+  font-size: var(--taomni-ui-font-size);
+  font-family: var(--taomni-ui-font-family);
   cursor: pointer;
   white-space: nowrap;
-  background-color: var(--moba-sidebar-bg);
-  color: var(--moba-text);
-  transition: var(--moba-transition);
+  background-color: var(--taomni-sidebar-bg);
+  color: var(--taomni-text);
+  transition: var(--taomni-transition);
 }
-.moba-tree-row:hover {
-  background-color: var(--moba-hover);
+.taomni-tree-row:hover {
+  background-color: var(--taomni-hover);
 }
-.moba-tree-row[data-selected="true"] {
-  background-color: var(--moba-selected);
-  outline: 1px dotted var(--moba-selected-border);
+.taomni-tree-row[data-selected="true"] {
+  background-color: var(--taomni-selected);
+  outline: 1px dotted var(--taomni-selected-border);
 }
 
 /* Sidebar and Session Tree Subpixel optimization */
 [data-testid="sidebar"],
 [data-testid="session-tree"] {
-  background-color: var(--moba-sidebar-bg) !important;
-  font-family: var(--moba-ui-font-family) !important;
-  font-size: var(--moba-ui-font-size) !important;
+  background-color: var(--taomni-sidebar-bg) !important;
+  font-family: var(--taomni-ui-font-family) !important;
+  font-size: var(--taomni-ui-font-size) !important;
 }
 
 [data-testid="sftp-browser"],
 [data-testid="sftp-detached-window"],
 [role="dialog"] {
-  font-family: var(--moba-ui-font-family) !important;
+  font-family: var(--taomni-ui-font-family) !important;
 }
 
-[data-testid="sftp-browser"] *:not(.moba-mono):not(.font-mono),
-[data-testid="sftp-detached-window"] *:not(.moba-mono):not(.font-mono),
-[role="dialog"] *:not(.moba-mono):not(.font-mono) {
+[data-testid="sftp-browser"] *:not(.taomni-mono):not(.font-mono),
+[data-testid="sftp-detached-window"] *:not(.taomni-mono):not(.font-mono),
+[role="dialog"] *:not(.taomni-mono):not(.font-mono) {
   font-family: inherit;
 }
 
 [data-testid="sftp-browser"] .text-\[12px\],
 [data-testid="sftp-detached-window"] .text-\[12px\],
 [role="dialog"] .text-\[12px\] {
-  font-size: var(--moba-ui-font-size) !important;
+  font-size: var(--taomni-ui-font-size) !important;
 }
 
 [data-testid="sftp-browser"] .text-\[11px\],
 [data-testid="sftp-detached-window"] .text-\[11px\],
 [role="dialog"] .text-\[11px\] {
-  font-size: calc(var(--moba-ui-font-size) - 1px) !important;
+  font-size: calc(var(--taomni-ui-font-size) - 1px) !important;
 }
 
 [data-testid="sftp-browser"] .text-\[10px\],
 [data-testid="sftp-detached-window"] .text-\[10px\],
 [role="dialog"] .text-\[10px\] {
-  font-size: calc(var(--moba-ui-font-size) - 2px) !important;
+  font-size: calc(var(--taomni-ui-font-size) - 2px) !important;
 }
 
 [data-testid="sftp-browser"] .text-xs,
 [data-testid="sftp-detached-window"] .text-xs,
 [role="dialog"] .text-xs {
-  font-size: var(--moba-ui-font-size) !important;
+  font-size: var(--taomni-ui-font-size) !important;
 }
 
 [data-testid="sftp-browser"] .text-sm,
 [data-testid="sftp-detached-window"] .text-sm,
 [role="dialog"] .text-sm {
-  font-size: calc(var(--moba-ui-font-size) + 2px) !important;
+  font-size: calc(var(--taomni-ui-font-size) + 2px) !important;
 }
 
 [data-testid="sftp-browser"] .text-\[14px\],
 [data-testid="sftp-detached-window"] .text-\[14px\],
 [role="dialog"] .text-\[14px\] {
-  font-size: calc(var(--moba-ui-font-size) + 2px) !important;
+  font-size: calc(var(--taomni-ui-font-size) + 2px) !important;
 }
 
 [data-testid="sftp-browser"] .text-base,
 [data-testid="sftp-detached-window"] .text-base,
 [role="dialog"] .text-base {
-  font-size: calc(var(--moba-ui-font-size) + 4px) !important;
+  font-size: calc(var(--taomni-ui-font-size) + 4px) !important;
 }
 
 
-.moba-status {
-  background: var(--moba-status-bg);
-  border-top: 1px solid var(--moba-divider);
-  color: var(--moba-status-text);
-  font-size: calc(var(--moba-ui-font-size) - 1px);
+.taomni-status {
+  background: var(--taomni-status-bg);
+  border-top: 1px solid var(--taomni-divider);
+  color: var(--taomni-status-text);
+  font-size: calc(var(--taomni-ui-font-size) - 1px);
 }
 
-.moba-divider-h { height: 1px; background: var(--moba-divider); }
-.moba-divider-v { width: 1px; background: var(--moba-divider); }
+.taomni-divider-h { height: 1px; background: var(--taomni-divider); }
+.taomni-divider-v { width: 1px; background: var(--taomni-divider); }
 
 @layer components {
-  .moba-btn {
+  .taomni-btn {
     height: 26px;
     padding: 0 14px;
-    font-size: var(--moba-ui-font-size);
-    background: linear-gradient(to bottom, var(--moba-button-from), var(--moba-button-to));
-    border: 1px solid var(--moba-input-border);
+    font-size: var(--taomni-ui-font-size);
+    background: linear-gradient(to bottom, var(--taomni-button-from), var(--taomni-button-to));
+    border: 1px solid var(--taomni-input-border);
     border-radius: 3px;
     cursor: pointer;
-    color: var(--moba-text);
-    transition: var(--moba-transition);
+    color: var(--taomni-text);
+    transition: var(--taomni-transition);
   }
-  .moba-btn:hover { background: linear-gradient(to bottom, var(--moba-button-hover-from), var(--moba-button-hover-to)); }
-  .moba-btn:disabled {
+  .taomni-btn:hover { background: linear-gradient(to bottom, var(--taomni-button-hover-from), var(--taomni-button-hover-to)); }
+  .taomni-btn:disabled {
     opacity: 0.45;
     cursor: default;
-    background: var(--moba-button-disabled);
+    background: var(--taomni-button-disabled);
   }
-  .moba-btn:disabled:hover { background: var(--moba-button-disabled); }
-  .moba-btn[data-primary="true"] {
-    background: linear-gradient(to bottom, var(--moba-accent-soft), var(--moba-accent));
-    border-color: var(--moba-accent); color: #fff; font-weight: 600;
+  .taomni-btn:disabled:hover { background: var(--taomni-button-disabled); }
+  .taomni-btn[data-primary="true"] {
+    background: linear-gradient(to bottom, var(--taomni-accent-soft), var(--taomni-accent));
+    border-color: var(--taomni-accent); color: #fff; font-weight: 600;
   }
-  .moba-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--moba-accent-soft) 85%, #fff), color-mix(in srgb, var(--moba-accent) 85%, #fff)); }
+  .taomni-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--taomni-accent-soft) 85%, #fff), color-mix(in srgb, var(--taomni-accent) 85%, #fff)); }
 }
 
 /* Card Hover Environment Shadow Depth Effect */
-.moba-card-hover {
-  transition: var(--moba-transition);
+.taomni-card-hover {
+  transition: var(--taomni-transition);
 }
-.moba-card-hover:hover {
+.taomni-card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: var(--moba-shadow-md);
-  border-color: var(--moba-accent-soft);
+  box-shadow: var(--taomni-shadow-md);
+  border-color: var(--taomni-accent-soft);
 }
 
 /* Chat assistant rendered markdown / HTML.
    Tight defaults so MD/HTML output reads well inside a 380px-wide drawer. */
-.moba-chat-md > div > *:first-child { margin-top: 0; }
-.moba-chat-md > div > *:last-child { margin-bottom: 0; }
-.moba-chat-md p { margin: 0.4em 0; }
-.moba-chat-md h1,
-.moba-chat-md h2,
-.moba-chat-md h3,
-.moba-chat-md h4,
-.moba-chat-md h5,
-.moba-chat-md h6 {
+.taomni-chat-md > div > *:first-child { margin-top: 0; }
+.taomni-chat-md > div > *:last-child { margin-bottom: 0; }
+.taomni-chat-md p { margin: 0.4em 0; }
+.taomni-chat-md h1,
+.taomni-chat-md h2,
+.taomni-chat-md h3,
+.taomni-chat-md h4,
+.taomni-chat-md h5,
+.taomni-chat-md h6 {
   margin: 0.6em 0 0.3em;
   font-weight: 600;
   line-height: 1.25;
 }
-.moba-chat-md h1 { font-size: 1.2em; }
-.moba-chat-md h2 { font-size: 1.12em; }
-.moba-chat-md h3 { font-size: 1.05em; }
-.moba-chat-md h4,
-.moba-chat-md h5,
-.moba-chat-md h6 { font-size: 1em; color: var(--moba-text-muted); }
-.moba-chat-md ul,
-.moba-chat-md ol {
+.taomni-chat-md h1 { font-size: 1.2em; }
+.taomni-chat-md h2 { font-size: 1.12em; }
+.taomni-chat-md h3 { font-size: 1.05em; }
+.taomni-chat-md h4,
+.taomni-chat-md h5,
+.taomni-chat-md h6 { font-size: 1em; color: var(--taomni-text-muted); }
+.taomni-chat-md ul,
+.taomni-chat-md ol {
   margin: 0.4em 0;
   padding-left: 1.4em;
 }
-.moba-chat-md li { margin: 0.15em 0; }
-.moba-chat-md ul { list-style: disc; }
-.moba-chat-md ol { list-style: decimal; }
-.moba-chat-md a {
-  color: var(--moba-link);
+.taomni-chat-md li { margin: 0.15em 0; }
+.taomni-chat-md ul { list-style: disc; }
+.taomni-chat-md ol { list-style: decimal; }
+.taomni-chat-md a {
+  color: var(--taomni-link);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--moba-link) 50%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--taomni-link) 50%, transparent);
 }
-.moba-chat-md a:hover { text-decoration-color: var(--moba-link); }
-.moba-chat-md code {
+.taomni-chat-md a:hover { text-decoration-color: var(--taomni-link); }
+.taomni-chat-md code {
   font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
   font-size: 0.92em;
-  background: color-mix(in srgb, var(--moba-divider) 60%, transparent);
+  background: color-mix(in srgb, var(--taomni-divider) 60%, transparent);
   padding: 0.05em 0.35em;
   border-radius: 3px;
 }
-.moba-chat-md pre {
+.taomni-chat-md pre {
   margin: 0.5em 0;
   padding: 0.6em 0.75em;
-  background: var(--moba-bg);
-  border: 1px solid var(--moba-divider);
+  background: var(--taomni-bg);
+  border: 1px solid var(--taomni-divider);
   border-radius: 4px;
   overflow-x: auto;
   font-size: 0.9em;
   line-height: 1.45;
 }
-.moba-chat-md pre code {
+.taomni-chat-md pre code {
   background: transparent;
   padding: 0;
   border-radius: 0;
@@ -623,128 +623,128 @@ body {
   transition: border-color 120ms ease, background 120ms ease;
 }
 .ai-chat-inline-code:hover {
-  border-color: color-mix(in srgb, var(--moba-accent) 50%, transparent);
-  background: color-mix(in srgb, var(--moba-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--taomni-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--taomni-accent) 12%, transparent);
 }
 .ai-chat-inline-code:hover::after {
   content: " ▶";
-  color: var(--moba-accent);
+  color: var(--taomni-accent);
   font-size: 0.85em;
 }
 .ai-chat-inline-code-sent {
   border-color: #4ade80 !important;
   background: color-mix(in srgb, #4ade80 18%, transparent) !important;
 }
-.moba-chat-md blockquote {
+.taomni-chat-md blockquote {
   margin: 0.4em 0;
   padding: 0.1em 0.75em;
-  border-left: 3px solid var(--moba-accent-soft);
-  color: var(--moba-text-muted);
+  border-left: 3px solid var(--taomni-accent-soft);
+  color: var(--taomni-text-muted);
 }
-.moba-chat-md table {
+.taomni-chat-md table {
   margin: 0.5em 0;
   border-collapse: collapse;
   width: 100%;
   font-size: 0.95em;
 }
-.moba-chat-md th,
-.moba-chat-md td {
-  border: 1px solid var(--moba-divider);
+.taomni-chat-md th,
+.taomni-chat-md td {
+  border: 1px solid var(--taomni-divider);
   padding: 0.25em 0.5em;
   text-align: left;
 }
-.moba-chat-md th {
-  background: color-mix(in srgb, var(--moba-divider) 50%, transparent);
+.taomni-chat-md th {
+  background: color-mix(in srgb, var(--taomni-divider) 50%, transparent);
   font-weight: 600;
 }
-.moba-chat-md hr {
+.taomni-chat-md hr {
   margin: 0.7em 0;
   border: none;
-  border-top: 1px solid var(--moba-divider);
+  border-top: 1px solid var(--taomni-divider);
 }
-.moba-chat-md img { max-width: 100%; height: auto; border-radius: 3px; }
+.taomni-chat-md img { max-width: 100%; height: auto; border-radius: 3px; }
 
-.moba-proto-btn {
+.taomni-proto-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 8px 6px 6px;
   width: 64px;
   border: 1px solid transparent;
   border-radius: 4px;
-  font-size: calc(var(--moba-ui-font-size) - 1px);
+  font-size: calc(var(--taomni-ui-font-size) - 1px);
   cursor: pointer;
   background: transparent;
-  color: var(--moba-text);
+  color: var(--taomni-text);
 }
-.moba-proto-btn:hover { background: var(--moba-hover); border-color: var(--moba-tab-border); }
-.moba-proto-btn[data-active="true"] {
-  background: var(--moba-selected);
-  border-color: var(--moba-accent-soft);
-  color: var(--moba-accent);
+.taomni-proto-btn:hover { background: var(--taomni-hover); border-color: var(--taomni-tab-border); }
+.taomni-proto-btn[data-active="true"] {
+  background: var(--taomni-selected);
+  border-color: var(--taomni-accent-soft);
+  color: var(--taomni-accent);
   font-weight: 600;
 }
 
-.moba-section-tab {
+.taomni-section-tab {
   padding: 4px 12px;
-  font-size: var(--moba-ui-font-size);
-  border: 1px solid var(--moba-input-border);
+  font-size: var(--taomni-ui-font-size);
+  border: 1px solid var(--taomni-input-border);
   border-bottom: none;
-  background: var(--moba-tab-inactive);
-  color: var(--moba-text);
+  background: var(--taomni-tab-inactive);
+  color: var(--taomni-text);
   cursor: pointer;
   margin-right: -1px;
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
 }
-.moba-section-tab[data-active="true"] { background: var(--moba-tab-active); font-weight: 600; }
+.taomni-section-tab[data-active="true"] { background: var(--taomni-tab-active); font-weight: 600; }
 
-.moba-checkbox {
+.taomni-checkbox {
   width: 13px; height: 13px;
-  border: 1px solid var(--moba-input-border);
-  background: var(--moba-input-bg);
+  border: 1px solid var(--taomni-input-border);
+  background: var(--taomni-input-bg);
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: middle;
   cursor: pointer;
   appearance: none;
   flex: 0 0 auto;
 }
-.moba-checkbox:checked,
-.moba-checkbox[data-checked="true"] {
-  background: var(--moba-input-bg);
-  color: var(--moba-accent);
+.taomni-checkbox:checked,
+.taomni-checkbox[data-checked="true"] {
+  background: var(--taomni-input-bg);
+  color: var(--taomni-accent);
 }
-.moba-checkbox:checked::after {
+.taomni-checkbox:checked::after {
   content: "✓";
   font-size: 10px;
   line-height: 1;
-  color: var(--moba-accent);
+  color: var(--taomni-accent);
 }
 
-.moba-radio {
+.taomni-radio {
   width: 12px;
   height: 12px;
-  border: 1px solid var(--moba-input-border);
+  border: 1px solid var(--taomni-input-border);
   border-radius: 9999px;
-  background: var(--moba-input-bg);
+  background: var(--taomni-input-bg);
   appearance: none;
   cursor: pointer;
   flex: 0 0 auto;
   position: relative;
 }
-.moba-radio:checked::after {
+.taomni-radio:checked::after {
   content: "";
   position: absolute;
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background: var(--moba-accent);
+  background: var(--taomni-accent);
   left: 2px;
   top: 2px;
 }
 
-.moba-blink {
-  animation: moba-blink 1s step-end infinite;
+.taomni-blink {
+  animation: taomni-blink 1s step-end infinite;
 }
-@keyframes moba-blink {
+@keyframes taomni-blink {
   50% { opacity: 0; }
 }
 
@@ -810,29 +810,29 @@ body {
 }
 
 html[data-app-theme="dark"] .bg-white {
-  background-color: var(--moba-panel-bg) !important;
+  background-color: var(--taomni-panel-bg) !important;
 }
 html[data-app-theme="dark"] .bg-white\/90 {
-  background-color: color-mix(in srgb, var(--moba-panel-bg) 90%, transparent) !important;
+  background-color: color-mix(in srgb, var(--taomni-panel-bg) 90%, transparent) !important;
 }
 html[data-app-theme="dark"] .bg-slate-100 {
-  background-color: var(--moba-quick-bg) !important;
+  background-color: var(--taomni-quick-bg) !important;
 }
 html[data-app-theme="dark"] .border-slate-100,
 html[data-app-theme="dark"] .border-slate-400,
 html[data-app-theme="dark"] .border-slate-500 {
-  border-color: var(--moba-divider) !important;
+  border-color: var(--taomni-divider) !important;
 }
 html[data-app-theme="dark"] .text-slate-300,
 html[data-app-theme="dark"] .text-slate-500,
 html[data-app-theme="dark"] .text-slate-600,
 html[data-app-theme="dark"] .text-slate-700 {
-  color: var(--moba-text-muted) !important;
+  color: var(--taomni-text-muted) !important;
 }
 html[data-app-theme="dark"] .hover\:bg-white\/15:hover,
 html[data-app-theme="dark"] .hover\:bg-white\/20:hover,
 html[data-app-theme="dark"] .hover\:bg-white\/70:hover {
-  background-color: var(--moba-control-hover) !important;
+  background-color: var(--taomni-control-hover) !important;
 }
 
 

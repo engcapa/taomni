@@ -45,7 +45,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           {status === "ready" && distros.length > 0 ? (
             <select
               data-testid="wsl-distro"
-              className="moba-input"
+              className="taomni-input"
               value={distroInList ? opt.distro : ""}
               onChange={(e) => set({ distro: e.target.value })}
             >
@@ -60,7 +60,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           {showFreeText && (
             <input
               data-testid="wsl-distro-text"
-              className="moba-input"
+              className="taomni-input"
               type="text"
               value={opt.distro}
               placeholder={t("wsl.options.distroPlaceholder")}
@@ -86,7 +86,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           <span>{t("wsl.options.user")}</span>
           <input
             data-testid="wsl-user"
-            className="moba-input"
+            className="taomni-input"
             type="text"
             value={opt.user ?? ""}
             placeholder={t("wsl.options.userPlaceholder")}
@@ -98,7 +98,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           <span>{t("wsl.options.cwd")}</span>
           <input
             data-testid="wsl-cwd"
-            className="moba-input"
+            className="taomni-input"
             type="text"
             value={opt.cwd ?? ""}
             placeholder={t("wsl.options.cwdPlaceholder")}
@@ -106,7 +106,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           />
           <button
             type="button"
-            className="moba-btn"
+            className="taomni-btn"
             onClick={() => void handleBrowseCwd()}
           >
             {t("wsl.options.cwdBrowse")}
@@ -117,7 +117,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           <span>{t("wsl.options.initialCommand")}</span>
           <input
             data-testid="wsl-initial-cmd"
-            className="moba-input"
+            className="taomni-input"
             type="text"
             value={opt.initialCommand ?? ""}
             placeholder={t("wsl.options.initialCommandPlaceholder")}
@@ -130,7 +130,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           <input
             data-testid="wsl-admin"
             type="checkbox"
-            className="moba-checkbox"
+            className="taomni-checkbox"
             checked={opt.asAdministrator ?? false}
             onChange={(e) => set({ asAdministrator: e.target.checked || undefined })}
           />
@@ -146,10 +146,10 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
           style={{
             display: "block",
             padding: "8px 10px",
-            background: "var(--moba-input-bg)",
-            border: "1px solid var(--moba-divider)",
+            background: "var(--taomni-input-bg)",
+            border: "1px solid var(--taomni-divider)",
             borderRadius: 4,
-            color: "var(--moba-text)",
+            color: "var(--taomni-text)",
             fontSize: 12,
             whiteSpace: "pre-wrap",
             wordBreak: "break-all",
@@ -180,7 +180,7 @@ function row(): React.CSSProperties {
 function hint(): React.CSSProperties {
   return {
     fontSize: 11,
-    color: "var(--moba-text-muted)",
+    color: "var(--taomni-text-muted)",
     marginLeft: 8,
     marginBottom: 4,
   };

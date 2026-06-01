@@ -8,11 +8,11 @@
  */
 import type { Plugin } from "vite";
 
-export const RDP_BRIDGE_PATH = "/__newmob/rdp-bridge";
+export const RDP_BRIDGE_PATH = "/__taomni/rdp-bridge";
 
 export function rdpProxyPlugin(): Plugin {
   return {
-    name: "newmob-rdp-proxy",
+    name: "taomni-rdp-proxy",
     configureServer(server) {
       server.middlewares.use(RDP_BRIDGE_PATH, (_req, res) => {
         res.statusCode = 501;

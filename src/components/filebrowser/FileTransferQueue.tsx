@@ -46,15 +46,15 @@ export function FileTransferQueue({
   const filtered = sessionId ? items.filter((it) => it.sessionId === sessionId) : items;
 
   return (
-    <div data-testid="sftp-transfer-queue" className="border-t flex flex-col shrink-0" style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}>
+    <div data-testid="sftp-transfer-queue" className="border-t flex flex-col shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
       <div className="h-5 px-2 flex items-center text-[11px] font-semibold gap-2"
-        style={{ borderBottom: "1px solid var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
+        style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
         <span>{t("fileBrowser.transferTitle")}</span>
-        <span className="text-[var(--moba-text-muted)]">{filtered.length}</span>
+        <span className="text-[var(--taomni-text-muted)]">{filtered.length}</span>
         <div className="flex-1" />
         <button
           type="button"
-          className="px-1 py-0.5 hover:bg-[var(--moba-hover)] rounded inline-flex items-center gap-1"
+          className="px-1 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center gap-1"
           title={t("fileBrowser.transferClearTitle")}
           onClick={clearCompleted}
         >
@@ -66,7 +66,7 @@ export function FileTransferQueue({
         style={{ maxHeight: compact ? 90 : 140, minHeight: compact ? 40 : 60 }}
       >
         {filtered.length === 0 && (
-          <div className="px-2 py-2 text-[var(--moba-text-muted)]">
+          <div className="px-2 py-2 text-[var(--taomni-text-muted)]">
             {t("fileBrowser.transferEmptyText")}
           </div>
         )}
@@ -83,7 +83,7 @@ export function FileTransferQueue({
             <div
               key={it.id}
               className="px-2 py-1 border-b"
-              style={{ borderColor: "var(--moba-divider)" }}
+              style={{ borderColor: "var(--taomni-divider)" }}
             >
               <div className="flex items-center gap-2 truncate">
                 <span style={{ color: it.direction === "upload" ? "#3a7ac0" : "#3da064" }}>
@@ -95,18 +95,18 @@ export function FileTransferQueue({
                   {it.direction === "upload" ? it.remotePath : it.localPath}
                 </span>
                 <StateBadge state={it.state} />
-                <span className="text-[var(--moba-text-muted)]">
+                <span className="text-[var(--taomni-text-muted)]">
                   {formatBytes(it.bytes)} / {formatBytes(it.size)}
                 </span>
                 {it.state === "running" && (
-                  <span className="text-[var(--moba-text-muted)]">
+                  <span className="text-[var(--taomni-text-muted)]">
                     {formatRate(it.rate)} • {formatEta(it.eta)}
                   </span>
                 )}
                 {canPause && (
                   <button
                     type="button"
-                    className="px-1 hover:bg-[var(--moba-hover)] rounded"
+                    className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferPause")}
                     onClick={() => onPause!(it.id)}
                   >
@@ -116,7 +116,7 @@ export function FileTransferQueue({
                 {canResume && (
                   <button
                     type="button"
-                    className="px-1 hover:bg-[var(--moba-hover)] rounded"
+                    className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferResume")}
                     onClick={() => onResume!(it.id)}
                   >
@@ -126,7 +126,7 @@ export function FileTransferQueue({
                 {canRetry && (
                   <button
                     type="button"
-                    className="px-1 hover:bg-[var(--moba-hover)] rounded"
+                    className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferRetryTitle")}
                     onClick={() => onRetry!(it.id)}
                   >
@@ -136,7 +136,7 @@ export function FileTransferQueue({
                 {isInFlight || it.state === "paused" ? (
                   <button
                     type="button"
-                    className="px-1 hover:bg-[var(--moba-hover)] rounded"
+                    className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferCancelTitle")}
                     onClick={() => onCancel(it.id)}
                   >
@@ -145,7 +145,7 @@ export function FileTransferQueue({
                 ) : (
                   <button
                     type="button"
-                    className="px-1 hover:bg-[var(--moba-hover)] rounded"
+                    className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferRemoveTitle")}
                     onClick={() => remove(it.id)}
                   >
@@ -155,7 +155,7 @@ export function FileTransferQueue({
               </div>
               <div
                 className="h-0.5 mt-1 rounded"
-                style={{ background: "var(--moba-divider)" }}
+                style={{ background: "var(--taomni-divider)" }}
               >
                 <div
                   className="h-full rounded"
@@ -168,7 +168,7 @@ export function FileTransferQueue({
                           ? "#3da064"
                           : it.state === "paused"
                             ? "#d99a2b"
-                            : "var(--moba-accent)",
+                            : "var(--taomni-accent)",
                   }}
                 />
               </div>
@@ -186,7 +186,7 @@ export function FileTransferQueue({
 function StateBadge({ state }: { state: TransferState }) {
   const colors: Record<TransferState, string> = {
     queued: "bg-slate-500",
-    running: "bg-[var(--moba-accent)]",
+    running: "bg-[var(--taomni-accent)]",
     paused: "bg-amber-500",
     done: "bg-emerald-600",
     error: "bg-red-600",

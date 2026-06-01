@@ -70,8 +70,8 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
 
   return (
     <div
-      className="border-t border-[var(--moba-divider)] p-2"
-      style={{ background: "var(--moba-panel-bg)" }}
+      className="border-t border-[var(--taomni-divider)] p-2"
+      style={{ background: "var(--taomni-panel-bg)" }}
     >
       {attachments.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1">
@@ -83,7 +83,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
       <div className="flex gap-2 items-end">
         <textarea
           ref={textareaRef}
-          className="moba-input flex-1 text-[12px] resize-none min-h-[56px] max-h-[120px] py-1.5"
+          className="taomni-input flex-1 text-[12px] resize-none min-h-[56px] max-h-[120px] py-1.5"
           placeholder={t("chat.inputPlaceholder")}
           value={text}
           disabled={disabled || sending}
@@ -97,7 +97,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
         />
         <button
           type="button"
-          className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
+          className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
           onClick={handleSend}
           disabled={!text.trim() || sending || disabled}
           title={t("chat.sendShortcutTitle")}

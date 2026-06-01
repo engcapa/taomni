@@ -28,8 +28,8 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--moba-ui-font-family", uiFontFamily);
-    root.style.setProperty("--moba-ui-font-size", `${uiFontSize}px`);
+    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
+    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
   }, [uiFontFamily, uiFontSize]);
 
   // Mirror the transfer queue across same-origin windows so a user can see

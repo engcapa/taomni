@@ -8,6 +8,7 @@ mod database;
 mod filebrowser;
 mod history;
 pub mod llm;
+mod migrate;
 pub mod models;
 mod nettools;
 pub mod perf;
@@ -42,9 +43,15 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("failed to resolve app data dir");
+
+            // One-time migration from the legacy Taomni identity (see migrate.rs).
+            // Runs before the app-data dir is created so the directory rename
+            // targets a non-existent destination on every platform.
+            migrate::run(&app_data);
+
             std::fs::create_dir_all(&app_data).ok();
 
-            let db_path = app_data.join("newmob.db");
+            let db_path = app_data.join("taomni.db");
             let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
             servers::db::init_server_tables(&conn).expect("init server tables");

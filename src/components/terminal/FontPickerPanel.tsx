@@ -57,27 +57,27 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
     <div
       className="flex flex-col w-[260px] rounded shadow-lg border text-[12px]"
       style={{
-        background: "var(--moba-panel-bg)",
-        borderColor: "var(--moba-divider)",
-        color: "var(--moba-text)",
+        background: "var(--taomni-panel-bg)",
+        borderColor: "var(--taomni-divider)",
+        color: "var(--taomni-text)",
       }}
       onClick={(e) => e.stopPropagation()} // Prevent clicking panel from closing or triggering parent clicks
     >
       {/* Search Header */}
-      <div className="p-2 border-b" style={{ borderColor: "var(--moba-divider)" }}>
+      <div className="p-2 border-b" style={{ borderColor: "var(--taomni-divider)" }}>
         <div className="relative flex items-center">
-          <Search className="absolute left-2 w-3.5 h-3.5 text-[var(--moba-text-muted)] pointer-events-none" />
+          <Search className="absolute left-2 w-3.5 h-3.5 text-[var(--taomni-text-muted)] pointer-events-none" />
           <input
             ref={inputRef}
             type="text"
             placeholder={t("fontPicker.searchPlaceholder")}
-            className="moba-input w-full text-[12px] h-7 pl-7 pr-7 font-normal"
+            className="taomni-input w-full text-[12px] h-7 pl-7 pr-7 font-normal"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               background: "rgba(0, 0, 0, 0.15)",
-              border: "1px solid var(--moba-divider)",
-              color: "var(--moba-text)",
+              border: "1px solid var(--taomni-divider)",
+              color: "var(--taomni-text)",
               paddingLeft: "28px",
               paddingRight: "28px",
             }}
@@ -85,7 +85,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
           {searchQuery && (
             <button
               onClick={clearSearch}
-              className="absolute right-2 p-0.5 rounded-full hover:bg-[rgba(255,255,255,0.1)] text-[var(--moba-text-muted)] hover:text-[var(--moba-text)]"
+              className="absolute right-2 p-0.5 rounded-full hover:bg-[rgba(255,255,255,0.1)] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
               type="button"
             >
               <X className="w-3 h-3" />
@@ -100,7 +100,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
         style={{ scrollbarWidth: "thin" }}
       >
         {monospaceFonts.length === 0 && proportionalFonts.length === 0 ? (
-          <div className="px-3 py-4 text-center text-[var(--moba-text-muted)] italic">
+          <div className="px-3 py-4 text-center text-[var(--taomni-text-muted)] italic">
             {t("fontPicker.noResults")}
           </div>
         ) : (
@@ -109,7 +109,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
             {monospaceFonts.length > 0 && (
               <div>
                 <div
-                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--moba-text-muted)]"
+                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--taomni-text-muted)]"
                   style={{ background: "rgba(0, 0, 0, 0.05)" }}
                 >
                   {t("fontPicker.monospaceHeading")}
@@ -121,10 +121,10 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
                       key={font}
                       type="button"
                       onClick={(e) => handleSelect(font, e)}
-                      className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] text-[12px] group"
+                      className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] text-[12px] group"
                     >
                       <span className="w-4 flex-shrink-0 text-center flex items-center justify-center">
-                        {isChecked && <Check className="w-3.5 h-3.5 text-[var(--moba-accent)]" />}
+                        {isChecked && <Check className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />}
                       </span>
                       <span
                         className="flex-1 truncate"
@@ -143,7 +143,7 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
             {proportionalFonts.length > 0 && (
               <div className="mt-1">
                 <div
-                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--moba-text-muted)]"
+                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--taomni-text-muted)]"
                   style={{ background: "rgba(0, 0, 0, 0.05)" }}
                 >
                   {t("fontPicker.proportionalHeading")}
@@ -155,10 +155,10 @@ export function FontPickerPanel({ fonts, selectedFont, onSelect }: FontPickerPan
                       key={font}
                       type="button"
                       onClick={(e) => handleSelect(font, e)}
-                      className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[var(--moba-hover)] text-[12px] group"
+                      className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] text-[12px] group"
                     >
                       <span className="w-4 flex-shrink-0 text-center flex items-center justify-center">
-                        {isChecked && <Check className="w-3.5 h-3.5 text-[var(--moba-accent)]" />}
+                        {isChecked && <Check className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />}
                       </span>
                       <span
                         className="flex-1 truncate"

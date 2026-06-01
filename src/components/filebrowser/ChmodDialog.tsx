@@ -122,13 +122,13 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
         role="dialog"
         aria-label={t("fileBrowser.chmodHeading")}
         className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-1">{t("fileBrowser.chmodHeading")}</div>
         <div
           className="text-[12px] mb-3 break-all"
-          style={{ color: "var(--moba-text-muted)" }}
+          style={{ color: "var(--taomni-text-muted)" }}
           title={summary}
         >
           {summary}
@@ -136,7 +136,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
 
         <table className="w-full text-[12px] mb-3 border-collapse">
           <thead>
-            <tr style={{ color: "var(--moba-text-muted)" }}>
+            <tr style={{ color: "var(--taomni-text-muted)" }}>
               <th className="text-left font-normal pb-1"></th>
               {BIT_ORDER.map((b) => (
                 <th key={b} className="font-normal pb-1 text-center">
@@ -170,7 +170,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
         </table>
 
         <div className="flex items-center gap-2 mb-2 text-[12px]">
-          <label htmlFor="chmod-octal" className="shrink-0" style={{ color: "var(--moba-text-muted)" }}>
+          <label htmlFor="chmod-octal" className="shrink-0" style={{ color: "var(--taomni-text-muted)" }}>
             {t("fileBrowser.chmodOctalLabel")}
           </label>
           <input
@@ -182,13 +182,13 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
             onChange={(e) => handleOctalChange(e.target.value)}
             className="w-16 px-1.5 py-0.5 font-mono text-[12px] rounded"
             style={{
-              background: "var(--moba-input-bg)",
-              border: `1px solid ${octalValid ? "var(--moba-input-border)" : "#c0392b"}`,
-              color: "var(--moba-text)",
+              background: "var(--taomni-input-bg)",
+              border: `1px solid ${octalValid ? "var(--taomni-input-border)" : "#c0392b"}`,
+              color: "var(--taomni-text)",
             }}
             aria-invalid={!octalValid}
           />
-          <span className="font-mono" style={{ color: "var(--moba-text-muted)" }}>
+          <span className="font-mono" style={{ color: "var(--taomni-text-muted)" }}>
             {modeToSymbolic(mode)}
           </span>
         </div>
@@ -207,7 +207,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
         <div className="flex gap-2 justify-end">
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
           >
             {t("fileBrowser.chmodCancel")}
@@ -215,7 +215,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
           <button
             type="button"
             className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={handleApply}
             disabled={!octalValid}
           >

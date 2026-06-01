@@ -141,7 +141,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   };
 
   return (
-    <div className="w-full h-full flex" style={{ background: "var(--moba-bg)" }}>
+    <div className="w-full h-full flex" style={{ background: "var(--taomni-bg)" }}>
       <input
         ref={fileInputRef}
         type="file"
@@ -160,13 +160,13 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
             </div>
             <div>
               <div className="text-xl font-semibold">{t("app.welcomeTitle")}</div>
-              <div className="text-[12px] text-[var(--moba-text-muted)]">
+              <div className="text-[12px] text-[var(--taomni-text-muted)]">
                 {t("app.tagline")}
               </div>
               <div
                 data-testid="welcome-version"
-                className="text-[11px] mt-0.5 moba-mono"
-                style={{ color: "var(--moba-text-muted)" }}
+                className="text-[11px] mt-0.5 taomni-mono"
+                style={{ color: "var(--taomni-text-muted)" }}
               >
                 {t("welcome.versionLabel", { version: __APP_VERSION__ })}
               </div>
@@ -239,13 +239,13 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
             />
           </div>
 
-          <div className="mt-6 text-[12px] text-[var(--moba-text-muted)]">
-            <div className="font-semibold text-[var(--moba-text)] mb-1">{t("welcome.tipsHeading")}</div>
+          <div className="mt-6 text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="font-semibold text-[var(--taomni-text)] mb-1">{t("welcome.tipsHeading")}</div>
             <ul className="list-disc pl-5 space-y-0.5">
               <li
                 dangerouslySetInnerHTML={{
                   __html: t("welcome.tipQuickConnect", {
-                    example: '<span class="moba-mono px-1 border rounded" style="background: var(--moba-input-bg); border-color: var(--moba-divider);">ssh user@host:22</span>',
+                    example: '<span class="taomni-mono px-1 border rounded" style="background: var(--taomni-input-bg); border-color: var(--taomni-divider);">ssh user@host:22</span>',
                   }),
                 }}
               />
@@ -256,10 +256,10 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
 
           <div
             data-testid="welcome-version-footer"
-            className="mt-6 pt-3 flex items-center justify-between text-[11px] moba-mono"
+            className="mt-6 pt-3 flex items-center justify-between text-[11px] taomni-mono"
             style={{
-              borderTop: "1px solid var(--moba-divider)",
-              color: "var(--moba-text-muted)",
+              borderTop: "1px solid var(--taomni-divider)",
+              color: "var(--taomni-text-muted)",
             }}
           >
             <span>{t("app.name")}</span>
@@ -268,7 +268,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
         </div>
       </div>
 
-      <div className="w-[260px] border-l p-3 text-[12px]" style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}>
+      <div className="w-[260px] border-l p-3 text-[12px]" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
         <div className="font-semibold mb-2 flex items-center gap-1"><Activity className="w-3.5 h-3.5" /> {t("welcome.activeConnections")}</div>
         {activeConnections.length === 0 ? (
           <EmptyText>{t("welcome.noActiveConnections")}</EmptyText>
@@ -333,33 +333,33 @@ function LocalTerminalCard({
 
   return (
     <div
-      className="text-left p-3 rounded-md border moba-card-hover"
-      style={{ borderColor: "var(--moba-card-border)", background: "var(--moba-card-bg)" }}
+      className="text-left p-3 rounded-md border taomni-card-hover"
+      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
-        <span style={{ color: "var(--moba-accent)" }}><TerminalIcon className="w-5 h-5" /></span>
+        <span style={{ color: "var(--taomni-accent)" }}><TerminalIcon className="w-5 h-5" /></span>
         <span className="font-semibold">{t("welcome.localTerminal")}</span>
         {kbd && (
           <span
-            className="ml-auto text-[10px] moba-mono px-1.5 py-0.5 rounded border"
+            className="ml-auto text-[10px] taomni-mono px-1.5 py-0.5 rounded border"
             style={{
-              background: "var(--moba-input-bg)",
-              borderColor: "var(--moba-divider)",
-              color: "var(--moba-text-muted)",
+              background: "var(--taomni-input-bg)",
+              borderColor: "var(--taomni-divider)",
+              color: "var(--taomni-text-muted)",
             }}
           >
             {kbd}
           </span>
         )}
       </div>
-      <div className="text-[12px] text-[var(--moba-text-muted)]">
+      <div className="text-[12px] text-[var(--taomni-text-muted)]">
         {selectedShell ? t("welcome.openShell", { shell: selectedShell.name }) : t("welcome.openLocalShell")}
       </div>
 
       <div className="mt-2 space-y-2">
         {hasChoices ? (
           <select
-            className="moba-input h-8 w-full"
+            className="taomni-input h-8 w-full"
             aria-label={t("welcome.terminalShellAria")}
             value={selectedShellId}
             title={selectedShell?.path}
@@ -373,9 +373,9 @@ function LocalTerminalCard({
           </select>
         ) : (
           <div
-            className="moba-input h-8 w-full flex items-center truncate"
+            className="taomni-input h-8 w-full flex items-center truncate"
             title={detail}
-            style={{ color: selectedShell ? "var(--moba-text)" : "var(--moba-text-muted)" }}
+            style={{ color: selectedShell ? "var(--taomni-text)" : "var(--taomni-text-muted)" }}
           >
             {selectedShell?.name ?? (shellStatus === "loading" ? t("welcome.detectingShellsShort") : t("welcome.defaultShell"))}
           </div>
@@ -384,7 +384,7 @@ function LocalTerminalCard({
           {onOpenHomeFolder && (
             <button
               data-testid="welcome-open-home-folder"
-              className="moba-btn h-8 px-3 inline-flex items-center gap-1.5"
+              className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
               onClick={onOpenHomeFolder}
               title={t("welcome.homeFolderTitle")}
               type="button"
@@ -393,12 +393,12 @@ function LocalTerminalCard({
               <span>{t("welcome.homeFolder")}</span>
             </button>
           )}
-          <button data-testid="welcome-open-local-terminal" className="moba-btn h-8 px-3" onClick={onStart} type="button">
+          <button data-testid="welcome-open-local-terminal" className="taomni-btn h-8 px-3" onClick={onStart} type="button">
             {t("welcome.open")}
           </button>
           {canElevate && (
             <button
-              className="moba-btn h-8 px-3 inline-flex items-center gap-1.5"
+              className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
               onClick={onStartAsAdministrator}
               title={t("welcome.adminTitle")}
               aria-label={t("welcome.adminTitle")}
@@ -438,8 +438,8 @@ function WslCard({
   return (
     <div
       data-testid="welcome-wsl-card"
-      className="text-left p-3 rounded-md border moba-card-hover"
-      style={{ borderColor: "var(--moba-card-border)", background: "var(--moba-card-bg)" }}
+      className="text-left p-3 rounded-md border taomni-card-hover"
+      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
         <span style={{ color: "#0078d4" }}>
@@ -447,12 +447,12 @@ function WslCard({
         </span>
         <span className="font-semibold">{t("welcome.openWsl")}</span>
       </div>
-      <div className="text-[12px] text-[var(--moba-text-muted)]">{detail}</div>
+      <div className="text-[12px] text-[var(--taomni-text-muted)]">{detail}</div>
 
       <div className="mt-2 space-y-2">
         <select
           data-testid="welcome-wsl-distro"
-          className="moba-input h-8 w-full"
+          className="taomni-input h-8 w-full"
           aria-label={t("welcome.wslDistroAria")}
           value={selectedDistro}
           onChange={(event) => onSelectDistro(event.target.value)}
@@ -466,7 +466,7 @@ function WslCard({
         <div className="flex items-center justify-end gap-2 flex-wrap">
           <button
             data-testid="welcome-wsl-open"
-            className="moba-btn h-8 px-3"
+            className="taomni-btn h-8 px-3"
             onClick={onStart}
             type="button"
           >
@@ -493,28 +493,28 @@ function ActionCard({
 }) {
   return (
     <button
-      className="text-left p-3 rounded-md border moba-card-hover"
-      style={{ borderColor: "var(--moba-card-border)", background: "var(--moba-card-bg)" }}
+      className="text-left p-3 rounded-md border taomni-card-hover"
+      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
       onClick={onClick}
       type="button"
     >
       <div className="flex items-center gap-2 mb-1">
-        <span style={{ color: "var(--moba-accent)" }}>{icon}</span>
+        <span style={{ color: "var(--taomni-accent)" }}>{icon}</span>
         <span className="font-semibold">{title}</span>
         {kbd && (
           <span
-            className="ml-auto text-[10px] moba-mono px-1.5 py-0.5 rounded border"
+            className="ml-auto text-[10px] taomni-mono px-1.5 py-0.5 rounded border"
             style={{
-              background: "var(--moba-input-bg)",
-              borderColor: "var(--moba-divider)",
-              color: "var(--moba-text-muted)",
+              background: "var(--taomni-input-bg)",
+              borderColor: "var(--taomni-divider)",
+              color: "var(--taomni-text-muted)",
             }}
           >
             {kbd}
           </span>
         )}
       </div>
-      <div className="text-[12px] text-[var(--moba-text-muted)]">{desc}</div>
+      <div className="text-[12px] text-[var(--taomni-text-muted)]">{desc}</div>
     </button>
   );
 }
@@ -525,7 +525,7 @@ function ConnRow({ color, name, meta }: { color: string; name: string; meta: str
       <span className="w-2 h-2 rounded-full" style={{ background: color }} />
       <div className="flex-1 min-w-0">
         <div className="truncate">{name}</div>
-        <div className="text-[10px] text-[var(--moba-text-muted)] moba-mono">{meta}</div>
+        <div className="text-[10px] text-[var(--taomni-text-muted)] taomni-mono">{meta}</div>
       </div>
     </div>
   );
@@ -535,12 +535,12 @@ function EventRow({ icon, text, tone }: { icon: string; text: string; tone: "ok"
   const colors = { ok: "#2f8a3e", info: "#1e5fa8", warn: "#a86b16" }[tone];
   return (
     <div className="flex items-start gap-2 py-0.5 text-[11px]">
-      <span style={{ color: colors }} className="moba-mono w-3">{icon}</span>
-      <span className="text-[var(--moba-text-muted)]">{text}</span>
+      <span style={{ color: colors }} className="taomni-mono w-3">{icon}</span>
+      <span className="text-[var(--taomni-text-muted)]">{text}</span>
     </div>
   );
 }
 
 function EmptyText({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] text-[var(--moba-text-muted)] py-1">{children}</div>;
+  return <div className="text-[11px] text-[var(--taomni-text-muted)] py-1">{children}</div>;
 }

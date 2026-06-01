@@ -19,7 +19,7 @@ steps:
   - seed_dialog: {confirm: true}
   - right_click: { selector: "[data-testid=\"session-tree\"]", position: { x: 16, y: 16 } }
   - wait_for: "[data-testid=\"context-menu\"]"
-  - assert_visible: '[data-testid="context-menu"] >> text=/Export NewMob session/i'
+  - assert_visible: '[data-testid="context-menu"] >> text=/Export Taomni session/i'
   - press: Escape
   - right_click: { selector: "[data-testid=\"session-tree\"]", position: { x: 16, y: 16 } }
   - wait_for: "[data-testid=\"context-menu\"]"

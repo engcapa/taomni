@@ -12,8 +12,8 @@ vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
 }));
 
-const STORAGE_KEY = "newmob.terminalProfile.v1";
-const APP_THEME_STORAGE_KEY = "newmob.appTheme.v1";
+const STORAGE_KEY = "taomni.terminalProfile.v1";
+const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
@@ -73,19 +73,19 @@ describe("SettingsPanel", () => {
     // Select alternative UI font
     const fontSelect = screen.getByLabelText("UI Font Family");
     await user.selectOptions(fontSelect, '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
-    expect(window.localStorage.getItem("newmob.uiFontFamily")).toContain("Outfit");
+    expect(window.localStorage.getItem("taomni.uiFontFamily")).toContain("Outfit");
 
     // Slider for base size
     const sizeSlider = screen.getByLabelText("UI Base Font Size");
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(sizeSlider, { target: { value: "16" } });
-    expect(window.localStorage.getItem("newmob.uiFontSize")).toBe("16");
+    expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("16");
 
     // Test Reset UI Font button
     const resetButton = screen.getByRole("button", { name: "Reset UI Font" });
     await user.click(resetButton);
-    expect(window.localStorage.getItem("newmob.uiFontFamily")).toContain("Inter");
-    expect(window.localStorage.getItem("newmob.uiFontSize")).toBe("12");
+    expect(window.localStorage.getItem("taomni.uiFontFamily")).toContain("Inter");
+    expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("12");
   });
 });
 

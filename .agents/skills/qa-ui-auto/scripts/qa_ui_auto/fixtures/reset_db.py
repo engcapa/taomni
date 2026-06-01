@@ -1,11 +1,11 @@
-"""Reset NewMob persistent state per case.
+"""Reset Taomni persistent state per case.
 
-Browser mode: clear localStorage keys (newmob.sessions.v1, newmob.groups.v1,
-newmob.tunnels.v1, newmob.appTheme.v1, newmob.terminalProfile.v1, newmob.compactMode,
-newmob.sftp.*).
+Browser mode: clear localStorage keys (taomni.sessions.v1, taomni.groups.v1,
+taomni.tunnels.v1, taomni.appTheme.v1, taomni.terminalProfile.v1, taomni.compactMode,
+taomni.sftp.*).
 
-Native mode: delete the SQLite DB at <app_data_dir>/newmob.db. The path is
-computed from the bundle identifier 'com.newmob.app' which is stable in
+Native mode: delete the SQLite DB at <app_data_dir>/taomni.db. The path is
+computed from the bundle identifier 'com.taomni.app' which is stable in
 src-tauri/tauri.conf.json. Each worker uses XDG_DATA_HOME=<run>/data-w<N>
 so per-worker isolation is automatic.
 """
@@ -18,20 +18,20 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-BUNDLE_ID = "com.newmob.app"
+BUNDLE_ID = "com.taomni.app"
 
 LOCAL_STORAGE_KEYS = [
-    "newmob.sessions.v1",
-    "newmob.groups.v1",
-    "newmob.tunnels.v1",
-    "newmob.appTheme.v1",
-    "newmob.terminalProfile.v1",
-    "newmob.compactMode",
+    "taomni.sessions.v1",
+    "taomni.groups.v1",
+    "taomni.tunnels.v1",
+    "taomni.appTheme.v1",
+    "taomni.terminalProfile.v1",
+    "taomni.compactMode",
 ]
 LOCAL_STORAGE_PREFIXES = [
-    "newmob.sftp.",
-    "newmob.tab.",
-    "newmob.recent.",
+    "taomni.sftp.",
+    "taomni.tab.",
+    "taomni.recent.",
 ]
 
 
@@ -99,8 +99,8 @@ def _reset_browser(ctx: Any) -> None:
 
 def _reset_native(ctx: Any) -> None:
     data_dir = _native_app_data_dir()
-    db = data_dir / "newmob.db"
-    for path in (db, data_dir / "newmob.db-wal", data_dir / "newmob.db-shm"):
+    db = data_dir / "taomni.db"
+    for path in (db, data_dir / "taomni.db-wal", data_dir / "taomni.db-shm"):
         try:
             if path.exists():
                 path.unlink()

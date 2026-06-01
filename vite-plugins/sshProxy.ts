@@ -4,7 +4,7 @@ import { Client, type ClientChannel, type ConnectConfig } from "ssh2";
 import type { Duplex } from "stream";
 import type { IncomingMessage } from "http";
 
-export const SSH_BRIDGE_PATH = "/__newmob/ssh-bridge";
+export const SSH_BRIDGE_PATH = "/__taomni/ssh-bridge";
 
 const HIGH_WATER = 1024 * 1024;
 const LOW_WATER = 256 * 1024;
@@ -127,7 +127,7 @@ export function sshProxyPlugin(): Plugin {
   let wss: WebSocketServer | null = null;
 
   return {
-    name: "newmob-ssh-proxy",
+    name: "taomni-ssh-proxy",
     apply: "serve",
     configureServer(server: ViteDevServer) {
       wss = new WebSocketServer({ noServer: true });

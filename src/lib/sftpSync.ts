@@ -1,7 +1,7 @@
 /**
  * Cross-window mirror for the SFTP UI.
  *
- * Each NewMob window — main app or detached SFTP window — runs its own
+ * Each Taomni window — main app or detached SFTP window — runs its own
  * `transferStore` and own `sftpStore`. When the user opens an SFTP browser
  * in its own window we want both windows to stay in sync:
  *
@@ -18,7 +18,7 @@
 import { useTransferStore } from "../stores/transferStore";
 import type { TransferItem } from "./sftp";
 
-const CHANNEL = "newmob.sftp.sync";
+const CHANNEL = "taomni.sftp.sync";
 const senderId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 type ItemsMessage = {

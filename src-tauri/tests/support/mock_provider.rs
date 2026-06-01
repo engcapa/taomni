@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream, StreamExt};
-use newmob_lib::llm::{
+use taomni_lib::llm::{
     ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError, LlmResult, TokenUsage,
 };
 use std::sync::{Arc, Mutex};

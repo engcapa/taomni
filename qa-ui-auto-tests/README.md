@@ -1,6 +1,6 @@
 # qa-ui-auto-tests/
 
-End-to-end UI test artifacts for NewMob, consumed by the `qa-ui-auto` skill.
+End-to-end UI test artifacts for Taomni, consumed by the `qa-ui-auto` skill.
 
 ## Layout
 

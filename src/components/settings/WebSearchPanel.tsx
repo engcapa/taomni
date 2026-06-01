@@ -30,7 +30,7 @@ export function WebSearchPanel() {
     if (!config) loadConfig();
   }, []);
 
-  if (!config) return <div className="text-[12px] text-[var(--moba-text-muted)]">{t("aiSettings.loading")}</div>;
+  if (!config) return <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
 
   const ws = config.web_search;
 
@@ -56,7 +56,7 @@ export function WebSearchPanel() {
     <div className="space-y-3">
       <div>
         <div className="text-[13px] font-semibold">{t("aiSettings.webTitle")}</div>
-        <div className="text-[11px] text-[var(--moba-text-muted)]">
+        <div className="text-[11px] text-[var(--taomni-text-muted)]">
           {t("aiSettings.webSubtitle")}
         </div>
       </div>
@@ -65,19 +65,19 @@ export function WebSearchPanel() {
       <div
         className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
           ws.client_enabled
-            ? "border-[var(--moba-accent)]/40 bg-[var(--moba-accent)]/5"
-            : "border-[var(--moba-divider)] bg-[var(--moba-bg)]"
+            ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"
+            : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
         }`}
         onClick={() => update({ client_enabled: !ws.client_enabled })}
       >
-        <Globe className={`w-4 h-4 shrink-0 ${ws.client_enabled ? "text-[var(--moba-accent)]" : "text-[var(--moba-text-muted)]"}`} />
+        <Globe className={`w-4 h-4 shrink-0 ${ws.client_enabled ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
         <div className="flex-1">
           <div className="text-[13px] font-semibold">{t("aiSettings.webEnable")}</div>
-          <div className="text-[11px] text-[var(--moba-text-muted)]">
+          <div className="text-[11px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.webEnableDesc")}
           </div>
         </div>
-        <div className={`w-9 h-5 rounded-full transition-colors relative ${ws.client_enabled ? "bg-[var(--moba-accent)]" : "bg-[var(--moba-divider)]"}`}>
+        <div className={`w-9 h-5 rounded-full transition-colors relative ${ws.client_enabled ? "bg-[var(--taomni-accent)]" : "bg-[var(--taomni-divider)]"}`}>
           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${ws.client_enabled ? "translate-x-4" : "translate-x-0.5"}`} />
         </div>
       </div>
@@ -86,7 +86,7 @@ export function WebSearchPanel() {
         <>
           {/* Provider selection */}
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("aiSettings.webProvider")}</div>
+            <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.webProvider")}</div>
             <div className="space-y-1">
               {PROVIDER_OPTIONS.map(({ value, label }) => (
                 <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -96,7 +96,7 @@ export function WebSearchPanel() {
                     value={value}
                     checked={ws.client_provider === value}
                     onChange={() => update({ client_provider: value })}
-                    className="accent-[var(--moba-accent)]"
+                    className="accent-[var(--taomni-accent)]"
                   />
                   <span className="text-[12px]">{label}</span>
                 </label>
@@ -107,18 +107,18 @@ export function WebSearchPanel() {
           {/* SearXNG URL */}
           {ws.client_provider === "searxng" && (
             <div>
-              <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">{t("aiSettings.webSearxngUrl")}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1">{t("aiSettings.webSearxngUrl")}</div>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  className="moba-input h-7 flex-1 text-[12px]"
+                  className="taomni-input h-7 flex-1 text-[12px]"
                   placeholder="https://searx.be"
                   value={ws.searxng_url ?? ""}
                   onChange={(e) => update({ searxng_url: e.target.value || undefined })}
                 />
                 <button
                   type="button"
-                  className="moba-btn h-7 px-2 text-[11px] inline-flex items-center gap-1 shrink-0"
+                  className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1 shrink-0"
                   onClick={handleProbe}
                   disabled={probing}
                 >
@@ -138,7 +138,7 @@ export function WebSearchPanel() {
             ws.client_provider === "exa" ||
             ws.client_provider === "google_cse") && (
             <div>
-              <div className="text-[11px] text-[var(--moba-text-muted)] mb-1">
+              <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1">
                 {ws.client_provider === "tavily" && t("aiSettings.webApiKeyTavily")}
                 {ws.client_provider === "serper" && t("aiSettings.webApiKeySerper")}
                 {ws.client_provider === "brave" && t("aiSettings.webApiKeyBrave")}
@@ -147,7 +147,7 @@ export function WebSearchPanel() {
               </div>
               <input
                 type="password"
-                className="moba-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-[12px]"
                 placeholder={
                   ws.client_provider === "google_cse"
                     ? t("aiSettings.webApiKeyGooglePlaceholder")
@@ -161,7 +161,7 @@ export function WebSearchPanel() {
 
           {/* Confirmation mode */}
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("aiSettings.webConfirmMode")}</div>
+            <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.webConfirmMode")}</div>
             <div className="space-y-1">
               {CONFIRM_MODE_OPTIONS.map(({ value, label, desc }) => (
                 <label key={value} className="flex items-start gap-2 cursor-pointer">
@@ -171,11 +171,11 @@ export function WebSearchPanel() {
                     value={value}
                     checked={ws.confirm_mode === value}
                     onChange={() => update({ confirm_mode: value })}
-                    className="mt-0.5 accent-[var(--moba-accent)]"
+                    className="mt-0.5 accent-[var(--taomni-accent)]"
                   />
                   <div>
                     <div className="text-[12px]">{label}</div>
-                    <div className="text-[10px] text-[var(--moba-text-muted)]">{desc}</div>
+                    <div className="text-[10px] text-[var(--taomni-text-muted)]">{desc}</div>
                   </div>
                 </label>
               ))}

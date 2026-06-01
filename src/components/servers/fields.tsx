@@ -4,8 +4,8 @@ import { selectFolderPath, selectFilePath } from "../../lib/ipc";
 /**
  * Reusable, controlled field primitives for the server settings forms. Every
  * form imports these so the per-type forms stay tiny and visually consistent.
- * All controls use the existing `.moba-input` / `.moba-checkbox` / `.moba-radio`
- * classes and `var(--moba-*)` tokens. Labels are passed in as plain strings
+ * All controls use the existing `.taomni-input` / `.taomni-checkbox` / `.taomni-radio`
+ * classes and `var(--taomni-*)` tokens. Labels are passed in as plain strings
  * (callers resolve i18n via `useT()`), so these primitives carry no copy.
  */
 
@@ -17,7 +17,7 @@ export function FormRow({ label, children }: { label: string; children: ReactNod
     <div className="flex items-center gap-2 mb-1.5 text-[12px]">
       <label
         className="shrink-0 text-right"
-        style={{ width: LABEL_WIDTH, color: "var(--moba-text-muted)" }}
+        style={{ width: LABEL_WIDTH, color: "var(--taomni-text-muted)" }}
       >
         {label}
       </label>
@@ -53,7 +53,7 @@ export function NumberField({
     <FormRow label={label}>
       <input
         type="number"
-        className="moba-input"
+        className="taomni-input"
         style={{ width }}
         value={Number.isFinite(value) ? value : ""}
         min={min}
@@ -91,7 +91,7 @@ export function TextField({
     <FormRow label={label}>
       <input
         type="text"
-        className="moba-input"
+        className="taomni-input"
         style={{ width, maxWidth: "100%" }}
         value={value}
         placeholder={placeholder}
@@ -123,13 +123,13 @@ export function CheckboxField({
       <label className="flex items-center gap-1.5 text-[12px] cursor-pointer">
         <input
           type="checkbox"
-          className="moba-checkbox"
+          className="taomni-checkbox"
           checked={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
         {checkboxLabel ? (
-          <span style={{ color: "var(--moba-text)" }}>{checkboxLabel}</span>
+          <span style={{ color: "var(--taomni-text)" }}>{checkboxLabel}</span>
         ) : null}
       </label>
     </FormRow>
@@ -161,7 +161,7 @@ export function SelectField({
   return (
     <FormRow label={label}>
       <select
-        className="moba-input appearance-none"
+        className="taomni-input appearance-none"
         style={{ width }}
         value={value}
         disabled={disabled}
@@ -198,7 +198,7 @@ export function PasswordField({
     <FormRow label={label}>
       <input
         type="password"
-        className="moba-input"
+        className="taomni-input"
         style={{ width, maxWidth: "100%" }}
         value={value}
         placeholder={placeholder}
@@ -246,7 +246,7 @@ export function PathField({
     <FormRow label={label}>
       <input
         type="text"
-        className="moba-input"
+        className="taomni-input"
         style={{ width: 240, maxWidth: "100%" }}
         value={value}
         placeholder={placeholder}
@@ -255,7 +255,7 @@ export function PathField({
       />
       <button
         type="button"
-        className="moba-btn"
+        className="taomni-btn"
         disabled={disabled}
         onClick={() => void browse()}
       >
@@ -298,14 +298,14 @@ export function RadioField({
           >
             <input
               type="radio"
-              className="moba-radio"
+              className="taomni-radio"
               name={name}
               value={opt.value}
               checked={value === opt.value}
               disabled={disabled}
               onChange={() => onChange(opt.value)}
             />
-            <span style={{ color: "var(--moba-text)" }}>{opt.label}</span>
+            <span style={{ color: "var(--taomni-text)" }}>{opt.label}</span>
           </label>
         ))}
       </div>
@@ -331,9 +331,9 @@ export function FieldNote({ children, tone = "info" }: FieldNoteProps) {
       className="flex items-start gap-1.5 text-[11px] rounded px-2 py-1.5 mb-1.5 leading-relaxed"
       style={{
         marginLeft: LABEL_WIDTH + 8,
-        background: warning ? "var(--moba-warning-bg)" : "transparent",
-        border: warning ? "1px solid var(--moba-warning-border)" : "none",
-        color: warning ? "var(--moba-warning-text)" : "var(--moba-text-muted)",
+        background: warning ? "var(--taomni-warning-bg)" : "transparent",
+        border: warning ? "1px solid var(--taomni-warning-border)" : "none",
+        color: warning ? "var(--taomni-warning-text)" : "var(--taomni-text-muted)",
       }}
     >
       <span>{children}</span>

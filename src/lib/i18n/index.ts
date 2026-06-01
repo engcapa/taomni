@@ -22,7 +22,7 @@ export const LOCALES: LocaleDescriptor[] = [
 // strings like "menu.terminal.title".
 export type TranslationDict = typeof en;
 
-const LOCALE_STORAGE_KEY = "newmob.locale.v1";
+const LOCALE_STORAGE_KEY = "taomni.locale.v1";
 const FALLBACK_LOCALE: LocaleCode = "en";
 const dictionaries: Record<LocaleCode, TranslationDict> = {
   "en": en,

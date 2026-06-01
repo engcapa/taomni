@@ -13,7 +13,7 @@ impl WebFetchTool {
         Self {
             client: Client::builder()
                 .timeout(Duration::from_secs(10))
-                .user_agent("NewMob/0.1 (web_fetch)")
+                .user_agent("Taomni/0.1 (web_fetch)")
                 .build()
                 .expect("failed to build reqwest client"),
         }

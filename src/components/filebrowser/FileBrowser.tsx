@@ -26,7 +26,7 @@ import { useT, type TranslateFn } from "../../lib/i18n";
 
 type Orientation = "horizontal" | "vertical";
 
-const ORIENTATION_KEY_PREFIX = "newmob.sftp.orientation.";
+const ORIENTATION_KEY_PREFIX = "taomni.sftp.orientation.";
 
 function loadOrientation(scope: string, fallback: Orientation): Orientation {
   try {
@@ -473,11 +473,11 @@ export function FileBrowser(props: FileBrowserProps) {
   const showCwdToolbar = !!props.onRequestTerminalCwd || props.cwdHint != null;
 
   return (
-    <div data-testid="sftp-browser" className="w-full h-full flex flex-col" style={{ background: "var(--moba-bg)" }}>
+    <div data-testid="sftp-browser" className="w-full h-full flex flex-col" style={{ background: "var(--taomni-bg)" }}>
       {props.showHeader && (
         <div
           className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0 gap-1"
-          style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           <span className="truncate flex-1">{props.title ?? t("fileBrowser.headerSftp")}</span>
           <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
@@ -485,7 +485,7 @@ export function FileBrowser(props: FileBrowserProps) {
             <button
               data-testid="sftp-detach"
               type="button"
-              className="px-1 hover:bg-[var(--moba-hover)] rounded"
+              className="px-1 hover:bg-[var(--taomni-hover)] rounded"
               title={t("fileBrowser.detachOpenInWindow")}
               onClick={props.onDetach}
             >
@@ -496,7 +496,7 @@ export function FileBrowser(props: FileBrowserProps) {
             <button
               data-testid="sftp-close"
               type="button"
-              className="px-1 hover:bg-[var(--moba-hover)] rounded"
+              className="px-1 hover:bg-[var(--taomni-hover)] rounded"
               title={t("fileBrowser.hideSftpPanel")}
               onClick={props.onClose}
             >
@@ -509,9 +509,9 @@ export function FileBrowser(props: FileBrowserProps) {
         <div
           className="text-[11px] px-2 py-1 border-b shrink-0 flex items-center gap-2"
           style={{
-            borderColor: "var(--moba-divider)",
-            background: "var(--moba-quick-bg)",
-            color: "var(--moba-text-muted)",
+            borderColor: "var(--taomni-divider)",
+            background: "var(--taomni-quick-bg)",
+            color: "var(--taomni-text-muted)",
           }}
         >
           <span className="shrink-0">{t("fileBrowser.terminalCwdLabel")}</span>
@@ -520,10 +520,10 @@ export function FileBrowser(props: FileBrowserProps) {
           </span>
           <button
             type="button"
-            className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--moba-hover)] shrink-0"
+            className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] shrink-0"
             title={t("fileBrowser.terminalCwdQueryTitle")}
             onClick={syncToTerminalCwd}
-            style={{ color: "var(--moba-accent)" }}
+            style={{ color: "var(--taomni-accent)" }}
           >
             <Link2 className="w-3 h-3" />
             <span>{t("fileBrowser.terminalCwdSync")}</span>
@@ -537,9 +537,9 @@ export function FileBrowser(props: FileBrowserProps) {
         <div
           className="text-[11px] px-2 py-1 border-b shrink-0"
           style={{
-            borderColor: "var(--moba-divider)",
-            background: session?.error ? "#fde7e2" : "var(--moba-quick-bg)",
-            color: session?.error ? "#7a1f0a" : "var(--moba-text)",
+            borderColor: "var(--taomni-divider)",
+            background: session?.error ? "#fde7e2" : "var(--taomni-quick-bg)",
+            color: session?.error ? "#7a1f0a" : "var(--taomni-text)",
           }}
         >
           {banner}
@@ -637,8 +637,8 @@ export function FileBrowser(props: FileBrowserProps) {
           <PanelResizeHandle
             className={
               orientation === "horizontal"
-                ? "w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize"
-                : "h-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-row-resize"
+                ? "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
+                : "h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize"
             }
           />
           <Panel defaultSize={50} minSize={15} className="flex flex-col min-h-0 min-w-0">
@@ -715,9 +715,9 @@ export function FileBrowser(props: FileBrowserProps) {
       <div
         className="text-[11px] px-2 py-1 border-t shrink-0 flex items-center gap-2"
         style={{
-          borderColor: "var(--moba-divider)",
-          background: "var(--moba-quick-bg)",
-          color: "var(--moba-text-muted)",
+          borderColor: "var(--taomni-divider)",
+          background: "var(--taomni-quick-bg)",
+          color: "var(--taomni-text-muted)",
         }}
       >
         <ArrowLeftRight className="w-3 h-3" />
@@ -728,7 +728,7 @@ export function FileBrowser(props: FileBrowserProps) {
           type="button"
           disabled
           className="ml-auto px-1.5 py-0.5 rounded text-[10px] opacity-50 cursor-not-allowed"
-          style={{ border: "1px solid var(--moba-divider)" }}
+          style={{ border: "1px solid var(--taomni-divider)" }}
           title={t("fileBrowser.crossHostPickPeerTitle")}
         >
           {t("fileBrowser.crossHostPickPeer")}
@@ -795,14 +795,14 @@ function OrientationToggle({
     <button
       data-testid="sftp-orientation-toggle"
       type="button"
-      className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--moba-hover)] shrink-0"
+      className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] shrink-0"
       title={
         orientation === "horizontal"
           ? t("fileBrowser.orientationToggleStackTitle")
           : t("fileBrowser.orientationToggleSideTitle")
       }
       onClick={() => onChange(next)}
-      style={{ color: "var(--moba-text-muted)" }}
+      style={{ color: "var(--taomni-text-muted)" }}
     >
       {orientation === "horizontal" ? (
         <Columns className="w-3 h-3" />
@@ -838,25 +838,25 @@ function DownloadPrompt({
         role="dialog"
         aria-modal="true"
         className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-2">{t("fileBrowser.downloadPromptTitle")}</div>
-        <div className="text-[12px] mb-3 break-all" style={{ color: "var(--moba-text-muted)" }}>
+        <div className="text-[12px] mb-3 break-all" style={{ color: "var(--taomni-text-muted)" }}>
           {t("fileBrowser.downloadPromptDescription", { name: entry.name })}
           <div className="mt-1 font-mono text-[11px]">{joinPath(localDir, entry.name)}</div>
         </div>
         <div className="flex gap-2 justify-end">
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
           >
             {t("fileBrowser.chmodCancel")}
           </button>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--moba-hover)]"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
             onClick={() => onDownload(false)}
           >
             {t("fileBrowser.downloadPromptDownloadOnly")}
@@ -864,7 +864,7 @@ function DownloadPrompt({
           <button
             type="button"
             className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: "var(--moba-accent)" }}
+            style={{ background: "var(--taomni-accent)" }}
             onClick={() => onDownload(true)}
           >
             {t("fileBrowser.downloadPromptDownloadAndOpen")}
@@ -897,20 +897,20 @@ function PreviewModal({
         role="dialog"
         aria-modal="true"
         className="w-[80vw] h-[70vh] rounded shadow-lg flex flex-col"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-1.5 text-[12px] flex items-center border-b"
-          style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}>
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <span className="font-semibold">{name}</span>
-          <span className="ml-2 text-[var(--moba-text-muted)]">{path}</span>
+          <span className="ml-2 text-[var(--taomni-text-muted)]">{path}</span>
           <div className="flex-1" />
-          <button type="button" className="px-2 py-0.5 hover:bg-[var(--moba-hover)] rounded" onClick={onClose}>
+          <button type="button" className="px-2 py-0.5 hover:bg-[var(--taomni-hover)] rounded" onClick={onClose}>
             {t("fileBrowser.previewClose")}
           </button>
         </div>
         <pre className="flex-1 overflow-auto px-3 py-2 text-[12px] font-mono whitespace-pre-wrap break-all"
-          style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
+          style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
 {text}
         </pre>
       </div>

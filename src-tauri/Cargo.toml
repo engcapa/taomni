@@ -1,14 +1,14 @@
 [package]
-name = "newmob"
+name = "taomni"
 version = "0.1.0"
-description = "Cross-platform remote connection manager"
+description = "AI-native remote workspace for developers"
 authors = ["engcapa"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "newmob_lib"
+name = "taomni_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

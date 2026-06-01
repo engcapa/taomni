@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NewMob AI 原生能力 — 测试建议</title>
+<title>Taomni AI 原生能力 — 测试建议</title>
 <style>
 :root{--bg:#fafafa;--fg:#1a1a1a;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb;--code-bg:#f3f4f6;--th:#f9fafb;--warn:#f59e0b;--warn-bg:#fef3c7}
 @media (prefers-color-scheme:dark){:root{--bg:#0f172a;--fg:#e2e8f0;--muted:#94a3b8;--accent:#60a5fa;--border:#334155;--code-bg:#1e293b;--th:#1e293b;--warn:#fbbf24;--warn-bg:#422006}}
@@ -38,7 +38,7 @@ footer{color:var(--muted);font-size:13px;text-align:center;margin-top:48px;paddi
 </head>
 <body>
 <div class="container">
-<h1>NewMob AI 原生能力 — 测试建议</h1>
+<h1>Taomni AI 原生能力 — 测试建议</h1>
 <p class="subtitle">从准备模型 / 配置到手工冒烟的指导 · 基于 ai-native-plan.md v2.0–v2.6 全 ✅ 已落地代码</p>
 <div class="toc">
 <h3>目录</h3>
@@ -82,8 +82,8 @@ footer{color:var(--muted);font-size:13px;text-align:center;margin-top:48px;paddi
 </blockquote>
 
 <h3>清理基线（每次大版本回归建议）</h3>
-<pre><code>rm -rf ~/.config/newmob/ai.json ~/.cache/newmob/  # Linux/macOS
-# Windows: del %APPDATA%\newmob\ai.json &amp; rmdir /s /q %LOCALAPPDATA%\newmob</code></pre>
+<pre><code>rm -rf ~/.config/taomni/ai.json ~/.cache/taomni/  # Linux/macOS
+# Windows: del %APPDATA%\taomni\ai.json &amp; rmdir /s /q %LOCALAPPDATA%\taomni</code></pre>
 
 <h2 id="sec-1">1. 第一层：cloud-only 开箱即用（80 MB，最快路径）</h2>
 <p><strong>目标</strong>：纯云 LLM + 不开语音 / 不开 FIM，验证"装好就能聊"。</p>
@@ -112,7 +112,7 @@ footer{color:var(--muted);font-size:13px;text-align:center;margin-top:48px;paddi
 <h3>模型准备</h3>
 <ul>
 <li>设置 → AI → 模型库 → <code>Streaming Zipformer (zh-en, small)</code> → 点"下载"</li>
-<li>下载到 <code>&lt;cache&gt;/newmob/models/asr_sherpa_zipformer_zh_en_small/sherpa-onnx-streaming-zipformer-bilingual-zh-en-small.tar.bz2</code></li>
+<li>下载到 <code>&lt;cache&gt;/taomni/models/asr_sherpa_zipformer_zh_en_small/sherpa-onnx-streaming-zipformer-bilingual-zh-en-small.tar.bz2</code></li>
 <li>下载完成后在面板上 → "校验" 期望 SHA-256 通过</li>
 </ul>
 
@@ -152,7 +152,7 @@ footer{color:var(--muted);font-size:13px;text-align:center;margin-top:48px;paddi
 <tr><td>默认 chat（可选）</td><td><code>llm_qwen3_1_7b_q4_k_m</code></td><td>1.4 GB</td></tr>
 </tbody>
 </table>
-<p>设置 → AI → 模型库 → 逐个下载；<code>models_verify</code> 全过；二进制落到 <code>&lt;cache&gt;/newmob/binaries/sidecar_llama_server_*/llama-server[.exe]</code></p>
+<p>设置 → AI → 模型库 → 逐个下载；<code>models_verify</code> 全过；二进制落到 <code>&lt;cache&gt;/taomni/binaries/sidecar_llama_server_*/llama-server[.exe]</code></p>
 
 <h3>配置</h3>
 <ul>
@@ -237,10 +237,10 @@ footer{color:var(--muted);font-size:13px;text-align:center;margin-top:48px;paddi
 <h3>冒烟点</h3>
 <ul>
 <li>设置 → 高级后端 → 启用 → 探针通过 → Drawer 顶部多出 <code>Claude Code (本机)</code> 选项</li>
-<li>thread 切到 CC → "分析 src/components/terminal/TerminalPanel.tsx 的事件流" → CC 调 Read/Grep → 每次工具调用弹 NewMob ActionCard（permissions_mcp 收口验证）</li>
+<li>thread 切到 CC → "分析 src/components/terminal/TerminalPanel.tsx 的事件流" → CC 调 Read/Grep → 每次工具调用弹 Taomni ActionCard（permissions_mcp 收口验证）</li>
 <li>CC 试图执行 <code>rm -rf /</code> → §5.3 黑名单在 permission_prompt 层拦下</li>
 <li>CC 试图读 <code>~/.ssh/id_rsa</code> → <code>--add-dir</code> 白名单 + deny 列表双重拒绝</li>
-<li>关闭 NewMob 再开同 thread → <code>--resume</code> 续接（看 <code>cc_session_id</code> 字段是否复用）</li>
+<li>关闭 Taomni 再开同 thread → <code>--resume</code> 续接（看 <code>cc_session_id</code> 字段是否复用）</li>
 <li>全本地模式打开 → CC 选项整段隐藏</li>
 </ul>
 
@@ -274,11 +274,11 @@ Phase 7  (15m)  边界用例
 
 <h2 id="sec-9">9. 常见踩坑</h2>
 <ul>
-<li><strong>Tauri sidecar bundle</strong>：<code>tauri.conf.json</code> 里 <code>bundle.externalBin</code> 现在已不打包 sidecar，运行期从 <code>&lt;cache&gt;/newmob/binaries/</code> 读。开发模式（<code>pnpm tauri dev</code>）首次启动如果没下过二进制 → <code>sidecar_status.binary_installed:false</code> → 必须先去模型库下载，<strong>不会</strong>自动从源码树拷</li>
+<li><strong>Tauri sidecar bundle</strong>：<code>tauri.conf.json</code> 里 <code>bundle.externalBin</code> 现在已不打包 sidecar，运行期从 <code>&lt;cache&gt;/taomni/binaries/</code> 读。开发模式（<code>pnpm tauri dev</code>）首次启动如果没下过二进制 → <code>sidecar_status.binary_installed:false</code> → 必须先去模型库下载，<strong>不会</strong>自动从源码树拷</li>
 <li><strong>manifest SHA-256 placeholder</strong>：当前全是 <code>0000…</code>，正式回归前必须填真值（否则下载层会跳过完整性校验）</li>
 <li><strong>Vulkan 检测 panic</strong>：<code>ash</code> crate 在某些驱动上加载会 panic，代码已用 <code>catch_unwind</code> 包住；若状态栏一直显示"GPU 不可用"且控制台无错，重装 GPU 驱动到 ≥ NV 535 / AMD 24.0</li>
 <li><strong>Windows <code>llama-cpp-2</code> 编译慢/失败</strong>：必须装 LLVM/clang 并在环境变量里能找到 <code>clang.exe</code>；CI 第一次会拖到 5 分钟以上</li>
-<li><strong>GLM key 在 ai.json 里能看到明文</strong>：保存时前端会自动转 <code>vault:&lt;id&gt;</code> 引用，看 <code>~/.config/newmob/ai.json</code> 里如果还是明文说明 vault 没解锁——先在设置里设一次 master password</li>
+<li><strong>GLM key 在 ai.json 里能看到明文</strong>：保存时前端会自动转 <code>vault:&lt;id&gt;</code> 引用，看 <code>~/.config/taomni/ai.json</code> 里如果还是明文说明 vault 没解锁——先在设置里设一次 master password</li>
 <li><strong>chat-stream 事件丢包</strong>：Drawer 流式断断续续 → 多半是 <code>chat_stream</code> 命令失败回退到非流式 <code>chat_send</code>，看控制台 console 应有 warning</li>
 </ul>
 
@@ -286,7 +286,7 @@ Phase 7  (15m)  边界用例
 <p>跑完 Phase 0–4 + 边界回归后，应用就具备发版前的最低质量信心；CC 与 Web Search BYOK 视下游用户群是否需要。</p>
 
 <footer>
-NewMob · ai-native-plan.md v2.0–v2.6 · 2026-05-24
+Taomni · ai-native-plan.md v2.0–v2.6 · 2026-05-24
 </footer>
 </div>
 </body>

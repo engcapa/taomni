@@ -40,7 +40,7 @@ steps:
   - assert_visible: '[data-testid="welcome-panel"]'
   - assert_text:
       selector: '[data-testid="welcome-panel"]'
-      contains: Welcome to NewMob
+      contains: Welcome to Taomni
   - assert_text:
       selector: '[data-testid="welcome-panel"]'
       contains: Start local terminal

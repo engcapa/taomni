@@ -1,6 +1,6 @@
-# NewMob
+# Taomni
 
-A cross-platform SSH/terminal client inspired by MobaXterm, built with React + Vite + TypeScript. Originally a Tauri desktop app, adapted to run in the browser on Replit.
+A cross-platform, AI-native SSH/terminal client for developers, built with React + Vite + TypeScript. Originally a Tauri desktop app, adapted to run in the browser on Replit.
 
 ## Architecture
 
@@ -75,7 +75,7 @@ all render the same `<FileBrowser>` component:
    inactive so transfers keep running in the background.
 3. **Detached window** — both attached and standalone variants expose a
    "Detach to window" action that stashes the SFTP credentials in
-   `localStorage` (key `newmob.sftp.detached.<sid>`) and opens `?sftp=<sid>`;
+   `localStorage` (key `taomni.sftp.detached.<sid>`) and opens `?sftp=<sid>`;
    `App.tsx` detects the query param and renders `<SftpDetachedWindow>`
    instead of the main shell. In Tauri the new window is a real OS
    `WebviewWindow` opened via the `open_sftp_window` Rust command (sharing
@@ -100,7 +100,7 @@ The SFTP browser also supports per-view toggles:
 - **Pane orientation** — `<FileBrowser>` accepts `defaultOrientation`
   (`horizontal`/`vertical`) and ships a header toggle so the user can flip
   between side-by-side and stacked layouts. The choice is persisted per
-  `orientationScope` in `localStorage` (`newmob.sftp.orientation.<scope>`).
+  `orientationScope` in `localStorage` (`taomni.sftp.orientation.<scope>`).
   The narrow attached `<SftpSidebar>` defaults to vertical (stacked); the
   full-tab and detached views default to horizontal.
 - **OSC 7 auto-inject** — under *Advanced SSH settings* the user can
@@ -141,7 +141,7 @@ explicit error) and `Remote` → SFTP `setstat`. The browser-preview stub
 no-ops the local case because the in-memory VFS does not track POSIX
 permission bits.
 
-A small `BroadcastChannel` (`newmob.sftp.sync`, see `src/lib/sftpSync.ts`)
+A small `BroadcastChannel` (`taomni.sftp.sync`, see `src/lib/sftpSync.ts`)
 mirrors the in-memory transfer queue across same-origin windows so a
 detached SFTP window and the main app see the same upload/download list.
 
@@ -173,7 +173,7 @@ detached SFTP window and the main app see the same upload/download list.
   `transfers: HashMap<String, Arc<TransferHandle>>`.
 
 **Web mode (dev-only) parity:**
-- `vite-plugins/sftpProxy.ts` — `ws.WebSocketServer` on `/__newmob/sftp-bridge`,
+- `vite-plugins/sftpProxy.ts` — `ws.WebSocketServer` on `/__taomni/sftp-bridge`,
   drives an `ssh2.SFTPWrapper` for remote ops (mirrors the JSON envelope
   protocol of the SSH proxy)
 - `src/stubs/sftpClient.ts` — WebSocket client used by `tauri-core` stub
@@ -185,7 +185,7 @@ detached SFTP window and the main app see the same upload/download list.
 This whole subsystem is dev-only and is **not** part of the Tauri desktop release.
 The Vite dev server hosts an SSH proxy alongside it so the browser preview can talk to real SSH servers:
 
-- **`vite-plugins/sshProxy.ts`** — A Vite plugin that attaches a `ws.WebSocketServer` (noServer mode) to Vite's HTTP server's `upgrade` event, listening on path `/__newmob/ssh-bridge`. For each WS connection it spins up an `ssh2.Client`, opens an interactive shell, and pipes bytes both ways (binary frames are base64-encoded inside small JSON envelopes).
+- **`vite-plugins/sshProxy.ts`** — A Vite plugin that attaches a `ws.WebSocketServer` (noServer mode) to Vite's HTTP server's `upgrade` event, listening on path `/__taomni/ssh-bridge`. For each WS connection it spins up an `ssh2.Client`, opens an interactive shell, and pipes bytes both ways (binary frames are base64-encoded inside small JSON envelopes).
 - **Wire protocol**:
   - Client → server: `{type:"connect",host,port,username,authMethod,authData,cols,rows,test?}` · `{type:"data",data:base64}` · `{type:"resize",cols,rows}` · `{type:"signal",signal}` · `{type:"close"}`
   - Server → client: `{type:"ready"}` (or `{type:"ok",message}` for `test:true`) · `{type:"output",data:base64}` · `{type:"error",message}` · `{type:"closed"}`
@@ -210,7 +210,7 @@ Configured as a **static** site deployment:
 
 ## Notes
 
-- Session data is persisted in `localStorage` (keys: `newmob.sessions.v1`, `newmob.groups.v1`)
+- Session data is persisted in `localStorage` (keys: `taomni.sessions.v1`, `taomni.groups.v1`)
 - SSH connections in browser preview are real (via the WebSocket proxy above). Local PTY and the placeholder protocols (RDP/VNC/SFTP/Telnet/Serial) are still UI-only.
 
 ## Running the Tauri desktop build on Replit (verified)
@@ -229,7 +229,7 @@ viewed through the workspace **Tools → VNC** panel.
   which launches `Xvnc :0` on RFB port `5901` (no auth, 1280x800x24, bound to
   localhost), then `websockify` on `0.0.0.0:5900` to bridge wss → raw RFB,
   plus `fluxbox` as the window manager. It then launches
-  `src-tauri/target/debug/newmob` on `DISPLAY=:0` in the background and
+  `src-tauri/target/debug/taomni` on `DISPLAY=:0` in the background and
   supervises all four children with `wait -n` plus an `EXIT/INT/TERM`
   trap that tears the whole stack down if any one of them dies.
   Replit's Tools → VNC connects via wss to port 5900; the websockify
@@ -252,7 +252,7 @@ viewed through the workspace **Tools → VNC** panel.
 - **Production bundle:** for a release build use `pnpm tauri build` (drop
   `--debug --no-bundle`); on Replit this produces a Linux binary, not a macOS
   `.app` / Windows `.exe` — those still require their respective host OSes.
-- The app theme (light/dark/system) is stored in `localStorage` under `newmob.appTheme.v1`
+- The app theme (light/dark/system) is stored in `localStorage` under `taomni.appTheme.v1`
 - SFTP detached windows: in Tauri they spawn a real `WebviewWindow` via
   the `open_sftp_window` command; in browser preview they fall back to
   `window.open` and report "Browser blocked the SFTP window…" if pop-ups
@@ -263,7 +263,7 @@ viewed through the workspace **Tools → VNC** panel.
 
 Cross-pane drag-and-drop (REMOTE↔LOCAL inside the same SFTP session) is
 implemented via HTML5 drag events in `FilePanel.tsx` using a custom
-`application/x-newmob-files` MIME payload that bundles the current
+`application/x-taomni-files` MIME payload that bundles the current
 selection (multi-select + folder support routed through
 `sftp_upload_dir`/`sftp_download_dir`).
 

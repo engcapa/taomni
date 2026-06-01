@@ -32,7 +32,7 @@ steps:
   - wait: 2
   - assert_text:
       selector: '[data-testid="terminal-pane"]'
-      contains: NewMob SSH terminal
+      contains: Taomni SSH terminal
       timeout_sec: 30
   - click: '[data-testid="terminal-pane"]'
   - send_keys: 'whoami'

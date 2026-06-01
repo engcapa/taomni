@@ -64,7 +64,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         <label style={row()}>
           <span>{t("rdp.options.domain")}</span>
           <input
-            className="moba-input"
+            className="taomni-input"
             type="text"
             value={opt.domain ?? ""}
             onChange={(e) => set({ domain: e.target.value || undefined })}
@@ -75,7 +75,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         <label style={row()}>
           <span>{t("rdp.options.colorDepth")}</span>
           <select
-            className="moba-input"
+            className="taomni-input"
             value={opt.colorDepth}
             onChange={(e) => set({ colorDepth: parseInt(e.target.value, 10) })}
           >
@@ -91,7 +91,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
           <span>{t("rdp.options.screen")}</span>
           <span style={{ display: "inline-flex", gap: 6 }}>
             <input
-              className="moba-input"
+              className="taomni-input"
               type="number"
               min={320}
               max={8192}
@@ -101,7 +101,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             />
             ×
             <input
-              className="moba-input"
+              className="taomni-input"
               type="number"
               min={200}
               max={8192}
@@ -194,7 +194,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             <label style={row()}>
               <span>{t("rdp.options.driveLabel")}</span>
               <input
-                className="moba-input"
+                className="taomni-input"
                 type="text"
                 maxLength={8}
                 value={opt.redirectDrive.label}
@@ -205,7 +205,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             <label style={row()}>
               <span>{t("rdp.options.drivePath")}</span>
               <input
-                className="moba-input"
+                className="taomni-input"
                 type="text"
                 value={opt.redirectDrive.path}
                 onChange={(e) => setDrive({ path: e.target.value })}
@@ -238,7 +238,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             <label style={row()}>
               <span>{t("rdp.options.gatewayHost")}</span>
               <input
-                className="moba-input"
+                className="taomni-input"
                 type="text"
                 value={opt.gateway.host}
                 onChange={(e) => setGateway({ host: e.target.value })}
@@ -249,7 +249,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             <label style={row()}>
               <span>{t("rdp.options.gatewayPort")}</span>
               <input
-                className="moba-input"
+                className="taomni-input"
                 type="number"
                 min={1}
                 max={65535}
@@ -271,7 +271,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
                 <label style={row()}>
                   <span>{t("rdp.options.gatewayUser")}</span>
                   <input
-                    className="moba-input"
+                    className="taomni-input"
                     type="text"
                     value={opt.gateway.username}
                     onChange={(e) => setGateway({ username: e.target.value })}
@@ -281,7 +281,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
                 <label style={row()}>
                   <span>{t("rdp.options.gatewayPassword")}</span>
                   <input
-                    className="moba-input"
+                    className="taomni-input"
                     type="password"
                     value={opt.gateway.password ?? ""}
                     onChange={(e) => setGateway({ password: e.target.value || undefined })}

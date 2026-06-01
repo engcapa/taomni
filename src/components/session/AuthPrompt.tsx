@@ -37,7 +37,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
         data-testid="auth-prompt"
         onSubmit={handleSubmit}
         className="w-[400px] rounded-md shadow-2xl border overflow-hidden"
-        style={{ background: "var(--moba-panel-bg)", borderColor: "var(--moba-chrome-border)", color: "var(--moba-text)" }}
+        style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         <div className="h-8 flex items-center px-3"
              style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
@@ -50,7 +50,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
         </div>
 
         <div className="p-4">
-          <div className="text-[12px] mb-3 text-[var(--moba-text-muted)]">
+          <div className="text-[12px] mb-3 text-[var(--taomni-text-muted)]">
             {t("authPrompt.subtitle", { user: username, host })}
           </div>
           <input
@@ -60,7 +60,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="moba-input w-full h-8 text-[13px]"
+            className="taomni-input w-full h-8 text-[13px]"
             placeholder={t("authPrompt.password")}
           />
           <label
@@ -74,12 +74,12 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             <input
               type="checkbox"
               data-testid="auth-save-to-vault"
-              className="moba-checkbox"
+              className="taomni-checkbox"
               checked={save}
               onChange={(e) => setSave(e.target.checked)}
               disabled={vaultState === "empty"}
             />
-            <span style={{ color: "var(--moba-text-muted)" }}>
+            <span style={{ color: "var(--taomni-text-muted)" }}>
               {vaultState === "empty"
                 ? t("authPrompt.saveToVaultUnsetup")
                 : t("authPrompt.saveToVault")}
@@ -88,14 +88,14 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
         </div>
 
         <div className="h-12 flex items-center justify-end px-3 gap-2 border-t"
-             style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}>
+             style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}>
           <button data-testid="auth-cancel" type="button" onClick={onCancel}
-                  className="moba-btn">
+                  className="taomni-btn">
             {t("authPrompt.cancel")}
           </button>
           <button type="submit"
                   data-testid="auth-submit"
-                  className="moba-btn font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="taomni-btn font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!password}
                   data-primary="true">
             {t("authPrompt.submit")}

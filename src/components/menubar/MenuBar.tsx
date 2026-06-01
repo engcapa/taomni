@@ -23,10 +23,10 @@ import {
   createSessionImportResult,
   parseCsvSessions,
   parseMobaXtermSessions,
-  parseNewMobSessions,
+  parseTaomniSessions,
   serializeCsvSessions,
   serializeMobaXtermSessions,
-  serializeNewMobSessions,
+  serializeTaomniSessions,
   type SessionExportResult,
   type SessionImportResult,
 } from "../../lib/sessionImportExport";
@@ -91,9 +91,9 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
   };
 
   const importJson = () => {
-    openTextFile(".json,.newmob-sessions.json,application/json").then((text) => {
+    openTextFile(".json,.taomni-sessions.json,.taomni-sessions.json,application/json").then((text) => {
       if (!text) return;
-      queueImportPreview(parseNewMobSessions(text, { existingSessions: sessions }), "NewMob");
+      queueImportPreview(parseTaomniSessions(text, { existingSessions: sessions }), "Taomni");
     }).catch(reportError);
   };
 
@@ -138,7 +138,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     }
   };
 
-  const exportJson = () => exportResult("NewMob", serializeNewMobSessions(sessions, null));
+  const exportJson = () => exportResult("Taomni", serializeTaomniSessions(sessions, null));
   const exportMoba = () => exportResult("MobaXterm", serializeMobaXtermSessions(sessions, null));
   const exportCsv = () => exportResult("CSV", serializeCsvSessions(sessions, null));
   const exportHtml = () => exportResult("HTML", serializeHtmlSessions(sessions, null));
@@ -171,7 +171,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
           testId: "menu-import-sessions",
           icon: <Upload className="w-3 h-3" />,
           children: [
-            { label: t("menu.importNewMob"), testId: "import-json", icon: <Upload className="w-3 h-3" />, onClick: importJson },
+            { label: t("menu.importTaomni"), testId: "import-json", icon: <Upload className="w-3 h-3" />, onClick: importJson },
             { label: t("menu.importMobaXterm"), testId: "import-mobaxterm", icon: <Upload className="w-3 h-3" />, onClick: importMoba },
             { label: t("menu.importCsv"), testId: "import-csv", icon: <FileText className="w-3 h-3" />, onClick: importCsv },
             { label: t("menu.importOpenSsh"), testId: "import-openssh", icon: <TerminalIcon className="w-3 h-3" />, onClick: importOpenSsh },
@@ -183,7 +183,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
           icon: <Download className="w-3 h-3" />,
           disabled: !hasSessions,
           children: [
-            { label: t("menu.exportNewMob"), testId: "export-json", icon: <Download className="w-3 h-3" />, onClick: exportJson },
+            { label: t("menu.exportTaomni"), testId: "export-json", icon: <Download className="w-3 h-3" />, onClick: exportJson },
             { label: t("menu.exportMobaXterm"), testId: "export-mobaxterm", icon: <Download className="w-3 h-3" />, onClick: exportMoba },
             { label: t("menu.exportCsv"), testId: "export-csv", icon: <FileText className="w-3 h-3" />, onClick: exportCsv },
             { label: t("menu.exportHtml"), testId: "export-html", icon: <FileText className="w-3 h-3" />, onClick: exportHtml },
@@ -211,7 +211,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
 
     if (menu === "help") {
       showMenu([
-        { label: t("menu.aboutNewMob"), icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+        { label: t("menu.aboutTaomni"), icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
       ]);
       return;
     }
@@ -227,9 +227,9 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
       data-testid="menu-bar"
       className="h-6 flex items-center px-2 gap-3 border-b"
       style={{
-        borderColor: "var(--moba-chrome-border)",
-        background: "var(--moba-menubar-bg)",
-        fontSize: "var(--moba-ui-font-size)",
+        borderColor: "var(--taomni-chrome-border)",
+        background: "var(--taomni-menubar-bg)",
+        fontSize: "var(--taomni-ui-font-size)",
       }}
     >
       {ctx.render}
@@ -248,7 +248,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
           <button
             key={id}
             data-testid={`menu-${id}`}
-            className="px-1 hover:bg-[var(--moba-hover)] rounded"
+            className="px-1 hover:bg-[var(--taomni-hover)] rounded"
             onClick={(event) => openMenu(event, id)}
             onMouseEnter={(event) => {
               if (ctx.isOpen) openMenu(event, id);

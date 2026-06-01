@@ -71,17 +71,17 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
 
   return (
     <div
-      className="absolute bottom-full left-0 right-0 mb-1 mx-2 rounded-lg border border-[var(--moba-accent)]/40 bg-[var(--moba-panel-bg)] shadow-xl p-3 z-[300]"
+      className="absolute bottom-full left-0 right-0 mb-1 mx-2 rounded-lg border border-[var(--taomni-accent)]/40 bg-[var(--taomni-panel-bg)] shadow-xl p-3 z-[300]"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2 mb-2">
-        <Wand2 className="w-3.5 h-3.5 text-[var(--moba-accent)] shrink-0" />
+        <Wand2 className="w-3.5 h-3.5 text-[var(--taomni-accent)] shrink-0" />
         <span className="text-[12px] font-semibold">{t("terminal.aiRewriteHeading")}</span>
-        <span className="text-[11px] text-[var(--moba-text-muted)] ml-auto">{t("terminal.aiRewriteEscHint")}</span>
+        <span className="text-[11px] text-[var(--taomni-text-muted)] ml-auto">{t("terminal.aiRewriteEscHint")}</span>
       </div>
 
       {/* Current command */}
-      <div className="mb-2 font-mono text-[11px] bg-[var(--moba-bg)] rounded px-2 py-1 text-[var(--moba-text-muted)] truncate">
+      <div className="mb-2 font-mono text-[11px] bg-[var(--taomni-bg)] rounded px-2 py-1 text-[var(--taomni-text-muted)] truncate">
         {currentCommand || <span className="italic">{t("terminal.aiRewriteEmpty")}</span>}
       </div>
 
@@ -90,7 +90,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
         <input
           ref={inputRef}
           type="text"
-          className="moba-input h-7 flex-1 text-[12px]"
+          className="taomni-input h-7 flex-1 text-[12px]"
           placeholder={t("terminal.aiRewritePlaceholder")}
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
@@ -100,7 +100,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
         />
         <button
           type="button"
-          className="moba-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
+          className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
           onClick={handleRewrite}
           disabled={loading || !instruction.trim()}
         >
@@ -115,7 +115,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
       {/* Diff display */}
       {rewritten !== null && (
         <div className="space-y-1 mb-2">
-          <div className="font-mono text-[11px] bg-red-500/10 border border-red-500/20 rounded px-2 py-1 line-through text-[var(--moba-text-muted)]">
+          <div className="font-mono text-[11px] bg-red-500/10 border border-red-500/20 rounded px-2 py-1 line-through text-[var(--taomni-text-muted)]">
             {currentCommand}
           </div>
           <div className="font-mono text-[11px] bg-green-500/10 border border-green-500/20 rounded px-2 py-1 text-green-300">
@@ -129,14 +129,14 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
         <div className="flex gap-2">
           <button
             type="button"
-            className="moba-btn h-7 px-3 text-[12px]"
+            className="taomni-btn h-7 px-3 text-[12px]"
             onClick={handleAccept}
           >
             {t("terminal.aiRewriteAccept")}
           </button>
           <button
             type="button"
-            className="moba-btn h-7 px-3 text-[12px] text-[var(--moba-text-muted)]"
+            className="taomni-btn h-7 px-3 text-[12px] text-[var(--taomni-text-muted)]"
             onClick={onDismiss}
           >
             {t("terminal.aiRewriteCancel")}

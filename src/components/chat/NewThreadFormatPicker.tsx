@@ -64,16 +64,16 @@ export function NewThreadFormatPicker({
       }}
     >
       <div
-        className="w-[300px] max-w-[90%] rounded-lg border border-[var(--moba-divider)] shadow-xl"
-        style={{ background: "var(--moba-panel-bg)" }}
+        className="w-[300px] max-w-[90%] rounded-lg border border-[var(--taomni-divider)] shadow-xl"
+        style={{ background: "var(--taomni-panel-bg)" }}
         role="dialog"
         aria-label={t("chat.pickerDialogAria")}
       >
-        <div className="flex items-center px-3 py-2 border-b border-[var(--moba-divider)]">
+        <div className="flex items-center px-3 py-2 border-b border-[var(--taomni-divider)]">
           <span className="text-[12px] font-semibold flex-1">{t("chat.pickerTitle")}</span>
           <button
             type="button"
-            className="moba-btn h-5 w-5 p-0 inline-flex items-center justify-center"
+            className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center"
             onClick={onCancel}
             aria-label={t("chat.pickerCancel")}
           >
@@ -98,7 +98,7 @@ export function NewThreadFormatPicker({
                   <Link2 className="w-2.5 h-2.5" />
                   {t("chat.pickerBindToTerminal")}
                 </span>
-                <span className="block text-[10px] text-[var(--moba-text-muted)]">
+                <span className="block text-[10px] text-[var(--taomni-text-muted)]">
                   {activeTerminalTitle
                     ? t("chat.pickerBindHelp", { title: activeTerminalTitle })
                     : t("chat.pickerBindNoTerminal")}
@@ -118,7 +118,7 @@ export function NewThreadFormatPicker({
                   <Globe className="w-2.5 h-2.5" />
                   {t("chat.pickerGlobal")}
                 </span>
-                <span className="block text-[10px] text-[var(--moba-text-muted)]">
+                <span className="block text-[10px] text-[var(--taomni-text-muted)]">
                   {t("chat.pickerGlobalDesc")}
                 </span>
               </span>
@@ -150,16 +150,16 @@ export function NewThreadFormatPicker({
                 </label>
               );
             })}
-            <p className="text-[10px] text-[var(--moba-text-muted)] mt-1">
+            <p className="text-[10px] text-[var(--taomni-text-muted)] mt-1">
               {t("chat.pickerFormatTip")}
             </p>
           </fieldset>
         </div>
 
-        <div className="flex justify-end gap-1.5 px-3 py-2 border-t border-[var(--moba-divider)]">
+        <div className="flex justify-end gap-1.5 px-3 py-2 border-t border-[var(--taomni-divider)]">
           <button
             type="button"
-            className="moba-btn h-7 px-3 text-[11px]"
+            className="taomni-btn h-7 px-3 text-[11px]"
             onClick={onCancel}
             disabled={submitting}
           >
@@ -167,7 +167,7 @@ export function NewThreadFormatPicker({
           </button>
           <button
             type="button"
-            className="moba-btn h-7 px-3 text-[11px] bg-[var(--moba-accent)] text-white"
+            className="taomni-btn h-7 px-3 text-[11px] bg-[var(--taomni-accent)] text-white"
             onClick={handleConfirm}
             disabled={submitting}
           >

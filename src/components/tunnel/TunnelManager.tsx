@@ -343,18 +343,18 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
     <div
       data-testid="tunnel-manager"
       className="w-full h-full flex flex-col"
-      style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       {/* Header */}
       <div
         className="px-4 py-2 border-b shrink-0 flex items-center gap-2"
-        style={{ borderColor: "var(--moba-divider)", background: "var(--moba-quick-bg)" }}
+        style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
-        <NetworkIcon className="w-4 h-4" style={{ color: "var(--moba-accent)" }} />
-        <div className="text-[13px] font-semibold" style={{ color: "var(--moba-accent)" }}>
+        <NetworkIcon className="w-4 h-4" style={{ color: "var(--taomni-accent)" }} />
+        <div className="text-[13px] font-semibold" style={{ color: "var(--taomni-accent)" }}>
           {t("tunnels.headerTitle")}
         </div>
-        <div className="text-[11px] ml-2" style={{ color: "var(--moba-text-muted)" }}>
+        <div className="text-[11px] ml-2" style={{ color: "var(--taomni-text-muted)" }}>
           {t("tunnels.headerSubtitle")}
         </div>
       </div>
@@ -364,8 +364,8 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           className="px-4 py-1.5 text-[11px] border-b shrink-0 flex items-center gap-1.5"
           style={{
             background: "rgba(255,196,0,0.12)",
-            borderColor: "var(--moba-divider)",
-            color: "var(--moba-text-muted)",
+            borderColor: "var(--taomni-divider)",
+            color: "var(--taomni-text-muted)",
           }}
         >
           <AlertCircle className="w-3 h-3" />
@@ -377,11 +377,11 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
         <div
           className="rounded border overflow-hidden"
-          style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
         >
           <table data-testid="tunnel-list" className="w-full text-[12px] border-collapse">
             <thead>
-              <tr style={{ background: "var(--moba-quick-bg)", color: "var(--moba-text)" }}>
+              <tr style={{ background: "var(--taomni-quick-bg)", color: "var(--taomni-text)" }}>
                 <Th>{t("tunnels.thOrder")}</Th>
                 <Th className="text-left">{t("tunnels.thName")}</Th>
                 <Th>{t("tunnels.thType")}</Th>
@@ -395,14 +395,14 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={8} className="text-center py-6" style={{ color: "var(--moba-text-muted)" }}>
+                  <td colSpan={8} className="text-center py-6" style={{ color: "var(--taomni-text-muted)" }}>
                     {t("tunnels.loadingList")}
                   </td>
                 </tr>
               )}
               {!loading && tunnels.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center py-8" style={{ color: "var(--moba-text-muted)" }}>
+                  <td colSpan={8} className="text-center py-8" style={{ color: "var(--taomni-text-muted)" }}>
                     {t("tunnels.emptyHint")} <strong>{t("tunnels.emptyHintAction")}</strong> {t("tunnels.emptyHintSuffix")}
                   </td>
                 </tr>
@@ -454,15 +454,15 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
       {/* Footer */}
       <div
         className="h-12 flex items-center px-3 gap-2 border-t shrink-0"
-        style={{ background: "var(--moba-quick-bg)", borderColor: "var(--moba-divider)" }}
+        style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
       >
-        <button data-testid="tunnel-new" type="button" className="moba-btn flex items-center gap-1.5" onClick={handleNew}>
+        <button data-testid="tunnel-new" type="button" className="taomni-btn flex items-center gap-1.5" onClick={handleNew}>
           <Plus className="w-3.5 h-3.5" /> {t("tunnels.newSshTunnel")}
         </button>
         <button
           data-testid="tunnel-start-all"
           type="button"
-          className="moba-btn flex items-center gap-1.5"
+          className="taomni-btn flex items-center gap-1.5"
           onClick={handleStartAll}
           disabled={busy || tunnels.length === 0}
         >
@@ -471,7 +471,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
         <button
           data-testid="tunnel-stop-all"
           type="button"
-          className="moba-btn flex items-center gap-1.5"
+          className="taomni-btn flex items-center gap-1.5"
           onClick={handleStopAll}
           disabled={busy || tunnels.length === 0}
         >
@@ -481,7 +481,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           <button
             data-testid="tunnel-exit"
             type="button"
-            className="moba-btn flex items-center gap-1.5"
+            className="taomni-btn flex items-center gap-1.5"
             onClick={onClose}
             title={t("tunnels.exitTitle")}
           >
@@ -489,7 +489,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           </button>
         )}
         <div className="flex-1" />
-        <span className="text-[11px]" style={{ color: "var(--moba-text-muted)" }}>
+        <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
           {t("tunnels.countSummary", {
             count: tunnels.length,
             plural: tunnels.length === 1 ? "" : "s",
@@ -519,7 +519,7 @@ function Th({ children, className = "" }: { children: React.ReactNode; className
   return (
     <th
       className={`px-2 py-1.5 text-[11px] font-semibold text-center border-b ${className}`}
-      style={{ borderColor: "var(--moba-divider)", color: "var(--moba-text)" }}
+      style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
     >
       {children}
     </th>
@@ -529,17 +529,17 @@ function Th({ children, className = "" }: { children: React.ReactNode; className
 function StatusBadge({ status, error }: { status?: TunnelStatus; error?: string }) {
   const t = useT();
   const s = status ?? "stopped";
-  let icon: React.ReactNode = <CircleDot className="w-3 h-3" style={{ color: "var(--moba-text-muted)" }} />;
+  let icon: React.ReactNode = <CircleDot className="w-3 h-3" style={{ color: "var(--taomni-text-muted)" }} />;
   let label = t("tunnels.statusStopped");
-  let color = "var(--moba-text-muted)";
+  let color = "var(--taomni-text-muted)";
   if (s === "running") {
     icon = <CheckCircle2 className="w-3 h-3" style={{ color: "#1f7a4a" }} />;
     label = t("tunnels.statusRunning");
     color = "#1f7a4a";
   } else if (s === "starting") {
-    icon = <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--moba-accent)" }} />;
+    icon = <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--taomni-accent)" }} />;
     label = t("tunnels.statusStarting");
-    color = "var(--moba-accent)";
+    color = "var(--taomni-accent)";
   } else if (s === "error") {
     icon = <AlertCircle className="w-3 h-3" style={{ color: "#b22222" }} />;
     label = t("tunnels.statusError");
@@ -627,14 +627,14 @@ function TunnelRow({
       data-testid="tunnel-row"
       data-tunnel-id={tunnel.id}
       className="border-b"
-      style={{ borderColor: "var(--moba-divider)" }}
+      style={{ borderColor: "var(--taomni-divider)" }}
     >
       <Td className="text-center">
-        <div className="inline-flex items-center gap-0.5 text-[10px]" style={{ color: "var(--moba-text-muted)" }}>
+        <div className="inline-flex items-center gap-0.5 text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
           <button
             data-testid="tunnel-row-move-up"
             type="button"
-            className="px-1 hover:text-[var(--moba-accent)] disabled:opacity-30"
+            className="px-1 hover:text-[var(--taomni-accent)] disabled:opacity-30"
             title={t("tunnels.rowMoveUp")}
             onClick={onMoveUp}
             disabled={index === 0}
@@ -645,7 +645,7 @@ function TunnelRow({
           <button
             data-testid="tunnel-row-move-down"
             type="button"
-            className="px-1 hover:text-[var(--moba-accent)] disabled:opacity-30"
+            className="px-1 hover:text-[var(--taomni-accent)] disabled:opacity-30"
             title={t("tunnels.rowMoveDown")}
             onClick={onMoveDown}
             disabled={index === total - 1}
@@ -657,7 +657,7 @@ function TunnelRow({
       <Td>
         <div className="font-semibold text-[12px]">{tunnel.name || t("tunnels.unnamed")}</div>
         {tunnel.description && (
-          <div className="text-[10.5px]" style={{ color: "var(--moba-text-muted)" }}>
+          <div className="text-[10.5px]" style={{ color: "var(--taomni-text-muted)" }}>
             {tunnel.description}
           </div>
         )}
@@ -666,8 +666,8 @@ function TunnelRow({
         <span
           className="inline-block px-1.5 py-0.5 rounded text-[11px]"
           style={{
-            background: "var(--moba-selected)",
-            color: "var(--moba-accent)",
+            background: "var(--taomni-selected)",
+            color: "var(--taomni-accent)",
           }}
         >
           {tunnel.kind}
@@ -679,7 +679,7 @@ function TunnelRow({
             data-testid="tunnel-row-toggle"
             type="button"
             title={running ? t("tunnels.rowStop") : t("tunnels.rowStart")}
-            className="p-1 rounded hover:bg-[var(--moba-hover)]"
+            className="p-1 rounded hover:bg-[var(--taomni-hover)]"
             onClick={running ? onStop : onStart}
           >
             {running ? (
@@ -696,17 +696,17 @@ function TunnelRow({
           </div>
         )}
       </Td>
-      <Td className="text-center moba-mono text-[12px]">
+      <Td className="text-center taomni-mono text-[12px]">
         {tunnel.listenHost}:{tunnel.listenPort || "?"}
       </Td>
-      <Td className="moba-mono text-[12px]">{dest}</Td>
+      <Td className="taomni-mono text-[12px]">{dest}</Td>
       <Td>
         <div className="flex items-center gap-1">
-          <span className="moba-mono text-[12px]">{sshLabel}</span>
-          <span className="text-[10.5px] px-1 rounded" style={{ background: "var(--moba-hover)", color: "var(--moba-text-muted)" }}>
+          <span className="taomni-mono text-[12px]">{sshLabel}</span>
+          <span className="text-[10.5px] px-1 rounded" style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}>
             {tunnel.ssh.authMethod}
           </span>
-          <span className="text-[10.5px] moba-mono" style={{ color: "var(--moba-text-muted)" }}>
+          <span className="text-[10.5px] taomni-mono" style={{ color: "var(--taomni-text-muted)" }}>
             {authPreview}
           </span>
         </div>
@@ -732,7 +732,7 @@ function TunnelRow({
           >
             <Zap
               className="w-3.5 h-3.5"
-              style={{ color: tunnel.autostart ? "#c97a23" : "var(--moba-text-muted)" }}
+              style={{ color: tunnel.autostart ? "#c97a23" : "var(--taomni-text-muted)" }}
             />
           </IconBtn>
           <IconBtn testId="tunnel-row-delete" title={t("tunnels.rowDelete")} onClick={onDelete}>
@@ -741,7 +741,7 @@ function TunnelRow({
           <IconBtn testId="tunnel-row-power" title={running ? t("tunnels.rowStop") : t("tunnels.rowStart")} onClick={running ? onStop : onStart}>
             <Power
               className="w-3.5 h-3.5"
-              style={{ color: running ? "#1f7a4a" : "var(--moba-text-muted)" }}
+              style={{ color: running ? "#1f7a4a" : "var(--taomni-text-muted)" }}
             />
           </IconBtn>
         </div>
@@ -773,7 +773,7 @@ function IconBtn({
     <button
       data-testid={testId}
       type="button"
-      className="p-1 rounded hover:bg-[var(--moba-hover)]"
+      className="p-1 rounded hover:bg-[var(--taomni-hover)]"
       title={title}
       onClick={onClick}
     >
@@ -815,18 +815,18 @@ function ActivityLog({
     <div
       data-testid="tunnel-activity-log"
       className="border-t shrink-0 flex flex-col"
-      style={{ borderColor: "var(--moba-divider)", background: "var(--moba-panel-bg)" }}
+      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
     >
       <button
         type="button"
         data-testid="tunnel-activity-log-toggle"
-        className="h-7 px-3 flex items-center gap-2 text-[11px] hover:bg-[var(--moba-hover)] text-left"
+        className="h-7 px-3 flex items-center gap-2 text-[11px] hover:bg-[var(--taomni-hover)] text-left"
         onClick={onToggle}
-        style={{ color: "var(--moba-text)" }}
+        style={{ color: "var(--taomni-text)" }}
       >
         {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         <span className="font-semibold">{t("tunnels.logTitle")}</span>
-        <span style={{ color: "var(--moba-text-muted)" }}>
+        <span style={{ color: "var(--taomni-text-muted)" }}>
           {t("tunnels.logCount", { count: logs.length })}
         </span>
         {errorCount > 0 && (
@@ -847,7 +847,7 @@ function ActivityLog({
                   ? "#b22222"
                   : latest.level === "success"
                     ? "#1f7a4a"
-                    : "var(--moba-text-muted)",
+                    : "var(--taomni-text-muted)",
             }}
             title={latest.text}
           >
@@ -857,11 +857,11 @@ function ActivityLog({
       </button>
       {expanded && (
         <div className="flex flex-col" style={{ maxHeight: 180 }}>
-          <div className="flex items-center justify-end px-2 py-1 border-b" style={{ borderColor: "var(--moba-divider)" }}>
+          <div className="flex items-center justify-end px-2 py-1 border-b" style={{ borderColor: "var(--taomni-divider)" }}>
             <button
               type="button"
               data-testid="tunnel-activity-log-clear"
-              className="moba-btn flex items-center gap-1 text-[11px]"
+              className="taomni-btn flex items-center gap-1 text-[11px]"
               onClick={onClear}
               disabled={logs.length === 0}
               title={t("tunnels.logClear")}
@@ -871,11 +871,11 @@ function ActivityLog({
           </div>
           <div
             ref={listRef}
-            className="flex-1 overflow-auto px-3 py-1.5 moba-mono text-[11px] leading-[1.6]"
-            style={{ background: "var(--moba-bg)" }}
+            className="flex-1 overflow-auto px-3 py-1.5 taomni-mono text-[11px] leading-[1.6]"
+            style={{ background: "var(--taomni-bg)" }}
           >
             {logs.length === 0 ? (
-              <div className="text-center py-3" style={{ color: "var(--moba-text-muted)" }}>
+              <div className="text-center py-3" style={{ color: "var(--taomni-text-muted)" }}>
                 {t("tunnels.logEmpty")}
               </div>
             ) : (
@@ -894,10 +894,10 @@ function ActivityLogRow({ entry }: { entry: TunnelLogEntry }) {
       ? "#b22222"
       : entry.level === "success"
         ? "#1f7a4a"
-        : "var(--moba-text)";
+        : "var(--taomni-text)";
   return (
     <div className="flex items-start gap-2" style={{ color }}>
-      <span style={{ color: "var(--moba-text-muted)" }}>{formatLogTime(entry.ts)}</span>
+      <span style={{ color: "var(--taomni-text-muted)" }}>{formatLogTime(entry.ts)}</span>
       <span className="whitespace-pre-wrap break-words">{entry.text}</span>
     </div>
   );

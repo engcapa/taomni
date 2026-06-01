@@ -53,25 +53,25 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
       data-testid="quick-connect"
       className="h-7 flex items-center gap-1 px-2 text-[12px]"
       style={{
-        background: "var(--moba-quick-bg)",
-        borderBottom: "1px solid var(--moba-divider)",
+        background: "var(--taomni-quick-bg)",
+        borderBottom: "1px solid var(--taomni-divider)",
       }}
     >
-      <button data-testid="qc-back" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title={t("quickConnect.back")} onClick={() => window.history.back()} type="button">
+      <button data-testid="qc-back" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" title={t("quickConnect.back")} onClick={() => window.history.back()} type="button">
         <ArrowLeft className="w-3.5 h-3.5" />
       </button>
-      <button data-testid="qc-forward" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title={t("quickConnect.forward")} onClick={() => window.history.forward()} type="button">
+      <button data-testid="qc-forward" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" title={t("quickConnect.forward")} onClick={() => window.history.forward()} type="button">
         <ArrowRight className="w-3.5 h-3.5" />
       </button>
-      <button data-testid="qc-home" className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded" title={t("quickConnect.homeButton")} onClick={onHome} type="button">
+      <button data-testid="qc-home" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" title={t("quickConnect.homeButton")} onClick={onHome} type="button">
         <Home className="w-3.5 h-3.5" />
       </button>
-      <span className="moba-divider-v h-4 mx-1" />
-      <span className="text-[var(--moba-text-muted)]">{t("quickConnect.label")}:</span>
+      <span className="taomni-divider-v h-4 mx-1" />
+      <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.label")}:</span>
       <input
         data-testid="qc-input"
         aria-label={t("quickConnect.label")}
-        className="moba-input flex-1 max-w-md"
+        className="taomni-input flex-1 max-w-md"
         placeholder={t("quickConnect.placeholderRich")}
         value={value}
         onChange={(event) => setValue(event.target.value)}
@@ -79,11 +79,11 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
           if (event.key === "Enter") submit();
         }}
       />
-      <button data-testid="qc-submit" className="moba-btn" onClick={submit} type="button">{t("quickConnect.go")}</button>
-      <span className="moba-divider-v h-4 mx-2" />
-      <span className="text-[var(--moba-text-muted)]">{t("quickConnect.recentLabel")}</span>
+      <button data-testid="qc-submit" className="taomni-btn" onClick={submit} type="button">{t("quickConnect.go")}</button>
+      <span className="taomni-divider-v h-4 mx-2" />
+      <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.recentLabel")}</span>
       {recent.length === 0 ? (
-        <span className="text-[var(--moba-text-muted)]">{t("quickConnect.recentNone")}</span>
+        <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.recentNone")}</span>
       ) : (
         recent.map((session) => {
           const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
@@ -93,8 +93,8 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
             data-session-id={session.id}
             data-session-type={typeLabel}
             key={session.id}
-            className="px-1.5 py-0.5 rounded hover:bg-[var(--moba-control-hover)] underline max-w-[110px] truncate"
-            style={{ color: "var(--moba-link)" }}
+            className="px-1.5 py-0.5 rounded hover:bg-[var(--taomni-control-hover)] underline max-w-[110px] truncate"
+            style={{ color: "var(--taomni-link)" }}
             onClick={() => onConnectSession(session)}
             title={`${session.name} (${typeLabel})`}
             type="button"
@@ -106,7 +106,7 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
       )}
       <button
         data-testid="qc-refresh"
-        className="p-0.5 hover:bg-[var(--moba-control-hover)] rounded disabled:opacity-50"
+        className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded disabled:opacity-50"
         title={refreshing ? t("quickConnect.refreshingTitle") : t("quickConnect.refreshTitle")}
         onClick={() => void refreshSessions()}
         disabled={refreshing}
@@ -114,7 +114,7 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
       >
         <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
       </button>
-      {refreshing && <span className="text-[var(--moba-text-muted)]">{t("quickConnect.refreshing")}</span>}
+      {refreshing && <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.refreshing")}</span>}
     </div>
   );
 }

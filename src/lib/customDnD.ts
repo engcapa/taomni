@@ -13,7 +13,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 export interface CustomDragData {
-  /** Application-defined key (e.g. "newmob/tab", "newmob/session"). */
+  /** Application-defined key (e.g. "taomni/tab", "taomni/session"). */
   mime: string;
   /** Arbitrary serialisable payload — drop targets read this. */
   payload: unknown;
@@ -27,8 +27,8 @@ export interface CustomDragEventDetail {
   target: Element | null;
 }
 
-const POINTER_EVENT = "newmob:custom-drag-pointer";
-const END_EVENT = "newmob:custom-drag-end";
+const POINTER_EVENT = "taomni:custom-drag-pointer";
+const END_EVENT = "taomni:custom-drag-end";
 
 interface PointerEventDetail extends CustomDragEventDetail {
   phase: "move" | "drop" | "cancel";
@@ -232,7 +232,7 @@ function createGhost(element: HTMLElement | null, text: string | null): HTMLElem
   } else if (text) {
     wrapper.textContent = text;
     wrapper.style.padding = "2px 8px";
-    wrapper.style.background = "var(--moba-accent, #2b5d8b)";
+    wrapper.style.background = "var(--taomni-accent, #2b5d8b)";
     wrapper.style.color = "#fff";
     wrapper.style.font = "12px system-ui, sans-serif";
     wrapper.style.borderRadius = "3px";

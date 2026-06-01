@@ -64,10 +64,10 @@ steps:
       state: detached
       timeout_sec: 5
 
-  # Help menu — About NewMob
+  # Help menu — About Taomni
   - click: '[data-testid="menu-help"]'
   - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: text="About NewMob"
+  - assert_visible: text="About Taomni"
   - press: Escape
   - wait_for:
       selector: '[data-testid="context-menu"]'

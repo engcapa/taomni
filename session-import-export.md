@@ -33,7 +33,7 @@
 
 | 格式 | 入口函数 | 文件 | UI 入口 |
 |------|----------|------|---------|
-| **NewMob JSON** (`.newmob-sessions.json`) | `parseNewMobSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import NewMob sessions" |
+| **Taomni JSON** (`.taomni-sessions.json`) | `parseTaomniSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import Taomni sessions" |
 | **MobaXterm** (`.mxtsessions` / `.moba`) | `parseMobaXtermSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import MobaXterm sessions" |
 | **CSV** (`.csv`) | `parseCsvSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import sessions from a CSV file" |
 | **OpenSSH config** | `parseOpenSshConfig()` | `quickConnect.ts` | WelcomePanel → "Import OpenSSH config" 卡片 |
@@ -42,7 +42,7 @@
 
 | 格式 | 入口函数 | 文件 | UI 入口 |
 |------|----------|------|---------|
-| **NewMob JSON** | `serializeNewMobSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Export NewMob sessions" |
+| **Taomni JSON** | `serializeTaomniSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Export Taomni sessions" |
 | **MobaXterm** | `serializeMobaXtermSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Export MobaXterm sessions" |
 | **HTML 网页** | 内联 `generateHtml()` | `SessionTree.tsx` | SessionTree 右键菜单 → "Generate HTML web page" |
 
@@ -83,12 +83,12 @@
 
 ### 3.1 ✅ MenuBar 菜单入口（P1 已完成）
 
-**现状**：[MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/menubar/MenuBar.tsx) 的 "Sessions" 菜单已补齐：
-- Import NewMob sessions
+**现状**：[MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/components/menubar/MenuBar.tsx) 的 "Sessions" 菜单已补齐：
+- Import Taomni sessions
 - Import MobaXterm sessions
 - Import sessions from a CSV file
 - Import OpenSSH config
-- Export NewMob sessions
+- Export Taomni sessions
 - Export MobaXterm sessions
 - Export sessions as CSV
 - Generate HTML web page
@@ -114,7 +114,7 @@
 **现状**：SessionTree 右键菜单中的 "Import sessions from third-party programs" 子菜单已经从存根改为可执行入口。WSL、External Bash、PuTTY 已走 Rust 后端；PuTTYCM、SuperPuTTY、mRemote/mRemoteNG、SecureCRT、RDM 已支持文件导入，其中 mRemoteNG 和 SecureCRT 也支持本机配置扫描。Exceed 已覆盖 XML、INI/key-value 与 SSH 命令型文本配置。
 
 1. **Import WSL sessions**：导入 Windows Subsystem for Linux (WSL) 子系统会话。
-   - **实现策略**：需要 Tauri 后端调用 `wsl.exe -l -v` 命令，枚举系统已安装的 WSL 发行版（如 Ubuntu, Debian 等），将其作为本地 Terminal 会话（或 SSH 本地环回）导入 NewMob。
+   - **实现策略**：需要 Tauri 后端调用 `wsl.exe -l -v` 命令，枚举系统已安装的 WSL 发行版（如 Ubuntu, Debian 等），将其作为本地 Terminal 会话（或 SSH 本地环回）导入 Taomni。
 2. **Import External Bash sessions**：导入外部 Bash 会话。
    - **实现策略**：后端扫描系统已知路径（如 `C:\Program Files\Git\bin\bash.exe`、`C:\cygwin64\bin\bash.exe`、`C:\msys64\usr\bin\bash.exe`），将检测到的 Shell 路径导入为本地 Terminal 会话。
 3. **Import PuTTY sessions**：导入 PuTTY 会话。
@@ -145,7 +145,7 @@
 - WSL / External Bash 枚举已在后端完成
 - 本机配置路径扫描已在后端完成，返回文本后由前端解析器转换
 
-**决策**：保持现有前端解析架构（NewMob JSON / MobaXterm / CSV / OpenSSH / 第三方导出文件），仅在需要系统 API 或跨目录读取时通过 Rust 后端命令提供扫描能力。
+**决策**：保持现有前端解析架构（Taomni JSON / MobaXterm / CSV / OpenSSH / 第三方导出文件），仅在需要系统 API 或跨目录读取时通过 Rust 后端命令提供扫描能力。
 
 ### 3.6 ✅ IPC 类型包装（P3）
 
@@ -185,7 +185,7 @@ Xshell 是 Windows 平台最主流的商业终端。
 - **2. 本机已安装配置导入**
   - **自动扫描路径**：`%APPDATA%\NetSarang\Xshell\Sessions\` (即 `C:\Users\<Username>\AppData\Roaming\NetSarang\Xshell\Sessions\`)。
   - **导入逻辑**：Tauri 后端（或通过授权的前端路径读取）递归遍历该目录下的所有文件夹和 `.xsh` 文件。
-  - **目录结构保留**：Xshell 会话的文件夹层级直接映射为 NewMob 的 Session 组层级，完美保留用户的分类习惯。
+  - **目录结构保留**：Xshell 会话的文件夹层级直接映射为 Taomni 的 Session 组层级，完美保留用户的分类习惯。
 
 ---
 
@@ -214,7 +214,7 @@ Tabby 是一款极受欢迎的开源现代跨平台终端。
     - **Windows**: `%APPDATA%\tabby\config.yaml` (以及用户级覆盖路径 `~/.tabby/config.yaml`)
     - **macOS**: `~/Library/Application Support/tabby/config.yaml` (以及 `~/.tabby/config.yaml`)
     - **Linux**: `~/.config/tabby/config.yaml` (以及 `~/.tabby/config.yaml`)
-  - **导入逻辑**：检测到对应文件存在后，直接异步读取并解析，提取所有 SSH/Telnet 会话导入至 NewMob 指定分组中。
+  - **导入逻辑**：检测到对应文件存在后，直接异步读取并解析，提取所有 SSH/Telnet 会话导入至 Taomni 指定分组中。
 
 ---
 
@@ -257,19 +257,19 @@ WindTerm 是一款高性能、多功能的高颜值跨平台终端。
       ```bash
       termius export-ssh-config
       ```
-      这会将所有主机导出为标准的 OpenSSH Config 格式。NewMob 的导入功能将直接提示并复用已有的 OpenSSH Config 解析器 (`parseOpenSshConfig`) 来完美解析导入。
+      这会将所有主机导出为标准的 OpenSSH Config 格式。Taomni 的导入功能将直接提示并复用已有的 OpenSSH Config 解析器 (`parseOpenSshConfig`) 来完美解析导入。
   - **2. 本机配置导入**：
     - **技术说明**：Termius 本地 SQLite 数据库（存储于 `%APPDATA%\Termius\` 或 `~/Library/Application Support/Termius/`）使用系统凭据管理器（Windows Credential Manager / macOS Keychain）中的密钥进行了端到端硬加密，直接读取 file 无法解密敏感数据。
-    - **解决策略**：在 UI 导入界面中，为 Termius 增加“引导提示”，以图文形式指导用户运行 `termius export-ssh-config` 导出到默认位置，随后 NewMob 会自动检测该位置的配置文件并一键导入。
+    - **解决策略**：在 UI 导入界面中，为 Termius 增加“引导提示”，以图文形式指导用户运行 `termius export-ssh-config` 导出到默认位置，随后 Taomni 会自动检测该位置的配置文件并一键导入。
 
 ---
 
 ### 3.8 🔴 已解决的紧急安全机制对齐：安全字段 `disableAiWrite` 导入导出支持
 
 **现状分析**：
-在最近合并的分支中，NewMob 引入了极其关键的**会话级 AI 安全动作禁用限制**（用以规避 AI 助手在特定会话下执行写动作，如命令注入与 SFTP 文件上传等）。该属性 `disableAiWrite: boolean` 被保存在 Session `options_json` 中。
-然而，在分析代码时我们发现，[sessionImportExport.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/sessionImportExport.ts) 中的核心过滤函数 `sanitizeOptions()` 采用的是强白名单过滤复制机制，因此在导入和导出时，旧版的白名单没有包含这个全新的字段，导致：
-1. 导入含有 `disableAiWrite: true` 的 NewMob JSON 配置文件时，该属性会被完全过滤并降级丢失。
+在最近合并的分支中，Taomni 引入了极其关键的**会话级 AI 安全动作禁用限制**（用以规避 AI 助手在特定会话下执行写动作，如命令注入与 SFTP 文件上传等）。该属性 `disableAiWrite: boolean` 被保存在 Session `options_json` 中。
+然而，在分析代码时我们发现，[sessionImportExport.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/lib/sessionImportExport.ts) 中的核心过滤函数 `sanitizeOptions()` 采用的是强白名单过滤复制机制，因此在导入和导出时，旧版的白名单没有包含这个全新的字段，导致：
+1. 导入含有 `disableAiWrite: true` 的 Taomni JSON 配置文件时，该属性会被完全过滤并降级丢失。
 2. 导出时，即使会话开启了此项安全保护，导出的备份文件里也无法带有这一关键字段。
 
 **解决与实现**：
@@ -286,18 +286,18 @@ copyBoolean(source, output, "disableAiWrite");
 
 | 文件 | 说明 | 行数 |
 |------|------|------|
-| [sessionImportExport.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/sessionImportExport.ts) | 核心导入/导出解析与序列化库 | 1,127 |
-| [sessionImportExport.test.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/sessionImportExport.test.ts) | 单元测试 | 245 |
-| [quickConnect.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/quickConnect.ts) | OpenSSH config 解析 (`parseOpenSshConfig`) | 224 |
-| [SessionTree.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/sidebar/SessionTree.tsx) | UI：右键菜单导入/导出入口 | 845 |
-| [WelcomePanel.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/WelcomePanel.tsx) | UI：Welcome 页面 OpenSSH 导入 | 399 |
-| [MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/menubar/MenuBar.tsx) | UI：菜单栏（缺少导入导出） | 101 |
-| [sessionStore.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/stores/sessionStore.ts) | Zustand store，含 `importSessions()` | 283 |
-| [ipc.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/ipc.ts) | Tauri IPC 类型定义（含导入扫描包装） | 488 |
-| [session/mod.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/mod.rs) | Rust 后端会话 CRUD + import 模块导出 | 66 |
-| [session/import.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/import.rs) | Rust 后端系统级会话导入与本地配置扫描 | 604 |
-| [session/models.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/models.rs) | Rust 数据模型 | 110 |
-| [session/db.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src-tauri/src/session/db.rs) | SQLite 数据库操作 | 174 |
+| [sessionImportExport.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/lib/sessionImportExport.ts) | 核心导入/导出解析与序列化库 | 1,127 |
+| [sessionImportExport.test.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/lib/sessionImportExport.test.ts) | 单元测试 | 245 |
+| [quickConnect.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/lib/quickConnect.ts) | OpenSSH config 解析 (`parseOpenSshConfig`) | 224 |
+| [SessionTree.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/components/sidebar/SessionTree.tsx) | UI：右键菜单导入/导出入口 | 845 |
+| [WelcomePanel.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/components/WelcomePanel.tsx) | UI：Welcome 页面 OpenSSH 导入 | 399 |
+| [MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/components/menubar/MenuBar.tsx) | UI：菜单栏（缺少导入导出） | 101 |
+| [sessionStore.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/stores/sessionStore.ts) | Zustand store，含 `importSessions()` | 283 |
+| [ipc.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/lib/ipc.ts) | Tauri IPC 类型定义（含导入扫描包装） | 488 |
+| [session/mod.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src-tauri/src/session/mod.rs) | Rust 后端会话 CRUD + import 模块导出 | 66 |
+| [session/import.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src-tauri/src/session/import.rs) | Rust 后端系统级会话导入与本地配置扫描 | 604 |
+| [session/models.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src-tauri/src/session/models.rs) | Rust 数据模型 | 110 |
+| [session/db.rs](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src-tauri/src/session/db.rs) | SQLite 数据库操作 | 174 |
 
 ---
 
@@ -309,14 +309,14 @@ copyBoolean(source, output, "disableAiWrite");
 
 #### 步骤
 
-1. ✅ **修改 [MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/components/menubar/MenuBar.tsx)**
+1. ✅ **修改 [MenuBar.tsx](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/components/menubar/MenuBar.tsx)**
    - 在 "Sessions" 菜单中添加分隔线和以下项：
-     - Import NewMob sessions
+     - Import Taomni sessions
      - Import MobaXterm sessions
      - Import sessions from a CSV file
      - Import OpenSSH config
      - ——（分隔线）
-     - Export NewMob sessions
+     - Export Taomni sessions
      - Export MobaXterm sessions
      - Generate HTML web page
    - 需要引入 `sessionImportExport.ts` 中的解析/序列化函数
@@ -326,12 +326,12 @@ copyBoolean(source, output, "disableAiWrite");
 2. ✅ **添加 test-id 属性**
    - 给菜单项添加 `data-testid` 以匹配 feature-list.md 中定义的控件 ID：
      - `#menu-import-sessions` → 导入子菜单
-     - `#import-json` → Import NewMob sessions
+     - `#import-json` → Import Taomni sessions
      - `#import-csv` → Import CSV
      - `#import-mobaxterm` → Import MobaXterm
      - `#import-openssh` → Import OpenSSH config
      - `#menu-export-sessions` → 导出子菜单
-     - `#export-json` → Export NewMob sessions
+     - `#export-json` → Export Taomni sessions
      - `#export-csv` → Export CSV (需 Phase 2 实现后启用)
 
 3. ✅ **复用文件打开/下载逻辑**
@@ -341,7 +341,7 @@ copyBoolean(source, output, "disableAiWrite");
 
 #### 步骤
 
-1. ✅ **在 [sessionImportExport.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/src/lib/sessionImportExport.ts) 中添加 `serializeCsvSessions()`**
+1. ✅ **在 [sessionImportExport.ts](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/src/lib/sessionImportExport.ts) 中添加 `serializeCsvSessions()`**
    - 导出列：name, session_type, host, port, username, group_path
    - 处理包含逗号和引号的字段（RFC 4180）
    - 返回 `SessionExportResult`
@@ -409,7 +409,7 @@ copyBoolean(source, output, "disableAiWrite");
 3. ✅ **UI 增强与用户引导**
    - 在导入界面中设计“本机自动导入”卡片，通过一键点击触发自动扫描。
    - 针对 Termius，展示引导式弹窗提示：
-     > *“由于 Termius 本地配置采用系统级加密，请点击 [查看指引] 在您的终端执行 `termius export-ssh-config`。NewMob 将自动探测导出路径并为您完美导入会话。”*
+     > *“由于 Termius 本地配置采用系统级加密，请点击 [查看指引] 在您的终端执行 `termius export-ssh-config`。Taomni 将自动探测导出路径并为您完美导入会话。”*
    - 提供成功导入提示，并支持将新导入的会话在指定的独立分类组（如 "Imported_Xshell", "Imported_Tabby"）中隔离存放。
 
 ---
@@ -418,9 +418,9 @@ copyBoolean(source, output, "disableAiWrite");
 
 | 测试用例 | 期望行为 | 当前状态 |
 |----------|----------|----------|
-| [TC-054](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/qa-ui-auto-tests/cases/TC-054-session-import-and-export-json-csv-and-mobaxterm.testcase.yaml) | 右键菜单有 Export NewMob / Export MobaXterm | ✅ 通过 |
-| [TC-055](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/newmob/audit-session-import-export/qa-ui-auto-tests/cases/TC-055-openssh-config-import-from-welcome-panel-creates.testcase.yaml) | Welcome 面板有 "Import OpenSSH config" | ✅ 通过 |
-| 单元测试 | NewMob JSON 往返、MobaXterm 导入导出、安全过滤 | ✅ 全部通过 |
+| [TC-054](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/qa-ui-auto-tests/cases/TC-054-session-import-and-export-json-csv-and-mobaxterm.testcase.yaml) | 右键菜单有 Export Taomni / Export MobaXterm | ✅ 通过 |
+| [TC-055](file:///C:/Users/zhyha/.gemini/antigravity/worktrees/taomni/audit-session-import-export/qa-ui-auto-tests/cases/TC-055-openssh-config-import-from-welcome-panel-creates.testcase.yaml) | Welcome 面板有 "Import OpenSSH config" | ✅ 通过 |
+| 单元测试 | Taomni JSON 往返、MobaXterm 导入导出、安全过滤 | ✅ 全部通过 |
 
 ---
 
@@ -428,7 +428,7 @@ copyBoolean(source, output, "disableAiWrite");
 
 Session 导入导出功能已完成 **约 100%**（结合新增的扩展第三方导入目标后）：
 
-- ✅ **核心库基本建立**：支持 NewMob JSON、MobaXterm、CSV、OpenSSH 导入及部分导出。
+- ✅ **核心库基本建立**：支持 Taomni JSON、MobaXterm、CSV、OpenSSH 导入及部分导出。
 - ✅ **基础 UI 框架就绪**：SessionTree 右键菜单及 WelcomePanel 完成。
 - ✅ **安全及规范机制到位**：大小限制、敏感信息排除、重名规避等已实现。
 - ✅ **MenuBar 入口完成**：Sessions 菜单已有 Import/Export 子菜单（Phase 1 已完成）。

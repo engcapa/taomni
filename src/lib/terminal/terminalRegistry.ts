@@ -41,7 +41,7 @@ interface TerminalRegistryShape {
   detachPending: Set<string>;
 }
 
-const KEY = "__newmob_terminal_registry__";
+const KEY = "__taomni_terminal_registry__";
 
 function ensureRegistry(): TerminalRegistryShape {
   const g = globalThis as unknown as Record<string, unknown>;

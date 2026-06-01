@@ -1,14 +1,14 @@
 # Feature Design: Servers Management
 
-> NewMob — Local Server Manager Panel  
+> Taomni — Local Server Manager Panel  
 > Design reference: MobaXterm "Servers management" dialog  
-> UI system: NewMob design tokens (`--moba-*`), Tailwind CSS, React 18 + TypeScript
+> UI system: Taomni design tokens (`--taomni-*`), Tailwind CSS, React 18 + TypeScript
 
 ---
 
 ## 1. Overview
 
-The **Servers** feature lets users start, stop, and configure lightweight local servers directly from NewMob — eliminating the need for external tools. Supported server types mirror MobaXterm's offering and are extended with modern additions.
+The **Servers** feature lets users start, stop, and configure lightweight local servers directly from Taomni — eliminating the need for external tools. Supported server types mirror MobaXterm's offering and are extended with modern additions.
 
 ### Supported Server Types
 
@@ -46,7 +46,7 @@ Color: #0891b2 (cyan-600) — distinct from SSH blue, signals "local infrastruct
 
 ## 3. UI Architecture
 
-The Servers feature is implemented as a **modal dialog** (not a sidebar panel), consistent with how NewMob handles Tunnels and other utility windows. It is a floating, resizable, non-blocking dialog.
+The Servers feature is implemented as a **modal dialog** (not a sidebar panel), consistent with how Taomni handles Tunnels and other utility windows. It is a floating, resizable, non-blocking dialog.
 
 ### 3.1 Dialog Shell
 
@@ -60,7 +60,7 @@ Position: Centered on first open, then remembered per session
 **Structure:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  [Server icon]  Servers Management          [─] [□] [✕]     │  ← Title bar (28px, --moba-chrome-bg gradient)
+│  [Server icon]  Servers Management          [─] [□] [✕]     │  ← Title bar (28px, --taomni-chrome-bg gradient)
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌──────────────────┐  ┌──────────────────────────────────┐ │
@@ -83,8 +83,8 @@ Position: Centered on first open, then remembered per session
 ### 4.1 Layout
 
 - Fixed width: **220px**
-- Right border: `1px solid var(--moba-divider)`
-- Background: `var(--moba-chrome-bg)`
+- Right border: `1px solid var(--taomni-divider)`
+- Background: `var(--taomni-chrome-bg)`
 - Scrollable if server list grows
 
 ### 4.2 Server Row
@@ -102,15 +102,15 @@ Each row is **40px tall** and contains:
 | Element | Detail |
 |---------|--------|
 | Status dot | 8px circle: green `#16a34a` = running, gray `#94a3b8` = stopped, amber `#f59e0b` = starting |
-| Server name | `var(--moba-text)`, 12px, font-weight 500, truncated with ellipsis |
+| Server name | `var(--taomni-text)`, 12px, font-weight 500, truncated with ellipsis |
 | Start button `▶` | 22×22px icon button, Lucide `Play`, color `#16a34a` when stopped |
 | Stop button `■` | 22×22px icon button, Lucide `Square`, color `#dc2626` when running |
-| Settings button `⚙` | 22×22px icon button, Lucide `Settings2`, color `var(--moba-accent)` |
+| Settings button `⚙` | 22×22px icon button, Lucide `Settings2`, color `var(--taomni-accent)` |
 
 **Row states:**
 - Default: `background: transparent`
-- Hover: `background: var(--moba-hover)`
-- Selected: `background: var(--moba-selected)`, left border `3px solid var(--moba-accent)`
+- Hover: `background: var(--taomni-hover)`
+- Selected: `background: var(--taomni-selected)`, left border `3px solid var(--taomni-accent)`
 - Running: status dot pulses with a subtle CSS animation (opacity 1→0.5→1, 2s loop)
 
 ### 4.3 Row Component Spec
@@ -144,9 +144,9 @@ The right panel shows configuration for the **currently selected** server. It ha
 └──────────────────────────────────────────────┘
 ```
 
-- Title: 13px, font-weight 600, `var(--moba-text)`
-- Divider: `1px solid var(--moba-divider)`, margin 8px 0
-- Description: 11px, `var(--moba-text-muted)`, max 3 lines
+- Title: 13px, font-weight 600, `var(--taomni-text)`
+- Divider: `1px solid var(--taomni-divider)`, margin 8px 0
+- Description: 11px, `var(--taomni-text-muted)`, max 3 lines
 
 ### 5.2 Configuration Fields
 
@@ -229,7 +229,7 @@ Below the config fields, a **log output area** shows real-time server stdout/std
 └──────────────────────────────────────────────┘
 ```
 
-- Log area: `background: var(--moba-term-bg)`, `color: var(--moba-term-text)`, monospace 11px
+- Log area: `background: var(--taomni-term-bg)`, `color: var(--taomni-term-text)`, monospace 11px
 - Height: `120px` fixed, scrollable, auto-scrolls to bottom when running
 - `[Clear]` button: clears log buffer
 - `[↓]` button: toggles auto-scroll lock
@@ -238,15 +238,15 @@ Below the config fields, a **log output area** shows real-time server stdout/std
 
 ## 6. Field Component Specs
 
-All form fields follow the existing NewMob input design system:
+All form fields follow the existing Taomni input design system:
 
 ### Number Input (Spin)
 
 ```css
 height: 22px;
 border-radius: 2px;
-border: 1px solid var(--moba-input-border);
-background: var(--moba-input-bg);
+border: 1px solid var(--taomni-input-border);
+background: var(--taomni-input-bg);
 font-size: 12px;
 padding: 0 6px;
 width: 80px;
@@ -259,18 +259,18 @@ Spin buttons: native browser spinners, styled to match chrome.
 ```css
 height: 22px;
 border-radius: 2px;
-border: 1px solid var(--moba-input-border);
-background: var(--moba-input-bg);
+border: 1px solid var(--taomni-input-border);
+background: var(--taomni-input-bg);
 font-size: 12px;
 padding: 0 6px;
 width: 100%;
 ```
 
-Focus ring: `box-shadow: 0 0 0 2px var(--moba-accent-soft)40`
+Focus ring: `box-shadow: 0 0 0 2px var(--taomni-accent-soft)40`
 
 ### Checkbox
 
-Native checkbox with custom accent color: `accent-color: var(--moba-accent)`
+Native checkbox with custom accent color: `accent-color: var(--taomni-accent)`
 
 ### Path Picker
 
@@ -287,8 +287,8 @@ Button: same style as secondary button (see §7).
 ```css
 height: 22px;
 border-radius: 2px;
-border: 1px solid var(--moba-input-border);
-background: var(--moba-input-bg);
+border: 1px solid var(--taomni-input-border);
+background: var(--taomni-input-bg);
 font-size: 12px;
 padding: 0 4px;
 ```
@@ -299,7 +299,7 @@ padding: 0 4px;
 Label (100px, right-aligned, muted)    [  Input field  ]
 ```
 
-Label: `font-size: 12px; color: var(--moba-text-muted); text-align: right; padding-right: 8px;`
+Label: `font-size: 12px; color: var(--taomni-text-muted); text-align: right; padding-right: 8px;`
 
 ---
 
@@ -315,11 +315,11 @@ Label: `font-size: 12px; color: var(--moba-text-muted); text-align: right; paddi
 height: 26px;
 padding: 0 16px;
 border-radius: 3px;
-background: linear-gradient(to bottom, var(--moba-accent-soft), var(--moba-accent));
+background: linear-gradient(to bottom, var(--taomni-accent-soft), var(--taomni-accent));
 color: #ffffff;
 font-size: 12px;
 font-weight: 500;
-border: 1px solid var(--moba-accent);
+border: 1px solid var(--taomni-accent);
 ```
 
 Hover: `filter: brightness(1.1)`  
@@ -331,10 +331,10 @@ Active: `filter: brightness(0.95)`
 height: 26px;
 padding: 0 16px;
 border-radius: 3px;
-background: var(--moba-chrome-bg);
-color: var(--moba-text);
+background: var(--taomni-chrome-bg);
+color: var(--taomni-text);
 font-size: 12px;
-border: 1px solid var(--moba-chrome-border);
+border: 1px solid var(--taomni-chrome-border);
 ```
 
 ---
@@ -385,7 +385,7 @@ interface ServersStore {
 
 ### Persistence
 
-Server configs are persisted to the existing SQLite database (`newmob.db`) in a new `server_configs` table:
+Server configs are persisted to the existing SQLite database (`taomni.db`) in a new `server_configs` table:
 
 ```sql
 CREATE TABLE server_configs (
@@ -547,7 +547,7 @@ All components use CSS variables, so dark theme is automatic. Additional dark-sp
 
 ```css
 html[data-app-theme="dark"] {
-  /* Log area already uses --moba-term-bg which is dark */
+  /* Log area already uses --taomni-term-bg which is dark */
   /* Status dot colors remain the same (semantic) */
   /* Running pulse animation: same */
 }
@@ -583,4 +583,4 @@ No additional dark theme work needed beyond the existing token system.
 
 ---
 
-*Design document generated 2026-05-30. Matches NewMob v0.1.37 UI system.*
+*Design document generated 2026-05-30. Matches Taomni v0.1.37 UI system.*

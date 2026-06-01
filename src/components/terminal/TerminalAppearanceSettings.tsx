@@ -145,13 +145,13 @@ export function TerminalAppearanceSettings({
 
   return (
     <div data-testid="terminal-appearance-settings" className={`space-y-4 ${className}`}>
-      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-7">
             <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.fontLabel")}</span>
             <select
               aria-label={t("terminalAppearance.fontAria")}
-              className="moba-input w-full"
+              className="taomni-input w-full"
               value={selectedFont}
               disabled={fontOptions.length === 0}
               onChange={(event) => updateProfile({ fontFamily: makeTerminalFontFamily(event.target.value) })}
@@ -186,7 +186,7 @@ export function TerminalAppearanceSettings({
             <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.textSizeLabel")}</span>
             <div className="inline-flex items-center gap-1">
               <button
-                className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center"
+                className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
                 type="button"
                 aria-label={t("terminalAppearance.decreaseTextSize")}
                 onClick={() => updateProfile({ fontSize: Math.max(8, profile.fontSize - 1) })}
@@ -194,7 +194,7 @@ export function TerminalAppearanceSettings({
                 <Minus className="w-4 h-4" />
               </button>
               <input
-                className="moba-input h-8 w-14 text-center"
+                className="taomni-input h-8 w-14 text-center"
                 aria-label={t("terminalAppearance.fontSizeAria")}
                 value={fontSizeText}
                 inputMode="numeric"
@@ -219,7 +219,7 @@ export function TerminalAppearanceSettings({
                 }}
               />
               <button
-                className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center"
+                className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
                 type="button"
                 aria-label={t("terminalAppearance.increaseTextSize")}
                 onClick={() => updateProfile({ fontSize: Math.min(32, profile.fontSize + 1) })}
@@ -231,7 +231,7 @@ export function TerminalAppearanceSettings({
 
           <label className="col-span-4 md:col-span-2 inline-flex items-center gap-1.5 pb-1">
             <input
-              className="moba-checkbox"
+              className="taomni-checkbox"
               type="checkbox"
               aria-label={t("terminalAppearance.enableLigaturesAria")}
               checked={profile.fontLigatures}
@@ -242,7 +242,7 @@ export function TerminalAppearanceSettings({
         </div>
       </section>
 
-      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.themeHeading")}</div>
         <div data-testid="terminal-theme-gallery" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
           {TERMINAL_THEME_DEFINITIONS.map((definition) => (
@@ -258,7 +258,7 @@ export function TerminalAppearanceSettings({
       </section>
 
       {showCustomColors && (
-        <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+        <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
           <div className="grid grid-cols-12 gap-2 items-center">
             <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
               <span className="w-24 text-[12px] font-semibold">{t("terminalAppearance.customBackgroundLabel")}</span>
@@ -270,7 +270,7 @@ export function TerminalAppearanceSettings({
                 className="w-8 h-7 border border-[#8aa0bd] rounded-sm"
               />
               <input
-                className="moba-input w-24 moba-mono"
+                className="taomni-input w-24 taomni-mono"
                 value={bg}
                 aria-label={t("terminalAppearance.backgroundHexAria")}
                 onChange={(event) => updateCustomColor(event.target.value, fg)}
@@ -286,7 +286,7 @@ export function TerminalAppearanceSettings({
                 className="w-8 h-7 border border-[#8aa0bd] rounded-sm"
               />
               <input
-                className="moba-input w-24 moba-mono"
+                className="taomni-input w-24 taomni-mono"
                 value={fg}
                 aria-label={t("terminalAppearance.foregroundHexAria")}
                 onChange={(event) => updateCustomColor(bg, event.target.value)}
@@ -296,14 +296,14 @@ export function TerminalAppearanceSettings({
         </section>
       )}
 
-      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.behaviorHeading")}</div>
         <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px]">
           <label className="col-span-12 md:col-span-4">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.cursorLabel")}</span>
+            <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("terminalAppearance.cursorLabel")}</span>
             <select
               aria-label={t("terminalAppearance.cursorAria")}
-              className="moba-input w-full"
+              className="taomni-input w-full"
               value={selectedCursor}
               onChange={(event) => {
                 const option = cursorOptions.find((item) => item.label === event.target.value);
@@ -317,10 +317,10 @@ export function TerminalAppearanceSettings({
           </label>
 
           <label className="col-span-12 md:col-span-4">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.scrollbackLabel")}</span>
+            <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("terminalAppearance.scrollbackLabel")}</span>
             <span className="flex items-center gap-2">
               <input
-                className="moba-input w-28"
+                className="taomni-input w-28"
                 value={scrollbackText}
                 aria-label={t("terminalAppearance.scrollbackLinesAria")}
                 inputMode="numeric"
@@ -344,15 +344,15 @@ export function TerminalAppearanceSettings({
                   }
                 }}
               />
-              <span className="text-[var(--moba-text-muted)]">{t("terminalAppearance.scrollbackLinesSuffix")}</span>
+              <span className="text-[var(--taomni-text-muted)]">{t("terminalAppearance.scrollbackLinesSuffix")}</span>
             </span>
           </label>
 
           <label className="col-span-12 md:col-span-4">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.rightClickLabel")}</span>
+            <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("terminalAppearance.rightClickLabel")}</span>
             <select
               aria-label={t("terminalAppearance.rightClickAria")}
-              className="moba-input w-full"
+              className="taomni-input w-full"
               value={selectedRightClick}
               onChange={(event) => {
                 const option = rightClickOptions.find((item) => item.label === event.target.value);
@@ -422,7 +422,7 @@ export function TerminalAppearanceSettings({
         />
       )}
 
-      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.inlineSuggestionsHeading")}</div>
         <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px] items-end">
           <div className="col-span-12 md:col-span-7">
@@ -431,15 +431,15 @@ export function TerminalAppearanceSettings({
               checked={profile.inlineSuggestions}
               onChange={(checked) => updateProfile({ inlineSuggestions: checked })}
             />
-            <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
+            <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)] leading-snug">
               {t("terminalAppearance.inlineSuggestionsHint")}
             </p>
           </div>
 
           <label className="col-span-8 md:col-span-3">
-            <span className="block mb-1 text-[var(--moba-text-muted)]">{t("terminalAppearance.inlineSuggestionsMaxLabel")}</span>
+            <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("terminalAppearance.inlineSuggestionsMaxLabel")}</span>
             <input
-              className="moba-input w-28"
+              className="taomni-input w-28"
               value={inlineSuggestionsMaxText}
               aria-label={t("terminalAppearance.inlineSuggestionsMaxAria")}
               inputMode="numeric"
@@ -469,7 +469,7 @@ export function TerminalAppearanceSettings({
           <div className="col-span-12 md:col-span-2 flex md:justify-end">
             <button
               type="button"
-              className="moba-btn h-8 px-2 text-[11px]"
+              className="taomni-btn h-8 px-2 text-[11px]"
               disabled={clearingHistory}
               onClick={() => {
                 if (!window.confirm(t("terminalAppearance.clearAllHistoryConfirm"))) {
@@ -489,11 +489,11 @@ export function TerminalAppearanceSettings({
         </div>
       </section>
 
-      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.aiAssistanceHeading")}</div>
         <div className="space-y-3">
           <div>
-            <div className="text-[11px] text-[var(--moba-text-muted)] mb-1.5">{t("terminalAppearance.suggestionSourceLabel")}</div>
+            <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("terminalAppearance.suggestionSourceLabel")}</div>
             <div className="flex flex-col gap-1.5">
               {(
                 [
@@ -510,30 +510,30 @@ export function TerminalAppearanceSettings({
                     checked={profile.inlineSuggestionsSource === value}
                     disabled={!profile.inlineSuggestions}
                     onChange={() => updateProfile({ inlineSuggestionsSource: value })}
-                    className="mt-0.5 accent-[var(--moba-accent)]"
+                    className="mt-0.5 accent-[var(--taomni-accent)]"
                   />
                   <div>
                     <div className="text-[12px]">{label}</div>
-                    <div className="text-[11px] text-[var(--moba-text-muted)]">{desc}</div>
+                    <div className="text-[11px] text-[var(--taomni-text-muted)]">{desc}</div>
                   </div>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="pt-2 border-t border-[var(--moba-divider)]">
+          <div className="pt-2 border-t border-[var(--taomni-divider)]">
             <CheckControl
               label={t("terminalAppearance.enableAiRewrite")}
               checked={profile.aiCommandRewriteEnabled}
               onChange={(checked) => updateProfile({ aiCommandRewriteEnabled: checked })}
             />
-            <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
+            <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)] leading-snug">
               {t("terminalAppearance.enableAiRewriteHint")}
             </p>
             <label className="mt-2 flex items-center gap-2 text-[11px]">
-              <span className="text-[var(--moba-text-muted)]">{t("terminalAppearance.aiRewriteShortcutLabel")}</span>
+              <span className="text-[var(--taomni-text-muted)]">{t("terminalAppearance.aiRewriteShortcutLabel")}</span>
               <input
-                className="moba-input h-7 w-32 text-[12px]"
+                className="taomni-input h-7 w-32 text-[12px]"
                 value={profile.aiCommandRewriteShortcut}
                 aria-label={t("terminalAppearance.aiRewriteShortcutAria")}
                 disabled={!profile.aiCommandRewriteEnabled}
@@ -545,22 +545,22 @@ export function TerminalAppearanceSettings({
             </label>
           </div>
 
-          <div className="pt-2 border-t border-[var(--moba-divider)]">
+          <div className="pt-2 border-t border-[var(--taomni-divider)]">
             <CheckControl
               label={t("terminalAppearance.aiInlineQqLabel")}
               checked={profile.aiInlineQqRender}
               onChange={(checked) => updateProfile({ aiInlineQqRender: checked })}
             />
-            <p className="mt-1 text-[11px] text-[var(--moba-text-muted)] leading-snug">
+            <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)] leading-snug">
               {t("terminalAppearance.aiInlineQqHint")}
             </p>
           </div>
         </div>
       </section>
 
-      <section className="rounded-md border border-[var(--moba-divider)] bg-[var(--moba-panel-bg)] p-3">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.commonCommandsHeading")}</div>
-        <p className="text-[11px] text-[var(--moba-text-muted)] leading-snug mb-2">
+        <p className="text-[11px] text-[var(--taomni-text-muted)] leading-snug mb-2">
           {t("terminalAppearance.commonCommandsHint")}
         </p>
         <CommonCommandsEditor
@@ -586,7 +586,7 @@ function CheckControl({
   return (
     <label className="inline-flex items-center gap-1.5">
       <input
-        className="moba-checkbox"
+        className="taomni-checkbox"
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
@@ -608,14 +608,14 @@ function ThemeCard({
   t: TranslateFn;
 }) {
   const theme = definition.theme;
-  const borderColor = selected ? "var(--moba-accent)" : "var(--moba-divider)";
+  const borderColor = selected ? "var(--taomni-accent)" : "var(--taomni-divider)";
 
   return (
     <button
       type="button"
       aria-label={t("terminalAppearance.themeUseLabel", { name: definition.name })}
       data-selected={selected}
-      className="h-[74px] rounded-md border bg-[var(--moba-card-bg)] text-left p-2 flex items-center gap-2 hover:bg-[var(--moba-hover)]"
+      className="h-[74px] rounded-md border bg-[var(--taomni-card-bg)] text-left p-2 flex items-center gap-2 hover:bg-[var(--taomni-hover)]"
       style={{ borderColor }}
       onClick={onSelect}
     >
@@ -629,7 +629,7 @@ function ThemeCard({
           <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.red ?? "#ff6b6b" }} />
         </span>
       </span>
-      {selected && <Check className="w-4 h-4 text-[var(--moba-accent)] flex-shrink-0" />}
+      {selected && <Check className="w-4 h-4 text-[var(--taomni-accent)] flex-shrink-0" />}
     </button>
   );
 }
@@ -695,7 +695,7 @@ function TerminalPreview({
   return (
     <div
       data-testid="terminal-preview"
-      className="rounded-md p-3 moba-mono leading-relaxed border border-black/10"
+      className="rounded-md p-3 taomni-mono leading-relaxed border border-black/10"
       style={{ background, color: foreground, fontFamily, fontSize }}
     >
       <span style={{ color: theme.green ?? "#62d36f" }}>user@host</span>
@@ -730,7 +730,7 @@ function TerminalPreviewCursor({
   styleName: TerminalCursorStyle;
   blink: boolean;
 }) {
-  const className = blink ? "moba-blink" : "";
+  const className = blink ? "taomni-blink" : "";
 
   if (styleName === "underline") {
     return (
@@ -790,7 +790,7 @@ function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEditorProps)
   return (
     <div className="flex flex-col gap-1.5">
       {value.length === 0 ? (
-        <div className="text-[11px] text-[var(--moba-text-muted)] italic px-1 py-2">
+        <div className="text-[11px] text-[var(--taomni-text-muted)] italic px-1 py-2">
           {t("terminalAppearance.commonCommandsEmpty")}
         </div>
       ) : (
@@ -798,14 +798,14 @@ function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEditorProps)
           {value.map((item, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <input
-                className="moba-input flex-1 min-w-0 font-mono text-[12px]"
+                className="taomni-input flex-1 min-w-0 font-mono text-[12px]"
                 placeholder={t("terminalAppearance.commonCommandPlaceholder")}
                 value={item.command}
                 onChange={(e) => updateRow(idx, { command: e.target.value })}
                 aria-label={t("terminalAppearance.commonCommandAriaCommand", { index: idx + 1 })}
               />
               <input
-                className="moba-input flex-1 min-w-0 text-[12px]"
+                className="taomni-input flex-1 min-w-0 text-[12px]"
                 placeholder={t("terminalAppearance.commonCommandDescriptionPlaceholder")}
                 value={item.description ?? ""}
                 onChange={(e) => updateRow(idx, { description: e.target.value })}
@@ -813,7 +813,7 @@ function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEditorProps)
               />
               <button
                 type="button"
-                className="moba-btn h-8 w-8 p-0 inline-flex items-center justify-center"
+                className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
                 onClick={() => removeRow(idx)}
                 aria-label={t("terminalAppearance.commonCommandRemoveAria", { index: idx + 1 })}
                 title={t("terminalAppearance.commonCommandRemove")}
@@ -826,7 +826,7 @@ function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEditorProps)
       )}
       <button
         type="button"
-        className="moba-btn h-8 px-2 text-[11px] self-start inline-flex items-center gap-1"
+        className="taomni-btn h-8 px-2 text-[11px] self-start inline-flex items-center gap-1"
         onClick={addRow}
       >
         <Plus size={12} /> {t("terminalAppearance.commonCommandAddEntry")}

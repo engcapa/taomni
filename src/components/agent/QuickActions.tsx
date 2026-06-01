@@ -93,7 +93,7 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
       {hasError && (
         <button
           type="button"
-          className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1 text-yellow-400 border-yellow-500/30"
+          className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1 text-yellow-400 border-yellow-500/30"
           onClick={handleExplainError}
           disabled={loading === "explain"}
           title={t("agent.explainErrorTitle")}
@@ -109,7 +109,7 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
 
       <button
         type="button"
-        className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+        className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
         onClick={() => handlePlanTool(t("agent.planRequestList"), "sessions")}
         disabled={!!loading}
         title={t("agent.listSessionsTitle")}
@@ -124,7 +124,7 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
 
       <button
         type="button"
-        className="moba-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+        className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
         onClick={() => handlePlanTool(t("agent.planRequestHistory"), "history")}
         disabled={!!loading}
         title={t("agent.findHistoryTitle")}

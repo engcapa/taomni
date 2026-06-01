@@ -49,7 +49,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
 
   if (!redisKey) {
     return (
-      <div className="h-full flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
         Select a key to view its value.
       </div>
     );
@@ -60,17 +60,17 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
       {/* Metadata bar */}
       <div
         className="shrink-0 flex items-center gap-2 px-2 h-8 text-[11px]"
-        style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+        style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
-        <span className="px-1.5 rounded uppercase text-[10px]" style={{ background: "var(--moba-accent)", color: "#fff" }}>
+        <span className="px-1.5 rounded uppercase text-[10px]" style={{ background: "var(--taomni-accent)", color: "#fff" }}>
           {value?.kind ?? "?"}
         </span>
         <span className="font-mono truncate flex-1" title={redisKey}>{redisKey}</span>
-        <span className="text-[var(--moba-text-muted)]">TTL: {value ? ttlText(value.ttl) : "—"}</span>
+        <span className="text-[var(--taomni-text-muted)]">TTL: {value ? ttlText(value.ttl) : "—"}</span>
         <button
           type="button"
           title="Edit TTL"
-          className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+          className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           onClick={async () => {
             const input = window.prompt("Set TTL in seconds (-1 = persist, 0 = remove key):", String(value?.ttl ?? -1));
             if (input === null) return;
@@ -92,15 +92,15 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
         >
           <Pencil className="w-3 h-3" />
         </button>
-        {value?.encoding && <span className="text-[var(--moba-text-muted)]">enc: {value.encoding}</span>}
-        {value?.memoryUsage != null && <span className="text-[var(--moba-text-muted)]">mem: {value.memoryUsage}B</span>}
-        <button type="button" title="Reload" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]" onClick={() => void load()}>
+        {value?.encoding && <span className="text-[var(--taomni-text-muted)]">enc: {value.encoding}</span>}
+        {value?.memoryUsage != null && <span className="text-[var(--taomni-text-muted)]">mem: {value.memoryUsage}B</span>}
+        <button type="button" title="Reload" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => void load()}>
           <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
         </button>
         <button
           type="button"
           title="Delete key"
-          className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+          className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           style={{ color: "#d9534f" }}
           onClick={async () => {
             if (!window.confirm(`Delete key "${redisKey}"?`)) return;
@@ -116,7 +116,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto moba-scroll-y p-2">
+      <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2">
         {error && <div className="text-[11px] mb-2" style={{ color: "#d9534f" }}>{error}</div>}
         {value && (
           <ValueEditor
@@ -162,7 +162,7 @@ function ValueEditor({
     case "stream":
       return <StreamViewer entries={value.value as { id: string; fields: [string, string][] }[]} />;
     default:
-      return <div className="text-[12px] text-[var(--moba-text-muted)]">Empty or unknown value.</div>;
+      return <div className="text-[12px] text-[var(--taomni-text-muted)]">Empty or unknown value.</div>;
   }
 }
 
@@ -199,7 +199,7 @@ function StringEditor({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="moba-btn px-2 py-0.5 text-[11px] flex items-center gap-1"
+          className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1"
           onClick={async () => {
             try {
               await redisSetKey(sessionId, redisKey, "string", text);
@@ -213,13 +213,13 @@ function StringEditor({
         </button>
         {isJson && (
           <label className="text-[11px] flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" className="moba-checkbox" checked={pretty} onChange={(e) => setPretty(e.target.checked)} />
+            <input type="checkbox" className="taomni-checkbox" checked={pretty} onChange={(e) => setPretty(e.target.checked)} />
             <Braces className="w-3 h-3" /> Format JSON
           </label>
         )}
       </div>
       <textarea
-        className="moba-input flex-1 font-mono"
+        className="taomni-input flex-1 font-mono"
         style={{ minHeight: 200, padding: 8, resize: "none" }}
         value={display}
         readOnly={pretty}
@@ -261,12 +261,12 @@ function PairEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <button type="button" className="moba-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
         <Save className="w-3 h-3" /> Save
       </button>
       <table className="w-full text-[12px]">
         <thead>
-          <tr className="text-left text-[var(--moba-text-muted)]">
+          <tr className="text-left text-[var(--taomni-text-muted)]">
             <th className="px-1 py-0.5 w-1/3">{headers[0]}</th>
             <th className="px-1 py-0.5">{headers[1]}</th>
             <th className="w-8" />
@@ -277,20 +277,20 @@ function PairEditor({
             <tr key={i}>
               <td className="px-1 py-0.5">
                 <input
-                  className="moba-input w-full font-mono"
+                  className="taomni-input w-full font-mono"
                   value={row[0]}
                   onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? [e.target.value, x[1]] : x)))}
                 />
               </td>
               <td className="px-1 py-0.5">
                 <input
-                  className="moba-input w-full font-mono"
+                  className="taomni-input w-full font-mono"
                   value={row[1]}
                   onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? [x[0], e.target.value] : x)))}
                 />
               </td>
               <td>
-                <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+                <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
                   <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
                 </button>
               </td>
@@ -298,7 +298,7 @@ function PairEditor({
           ))}
         </tbody>
       </table>
-      <button type="button" className="moba-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ["", ""]])}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ["", ""]])}>
         <Plus className="w-3 h-3" /> Add {kind === "hash" ? "field" : "member"}
       </button>
     </div>
@@ -334,25 +334,25 @@ function ListEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <button type="button" className="moba-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
         <Save className="w-3 h-3" /> Save
       </button>
       <div className="flex flex-col gap-1">
         {rows.map((item, i) => (
           <div key={i} className="flex items-center gap-1">
-            <span className="text-[10px] text-[var(--moba-text-muted)] w-8 text-right">{kind === "list" ? i : "•"}</span>
+            <span className="text-[10px] text-[var(--taomni-text-muted)] w-8 text-right">{kind === "list" ? i : "•"}</span>
             <input
-              className="moba-input flex-1 font-mono"
+              className="taomni-input flex-1 font-mono"
               value={item}
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? e.target.value : x)))}
             />
-            <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+            <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
               <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
             </button>
           </div>
         ))}
       </div>
-      <button type="button" className="moba-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ""])}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ""])}>
         <Plus className="w-3 h-3" /> Add {kind === "list" ? "item" : "member"}
       </button>
     </div>
@@ -364,7 +364,7 @@ function StreamViewer({ entries }: { entries: { id: string; fields: [string, str
     <div className="text-[12px] font-mono">
       <table className="w-full">
         <thead>
-          <tr className="text-left text-[var(--moba-text-muted)]">
+          <tr className="text-left text-[var(--taomni-text-muted)]">
             <th className="px-1 py-0.5">Entry ID</th>
             <th className="px-1 py-0.5">Field</th>
             <th className="px-1 py-0.5">Value</th>
@@ -373,7 +373,7 @@ function StreamViewer({ entries }: { entries: { id: string; fields: [string, str
         <tbody>
           {entries.flatMap((entry) =>
             entry.fields.map(([f, v], i) => (
-              <tr key={`${entry.id}-${i}`} style={{ borderTop: i === 0 ? "1px solid var(--moba-divider)" : undefined }}>
+              <tr key={`${entry.id}-${i}`} style={{ borderTop: i === 0 ? "1px solid var(--taomni-divider)" : undefined }}>
                 <td className="px-1 py-0.5 align-top">{i === 0 ? entry.id : ""}</td>
                 <td className="px-1 py-0.5">{f}</td>
                 <td className="px-1 py-0.5 truncate" title={v}>{v}</td>

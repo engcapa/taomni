@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn missing_entry_reports_not_found_without_error() {
         let q = KeychainQuery {
-            service: "newmob-tests-does-not-exist-9f8a7b6c".to_string(),
+            service: "taomni-tests-does-not-exist-9f8a7b6c".to_string(),
             account: "nobody".to_string(),
         };
         let hit = lookup_one(&q);

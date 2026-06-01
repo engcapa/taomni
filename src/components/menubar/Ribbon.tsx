@@ -43,7 +43,7 @@ interface RibbonProps {
 export function Ribbon({ xServerEnabled, splitActive, onCommand }: RibbonProps) {
   const t = useT();
   return (
-    <div data-testid="ribbon" className="moba-ribbon px-2 pt-1.5 pb-1 flex items-end gap-1">
+    <div data-testid="ribbon" className="taomni-ribbon px-2 pt-1.5 pb-1 flex items-end gap-1">
       <RibbonBtn id="session" icon={<TerminalIcon className="w-6 h-6" style={{ color: "#2b5d8b" }} />} label={t("ribbon.newSession")} highlight onClick={() => onCommand("new-session")} />
       <RibbonBtn id="sftp" icon={<FolderTree className="w-6 h-6" style={{ color: "#1f7a4a" }} />} label={t("ribbon.newSftp")} onClick={() => onCommand("new-sftp")} />
       <RibbonBtn id="servers" icon={<Server className="w-6 h-6" style={{ color: "#3b7ac2" }} />} label={t("ribbon.serversTab")} onClick={() => onCommand("servers")} />
@@ -53,11 +53,11 @@ export function Ribbon({ xServerEnabled, splitActive, onCommand }: RibbonProps) 
       <RibbonBtn id="multiexec" icon={<Users className="w-6 h-6" style={{ color: "#7a3d9d" }} />} label={t("ribbon.multiExec")} onClick={() => onCommand("multiexec")} />
       <RibbonBtn id="tunneling" icon={<Network className="w-6 h-6" style={{ color: "#236a98" }} />} label={t("ribbon.tunneling")} onClick={() => onCommand("tunneling")} />
       <RibbonBtn id="packages" icon={<Package className="w-6 h-6" style={{ color: "#7a4f1a" }} />} label={t("ribbon.packages")} onClick={() => onCommand("packages")} />
-      <RibbonBtn id="settings" icon={<Settings className="w-6 h-6" style={{ color: "var(--moba-text-muted)" }} />} label={t("ribbon.settings")} onClick={() => onCommand("settings")} />
+      <RibbonBtn id="settings" icon={<Settings className="w-6 h-6" style={{ color: "var(--taomni-text-muted)" }} />} label={t("ribbon.settings")} onClick={() => onCommand("settings")} />
       <RibbonBtn id="help" icon={<HelpCircle className="w-6 h-6" style={{ color: "#1f6db8" }} />} label={t("ribbon.help")} onClick={() => onCommand("help")} />
       <div className="flex-1" />
       <div className="flex items-center gap-2 mr-2">
-        <span className="moba-pill">
+        <span className="taomni-pill">
           <span className={`w-1.5 h-1.5 rounded-full inline-block ${xServerEnabled ? "bg-emerald-500" : "bg-slate-400"}`} /> {t("menu.xserver")}: {xServerEnabled ? t("common.enabled") : t("common.disabled")}
         </span>
         <RibbonBtn id="x-server" icon={<Monitor className="w-6 h-6" style={{ color: "#2b5d8b" }} />} label={t("menu.xserver")} onClick={() => onCommand("toggle-xserver")} />
@@ -85,14 +85,14 @@ function RibbonBtn({
   return (
     <button
       data-testid={`ribbon-${id}`}
-      className="moba-ribbon-btn"
+      className="taomni-ribbon-btn"
       onClick={onClick}
       type="button"
       style={
         active
-          ? { background: "var(--moba-selected)", outline: "1px solid var(--moba-accent)" }
+          ? { background: "var(--taomni-selected)", outline: "1px solid var(--taomni-accent)" }
           : highlight
-          ? { background: "var(--moba-control-hover)", outline: "1px solid var(--moba-tab-border)" }
+          ? { background: "var(--taomni-control-hover)", outline: "1px solid var(--taomni-tab-border)" }
           : undefined
       }
     >

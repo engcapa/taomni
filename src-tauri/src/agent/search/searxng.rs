@@ -16,7 +16,7 @@ impl SearXngProvider {
         Self {
             client: Client::builder()
                 .timeout(Duration::from_secs(10))
-                .user_agent("NewMob/0.1 (web_search; https://github.com/engcapa/newmob)")
+                .user_agent("Taomni/0.1 (web_search; https://github.com/engcapa/taomni)")
                 .build()
                 .expect("failed to build reqwest client"),
             base_url: Arc::new(Mutex::new(base_url.into())),

@@ -104,8 +104,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ steps.version.outputs.tag }}
-          releaseName: NewMob v${{ steps.version.outputs.version }}
-          releaseBody: Desktop bundles for NewMob v${{ steps.version.outputs.version }}.
+          releaseName: Taomni v${{ steps.version.outputs.version }}
+          releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           uploadWorkflowArtifacts: true

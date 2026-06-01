@@ -7,8 +7,11 @@ import {
 } from "./sessionPaths";
 import { normalizeTerminalProfile, parseSessionOptions } from "./terminalProfile";
 
-const NEWMOB_FORMAT = "newmob.sessions";
-const NEWMOB_SCHEMA_VERSION = 1;
+const TAOMNI_FORMAT = "taomni.sessions";
+// Legacy export-format tag (app was renamed NewMob → Taomni). Still accepted
+// on import so files exported by older builds keep working.
+const LEGACY_FORMAT = "newmob.sessions";
+const SCHEMA_VERSION = 1;
 const MAX_IMPORT_CHARS = 2_000_000;
 const MAX_IMPORT_ARCHIVE_BYTES = 50_000_000;
 const MAX_SESSIONS = 5_000;
@@ -58,7 +61,7 @@ export interface SessionImportSecret {
   /**
    * `"session"` (default) attaches to the parent session via `passwordRef`;
    * `"standalone"` writes a plain vault entry the user manages by hand
-   * (used for Tabby private-key passphrases that don't map to a NewMob
+   * (used for Tabby private-key passphrases that don't map to a Taomni
    * private-key path).
    */
   attachment?: "session" | "standalone";
@@ -122,7 +125,7 @@ type PortableAuth =
 
 let fallbackIdCounter = 0;
 
-export function parseNewMobSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+export function parseTaomniSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
   assertImportSize(text);
 
   let parsed: unknown;
@@ -134,7 +137,7 @@ export function parseNewMobSessions(text: string, options: SessionImportOptions 
 
   const warnings: string[] = [];
   const now = resolveNow(options.now);
-  const parsedRows = extractNewMobRows(parsed, warnings);
+  const parsedRows = extractTaomniRows(parsed, warnings);
   const sessions = parsedRows.items
     .map(({ row, folderMode, scopeFolder }) =>
       rowToSession(row, folderMode, scopeFolder, options.targetFolder ?? null, now, warnings))
@@ -144,15 +147,15 @@ export function parseNewMobSessions(text: string, options: SessionImportOptions 
   return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
 }
 
-export function serializeNewMobSessions(
+export function serializeTaomniSessions(
   sessions: readonly SessionConfig[],
   scopeFolder: string | null,
 ): SessionExportResult {
   const exportedAt = new Date().toISOString();
   const portableSessions = sessions.map((session) => toPortableSession(session, scopeFolder));
   const payload = {
-    format: NEWMOB_FORMAT,
-    schema_version: NEWMOB_SCHEMA_VERSION,
+    format: TAOMNI_FORMAT,
+    schema_version: SCHEMA_VERSION,
     exported_at: exportedAt,
     security: {
       secrets: "excluded",
@@ -165,7 +168,7 @@ export function serializeNewMobSessions(
   };
 
   return {
-    filename: `${slugify(normalizeGroupPath(scopeFolder) ?? "user-sessions")}.newmob-sessions.json`,
+    filename: `${slugify(normalizeGroupPath(scopeFolder) ?? "user-sessions")}.taomni-sessions.json`,
     text: JSON.stringify(payload, null, 2),
     mimeType: "application/json",
     warnings: [],
@@ -337,7 +340,7 @@ export function parseXshellSessions(text: string, options: SessionImportOptions 
 }
 
 /**
- * Maps Xshell's `[CONNECTION:AUTHENTICATION]` block to a NewMob auth method.
+ * Maps Xshell's `[CONNECTION:AUTHENTICATION]` block to a Taomni auth method.
  * Xshell records the chosen method in `Method` ("Password", "Public Key",
  * "Keyboard Interactive", ...) and, for public-key auth, the *name* of a key
  * in its own key store (e.g. "id_rsa") rather than a filesystem path. We map
@@ -506,7 +509,7 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
       );
     } else {
       warnings.push(
-        `Tabby keeps remembered passwords in the OS keychain (Credential Manager / Keychain / Secret Service). NewMob will read them automatically; ${externalPasswordCount} profile(s) using password auth still need an entry there.`,
+        `Tabby keeps remembered passwords in the OS keychain (Credential Manager / Keychain / Secret Service). Taomni will read them automatically; ${externalPasswordCount} profile(s) using password auth still need an entry there.`,
       );
     }
   }
@@ -965,7 +968,7 @@ function tabbyOptions(
 
   if (optionsRecord.agentForward === true || optionsRecord.agentForwarding === true) {
     imported.agentForward = true;
-    warnings.push("Imported Tabby agent forwarding as metadata; NewMob does not enable SSH agent forwarding at runtime yet.");
+    warnings.push("Imported Tabby agent forwarding as metadata; Taomni does not enable SSH agent forwarding at runtime yet.");
   }
 
   const jump = resolveTabbyJumpHost(profileName, optionsRecord.jumpHost, profileLookup, warnings);
@@ -974,12 +977,12 @@ function tabbyOptions(
     imported.jumpHost = jump.host;
     imported.jumpPort = String(jump.port);
     if (jump.username) imported.jumpUser = jump.username;
-    warnings.push("Imported Tabby jump-host settings as metadata; NewMob does not use jump hosts at runtime yet.");
+    warnings.push("Imported Tabby jump-host settings as metadata; Taomni does not use jump hosts at runtime yet.");
   }
 
   const proxyCommand = cleanText(firstNonEmptyString(optionsRecord.proxyCommand), MAX_OPTION_LENGTH);
   if (proxyCommand) {
-    warnings.push(`Skipped Tabby proxy command for "${profileName}" because NewMob session import cannot map proxy commands yet.`);
+    warnings.push(`Skipped Tabby proxy command for "${profileName}" because Taomni session import cannot map proxy commands yet.`);
   }
 
   const tags = cleanText(firstNonEmptyString(profile.tags, profile.tag), MAX_OPTION_LENGTH);
@@ -1002,7 +1005,7 @@ function tabbyAuthMethod(
   const password = cleanText(firstNonEmptyString(optionsRecord.password), MAX_OPTION_LENGTH);
 
   if (auth === "agent") {
-    warnings.push("Imported Tabby SSH agent authentication, but NewMob SSH agent authentication is not implemented at runtime yet.");
+    warnings.push("Imported Tabby SSH agent authentication, but Taomni SSH agent authentication is not implemented at runtime yet.");
     return { authMethod: "Agent" };
   }
 
@@ -1801,7 +1804,7 @@ function decodeXml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function extractNewMobRows(
+function extractTaomniRows(
   parsed: unknown,
   warnings: string[],
 ): {
@@ -1809,7 +1812,7 @@ function extractNewMobRows(
   skipped: number;
 } {
   if (Array.isArray(parsed)) {
-    warnings.push("Imported legacy NewMob JSON array format.");
+    warnings.push("Imported legacy Taomni JSON array format.");
     const limited = limitRows(parsed, warnings);
     return {
       items: limited.rows.map((row) => ({ row, folderMode: "legacy", scopeFolder: null })),
@@ -1821,12 +1824,12 @@ function extractNewMobRows(
     throw new Error("The selected file does not contain a sessions array.");
   }
 
-  if (parsed.format === NEWMOB_FORMAT) {
-    if (parsed.schema_version !== NEWMOB_SCHEMA_VERSION) {
-      throw new Error(`Unsupported NewMob sessions schema version: ${String(parsed.schema_version)}.`);
+  if (parsed.format === TAOMNI_FORMAT || parsed.format === LEGACY_FORMAT) {
+    if (parsed.schema_version !== SCHEMA_VERSION) {
+      throw new Error(`Unsupported Taomni sessions schema version: ${String(parsed.schema_version)}.`);
     }
     if (!Array.isArray(parsed.sessions)) {
-      throw new Error("The NewMob sessions file does not contain a sessions array.");
+      throw new Error("The Taomni sessions file does not contain a sessions array.");
     }
     const scopeFolder = isRecord(parsed.scope)
       ? normalizeGroupPath(firstString(parsed.scope.folder_path, parsed.scope.folder))
@@ -1839,7 +1842,7 @@ function extractNewMobRows(
   }
 
   if (Array.isArray(parsed.sessions)) {
-    warnings.push("Imported legacy NewMob JSON object format.");
+    warnings.push("Imported legacy Taomni JSON object format.");
     const limited = limitRows(parsed.sessions, warnings);
     return {
       items: limited.rows.map((row) => ({ row, folderMode: "legacy", scopeFolder: null })),

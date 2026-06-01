@@ -5,7 +5,7 @@ import {
   parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
-  parseNewMobSessions,
+  parseTaomniSessions,
   parseSecureCrtSessions,
   parseTabbySessions,
   parseWindTermSessions,
@@ -15,7 +15,7 @@ import {
   parseXshellFile,
   serializeCsvSessions,
   serializeMobaXtermSessions,
-  serializeNewMobSessions,
+  serializeTaomniSessions,
 } from "./sessionImportExport";
 
 function session(overrides: Partial<SessionConfig> = {}): SessionConfig {
@@ -133,16 +133,16 @@ function makeStoredZip(entries: Record<string, string>): Uint8Array {
   return out;
 }
 
-describe("NewMob session import/export", () => {
+describe("Taomni session import/export", () => {
   it("round trips safe session fields and strips local log paths", () => {
-    const exported = serializeNewMobSessions([session()], "Production");
+    const exported = serializeTaomniSessions([session()], "Production");
     const parsed = JSON.parse(exported.text) as { sessions: Array<{ folder_path: string | null; options: Record<string, unknown> }> };
 
     expect(parsed.sessions[0].folder_path).toBeNull();
     expect(JSON.stringify(parsed.sessions[0].options)).not.toContain("terminal.log");
     expect(parsed.sessions[0].options.disableAiWrite).toBe(true);
 
-    const result = parseNewMobSessions(exported.text, {
+    const result = parseTaomniSessions(exported.text, {
       targetFolder: "Imported",
       now: 1234,
     });
@@ -161,6 +161,24 @@ describe("NewMob session import/export", () => {
     });
     expect(result.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "C:\\keys\\deploy.ppk" } });
     expect(JSON.parse(result.sessions[0].options_json).disableAiWrite).toBe(true);
+  });
+
+  it("tags new exports with the taomni.sessions format", () => {
+    const exported = serializeTaomniSessions([session()], null);
+    const parsed = JSON.parse(exported.text) as { format: string };
+    expect(parsed.format).toBe("taomni.sessions");
+    expect(exported.filename.endsWith(".taomni-sessions.json")).toBe(true);
+  });
+
+  it("still imports files tagged with the legacy newmob.sessions format", () => {
+    // Files exported by pre-rename (NewMob) builds carry format: "newmob.sessions".
+    const legacyExport = serializeTaomniSessions([session()], "Production");
+    const payload = JSON.parse(legacyExport.text) as Record<string, unknown>;
+    payload.format = "newmob.sessions";
+
+    const result = parseTaomniSessions(JSON.stringify(payload), { now: 4321 });
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].name).toBe("Prod");
   });
 
   it("imports legacy JSON safely and creates duplicate names instead of overwriting", () => {
@@ -188,7 +206,7 @@ describe("NewMob session import/export", () => {
       ],
     });
 
-    const result = parseNewMobSessions(legacy, {
+    const result = parseTaomniSessions(legacy, {
       targetFolder: "Production",
       now: 2222,
       existingSessions: [session()],
@@ -858,8 +876,8 @@ describe("third-party session import parsers", () => {
     });
   });
 
-  it("preserves LocalShell launch arguments in NewMob round trips", () => {
-    const exported = serializeNewMobSessions([
+  it("preserves LocalShell launch arguments in Taomni round trips", () => {
+    const exported = serializeTaomniSessions([
       session({
         name: "Ubuntu",
         session_type: "LocalShell",
@@ -874,7 +892,7 @@ describe("third-party session import parsers", () => {
       }),
     ], null);
 
-    const imported = parseNewMobSessions(exported.text);
+    const imported = parseTaomniSessions(exported.text);
     expect(JSON.parse(imported.sessions[0].options_json)).toMatchObject({
       localShellPath: "wsl.exe",
       localShellArgs: ["-d", "Ubuntu"],

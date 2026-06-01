@@ -25,14 +25,14 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
   return (
     <div className="flex flex-col h-full">
       <div
-        className="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--moba-divider)]"
-        style={{ background: "var(--moba-panel-bg)" }}
+        className="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--taomni-divider)]"
+        style={{ background: "var(--taomni-panel-bg)" }}
       >
-        <Clock className="w-3.5 h-3.5 text-[var(--moba-text-muted)]" />
+        <Clock className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
         <span className="text-[12px] font-semibold flex-1">{t("chat.threadListTitle")}</span>
         <button
           type="button"
-          className="moba-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+          className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
           onClick={onNew}
           title={t("chat.threadNewTitle")}
         >
@@ -42,7 +42,7 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
 
       <div className="flex-1 overflow-y-auto">
         {threads.length === 0 && (
-          <div className="text-[11px] text-[var(--moba-text-muted)] text-center py-4">
+          <div className="text-[11px] text-[var(--taomni-text-muted)] text-center py-4">
             {t("chat.threadEmptyState")}
           </div>
         )}
@@ -51,14 +51,14 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
             key={th.id}
             className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer group transition-colors ${
               th.id === activeThreadId
-                ? "bg-[var(--moba-selected)] border-l-2 border-[var(--moba-accent)]"
-                : "hover:bg-[var(--moba-hover)]"
+                ? "bg-[var(--taomni-selected)] border-l-2 border-[var(--taomni-accent)]"
+                : "hover:bg-[var(--taomni-hover)]"
             }`}
             onClick={() => onSelect(th.id)}
           >
             <div className="flex-1 min-w-0">
               <div className="text-[12px] truncate">{th.title}</div>
-              <div className="text-[10px] text-[var(--moba-text-muted)]">
+              <div className="text-[10px] text-[var(--taomni-text-muted)]">
                 {th.provider_id} · {formatTime(th.updated_at, t)}
               </div>
             </div>

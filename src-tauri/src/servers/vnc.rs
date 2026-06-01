@@ -103,7 +103,7 @@ async fn start_macos(ctx: ServerCtx, port: u16) -> Result<ServerStarted, String>
     // CLI in a way we can supervise. Be honest about it.
     let _ = port;
     let msg = "macOS VNC must be enabled via System Settings > General > Sharing > \
-               Screen Sharing (or Remote Management). NewMob cannot start it for you.";
+               Screen Sharing (or Remote Management). Taomni cannot start it for you.";
     ctx.log.line(msg);
     Err(msg.to_string())
 }

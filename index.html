@@ -4,14 +4,36 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NewMob</title>
+    <title>Taomni</title>
     <script>
+      // One-time localStorage migration from the legacy NewMob → Taomni
+      // rename. Runs before anything reads a key so a returning user keeps
+      // their theme, locale, fonts, etc. Idempotent via a sentinel key.
+      (function () {
+        try {
+          if (localStorage.getItem("taomni.migrated.v1")) return;
+          var keys = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf("newmob.") === 0) keys.push(k);
+          }
+          for (var j = 0; j < keys.length; j++) {
+            var nk = "taomni." + keys[j].slice("newmob.".length);
+            if (localStorage.getItem(nk) === null) {
+              localStorage.setItem(nk, localStorage.getItem(keys[j]));
+            }
+          }
+          localStorage.setItem("taomni.migrated.v1", "1");
+        } catch (_) {
+          /* noop */
+        }
+      })();
       // Apply the saved (or system) app theme synchronously, before React
       // mounts, so the chrome (including detached SFTP popups) doesn't
       // flash a wrong-mode background while the JS bundle is still loading.
       (function () {
         try {
-          var stored = localStorage.getItem("newmob.appTheme.v1");
+          var stored = localStorage.getItem("taomni.appTheme.v1");
           var mode = (stored === "light" || stored === "dark" || stored === "system") ? stored : "system";
           var resolved = mode;
           if (mode === "system") {

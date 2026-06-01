@@ -44,8 +44,8 @@ export function LanguageSwitcher() {
         data-testid="language-switcher"
         title={title}
         aria-label={t("language.ariaLabel")}
-        className="moba-titlebar-tray-btn h-full w-12 inline-flex items-center justify-center gap-1 hover:bg-[var(--moba-hover)]"
-        style={{ color: "var(--moba-text)" }}
+        className="taomni-titlebar-tray-btn h-full w-12 inline-flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)]"
+        style={{ color: "var(--taomni-text)" }}
         onClick={openMenu}
       >
         <Languages className="w-[16px] h-[16px]" />

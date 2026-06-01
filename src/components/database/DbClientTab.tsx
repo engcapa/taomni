@@ -128,11 +128,11 @@ interface QueryWorkspaceCache {
 }
 
 function widthKey(engine: string): string {
-  return `newmob.db.schemaWidth.${engine}`;
+  return `taomni.db.schemaWidth.${engine}`;
 }
 
 function settingKey(engine: string, name: string): string {
-  return `newmob.db.${engine}.${name}`;
+  return `taomni.db.${engine}.${name}`;
 }
 
 function settingDefaultMigrationKey(engine: string, name: string): string {
@@ -179,7 +179,7 @@ function writeIntSetting(engine: string, name: string, value: number): void {
 }
 
 function workspaceKey(sessionId: string): string {
-  return `newmob.db.queryWorkspace.v${QUERY_WORKSPACE_CACHE_VERSION}.${sessionId}`;
+  return `taomni.db.queryWorkspace.v${QUERY_WORKSPACE_CACHE_VERSION}.${sessionId}`;
 }
 
 function basename(path: string): string {
@@ -1235,11 +1235,11 @@ export default function DbClientTab({
 
   if (connError) {
     return (
-      <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}>
+      <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
         <div className="max-w-md text-center">
           <AlertTriangle className="w-6 h-6 mx-auto mb-2" style={{ color: "#d9534f" }} />
           <div className="font-semibold mb-1">Connection failed</div>
-          <div className="text-[12px] text-[var(--moba-text-muted)] break-words">{connError}</div>
+          <div className="text-[12px] text-[var(--taomni-text-muted)] break-words">{connError}</div>
         </div>
       </div>
     );
@@ -1249,7 +1249,7 @@ export default function DbClientTab({
     return (
       <div
         className="h-full w-full flex items-center justify-center text-sm"
-        style={{ background: "var(--moba-bg)", color: "var(--moba-text-muted)" }}
+        style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
       >
         Loading query workspace...
       </div>
@@ -1260,7 +1260,7 @@ export default function DbClientTab({
     <div
       ref={rootRef}
       className="h-full w-full flex flex-col relative"
-      style={{ background: "var(--moba-bg)", color: "var(--moba-text)" }}
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       {queryTabMenu.render}
       <FloatingToolbar
@@ -1353,11 +1353,11 @@ export default function DbClientTab({
         <button
           type="button"
           data-testid="db-schema-drawer-handle"
-          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--moba-hover)]"
+          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
           style={{
-            background: "var(--moba-panel-bg)",
-            borderColor: "var(--moba-divider)",
-            color: "var(--moba-text-muted)",
+            background: "var(--taomni-panel-bg)",
+            borderColor: "var(--taomni-divider)",
+            color: "var(--taomni-text-muted)",
           }}
           title="Show database objects"
           aria-label="Show database objects"
@@ -1381,7 +1381,7 @@ export default function DbClientTab({
           onExpand={() => setSchemaCollapsed(false)}
           onResize={handleSchemaResize}
         >
-          <div className="h-full" style={{ borderRight: "1px solid var(--moba-divider)" }}>
+          <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
             {connected && (
               <SchemaTree
                 sessionId={sessionId}
@@ -1395,13 +1395,13 @@ export default function DbClientTab({
             )}
           </div>
         </Panel>
-        <PanelResizeHandle className="w-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-col-resize" />
+        <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel>
           {/* Panel tab strip */}
           <div className="h-full flex flex-col min-w-0">
             <div
               className="h-7 shrink-0 flex items-center gap-1 px-1 text-[11px]"
-              style={{ background: "var(--moba-chrome-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+              style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
             >
               {panels.map((p, i) => {
                 const panelRunning = p.sheets.some((sheet) => sheet.running);
@@ -1412,8 +1412,8 @@ export default function DbClientTab({
                     type="button"
                     className="px-2 h-5 max-w-[190px] rounded inline-flex items-center gap-1"
                     style={{
-                      background: p.id === activePanelId ? "var(--moba-selected)" : "transparent",
-                      color: p.id === activePanelId ? "var(--moba-accent)" : "var(--moba-text-muted)",
+                      background: p.id === activePanelId ? "var(--taomni-selected)" : "transparent",
+                      color: p.id === activePanelId ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
                     }}
                     onClick={() => setActivePanelId(p.id)}
                     onContextMenu={(event) => openPanelMenu(event, p)}
@@ -1423,7 +1423,7 @@ export default function DbClientTab({
                     {panelRunning && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
                     {panels.length > 1 && (
                       <X
-                        className="w-3 h-3 shrink-0 hover:text-[var(--moba-text)]"
+                        className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]"
                         onClick={(e) => {
                           e.stopPropagation();
                           closePanel(p.id);
@@ -1437,7 +1437,7 @@ export default function DbClientTab({
                 <button
                   type="button"
                   title="New query panel"
-                  className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--moba-hover)]"
+                  className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
                   onClick={addPanel}
                 >
                   <Plus className="w-3 h-3" />
@@ -1505,7 +1505,7 @@ export default function DbClientTab({
                     />
                   </div>
                 </Panel>
-                <PanelResizeHandle className="h-[3px] bg-[var(--moba-divider)] hover:bg-[var(--moba-accent)] transition-colors cursor-row-resize" />
+                <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
                 <Panel minSize={15}>
                   <ResultArea
                     panel={activePanel}
@@ -1561,12 +1561,12 @@ function EditorToolbar({
   onRowLimitChange: (value: number) => void;
   onMaxResultSheetsChange: (value: number) => void;
 }) {
-  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--moba-hover)] disabled:opacity-40";
-  const input = "moba-input h-6 w-[68px] text-[11px]";
+  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const input = "taomni-input h-6 w-[68px] text-[11px]";
   return (
     <div
       className="h-8 shrink-0 flex items-center gap-1 px-2"
-      style={{ background: "var(--moba-quick-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+      style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
     >
       <button type="button" className={btn} onClick={onRun} disabled={running} title="Run (F5)">
         <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
@@ -1577,7 +1577,7 @@ function EditorToolbar({
       <button type="button" className={btn} onClick={onCancel} disabled={!running} title="Cancel query">
         <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
       </button>
-      <span className="w-px h-4 mx-1" style={{ background: "var(--moba-divider)" }} />
+      <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
       <button type="button" className={btn} onClick={onFormat} title="Format SQL">
         <Sparkles className="w-3.5 h-3.5" /> Format
       </button>
@@ -1587,8 +1587,8 @@ function EditorToolbar({
       <button type="button" className={btn} onClick={onSave} title="Save query tab as SQL file">
         <Save className="w-3.5 h-3.5" /> Save
       </button>
-      <span className="w-px h-4 mx-1" style={{ background: "var(--moba-divider)" }} />
-      <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--moba-text-muted)]">
+      <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
+      <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
         Rows
         <input
           className={input}
@@ -1600,7 +1600,7 @@ function EditorToolbar({
           onChange={(event) => onRowLimitChange(Number(event.target.value))}
         />
       </label>
-      <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--moba-text-muted)]">
+      <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
         Sheets
         <input
           className={input}
@@ -1615,7 +1615,7 @@ function EditorToolbar({
       <div className="flex-1" />
       {schemas.length > 0 && (
         <select
-          className="moba-input h-6 max-w-[180px] text-[11px]"
+          className="taomni-input h-6 max-w-[180px] text-[11px]"
           value={activeSchema ?? ""}
           aria-label="Schema"
           title="Schema / database"
@@ -1628,7 +1628,7 @@ function EditorToolbar({
           ))}
         </select>
       )}
-      <span className="text-[10px] text-[var(--moba-text-muted)]">{engine}</span>
+      <span className="text-[10px] text-[var(--taomni-text-muted)]">{engine}</span>
     </div>
   );
 }
@@ -1646,17 +1646,17 @@ function HistoryDropdown({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className="absolute right-2 top-9 z-50 w-[420px] max-h-[300px] overflow-auto rounded shadow-lg moba-scroll-y"
-        style={{ background: "var(--moba-panel-bg)", border: "1px solid var(--moba-divider)" }}
+        className="absolute right-2 top-9 z-50 w-[420px] max-h-[300px] overflow-auto rounded shadow-lg taomni-scroll-y"
+        style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
       >
         {history.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--moba-text-muted)]">No query history yet.</div>
+          <div className="px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]">No query history yet.</div>
         ) : (
           history.map((sql, i) => (
             <button
               key={i}
               type="button"
-              className="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--moba-hover)] truncate font-mono"
+              className="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--taomni-hover)] truncate font-mono"
               onClick={() => onPick(sql)}
               title={sql}
             >
@@ -1696,13 +1696,13 @@ function ResultArea({
     sheet.result.columns.length === 0 &&
     sheet.result.rows.length === 0;
   return (
-    <div className="h-full flex flex-col min-h-0" style={{ background: "var(--moba-bg)" }}>
+    <div className="h-full flex flex-col min-h-0" style={{ background: "var(--taomni-bg)" }}>
       <div
         className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden"
-        style={{ background: "var(--moba-chrome-bg)", borderBottom: "1px solid var(--moba-divider)" }}
+        style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
         {panel.sheets.length === 0 ? (
-          <span className="px-2 pb-1 text-[11px] text-[var(--moba-text-muted)]">Result sheets</span>
+          <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
         ) : (
           panel.sheets.map((resultSheet) => {
             const active = resultSheet.id === sheet?.id;
@@ -1712,10 +1712,10 @@ function ResultArea({
                 type="button"
                 className="h-6 max-w-[170px] px-2 inline-flex items-center gap-1 text-[11px]"
                 style={{
-                  background: active ? "var(--moba-tab-active)" : "var(--moba-tab-inactive)",
-                  color: active ? "var(--moba-accent)" : "var(--moba-text-muted)",
-                  border: "1px solid var(--moba-tab-border)",
-                  borderBottom: active ? "1px solid var(--moba-tab-active)" : "1px solid var(--moba-divider)",
+                  background: active ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
+                  color: active ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
+                  border: "1px solid var(--taomni-tab-border)",
+                  borderBottom: active ? "1px solid var(--taomni-tab-active)" : "1px solid var(--taomni-divider)",
                   borderTopLeftRadius: 4,
                   borderTopRightRadius: 4,
                 }}
@@ -1728,7 +1728,7 @@ function ResultArea({
                   <span className="text-[10px] shrink-0">●</span>
                 )}
                 <X
-                  className="w-3 h-3 shrink-0 hover:text-[var(--moba-text)]"
+                  className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]"
                   onClick={(event) => {
                     event.stopPropagation();
                     onSheetClose(resultSheet.id);
@@ -1740,11 +1740,11 @@ function ResultArea({
         )}
       </div>
       {sheet && (
-        <div className="h-7 shrink-0 flex items-center gap-1 px-1" style={{ borderBottom: "1px solid var(--moba-divider)" }}>
+        <div className="h-7 shrink-0 flex items-center gap-1 px-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
           <button
             type="button"
             className={tab}
-            style={{ color: sheet.resultTab === "results" ? "var(--moba-accent)" : "var(--moba-text-muted)" }}
+            style={{ color: sheet.resultTab === "results" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
             onClick={() => onTabChange(sheet.id, "results")}
           >
             Results
@@ -1752,24 +1752,24 @@ function ResultArea({
           <button
             type="button"
             className={tab}
-            style={{ color: sheet.resultTab === "messages" ? "var(--moba-accent)" : "var(--moba-text-muted)" }}
+            style={{ color: sheet.resultTab === "messages" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
             onClick={() => onTabChange(sheet.id, "messages")}
           >
             Messages{(sheet.error || sheet.warnings.length > 0) ? " ●" : ""}
           </button>
-          <span className="ml-auto truncate px-2 text-[10px] text-[var(--moba-text-muted)] font-mono" title={sheet.sql}>
+          <span className="ml-auto truncate px-2 text-[10px] text-[var(--taomni-text-muted)] font-mono" title={sheet.sql}>
             {sheet.sql.replace(/\s+/g, " ")}
           </span>
         </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col">
         {!sheet ? (
-          <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+          <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
             Run a query to create a result sheet.
           </div>
         ) : sheet.resultTab === "results" ? (
           waitingForFirstResult ? (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
               {sheet.cancelling ? "Cancelling…" : "Running…"}
             </div>
           ) : sheet.result ? (
@@ -1786,12 +1786,12 @@ function ResultArea({
               />
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--moba-text-muted)]">
+            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
               {sheet.running ? "Running…" : "Run a query to see results."}
             </div>
           )
         ) : (
-          <div className="flex-1 overflow-auto moba-scroll-y p-2 text-[12px] font-mono">
+          <div className="flex-1 overflow-auto taomni-scroll-y p-2 text-[12px] font-mono">
             {sheet.error && <div style={{ color: "#d9534f" }}>{sheet.error}</div>}
             {sheet.warnings.map((w, i) => (
               <div key={i} style={{ color: "#e6a817" }}>
@@ -1799,7 +1799,7 @@ function ResultArea({
               </div>
             ))}
             {!sheet.error && sheet.warnings.length === 0 && (
-              <div className="text-[var(--moba-text-muted)]">No messages.</div>
+              <div className="text-[var(--taomni-text-muted)]">No messages.</div>
             )}
           </div>
         )}
@@ -1813,8 +1813,8 @@ function StatusBar({ panel }: { panel: PanelState }) {
   const r = sheet?.result ?? null;
   return (
     <div
-      className="h-6 shrink-0 flex items-center gap-3 px-2 text-[11px] text-[var(--moba-text-muted)]"
-      style={{ background: "var(--moba-quick-bg)", borderTop: "1px solid var(--moba-divider)" }}
+      className="h-6 shrink-0 flex items-center gap-3 px-2 text-[11px] text-[var(--taomni-text-muted)]"
+      style={{ background: "var(--taomni-quick-bg)", borderTop: "1px solid var(--taomni-divider)" }}
     >
       {sheet?.running ? (
         <span className="inline-flex items-center gap-1">

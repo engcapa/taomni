@@ -30,7 +30,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
         aria-modal="true"
         data-testid="about-dialog"
         className="w-[380px] rounded shadow-lg p-5"
-        style={{ background: "var(--moba-bg)", border: "1px solid var(--moba-card-border)" }}
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 mb-3">
@@ -44,15 +44,15 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
             <div className="text-lg font-semibold">{t("app.name")}</div>
             <div
               data-testid="about-version"
-              className="text-[12px] moba-mono"
-              style={{ color: "var(--moba-text-muted)" }}
+              className="text-[12px] taomni-mono"
+              style={{ color: "var(--taomni-text-muted)" }}
             >
               {t("about.version", { version: __APP_VERSION__ })}
             </div>
           </div>
         </div>
 
-        <div className="text-[12px] mb-4" style={{ color: "var(--moba-text-muted)" }}>
+        <div className="text-[12px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
           {t("about.description")}
         </div>
 
@@ -60,7 +60,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           <button
             ref={closeRef}
             type="button"
-            className="moba-btn h-8 px-4"
+            className="taomni-btn h-8 px-4"
             onClick={onClose}
           >
             {t("common.close")}

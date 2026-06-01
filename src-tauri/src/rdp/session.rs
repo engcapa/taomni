@@ -247,7 +247,7 @@ struct RemoteFileTransfer {
     next_stream_id: u32,
 }
 
-struct NewMobCliprdrBackend {
+struct TaomniCliprdrBackend {
     bridge: ClipboardBridge,
     temporary_directory: String,
 }
@@ -273,12 +273,12 @@ impl ClipboardBridge {
         }
     }
 
-    fn backend(&self) -> NewMobCliprdrBackend {
+    fn backend(&self) -> TaomniCliprdrBackend {
         let temporary_directory = std::env::temp_dir()
-            .join("newmob-rdp-cliprdr")
+            .join("taomni-rdp-cliprdr")
             .to_string_lossy()
             .into_owned();
-        NewMobCliprdrBackend {
+        TaomniCliprdrBackend {
             bridge: self.clone(),
             temporary_directory,
         }
@@ -548,9 +548,9 @@ impl std::fmt::Debug for ClipboardBridge {
     }
 }
 
-impl std::fmt::Debug for NewMobCliprdrBackend {
+impl std::fmt::Debug for TaomniCliprdrBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NewMobCliprdrBackend")
+        f.debug_struct("TaomniCliprdrBackend")
             .finish_non_exhaustive()
     }
 }
@@ -563,7 +563,7 @@ impl std::fmt::Debug for RdpsndWsBackend {
     }
 }
 
-impl AsAny for NewMobCliprdrBackend {
+impl AsAny for TaomniCliprdrBackend {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -573,7 +573,7 @@ impl AsAny for NewMobCliprdrBackend {
     }
 }
 
-impl CliprdrBackend for NewMobCliprdrBackend {
+impl CliprdrBackend for TaomniCliprdrBackend {
     fn temporary_directory(&self) -> &str {
         &self.temporary_directory
     }
@@ -1589,7 +1589,7 @@ fn build_remote_file_transfer(
     list: PackedFileList,
 ) -> Result<(RemoteFileTransfer, Vec<FileContentsRequest>), String> {
     let staging_dir = std::env::temp_dir()
-        .join("newmob-rdp-cliprdr")
+        .join("taomni-rdp-cliprdr")
         .join(uuid::Uuid::new_v4().to_string());
     fs::create_dir_all(&staging_dir).map_err(|e| {
         format!(
@@ -1935,7 +1935,7 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
             codecs,
         }),
         client_build: 0,
-        client_name: "newmob".to_owned(),
+        client_name: "taomni".to_owned(),
         client_dir: "C:\\Windows\\System32\\mstscax.dll".to_owned(),
         platform: platform_type(),
         enable_server_pointer: true,
@@ -2337,17 +2337,17 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires NEWMOB_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
+    #[ignore = "requires TAOMNI_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
     async fn live_credssp_session_emits_first_frame() {
-        let host = std::env::var("NEWMOB_RDP_LIVE_HOST").expect("NEWMOB_RDP_LIVE_HOST is required");
-        let port = std::env::var("NEWMOB_RDP_LIVE_PORT")
+        let host = std::env::var("TAOMNI_RDP_LIVE_HOST").expect("TAOMNI_RDP_LIVE_HOST is required");
+        let port = std::env::var("TAOMNI_RDP_LIVE_PORT")
             .ok()
             .and_then(|raw| raw.parse::<u16>().ok())
             .unwrap_or(3389);
         let username =
-            std::env::var("NEWMOB_RDP_LIVE_USER").expect("NEWMOB_RDP_LIVE_USER is required");
+            std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
         let password =
-            std::env::var("NEWMOB_RDP_LIVE_PASS").expect("NEWMOB_RDP_LIVE_PASS is required");
+            std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
         let stream = TcpStream::connect((host.as_str(), port))
             .await
@@ -2358,9 +2358,9 @@ mod tests {
         options.screen_h = 720;
         options.nla = true;
         options.redirect_audio = "play".to_owned();
-        if let Ok(path) = std::env::var("NEWMOB_RDP_LIVE_DRIVE_PATH") {
+        if let Ok(path) = std::env::var("TAOMNI_RDP_LIVE_DRIVE_PATH") {
             options.redirect_drive.enabled = true;
-            options.redirect_drive.label = "newmob".to_owned();
+            options.redirect_drive.label = "taomni".to_owned();
             options.redirect_drive.path = path;
         }
 
@@ -2417,17 +2417,17 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires NEWMOB_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
+    #[ignore = "requires TAOMNI_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
     async fn live_credssp_clipboard_text_channel_accepts_local_copy() {
-        let host = std::env::var("NEWMOB_RDP_LIVE_HOST").expect("NEWMOB_RDP_LIVE_HOST is required");
-        let port = std::env::var("NEWMOB_RDP_LIVE_PORT")
+        let host = std::env::var("TAOMNI_RDP_LIVE_HOST").expect("TAOMNI_RDP_LIVE_HOST is required");
+        let port = std::env::var("TAOMNI_RDP_LIVE_PORT")
             .ok()
             .and_then(|raw| raw.parse::<u16>().ok())
             .unwrap_or(3389);
         let username =
-            std::env::var("NEWMOB_RDP_LIVE_USER").expect("NEWMOB_RDP_LIVE_USER is required");
+            std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
         let password =
-            std::env::var("NEWMOB_RDP_LIVE_PASS").expect("NEWMOB_RDP_LIVE_PASS is required");
+            std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
         let stream = TcpStream::connect((host.as_str(), port))
             .await
@@ -2490,7 +2490,7 @@ mod tests {
                         handle
                             .dispatch_control(RdpControl::ClipboardData {
                                 format: ClipboardFormatId::CF_UNICODETEXT.value(),
-                                data: b"newmob live clipboard text".to_vec(),
+                                data: b"taomni live clipboard text".to_vec(),
                             })
                             .await
                             .expect("send live clipboard control");
@@ -2519,17 +2519,17 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires NEWMOB_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
+    #[ignore = "requires TAOMNI_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
     async fn live_credssp_drive_channel_is_accepted() {
-        let host = std::env::var("NEWMOB_RDP_LIVE_HOST").expect("NEWMOB_RDP_LIVE_HOST is required");
-        let port = std::env::var("NEWMOB_RDP_LIVE_PORT")
+        let host = std::env::var("TAOMNI_RDP_LIVE_HOST").expect("TAOMNI_RDP_LIVE_HOST is required");
+        let port = std::env::var("TAOMNI_RDP_LIVE_PORT")
             .ok()
             .and_then(|raw| raw.parse::<u16>().ok())
             .unwrap_or(3389);
         let username =
-            std::env::var("NEWMOB_RDP_LIVE_USER").expect("NEWMOB_RDP_LIVE_USER is required");
+            std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
         let password =
-            std::env::var("NEWMOB_RDP_LIVE_PASS").expect("NEWMOB_RDP_LIVE_PASS is required");
+            std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
         let drive_dir = tempfile::tempdir().expect("create live redirected drive directory");
 
         let stream = TcpStream::connect((host.as_str(), port))
@@ -2543,7 +2543,7 @@ mod tests {
         options.redirect_clipboard = false;
         options.redirect_audio = "off".to_owned();
         options.redirect_drive.enabled = true;
-        options.redirect_drive.label = "newmob".to_owned();
+        options.redirect_drive.label = "taomni".to_owned();
         options.redirect_drive.path = drive_dir.path().to_string_lossy().into_owned();
 
         let mut handle = start_ironrdp_session(RdpSessionConfig {
@@ -2605,17 +2605,17 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires NEWMOB_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
+    #[ignore = "requires TAOMNI_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
     async fn live_credssp_session_resizes_and_reactivates() {
-        let host = std::env::var("NEWMOB_RDP_LIVE_HOST").expect("NEWMOB_RDP_LIVE_HOST is required");
-        let port = std::env::var("NEWMOB_RDP_LIVE_PORT")
+        let host = std::env::var("TAOMNI_RDP_LIVE_HOST").expect("TAOMNI_RDP_LIVE_HOST is required");
+        let port = std::env::var("TAOMNI_RDP_LIVE_PORT")
             .ok()
             .and_then(|raw| raw.parse::<u16>().ok())
             .unwrap_or(3389);
         let username =
-            std::env::var("NEWMOB_RDP_LIVE_USER").expect("NEWMOB_RDP_LIVE_USER is required");
+            std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
         let password =
-            std::env::var("NEWMOB_RDP_LIVE_PASS").expect("NEWMOB_RDP_LIVE_PASS is required");
+            std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
         let stream = TcpStream::connect((host.as_str(), port))
             .await
@@ -2705,17 +2705,17 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires NEWMOB_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
+    #[ignore = "requires TAOMNI_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
     async fn live_credssp_connection_test_reaches_connected() {
-        let host = std::env::var("NEWMOB_RDP_LIVE_HOST").expect("NEWMOB_RDP_LIVE_HOST is required");
-        let port = std::env::var("NEWMOB_RDP_LIVE_PORT")
+        let host = std::env::var("TAOMNI_RDP_LIVE_HOST").expect("TAOMNI_RDP_LIVE_HOST is required");
+        let port = std::env::var("TAOMNI_RDP_LIVE_PORT")
             .ok()
             .and_then(|raw| raw.parse::<u16>().ok())
             .unwrap_or(3389);
         let username =
-            std::env::var("NEWMOB_RDP_LIVE_USER").expect("NEWMOB_RDP_LIVE_USER is required");
+            std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
         let password =
-            std::env::var("NEWMOB_RDP_LIVE_PASS").expect("NEWMOB_RDP_LIVE_PASS is required");
+            std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
         let stream = TcpStream::connect((host.as_str(), port))
             .await
