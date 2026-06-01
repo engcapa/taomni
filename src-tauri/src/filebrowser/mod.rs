@@ -16,6 +16,7 @@ pub mod transfer;
 
 use crate::state::AppState;
 use crate::terminal::ssh::SshAuth;
+use crate::terminal::{build_kbd_prompter, clear_session_auth_responders};
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -73,7 +74,14 @@ pub async fn sftp_attach(
     app_handle: AppHandle,
 ) -> Result<AttachResultPayload, String> {
     let auth = auth_from_with_vault(&auth_method, auth_data, &state.vault)?;
-    let session = sftp::open_sftp(&host, port, &username, auth).await?;
+    let prompter = build_kbd_prompter(
+        app_handle.clone(),
+        state.ssh_auth_responders.clone(),
+        session_id.clone(),
+    );
+    let session_result = sftp::open_sftp(&host, port, &username, auth, Some(&prompter)).await;
+    clear_session_auth_responders(&state.ssh_auth_responders, &session_id);
+    let session = session_result?;
     let home = session.home.clone();
 
     {

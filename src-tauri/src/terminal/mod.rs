@@ -96,7 +96,7 @@ struct SshAuthPromptPayload {
 /// Build a keyboard-interactive prompter that bridges russh's auth loop to the
 /// frontend: each round registers a oneshot responder keyed by a fresh request
 /// id, emits the prompt event, and awaits the user's answers (or cancellation).
-fn build_kbd_prompter(
+pub(crate) fn build_kbd_prompter(
     app_handle: AppHandle,
     responders: Arc<Mutex<HashMap<String, crate::state::SshAuthResponder>>>,
     session_id: String,
@@ -691,7 +691,7 @@ pub fn submit_ssh_auth_response(
 /// connection attempt settles so stale rounds (which key by `session_id:<nanos>`)
 /// don't accumulate. Dropping the sender resolves the waiting auth future to
 /// cancellation if it somehow outlives this.
-fn clear_session_auth_responders(
+pub(crate) fn clear_session_auth_responders(
     responders: &Arc<Mutex<HashMap<String, crate::state::SshAuthResponder>>>,
     session_id: &str,
 ) {
