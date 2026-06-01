@@ -58,6 +58,7 @@ interface FileBrowserProps {
   username: string;
   authMethod: string;
   authData: string | null;
+  networkSettingsJson?: string | null;
   initialPath?: string;
   onDetach?: () => void;
   onClose?: () => void;
@@ -172,6 +173,7 @@ export function FileBrowser(props: FileBrowserProps) {
         username: props.username,
         authMethod: props.authMethod,
         authData: props.authData,
+        networkSettingsJson: props.networkSettingsJson ?? null,
       })
         .then(() => {
           if (!cancelled && props.initialPath) {
@@ -614,6 +616,7 @@ export function FileBrowser(props: FileBrowserProps) {
                     username: props.username,
                     authMethod: props.authMethod,
                     authData: props.authData,
+                    networkSettingsJson: props.networkSettingsJson ?? null,
                   }).catch((err) => setStatus(t("fileBrowser.statusReconnectFailed", { error: String(err) })))
                 );
               }}

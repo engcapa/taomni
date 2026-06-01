@@ -8,6 +8,7 @@ interface SftpSidebarProps {
   username: string;
   authMethod: string;
   authData: string | null;
+  networkSettingsJson?: string | null;
   cwdHint?: string | null;
   cwdHintVersion?: number;
   onRequestTerminalCwd?: () => boolean;
@@ -36,6 +37,7 @@ export function SftpSidebar(props: SftpSidebarProps) {
       username={props.username}
       authMethod={props.authMethod}
       authData={props.authData}
+      networkSettingsJson={props.networkSettingsJson ?? null}
       cwdHint={props.cwdHint}
       cwdHintVersion={props.cwdHintVersion}
       onRequestTerminalCwd={props.onRequestTerminalCwd}
