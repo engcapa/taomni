@@ -465,9 +465,9 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64ct"
-version = "1.8.3"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "bcrypt-pbkdf"
@@ -6280,8 +6280,6 @@ dependencies = [
 [[package]]
 name = "russh"
 version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c536b90d8e2468d8dedc8de2369383c101325e23fffa3a30de713032862a11d4"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm 0.10.3",
@@ -7862,7 +7860,7 @@ dependencies = [
 
 [[package]]
 name = "taomni"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm 0.10.3",

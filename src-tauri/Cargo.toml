@@ -113,3 +113,12 @@ x11rb = { version = "0.13", features = ["shm", "damage"] }
 
 [dev-dependencies]
 tempfile = "3"
+
+# russh 0.46 vendored with a one-line fix: write_auth_request_if_needed now
+# sets auth_request.current = KeyboardInteractive when starting KI after
+# another method (e.g. password partial-success), so USERAUTH_INFO_REQUEST
+# (MFA prompts) are correctly parsed instead of silently dropped.
+# Upstream bug is unfixed through russh 0.61; remove this patch when upstream
+# ships a fix.
+[patch.crates-io]
+russh = { path = "vendor/russh" }
