@@ -410,6 +410,8 @@ function dbEngineColor(engine?: string): string {
       return "#336791";
     case "ClickHouse":
       return "#e6a817";
+    case "Presto":
+      return "#5a4fcf";
     case "Redis":
       return "#d82c20";
     default:

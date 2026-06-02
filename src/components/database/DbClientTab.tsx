@@ -195,8 +195,9 @@ function sanitizeFilePart(value: string): string {
 }
 
 function defaultQueryCacheName(info: DbConnectInfo, ordinal: number): string {
+  const catalog = info.catalog ? `-${info.catalog}` : "";
   const database = info.database ? `-${info.database}` : "";
-  const stem = sanitizeFilePart(`${info.engine}-${info.host}-${info.port}${database}`) || "query";
+  const stem = sanitizeFilePart(`${info.engine}-${info.host}-${info.port}${catalog}${database}`) || "query";
   return `${stem}-query-${ordinal}.sql`;
 }
 
@@ -262,19 +263,25 @@ async function writeTextFile(path: string, text: string): Promise<void> {
 }
 
 function quoteIdent(engine: string, ident: string): string {
-  if (engine === "PostgreSQL") return `"${ident.replace(/"/g, "\"\"")}"`;
+  if (engine === "PostgreSQL" || engine === "Presto") return `"${ident.replace(/"/g, "\"\"")}"`;
   return `\`${ident.replace(/`/g, "``")}\``;
 }
 
-function qualifiedName(engine: string, schema: string | null, table: string): string {
+function qualifiedName(engine: string, schema: string | null, table: string, catalog?: string | null): string {
+  if (engine === "Presto" && catalog && schema) {
+    return `${quoteIdent(engine, catalog)}.${quoteIdent(engine, schema)}.${quoteIdent(engine, table)}`;
+  }
   return schema
     ? `${quoteIdent(engine, schema)}.${quoteIdent(engine, table)}`
     : quoteIdent(engine, table);
 }
 
-function schemaSwitchSql(engine: string, schema: string): string {
+function schemaSwitchSql(engine: string, schema: string, catalog?: string | null): string {
   if (engine === "PostgreSQL") {
     return `SET search_path TO ${quoteIdent(engine, schema)}`;
+  }
+  if (engine === "Presto" && catalog) {
+    return `USE ${quoteIdent(engine, catalog)}.${quoteIdent(engine, schema)}`;
   }
   return `USE ${quoteIdent(engine, schema)}`;
 }
@@ -299,9 +306,11 @@ function parseEditableSelectTarget(sql: string): { schema: string | null; table:
   if (!/^select\b/i.test(cleaned)) return null;
   if (/\b(join|union|group\s+by|having)\b/i.test(cleaned)) return null;
   const ident = String.raw`(?:"[^"]+"|` + "`[^`]+`" + String.raw`|\[[^\]]+\]|[A-Za-z_][\w$]*)`;
-  const match = cleaned.match(new RegExp(String.raw`\bfrom\s+(${ident})(?:\s*\.\s*(${ident}))?`, "i"));
+  const match = cleaned.match(new RegExp(String.raw`\bfrom\s+(${ident})(?:\s*\.\s*(${ident}))?(?:\s*\.\s*(${ident}))?`, "i"));
   if (!match) return null;
-  return match[2]
+  return match[3]
+    ? { schema: unquoteIdent(match[2]), table: unquoteIdent(match[3]) }
+    : match[2]
     ? { schema: unquoteIdent(match[1]), table: unquoteIdent(match[2]) }
     : { schema: null, table: unquoteIdent(match[1]) };
 }
@@ -732,9 +741,11 @@ export default function DbClientTab({
   );
 
   const queryRegistryTitle = useMemo(() => {
-    const database = info.database ? `/${info.database}` : "";
-    return `${info.engine} ${info.host}:${info.port}${database}`;
-  }, [info.database, info.engine, info.host, info.port]);
+    const database = info.engine === "Presto"
+      ? [info.catalog, info.database].filter(Boolean).join(".")
+      : info.database;
+    return `${info.engine} ${info.host}:${info.port}${database ? `/${database}` : ""}`;
+  }, [info.catalog, info.database, info.engine, info.host, info.port]);
 
   useEffect(() => {
     return registerQueryTab({
@@ -861,7 +872,7 @@ export default function DbClientTab({
         throw new Error("Grid write-back supports simple SELECT ... FROM table result sheets only.");
       }
       const schema = target.schema ?? activeSchema;
-      const tableName = qualifiedName(info.engine, schema, target.table);
+      const tableName = qualifiedName(info.engine, schema, target.table, info.catalog);
       let described: DbColumnDescription[] = [];
       try {
         described = await dbDescribeTable(sessionId, schema, target.table);
@@ -906,7 +917,7 @@ export default function DbClientTab({
       );
       await refreshSheet(panelId, sheetId, "clearView");
     },
-    [activeSchema, info.engine, panels, refreshSheet, sessionId, setStatusMessage],
+    [activeSchema, info.catalog, info.engine, panels, refreshSheet, sessionId, setStatusMessage],
   );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
@@ -932,7 +943,7 @@ export default function DbClientTab({
     async (schema: string) => {
       if (!schema || schema === activeSchema) return;
       const panelId = activePanelId;
-      const sql = schemaSwitchSql(info.engine, schema);
+      const sql = schemaSwitchSql(info.engine, schema, info.catalog);
       const panel = panels.find((p) => p.id === panelId);
       const sheet = newResultSheet(sql, (panel?.sheets.length ?? 0) + 1, rowLimit);
       sheet.title = "Schema";
@@ -983,7 +994,7 @@ export default function DbClientTab({
         );
       }
     },
-    [activePanelId, activeSchema, info.engine, maxResultSheets, panels, rowLimit, sessionId],
+    [activePanelId, activeSchema, info.catalog, info.engine, maxResultSheets, panels, rowLimit, sessionId],
   );
   const insertIntoActive = useCallback(
     (text: string) => {
@@ -994,12 +1005,12 @@ export default function DbClientTab({
 
   const quickSelect = useCallback(
     (schema: string | null, table: string) => {
-      const qualified = qualifiedName(info.engine, schema ?? activeSchema, table);
+      const qualified = qualifiedName(info.engine, schema ?? activeSchema, table, info.catalog);
       const sql = `SELECT * FROM ${qualified} LIMIT ${rowLimit}`;
       editorHandles.current[activePanelId]?.setValue(sql);
       void runQuery(activePanelId, sql);
     },
-    [activePanelId, activeSchema, info.engine, rowLimit, runQuery],
+    [activePanelId, activeSchema, info.catalog, info.engine, rowLimit, runQuery],
   );
 
   const addPanel = () => {

@@ -29,6 +29,12 @@ const DEFAULT_PORTS: Record<string, number> = {
   SFTP: 22,
   Serial: 0,
   LocalShell: 0,
+  File: 0,
+  MySQL: 3306,
+  PostgreSQL: 5432,
+  ClickHouse: 9000,
+  Presto: 8080,
+  Redis: 6379,
 };
 
 const MOBAXTERM_TYPE_TO_SESSION: Record<string, string> = {
@@ -2372,6 +2378,14 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyString(source, output, "tags", MAX_OPTION_LENGTH);
   copyString(source, output, "localShellPath", MAX_PATH_LENGTH);
   copyStringArray(source, output, "localShellArgs", 64, MAX_OPTION_LENGTH);
+  copyString(source, output, "passwordRef", MAX_OPTION_LENGTH);
+  copyString(source, output, "dbCatalog", MAX_NAME_LENGTH);
+  copyString(source, output, "dbDatabase", MAX_NAME_LENGTH);
+  copyString(source, output, "dbTimeout", 16);
+  copyString(source, output, "dbHttpPort", 16);
+  copyString(source, output, "dbChProtocol", 16);
+  copyString(source, output, "dbRedisIndex", 16);
+  copyBoolean(source, output, "dbSsl");
 
   if ("terminalProfile" in source) {
     const profile = normalizeTerminalProfile(source.terminalProfile);

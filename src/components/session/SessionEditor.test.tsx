@@ -414,6 +414,35 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists Presto database settings through the session store save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Presto" });
+
+    await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "presto.example.com");
+    await user.type(screen.getByLabelText("Database username"), "analyst");
+    await user.type(screen.getByLabelText("Presto catalog"), "hive");
+    await user.type(screen.getByLabelText("Presto schema"), "sales");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "Presto",
+      host: "presto.example.com",
+      port: 8080,
+      username: "analyst",
+    });
+    expect(savedOptions).toMatchObject({
+      dbCatalog: "hive",
+      dbDatabase: "sales",
+      dbTimeout: "15",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists edited Terminal settings for an existing session", async () => {
     const user = userEvent.setup();
     const session = {

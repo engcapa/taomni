@@ -14,18 +14,20 @@ export interface VncConnectInfo {
 
 /**
  * Connection parameters for a database client tab (MySQL / PostgreSQL /
- * ClickHouse / Redis). Mirrors the Rust `DbConfig` (camelCase). The password
+ * ClickHouse / Presto / Redis). Mirrors the Rust `DbConfig` (camelCase). The password
  * may be a `vault:<id>` reference resolved server-side.
  */
 export interface DbConnectInfo {
   sessionId: string;
   /** Stable saved-session id used for restoring query workspace files. */
   workspaceSessionId?: string;
-  engine: "MySQL" | "PostgreSQL" | "ClickHouse" | "Redis";
+  engine: "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis";
   host: string;
   port: number;
   username?: string | null;
   password?: string;
+  /** Presto catalog name. */
+  catalog?: string | null;
   database?: string | null;
   ssl?: boolean;
   timeoutSecs?: number | null;

@@ -23,6 +23,10 @@ const quickConnectMock = vi.hoisted(() => ({
   }>,
 }));
 
+const dbClientMock = vi.hoisted(() => ({
+  props: [] as Array<{ tabId?: string; info?: Record<string, unknown>; visible?: boolean }>,
+}));
+
 const vaultMock = vi.hoisted(() => {
   const mock = {
     state: "empty",
@@ -170,6 +174,27 @@ vi.mock("../components/filebrowser/SftpSidebar", () => ({
   SftpSidebar: () => <div data-testid="sftp-sidebar" />,
 }));
 
+vi.mock("../components/database/DbClientTab", () => ({
+  default: (props: { tabId?: string; info?: Record<string, unknown>; visible?: boolean }) => {
+    dbClientMock.props.push(props);
+    return (
+      <div
+        data-testid="db-client-tab"
+        data-tab-id={props.tabId ?? ""}
+        data-engine={String(props.info?.engine ?? "")}
+        data-host={String(props.info?.host ?? "")}
+        data-catalog={String(props.info?.catalog ?? "")}
+        data-database={String(props.info?.database ?? "")}
+        data-visible={props.visible ? "true" : "false"}
+      />
+    );
+  },
+}));
+
+vi.mock("../components/database/RedisClientTab", () => ({
+  default: () => <div data-testid="redis-client-tab" />,
+}));
+
 vi.mock("../lib/ipc", () => ({
   encodeBase64: (value: string) => btoa(value),
   exitApp: vi.fn(async () => undefined),
@@ -211,6 +236,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     terminalLifecycle.unmounted.mockClear();
     sidebarMock.props = [];
     quickConnectMock.props = [];
+    dbClientMock.props = [];
     vaultMock.state = "empty";
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
@@ -664,6 +690,56 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-host", "win.example.test");
     expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-port", "3390");
     expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-username", "alice");
+  });
+
+  it("opens saved Presto sessions as database tabs with catalog context", async () => {
+    const prestoSession: SessionConfig = {
+      id: "presto-1",
+      name: "Presto Analytics",
+      session_type: "Presto",
+      group_path: null,
+      host: "presto.example.test",
+      port: 8080,
+      username: "analyst",
+      auth_method: "None",
+      options_json: JSON.stringify({
+        dbCatalog: "hive",
+        dbDatabase: "sales",
+        dbSsl: true,
+        dbTimeout: "30",
+      }),
+      created_at: 10,
+      updated_at: 10,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+
+    render(<MainLayout />);
+
+    act(() => {
+      latestSidebarProps().onConnectSession?.(prestoSession);
+    });
+
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((candidate) => candidate.sessionId === "presto-1");
+      expect(tab).toMatchObject({
+        type: "database",
+        title: "Presto presto.example.test:8080/hive.sales",
+        db: {
+          engine: "Presto",
+          host: "presto.example.test",
+          port: 8080,
+          username: "analyst",
+          catalog: "hive",
+          database: "sales",
+          ssl: true,
+          timeoutSecs: 30,
+        },
+      });
+    });
+    expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-engine", "Presto");
+    expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-catalog", "hive");
+    expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-database", "sales");
   });
 });
 
