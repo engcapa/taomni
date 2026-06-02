@@ -238,6 +238,60 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("handles macOS Cmd+V through the native paste event without reading clipboard permissions", async () => {
+    const originalPlatform = window.navigator.platform;
+    const originalClipboard = window.navigator.clipboard;
+    const readText = vi.fn(async () => "permission paste");
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      fireEvent.keyDown(window, { key: "v", metaKey: true });
+      await Promise.resolve();
+
+      expect(readText).not.toHaveBeenCalled();
+      expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+
+      const screenEl = screen.getByTestId("terminal-pane").querySelector(".xterm-screen");
+      expect(screenEl).toBeTruthy();
+      const getData = vi.fn((type: string) => (type === "text/plain" ? "native paste" : ""));
+      fireEvent.paste(screenEl as Element, {
+        clipboardData: { getData },
+      });
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("native paste"),
+        );
+      });
+      expect(readText).not.toHaveBeenCalled();
+      expect(getData).toHaveBeenCalledWith("text/plain");
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
   it("converts LF to CR for multi-line paste when bracketed paste is off", async () => {
     terminalMocks.modes.bracketedPasteMode = false;
     const readText = vi.fn(async () => "line1\nline2\nline3");
