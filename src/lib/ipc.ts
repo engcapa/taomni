@@ -678,7 +678,7 @@ export async function tabbyDecryptVault(
   });
 }
 
-// --- Database client (MySQL / PostgreSQL / ClickHouse / Redis) ---
+// --- Database client (MySQL / PostgreSQL / ClickHouse / Presto / Redis) ---
 
 /** Strip the frontend-only `sessionId` to build the Rust `DbConfig` payload. */
 function toDbConfigPayload(info: DbConnectInfo): Record<string, unknown> {
@@ -688,6 +688,7 @@ function toDbConfigPayload(info: DbConnectInfo): Record<string, unknown> {
     port: info.port,
     username: info.username ?? null,
     password: info.password ?? null,
+    catalog: info.catalog ?? null,
     database: info.database ?? null,
     ssl: info.ssl ?? false,
     timeoutSecs: info.timeoutSecs ?? null,

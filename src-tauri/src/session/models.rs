@@ -37,6 +37,7 @@ pub enum SessionType {
     MySQL,
     PostgreSQL,
     ClickHouse,
+    Presto,
     Redis,
 }
 
@@ -55,6 +56,7 @@ impl SessionType {
             Self::MySQL => "MySQL",
             Self::PostgreSQL => "PostgreSQL",
             Self::ClickHouse => "ClickHouse",
+            Self::Presto => "Presto",
             Self::Redis => "Redis",
         }
     }
@@ -73,6 +75,7 @@ impl SessionType {
             "MySQL" => Self::MySQL,
             "PostgreSQL" => Self::PostgreSQL,
             "ClickHouse" => Self::ClickHouse,
+            "Presto" => Self::Presto,
             "Redis" => Self::Redis,
             _ => Self::SSH,
         }
@@ -88,6 +91,7 @@ impl SessionType {
             Self::MySQL => 3306,
             Self::PostgreSQL => 5432,
             Self::ClickHouse => 9000,
+            Self::Presto => 8080,
             Self::Redis => 6379,
             Self::Serial | Self::LocalShell | Self::File => 0,
         }

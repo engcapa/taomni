@@ -87,7 +87,7 @@ import { useT, type TranslateFn } from "../../lib/i18n";
 type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
-  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Redis";
+  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis";
 
 type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database";
 
@@ -109,6 +109,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "MySQL",      icon: <Database className="w-7 h-7" />, color: "#00758f" },
   { id: "PostgreSQL", icon: <Database className="w-7 h-7" />, color: "#336791" },
   { id: "ClickHouse", icon: <Database className="w-7 h-7" />, color: "#e6a817" },
+  { id: "Presto",     icon: <Database className="w-7 h-7" />, color: "#5a4fcf" },
   { id: "Redis",      icon: <Database className="w-7 h-7" />, color: "#d82c20" },
 ];
 
@@ -116,10 +117,10 @@ const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22, Telnet: 23, Rlogin: 513, RDP: 3389, VNC: 5900,
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
-  MySQL: 3306, PostgreSQL: 5432, ClickHouse: 9000, Redis: 6379,
+  MySQL: 3306, PostgreSQL: 5432, ClickHouse: 9000, Presto: 8080, Redis: 6379,
 };
 
-const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Redis"];
+const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Presto", "Redis"];
 
 /** Map UI proto to the backend session_type string. */
 function protoToSessionType(p: Proto): string {
@@ -962,6 +963,7 @@ function DatabaseSettings({
   showPwd, setShowPwd,
   saveInVault, setSaveInVault,
   vaultState,
+  catalog, setCatalog,
   database, setDatabase,
   ssl, setSsl,
   timeoutSecs, setTimeoutSecs,
@@ -976,6 +978,7 @@ function DatabaseSettings({
   showPwd: boolean; setShowPwd: (v: boolean) => void;
   saveInVault: boolean; setSaveInVault: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
+  catalog: string; setCatalog: (v: string) => void;
   database: string; setDatabase: (v: string) => void;
   ssl: boolean; setSsl: (v: boolean) => void;
   timeoutSecs: string; setTimeoutSecs: (v: string) => void;
@@ -985,6 +988,7 @@ function DatabaseSettings({
 }) {
   const isRedis = proto === "Redis";
   const isClickHouse = proto === "ClickHouse";
+  const isPresto = proto === "Presto";
   return (
     <div data-testid="database-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label="Username">
@@ -1040,13 +1044,25 @@ function DatabaseSettings({
         </span>
       </Field>
 
+      {isPresto && (
+        <Field label="Catalog">
+          <input
+            className="taomni-input w-64"
+            value={catalog}
+            aria-label="Presto catalog"
+            placeholder="hive / tpch / system"
+            onChange={(e) => setCatalog(e.target.value)}
+          />
+        </Field>
+      )}
+
       {!isRedis && (
-        <Field label="Database">
+        <Field label={isPresto ? "Schema" : "Database"}>
           <input
             className="taomni-input w-64"
             value={database}
-            aria-label="Database name"
-            placeholder="database / schema name"
+            aria-label={isPresto ? "Presto schema" : "Database name"}
+            placeholder={isPresto ? "(optional) default schema" : "database / schema name"}
             onChange={(e) => setDatabase(e.target.value)}
           />
         </Field>
@@ -1215,7 +1231,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
   const [fileExtraArgs, setFileExtraArgs] = useState(() => optionString(initialOptions, "fileExtraArgs", ""));
 
-  /* --- database session options (MySQL/PostgreSQL/ClickHouse/Redis) --- */
+  /* --- database session options (MySQL/PostgreSQL/ClickHouse/Presto/Redis) --- */
+  const [dbCatalog, setDbCatalog] = useState(() => optionString(initialOptions, "dbCatalog", ""));
   const [dbDatabase, setDbDatabase] = useState(() => optionString(initialOptions, "dbDatabase", ""));
   const [dbSsl, setDbSsl] = useState(() => optionBoolean(initialOptions, "dbSsl", false));
   const [dbTimeout, setDbTimeout] = useState(() => optionString(initialOptions, "dbTimeout", "15"));
@@ -1365,6 +1382,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     const dbOverrides: Record<string, unknown> = isDb
       ? {
           dbDatabase,
+          dbCatalog,
           dbSsl,
           dbTimeout,
           dbHttpPort,
@@ -1433,6 +1451,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (needsHost && !host.trim()) return t("sessionEditor2.errHostRequired");
     if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");
     if (proto === "WSL" && !wslOptions.distro.trim()) return t("sessionEditor2.errWslDistroRequired");
+    if (proto === "Presto" && !dbCatalog.trim()) return "Presto catalog is required.";
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
     if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
     return null;
@@ -1572,6 +1591,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setTags(optionString(nextOptions, "tags", ""));
     setFileEmbedInTab(optionBoolean(nextOptions, "fileEmbedInTab", true));
     setFileExtraArgs(optionString(nextOptions, "fileExtraArgs", ""));
+    setDbCatalog(optionString(nextOptions, "dbCatalog", ""));
     setDbDatabase(optionString(nextOptions, "dbDatabase", ""));
     setDbSsl(optionBoolean(nextOptions, "dbSsl", false));
     setDbTimeout(optionString(nextOptions, "dbTimeout", "15"));
@@ -1692,6 +1712,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     port: parseInt(port) || DEFAULT_PORTS[proto] || 0,
     username: username || null,
     password: password || passwordRef || undefined,
+    catalog: proto === "Presto" ? dbCatalog || null : null,
     database: dbDatabase || null,
     ssl: dbSsl,
     timeoutSecs: parseInt(dbTimeout) || null,
@@ -1703,6 +1724,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const handleTestDbConnection = async () => {
     if (!host) {
       setTestResult({ ok: false, msg: t("sessionEditor2.errHostRequired") });
+      return;
+    }
+    if (proto === "Presto" && !dbCatalog.trim()) {
+      setTestResult({ ok: false, msg: "Presto catalog is required." });
       return;
     }
     setTesting(true);
@@ -2055,6 +2080,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 showPwd={showPwd} setShowPwd={setShowPwd}
                 saveInVault={saveInVault} setSaveInVault={setSaveInVault}
                 vaultState={vaultState}
+                catalog={dbCatalog} setCatalog={setDbCatalog}
                 database={dbDatabase} setDatabase={setDbDatabase}
                 ssl={dbSsl} setSsl={setDbSsl}
                 timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}

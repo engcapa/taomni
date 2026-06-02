@@ -132,8 +132,8 @@ function passwordRefFromOptions(session: SessionConfig): string | null {
 
 /**
  * Build a {@link DbConnectInfo} from a saved DB session. Engine-specific
- * options (ClickHouse HTTP port / protocol, Redis DB index, SSL, timeout,
- * default database) live in `options_json` under the `db*` keys the session
+ * options (ClickHouse HTTP port / protocol, Presto catalog, Redis DB index,
+ * SSL, timeout, default database) live in `options_json` under the `db*` keys the session
  * editor writes. `password` is the resolved credential (plaintext or a
  * `vault:` reference) the connect path already worked out.
  */
@@ -155,6 +155,7 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
     port: session.port,
     username: session.username,
     password,
+    catalog: engine === "Presto" ? str("dbCatalog") || null : null,
     database: str("dbDatabase") || null,
     ssl: opts.dbSsl === true,
     timeoutSecs: num("dbTimeout"),
@@ -889,7 +890,10 @@ export function MainLayout() {
     const isRedis = engine === "Redis";
     const id = `${isRedis ? "redis" : "database"}-${session.id}-${Date.now()}`;
     const info = sessionToDbConnectInfo(session, password);
-    const title = `${engine} ${session.host}:${session.port}${info.database ? `/${info.database}` : ""}`;
+    const prestoPath = info.engine === "Presto"
+      ? [info.catalog, info.database].filter(Boolean).join(".")
+      : info.database;
+    const title = `${engine} ${session.host}:${session.port}${prestoPath ? `/${prestoPath}` : ""}`;
     addTab({
       id,
       type: isRedis ? "redis" : "database",
@@ -1091,6 +1095,7 @@ export function MainLayout() {
       session.session_type === "MySQL" ||
       session.session_type === "PostgreSQL" ||
       session.session_type === "ClickHouse" ||
+      session.session_type === "Presto" ||
       session.session_type === "Redis"
     ) {
       // DB sessions store the password as a vault: ref in options_json. Many

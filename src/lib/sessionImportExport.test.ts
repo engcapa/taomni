@@ -220,6 +220,44 @@ describe("Taomni session import/export", () => {
     expect(result.sessions[0].options_json).not.toContain("proxyPass");
     expect(result.sessions[0].options_json).not.toContain("secret");
   });
+
+  it("round-trips Presto sessions and database options", () => {
+    const presto = session({
+      id: "presto-1",
+      name: "Presto Analytics",
+      session_type: "Presto",
+      host: "presto.example.com",
+      port: 8080,
+      username: "analyst",
+      auth_method: "None",
+      options_json: JSON.stringify({
+        dbCatalog: "hive",
+        dbDatabase: "sales",
+        dbSsl: true,
+        dbTimeout: "30",
+        passwordRef: "vault:db-presto",
+      }),
+    });
+
+    const exported = serializeTaomniSessions([presto], null);
+    const imported = parseTaomniSessions(exported.text, { now: 3333 });
+
+    expect(imported.sessions).toHaveLength(1);
+    expect(imported.sessions[0]).toMatchObject({
+      name: "Presto Analytics",
+      session_type: "Presto",
+      host: "presto.example.com",
+      port: 8080,
+      username: "analyst",
+    });
+    expect(JSON.parse(imported.sessions[0].options_json)).toMatchObject({
+      dbCatalog: "hive",
+      dbDatabase: "sales",
+      dbSsl: true,
+      dbTimeout: "30",
+      passwordRef: "vault:db-presto",
+    });
+  });
 });
 
 describe("CSV session import/export", () => {
