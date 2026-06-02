@@ -6,6 +6,7 @@
 // knows how to touch the system clipboard with multi-format payloads.
 
 import { invoke } from "@tauri-apps/api/core";
+import { getAppPlatform, isTauriRuntime } from "./runtime";
 
 export interface MultiFormatPayload {
   text: string;
@@ -39,13 +40,26 @@ function fallbackCopyText(text: string): boolean {
 }
 
 export async function readText(): Promise<string> {
-  // Prefer the webview clipboard API. On Linux/X11, arboard's get_text() must
+  // On macOS WKWebView, navigator.clipboard.readText() can show the native
+  // "Paste" confirmation popover even for a user-triggered terminal paste.
+  // The desktop app has a native clipboard command, so prefer it on macOS.
+  // Windows keeps the existing webview-first order; Linux keeps the webview
+  // path that avoids the X11 round-trip issue below.
+  if (isTauriRuntime() && getAppPlatform() === "macos") {
+    try {
+      return await invoke<string>("clipboard_read_text");
+    } catch {
+      // Fall back to the webview API / final native retry below.
+    }
+  }
+
+  // Prefer the webview clipboard API on Linux/X11. arboard's get_text() must
   // round-trip a SelectionRequest to whichever process owns the CLIPBOARD
   // selection. When that owner is our own webview (e.g. the user copied text
   // from the AI chat panel), the request has to be answered on webkit's GTK
-  // main thread — which can stall for seconds while chat is streaming, and
-  // arboard then logs a 4s timeout. The webview API resolves the same read
-  // against webkit's internal selection state without leaving the process.
+  // main thread, which can stall for seconds while chat is streaming. The
+  // webview API resolves the same read against webkit's internal selection
+  // state without leaving the process.
   if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
     try {
       return await navigator.clipboard.readText();

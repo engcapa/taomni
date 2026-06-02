@@ -376,6 +376,7 @@ export function TerminalPanel({
   const eventIdRef = useRef(0);
   const imeGuardRef = useRef<TerminalImeInputGuard | null>(null);
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
+  const suppressNativePasteUntilRef = useRef(0);
   const lastCwdRequestTokenRef = useRef(cwdRequestToken);
   const quickFontOptions = useMemo(() => {
     const available = fontState.fonts;
@@ -764,6 +765,25 @@ export function TerminalPanel({
     }
   }, [focusTerminal, fontFamily, fontSize, setStatusMessage, themeName, writeClipboardText]);
 
+  const pasteTextIntoTerminal = useCallback((text: string): boolean => {
+    if (readOnlyRef.current) {
+      setStatusMessage("Terminal is read-only");
+      return false;
+    }
+
+    if (!text) return false;
+    if (
+      multilinePasteConfirm &&
+      /\r?\n/.test(text) &&
+      !window.confirm(`Paste ${text.split(/\r?\n/).length} lines into this terminal?`)
+    ) {
+      return false;
+    }
+    writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
+    focusTerminal();
+    return true;
+  }, [focusTerminal, multilinePasteConfirm, setStatusMessage, writeBroadcastInput]);
+
   const pasteFromClipboard = useCallback(async () => {
     if (readOnlyRef.current) {
       setStatusMessage("Terminal is read-only");
@@ -772,20 +792,11 @@ export function TerminalPanel({
 
     try {
       const text = (await clipboardReadText()) || window.prompt("Paste text") || "";
-      if (!text) return;
-      if (
-        multilinePasteConfirm &&
-        /\r?\n/.test(text) &&
-        !window.confirm(`Paste ${text.split(/\r?\n/).length} lines into this terminal?`)
-      ) {
-        return;
-      }
-      writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
-      focusTerminal();
+      pasteTextIntoTerminal(text);
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
     }
-  }, [focusTerminal, multilinePasteConfirm, setStatusMessage, writeBroadcastInput]);
+  }, [pasteTextIntoTerminal, setStatusMessage]);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!isOsFileDrag(event.dataTransfer)) return;
@@ -1131,11 +1142,9 @@ export function TerminalPanel({
         return true; // no selection: pass through (sends ETX)
       }
       if (event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "v") {
-        if (!readOnlyRef.current) {
-          event.preventDefault();
-          void pasteFromClipboard();
-          return false;
-        }
+        // Let macOS/WKWebView deliver a real `paste` event with clipboardData.
+        // Calling navigator.clipboard.readText() from keydown triggers the
+        // native "Paste" confirmation popover in WKWebView.
         return true;
       }
     } else {
@@ -1416,6 +1425,12 @@ export function TerminalPanel({
     }
     void pasteFromClipboard();
   }, [focusTerminal, pasteFromClipboard, setStatusMessage, writeBroadcastInput]);
+
+  const handleTerminalMouseDownCapture = useCallback((event: ReactMouseEvent) => {
+    if (event.button === 1) {
+      suppressNativePasteUntilRef.current = Date.now() + 500;
+    }
+  }, []);
 
   useEffect(() => {
     readOnlyRef.current = effectiveReadOnly;
@@ -1984,30 +1999,32 @@ export function TerminalPanel({
     return () => el.removeEventListener("wheel", handleWheel, { capture: true });
   }, [decreaseFontSize, increaseFontSize, visible]);
 
-  // Suppress xterm.js's built-in paste handler. Every paste path that targets
-  // the terminal is owned by our own code:
-  //   * Ctrl+Shift+V / Cmd+V / Shift+Insert → handleShortcutKey → pasteFromClipboard
-  //   * right-click / right-click paste behavior → pasteFromClipboard
-  //   * middle-click → handleMiddleClick (selection-or-clipboard)
-  // Letting xterm.js also handle the native `paste` event causes double-paste
-  // on Linux/WebKitGTK, where middle-clicking the focused .xterm-helper-textarea
-  // fires a native X11 PRIMARY-selection paste in addition to our onAuxClick.
+  // Own macOS native paste events instead of letting xterm.js handle them. The event
+  // carries clipboardData for user-triggered paste (Cmd+V / menu Paste) without
+  // invoking navigator.clipboard.readText(), so macOS WKWebView does not show
+  // the native "Paste" confirmation popover. Capturing on the xterm container
+  // keeps this scoped away from sibling inputs like the find bar.
   //
-  // Capturing on the xterm container (not the whole panel) keeps this scoped
-  // to the .xterm-helper-textarea and avoids breaking paste in sibling inputs
-  // like the find bar. No-op on macOS / Windows: those platforms have no
-  // native middle-click paste, and shortcut-driven paste is preventDefault'd
-  // on keydown before any `paste` event fires.
+  // On Windows / Linux, preserve the previous behavior: suppress native paste
+  // events and use the explicit terminal paste shortcuts/menu paths instead.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const onPaste = (event: ClipboardEvent) => {
       event.stopImmediatePropagation();
       event.preventDefault();
+      if (!isMac) {
+        return;
+      }
+      if (Date.now() < suppressNativePasteUntilRef.current) {
+        return;
+      }
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      pasteTextIntoTerminal(text);
     };
     el.addEventListener("paste", onPaste, { capture: true });
     return () => el.removeEventListener("paste", onPaste, { capture: true });
-  }, []);
+  }, [isMac, pasteTextIntoTerminal]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -2147,6 +2164,7 @@ export function TerminalPanel({
       onDragOver={handleTerminalDragOver}
       onDrop={handleTerminalDrop}
       onContextMenu={handleTerminalContextMenu}
+      onMouseDownCapture={handleTerminalMouseDownCapture}
       onAuxClick={handleMiddleClick}
     >
       <div ref={containerRef} className="w-full h-full" />
