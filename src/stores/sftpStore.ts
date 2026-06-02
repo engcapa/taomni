@@ -130,6 +130,16 @@ async function listSide(
     : sftpListLocal(path);
 }
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function isSftpRefreshDirectorySignal(err: unknown): boolean {
+  return errorMessage(err)
+    .toLowerCase()
+    .includes("character is changed please refresh directory");
+}
+
 /**
  * Per-session reference counts. Each component that calls `attach` for a
  * session id holds one reference until it calls `detach`. The backend
@@ -454,7 +464,36 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
         };
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      let displayErr = err;
+      if (side === "remote" && isSftpRefreshDirectorySignal(err)) {
+        try {
+          const entries = await listSide(sessionId, side, prev.path);
+          set((state) => {
+            const cur = state.sessions[sessionId];
+            if (!cur) return state;
+            return {
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...cur,
+                  [side]: {
+                    ...cur[side],
+                    path: prev.path,
+                    entries,
+                    loading: false,
+                    error: null,
+                    selection: [],
+                  },
+                },
+              },
+            };
+          });
+          return;
+        } catch (refreshErr) {
+          displayErr = refreshErr;
+        }
+      }
+      const message = errorMessage(displayErr);
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;

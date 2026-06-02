@@ -810,6 +810,7 @@ export function MainLayout() {
 
   const openSftpTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const tabId = `sftp-${session.id}-${Date.now()}`;
+    const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
     addTab({
       id: tabId,
       type: "sftp",
@@ -823,6 +824,7 @@ export function MainLayout() {
         username: session.username ?? "root",
         authMethod,
         authData,
+        networkSettingsJson: JSON.stringify(ns),
         attachedToTerminal: false,
       },
     });
@@ -1690,6 +1692,9 @@ export function MainLayout() {
                           username={tab.ssh.username}
                           authMethod={tab.ssh.authMethod}
                           authData={tab.ssh.authData}
+                          networkSettingsJson={JSON.stringify(
+                            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+                          )}
                           cwdHint={terminalCwds[tab.id] ?? null}
                           cwdHintVersion={terminalCwdVersions[tab.id] ?? 0}
                           title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
@@ -1710,6 +1715,9 @@ export function MainLayout() {
                                 username: tab.ssh!.username,
                                 authMethod: tab.ssh!.authMethod,
                                 authData: tab.ssh!.authData,
+                                networkSettingsJson: JSON.stringify(
+                                  toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh!.optionsJson)),
+                                ),
                                 initialPath: terminalCwds[tab.id],
                                 attachedToTerminal: true,
                               },
@@ -1880,6 +1888,7 @@ export function MainLayout() {
                         username={tab.sftp.username}
                         authMethod={tab.sftp.authMethod}
                         authData={tab.sftp.authData}
+                        networkSettingsJson={tab.sftp.networkSettingsJson ?? null}
                         initialPath={tab.sftp.initialPath}
                         detachable
                         onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}

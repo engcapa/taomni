@@ -95,6 +95,7 @@ export interface AttachOptions {
   username: string;
   authMethod: string;
   authData: string | null;
+  networkSettingsJson?: string | null;
 }
 
 export interface AttachResult {
@@ -110,6 +111,7 @@ export async function sftpAttach(opts: AttachOptions): Promise<AttachResult> {
       username: opts.username,
       authMethod: opts.authMethod,
       authData: opts.authData,
+      networkSettingsJson: opts.networkSettingsJson ?? null,
     }),
   );
 }

@@ -79,6 +79,7 @@ export interface SftpTabInfo {
   username: string;
   authMethod: string;
   authData: string | null;
+  networkSettingsJson?: string | null;
   initialPath?: string;
   attachedToTerminal?: boolean;
 }

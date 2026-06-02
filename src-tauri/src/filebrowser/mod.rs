@@ -70,16 +70,34 @@ pub async fn sftp_attach(
     username: String,
     auth_method: String,
     auth_data: Option<String>,
+    network_settings_json: Option<String>,
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<AttachResultPayload, String> {
     let auth = auth_from_with_vault(&auth_method, auth_data, &state.vault)?;
+    let network =
+        crate::terminal::network::NetworkSettings::from_json(network_settings_json.as_deref());
+    let network = match network {
+        Some(mut n) => {
+            n.resolve_proxy_pass(&state.vault)?;
+            Some(n)
+        }
+        None => None,
+    };
     let prompter = build_kbd_prompter(
         app_handle.clone(),
         state.ssh_auth_responders.clone(),
         session_id.clone(),
     );
-    let session_result = sftp::open_sftp(&host, port, &username, auth, Some(&prompter)).await;
+    let session_result = sftp::open_sftp(
+        &host,
+        port,
+        &username,
+        auth,
+        network.as_ref(),
+        Some(&prompter),
+    )
+    .await;
     clear_session_auth_responders(&state.ssh_auth_responders, &session_id);
     let session = session_result?;
     let home = session.home.clone();

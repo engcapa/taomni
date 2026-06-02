@@ -138,6 +138,7 @@ export async function sftpAttach(args: {
   username: string;
   authMethod: string;
   authData: string | null;
+  networkSettingsJson?: string | null;
 }): Promise<{ homeDir: string }> {
   if (sessions.has(args.sessionId)) {
     return { homeDir: sessions.get(args.sessionId)!.homeDir };

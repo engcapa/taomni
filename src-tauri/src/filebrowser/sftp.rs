@@ -5,6 +5,7 @@
 
 use crate::filebrowser::local;
 use crate::filebrowser::transfer::{self, ProgressPayload, TransferHandle};
+use crate::terminal::network::NetworkSettings;
 use crate::terminal::ssh::{
     connect_ssh_authenticated_with_prompter, KbdInteractivePrompter, SshAuth, SshHandler,
 };
@@ -58,10 +59,12 @@ pub async fn open_sftp(
     port: u16,
     username: &str,
     auth: SshAuth,
+    network: Option<&NetworkSettings>,
     prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<ActiveSftp, String> {
     let handle =
-        connect_ssh_authenticated_with_prompter(host, port, username, auth, None, prompter).await?;
+        connect_ssh_authenticated_with_prompter(host, port, username, auth, network, prompter)
+            .await?;
     let channel = handle
         .channel_open_session()
         .await

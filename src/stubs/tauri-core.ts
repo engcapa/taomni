@@ -459,6 +459,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         username: args?.username as string,
         authMethod: (args?.authMethod as string) || "Password",
         authData: (args?.authData as string | null) ?? null,
+        networkSettingsJson: (args?.networkSettingsJson as string | null) ?? null,
       });
       return result as T;
     }

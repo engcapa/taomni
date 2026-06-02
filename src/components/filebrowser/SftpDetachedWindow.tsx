@@ -34,6 +34,7 @@ interface DetachedSftpParams {
   username: string;
   authMethod: string;
   authData: string | null;
+  networkSettingsJson?: string | null;
   initialPath?: string;
   title?: string;
 }
@@ -296,6 +297,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
           username={params.username}
           authMethod={params.authMethod}
           authData={params.authData}
+          networkSettingsJson={params.networkSettingsJson ?? null}
           initialPath={params.initialPath}
           cwdHint={cwdHint}
           detachable={false}
