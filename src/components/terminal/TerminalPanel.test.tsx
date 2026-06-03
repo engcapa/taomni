@@ -292,6 +292,65 @@ describe("TerminalPanel focus behavior", () => {
     }
   });
 
+  it("confirms macOS native multi-line paste before writing to the terminal", async () => {
+    const originalPlatform = window.navigator.platform;
+    const originalClipboard = window.navigator.clipboard;
+    const readText = vi.fn(async () => "permission paste");
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const screenEl = screen.getByTestId("terminal-pane").querySelector(".xterm-screen");
+      expect(screenEl).toBeTruthy();
+      const getData = vi.fn((type: string) => (type === "text/plain" ? "line1\nline2" : ""));
+      fireEvent.paste(screenEl as Element, {
+        clipboardData: { getData },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+      });
+      expect(readText).not.toHaveBeenCalled();
+      expect(ipcMocks.writeTerminal).not.toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("line1\rline2"),
+      );
+
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("line1\rline2"),
+        );
+      });
+      expect(readText).not.toHaveBeenCalled();
+      expect(getData).toHaveBeenCalledWith("text/plain");
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
   it("converts LF to CR for multi-line paste when bracketed paste is off", async () => {
     terminalMocks.modes.bracketedPasteMode = false;
     const readText = vi.fn(async () => "line1\nline2\nline3");
@@ -299,7 +358,6 @@ describe("TerminalPanel focus behavior", () => {
       ...navigator,
       clipboard: { readText },
     });
-    vi.stubGlobal("confirm", () => true);
     const onSessionReady = vi.fn();
 
     render(<TerminalPanel visible onSessionReady={onSessionReady} />);
@@ -309,6 +367,16 @@ describe("TerminalPanel focus behavior", () => {
     });
 
     fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    });
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalledWith(
+      "terminal-session",
+      btoa("line1\rline2\rline3"),
+    );
+
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
       expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
@@ -325,7 +393,6 @@ describe("TerminalPanel focus behavior", () => {
       ...navigator,
       clipboard: { readText },
     });
-    vi.stubGlobal("confirm", () => true);
     const onSessionReady = vi.fn();
 
     try {
@@ -336,6 +403,12 @@ describe("TerminalPanel focus behavior", () => {
       });
 
       fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
       await waitFor(() => {
         expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(

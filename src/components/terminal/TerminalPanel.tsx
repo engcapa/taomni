@@ -54,6 +54,7 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
   FT_BUTTON_STYLE,
   FT_BUTTON_ACTIVE_OVERRIDE,
@@ -260,6 +261,7 @@ export function TerminalPanel({
   maximizeToggle,
 }: TerminalPanelProps) {
   const t = useT();
+  const { confirm: confirmPaste, render: pasteConfirmDialog } = useConfirmDialog();
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
@@ -765,24 +767,26 @@ export function TerminalPanel({
     }
   }, [focusTerminal, fontFamily, fontSize, setStatusMessage, themeName, writeClipboardText]);
 
-  const pasteTextIntoTerminal = useCallback((text: string): boolean => {
+  const pasteTextIntoTerminal = useCallback(async (text: string): Promise<boolean> => {
     if (readOnlyRef.current) {
       setStatusMessage("Terminal is read-only");
       return false;
     }
 
     if (!text) return false;
-    if (
-      multilinePasteConfirm &&
-      /\r?\n/.test(text) &&
-      !window.confirm(`Paste ${text.split(/\r?\n/).length} lines into this terminal?`)
-    ) {
-      return false;
+    if (multilinePasteConfirm && /\r?\n/.test(text)) {
+      const lineCount = text.split(/\r?\n/).length;
+      const ok = await confirmPaste({
+        title: t("terminal.multilinePasteTitle"),
+        message: t("terminal.multilinePasteMessage", { count: lineCount }),
+        confirmLabel: t("terminal.paste"),
+      });
+      if (!ok) return false;
     }
     writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
     focusTerminal();
     return true;
-  }, [focusTerminal, multilinePasteConfirm, setStatusMessage, writeBroadcastInput]);
+  }, [confirmPaste, focusTerminal, multilinePasteConfirm, setStatusMessage, t, writeBroadcastInput]);
 
   const pasteFromClipboard = useCallback(async () => {
     if (readOnlyRef.current) {
@@ -792,7 +796,7 @@ export function TerminalPanel({
 
     try {
       const text = (await clipboardReadText()) || window.prompt("Paste text") || "";
-      pasteTextIntoTerminal(text);
+      await pasteTextIntoTerminal(text);
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
     }
@@ -2020,7 +2024,7 @@ export function TerminalPanel({
         return;
       }
       const text = event.clipboardData?.getData("text/plain") ?? "";
-      pasteTextIntoTerminal(text);
+      void pasteTextIntoTerminal(text);
     };
     el.addEventListener("paste", onPaste, { capture: true });
     return () => el.removeEventListener("paste", onPaste, { capture: true });
@@ -2490,6 +2494,7 @@ export function TerminalPanel({
       )}
 
       {contextMenu.render}
+      {pasteConfirmDialog}
 
       {conflictDialogState && (
         <ZmodemConflictDialog

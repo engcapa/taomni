@@ -506,6 +506,8 @@ export const zhCN: DeepPartial<typeof en> = {
     reconnect: "重新连接",
     copySelection: "复制选区",
     paste: "粘贴",
+    multilinePasteTitle: "确认多行粘贴",
+    multilinePasteMessage: "确认向该终端粘贴 {count} 行内容？",
     clear: "清屏",
     findInTerminal: "在终端中查找…",
     fontSettings: "字体设置",

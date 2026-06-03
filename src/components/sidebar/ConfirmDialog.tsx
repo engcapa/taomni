@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useT } from "../../lib/i18n";
 
 export interface ConfirmDialogProps {
@@ -9,6 +9,53 @@ export interface ConfirmDialogProps {
   danger?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+}
+
+export type ConfirmDialogOptions = Pick<
+  ConfirmDialogProps,
+  "title" | "message" | "confirmLabel" | "cancelLabel" | "danger"
+>;
+
+type PendingConfirmDialog = ConfirmDialogOptions & {
+  resolve: (confirmed: boolean) => void;
+};
+
+export function useConfirmDialog(): {
+  confirm: (options: ConfirmDialogOptions) => Promise<boolean>;
+  render: ReactNode;
+} {
+  const [pending, setPending] = useState<PendingConfirmDialog | null>(null);
+
+  const confirm = useCallback((options: ConfirmDialogOptions) => {
+    return new Promise<boolean>((resolve) => {
+      setPending((current) => {
+        current?.resolve(false);
+        return { ...options, resolve };
+      });
+    });
+  }, []);
+
+  const resolvePending = useCallback((confirmed: boolean) => {
+    setPending((current) => {
+      current?.resolve(confirmed);
+      return null;
+    });
+  }, []);
+
+  return {
+    confirm,
+    render: pending ? (
+      <ConfirmDialog
+        title={pending.title}
+        message={pending.message}
+        confirmLabel={pending.confirmLabel}
+        cancelLabel={pending.cancelLabel}
+        danger={pending.danger}
+        onCancel={() => resolvePending(false)}
+        onConfirm={() => resolvePending(true)}
+      />
+    ) : null,
+  };
 }
 
 // Drop-in replacement for window.confirm. Tauri 2's macOS WKWebView ignores
