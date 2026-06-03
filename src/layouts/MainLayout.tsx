@@ -21,6 +21,7 @@ import { MenuBar } from "../components/menubar/MenuBar";
 import { Ribbon, type RibbonCommand } from "../components/menubar/Ribbon";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
+import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
 import { CompactTitleBar } from "../components/tabbar/CompactTitleBar";
 import { TabBar } from "../components/tabbar/TabBar";
 import { StatusBar } from "../components/statusbar/StatusBar";
@@ -218,6 +219,8 @@ export function MainLayout() {
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
+  const exitRequestInFlightRef = useRef(false);
+  const { confirm: confirmAppExit, render: appExitConfirmDialog } = useConfirmDialog();
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
   const [terminalCwdVersions, setTerminalCwdVersions] = useState<Record<string, number>>({});
   const [terminalCwdRequestTokens, setTerminalCwdRequestTokens] = useState<Record<string, number>>({});
@@ -726,7 +729,7 @@ export function MainLayout() {
     void useServersStore.getState().loadAll();
   }, []);
 
-  const confirmExitWithOpenTabs = useCallback(() => {
+  const confirmExitWithOpenTabs = useCallback(async () => {
     const currentTabs = tabsRef.current;
     const terminalCount = currentTabs.filter((tab) => tab.type === "terminal" && tab.closable).length;
     const tabCount = currentTabs.filter((tab) => tab.closable).length;
@@ -742,25 +745,37 @@ export function MainLayout() {
     } else {
       message = tr(isOne ? "exit.promptOne" : "exit.promptMany", { count: tabCount });
     }
-    return window.confirm(message);
-  }, []);
+    return confirmAppExit({
+      title: tr("ribbon.exit"),
+      message,
+      confirmLabel: tr("ribbon.exit"),
+      danger: true,
+    });
+  }, [confirmAppExit]);
 
   const requestAppExit = useCallback(() => {
-    if (confirmExitWithOpenTabs()) {
-      void exitApp();
-    }
+    if (exitRequestInFlightRef.current) return;
+    exitRequestInFlightRef.current = true;
+    void (async () => {
+      try {
+        if (await confirmExitWithOpenTabs()) {
+          await exitApp();
+        }
+      } catch {
+        // Keep exit failure non-fatal; the user stays in the app.
+      } finally {
+        exitRequestInFlightRef.current = false;
+      }
+    })();
   }, [confirmExitWithOpenTabs]);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
     let unlisten: (() => void) | undefined;
 
-    void appWindow.onCloseRequested(async (event) => {
-      if (!confirmExitWithOpenTabs()) {
-        event.preventDefault();
-        return;
-      }
-      await exitApp().catch(() => {});
+    void appWindow.onCloseRequested((event) => {
+      event.preventDefault();
+      requestAppExit();
     }).then((fn) => {
       unlisten = fn;
     });
@@ -768,7 +783,7 @@ export function MainLayout() {
     return () => {
       unlisten?.();
     };
-  }, [confirmExitWithOpenTabs]);
+  }, [requestAppExit]);
 
   const handleNewSession = useCallback((groupPath: string | null = null) => {
     setEditingSession(undefined);
@@ -1503,7 +1518,7 @@ export function MainLayout() {
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       <WindowResizeHandles />
-      {!compactMode && !chromeHidden && <AppTitleBar />}
+      {!compactMode && !chromeHidden && <AppTitleBar onClose={requestAppExit} />}
       {!compactMode && !chromeHidden && (
         <>
           <MenuBar activeTabClosable={!!activeTab?.closable} onCommand={handleCommand} />
@@ -1529,6 +1544,7 @@ export function MainLayout() {
           }
           onConnectSession={handleConnectSession}
           onOpenSessionEditor={() => handleNewSession()}
+          onCloseWindow={requestAppExit}
         />
       )}
 
@@ -2127,6 +2143,7 @@ export function MainLayout() {
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
 
       <ServersDialog />
+      {appExitConfirmDialog}
     </div>
   );
 }

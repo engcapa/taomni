@@ -507,6 +507,8 @@ const dict = {
     reconnect: "Reconnect",
     copySelection: "Copy selection",
     paste: "Paste",
+    multilinePasteTitle: "Confirm multiline paste",
+    multilinePasteMessage: "Paste {count} lines into this terminal?",
     clear: "Clear",
     findInTerminal: "Find in terminal…",
     fontSettings: "Font settings",

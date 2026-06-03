@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { MainLayout } from "./MainLayout";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { listSessions, writeTerminal, type SessionConfig } from "../lib/ipc";
+import { exitApp, listSessions, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
 const terminalLifecycle = vi.hoisted(() => ({
@@ -66,7 +66,13 @@ vi.mock("../components/menubar/MenuBar", () => ({
 }));
 
 vi.mock("../components/menubar/Ribbon", () => ({
-  Ribbon: () => <div data-testid="ribbon" />,
+  Ribbon: ({ onCommand }: { onCommand?: (command: string) => void }) => (
+    <div data-testid="ribbon">
+      <button type="button" data-testid="mock-ribbon-exit" onClick={() => onCommand?.("exit")}>
+        Exit
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../components/quickconnect/QuickConnect", () => ({
@@ -240,6 +246,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     vaultMock.state = "empty";
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
+    vi.mocked(exitApp).mockClear();
     vi.mocked(listSessions).mockResolvedValue([]);
     useSessionStore.setState({
       sessions: [],
@@ -327,6 +334,32 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(screen.getByTestId("status-bar")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+  });
+
+  it("routes titlebar close through the app exit command", async () => {
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByTestId("window-close"));
+
+    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => {
+      expect(exitApp).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("routes ribbon exit through the app exit command", async () => {
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByTestId("mock-ribbon-exit"));
+
+    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => {
+      expect(exitApp).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("opens compact main menu and sessions drawer from the titlebar", () => {
