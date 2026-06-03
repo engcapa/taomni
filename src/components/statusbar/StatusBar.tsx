@@ -159,7 +159,7 @@ export function StatusBar() {
         {activeTab?.type ?? t("statusBar.activeTabNone")} • {t("statusBar.terminalsCount", { count: tabs.filter((tab) => tab.type === "terminal").length })}
       </span>
       <span className="taomni-divider-v h-3" />
-      <span>{t("statusBar.versionTag", { version: "0.1.0" })}</span>
+      <span>{t("statusBar.versionTag", { version: "0.2.0" })}</span>
     </div>
   );
 }

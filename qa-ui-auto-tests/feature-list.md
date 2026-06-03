@@ -27,7 +27,8 @@ components: [MainLayout, MenuBar, Ribbon, QuickConnect, Sidebar, TabBar, StatusB
 files:
   - src/layouts/MainLayout.tsx
 controls:
-  # MainLayout owns layout-level chrome only; menu/ribbon/sidebar/quick-connect testids belong to their own features
+  # MainLayout owns layout-level chrome only; menu/ribbon/sidebar/quick-connect testids belong to their own features.
+  # Ribbon and QuickConnect are hidden by default and can be enabled from View.
   - id: collapsed-sidebar-rail
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
@@ -238,12 +239,6 @@ controls:
   - id: new-session-card
     selector: 'text="New session…"'
     kind: interactive
-  - id: import-openssh-card
-    selector: 'text="Import OpenSSH config"'
-    kind: interactive
-  - id: refresh-sessions-card
-    selector: 'text="Refresh sessions"'
-    kind: interactive
   - id: tips-section
     selector: 'text="Tips"'
     kind: display
@@ -252,6 +247,12 @@ controls:
     kind: display
     aliases:
       - 'text="No active terminal tabs."'   # empty-state copy used by tests as a proxy for the list
+  - id: activity-pane-resize
+    selector: '[data-testid="welcome-activity-pane-resize-handle"]'
+    kind: interactive
+  - id: activity-pane-collapse
+    selector: '[data-testid="welcome-activity-pane-collapse"]'
+    kind: interactive
   - id: last-events-list
     selector: 'text="Last events"'
     kind: display
@@ -312,6 +313,14 @@ controls:
   - id: menu-view
     selector: '[data-testid="menu-view"]'
     kind: interactive
+  - id: menu-toggle-ribbon
+    selector: '[data-testid="context-menu-item-toggle-ribbon"]'
+    kind: interactive
+    optional: true       # only after opening View or the menu-bar right-click menu
+  - id: menu-toggle-quick-connect
+    selector: '[data-testid="context-menu-item-toggle-quick-connect"]'
+    kind: interactive
+    optional: true       # only after opening View or the menu-bar right-click menu
   - id: menu-help
     selector: '[data-testid="menu-help"]'
     kind: interactive
@@ -342,6 +351,7 @@ controls:
   - id: ribbon
     selector: '[data-testid="ribbon"]'
     kind: display
+    optional: true       # hidden by default; enable via View -> Tool button bar
   - id: ribbon-session
     selector: '[data-testid="ribbon-session"]'
     kind: interactive
@@ -1306,6 +1316,7 @@ controls:
   - id: bar-root
     selector: '[data-testid="quick-connect"]'
     kind: display
+    optional: true       # hidden by default; enable via View -> Quick connect toolbar
   - id: input
     selector: '[data-testid="qc-input"]'
     kind: interactive
@@ -1372,11 +1383,11 @@ status: done
 area: sessions/import
 files:
   - src/lib/sessionImportExport.ts
-controls: []   # UI entry is F1.6's `import-openssh-card`; this feature is the import library logic only
+controls: []   # UI entry is the Sessions menu import flow; this feature is the import library logic only
 -->
 
 - 解析 `~/.ssh/config` 并批量导入会话
-- Welcome 页提供入口
+- Sessions 菜单提供入口
 
 ### 6.7 会话 import/export 工具 ✅
 - `src/lib/sessionImportExport.ts` 提供导入导出能力（含单元测试）
