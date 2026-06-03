@@ -114,7 +114,7 @@ export function SqlEditorPanel({
         EditorView.theme({
           "&": {
             height: "100%",
-            fontSize: "13px",
+            fontSize: "var(--taomni-db-font-size, 13px)",
             backgroundColor: "var(--taomni-bg)",
             color: "var(--taomni-text)",
           },
@@ -135,6 +135,20 @@ export function SqlEditorPanel({
             backgroundColor: "var(--taomni-hover)",
           },
           ".cm-scroller": { fontFamily: "var(--taomni-mono-font, monospace)", overflow: "auto" },
+          ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+            backgroundColor: "var(--taomni-editor-selection-bg) !important",
+          },
+          ".cm-content ::selection": {
+            backgroundColor: "var(--taomni-editor-selection-bg)",
+            color: "var(--taomni-editor-selection-text)",
+          },
+          ".cm-selectionMatch": {
+            backgroundColor: "var(--taomni-editor-selection-match-bg)",
+            outline: "1px solid var(--taomni-editor-selection-match-border)",
+          },
+          ".cm-cursor": {
+            borderLeftColor: "var(--taomni-accent)",
+          },
           "&.cm-focused": { outline: "none" },
         }),
       ],

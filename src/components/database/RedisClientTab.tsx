@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
@@ -7,6 +7,7 @@ import { RedisKeyBrowser } from "./RedisKeyBrowser";
 import { RedisValuePanel } from "./RedisValuePanel";
 import { RedisCli } from "./RedisCli";
 import { RedisNewKeyDialog } from "./RedisNewKeyDialog";
+import { useDbSessionFontSize } from "./useDbSessionFontSize";
 
 interface RedisClientTabProps {
   tabId: string;
@@ -14,7 +15,7 @@ interface RedisClientTabProps {
   visible: boolean;
 }
 
-export default function RedisClientTab({ info }: RedisClientTabProps) {
+export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
   const sessionId = info.sessionId;
   const [connected, setConnected] = useState(false);
   const [connError, setConnError] = useState<string | null>(null);
@@ -24,6 +25,15 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
   const [showNewKey, setShowNewKey] = useState(false);
   const [cliCollapsed, setCliCollapsed] = useState(false);
   const connectedRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { fontSize: dbFontSize } = useDbSessionFontSize(visible, rootRef);
+  const dbFontStyle = useMemo(
+    () => ({
+      "--taomni-db-font-size": `${dbFontSize}px`,
+      "--taomni-db-font-size-sm": `${Math.max(10, dbFontSize - 2)}px`,
+    }) as CSSProperties,
+    [dbFontSize],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +68,11 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
 
   if (connError) {
     return (
-      <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
+      <div
+        ref={rootRef}
+        className="h-full w-full flex items-center justify-center p-6"
+        style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
+      >
         <div className="max-w-md text-center">
           <AlertTriangle className="w-6 h-6 mx-auto mb-2" style={{ color: "#d9534f" }} />
           <div className="font-semibold mb-1">Connection failed</div>
@@ -69,7 +83,7 @@ export default function RedisClientTab({ info }: RedisClientTabProps) {
   }
 
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
+    <div ref={rootRef} className="h-full w-full flex flex-col" style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
       {/* Toolbar: DB index switcher */}
       <div
         className="h-7 shrink-0 flex items-center gap-2 px-2 text-[11px]"

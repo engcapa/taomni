@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
 import {
   Play,
@@ -56,6 +56,7 @@ import {
 import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../lib/capture";
 import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
+import { useDbSessionFontSize } from "./useDbSessionFontSize";
 
 interface DbClientTabProps {
   tabId: string;
@@ -421,6 +422,14 @@ export default function DbClientTab({
   const [schemaCollapsed, setSchemaCollapsed] = useState(false);
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const { fontSize: dbFontSize } = useDbSessionFontSize(visible, rootRef);
+  const dbFontStyle = useMemo(
+    () => ({
+      "--taomni-db-font-size": `${dbFontSize}px`,
+      "--taomni-db-font-size-sm": `${Math.max(10, dbFontSize - 2)}px`,
+    }) as CSSProperties,
+    [dbFontSize],
+  );
 
   const sessionId = info.sessionId;
   const workspaceSessionId = info.workspaceSessionId ?? info.sessionId;
@@ -1246,7 +1255,11 @@ export default function DbClientTab({
 
   if (connError) {
     return (
-      <div className="h-full w-full flex items-center justify-center p-6" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
+      <div
+        ref={rootRef}
+        className="h-full w-full flex items-center justify-center p-6"
+        style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
+      >
         <div className="max-w-md text-center">
           <AlertTriangle className="w-6 h-6 mx-auto mb-2" style={{ color: "#d9534f" }} />
           <div className="font-semibold mb-1">Connection failed</div>
@@ -1259,8 +1272,9 @@ export default function DbClientTab({
   if (!workspaceReady) {
     return (
       <div
+        ref={rootRef}
         className="h-full w-full flex items-center justify-center text-sm"
-        style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
+        style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
       >
         Loading query workspace...
       </div>
@@ -1271,7 +1285,7 @@ export default function DbClientTab({
     <div
       ref={rootRef}
       className="h-full w-full flex flex-col relative"
-      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
+      style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       {queryTabMenu.render}
       <FloatingToolbar
@@ -1707,7 +1721,10 @@ function ResultArea({
     sheet.result.columns.length === 0 &&
     sheet.result.rows.length === 0;
   return (
-    <div className="h-full flex flex-col min-h-0" style={{ background: "var(--taomni-bg)" }}>
+    <div
+      className="h-full flex flex-col min-h-0"
+      style={{ background: "var(--taomni-bg)", fontSize: "var(--taomni-db-font-size, 12px)" }}
+    >
       <div
         className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden"
         style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
@@ -1802,7 +1819,10 @@ function ResultArea({
             </div>
           )
         ) : (
-          <div className="flex-1 overflow-auto taomni-scroll-y p-2 text-[12px] font-mono">
+          <div
+            className="flex-1 overflow-auto taomni-scroll-y p-2 text-[12px] font-mono"
+            style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
+          >
             {sheet.error && <div style={{ color: "#d9534f" }}>{sheet.error}</div>}
             {sheet.warnings.map((w, i) => (
               <div key={i} style={{ color: "#e6a817" }}>

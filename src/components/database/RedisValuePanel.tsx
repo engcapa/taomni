@@ -49,18 +49,25 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
 
   if (!redisKey) {
     return (
-      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div
+        className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]"
+        style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
+      >
         Select a key to view its value.
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="h-full flex flex-col min-h-0" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
       {/* Metadata bar */}
       <div
         className="shrink-0 flex items-center gap-2 px-2 h-8 text-[11px]"
-        style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
+        style={{
+          background: "var(--taomni-quick-bg)",
+          borderBottom: "1px solid var(--taomni-divider)",
+          fontSize: "var(--taomni-db-font-size-sm, 11px)",
+        }}
       >
         <span className="px-1.5 rounded uppercase text-[10px]" style={{ background: "var(--taomni-accent)", color: "#fff" }}>
           {value?.kind ?? "?"}
@@ -162,7 +169,14 @@ function ValueEditor({
     case "stream":
       return <StreamViewer entries={value.value as { id: string; fields: [string, string][] }[]} />;
     default:
-      return <div className="text-[12px] text-[var(--taomni-text-muted)]">Empty or unknown value.</div>;
+      return (
+        <div
+          className="text-[12px] text-[var(--taomni-text-muted)]"
+          style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
+        >
+          Empty or unknown value.
+        </div>
+      );
   }
 }
 
@@ -220,7 +234,12 @@ function StringEditor({
       </div>
       <textarea
         className="taomni-input flex-1 font-mono"
-        style={{ minHeight: 200, padding: 8, resize: "none" }}
+        style={{
+          minHeight: 200,
+          padding: 8,
+          resize: "none",
+          fontSize: "var(--taomni-db-font-size, 12px)",
+        }}
         value={display}
         readOnly={pretty}
         onChange={(e) => setText(e.target.value)}
@@ -264,7 +283,7 @@ function PairEditor({
       <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
         <Save className="w-3 h-3" /> Save
       </button>
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[12px]" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
         <thead>
           <tr className="text-left text-[var(--taomni-text-muted)]">
             <th className="px-1 py-0.5 w-1/3">{headers[0]}</th>
@@ -278,6 +297,7 @@ function PairEditor({
               <td className="px-1 py-0.5">
                 <input
                   className="taomni-input w-full font-mono"
+                  style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
                   value={row[0]}
                   onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? [e.target.value, x[1]] : x)))}
                 />
@@ -285,6 +305,7 @@ function PairEditor({
               <td className="px-1 py-0.5">
                 <input
                   className="taomni-input w-full font-mono"
+                  style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
                   value={row[1]}
                   onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? [x[0], e.target.value] : x)))}
                 />
@@ -343,6 +364,7 @@ function ListEditor({
             <span className="text-[10px] text-[var(--taomni-text-muted)] w-8 text-right">{kind === "list" ? i : "•"}</span>
             <input
               className="taomni-input flex-1 font-mono"
+              style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
               value={item}
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? e.target.value : x)))}
             />
@@ -361,7 +383,7 @@ function ListEditor({
 
 function StreamViewer({ entries }: { entries: { id: string; fields: [string, string][] }[] }) {
   return (
-    <div className="text-[12px] font-mono">
+    <div className="text-[12px] font-mono" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
       <table className="w-full">
         <thead>
           <tr className="text-left text-[var(--taomni-text-muted)]">

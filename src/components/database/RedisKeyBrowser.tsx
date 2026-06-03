@@ -254,7 +254,10 @@ export function RedisKeyBrowser({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]">
+      <div
+        className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]"
+        style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
+      >
         {error && <div className="px-2 py-1 text-[11px]" style={{ color: "#d9534f" }}>{error}</div>}
         {renderNode(tree, 0)}
         {cursor !== "0" && (

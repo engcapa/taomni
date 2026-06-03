@@ -157,7 +157,11 @@ export function SchemaTree({
     <div className="h-full flex flex-col" data-testid="schema-tree">
       <div
         className="h-7 flex items-center gap-1 px-2 shrink-0 text-[11px] font-semibold"
-        style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
+        style={{
+          background: "var(--taomni-quick-bg)",
+          borderBottom: "1px solid var(--taomni-divider)",
+          fontSize: "var(--taomni-db-font-size-sm, 11px)",
+        }}
       >
         <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
         <span className="truncate flex-1">{engine}</span>
@@ -175,7 +179,10 @@ export function SchemaTree({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]">
+      <div
+        className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]"
+        style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
+      >
         {error && (
           <div className="px-2 py-1 text-[11px]" style={{ color: "#d9534f" }}>
             {error}
