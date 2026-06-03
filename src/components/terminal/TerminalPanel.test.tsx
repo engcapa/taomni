@@ -578,6 +578,186 @@ describe("TerminalPanel focus behavior", () => {
     expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();
   });
 
+  it("pastes the captured terminal selection on macOS middle mouse up", async () => {
+    const originalPlatform = window.navigator.platform;
+    const originalClipboard = window.navigator.clipboard;
+    const readText = vi.fn(async () => "clipboard fallback");
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      term.getSelection.mockReturnValue("selected text");
+      const pane = screen.getByTestId("terminal-pane");
+
+      fireEvent.mouseDown(pane, { button: 1 });
+      term.getSelection.mockReturnValue("");
+      fireEvent.mouseUp(pane, { button: 1 });
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("selected text"),
+        );
+      });
+      expect(readText).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it("falls back to the clipboard on macOS middle mouse up when there is no terminal selection", async () => {
+    const originalPlatform = window.navigator.platform;
+    const originalClipboard = window.navigator.clipboard;
+    const readText = vi.fn(async () => "mac clipboard");
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const pane = screen.getByTestId("terminal-pane");
+      fireEvent.mouseDown(pane, { button: 1 });
+      fireEvent.mouseUp(pane, { button: 1 });
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("mac clipboard"),
+        );
+      });
+      expect(readText).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it("does not paste twice when macOS emits both mouseup and auxclick for the middle button", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      term.getSelection.mockReturnValue("selected once");
+      const pane = screen.getByTestId("terminal-pane");
+
+      fireEvent.mouseDown(pane, { button: 1 });
+      fireEvent.mouseUp(pane, { button: 1 });
+      fireEvent(pane, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledTimes(1);
+      });
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("selected once"),
+      );
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
+  });
+
+  it("keeps non-macOS middle-click paste on the existing auxclick path", async () => {
+    const originalPlatform = window.navigator.platform;
+    const originalClipboard = window.navigator.clipboard;
+    const readText = vi.fn(async () => "windows clipboard");
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "Win32",
+    });
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const pane = screen.getByTestId("terminal-pane");
+      fireEvent.mouseDown(pane, { button: 1 });
+      fireEvent.mouseUp(pane, { button: 1 });
+      await Promise.resolve();
+
+      expect(readText).not.toHaveBeenCalled();
+      expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+
+      fireEvent(pane, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+          "terminal-session",
+          btoa("windows clipboard"),
+        );
+      });
+      expect(readText).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
   it("accepts OSC 52 clipboard writes from local terminals", async () => {
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal("navigator", {
