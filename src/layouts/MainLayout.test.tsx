@@ -238,6 +238,7 @@ vi.mock("../stores/vaultStore", () => ({
 
 describe("MainLayout attached SFTP sidebar", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     terminalLifecycle.mounted.mockClear();
     terminalLifecycle.unmounted.mockClear();
     sidebarMock.props = [];
@@ -310,7 +311,7 @@ describe("MainLayout attached SFTP sidebar", () => {
 
     expect(screen.getByTestId("menu-bar")).toBeInTheDocument();
     expect(screen.getByTestId("ribbon")).toBeInTheDocument();
-    expect(screen.getByTestId("quick-connect")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
     expect(screen.getByTestId("status-bar")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
 
@@ -330,7 +331,7 @@ describe("MainLayout attached SFTP sidebar", () => {
 
     expect(screen.getByTestId("menu-bar")).toBeInTheDocument();
     expect(screen.getByTestId("ribbon")).toBeInTheDocument();
-    expect(screen.getByTestId("quick-connect")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
     expect(screen.getByTestId("status-bar")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
@@ -700,6 +701,7 @@ describe("MainLayout attached SFTP sidebar", () => {
   });
 
   it("opens RDP quick-connect URLs through the password prompt into an RDP tab", async () => {
+    window.localStorage.setItem("taomni.quickConnectVisible", "true");
     render(<MainLayout />);
 
     act(() => {

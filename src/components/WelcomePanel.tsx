@@ -7,8 +7,10 @@ import {
   Activity,
   ScrollText,
   FolderOpen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseOpenSshConfig } from "../lib/quickConnect";
 import {
   listLocalShells,
@@ -46,6 +48,35 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
     .slice()
     .sort((a, b) => Math.max(b.updated_at, b.last_connected_at ?? 0) - Math.max(a.updated_at, a.last_connected_at ?? 0))
     .slice(0, 5);
+  const [activityPaneWidth, setActivityPaneWidth] = useState(280);
+  const [activityPaneCollapsed, setActivityPaneCollapsed] = useState(false);
+
+  const startActivityPaneResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = activityPaneWidth;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      setActivityPaneWidth(clampNumber(startWidth + startX - moveEvent.clientX, 180, 420));
+    };
+
+    const stop = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  }, [activityPaneWidth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +172,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   };
 
   return (
-    <div className="w-full h-full flex" style={{ background: "var(--taomni-bg)" }}>
+    <div data-testid="welcome-panel" className="w-full h-full flex min-w-0 overflow-hidden" style={{ background: "var(--taomni-bg)" }}>
       <input
         ref={fileInputRef}
         type="file"
@@ -149,9 +180,9 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
         accept=".config,.txt,*"
         onChange={(event) => void handleImport(event)}
       />
-      <div data-testid="welcome-panel" className="flex-1 overflow-auto px-6 py-8 flex justify-center">
-        <div className="w-full max-w-4xl">
-          <div className="flex items-center gap-3 mb-4">
+      <div className="flex-1 min-w-0 overflow-auto">
+        <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
+          <div className="flex items-center gap-3 mb-5">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
               style={{ background: "linear-gradient(135deg, #1e5fa8, #62d36f)" }}
@@ -173,7 +204,10 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            className="grid gap-4 items-stretch"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
+          >
             <LocalTerminalCard
               translate={t}
               shells={mergedShells}
@@ -239,7 +273,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
             />
           </div>
 
-          <div className="mt-6 text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
             <div className="font-semibold text-[var(--taomni-text)] mb-1">{t("welcome.tipsHeading")}</div>
             <ul className="list-disc pl-5 space-y-0.5">
               <li
@@ -256,7 +290,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
 
           <div
             data-testid="welcome-version-footer"
-            className="mt-6 pt-3 flex items-center justify-between text-[11px] taomni-mono"
+            className="mt-7 pt-3 flex items-center justify-between text-[11px] taomni-mono"
             style={{
               borderTop: "1px solid var(--taomni-divider)",
               color: "var(--taomni-text-muted)",
@@ -268,36 +302,87 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
         </div>
       </div>
 
-      <div className="w-[260px] border-l p-3 text-[12px]" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
-        <div className="font-semibold mb-2 flex items-center gap-1"><Activity className="w-3.5 h-3.5" /> {t("welcome.activeConnections")}</div>
-        {activeConnections.length === 0 ? (
-          <EmptyText>{t("welcome.noActiveConnections")}</EmptyText>
-        ) : (
-          activeConnections.slice(0, 5).map((tab) => (
-            <ConnRow
-              key={tab.id}
-              color={tab.ssh ? "#2b5d8b" : "#2f8a3e"}
-              name={tab.title}
-              meta={tab.ssh ? `ssh • ${tab.ssh.username}@${tab.ssh.host}` : tab.localShell?.name ?? "local shell"}
-            />
-          ))
-        )}
-        <div className="mt-4 font-semibold mb-2 flex items-center gap-1"><ScrollText className="w-3.5 h-3.5" /> {t("welcome.lastEvents")}</div>
-        {recentEvents.length === 0 ? (
-          <EmptyText>{t("welcome.noEvents")}</EmptyText>
-        ) : (
-          recentEvents.map((session) => (
-            <EventRow
-              key={session.id}
-              icon={session.last_connected_at ? ">" : "+"}
-              text={session.last_connected_at
-                ? t("welcome.eventConnected", { name: session.name })
-                : t("welcome.eventSaved", { name: session.name })}
-              tone={session.last_connected_at ? "ok" : "info"}
-            />
-          ))
-        )}
-      </div>
+      {activityPaneCollapsed ? (
+        <div
+          className="w-8 shrink-0 border-l flex items-start justify-center py-2"
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
+        >
+          <button
+            type="button"
+            data-testid="welcome-activity-pane-expand"
+            aria-label={t("welcome.expandActivityPane")}
+            title={t("welcome.expandActivityPane")}
+            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+            onClick={() => setActivityPaneCollapsed(false)}
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div
+            data-testid="welcome-activity-pane-resize-handle"
+            className="w-1.5 shrink-0 cursor-col-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)]/70"
+            role="separator"
+            aria-orientation="vertical"
+            onPointerDown={startActivityPaneResize}
+          />
+          <div
+            data-testid="welcome-activity-pane"
+            className="shrink-0 border-l p-3 text-[12px] taomni-scroll-y"
+            style={{
+              width: activityPaneWidth,
+              borderColor: "var(--taomni-divider)",
+              background: "var(--taomni-panel-bg)",
+            }}
+          >
+            <div className="font-semibold mb-2 flex items-center gap-1">
+              <Activity className="w-3.5 h-3.5" />
+              <span className="flex-1 truncate">{t("welcome.activeConnections")}</span>
+              <button
+                type="button"
+                data-testid="welcome-activity-pane-collapse"
+                aria-label={t("welcome.collapseActivityPane")}
+                title={t("welcome.collapseActivityPane")}
+                className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+                onClick={() => setActivityPaneCollapsed(true)}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {activeConnections.length === 0 ? (
+              <EmptyText>{t("welcome.noActiveConnections")}</EmptyText>
+            ) : (
+              activeConnections.slice(0, 8).map((tab) => (
+                <ConnRow
+                  key={tab.id}
+                  color={tab.ssh ? "#2b5d8b" : "#2f8a3e"}
+                  name={tab.title}
+                  meta={tab.ssh ? `ssh - ${tab.ssh.username}@${tab.ssh.host}` : tab.localShell?.name ?? "local shell"}
+                />
+              ))
+            )}
+            <div className="mt-4 font-semibold mb-2 flex items-center gap-1">
+              <ScrollText className="w-3.5 h-3.5" />
+              {t("welcome.lastEvents")}
+            </div>
+            {recentEvents.length === 0 ? (
+              <EmptyText>{t("welcome.noEvents")}</EmptyText>
+            ) : (
+              recentEvents.map((session) => (
+                <EventRow
+                  key={session.id}
+                  icon={session.last_connected_at ? ">" : "+"}
+                  text={session.last_connected_at
+                    ? t("welcome.eventConnected", { name: session.name })
+                    : t("welcome.eventSaved", { name: session.name })}
+                  tone={session.last_connected_at ? "ok" : "info"}
+                />
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -333,7 +418,7 @@ function LocalTerminalCard({
 
   return (
     <div
-      className="text-left p-3 rounded-md border taomni-card-hover"
+      className="text-left p-4 min-h-[170px] h-full rounded-md border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -356,7 +441,7 @@ function LocalTerminalCard({
         {selectedShell ? t("welcome.openShell", { shell: selectedShell.name }) : t("welcome.openLocalShell")}
       </div>
 
-      <div className="mt-2 space-y-2">
+      <div className="mt-3 space-y-3">
         {hasChoices ? (
           <select
             className="taomni-input h-8 w-full"
@@ -438,7 +523,7 @@ function WslCard({
   return (
     <div
       data-testid="welcome-wsl-card"
-      className="text-left p-3 rounded-md border taomni-card-hover"
+      className="text-left p-4 min-h-[170px] h-full rounded-md border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -449,7 +534,7 @@ function WslCard({
       </div>
       <div className="text-[12px] text-[var(--taomni-text-muted)]">{detail}</div>
 
-      <div className="mt-2 space-y-2">
+      <div className="mt-3 space-y-3">
         <select
           data-testid="welcome-wsl-distro"
           className="taomni-input h-8 w-full"
@@ -493,7 +578,7 @@ function ActionCard({
 }) {
   return (
     <button
-      className="text-left p-3 rounded-md border taomni-card-hover"
+      className="text-left p-4 min-h-[138px] h-full rounded-md border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
       onClick={onClick}
       type="button"
@@ -543,4 +628,8 @@ function EventRow({ icon, text, tone }: { icon: string; text: string; tone: "ok"
 
 function EmptyText({ children }: { children: React.ReactNode }) {
   return <div className="text-[11px] text-[var(--taomni-text-muted)] py-1">{children}</div>;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

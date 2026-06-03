@@ -27,7 +27,8 @@ components: [MainLayout, MenuBar, Ribbon, QuickConnect, Sidebar, TabBar, StatusB
 files:
   - src/layouts/MainLayout.tsx
 controls:
-  # MainLayout owns layout-level chrome only; menu/ribbon/sidebar/quick-connect testids belong to their own features
+  # MainLayout owns layout-level chrome only; menu/ribbon/sidebar/quick-connect testids belong to their own features.
+  # QuickConnect is hidden by default and can be enabled from View.
   - id: collapsed-sidebar-rail
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
@@ -252,6 +253,12 @@ controls:
     kind: display
     aliases:
       - 'text="No active terminal tabs."'   # empty-state copy used by tests as a proxy for the list
+  - id: activity-pane-resize
+    selector: '[data-testid="welcome-activity-pane-resize-handle"]'
+    kind: interactive
+  - id: activity-pane-collapse
+    selector: '[data-testid="welcome-activity-pane-collapse"]'
+    kind: interactive
   - id: last-events-list
     selector: 'text="Last events"'
     kind: display
@@ -312,6 +319,10 @@ controls:
   - id: menu-view
     selector: '[data-testid="menu-view"]'
     kind: interactive
+  - id: menu-toggle-quick-connect
+    selector: '[data-testid="context-menu-item-toggle-quick-connect"]'
+    kind: interactive
+    optional: true       # only after opening View or the menu-bar right-click menu
   - id: menu-help
     selector: '[data-testid="menu-help"]'
     kind: interactive
@@ -1306,6 +1317,7 @@ controls:
   - id: bar-root
     selector: '[data-testid="quick-connect"]'
     kind: display
+    optional: true       # hidden by default; enable via View -> Quick connect toolbar
   - id: input
     selector: '[data-testid="qc-input"]'
     kind: interactive

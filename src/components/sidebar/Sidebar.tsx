@@ -6,11 +6,8 @@ import {
   Trash2,
   RefreshCw,
   Star,
-  Clock,
-  Terminal as TerminalIcon,
   Wrench,
   Bot,
-  FolderTree,
 } from "lucide-react";
 import { useState } from "react";
 import { SessionTree } from "./SessionTree";
@@ -18,7 +15,6 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { useAppStore, type SideTab } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { SessionConfig } from "../../lib/ipc";
-import { sessionTypeLabel } from "../../lib/terminalProfile";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface SidebarProps {
@@ -29,7 +25,7 @@ interface SidebarProps {
   compact?: boolean;
 }
 
-export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConnectSession, compact = false }: SidebarProps) {
+export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact = false }: SidebarProps) {
   const {
     activeSideTab,
     setActiveSideTab,
@@ -47,11 +43,6 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
   } = useSessionStore();
   const t = useT();
   const selectedSession = sessions.find((session) => session.id === selectedSessionId);
-  const recentSessions = sessions
-    .filter((session) => session.last_connected_at)
-    .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
-    .slice(0, 6);
-
   const [deleteConfirm, setDeleteConfirm] = useState<SessionConfig | null>(null);
 
   const handleDelete = () => {
@@ -147,55 +138,6 @@ export function Sidebar({ onNewSession, onNewSftpSession, onEditSession, onConne
         ) : (
           <UtilityPanel tab={activeSideTab} />
         )}
-        <div className="h-[160px] border-t flex flex-col shrink-0" style={{ borderColor: "var(--taomni-sidebar-border)", background: "var(--taomni-panel-bg)" }}>
-          <div className="h-6 flex items-center px-2 font-semibold border-b" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 1px)", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
-            <Clock className="w-3.5 h-3.5 mr-1 text-[var(--taomni-text-muted)]" />
-            {t("sidebar.recentConnections")}
-            <div className="ml-auto flex items-center gap-1">
-              {onNewSftpSession && (
-                <IconBtn
-                  title={t("sidebar.sftpBrowserTitle")}
-                  icon={<FolderTree className="w-3 h-3" />}
-                  onClick={() => onNewSftpSession()}
-                />
-              )}
-              <IconBtn title={t("sidebar.refreshTitle")} icon={<RefreshCw className="w-3 h-3" />} onClick={() => void loadSessions()} />
-            </div>
-          </div>
-          <div className="flex-1 taomni-scroll-y py-1" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
-            {recentSessions.length === 0 ? (
-              <div className="px-2 py-2 text-[var(--taomni-text-muted)]" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 1px)" }}>
-                {t("sidebar.noRecent")}
-                {onNewSftpSession && (
-                  <button
-                    type="button"
-                    className="block mt-1 underline text-[var(--taomni-accent)]"
-                    onClick={() => onNewSftpSession()}
-                  >
-                    {t("sidebar.sftpBrowserCta")}
-                  </button>
-                )}
-              </div>
-            ) : (
-              recentSessions.map((session) => {
-                const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
-                return (
-                <button
-                  key={session.id}
-                  className="taomni-tree-row w-full text-left"
-                  onClick={() => onConnectSession?.(session)}
-                  title={`${session.name} (${typeLabel})`}
-                  type="button"
-                >
-                  <TerminalIcon className="w-3 h-3 text-[var(--taomni-accent)]" />
-                  <span className="flex-1 truncate">{session.name}</span>
-                  <span className="text-slate-500" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>{typeLabel}</span>
-                </button>
-                );
-              })
-            )}
-          </div>
-        </div>
       </div>
       )}
     </div>

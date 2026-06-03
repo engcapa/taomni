@@ -8,6 +8,7 @@ import {
   PanelTopClose,
   Plus,
   RefreshCw,
+  Search,
   Terminal as TerminalIcon,
   Upload,
   X,
@@ -36,7 +37,8 @@ import { alertAppDialog } from "../../lib/appDialogs";
 
 interface MenuBarProps {
   activeTabClosable: boolean;
-  onCommand: (command: RibbonCommand | "close-active" | "reload-sessions") => void;
+  quickConnectVisible: boolean;
+  onCommand: (command: RibbonCommand | "close-active" | "reload-sessions" | "toggle-quick-connect") => void;
 }
 
 // Stable identifiers used for test IDs and underscore-name routing. Labels
@@ -63,7 +65,7 @@ const MENU_LABEL_KEYS: Record<MenuId, string> = {
   help: "menu.help",
 };
 
-export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
+export function MenuBar({ activeTabClosable, quickConnectVisible, onCommand }: MenuBarProps) {
   const ctx = useContextMenu();
   const { sessions, importSessions } = useSessionStore();
   const { setStatusMessage } = useAppStore();
@@ -76,6 +78,14 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     "terminal", "sessions", "view", "x-server", "tools", "settings", "macros", "help",
   ];
   const hasSessions = sessions.length > 0;
+
+  const quickConnectToggleItem = (): MenuItem => ({
+    label: t("menu.quickConnectToolbar"),
+    testId: "context-menu-item-toggle-quick-connect",
+    icon: <Search className="w-3 h-3" />,
+    checked: quickConnectVisible,
+    onClick: () => onCommand("toggle-quick-connect"),
+  });
 
   const queueImportPreview = (result: SessionImportResult, source: string) => {
     setPendingImport({ result, source });
@@ -202,6 +212,7 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
 
     if (menu === "view") {
       showMenu([
+        quickConnectToggleItem(),
         { label: t("menu.toggleSidebar"), icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("view") },
         { label: t("menu.toggleCompact"), icon: <PanelTopClose className="w-3 h-3" />, shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
         { label: t("menu.splitTerminal"), icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("split") },
@@ -229,10 +240,20 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
     ]);
   };
 
+  const openChromeContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    ctx.show(event, [
+      quickConnectToggleItem(),
+      { label: "", separator: true },
+      { label: t("menu.toggleSidebar"), icon: <PanelLeft className="w-3 h-3" />, onClick: () => onCommand("view") },
+      { label: t("menu.toggleCompact"), icon: <PanelTopClose className="w-3 h-3" />, shortcut: "Ctrl+Shift+M", onClick: () => onCommand("toggle-compact") },
+    ]);
+  };
+
   return (
     <div
       data-testid="menu-bar"
       className="h-6 flex items-center px-2 gap-3 border-b"
+      onContextMenu={openChromeContextMenu}
       style={{
         borderColor: "var(--taomni-chrome-border)",
         background: "var(--taomni-menubar-bg)",

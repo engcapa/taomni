@@ -100,6 +100,23 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
+const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
+
+function readQuickConnectVisible(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(QUICK_CONNECT_VISIBLE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeQuickConnectVisible(visible: boolean) {
+  try {
+    window.localStorage.setItem(QUICK_CONNECT_VISIBLE_KEY, visible ? "true" : "false");
+  } catch {
+    // Ignore storage failures; the in-memory visibility state still applies.
+  }
+}
 
 function localShellSelectionFromSession(session: SessionConfig): LocalShellSelection | undefined {
   const options = parseSessionOptions(session.options_json);
@@ -219,6 +236,7 @@ export function MainLayout() {
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
+  const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
   const exitRequestInFlightRef = useRef(false);
   const { confirm: confirmAppExit, render: appExitConfirmDialog } = useConfirmDialog();
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
@@ -1274,7 +1292,14 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
-  const handleCommand = useCallback((command: RibbonCommand | "close-active" | "reload-sessions") => {
+  const toggleQuickConnectVisible = useCallback(() => {
+    const next = !quickConnectVisible;
+    setQuickConnectVisible(next);
+    writeQuickConnectVisible(next);
+    setStatusMessage(tr(next ? "status.quickConnectShown" : "status.quickConnectHidden"));
+  }, [quickConnectVisible, setStatusMessage]);
+
+  const handleCommand = useCallback((command: RibbonCommand | "close-active" | "reload-sessions" | "toggle-quick-connect") => {
     switch (command) {
       case "new-session":
         handleNewSession();
@@ -1304,6 +1329,9 @@ export function MainLayout() {
         break;
       case "toggle-compact":
         toggleCompactMode();
+        break;
+      case "toggle-quick-connect":
+        toggleQuickConnectVisible();
         break;
       case "servers":
         useServersStore.getState().openDialog();
@@ -1370,11 +1398,33 @@ export function MainLayout() {
     setActiveTab,
     setStatusMessage,
     setSidebarCollapsed,
+    toggleQuickConnectVisible,
     toggleCompactMode,
     toggleTerminalSplit,
     toggleSidebar,
     toggleXServer,
   ]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const primary = event.ctrlKey || event.metaKey;
+      if (!primary || !event.shiftKey || event.altKey) return;
+
+      const key = event.key.toLowerCase();
+      if (key !== "t" && key !== "n") return;
+
+      const state = useAppStore.getState();
+      const current = state.tabs.find((tab) => tab.id === state.activeTabId);
+      if (current?.type !== "welcome") return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleCommand(key === "t" ? "new-terminal" : "new-session");
+    };
+
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [handleCommand]);
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
@@ -1521,17 +1571,23 @@ export function MainLayout() {
       {!compactMode && !chromeHidden && <AppTitleBar onClose={requestAppExit} />}
       {!compactMode && !chromeHidden && (
         <>
-          <MenuBar activeTabClosable={!!activeTab?.closable} onCommand={handleCommand} />
+          <MenuBar
+            activeTabClosable={!!activeTab?.closable}
+            quickConnectVisible={quickConnectVisible}
+            onCommand={handleCommand}
+          />
           <Ribbon
             xServerEnabled={xServerEnabled}
             splitActive={terminalSplitActive}
             onCommand={handleCommand}
           />
-          <QuickConnect
-            onConnectInput={handleQuickConnect}
-            onConnectSession={handleConnectSession}
-            onHome={() => setActiveTab("welcome")}
-          />
+          {quickConnectVisible && (
+            <QuickConnect
+              onConnectInput={handleQuickConnect}
+              onConnectSession={handleConnectSession}
+              onHome={() => setActiveTab("welcome")}
+            />
+          )}
         </>
       )}
       {compactMode && !chromeHidden && (
