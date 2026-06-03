@@ -157,10 +157,11 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
         <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
           <div className="flex items-center gap-3 mb-5">
             <div
+              data-testid="welcome-brand-mark"
               className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
               style={{ background: "linear-gradient(135deg, #1e5fa8, #62d36f)" }}
             >
-              N
+              T
             </div>
             <div>
               <div className="text-xl font-semibold">{t("app.welcomeTitle")}</div>
