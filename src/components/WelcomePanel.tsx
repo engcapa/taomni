@@ -2,16 +2,13 @@ import {
   Terminal as TerminalIcon,
   Plus,
   Shield,
-  Upload,
-  RefreshCw,
   Activity,
   ScrollText,
   FolderOpen,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseOpenSshConfig } from "../lib/quickConnect";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   listLocalShells,
   listWslDistros,
@@ -33,7 +30,6 @@ interface WelcomePanelProps {
 }
 
 export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath }: WelcomePanelProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -41,7 +37,7 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   const [selectedDistro, setSelectedDistro] = useState("");
   const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">("loading");
   const { tabs, setStatusMessage } = useAppStore();
-  const { sessions, addSession, loadSessions } = useSessionStore();
+  const { sessions } = useSessionStore();
   const t = useT();
   const activeConnections = tabs.filter((tab) => tab.type === "terminal" && tab.closable);
   const recentEvents = sessions
@@ -145,22 +141,6 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
     }
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const text = await file.text();
-    const imported = parseOpenSshConfig(text);
-    for (const session of imported) {
-      await addSession(session);
-    }
-    setStatusMessage(t("status.importedSshSessions", {
-      count: imported.length,
-      plural: imported.length === 1 ? "" : "s",
-    }));
-  };
-
   const handleOpenHomeFolder = async () => {
     if (!onOpenLocalPath) return;
     try {
@@ -173,13 +153,6 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
 
   return (
     <div data-testid="welcome-panel" className="w-full h-full flex min-w-0 overflow-hidden" style={{ background: "var(--taomni-bg)" }}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept=".config,.txt,*"
-        onChange={(event) => void handleImport(event)}
-      />
       <div className="flex-1 min-w-0 overflow-auto">
         <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
           <div className="flex items-center gap-3 mb-5">
@@ -256,20 +229,6 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
               desc={t("welcome.newSessionDesc")}
               kbd="Ctrl+Shift+N"
               onClick={() => onNewSession()}
-            />
-            <ActionCard
-              icon={<Upload className="w-5 h-5" />}
-              title={t("welcome.importTitle")}
-              desc={t("welcome.importDesc")}
-              kbd=""
-              onClick={() => fileInputRef.current?.click()}
-            />
-            <ActionCard
-              icon={<RefreshCw className="w-5 h-5" />}
-              title={t("welcome.refreshTitle")}
-              desc={t("welcome.refreshDesc")}
-              kbd=""
-              onClick={() => void loadSessions()}
             />
           </div>
 
@@ -466,18 +425,6 @@ function LocalTerminalCard({
           </div>
         )}
         <div className="flex items-center justify-end gap-2 flex-wrap">
-          {onOpenHomeFolder && (
-            <button
-              data-testid="welcome-open-home-folder"
-              className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
-              onClick={onOpenHomeFolder}
-              title={t("welcome.homeFolderTitle")}
-              type="button"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span>{t("welcome.homeFolder")}</span>
-            </button>
-          )}
           <button data-testid="welcome-open-local-terminal" className="taomni-btn h-8 px-3" onClick={onStart} type="button">
             {t("welcome.open")}
           </button>
@@ -491,6 +438,18 @@ function LocalTerminalCard({
             >
               <Shield className="w-3.5 h-3.5" />
               <span>{t("welcome.admin")}</span>
+            </button>
+          )}
+          {onOpenHomeFolder && (
+            <button
+              data-testid="welcome-open-home-folder"
+              className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
+              onClick={onOpenHomeFolder}
+              title={t("welcome.homeFolderTitle")}
+              type="button"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>{t("welcome.homeFolder")}</span>
             </button>
           )}
         </div>

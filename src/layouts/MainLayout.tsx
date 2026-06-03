@@ -100,7 +100,24 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
+const RIBBON_VISIBLE_KEY = "taomni.ribbonVisible";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
+
+function readRibbonVisible(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(RIBBON_VISIBLE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeRibbonVisible(visible: boolean) {
+  try {
+    window.localStorage.setItem(RIBBON_VISIBLE_KEY, visible ? "true" : "false");
+  } catch {
+    // Ignore storage failures; the in-memory visibility state still applies.
+  }
+}
 
 function readQuickConnectVisible(): boolean {
   try {
@@ -236,6 +253,7 @@ export function MainLayout() {
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
+  const [ribbonVisible, setRibbonVisible] = useState(readRibbonVisible);
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
   const exitRequestInFlightRef = useRef(false);
   const { confirm: confirmAppExit, render: appExitConfirmDialog } = useConfirmDialog();
@@ -1299,7 +1317,14 @@ export function MainLayout() {
     setStatusMessage(tr(next ? "status.quickConnectShown" : "status.quickConnectHidden"));
   }, [quickConnectVisible, setStatusMessage]);
 
-  const handleCommand = useCallback((command: RibbonCommand | "close-active" | "reload-sessions" | "toggle-quick-connect") => {
+  const toggleRibbonVisible = useCallback(() => {
+    const next = !ribbonVisible;
+    setRibbonVisible(next);
+    writeRibbonVisible(next);
+    setStatusMessage(tr(next ? "status.ribbonShown" : "status.ribbonHidden"));
+  }, [ribbonVisible, setStatusMessage]);
+
+  const handleCommand = useCallback((command: RibbonCommand | "close-active" | "reload-sessions" | "toggle-quick-connect" | "toggle-ribbon") => {
     switch (command) {
       case "new-session":
         handleNewSession();
@@ -1332,6 +1357,9 @@ export function MainLayout() {
         break;
       case "toggle-quick-connect":
         toggleQuickConnectVisible();
+        break;
+      case "toggle-ribbon":
+        toggleRibbonVisible();
         break;
       case "servers":
         useServersStore.getState().openDialog();
@@ -1399,6 +1427,7 @@ export function MainLayout() {
     setStatusMessage,
     setSidebarCollapsed,
     toggleQuickConnectVisible,
+    toggleRibbonVisible,
     toggleCompactMode,
     toggleTerminalSplit,
     toggleSidebar,
@@ -1413,13 +1442,20 @@ export function MainLayout() {
       const key = event.key.toLowerCase();
       if (key !== "t" && key !== "n") return;
 
+      if (key === "t") {
+        event.preventDefault();
+        event.stopPropagation();
+        handleCommand("new-terminal");
+        return;
+      }
+
       const state = useAppStore.getState();
       const current = state.tabs.find((tab) => tab.id === state.activeTabId);
-      if (current?.type !== "welcome") return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      handleCommand(key === "t" ? "new-terminal" : "new-session");
+      if (current?.type === "welcome") {
+        event.preventDefault();
+        event.stopPropagation();
+        handleCommand("new-session");
+      }
     };
 
     window.addEventListener("keydown", handler, true);
@@ -1573,14 +1609,17 @@ export function MainLayout() {
         <>
           <MenuBar
             activeTabClosable={!!activeTab?.closable}
+            ribbonVisible={ribbonVisible}
             quickConnectVisible={quickConnectVisible}
             onCommand={handleCommand}
           />
-          <Ribbon
-            xServerEnabled={xServerEnabled}
-            splitActive={terminalSplitActive}
-            onCommand={handleCommand}
-          />
+          {ribbonVisible && (
+            <Ribbon
+              xServerEnabled={xServerEnabled}
+              splitActive={terminalSplitActive}
+              onCommand={handleCommand}
+            />
+          )}
           {quickConnectVisible && (
             <QuickConnect
               onConnectInput={handleQuickConnect}

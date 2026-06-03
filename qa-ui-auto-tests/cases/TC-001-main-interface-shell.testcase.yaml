@@ -3,11 +3,10 @@ title: Main interface shell renders all primary surfaces
 description: |
   Smoke test for the chrome of the app in standard (non-compact) mode. Loads
   the welcome screen and verifies every top-level layout surface is mounted:
-  menu bar, ribbon, sidebar sidetab strip, session tree, tab bar, status bar,
-  welcome panel, and the optional quick-connect toolbar once enabled from
-  View. Asserts the four
-  welcome cards (Start local terminal, New session, Import OpenSSH config,
-  Refresh sessions), the Tips section, and the right-hand activity column
+  menu bar, sidebar sidetab strip, session tree, tab bar, status bar,
+  welcome panel, and the optional ribbon / quick-connect toolbars once enabled
+  from View. Asserts the remaining welcome actions (Start local terminal,
+  New session), the Tips section, and the right-hand activity column
   (Active connections / Last events with the empty placeholder). Status bar
   segments are spot-checked. Compact-mode interaction is covered separately
   in TC-auto-F1.4.
@@ -19,6 +18,10 @@ timeout_sec: 60
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="menu-bar"]'
+  - assert_not_visible: '[data-testid="ribbon"]'
+  - click: '[data-testid="menu-view"]'
+  - click: '[data-testid="context-menu-item-toggle-ribbon"]'
+  - wait_for: '[data-testid="ribbon"]'
   - assert_visible: '[data-testid="ribbon"]'
   - assert_visible: '[data-testid="ribbon-session"]'
   - assert_visible: '[data-testid="ribbon-sftp"]'
@@ -53,10 +56,8 @@ steps:
   - assert_enabled: '[data-testid="welcome-open-local-terminal"]'
   - assert_visible: '[data-testid="welcome-version"]'
   - assert_visible: '[data-testid="welcome-version-footer"]'
-  # Welcome screen content — four cards + tips + quick connect hint
+  # Welcome screen content — remaining actions + tips + quick connect hint
   - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'New session'}
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Import OpenSSH config'}
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Refresh sessions'}
   - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Tips'}
   - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Quick connect'}
   # Right-hand activity column is part of the welcome panel and can be resized/collapsed.
@@ -70,4 +71,5 @@ steps:
   - assert_text: {selector: '[data-testid="status-bar"]', contains: 'Network'}
   - assert_text: {selector: '[data-testid="status-bar"]', contains: 'Theme'}
   - assert_text: {selector: '[data-testid="status-bar"]', contains: 'terminals'}
+  - assert_text: {selector: '[data-testid="status-bar"]', contains: '0.2.0 MVP'}
   - screenshot: 001-main-interface.png

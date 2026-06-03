@@ -27,7 +27,7 @@ describe("MenuBar", () => {
   });
 
   it("does not open a top-level menu on hover before one is active", () => {
-    render(<MenuBar activeTabClosable quickConnectVisible={false} onCommand={vi.fn()} />);
+    render(<MenuBar activeTabClosable ribbonVisible={false} quickConnectVisible={false} onCommand={vi.fn()} />);
 
     fireEvent.mouseEnter(screen.getByTestId("menu-sessions"), { clientX: 80, clientY: 10 });
 
@@ -35,13 +35,13 @@ describe("MenuBar", () => {
   });
 
   it("omits inactive Games from the top-level menus", () => {
-    render(<MenuBar activeTabClosable quickConnectVisible={false} onCommand={vi.fn()} />);
+    render(<MenuBar activeTabClosable ribbonVisible={false} quickConnectVisible={false} onCommand={vi.fn()} />);
 
     expect(screen.queryByTestId("menu-games")).not.toBeInTheDocument();
   });
 
   it("switches top-level menus on hover after a menu has been opened", () => {
-    render(<MenuBar activeTabClosable quickConnectVisible={false} onCommand={vi.fn()} />);
+    render(<MenuBar activeTabClosable ribbonVisible={false} quickConnectVisible={false} onCommand={vi.fn()} />);
 
     fireEvent.click(screen.getByTestId("menu-terminal"), { clientX: 16, clientY: 10 });
     expect(screen.getByTestId("context-menu-item-new-local-terminal")).toBeInTheDocument();
@@ -52,16 +52,20 @@ describe("MenuBar", () => {
     expect(screen.queryByTestId("context-menu-item-new-local-terminal")).not.toBeInTheDocument();
   });
 
-  it("exposes the quick-connect toolbar toggle from View and right-click menus", () => {
+  it("exposes toolbar toggles from View and right-click menus", () => {
     const onCommand = vi.fn();
-    render(<MenuBar activeTabClosable quickConnectVisible={false} onCommand={onCommand} />);
+    render(<MenuBar activeTabClosable ribbonVisible={false} quickConnectVisible={false} onCommand={onCommand} />);
+
+    fireEvent.click(screen.getByTestId("menu-view"), { clientX: 120, clientY: 10 });
+    fireEvent.click(screen.getByTestId("context-menu-item-toggle-ribbon"));
+    expect(onCommand).toHaveBeenCalledWith("toggle-ribbon");
 
     fireEvent.click(screen.getByTestId("menu-view"), { clientX: 120, clientY: 10 });
     fireEvent.click(screen.getByTestId("context-menu-item-toggle-quick-connect"));
-
     expect(onCommand).toHaveBeenCalledWith("toggle-quick-connect");
 
     fireEvent.contextMenu(screen.getByTestId("menu-bar"), { clientX: 140, clientY: 12 });
+    expect(screen.getByTestId("context-menu-item-toggle-ribbon")).toBeInTheDocument();
     expect(screen.getByTestId("context-menu-item-toggle-quick-connect")).toBeInTheDocument();
   });
 });

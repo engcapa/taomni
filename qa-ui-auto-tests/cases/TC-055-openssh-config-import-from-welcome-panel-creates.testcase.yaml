@@ -1,5 +1,5 @@
 id: TC-055
-title: OpenSSH config import from Welcome panel creates sessions
+title: OpenSSH config import moved out of Welcome panel
 covers: [F6.6]
 tags: [import, legacy-imported, openssh, p1, session]
 modes: [browser]
@@ -7,7 +7,8 @@ fixtures: [reset_db, ssh_required]
 steps:
   - open: "${cfg.app.base_url}"
   - wait_for: "[data-testid=\"welcome-panel\"]"
-  - assert_visible: "text=\"Import OpenSSH config\""
-  - click: 'text="Import OpenSSH config"'
+  - assert_not_visible: "text=\"Import OpenSSH config\""
+  - click: '[data-testid="menu-sessions"]'
+  - assert_visible: '[data-testid="menu-import-sessions"]'
   - wait: 1
   - screenshot: 055-openssh-config-import.png

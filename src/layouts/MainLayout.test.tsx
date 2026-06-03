@@ -310,7 +310,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     render(<MainLayout />);
 
     expect(screen.getByTestId("menu-bar")).toBeInTheDocument();
-    expect(screen.getByTestId("ribbon")).toBeInTheDocument();
+    expect(screen.queryByTestId("ribbon")).not.toBeInTheDocument();
     expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
     expect(screen.getByTestId("status-bar")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
@@ -330,7 +330,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: /exit compact mode/i }));
 
     expect(screen.getByTestId("menu-bar")).toBeInTheDocument();
-    expect(screen.getByTestId("ribbon")).toBeInTheDocument();
+    expect(screen.queryByTestId("ribbon")).not.toBeInTheDocument();
     expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
     expect(screen.getByTestId("status-bar")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
@@ -351,6 +351,7 @@ describe("MainLayout attached SFTP sidebar", () => {
   });
 
   it("routes ribbon exit through the app exit command", async () => {
+    window.localStorage.setItem("taomni.ribbonVisible", "true");
     render(<MainLayout />);
 
     fireEvent.click(screen.getByTestId("mock-ribbon-exit"));
@@ -360,6 +361,20 @@ describe("MainLayout attached SFTP sidebar", () => {
 
     await waitFor(() => {
       expect(exitApp).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("opens a local terminal from Ctrl+Shift+T outside the welcome tab", async () => {
+    render(<MainLayout />);
+
+    expect(useAppStore.getState().activeTabId).toBe("ssh-tab");
+
+    fireEvent.keyDown(window, { key: "T", ctrlKey: true, shiftKey: true });
+
+    await waitFor(() => {
+      expect(
+        useAppStore.getState().tabs.some((tab) => tab.type === "terminal" && tab.id.startsWith("local-")),
+      ).toBe(true);
     });
   });
 
