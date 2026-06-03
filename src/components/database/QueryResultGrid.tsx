@@ -726,6 +726,7 @@ export function QueryResultGrid({
   const containerRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<GridRow[]>(() => makeRows(result));
   const [scrollTop, setScrollTop] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const [viewportH, setViewportH] = useState(400);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -773,6 +774,7 @@ export function QueryResultGrid({
 
   const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
+    setScrollLeft(e.currentTarget.scrollLeft);
     setViewportH(e.currentTarget.clientHeight);
   }, []);
 
@@ -1268,7 +1270,11 @@ export function QueryResultGrid({
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col" data-testid="query-result-grid">
+    <div
+      className="flex-1 min-h-0 flex flex-col"
+      data-testid="query-result-grid"
+      style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
+    >
       <div
         className="min-h-8 shrink-0 flex flex-wrap items-center gap-1 px-1 py-1"
         style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
@@ -1491,45 +1497,55 @@ export function QueryResultGrid({
       {viewMode === "table" && (
         <>
           <div
-            className="flex shrink-0 text-[11px] font-semibold select-none"
+            className="shrink-0 overflow-hidden select-none"
             style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
           >
             <div
-              className="w-12 px-1 py-1 text-[var(--taomni-text-muted)] shrink-0 flex items-center justify-between"
-              style={{ borderRight: "1px solid var(--taomni-divider)" }}
+              data-testid="query-result-grid-header-scroll"
+              className="flex text-[11px] font-semibold"
+              style={{
+                fontSize: "var(--taomni-db-font-size-sm, 11px)",
+                transform: `translateX(${-scrollLeft}px)`,
+                willChange: "transform",
+              }}
             >
-              <span>#</span>
-              <span className="text-[10px]">{selectedRows.length || ""}</span>
+              <div
+                className="w-12 px-1 py-1 text-[var(--taomni-text-muted)] shrink-0 flex items-center justify-between"
+                style={{ borderRight: "1px solid var(--taomni-divider)" }}
+              >
+                <span>#</span>
+                <span className="text-[10px]">{selectedRows.length || ""}</span>
+              </div>
+              {visibleColumnIndexes.map((columnIndex) => {
+                const col = result.columns[columnIndex];
+                return (
+                  <button
+                    key={columnIndex}
+                    type="button"
+                    className="relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--taomni-hover)]"
+                    style={{ ...columnStyle(columnIndex), borderRight: "1px solid var(--taomni-divider)" }}
+                    onClick={() => toggleSort(columnIndex)}
+                    title={`${col.name} (${col.type})`}
+                  >
+                    <span className="truncate flex-1">{col.name}</span>
+                    {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
+                    {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
+                    <span
+                      className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--taomni-accent)]"
+                      onMouseDown={(event) => startColumnResize(event, columnIndex)}
+                      title="Resize column"
+                    />
+                  </button>
+                );
+              })}
             </div>
-            {visibleColumnIndexes.map((columnIndex) => {
-              const col = result.columns[columnIndex];
-              return (
-                <button
-                  key={columnIndex}
-                  type="button"
-                  className="relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--taomni-hover)]"
-                  style={{ ...columnStyle(columnIndex), borderRight: "1px solid var(--taomni-divider)" }}
-                  onClick={() => toggleSort(columnIndex)}
-                  title={`${col.name} (${col.type})`}
-                >
-                  <span className="truncate flex-1">{col.name}</span>
-                  {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
-                  {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
-                  <span
-                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--taomni-accent)]"
-                    onMouseDown={(event) => startColumnResize(event, columnIndex)}
-                    title="Resize column"
-                  />
-                </button>
-              );
-            })}
           </div>
 
           <div
             ref={containerRef}
+            data-testid="query-result-grid-scroll"
             className="flex-1 min-h-0 overflow-auto taomni-scroll-y"
             onScroll={onScroll}
-            style={{ fontSize: 12 }}
           >
             <div style={{ height: total * ROW_HEIGHT, position: "relative" }}>
               {visible.map((rowIndex, i) => {
