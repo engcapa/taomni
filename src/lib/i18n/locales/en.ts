@@ -447,6 +447,8 @@ const dict = {
     newLocalTerminal: "New local terminal",
     closeAllTerminals: "Close all terminals",
     more: "More",
+    scrollLeft: "Scroll tabs left",
+    scrollRight: "Scroll tabs right",
     multiExecAdd: "Add to MultiExec",
     multiExecRemove: "Remove from MultiExec",
     newOutput: "New output",

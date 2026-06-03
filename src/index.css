@@ -364,6 +364,18 @@ body {
   right: -2px;
 }
 
+.taomni-tab-scroll {
+  max-width: 100%;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.taomni-tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+.taomni-tab-scroll .taomni-tab {
+  flex: 0 0 auto;
+}
+
 .taomni-app-titlebar {
   background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
   border-bottom: 1px solid var(--taomni-chrome-border);
