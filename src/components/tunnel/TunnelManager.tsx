@@ -44,6 +44,7 @@ import { TunnelEditor } from "./TunnelEditor";
 import { useSessionStore } from "../../stores/sessionStore";
 import { isTauriRuntime } from "../../lib/runtime";
 import { useT } from "../../lib/i18n";
+import { confirmAppDialog } from "../../lib/appDialogs";
 
 interface Props {
   onStatusMessage?: (msg: string) => void;
@@ -203,7 +204,12 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
   };
 
   const handleDelete = async (t2: TunnelConfig) => {
-    if (!window.confirm(t("tunnels.confirmDeleteName", { name: t2.name }))) return;
+    const confirmed = await confirmAppDialog({
+      message: t("tunnels.confirmDeleteName", { name: t2.name }),
+      confirmLabel: t("common.delete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteTunnel(t2.id);
       await refresh();

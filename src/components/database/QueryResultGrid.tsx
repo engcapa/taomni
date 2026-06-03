@@ -53,6 +53,7 @@ import { isTauriRuntime } from "../../lib/runtime";
 import { sftpOpenPath } from "../../lib/sftp";
 import { getActiveQueryTab, listQueryTabs } from "../../lib/queryRegistry";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 
 const ROW_HEIGHT = 26;
 const OVERSCAN = 12;
@@ -1130,9 +1131,12 @@ export function QueryResultGrid({
         original: row.original ? [...row.original] : null,
       }));
     if (changes.length === 0) return;
-    const ok = window.confirm(
-      `Apply grid changes to the database?\n\nAdded: ${changeCounts.inserted}\nModified: ${changeCounts.updated}\nDeleted: ${changeCounts.deleted}`,
-    );
+    const ok = await confirmAppDialog({
+      title: "Apply grid changes",
+      message: `Apply grid changes to the database?\n\nAdded: ${changeCounts.inserted}\nModified: ${changeCounts.updated}\nDeleted: ${changeCounts.deleted}`,
+      confirmLabel: "Apply",
+      danger: changeCounts.deleted > 0,
+    });
     if (!ok) {
       setStatus("Grid change submit canceled.");
       return;
@@ -1228,7 +1232,12 @@ export function QueryResultGrid({
       setStatus(`Exported ${rowsToExport.length} row(s).`);
     } catch (err) {
       const message = `${openAfter ? "Open" : "Export"} failed: ${String(err)}`;
-      if (openAfter) window.alert(message);
+      if (openAfter) {
+        await alertAppDialog({
+          title: "Open failed",
+          message,
+        });
+      }
       setStatus(message);
     }
   };

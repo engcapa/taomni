@@ -9,6 +9,7 @@ import {
 } from "../../lib/servers";
 import { useServersStore } from "../../stores/serversStore";
 import { useT } from "../../lib/i18n";
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { ServerList } from "./ServerList";
 import { ServerSettings } from "./ServerSettings";
 
@@ -79,9 +80,12 @@ function ServersDialogInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const attemptClose = () => {
+  const attemptClose = async () => {
     if (useServersStore.getState().dirty) {
-      if (!window.confirm(t("servers.confirmDiscard"))) return;
+      const confirmed = await confirmAppDialog({
+        message: t("servers.confirmDiscard"),
+      });
+      if (!confirmed) return;
     }
     clearDirty();
     closeDialog();
@@ -92,7 +96,7 @@ function ServersDialogInner() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        attemptClose();
+        void attemptClose();
       }
     };
     window.addEventListener("keydown", handler);
@@ -131,7 +135,7 @@ function ServersDialogInner() {
       className="fixed inset-0 z-[400] flex items-center justify-center"
       style={{ background: "rgba(20,30,45,0.45)" }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) attemptClose();
+        if (e.target === e.currentTarget) void attemptClose();
       }}
     >
       <div
@@ -167,7 +171,7 @@ function ServersDialogInner() {
             title={t("servers.cancel")}
             aria-label={t("servers.cancel")}
             className="ml-auto hover:bg-red-500 rounded p-0.5"
-            onClick={attemptClose}
+            onClick={() => void attemptClose()}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -188,7 +192,7 @@ function ServersDialogInner() {
             type="button"
             data-testid="servers-dialog-cancel"
             className="taomni-btn"
-            onClick={attemptClose}
+            onClick={() => void attemptClose()}
           >
             {t("servers.cancel")}
           </button>
@@ -206,4 +210,3 @@ function ServersDialogInner() {
     </div>
   );
 }
-

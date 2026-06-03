@@ -25,6 +25,7 @@ export interface TextInputDialogProps {
   label?: string;
   initialValue?: string;
   placeholder?: string;
+  allowEmpty?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
   onCancel: () => void;
@@ -33,7 +34,7 @@ export interface TextInputDialogProps {
 
 export type TextInputDialogOptions = Pick<
   TextInputDialogProps,
-  "title" | "label" | "initialValue" | "placeholder" | "confirmLabel" | "cancelLabel"
+  "title" | "label" | "initialValue" | "placeholder" | "allowEmpty" | "confirmLabel" | "cancelLabel"
 >;
 
 type PendingTextInputDialog = TextInputDialogOptions & {
@@ -108,6 +109,7 @@ export function useTextInputDialog(): {
         label={pending.label}
         initialValue={pending.initialValue}
         placeholder={pending.placeholder}
+        allowEmpty={pending.allowEmpty}
         confirmLabel={pending.confirmLabel}
         cancelLabel={pending.cancelLabel}
         onCancel={() => resolvePending(null)}
@@ -155,7 +157,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[950] flex items-center justify-center"
       style={{ background: "rgba(0,0,0,0.4)" }}
       onClick={onCancel}
       onKeyDown={handleKeyDown}
@@ -209,6 +211,7 @@ export function TextInputDialog({
   label,
   initialValue = "",
   placeholder,
+  allowEmpty = false,
   confirmLabel,
   cancelLabel,
   onCancel,
@@ -220,7 +223,7 @@ export function TextInputDialog({
   const [value, setValue] = useState(initialValue);
   const resolvedConfirm = confirmLabel ?? t("common.ok");
   const resolvedCancel = cancelLabel ?? t("common.cancel");
-  const canConfirm = value.trim().length > 0;
+  const canConfirm = allowEmpty || value.trim().length > 0;
 
   useEffect(() => {
     setValue(initialValue);
@@ -249,7 +252,7 @@ export function TextInputDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[950] flex items-center justify-center"
       style={{ background: "rgba(0,0,0,0.4)" }}
       onClick={onCancel}
       onKeyDown={handleKeyDown}
@@ -298,6 +301,72 @@ export function TextInputDialog({
             disabled={!canConfirm}
           >
             {resolvedConfirm}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface AlertDialogProps {
+  title?: string;
+  message: string;
+  okLabel?: string;
+  onClose: () => void;
+}
+
+export function AlertDialog({ title, message, okLabel, onClose }: AlertDialogProps) {
+  const t = useT();
+  const okRef = useRef<HTMLButtonElement>(null);
+  const resolvedTitle = title ?? t("common.message");
+  const resolvedOk = okLabel ?? t("common.ok");
+
+  useEffect(() => {
+    okRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" || event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[950] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.4)" }}
+      onClick={onClose}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        role="alertdialog"
+        aria-label={resolvedTitle}
+        aria-modal="true"
+        data-testid="alert-dialog"
+        className="w-[420px] rounded shadow-lg p-4"
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
+        <div
+          data-testid="alert-dialog-message"
+          className="text-[12px] mb-4 whitespace-pre-line"
+          style={{ color: "var(--taomni-text)" }}
+        >
+          {message}
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            ref={okRef}
+            type="button"
+            data-testid="alert-dialog-ok"
+            className="px-3 py-1 text-[12px] rounded text-white"
+            style={{ background: "var(--taomni-accent)" }}
+            onClick={onClose}
+          >
+            {resolvedOk}
           </button>
         </div>
       </div>

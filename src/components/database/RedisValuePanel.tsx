@@ -7,6 +7,7 @@ import {
   redisExec,
   type RedisValue,
 } from "../../lib/ipc";
+import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 
 interface RedisValuePanelProps {
   sessionId: string;
@@ -79,7 +80,12 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           title="Edit TTL"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           onClick={async () => {
-            const input = window.prompt("Set TTL in seconds (-1 = persist, 0 = remove key):", String(value?.ttl ?? -1));
+            const input = await promptAppDialog({
+              title: "Set TTL",
+              label: "Set TTL in seconds (-1 = persist, 0 = remove key):",
+              initialValue: String(value?.ttl ?? -1),
+              allowEmpty: true,
+            });
             if (input === null) return;
             const secs = parseInt(input, 10);
             if (Number.isNaN(secs)) return;
@@ -110,7 +116,12 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           style={{ color: "#d9534f" }}
           onClick={async () => {
-            if (!window.confirm(`Delete key "${redisKey}"?`)) return;
+            const confirmed = await confirmAppDialog({
+              message: `Delete key "${redisKey}"?`,
+              confirmLabel: "Delete",
+              danger: true,
+            });
+            if (!confirmed) return;
             try {
               await redisDelKey(sessionId, redisKey);
               onDeleted();

@@ -3,6 +3,7 @@ import { useVaultStore } from "../../stores/vaultStore";
 import { VaultSetupDialog } from "./VaultSetupDialog";
 import { VaultUnlockDialog } from "./VaultUnlockDialog";
 import { useT } from "../../lib/i18n";
+import { confirmAppDialog } from "../../lib/appDialogs";
 
 type Action = null | "init" | "unlock" | "change-master";
 
@@ -241,13 +242,14 @@ export function VaultSettings() {
                     type="button"
                     className="px-2 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          t("vaultSettings.confirmDeleteEntry", { label: e.label }),
-                        )
-                      ) {
+                      void confirmAppDialog({
+                        message: t("vaultSettings.confirmDeleteEntry", { label: e.label }),
+                        confirmLabel: t("common.delete"),
+                        danger: true,
+                      }).then((confirmed) => {
+                        if (!confirmed) return;
                         void deleteEntry(e.id);
-                      }
+                      });
                     }}
                     data-testid={`vault-entry-delete-${e.id}`}
                   >

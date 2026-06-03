@@ -114,6 +114,7 @@ import { useSuggestionSource } from "../../lib/terminal/aiSuggestionSource";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { promptAppDialog } from "../../lib/appDialogs";
 import {
   NATIVE_FILE_DROP_EVENT,
   type NativeFileDropDetail,
@@ -797,7 +798,14 @@ export function TerminalPanel({
     }
 
     try {
-      const text = (await clipboardReadText()) || window.prompt("Paste text") || "";
+      const text =
+        (await clipboardReadText()) ||
+        (await promptAppDialog({
+          title: "Paste text",
+          initialValue: "",
+          allowEmpty: true,
+        })) ||
+        "";
       await pasteTextIntoTerminal(text);
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
@@ -980,9 +988,13 @@ export function TerminalPanel({
     }
   }, [searchValue]);
 
-  const renameTerminal = useCallback(() => {
+  const renameTerminal = useCallback(async () => {
     if (!tabId) return;
-    const nextTitle = window.prompt("Set terminal title", tabTitle);
+    const nextTitle = await promptAppDialog({
+      title: "Set terminal title",
+      initialValue: tabTitle,
+      allowEmpty: true,
+    });
     if (!nextTitle?.trim()) return;
     updateTabTitle(tabId, nextTitle.trim());
     focusTerminal();

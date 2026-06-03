@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { MainLayout } from "./layouts/MainLayout";
 import {
   SftpDetachedWindow,
@@ -12,6 +12,7 @@ import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindo
 import { dispatchNativeFileDrop, isOsFileDrag } from "./lib/osFileDrop";
 import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { useAppStore } from "./stores/appStore";
+import { AppDialogProvider } from "./lib/appDialogs";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -89,18 +90,18 @@ function App() {
     sweepExpiredHandoffs();
   }, []);
 
+  let content: ReactNode;
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {
-    return <SftpDetachedWindow sessionId={detachedSftpId} />;
-  }
-  const detachedRoute = detectDetachedRoute();
-  if (detachedRoute && detachedRoute.kind !== "sftp") {
-    return (
-      <DetachedSessionWindow kind={detachedRoute.kind} id={detachedRoute.id} />
-    );
+    content = <SftpDetachedWindow sessionId={detachedSftpId} />;
+  } else {
+    const detachedRoute = detectDetachedRoute();
+    content = detachedRoute && detachedRoute.kind !== "sftp"
+      ? <DetachedSessionWindow kind={detachedRoute.kind} id={detachedRoute.id} />
+      : <MainLayout />;
   }
 
-  return <MainLayout />;
+  return <AppDialogProvider>{content}</AppDialogProvider>;
 }
 
 export default App;

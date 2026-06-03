@@ -45,6 +45,7 @@ const dict = {
     new: "New",
     backToTop: "Back to top",
     error: "Error",
+    message: "Message",
   },
   window: {
     minimize: "Minimize",
