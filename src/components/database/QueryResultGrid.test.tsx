@@ -42,6 +42,24 @@ function wideResult(): DbQueryResult {
   };
 }
 
+function filterResult(): DbQueryResult {
+  return {
+    columns: [
+      { name: "id", type: "Int" },
+      { name: "name", type: "String" },
+      { name: "status", type: "String" },
+    ],
+    rows: [
+      ["1", "Ann", "active"],
+      ["2", "Anne", "inactive"],
+      ["3", "Bob", "active"],
+    ],
+    rowsAffected: 0,
+    durationMs: 8,
+    warnings: [],
+  };
+}
+
 describe("QueryResultGrid", () => {
   it("keeps the table header horizontally synchronized with the body scroll", () => {
     render(<QueryResultGrid result={wideResult()} />);
@@ -56,5 +74,21 @@ describe("QueryResultGrid", () => {
     expect(screen.getByTestId("query-result-grid-header-scroll")).toHaveStyle({
       transform: "translateX(-240px)",
     });
+  });
+
+  it("filters a specific column with fuzzy or exact matching", () => {
+    render(<QueryResultGrid result={filterResult()} />);
+
+    fireEvent.click(screen.getByLabelText("Filter column name"));
+    fireEvent.change(screen.getByLabelText("Filter name"), { target: { value: "Ann" } });
+
+    expect(screen.getByText("Ann")).toBeInTheDocument();
+    expect(screen.getByText("Anne")).toBeInTheDocument();
+    expect(screen.queryByText("Bob")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Exact" }));
+
+    expect(screen.getByText("Ann")).toBeInTheDocument();
+    expect(screen.queryByText("Anne")).not.toBeInTheDocument();
   });
 });

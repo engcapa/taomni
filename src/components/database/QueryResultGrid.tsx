@@ -91,6 +91,7 @@ type SortDir = "asc" | "desc" | null;
 type ViewMode = "table" | "list" | "chart";
 type RowStatus = "clean" | "inserted" | "updated" | "deleted";
 type ExportTarget = "all" | "selection";
+type ColumnFilterMode = "fuzzy" | "exact";
 type OutputFormat = "csv" | "html" | "txt" | "sql" | "xml" | "excel" | "json";
 type TextFunction = "none" | "upper" | "lower" | "trim";
 type QuoteMode = "double" | "single" | "none";
@@ -107,6 +108,17 @@ interface GridRow {
   values: (string | null)[];
   original: (string | null)[] | null;
   status: RowStatus;
+}
+
+interface ColumnFilterConfig {
+  text: string;
+  mode: ColumnFilterMode;
+}
+
+interface OpenColumnFilter {
+  columnIndex: number;
+  left: number;
+  top: number;
 }
 
 interface ExportOptions {
@@ -244,6 +256,8 @@ const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   excelAutoResizeColumns: true,
   jsonStyle: "array",
 };
+
+const DEFAULT_COLUMN_FILTER: ColumnFilterConfig = { text: "", mode: "fuzzy" };
 
 const EXPORT_DEFAULTS_KEY = "taomni.db.exportGrid.defaults.v1";
 const EXPORT_HISTORY_KEY = "taomni.db.exportGrid.fileHistory.v1";
@@ -724,6 +738,7 @@ export function QueryResultGrid({
   onStatus,
 }: QueryResultGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const columnFilterPopoverRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<GridRow[]>(() => makeRows(result));
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -742,6 +757,8 @@ export function QueryResultGrid({
   const [editValue, setEditValue] = useState("");
   const [filterText, setFilterText] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [columnFilters, setColumnFilters] = useState<Record<number, ColumnFilterConfig>>({});
+  const [openColumnFilter, setOpenColumnFilter] = useState<OpenColumnFilter | null>(null);
   const [searchText, setSearchText] = useState("");
   const [showStats, setShowStats] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
@@ -764,8 +781,27 @@ export function QueryResultGrid({
   useEffect(() => {
     setVisibleColumns(new Set(result.columns.map((_, index) => index)));
     setColumnWidths({});
+    setColumnFilters({});
+    setOpenColumnFilter(null);
     setExportColumns(defaultExportColumns(result.columns));
   }, [result.columns]);
+
+  useEffect(() => {
+    if (!openColumnFilter) return;
+    const closeOnOutsideClick = (event: globalThis.MouseEvent) => {
+      if (columnFilterPopoverRef.current?.contains(event.target as Node)) return;
+      setOpenColumnFilter(null);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setOpenColumnFilter(null);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openColumnFilter]);
 
   const visibleColumnIndexes = useMemo(
     () => result.columns.map((_, index) => index).filter((index) => visibleColumns.has(index)),
@@ -778,13 +814,39 @@ export function QueryResultGrid({
     setViewportH(e.currentTarget.clientHeight);
   }, []);
 
+  const activeColumnFilters = useMemo(
+    () =>
+      Object.entries(columnFilters)
+        .map(([rawIndex, config]) => ({
+          columnIndex: Number(rawIndex),
+          text: config.text.trim(),
+          mode: config.mode,
+        }))
+        .filter(
+          (filter) =>
+            Number.isInteger(filter.columnIndex) &&
+            filter.columnIndex >= 0 &&
+            filter.columnIndex < result.columns.length &&
+            filter.text.length > 0,
+        ),
+    [columnFilters, result.columns.length],
+  );
+
+  const activeColumnFilterCount = activeColumnFilters.length;
+
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
       const needle = filterText.trim().toLowerCase();
-      if (!needle) return true;
-      return visibleColumnIndexes.some((index) => (row.values[index] ?? "").toLowerCase().includes(needle));
+      if (needle && !visibleColumnIndexes.some((index) => (row.values[index] ?? "").toLowerCase().includes(needle))) {
+        return false;
+      }
+      return activeColumnFilters.every((filter) => {
+        const value = (row.values[filter.columnIndex] ?? "").toLowerCase();
+        const columnNeedle = filter.text.toLowerCase();
+        return filter.mode === "exact" ? value === columnNeedle : value.includes(columnNeedle);
+      });
     },
-    [filterText, visibleColumnIndexes],
+    [activeColumnFilters, filterText, visibleColumnIndexes],
   );
 
   const order = useMemo(() => {
@@ -854,6 +916,36 @@ export function QueryResultGrid({
   const openDropdown = (event: MouseEvent<HTMLButtonElement>, items: MenuItem[]) => {
     const rect = event.currentTarget.getBoundingClientRect();
     openMenuAt(rect.left, rect.bottom + 4, items);
+  };
+
+  const updateColumnFilter = (columnIndex: number, patch: Partial<ColumnFilterConfig>) => {
+    setColumnFilters((current) => {
+      const previous = current[columnIndex] ?? DEFAULT_COLUMN_FILTER;
+      return { ...current, [columnIndex]: { ...previous, ...patch } };
+    });
+  };
+
+  const clearColumnFilter = (columnIndex: number) => {
+    setColumnFilters((current) => {
+      const next = { ...current };
+      delete next[columnIndex];
+      return next;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setFilterText("");
+    setColumnFilters({});
+    setOpenColumnFilter(null);
+  };
+
+  const openColumnFilterPanel = (event: MouseEvent<HTMLButtonElement>, columnIndex: number) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 240;
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 162));
+    setOpenColumnFilter({ columnIndex, left, top });
   };
 
   const columnStyle = (columnIndex: number): CSSProperties => {
@@ -1226,6 +1318,18 @@ export function QueryResultGrid({
   const endRow = Math.min(total, Math.ceil((scrollTop + viewportH) / ROW_HEIGHT) + OVERSCAN);
   const visible = order.slice(startRow, endRow);
   const searchNeedle = searchText.trim().toLowerCase();
+  const openFilterColumn = openColumnFilter ? result.columns[openColumnFilter.columnIndex] : null;
+  const openFilterConfig = openColumnFilter
+    ? columnFilters[openColumnFilter.columnIndex] ?? DEFAULT_COLUMN_FILTER
+    : DEFAULT_COLUMN_FILTER;
+  const filterModeButtonStyle = (active: boolean): CSSProperties | undefined =>
+    active
+      ? {
+          background: "var(--taomni-selected)",
+          borderColor: "var(--taomni-selected-border)",
+          color: "var(--taomni-accent)",
+        }
+      : undefined;
 
   const stats = useMemo(() => {
     return visibleColumnIndexes.map((columnIndex) => {
@@ -1384,7 +1488,7 @@ export function QueryResultGrid({
         <ToolButton
           title="Filter rows"
           onClick={() => setFilterOpen((value) => !value)}
-          active={filterOpen}
+          active={filterOpen || !!filterText.trim() || activeColumnFilterCount > 0}
           icon={<Filter className="w-3.5 h-3.5" />}
         />
         <ToolButton
@@ -1445,6 +1549,17 @@ export function QueryResultGrid({
               aria-label="Filter rows"
             />
           </label>
+        )}
+        {(filterText.trim() || activeColumnFilterCount > 0) && (
+          <button
+            type="button"
+            className="h-6 px-1.5 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)]"
+            title="Clear filters"
+            onClick={clearAllFilters}
+          >
+            <Ban className="w-3.5 h-3.5" />
+            {activeColumnFilterCount > 0 ? `${activeColumnFilterCount} col` : "Clear"}
+          </button>
         )}
         <label className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
           <Search className="w-3.5 h-3.5" />
@@ -1518,24 +1633,44 @@ export function QueryResultGrid({
               </div>
               {visibleColumnIndexes.map((columnIndex) => {
                 const col = result.columns[columnIndex];
+                const columnFilter = columnFilters[columnIndex] ?? DEFAULT_COLUMN_FILTER;
+                const columnFiltered = columnFilter.text.trim().length > 0;
                 return (
-                  <button
+                  <div
                     key={columnIndex}
-                    type="button"
-                    className="relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--taomni-hover)]"
+                    className="group relative px-2 py-1 text-left flex items-center gap-1 hover:bg-[var(--taomni-hover)]"
                     style={{ ...columnStyle(columnIndex), borderRight: "1px solid var(--taomni-divider)" }}
-                    onClick={() => toggleSort(columnIndex)}
                     title={`${col.name} (${col.type})`}
                   >
-                    <span className="truncate flex-1">{col.name}</span>
-                    {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
-                    {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
+                    <button
+                      type="button"
+                      className="min-w-0 flex flex-1 items-center gap-1 bg-transparent p-0 text-left"
+                      onClick={() => toggleSort(columnIndex)}
+                    >
+                      <span className="truncate flex-1">{col.name}</span>
+                      {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
+                      {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
+                    </button>
+                    <button
+                      type="button"
+                      className={`mr-1 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded transition-all hover:bg-[var(--taomni-hover)] ${
+                        columnFiltered
+                          ? "opacity-100 text-[var(--taomni-accent)] shadow-sm"
+                          : "opacity-0 translate-y-0.5 text-[var(--taomni-text-muted)] group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                      }`}
+                      style={columnFiltered ? { background: "var(--taomni-selected)" } : undefined}
+                      title={`Filter ${col.name}`}
+                      aria-label={`Filter column ${col.name}`}
+                      onClick={(event) => openColumnFilterPanel(event, columnIndex)}
+                    >
+                      <Filter className="w-3 h-3" />
+                    </button>
                     <span
                       className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--taomni-accent)]"
                       onMouseDown={(event) => startColumnResize(event, columnIndex)}
                       title="Resize column"
                     />
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1714,6 +1849,74 @@ export function QueryResultGrid({
             void exportWithOptions(exportTarget, options, columns, destination);
           }}
         />
+      )}
+      {openColumnFilter && openFilterColumn && (
+        <div
+          ref={columnFilterPopoverRef}
+          className="fixed z-[10000] w-[240px] rounded shadow-xl p-2 text-[12px]"
+          style={{
+            left: openColumnFilter.left,
+            top: openColumnFilter.top,
+            background: "var(--taomni-panel-bg)",
+            border: "1px solid var(--taomni-divider)",
+            color: "var(--taomni-text)",
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+            <div className="min-w-0 flex-1 truncate font-semibold" title={openFilterColumn.name}>
+              {openFilterColumn.name}
+            </div>
+            <button
+              type="button"
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+              title="Clear column filter"
+              aria-label={`Clear filter for ${openFilterColumn.name}`}
+              onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}
+            >
+              <Ban className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <input
+            autoFocus
+            value={openFilterConfig.text}
+            onChange={(event) => updateColumnFilter(openColumnFilter.columnIndex, { text: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") setOpenColumnFilter(null);
+              if (event.key === "Escape") setOpenColumnFilter(null);
+            }}
+            className="taomni-input h-7 w-full text-[12px]"
+            placeholder="Filter this column"
+            aria-label={`Filter ${openFilterColumn.name}`}
+          />
+          <div className="mt-2 grid grid-cols-2 gap-1">
+            <button
+              type="button"
+              className="taomni-btn h-7"
+              style={filterModeButtonStyle(openFilterConfig.mode === "fuzzy")}
+              onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { mode: "fuzzy" })}
+            >
+              Fuzzy
+            </button>
+            <button
+              type="button"
+              className="taomni-btn h-7"
+              style={filterModeButtonStyle(openFilterConfig.mode === "exact")}
+              onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { mode: "exact" })}
+            >
+              Exact
+            </button>
+          </div>
+          <div className="mt-2 flex items-center justify-end gap-1">
+            <button type="button" className="taomni-btn h-7 px-2" onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}>
+              Clear
+            </button>
+            <button type="button" className="taomni-btn h-7 px-2" data-primary="true" onClick={() => setOpenColumnFilter(null)}>
+              Done
+            </button>
+          </div>
+        </div>
       )}
       {menu}
     </div>
