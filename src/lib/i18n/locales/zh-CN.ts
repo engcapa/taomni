@@ -446,6 +446,8 @@ export const zhCN: DeepPartial<typeof en> = {
     newLocalTerminal: "新建本地终端",
     closeAllTerminals: "关闭所有终端",
     more: "更多",
+    scrollLeft: "向左滚动标签页",
+    scrollRight: "向右滚动标签页",
     multiExecAdd: "加入多终端同步执行",
     multiExecRemove: "移出多终端同步执行",
     newOutput: "有新输出",
