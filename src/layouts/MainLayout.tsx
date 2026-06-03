@@ -747,7 +747,7 @@ export function MainLayout() {
 
   const requestAppExit = useCallback(() => {
     if (confirmExitWithOpenTabs()) {
-      void exitApp();
+      void exitApp().catch(() => undefined);
     }
   }, [confirmExitWithOpenTabs]);
 
@@ -755,12 +755,12 @@ export function MainLayout() {
     const appWindow = getCurrentWindow();
     let unlisten: (() => void) | undefined;
 
-    void appWindow.onCloseRequested(async (event) => {
+    void appWindow.onCloseRequested((event) => {
+      event.preventDefault();
       if (!confirmExitWithOpenTabs()) {
-        event.preventDefault();
         return;
       }
-      await exitApp().catch(() => {});
+      void exitApp().catch(() => undefined);
     }).then((fn) => {
       unlisten = fn;
     });
@@ -1503,7 +1503,7 @@ export function MainLayout() {
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       <WindowResizeHandles />
-      {!compactMode && !chromeHidden && <AppTitleBar />}
+      {!compactMode && !chromeHidden && <AppTitleBar onClose={requestAppExit} />}
       {!compactMode && !chromeHidden && (
         <>
           <MenuBar activeTabClosable={!!activeTab?.closable} onCommand={handleCommand} />
@@ -1529,6 +1529,7 @@ export function MainLayout() {
           }
           onConnectSession={handleConnectSession}
           onOpenSessionEditor={() => handleNewSession()}
+          onCloseWindow={requestAppExit}
         />
       )}
 
