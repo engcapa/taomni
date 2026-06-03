@@ -7,6 +7,7 @@ import { FileBrowser } from "./FileBrowser";
 import { useSftpStore, type PaneState } from "../../stores/sftpStore";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 import type { FileEntry } from "../../lib/sftp";
+import { setLocale } from "../../lib/i18n";
 
 const controllerMocks = vi.hoisted(() => ({
   upload: vi.fn(async () => undefined),
@@ -127,6 +128,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useSftpStore.setState({ sessions: {} });
+  setLocale("en");
   vi.clearAllMocks();
 });
 
@@ -610,6 +612,73 @@ describe("FileBrowser → FilePanel toolbar wiring", () => {
         value: originalElementFromPoint,
       });
     }
+  });
+
+  it("opens an in-app text dialog for remote New file and creates after confirmation", async () => {
+    const user = userEvent.setup();
+    const promptSpy = vi.spyOn(window, "prompt").mockImplementation(() => {
+      throw new Error("native prompt should not be used");
+    });
+    seedSession();
+    renderBrowser();
+
+    const remotePanel = screen.getByText("REMOTE").closest("div.h-full") as HTMLElement;
+    await user.click(within(remotePanel).getByTestId("sftp-remote-new-file"));
+
+    expect(screen.getByTestId("text-input-dialog")).toBeInTheDocument();
+    const input = screen.getByTestId("text-input-dialog-input");
+    await user.clear(input);
+    await user.type(input, "remote-created.txt");
+    await user.click(screen.getByTestId("text-input-dialog-confirm"));
+
+    expect(controllerMocks.createFile).toHaveBeenCalledWith(
+      "/work",
+      "remote-created.txt",
+      "remote",
+    );
+    expect(promptSpy).not.toHaveBeenCalled();
+    promptSpy.mockRestore();
+  });
+
+  it("opens an in-app confirm dialog for remote Delete and removes only after confirmation", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockImplementation(() => {
+      throw new Error("native confirm should not be used");
+    });
+    seedSession();
+    renderBrowser();
+
+    const remotePanel = screen.getByText("REMOTE").closest("div.h-full") as HTMLElement;
+    await user.click(within(remotePanel).getByText("notes.txt"));
+    await user.click(within(remotePanel).getByTestId("sftp-remote-delete"));
+
+    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("confirm-dialog-message")).toHaveTextContent("Delete remote: notes.txt?");
+    expect(controllerMocks.remove).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    expect(controllerMocks.remove).toHaveBeenCalledWith("/work/notes.txt", "remote", true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("opens remote New folder from the toolbar in Chinese without relying on English menu text", async () => {
+    const user = userEvent.setup();
+    setLocale("zh-CN");
+    seedSession();
+    renderBrowser();
+
+    const remotePanel = screen.getByText("REMOTE").closest("div.h-full") as HTMLElement;
+    await user.click(within(remotePanel).getByTestId("sftp-remote-new-folder"));
+
+    expect(screen.getByTestId("text-input-dialog")).toBeInTheDocument();
+    const input = screen.getByTestId("text-input-dialog-input");
+    await user.clear(input);
+    await user.type(input, "remote-dir");
+    await user.click(screen.getByTestId("text-input-dialog-confirm"));
+
+    expect(controllerMocks.mkdir).toHaveBeenCalledWith("/work", "remote-dir", "remote");
   });
 
   it("wires the local-pane context Upload action to the full multi-selection", async () => {

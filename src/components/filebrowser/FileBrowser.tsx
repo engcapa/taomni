@@ -29,6 +29,7 @@ import type { MenuItem } from "../ContextMenu";
 import { MfaPrompt } from "../session/MfaPrompt";
 import { useAppStore } from "../../stores/appStore";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
 
 type Orientation = "horizontal" | "vertical";
 
@@ -88,6 +89,8 @@ export function FileBrowser(props: FileBrowserProps) {
   const navigate = useSftpStore((s) => s.navigate);
   const setStatus = useAppStore((s) => s.setStatusMessage);
   const controller = useSftpController(props.sessionId);
+  const { confirm: confirmDialog, render: confirmDialogRender } = useConfirmDialog();
+  const { promptText, render: textInputDialogRender } = useTextInputDialog();
 
   const [downloadPrompt, setDownloadPrompt] = useState<FileEntry | null>(null);
   const [previewing, setPreviewing] = useState<{ entry: FileEntry; side: FsSide; text: string } | null>(null);
@@ -324,6 +327,67 @@ export function FileBrowser(props: FileBrowserProps) {
     [navigate, props.sessionId, setStatus, t],
   );
 
+  const renameEntry = useCallback(
+    async (entry: FileEntry, side: FsSide) => {
+      const next = await promptText({
+        title: t("fileBrowser.promptRenameTitle"),
+        initialValue: entry.name,
+      });
+      if (next && next !== entry.name) {
+        void controller.rename(entry.path, next, side);
+      }
+    },
+    [controller, promptText, t],
+  );
+
+  const deleteEntries = useCallback(
+    async (entries: FileEntry[], side: FsSide) => {
+      if (entries.length === 0) return;
+      const summary = entries.length === 1
+        ? entries[0].name
+        : t("fileBrowser.summaryItems", { count: entries.length });
+      const message = side === "remote"
+        ? t("fileBrowser.confirmDeleteRemoteSummary", { summary })
+        : t("fileBrowser.confirmDeleteSummary", { summary });
+      const confirmed = await confirmDialog({
+        message,
+        confirmLabel: t("common.delete"),
+        danger: true,
+      });
+      if (!confirmed) return;
+      for (const entry of entries) {
+        void controller.remove(entry.path, side, true);
+      }
+    },
+    [confirmDialog, controller, t],
+  );
+
+  const createFolder = useCallback(
+    async (side: FsSide) => {
+      const name = await promptText({
+        title: t("fileBrowser.promptNewFolderTitle"),
+        initialValue: t("fileBrowser.promptNewFolderDefault"),
+      });
+      if (!name) return;
+      const dir = side === "remote" ? session?.remote.path ?? "/" : session?.local.path ?? "";
+      void controller.mkdir(dir, name, side);
+    },
+    [controller, promptText, session?.local.path, session?.remote.path, t],
+  );
+
+  const createFile = useCallback(
+    async (side: FsSide) => {
+      const name = await promptText({
+        title: t("fileBrowser.promptNewFileTitle"),
+        initialValue: t("fileBrowser.promptNewFileDefault"),
+      });
+      if (!name) return;
+      const dir = side === "remote" ? session?.remote.path ?? "/" : session?.local.path ?? "";
+      void controller.createFile(dir, name, side);
+    },
+    [controller, promptText, session?.local.path, session?.remote.path, t],
+  );
+
   const localContext = useCallback(
     (entry: FileEntry, _anchor: { x: number; y: number }, selectedEntries: FileEntry[]): MenuItem[] => {
       const targets = selectedEntries.length > 0 ? selectedEntries : [entry];
@@ -351,12 +415,7 @@ export function FileBrowser(props: FileBrowserProps) {
       if (!multi) {
         items.push({
           label: t("fileBrowser.contextRename"),
-          onClick: () => {
-            const next = window.prompt(t("fileBrowser.promptRenameTitle"), target.name);
-            if (next && next !== target.name) {
-              void controller.rename(target.path, next, "local");
-            }
-          },
+          onClick: () => void renameEntry(target, "local"),
         });
       }
       items.push({
@@ -365,19 +424,12 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       items.push({
         label: multi ? t("fileBrowser.contextDeleteCount", { count: targets.length }) : t("fileBrowser.contextDelete"),
-        onClick: () => {
-          const summary = multi ? t("fileBrowser.summaryItems", { count: targets.length }) : target.name;
-          if (window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) {
-            for (const item of targets) {
-              void controller.remove(item.path, "local", true);
-            }
-          }
-        },
+        onClick: () => void deleteEntries(targets, "local"),
         danger: true,
       });
       return items;
     },
-    [controller, handleOpenLocal, session?.remote.path, t],
+    [controller, deleteEntries, handleOpenLocal, renameEntry, session?.remote.path, t],
   );
 
   const remoteContext = useCallback(
@@ -408,12 +460,7 @@ export function FileBrowser(props: FileBrowserProps) {
       if (!multi) {
         items.push({
           label: t("fileBrowser.contextRename"),
-          onClick: () => {
-            const next = window.prompt(t("fileBrowser.promptRenameTitle"), target.name);
-            if (next && next !== target.name) {
-              void controller.rename(target.path, next, "remote");
-            }
-          },
+          onClick: () => void renameEntry(target, "remote"),
         });
       }
       items.push({
@@ -422,59 +469,40 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       items.push({
         label: multi ? t("fileBrowser.contextDeleteCount", { count: targets.length }) : t("fileBrowser.contextDelete"),
-        onClick: () => {
-          const summary = multi ? t("fileBrowser.summaryItems", { count: targets.length }) : target.name;
-          if (window.confirm(t("fileBrowser.confirmDeleteRemoteSummary", { summary }))) {
-            for (const item of targets) {
-              void controller.remove(item.path, "remote", true);
-            }
-          }
-        },
+        onClick: () => void deleteEntries(targets, "remote"),
         danger: true,
       });
       return items;
     },
-    [controller, session?.local.path, t],
+    [controller, deleteEntries, renameEntry, session?.local.path, t],
   );
 
   const localEmptyContext = useCallback(
     (): MenuItem[] => [
       {
         label: t("fileBrowser.contextNewFolder"),
-        onClick: () => {
-          const name = window.prompt(t("fileBrowser.promptNewFolderTitle"), t("fileBrowser.promptNewFolderDefault"));
-          if (name) void controller.mkdir(session?.local.path ?? "", name, "local");
-        },
+        onClick: () => void createFolder("local"),
       },
       {
         label: t("fileBrowser.contextNewFile"),
-        onClick: () => {
-          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
-          if (name) void controller.createFile(session?.local.path ?? "", name, "local");
-        },
+        onClick: () => void createFile("local"),
       },
     ],
-    [controller, session?.local.path, t],
+    [createFile, createFolder, t],
   );
 
   const remoteEmptyContext = useCallback(
     (): MenuItem[] => [
       {
         label: t("fileBrowser.contextNewFolder"),
-        onClick: () => {
-          const name = window.prompt(t("fileBrowser.promptNewFolderTitle"), t("fileBrowser.promptNewFolderDefault"));
-          if (name) void controller.mkdir(session?.remote.path ?? "/", name, "remote");
-        },
+        onClick: () => void createFolder("remote"),
       },
       {
         label: t("fileBrowser.contextNewFile"),
-        onClick: () => {
-          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
-          if (name) void controller.createFile(session?.remote.path ?? "/", name, "remote");
-        },
+        onClick: () => void createFile("remote"),
       },
     ],
-    [controller, session?.remote.path, t],
+    [createFile, createFolder, t],
   );
 
   const handleLocalFiles = useCallback(
@@ -660,14 +688,7 @@ export function FileBrowser(props: FileBrowserProps) {
               onUploadFromDisk={(files) => void handleLocalFiles(files)}
               onUploadPathsFromDisk={(paths) => void handleLocalPaths(paths)}
               onDeleteSelected={(entries) => {
-                if (entries.length === 0) return;
-                const summary = entries.length === 1
-                  ? entries[0].name
-                  : t("fileBrowser.summaryItems", { count: entries.length });
-                if (!window.confirm(t("fileBrowser.confirmDeleteRemoteSummary", { summary }))) return;
-                for (const entry of entries) {
-                  void controller.remove(entry.path, "remote", true);
-                }
+                void deleteEntries(entries, "remote");
               }}
               onChmodSelected={(entries) => {
                 if (entries.length === 0) return;
@@ -688,10 +709,8 @@ export function FileBrowser(props: FileBrowserProps) {
                   }
                 })();
               }}
-              onNewFile={() => {
-                const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
-                if (name) void controller.createFile(session?.remote.path ?? "/", name, "remote");
-              }}
+              onNewFolder={() => void createFolder("remote")}
+              onNewFile={() => void createFile("remote")}
               onOpenTerminalHere={props.onOpenTerminalHere}
             />
           </Panel>
@@ -734,14 +753,7 @@ export function FileBrowser(props: FileBrowserProps) {
                 }
               }}
               onDeleteSelected={(entries) => {
-                if (entries.length === 0) return;
-                const summary = entries.length === 1
-                  ? entries[0].name
-                  : t("fileBrowser.summaryItems", { count: entries.length });
-                if (!window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) return;
-                for (const entry of entries) {
-                  void controller.remove(entry.path, "local", true);
-                }
+                void deleteEntries(entries, "local");
               }}
               onChmodSelected={(entries) => {
                 if (entries.length === 0) return;
@@ -762,10 +774,8 @@ export function FileBrowser(props: FileBrowserProps) {
                   }
                 })();
               }}
-              onNewFile={() => {
-                const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
-                if (name) void controller.createFile(session?.local.path ?? "", name, "local");
-              }}
+              onNewFolder={() => void createFolder("local")}
+              onNewFile={() => void createFile("local")}
             />
           </Panel>
         </PanelGroup>
@@ -838,6 +848,9 @@ export function FileBrowser(props: FileBrowserProps) {
           onClose={() => setPreviewing(null)}
         />
       )}
+
+      {confirmDialogRender}
+      {textInputDialogRender}
 
       {mfaPrompt && (
         <MfaPrompt

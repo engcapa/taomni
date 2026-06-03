@@ -101,6 +101,7 @@ interface FilePanelProps {
   onDeleteSelected?: (entries: FileEntry[]) => void;
   onChmodSelected?: (entries: FileEntry[]) => void;
   onPreviewSelected?: (entry: FileEntry) => void;
+  onNewFolder?: () => void;
   onNewFile?: () => void;
   onOpenTerminalHere?: (path: string) => void;
   /** Local pane only: open selected files/dirs with the system default app. */
@@ -134,6 +135,7 @@ export function FilePanel({
   onDeleteSelected,
   onChmodSelected,
   onPreviewSelected,
+  onNewFolder,
   onNewFile,
   onOpenTerminalHere,
   onOpenLocalSelected,
@@ -409,6 +411,10 @@ export function FilePanel({
   };
 
   const handleMkdir = () => {
+    if (onNewFolder) {
+      onNewFolder();
+      return;
+    }
     if (!onEmptyContext) return;
     const items = onEmptyContext({ x: 0, y: 0 });
     const mkdirItem = items.find((it) => it.label.toLowerCase().includes("folder"));
