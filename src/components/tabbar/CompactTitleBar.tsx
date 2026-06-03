@@ -30,6 +30,7 @@ interface CompactTitleBarProps {
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
   onConnectSession: (session: SessionConfig) => void;
   onOpenSessionEditor: () => void;
+  onCloseWindow?: () => void;
 }
 
 export function CompactTitleBar({
@@ -39,6 +40,7 @@ export function CompactTitleBar({
   onStartLocalTerminal,
   onConnectSession,
   onOpenSessionEditor,
+  onCloseWindow,
 }: CompactTitleBarProps) {
   const ctx = useContextMenu();
   const t = useT();
@@ -105,7 +107,7 @@ export function CompactTitleBar({
       </div>
       <div data-window-drag className="w-10 self-stretch shrink-0" />
       <TitleBarTrayControls />
-      <WindowControls />
+      <WindowControls onClose={onCloseWindow} />
     </div>
   );
 }

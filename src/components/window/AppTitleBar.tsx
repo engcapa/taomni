@@ -3,7 +3,11 @@ import { WindowControls } from "./WindowControls";
 import { TitleBarTrayControls } from "./TitleBarTrayControls";
 import { useT } from "../../lib/i18n";
 
-export function AppTitleBar() {
+interface AppTitleBarProps {
+  onClose?: () => void;
+}
+
+export function AppTitleBar({ onClose }: AppTitleBarProps) {
   const t = useT();
   const startDrag = (event: React.MouseEvent) => {
     if (event.button !== 0) return;
@@ -26,7 +30,7 @@ export function AppTitleBar() {
       <div className="w-28 shrink-0" />
       <div className="flex-1 text-center text-[12px] font-semibold truncate">{t("app.title")}</div>
       <TitleBarTrayControls />
-      <WindowControls />
+      <WindowControls onClose={onClose} />
     </div>
   );
 }
