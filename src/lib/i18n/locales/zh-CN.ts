@@ -44,6 +44,7 @@ export const zhCN: DeepPartial<typeof en> = {
     new: "新建",
     backToTop: "回到顶部",
     error: "错误",
+    message: "消息",
   },
   window: {
     minimize: "最小化",

@@ -32,6 +32,7 @@ import {
 } from "../../lib/sessionImportExport";
 import { SessionImportPreview } from "../session/SessionImportPreview";
 import { useT, t as translate } from "../../lib/i18n";
+import { alertAppDialog } from "../../lib/appDialogs";
 
 interface MenuBarProps {
   activeTabClosable: boolean;
@@ -134,7 +135,13 @@ export function MenuBar({ activeTabClosable, onCommand }: MenuBarProps) {
       warnings: warningSuffix,
     }));
     if (result.warnings.length) {
-      window.alert(result.warnings.slice(0, 8).join("\n"));
+      void alertAppDialog({
+        title: translate("status.warnings", {
+          count: result.warnings.length,
+          plural: result.warnings.length === 1 ? "" : "s",
+        }),
+        message: result.warnings.slice(0, 8).join("\n"),
+      });
     }
   };
 
@@ -282,5 +289,8 @@ function importStatusMessage(source: string, result: SessionImportResult): strin
 }
 
 function reportError(error: unknown) {
-  window.alert(error instanceof Error ? error.message : String(error));
+  void alertAppDialog({
+    title: translate("common.error"),
+    message: error instanceof Error ? error.message : String(error),
+  });
 }

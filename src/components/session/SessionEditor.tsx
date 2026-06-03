@@ -56,6 +56,7 @@ import {
   normalizeGroupPath,
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
+import { promptAppDialog } from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import {
   getSessionTerminalProfile,
@@ -1655,8 +1656,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
-  const handleNewFolder = () => {
-    const next = window.prompt(t("sessionEditor2.promptNewFolder"), groupPath || t("sessionEditor2.promptNewFolderDefault"));
+  const handleNewFolder = async () => {
+    const next = await promptAppDialog({
+      title: t("sessionEditor2.promptNewFolder"),
+      initialValue: groupPath || t("sessionEditor2.promptNewFolderDefault"),
+      allowEmpty: true,
+    });
     const normalized = normalizeGroupPath(next);
     if (!normalized) return;
     setGroupPath(toStoredGroupPath(normalized) ?? "");

@@ -7,6 +7,7 @@ import { sftpOpenPath, effectiveFileType, type FileEntry } from "../../lib/sftp"
 import { useAppStore } from "../../stores/appStore";
 import type { MenuItem } from "../ContextMenu";
 import { useT } from "../../lib/i18n";
+import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
 
 interface Props {
   /** Stable id used to namespace this tab's pane state in `sftpStore`. */
@@ -28,6 +29,8 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
   const navigate = useSftpStore((s) => s.navigate);
   const setStatus = useAppStore((s) => s.setStatusMessage);
   const controller = useSftpController(tabId);
+  const { confirm: confirmDialog, render: confirmDialogRender } = useConfirmDialog();
+  const { promptText, render: textInputDialogRender } = useTextInputDialog();
 
   const [chmodPrompt, setChmodPrompt] = useState<{ entries: FileEntry[] } | null>(null);
   const [filterText, setFilterText] = useState("");
@@ -71,6 +74,60 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
     }
   }, [navigate, setStatus, tabId, t]);
 
+  const renameEntry = useCallback(
+    async (entry: FileEntry) => {
+      const next = await promptText({
+        title: t("fileBrowser.promptRenameTitle"),
+        initialValue: entry.name,
+      });
+      if (next && next !== entry.name) {
+        void controller.rename(entry.path, next, "local");
+      }
+    },
+    [controller, promptText, t],
+  );
+
+  const deleteEntries = useCallback(
+    async (entries: FileEntry[]) => {
+      if (entries.length === 0) return;
+      const summary = entries.length === 1
+        ? entries[0].name
+        : t("fileBrowser.summaryItems", { count: entries.length });
+      const confirmed = await confirmDialog({
+        message: t("fileBrowser.confirmDeleteSummary", { summary }),
+        confirmLabel: t("common.delete"),
+        danger: true,
+      });
+      if (!confirmed) return;
+      for (const entry of entries) {
+        void controller.remove(entry.path, "local", true);
+      }
+    },
+    [confirmDialog, controller, t],
+  );
+
+  const createFolder = useCallback(
+    async () => {
+      const name = await promptText({
+        title: t("fileBrowser.promptNewFolderTitle"),
+        initialValue: t("fileBrowser.promptNewFolderDefault"),
+      });
+      if (name) void controller.mkdir(session?.local.path ?? "", name, "local");
+    },
+    [controller, promptText, session?.local.path, t],
+  );
+
+  const createFile = useCallback(
+    async () => {
+      const name = await promptText({
+        title: t("fileBrowser.promptNewFileTitle"),
+        initialValue: t("fileBrowser.promptNewFileDefault"),
+      });
+      if (name) void controller.createFile(session?.local.path ?? "", name, "local");
+    },
+    [controller, promptText, session?.local.path, t],
+  );
+
   const localContext = useCallback(
     (entry: FileEntry, _anchor: { x: number; y: number }, selectedEntries: FileEntry[]): MenuItem[] => {
       const targets = selectedEntries.length > 0 ? selectedEntries : [entry];
@@ -98,12 +155,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
       if (!multi) {
         items.push({
           label: t("fileBrowser.contextRename"),
-          onClick: () => {
-            const next = window.prompt(t("fileBrowser.promptRenameTitle"), target.name);
-            if (next && next !== target.name) {
-              void controller.rename(target.path, next, "local");
-            }
-          },
+          onClick: () => void renameEntry(target),
         });
       }
       items.push({
@@ -112,36 +164,23 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
       });
       items.push({
         label: multi ? t("fileBrowser.contextDeleteCount", { count: targets.length }) : t("fileBrowser.contextDelete"),
-        onClick: () => {
-          const summary = multi ? t("fileBrowser.summaryItems", { count: targets.length }) : target.name;
-          if (window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) {
-            for (const item of targets) {
-              void controller.remove(item.path, "local", true);
-            }
-          }
-        },
+        onClick: () => void deleteEntries(targets),
         danger: true,
       });
       return items;
     },
-    [controller, handleOpen, session?.local.path, setStatus, t],
+    [deleteEntries, handleOpen, renameEntry, session?.local.path, setStatus, t],
   );
 
   const localEmptyContext = useCallback(
     (): MenuItem[] => [
       {
         label: t("fileBrowser.contextNewFolder"),
-        onClick: () => {
-          const name = window.prompt(t("fileBrowser.promptNewFolderTitle"), t("fileBrowser.promptNewFolderDefault"));
-          if (name) void controller.mkdir(session?.local.path ?? "", name, "local");
-        },
+        onClick: () => void createFolder(),
       },
       {
         label: t("fileBrowser.contextNewFile"),
-        onClick: () => {
-          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
-          if (name) void controller.createFile(session?.local.path ?? "", name, "local");
-        },
+        onClick: () => void createFile(),
       },
       {
         label: t("fileBrowser.contextRefresh"),
@@ -157,7 +196,7 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
         },
       },
     ],
-    [controller, session?.local.path, setStatus, tabId, t],
+    [createFile, createFolder, session?.local.path, setStatus, tabId, t],
   );
 
   if (!session?.attached) {
@@ -187,23 +226,14 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
         filterText={filterText}
         onFilterTextChange={setFilterText}
         onDeleteSelected={(entries) => {
-          if (entries.length === 0) return;
-          const summary = entries.length === 1
-            ? entries[0].name
-            : t("fileBrowser.summaryItems", { count: entries.length });
-          if (!window.confirm(t("fileBrowser.confirmDeleteSummary", { summary }))) return;
-          for (const entry of entries) {
-            void controller.remove(entry.path, "local", true);
-          }
+          void deleteEntries(entries);
         }}
         onChmodSelected={(entries) => {
           if (entries.length === 0) return;
           setChmodPrompt({ entries });
         }}
-        onNewFile={() => {
-          const name = window.prompt(t("fileBrowser.promptNewFileTitle"), t("fileBrowser.promptNewFileDefault"));
-          if (name) void controller.createFile(session?.local.path ?? "", name, "local");
-        }}
+        onNewFolder={() => void createFolder()}
+        onNewFile={() => void createFile()}
       />
 
       {chmodPrompt && (
@@ -222,6 +252,8 @@ export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
           }}
         />
       )}
+      {confirmDialogRender}
+      {textInputDialogRender}
     </div>
   );
 }
