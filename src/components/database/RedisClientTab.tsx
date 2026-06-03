@@ -8,6 +8,7 @@ import { RedisValuePanel } from "./RedisValuePanel";
 import { RedisCli } from "./RedisCli";
 import { RedisNewKeyDialog } from "./RedisNewKeyDialog";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
+import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 
 interface RedisClientTabProps {
   tabId: string;
@@ -123,13 +124,23 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
                     onSelectKey={setSelectedKey}
                     onAddKey={() => setShowNewKey(true)}
                     onDeleteKey={async (key) => {
-                      if (!window.confirm(`Delete key "${key}"?`)) return;
+                      const confirmed = await confirmAppDialog({
+                        message: `Delete key "${key}"?`,
+                        confirmLabel: "Delete",
+                        danger: true,
+                      });
+                      if (!confirmed) return;
                       await redisDelKey(sessionId, key).catch(() => undefined);
                       if (selectedKey === key) setSelectedKey(null);
                       reload();
                     }}
                     onSetTtl={async (key) => {
-                      const input = window.prompt(`Set TTL (seconds) for "${key}" (-1 = persist):`, "60");
+                      const input = await promptAppDialog({
+                        title: "Set TTL",
+                        label: `Set TTL (seconds) for "${key}" (-1 = persist):`,
+                        initialValue: "60",
+                        allowEmpty: true,
+                      });
                       if (input === null) return;
                       const secs = parseInt(input, 10);
                       if (Number.isNaN(secs)) return;

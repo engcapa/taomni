@@ -24,6 +24,7 @@ import {
 } from "../../lib/systemFonts";
 import { historyClear } from "../../lib/ipc";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import { confirmAppDialog } from "../../lib/appDialogs";
 
 interface TerminalAppearanceSettingsProps {
   profile: TerminalProfile;
@@ -471,8 +472,13 @@ export function TerminalAppearanceSettings({
               type="button"
               className="taomni-btn h-8 px-2 text-[11px]"
               disabled={clearingHistory}
-              onClick={() => {
-                if (!window.confirm(t("terminalAppearance.clearAllHistoryConfirm"))) {
+              onClick={async () => {
+                const confirmed = await confirmAppDialog({
+                  message: t("terminalAppearance.clearAllHistoryConfirm"),
+                  confirmLabel: t("common.delete"),
+                  danger: true,
+                });
+                if (!confirmed) {
                   return;
                 }
                 setClearingHistory(true);

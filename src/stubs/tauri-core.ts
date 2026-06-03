@@ -41,6 +41,7 @@ import {
   VFS_ROOT,
 } from "./localVfs";
 import { emit } from "./tauri-event";
+import { promptAppDialog } from "../lib/appDialogs";
 
 const SESSION_STORAGE_KEY = "taomni.sessions.v1";
 const GROUP_STORAGE_KEY = "taomni.groups.v1";
@@ -271,32 +272,56 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "select_private_key_file": {
       const current = (args?.currentPath as string | null) || "~/.ssh/id_ed25519";
-      const selected = window.prompt("Private key path", current);
+      const selected = await promptAppDialog({
+        title: "Private key path",
+        initialValue: current,
+        allowEmpty: true,
+      });
       return (selected?.trim() || null) as T;
     }
     case "select_upload_file": {
-      const selected = window.prompt("Upload file path in browser VFS", VFS_ROOT);
+      const selected = await promptAppDialog({
+        title: "Upload file path in browser VFS",
+        initialValue: VFS_ROOT,
+        allowEmpty: true,
+      });
       return (selected?.trim() ? [selected.trim()] : []) as T;
     }
     case "select_save_directory": {
       const current = ((args as InvokeArgs | undefined)?.currentPath as string | null) || VFS_ROOT;
-      const selected = window.prompt("Save directory in browser VFS", current);
+      const selected = await promptAppDialog({
+        title: "Save directory in browser VFS",
+        initialValue: current,
+        allowEmpty: true,
+      });
       return (selected?.trim() || null) as T;
     }
     case "select_save_file_path": {
       const defaultName = ((args as InvokeArgs | undefined)?.defaultName as string | null) || "capture.png";
       const current = ((args as InvokeArgs | undefined)?.currentPath as string | null) || `${VFS_ROOT}/${defaultName}`;
-      const selected = window.prompt("Save file path in browser VFS", current);
+      const selected = await promptAppDialog({
+        title: "Save file path in browser VFS",
+        initialValue: current,
+        allowEmpty: true,
+      });
       return (selected?.trim() || null) as T;
     }
     case "select_file_path": {
       const current = ((args as InvokeArgs | undefined)?.currentPath as string | null) || VFS_ROOT;
-      const selected = window.prompt("File path in browser VFS", current);
+      const selected = await promptAppDialog({
+        title: "File path in browser VFS",
+        initialValue: current,
+        allowEmpty: true,
+      });
       return (selected?.trim() || null) as T;
     }
     case "select_folder_path": {
       const current = ((args as InvokeArgs | undefined)?.currentPath as string | null) || VFS_ROOT;
-      const selected = window.prompt("Folder path in browser VFS", current);
+      const selected = await promptAppDialog({
+        title: "Folder path in browser VFS",
+        initialValue: current,
+        allowEmpty: true,
+      });
       return (selected?.trim() || null) as T;
     }
     case "read_file_bytes": {

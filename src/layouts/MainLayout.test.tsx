@@ -337,31 +337,29 @@ describe("MainLayout attached SFTP sidebar", () => {
   });
 
   it("routes titlebar close through the app exit command", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-
     render(<MainLayout />);
 
     fireEvent.click(screen.getByTestId("window-close"));
 
+    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
     await waitFor(() => {
       expect(exitApp).toHaveBeenCalledTimes(1);
     });
-    expect(confirmSpy).toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it("routes ribbon exit through the app exit command", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-
     render(<MainLayout />);
 
     fireEvent.click(screen.getByTestId("mock-ribbon-exit"));
 
+    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
     await waitFor(() => {
       expect(exitApp).toHaveBeenCalledTimes(1);
     });
-    expect(confirmSpy).toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it("opens compact main menu and sessions drawer from the titlebar", () => {

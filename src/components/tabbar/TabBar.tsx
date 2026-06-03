@@ -22,7 +22,7 @@ import {
   History,
   FilePlus,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -42,8 +42,28 @@ import {
 import { getAppPlatform } from "../../lib/runtime";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
+type TabScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean };
 
 const TAB_DRAG_MIME = "taomni/tab";
+const TAB_SCROLL_EDGE_TOLERANCE = 1;
+const TAB_SCROLL_PADDING = 8;
+const TAB_SCROLL_STEP_MIN = 160;
+
+function maxScrollLeft(el: HTMLElement): number {
+  return Math.max(0, el.scrollWidth - el.clientWidth);
+}
+
+function setTabScrollLeft(el: HTMLElement, left: number) {
+  const next = Math.max(0, Math.min(left, maxScrollLeft(el)));
+  el.scrollLeft = next;
+  if (typeof el.scrollTo === "function") {
+    try {
+      el.scrollTo({ left: next });
+    } catch {
+      // The assigned scrollLeft above is enough for older WebViews and tests.
+    }
+  }
+}
 
 interface TabBarProps {
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
@@ -82,6 +102,50 @@ export function TabBar({
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [shellsLoaded, setShellsLoaded] = useState(false);
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+  const tabElementRefs = useRef(new Map<string, HTMLDivElement>());
+  const [tabScrollState, setTabScrollState] = useState<TabScrollState>({
+    overflow: false,
+    atStart: true,
+    atEnd: true,
+  });
+
+  const setTabElement = useCallback((tabId: string, node: HTMLDivElement | null) => {
+    if (node) {
+      tabElementRefs.current.set(tabId, node);
+    } else {
+      tabElementRefs.current.delete(tabId);
+    }
+  }, []);
+
+  const updateTabScrollState = useCallback(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    const maxLeft = maxScrollLeft(el);
+    const next: TabScrollState = {
+      overflow: maxLeft > TAB_SCROLL_EDGE_TOLERANCE,
+      atStart: el.scrollLeft <= TAB_SCROLL_EDGE_TOLERANCE,
+      atEnd: el.scrollLeft >= maxLeft - TAB_SCROLL_EDGE_TOLERANCE,
+    };
+    setTabScrollState((prev) =>
+      prev.overflow === next.overflow &&
+      prev.atStart === next.atStart &&
+      prev.atEnd === next.atEnd
+        ? prev
+        : next,
+    );
+  }, []);
+
+  const scrollTabsBy = useCallback(
+    (direction: "left" | "right") => {
+      const el = tabScrollRef.current;
+      if (!el) return;
+      const delta = Math.max(TAB_SCROLL_STEP_MIN, Math.floor(el.clientWidth * 0.8));
+      setTabScrollLeft(el, el.scrollLeft + (direction === "right" ? delta : -delta));
+      updateTabScrollState();
+    },
+    [updateTabScrollState],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +173,47 @@ export function TabBar({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    updateTabScrollState();
+  }, [tabs, updateTabScrollState]);
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    updateTabScrollState();
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => updateTabScrollState());
+    resizeObserver?.observe(el);
+    window.addEventListener("resize", updateTabScrollState);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateTabScrollState);
+    };
+  }, [updateTabScrollState]);
+
+  useEffect(() => {
+    const container = tabScrollRef.current;
+    const activeEl = activeTabId ? tabElementRefs.current.get(activeTabId) : null;
+    if (!container || !activeEl) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = activeEl.getBoundingClientRect();
+    const tabLeft = activeRect.left - containerRect.left + container.scrollLeft;
+    const tabRight = activeRect.right - containerRect.left + container.scrollLeft;
+    const visibleLeft = container.scrollLeft;
+    const visibleRight = visibleLeft + container.clientWidth;
+
+    if (tabLeft < visibleLeft + TAB_SCROLL_PADDING) {
+      setTabScrollLeft(container, tabLeft - TAB_SCROLL_PADDING);
+    } else if (tabRight > visibleRight - TAB_SCROLL_PADDING) {
+      setTabScrollLeft(container, tabRight - container.clientWidth + TAB_SCROLL_PADDING);
+    }
+    updateTabScrollState();
+  }, [activeTabId, tabs, updateTabScrollState]);
 
   const mergedShells = useMemo<LocalShellOption[]>(() => {
     if (wslDistros.length === 0) return localShells;
@@ -311,64 +416,90 @@ export function TabBar({
     <div
       data-testid="tab-bar"
       data-compact={compactMode}
-      className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0"
+      className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0 overflow-hidden"
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
       {ctx.render}
-      {tabs.map((tab) => {
-        const isSelected = multiExecActive && tab.type === "terminal" && multiExecSelectedTabIds.has(tab.id);
-        const dropSide = dropIndicator && dropIndicator.tabId === tab.id ? dropIndicator.side : undefined;
-        return (
-          <TabItem
-            key={tab.id}
-            tab={tab}
-            translate={t}
-            active={activeTabId === tab.id}
-            multiExecSelected={!!isSelected}
-            multiExecActive={multiExecActive}
-            dragging={draggedId === tab.id}
-            draggedId={draggedId}
-            dropSide={dropSide}
-            editing={editingTabId === tab.id}
-            draftTitle={draftTitle}
-            onStartDrag={handleTabPointerDown}
-            onDragOverTab={(t, rect, clientX) => {
-              if (!draggedId || draggedId === t.id) {
-                setDropIndicator(null);
-                return;
+      {tabScrollState.overflow && (
+        <IconBtn
+          testId="tab-scroll-left"
+          title={t("tabs.scrollLeft")}
+          icon={<ChevronLeft className="w-3.5 h-3.5" />}
+          onClick={() => scrollTabsBy("left")}
+          disabled={tabScrollState.atStart}
+        />
+      )}
+      <div
+        ref={tabScrollRef}
+        data-testid="tab-scroll-area"
+        className="taomni-tab-scroll flex items-end min-w-0 overflow-x-auto overflow-y-hidden"
+        onScroll={updateTabScrollState}
+      >
+        {tabs.map((tab) => {
+          const isSelected = multiExecActive && tab.type === "terminal" && multiExecSelectedTabIds.has(tab.id);
+          const dropSide = dropIndicator && dropIndicator.tabId === tab.id ? dropIndicator.side : undefined;
+          return (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              translate={t}
+              active={activeTabId === tab.id}
+              multiExecSelected={!!isSelected}
+              multiExecActive={multiExecActive}
+              dragging={draggedId === tab.id}
+              draggedId={draggedId}
+              dropSide={dropSide}
+              editing={editingTabId === tab.id}
+              draftTitle={draftTitle}
+              onElementChange={setTabElement}
+              onStartDrag={handleTabPointerDown}
+              onDragOverTab={(t, rect, clientX) => {
+                if (!draggedId || draggedId === t.id) {
+                  setDropIndicator(null);
+                  return;
+                }
+                const side = computeDropSide(rect, clientX);
+                setDropIndicator((prev) => {
+                  if (prev && prev.tabId === t.id && prev.side === side) return prev;
+                  return { tabId: t.id, side };
+                });
+              }}
+              onDragLeaveTab={(t) =>
+                setDropIndicator((prev) => (prev && prev.tabId === t.id ? null : prev))
               }
-              const side = computeDropSide(rect, clientX);
-              setDropIndicator((prev) => {
-                if (prev && prev.tabId === t.id && prev.side === side) return prev;
-                return { tabId: t.id, side };
-              });
-            }}
-            onDragLeaveTab={(t) =>
-              setDropIndicator((prev) => (prev && prev.tabId === t.id ? null : prev))
-            }
-            onDropOnTab={(t, rect, clientX) => {
-              if (!draggedId) return;
-              const side = computeDropSide(rect, clientX);
-              if (draggedId !== t.id) {
-                moveTab(draggedId, t.id, side);
-              }
-              clearDragState();
-            }}
-            onActivate={(t) => {
-              if (editingTabId === t.id) return;
-              setActiveTab(t.id);
-            }}
-            onMouseDown={handleMouseDown}
-            onContextMenu={handleTabContext}
-            onDraftTitleChange={setDraftTitle}
-            onCommitRename={commitRename}
-            onCancelRename={cancelRename}
-            onStartRename={startRename}
-            onToggleMultiExecTab={toggleMultiExecTab}
-            onRemove={removeTab}
-          />
-        );
-      })}
+              onDropOnTab={(t, rect, clientX) => {
+                if (!draggedId) return;
+                const side = computeDropSide(rect, clientX);
+                if (draggedId !== t.id) {
+                  moveTab(draggedId, t.id, side);
+                }
+                clearDragState();
+              }}
+              onActivate={(t) => {
+                if (editingTabId === t.id) return;
+                setActiveTab(t.id);
+              }}
+              onMouseDown={handleMouseDown}
+              onContextMenu={handleTabContext}
+              onDraftTitleChange={setDraftTitle}
+              onCommitRename={commitRename}
+              onCancelRename={cancelRename}
+              onStartRename={startRename}
+              onToggleMultiExecTab={toggleMultiExecTab}
+              onRemove={removeTab}
+            />
+          );
+        })}
+      </div>
+      {tabScrollState.overflow && (
+        <IconBtn
+          testId="tab-scroll-right"
+          title={t("tabs.scrollRight")}
+          icon={<ChevronRight className="w-3.5 h-3.5" />}
+          onClick={() => scrollTabsBy("right")}
+          disabled={tabScrollState.atEnd}
+        />
+      )}
 
       <div className="flex items-end" data-testid="new-tab-split">
         <button
@@ -464,7 +595,7 @@ function IconBtn({
       title={title}
       aria-label={title}
       data-active={active || undefined}
-      className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-default"
+      className="w-6 h-6 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-default"
       style={active ? { background: "var(--taomni-selected)", color: "var(--taomni-accent)" } : undefined}
       onClick={onClick}
       disabled={disabled}
@@ -486,6 +617,7 @@ interface TabItemProps {
   dropSide: "before" | "after" | undefined;
   editing: boolean;
   draftTitle: string;
+  onElementChange: (id: string, node: HTMLDivElement | null) => void;
   onStartDrag: (e: React.PointerEvent<HTMLDivElement>, tab: Tab, el: HTMLDivElement) => void;
   onDragOverTab: (tab: Tab, rect: DOMRect, clientX: number) => void;
   onDragLeaveTab: (tab: Tab) => void;
@@ -513,6 +645,7 @@ function TabItem(props: TabItemProps) {
     dropSide,
     editing,
     draftTitle,
+    onElementChange,
     onStartDrag,
     onDragOverTab,
     onDragLeaveTab,
@@ -529,6 +662,11 @@ function TabItem(props: TabItemProps) {
   } = props;
 
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onElementChange(tab.id, ref.current);
+    return () => onElementChange(tab.id, null);
+  }, [onElementChange, tab.id]);
 
   useCustomDropTarget<HTMLDivElement>(ref, {
     accepts: (data: CustomDragData) => data.mime === TAB_DRAG_MIME && draggedId !== null,

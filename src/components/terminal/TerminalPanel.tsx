@@ -54,6 +54,7 @@ import {
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
   FT_BUTTON_STYLE,
   FT_BUTTON_ACTIVE_OVERRIDE,
@@ -113,6 +114,7 @@ import { useSuggestionSource } from "../../lib/terminal/aiSuggestionSource";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { promptAppDialog } from "../../lib/appDialogs";
 import {
   NATIVE_FILE_DROP_EVENT,
   type NativeFileDropDetail,
@@ -260,6 +262,7 @@ export function TerminalPanel({
   maximizeToggle,
 }: TerminalPanelProps) {
   const t = useT();
+  const { confirm: confirmPaste, render: pasteConfirmDialog } = useConfirmDialog();
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
@@ -377,6 +380,8 @@ export function TerminalPanel({
   const imeGuardRef = useRef<TerminalImeInputGuard | null>(null);
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
   const suppressNativePasteUntilRef = useRef(0);
+  const middleClickSelectionRef = useRef("");
+  const lastMacMiddlePasteAtRef = useRef(0);
   const lastCwdRequestTokenRef = useRef(cwdRequestToken);
   const quickFontOptions = useMemo(() => {
     const available = fontState.fonts;
@@ -765,24 +770,26 @@ export function TerminalPanel({
     }
   }, [focusTerminal, fontFamily, fontSize, setStatusMessage, themeName, writeClipboardText]);
 
-  const pasteTextIntoTerminal = useCallback((text: string): boolean => {
+  const pasteTextIntoTerminal = useCallback(async (text: string): Promise<boolean> => {
     if (readOnlyRef.current) {
       setStatusMessage("Terminal is read-only");
       return false;
     }
 
     if (!text) return false;
-    if (
-      multilinePasteConfirm &&
-      /\r?\n/.test(text) &&
-      !window.confirm(`Paste ${text.split(/\r?\n/).length} lines into this terminal?`)
-    ) {
-      return false;
+    if (multilinePasteConfirm && /\r?\n/.test(text)) {
+      const lineCount = text.split(/\r?\n/).length;
+      const ok = await confirmPaste({
+        title: t("terminal.multilinePasteTitle"),
+        message: t("terminal.multilinePasteMessage", { count: lineCount }),
+        confirmLabel: t("terminal.paste"),
+      });
+      if (!ok) return false;
     }
     writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
     focusTerminal();
     return true;
-  }, [focusTerminal, multilinePasteConfirm, setStatusMessage, writeBroadcastInput]);
+  }, [confirmPaste, focusTerminal, multilinePasteConfirm, setStatusMessage, t, writeBroadcastInput]);
 
   const pasteFromClipboard = useCallback(async () => {
     if (readOnlyRef.current) {
@@ -791,8 +798,15 @@ export function TerminalPanel({
     }
 
     try {
-      const text = (await clipboardReadText()) || window.prompt("Paste text") || "";
-      pasteTextIntoTerminal(text);
+      const text =
+        (await clipboardReadText()) ||
+        (await promptAppDialog({
+          title: "Paste text",
+          initialValue: "",
+          allowEmpty: true,
+        })) ||
+        "";
+      await pasteTextIntoTerminal(text);
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
     }
@@ -974,9 +988,13 @@ export function TerminalPanel({
     }
   }, [searchValue]);
 
-  const renameTerminal = useCallback(() => {
+  const renameTerminal = useCallback(async () => {
     if (!tabId) return;
-    const nextTitle = window.prompt("Set terminal title", tabTitle);
+    const nextTitle = await promptAppDialog({
+      title: "Set terminal title",
+      initialValue: tabTitle,
+      allowEmpty: true,
+    });
     if (!nextTitle?.trim()) return;
     updateTabTitle(tabId, nextTitle.trim());
     focusTerminal();
@@ -1407,17 +1425,15 @@ export function TerminalPanel({
     rightClickBehavior,
   ]);
 
-  // Middle-click paste: if the terminal has a current selection, paste it at
-  // the cursor; otherwise fall back to the system clipboard. Same behaviour
-  // on Windows, macOS and Linux.
-  const handleMiddleClick = useCallback((event: ReactMouseEvent) => {
-    if (event.button !== 1) return;
-    event.preventDefault();
+  const pasteMiddleClickSelectionOrClipboard = useCallback(() => {
     if (readOnlyRef.current) {
+      middleClickSelectionRef.current = "";
       setStatusMessage("Terminal is read-only");
       return;
     }
-    const selection = termRef.current?.getSelection();
+
+    const selection = termRef.current?.getSelection() || middleClickSelectionRef.current;
+    middleClickSelectionRef.current = "";
     if (selection) {
       writeBroadcastInput(formatPasteForTerminal(termRef.current, selection));
       focusTerminal();
@@ -1426,11 +1442,37 @@ export function TerminalPanel({
     void pasteFromClipboard();
   }, [focusTerminal, pasteFromClipboard, setStatusMessage, writeBroadcastInput]);
 
+  const shouldHandleMacMiddlePaste = useCallback(() => {
+    const now = Date.now();
+    if (now - lastMacMiddlePasteAtRef.current < 250) return false;
+    lastMacMiddlePasteAtRef.current = now;
+    return true;
+  }, []);
+
+  // Middle-click paste: if the terminal has a current selection, paste it at
+  // the cursor; otherwise fall back to the system clipboard. Linux/Windows use
+  // auxclick; macOS gets a mouseup capture fallback because WKWebView does not
+  // consistently dispatch auxclick for the middle button.
+  const handleMiddleClick = useCallback((event: ReactMouseEvent) => {
+    if (event.button !== 1) return;
+    event.preventDefault();
+    if (isMac && !shouldHandleMacMiddlePaste()) return;
+    pasteMiddleClickSelectionOrClipboard();
+  }, [isMac, pasteMiddleClickSelectionOrClipboard, shouldHandleMacMiddlePaste]);
+
   const handleTerminalMouseDownCapture = useCallback((event: ReactMouseEvent) => {
     if (event.button === 1) {
       suppressNativePasteUntilRef.current = Date.now() + 500;
+      middleClickSelectionRef.current = termRef.current?.getSelection() ?? "";
     }
   }, []);
+
+  const handleTerminalMouseUpCapture = useCallback((event: ReactMouseEvent) => {
+    if (!isMac || event.button !== 1) return;
+    event.preventDefault();
+    if (!shouldHandleMacMiddlePaste()) return;
+    pasteMiddleClickSelectionOrClipboard();
+  }, [isMac, pasteMiddleClickSelectionOrClipboard, shouldHandleMacMiddlePaste]);
 
   useEffect(() => {
     readOnlyRef.current = effectiveReadOnly;
@@ -2020,7 +2062,7 @@ export function TerminalPanel({
         return;
       }
       const text = event.clipboardData?.getData("text/plain") ?? "";
-      pasteTextIntoTerminal(text);
+      void pasteTextIntoTerminal(text);
     };
     el.addEventListener("paste", onPaste, { capture: true });
     return () => el.removeEventListener("paste", onPaste, { capture: true });
@@ -2165,6 +2207,7 @@ export function TerminalPanel({
       onDrop={handleTerminalDrop}
       onContextMenu={handleTerminalContextMenu}
       onMouseDownCapture={handleTerminalMouseDownCapture}
+      onMouseUpCapture={handleTerminalMouseUpCapture}
       onAuxClick={handleMiddleClick}
     >
       <div ref={containerRef} className="w-full h-full" />
@@ -2490,6 +2533,7 @@ export function TerminalPanel({
       )}
 
       {contextMenu.render}
+      {pasteConfirmDialog}
 
       {conflictDialogState && (
         <ZmodemConflictDialog
