@@ -378,6 +378,126 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
+  it("switches tabs with macOS Command+number shortcuts", async () => {
+    const restorePlatform = setNavigatorPlatform("MacIntel");
+    const shortcutTabs = [
+      { id: "welcome", type: "welcome" as const, title: "Welcome", closable: false },
+      ...Array.from({ length: 7 }, (_, index) => ({
+        id: `term-${index + 1}`,
+        type: "terminal" as const,
+        title: `Terminal ${index + 1}`,
+        closable: true,
+      })),
+    ];
+    useAppStore.setState({
+      tabs: shortcutTabs,
+      activeTabId: "term-7",
+      terminalSplitActive: false,
+    });
+
+    try {
+      render(<MainLayout />);
+
+      for (const [index, tab] of shortcutTabs.entries()) {
+        const digit = String(index + 1);
+        fireEvent.keyDown(window, { key: digit, code: `Digit${digit}`, metaKey: true });
+        await waitFor(() => {
+          expect(useAppStore.getState().activeTabId).toBe(tab.id);
+        });
+        if (tab.type === "terminal") {
+          const panel = screen
+            .getAllByTestId("terminal-panel")
+            .find((node) => node.getAttribute("data-tab-id") === tab.id);
+          expect(panel).toHaveAttribute("data-active-shortcuts", "true");
+        }
+      }
+
+      fireEvent.keyDown(window, { key: "9", code: "Digit9", metaKey: true });
+
+      await waitFor(() => {
+        expect(useAppStore.getState().activeTabId).toBe("term-7");
+      });
+    } finally {
+      restorePlatform();
+    }
+  });
+
+  it("keeps Command+number no-op when the target tab is missing", () => {
+    const restorePlatform = setNavigatorPlatform("MacIntel");
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: false,
+    });
+
+    try {
+      render(<MainLayout />);
+
+      const event = new KeyboardEvent("keydown", {
+        key: "5",
+        code: "Digit5",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(event);
+
+      expect(useAppStore.getState().activeTabId).toBe("term-1");
+      expect(event.defaultPrevented).toBe(true);
+    } finally {
+      restorePlatform();
+    }
+  });
+
+  it("does not treat ordinary digits or non-macOS Meta+digits as tab shortcuts", () => {
+    const restorePlatform = setNavigatorPlatform("Win32");
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "term-1", type: "terminal", title: "One", closable: true },
+        { id: "term-2", type: "terminal", title: "Two", closable: true },
+      ],
+      activeTabId: "term-1",
+      terminalSplitActive: false,
+    });
+
+    try {
+      render(<MainLayout />);
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      const plainDigit = new KeyboardEvent("keydown", {
+        key: "2",
+        code: "Digit2",
+        bubbles: true,
+        cancelable: true,
+      });
+      input.dispatchEvent(plainDigit);
+      input.remove();
+
+      expect(useAppStore.getState().activeTabId).toBe("term-1");
+      expect(plainDigit.defaultPrevented).toBe(false);
+
+      const metaDigit = new KeyboardEvent("keydown", {
+        key: "2",
+        code: "Digit2",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(metaDigit);
+
+      expect(useAppStore.getState().activeTabId).toBe("term-1");
+      expect(metaDigit.defaultPrevented).toBe(false);
+    } finally {
+      restorePlatform();
+    }
+  });
+
   it("opens compact main menu and sessions drawer from the titlebar", () => {
     render(<MainLayout />);
 
@@ -842,4 +962,18 @@ function latestQuickConnectProps(): {
   const props = quickConnectMock.props.at(-1);
   if (!props) throw new Error("QuickConnect props were not captured");
   return props;
+}
+
+function setNavigatorPlatform(platform: string): () => void {
+  const originalPlatform = window.navigator.platform;
+  Object.defineProperty(window.navigator, "platform", {
+    configurable: true,
+    value: platform,
+  });
+  return () => {
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: originalPlatform,
+    });
+  };
 }
