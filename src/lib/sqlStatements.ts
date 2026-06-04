@@ -154,6 +154,16 @@ export function splitSqlStatements(sql: string): string[] {
   return statements;
 }
 
+export function sqlStatementsForExecution(engine: string, sql: string): string[] {
+  const trimmed = sql.trim();
+  if (!trimmed) return [];
+  return shouldSplitSqlForExecution(engine) ? splitSqlStatements(trimmed) : [trimmed];
+}
+
+function shouldSplitSqlForExecution(engine: string): boolean {
+  return engine === "MySQL" || engine === "Presto";
+}
+
 function hasExecutableSql(statement: string): boolean {
   let i = 0;
   while (i < statement.length) {

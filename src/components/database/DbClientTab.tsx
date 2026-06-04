@@ -57,7 +57,7 @@ import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../li
 import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
-import { splitSqlStatements } from "../../lib/sqlStatements";
+import { sqlStatementsForExecution } from "../../lib/sqlStatements";
 
 interface DbClientTabProps {
   tabId: string;
@@ -704,7 +704,7 @@ export default function DbClientTab({
       if (!trimmed) return;
       const panel = panels.find((p) => p.id === panelId);
       if (panel?.sheets.some((sheet) => sheet.running)) return;
-      const statements = info.engine === "Presto" ? splitSqlStatements(trimmed) : [trimmed];
+      const statements = sqlStatementsForExecution(info.engine, trimmed);
       if (statements.length === 0) return;
       // Record history (newest first, dedup consecutive).
       const panelHistory = historyRef.current[panelId] ?? [];

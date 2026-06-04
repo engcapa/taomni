@@ -200,8 +200,7 @@ fn pg_value_to_string(row: &sqlx::postgres::PgRow, i: usize) -> Option<String> {
 
 /// Heuristic: does the statement return rows? (SELECT/SHOW/DESCRIBE/WITH/...)
 fn is_query(sql: &str) -> bool {
-    let trimmed = sql.trim_start();
-    let head: String = trimmed
+    let head: String = executable_sql_head(sql)
         .chars()
         .take_while(|c| c.is_alphabetic())
         .collect::<String>()
@@ -218,6 +217,37 @@ fn is_query(sql: &str) -> bool {
             | "VALUES"
             | "PRAGMA"
     )
+}
+
+fn executable_sql_head(sql: &str) -> &str {
+    let mut rest = sql.trim_start();
+    loop {
+        if let Some(after_comment) = rest.strip_prefix("--") {
+            rest = match after_comment.find('\n') {
+                Some(index) => &after_comment[index + 1..],
+                None => "",
+            }
+            .trim_start();
+            continue;
+        }
+        if let Some(after_comment) = rest.strip_prefix('#') {
+            rest = match after_comment.find('\n') {
+                Some(index) => &after_comment[index + 1..],
+                None => "",
+            }
+            .trim_start();
+            continue;
+        }
+        if let Some(after_comment) = rest.strip_prefix("/*") {
+            rest = match after_comment.find("*/") {
+                Some(index) => &after_comment[index + 2..],
+                None => "",
+            }
+            .trim_start();
+            continue;
+        }
+        return rest;
+    }
 }
 
 fn limit_warning(limit_reached: bool, max_rows: Option<u64>) -> Vec<String> {
@@ -1065,5 +1095,16 @@ mod tests {
     fn mysql_table_kind_maps_views() {
         assert_eq!(mysql_table_kind("VIEW"), "view");
         assert_eq!(mysql_table_kind("BASE TABLE"), "table");
+    }
+
+    #[test]
+    fn query_detection_skips_leading_comments() {
+        assert!(is_query("-- explain selected statement\nSELECT 1"));
+        assert!(is_query("/* leading ; block */ SHOW TABLES"));
+        assert!(is_query(
+            "# mysql comment\nWITH cte AS (SELECT 1) SELECT * FROM cte"
+        ));
+        assert!(!is_query("-- mutate\nINSERT INTO t VALUES (1)"));
+        assert!(!is_query("/* unterminated"));
     }
 }
