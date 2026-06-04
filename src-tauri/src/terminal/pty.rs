@@ -1,5 +1,7 @@
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Serialize;
+#[cfg(target_os = "macos")]
+use std::ffi::OsStr;
 use std::io::Read;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -435,6 +437,86 @@ fn path_to_string(path: PathBuf) -> String {
     path.to_string_lossy().into_owned()
 }
 
+#[cfg(unix)]
+fn apply_terminal_environment(cmd: &mut CommandBuilder) {
+    cmd.env("TERM", "xterm-256color");
+
+    #[cfg(target_os = "macos")]
+    apply_macos_utf8_locale(cmd);
+}
+
+#[cfg(target_os = "macos")]
+fn apply_macos_utf8_locale(cmd: &mut CommandBuilder) {
+    let locale = preferred_utf8_locale(cmd).unwrap_or_else(|| "en_US.UTF-8".to_string());
+
+    set_if_not_full_utf8_locale(cmd, "LANG", &locale);
+    set_lc_ctype_if_not_utf8(cmd, &locale);
+    set_lc_all_if_present_and_not_full_utf8_locale(cmd, &locale);
+}
+
+#[cfg(target_os = "macos")]
+fn preferred_utf8_locale(cmd: &CommandBuilder) -> Option<String> {
+    ["LANG", "LC_CTYPE", "LC_ALL"]
+        .into_iter()
+        .filter_map(|key| cmd.get_env(key))
+        .filter_map(OsStr::to_str)
+        .map(str::trim)
+        .find(|value| locale_is_full_utf8(value))
+        .map(str::to_string)
+}
+
+#[cfg(target_os = "macos")]
+fn set_if_not_full_utf8_locale(cmd: &mut CommandBuilder, key: &str, value: &str) {
+    if !cmd
+        .get_env(key)
+        .and_then(OsStr::to_str)
+        .map(str::trim)
+        .is_some_and(locale_is_full_utf8)
+    {
+        cmd.env(key, value);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn set_lc_ctype_if_not_utf8(cmd: &mut CommandBuilder, value: &str) {
+    if !cmd
+        .get_env("LC_CTYPE")
+        .and_then(OsStr::to_str)
+        .map(str::trim)
+        .is_some_and(locale_is_valid_macos_lc_ctype)
+    {
+        cmd.env("LC_CTYPE", value);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn set_lc_all_if_present_and_not_full_utf8_locale(cmd: &mut CommandBuilder, value: &str) {
+    if cmd
+        .get_env("LC_ALL")
+        .and_then(OsStr::to_str)
+        .map(str::trim)
+        .is_some_and(|current| !current.is_empty() && !locale_is_full_utf8(current))
+    {
+        cmd.env("LC_ALL", value);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn locale_is_valid_macos_lc_ctype(value: &str) -> bool {
+    normalized_locale(value) == "UTF8" || locale_is_full_utf8(value)
+}
+
+#[cfg(target_os = "macos")]
+fn locale_is_full_utf8(value: &str) -> bool {
+    let normalized = normalized_locale(value);
+    normalized.contains('.') && normalized.contains("UTF8") && !normalized.starts_with("C.")
+}
+
+#[cfg(target_os = "macos")]
+fn normalized_locale(value: &str) -> String {
+    value.to_ascii_uppercase().replace('-', "")
+}
+
 pub fn create_pty(
     cols: u16,
     rows: u16,
@@ -462,7 +544,7 @@ pub fn create_pty(
     }
 
     #[cfg(unix)]
-    cmd.env("TERM", "xterm-256color");
+    apply_terminal_environment(&mut cmd);
 
     if let Some(dir) = cwd {
         cmd.cwd(dir);
@@ -509,4 +591,100 @@ pub fn resize_pty(
             pixel_height: 0,
         })
         .map_err(|e| format!("Failed to resize PTY: {}", e))
+}
+
+#[cfg(test)]
+#[cfg(target_os = "macos")]
+mod tests {
+    use super::*;
+
+    fn env<'a>(cmd: &'a CommandBuilder, key: &str) -> Option<&'a str> {
+        cmd.get_env(key).and_then(OsStr::to_str)
+    }
+
+    #[test]
+    fn terminal_environment_repairs_empty_and_c_locale_on_macos() {
+        let mut cmd = CommandBuilder::new("/bin/zsh");
+        cmd.env("LANG", "");
+        cmd.env("LC_CTYPE", "C");
+        cmd.env("LC_ALL", "C");
+
+        apply_terminal_environment(&mut cmd);
+
+        assert_eq!(env(&cmd, "TERM"), Some("xterm-256color"));
+        assert_eq!(env(&cmd, "LANG"), Some("en_US.UTF-8"));
+        assert_eq!(env(&cmd, "LC_CTYPE"), Some("en_US.UTF-8"));
+        assert_eq!(env(&cmd, "LC_ALL"), Some("en_US.UTF-8"));
+    }
+
+    #[test]
+    fn terminal_environment_uses_existing_utf8_locale_as_fallback_on_macos() {
+        let mut cmd = CommandBuilder::new("/bin/zsh");
+        cmd.env("LANG", "zh_CN.UTF-8");
+        cmd.env("LC_CTYPE", "C");
+        cmd.env("LC_ALL", "");
+
+        apply_terminal_environment(&mut cmd);
+
+        assert_eq!(env(&cmd, "LANG"), Some("zh_CN.UTF-8"));
+        assert_eq!(env(&cmd, "LC_CTYPE"), Some("zh_CN.UTF-8"));
+        assert_eq!(env(&cmd, "LC_ALL"), Some(""));
+    }
+
+    #[test]
+    fn terminal_environment_replaces_c_utf8_on_macos() {
+        let mut cmd = CommandBuilder::new("/bin/zsh");
+        cmd.env("LANG", "zh_CN.UTF-8");
+        cmd.env("LC_CTYPE", "C.UTF-8");
+        cmd.env("LC_ALL", "C.UTF-8");
+
+        apply_terminal_environment(&mut cmd);
+
+        assert_eq!(env(&cmd, "LANG"), Some("zh_CN.UTF-8"));
+        assert_eq!(env(&cmd, "LC_CTYPE"), Some("zh_CN.UTF-8"));
+        assert_eq!(env(&cmd, "LC_ALL"), Some("zh_CN.UTF-8"));
+    }
+
+    #[test]
+    fn terminal_environment_preserves_explicit_utf8_locale_on_macos() {
+        let mut cmd = CommandBuilder::new("/bin/zsh");
+        cmd.env("LANG", "ja_JP.UTF-8");
+        cmd.env("LC_CTYPE", "zh_CN.UTF-8");
+        cmd.env("LC_ALL", "en_US.UTF-8");
+
+        apply_terminal_environment(&mut cmd);
+
+        assert_eq!(env(&cmd, "LANG"), Some("ja_JP.UTF-8"));
+        assert_eq!(env(&cmd, "LC_CTYPE"), Some("zh_CN.UTF-8"));
+        assert_eq!(env(&cmd, "LC_ALL"), Some("en_US.UTF-8"));
+    }
+
+    #[test]
+    fn create_pty_lists_utf8_filename_on_macos() {
+        let temp = tempfile::tempdir().expect("create temp dir");
+        let filename = "\u{5bfc}\u{56fe}1.emmx";
+        std::fs::write(temp.path().join(filename), b"").expect("write utf8 filename");
+
+        let (mut handle, mut reader, _) = create_pty(
+            80,
+            24,
+            Some("/bin/ls".to_string()),
+            Some(vec![
+                "-1".to_string(),
+                temp.path().to_string_lossy().into_owned(),
+            ]),
+            None,
+        )
+        .expect("spawn ls in pty");
+
+        let mut output = String::new();
+        reader.read_to_string(&mut output).expect("read ls output");
+        let status = handle.child.wait().expect("wait for ls");
+
+        assert!(status.success(), "ls exited with {status}");
+        assert!(
+            output.contains(filename),
+            "ls output should include utf8 filename, got {output:?}"
+        );
+    }
 }
