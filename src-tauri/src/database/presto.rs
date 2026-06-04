@@ -258,19 +258,161 @@ async fn read_results_response(
     Ok(results)
 }
 
+fn normalize_presto_statement(sql: &str) -> Result<String, String> {
+    let mut statements = split_presto_statements(sql);
+    match statements.len() {
+        0 => Err("Presto SQL statement is empty".into()),
+        1 => Ok(statements.remove(0)),
+        _ => Err(
+            "Presto accepts one SQL statement per HTTP request; split scripts before executing."
+                .into(),
+        ),
+    }
+}
+
+fn split_presto_statements(sql: &str) -> Vec<String> {
+    let mut statements = Vec::new();
+    let mut current = String::new();
+    let mut chars = sql.chars().peekable();
+    let mut single_quoted = false;
+    let mut double_quoted = false;
+    let mut line_comment = false;
+    let mut block_comment = false;
+
+    while let Some(ch) = chars.next() {
+        if line_comment {
+            current.push(ch);
+            if ch == '\n' {
+                line_comment = false;
+            }
+            continue;
+        }
+
+        if block_comment {
+            current.push(ch);
+            if ch == '*' && matches!(chars.peek(), Some('/')) {
+                current.push('/');
+                chars.next();
+                block_comment = false;
+            }
+            continue;
+        }
+
+        if single_quoted {
+            current.push(ch);
+            if ch == '\'' {
+                if matches!(chars.peek(), Some('\'')) {
+                    current.push('\'');
+                    chars.next();
+                } else {
+                    single_quoted = false;
+                }
+            }
+            continue;
+        }
+
+        if double_quoted {
+            current.push(ch);
+            if ch == '"' {
+                if matches!(chars.peek(), Some('"')) {
+                    current.push('"');
+                    chars.next();
+                } else {
+                    double_quoted = false;
+                }
+            }
+            continue;
+        }
+
+        match ch {
+            '-' if matches!(chars.peek(), Some('-')) => {
+                current.push(ch);
+                current.push('-');
+                chars.next();
+                line_comment = true;
+            }
+            '/' if matches!(chars.peek(), Some('*')) => {
+                current.push(ch);
+                current.push('*');
+                chars.next();
+                block_comment = true;
+            }
+            '\'' => {
+                current.push(ch);
+                single_quoted = true;
+            }
+            '"' => {
+                current.push(ch);
+                double_quoted = true;
+            }
+            ';' => push_presto_statement(&mut statements, &mut current),
+            _ => current.push(ch),
+        }
+    }
+
+    push_presto_statement(&mut statements, &mut current);
+    statements
+}
+
+fn push_presto_statement(statements: &mut Vec<String>, current: &mut String) {
+    let statement = current.trim();
+    if !statement.is_empty() && has_executable_presto_sql(statement) {
+        statements.push(statement.to_string());
+    }
+    current.clear();
+}
+
+fn has_executable_presto_sql(statement: &str) -> bool {
+    let mut chars = statement.chars().peekable();
+    let mut line_comment = false;
+    let mut block_comment = false;
+
+    while let Some(ch) = chars.next() {
+        if line_comment {
+            if ch == '\n' {
+                line_comment = false;
+            }
+            continue;
+        }
+        if block_comment {
+            if ch == '*' && matches!(chars.peek(), Some('/')) {
+                chars.next();
+                block_comment = false;
+            }
+            continue;
+        }
+        if ch.is_whitespace() {
+            continue;
+        }
+        match ch {
+            '-' if matches!(chars.peek(), Some('-')) => {
+                chars.next();
+                line_comment = true;
+            }
+            '/' if matches!(chars.peek(), Some('*')) => {
+                chars.next();
+                block_comment = true;
+            }
+            _ => return true,
+        }
+    }
+    false
+}
+
 async fn post_statement(
     client: &PrestoClient,
     sql: &str,
     token: &CancellationToken,
     track_cancel: bool,
 ) -> Result<PrestoResults, String> {
+    let statement = normalize_presto_statement(sql)?;
     let (catalog, schema) = request_context(client).await;
     let req = add_presto_headers(
         client,
         client
             .client
             .post(format!("{}/v1/statement", client.base_url))
-            .body(sql.to_string()),
+            .body(statement),
         catalog.as_deref(),
         schema.as_deref(),
     );
@@ -746,6 +888,7 @@ mod tests {
         method: &'static str,
         path: String,
         body_contains: Option<&'static str>,
+        body_equals: Option<&'static str>,
         headers: Vec<(&'static str, &'static str)>,
         response_body: String,
     }
@@ -820,6 +963,9 @@ mod tests {
                     "request body did not contain {body_part:?}: {}",
                     request_body(&request)
                 );
+            }
+            if let Some(body) = expected.body_equals {
+                assert_eq!(request_body(&request), body);
             }
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -896,6 +1042,33 @@ mod tests {
         assert_eq!(parse_use_parts("SELECT 1"), None);
     }
 
+    #[test]
+    fn presto_statement_splitter_ignores_semicolons_inside_strings_and_comments() {
+        assert_eq!(
+            split_presto_statements(
+                "SELECT ';' AS literal -- comment ; ignored\nFROM t;\n\
+                 /* comment ; ignored */ SELECT 'it''s; ok';"
+            ),
+            vec![
+                "SELECT ';' AS literal -- comment ; ignored\nFROM t".to_string(),
+                "/* comment ; ignored */ SELECT 'it''s; ok'".to_string(),
+            ]
+        );
+        assert_eq!(
+            split_presto_statements("; /* comment only */ ; -- trailing"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn presto_statement_normalization_requires_one_statement() {
+        assert_eq!(
+            normalize_presto_statement("SELECT 1; -- trailing comment").unwrap(),
+            "SELECT 1"
+        );
+        assert!(normalize_presto_statement("SELECT 1; SELECT 2").is_err());
+    }
+
     #[tokio::test]
     async fn execute_posts_statement_and_polls_next_uri() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -909,6 +1082,7 @@ mod tests {
                     method: "POST",
                     path: "/v1/statement".to_string(),
                     body_contains: Some("SELECT * FROM orders"),
+                    body_equals: None,
                     headers: vec![
                         ("X-Presto-User", "analyst"),
                         ("X-Presto-Catalog", "hive"),
@@ -922,6 +1096,7 @@ mod tests {
                     method: "GET",
                     path: next_path.to_string(),
                     body_contains: None,
+                    body_equals: None,
                     headers: vec![
                         ("X-Presto-User", "analyst"),
                         ("X-Presto-Catalog", "hive"),
@@ -948,6 +1123,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn execute_posts_single_statement_without_outer_semicolon() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(serve_expected_requests(
+            listener,
+            vec![ExpectedRequest {
+                method: "POST",
+                path: "/v1/statement".to_string(),
+                body_contains: None,
+                body_equals: Some("SELECT 1"),
+                headers: vec![
+                    ("X-Presto-User", "analyst"),
+                    ("X-Presto-Catalog", "hive"),
+                    ("X-Presto-Schema", "sales"),
+                ],
+                response_body:
+                    r#"{"id":"query-1","columns":[{"name":"_col0","type":"integer"}],"data":[[1]]}"#
+                        .to_string(),
+            }],
+        ));
+        let token = CancellationToken::new();
+
+        let result = execute(
+            &test_client(base_url),
+            "SELECT 1; -- trailing comment",
+            &token,
+        )
+        .await
+        .unwrap();
+        server.await.unwrap();
+
+        assert_eq!(result.rows, vec![vec![Some("1".to_string())]]);
+    }
+
+    #[tokio::test]
     async fn metadata_calls_use_catalog_context() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base_url = format!("http://{}", listener.local_addr().unwrap());
@@ -958,6 +1168,7 @@ mod tests {
                     method: "POST",
                     path: "/v1/statement".to_string(),
                     body_contains: Some("information_schema.schemata"),
+                    body_equals: None,
                     headers: vec![
                         ("X-Presto-User", "analyst"),
                         ("X-Presto-Catalog", "hive"),
@@ -970,6 +1181,7 @@ mod tests {
                     method: "POST",
                     path: "/v1/statement".to_string(),
                     body_contains: Some("table_schema = 'sales'"),
+                    body_equals: None,
                     headers: vec![
                         ("X-Presto-User", "analyst"),
                         ("X-Presto-Catalog", "hive"),
@@ -982,6 +1194,7 @@ mod tests {
                     method: "POST",
                     path: "/v1/statement".to_string(),
                     body_contains: Some("table_name = 'orders'"),
+                    body_equals: None,
                     headers: vec![
                         ("X-Presto-User", "analyst"),
                         ("X-Presto-Catalog", "hive"),

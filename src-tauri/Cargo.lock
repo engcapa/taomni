@@ -7860,7 +7860,7 @@ dependencies = [
 
 [[package]]
 name = "taomni"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm 0.10.3",
