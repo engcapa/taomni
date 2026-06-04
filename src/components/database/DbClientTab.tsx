@@ -57,6 +57,7 @@ import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../li
 import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
+import { splitSqlStatements } from "../../lib/sqlStatements";
 
 interface DbClientTabProps {
   tabId: string;
@@ -617,44 +618,36 @@ export default function DbClientTab({
     setTabHasNewOutput(tabId, anyRunning && !visible);
   }, [anyRunning, visible, tabId, setTabHasNewOutput]);
 
-  const runQuery = useCallback(
-    async (panelId: string, sqlText: string) => {
-      const trimmed = sqlText.trim();
-      if (!trimmed) return;
-      const panel = panels.find((p) => p.id === panelId);
-      if (panel?.sheets.some((sheet) => sheet.running)) return;
-      // Record history (newest first, dedup consecutive).
-      const panelHistory = historyRef.current[panelId] ?? [];
-      if (panelHistory[0] !== trimmed) {
-        historyRef.current[panelId] = [trimmed, ...panelHistory].slice(0, MAX_HISTORY);
-      }
-      const sheet = newResultSheet(trimmed, (panel?.sheets.length ?? 0) + 1, rowLimit);
-      setPanels((prev) =>
-        prev.map((p) => {
-          if (p.id !== panelId) return p;
-          const sheets = [...p.sheets, sheet].slice(-maxResultSheets);
-          return {
-            ...p,
-            sheets,
-            activeSheetId: sheet.id,
-          };
-        }),
-      );
+  const streamQueryIntoSheet = useCallback(
+    async (
+      panelId: string,
+      sheetId: string,
+      sql: string,
+      maxRows: number,
+      resetRowsOnColumns = false,
+    ): Promise<boolean> => {
       const started = Date.now();
       const timer = setInterval(() => {
-        patchSheet(panelId, sheet.id, { elapsedMs: Date.now() - started });
+        patchSheet(panelId, sheetId, { elapsedMs: Date.now() - started });
       }, 100);
-      timersRef.current[sheet.id] = timer;
+      timersRef.current[sheetId] = timer;
       let sawDone = false;
       try {
-        await dbExecuteStream(sessionId, trimmed, rowLimit, (event) => {
+        await dbExecuteStream(sessionId, sql, maxRows, (event) => {
           if (event.kind === "columns") {
-            updateSheet(panelId, sheet.id, (current) => {
+            updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
-              return { ...current, result: { ...result, columns: event.columns } };
+              return {
+                ...current,
+                result: {
+                  ...result,
+                  columns: event.columns,
+                  rows: resetRowsOnColumns ? [] : result.rows,
+                },
+              };
             });
           } else if (event.kind === "rows") {
-            updateSheet(panelId, sheet.id, (current) => {
+            updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
               const remaining = Math.max(0, current.rowLimit - result.rows.length);
               const rows = remaining > 0 ? event.rows.slice(0, remaining) : [];
@@ -663,7 +656,7 @@ export default function DbClientTab({
           } else {
             sawDone = true;
             const warnings = event.warnings ?? [];
-            updateSheet(panelId, sheet.id, (current) => {
+            updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
               return {
                 ...current,
@@ -683,24 +676,61 @@ export default function DbClientTab({
           }
         });
         if (!sawDone) {
-          patchSheet(panelId, sheet.id, { running: false, cancelling: false });
+          patchSheet(panelId, sheetId, { running: false, cancelling: false });
         }
+        return true;
       } catch (err) {
-        patchSheet(panelId, sheet.id, {
+        patchSheet(panelId, sheetId, {
           running: false,
           cancelling: false,
           error: String(err),
           warnings: [],
           resultTab: "messages",
         });
+        return false;
       } finally {
-        if (timersRef.current[sheet.id] === timer) {
+        if (timersRef.current[sheetId] === timer) {
           clearInterval(timer);
-          delete timersRef.current[sheet.id];
+          delete timersRef.current[sheetId];
         }
       }
     },
-    [maxResultSheets, panels, patchSheet, rowLimit, sessionId, updateSheet],
+    [patchSheet, sessionId, updateSheet],
+  );
+
+  const runQuery = useCallback(
+    async (panelId: string, sqlText: string) => {
+      const trimmed = sqlText.trim();
+      if (!trimmed) return;
+      const panel = panels.find((p) => p.id === panelId);
+      if (panel?.sheets.some((sheet) => sheet.running)) return;
+      const statements = info.engine === "Presto" ? splitSqlStatements(trimmed) : [trimmed];
+      if (statements.length === 0) return;
+      // Record history (newest first, dedup consecutive).
+      const panelHistory = historyRef.current[panelId] ?? [];
+      if (panelHistory[0] !== trimmed) {
+        historyRef.current[panelId] = [trimmed, ...panelHistory].slice(0, MAX_HISTORY);
+      }
+
+      const baseOrdinal = panel?.sheets.length ?? 0;
+      for (const [index, statement] of statements.entries()) {
+        const sheet = newResultSheet(statement, baseOrdinal + index + 1, rowLimit);
+        setPanels((prev) =>
+          prev.map((p) => {
+            if (p.id !== panelId) return p;
+            const sheets = [...p.sheets, sheet].slice(-maxResultSheets);
+            return {
+              ...p,
+              sheets,
+              activeSheetId: sheet.id,
+            };
+          }),
+        );
+        const ok = await streamQueryIntoSheet(panelId, sheet.id, statement, rowLimit);
+        if (!ok) break;
+      }
+    },
+    [info.engine, maxResultSheets, panels, rowLimit, streamQueryIntoSheet],
   );
 
   const insertQueryFromOutside = useCallback(
@@ -808,67 +838,9 @@ export default function DbClientTab({
         resultTab: "results",
       });
 
-      const started = Date.now();
-      const timer = setInterval(() => {
-        patchSheet(panelId, sheetId, { elapsedMs: Date.now() - started });
-      }, 100);
-      timersRef.current[sheetId] = timer;
-      let sawDone = false;
-      try {
-        await dbExecuteStream(sessionId, trimmed, effectiveLimit, (event) => {
-          if (event.kind === "columns") {
-            updateSheet(panelId, sheetId, (current) => {
-              const result = current.result ?? emptyQueryResult();
-              return { ...current, result: { ...result, columns: event.columns, rows: [] } };
-            });
-          } else if (event.kind === "rows") {
-            updateSheet(panelId, sheetId, (current) => {
-              const result = current.result ?? emptyQueryResult();
-              const remaining = Math.max(0, current.rowLimit - result.rows.length);
-              const rows = remaining > 0 ? event.rows.slice(0, remaining) : [];
-              return { ...current, result: { ...result, rows: [...result.rows, ...rows] } };
-            });
-          } else {
-            sawDone = true;
-            const warnings = event.warnings ?? [];
-            updateSheet(panelId, sheetId, (current) => {
-              const result = current.result ?? emptyQueryResult();
-              return {
-                ...current,
-                result: {
-                  ...result,
-                  rowsAffected: event.rowsAffected,
-                  durationMs: event.durationMs,
-                  warnings,
-                },
-                warnings,
-                running: false,
-                cancelling: false,
-                error: null,
-                resultTab: warnings.length > 0 ? "messages" : "results",
-              };
-            });
-          }
-        });
-        if (!sawDone) {
-          patchSheet(panelId, sheetId, { running: false, cancelling: false });
-        }
-      } catch (err) {
-        patchSheet(panelId, sheetId, {
-          running: false,
-          cancelling: false,
-          error: String(err),
-          warnings: [],
-          resultTab: "messages",
-        });
-      } finally {
-        if (timersRef.current[sheetId] === timer) {
-          clearInterval(timer);
-          delete timersRef.current[sheetId];
-        }
-      }
+      await streamQueryIntoSheet(panelId, sheetId, trimmed, effectiveLimit, true);
     },
-    [panels, patchSheet, rowLimit, sessionId, updateSheet],
+    [panels, patchSheet, rowLimit, streamQueryIntoSheet],
   );
 
   const commitGridChanges = useCallback(
