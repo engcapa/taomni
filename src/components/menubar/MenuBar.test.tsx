@@ -40,6 +40,18 @@ describe("MenuBar", () => {
     expect(screen.queryByTestId("menu-games")).not.toBeInTheDocument();
   });
 
+  it("adds a top-level Exit button after Help and routes it through the app exit command", () => {
+    const onCommand = vi.fn();
+    render(<MenuBar activeTabClosable ribbonVisible={false} quickConnectVisible={false} onCommand={onCommand} />);
+
+    const help = screen.getByTestId("menu-help");
+    const exit = screen.getByTestId("menu-exit");
+    expect(help.compareDocumentPosition(exit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(exit);
+    expect(onCommand).toHaveBeenCalledWith("exit");
+  });
+
   it("switches top-level menus on hover after a menu has been opened", () => {
     render(<MenuBar activeTabClosable ribbonVisible={false} quickConnectVisible={false} onCommand={vi.fn()} />);
 

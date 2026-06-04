@@ -7,6 +7,7 @@ import {
   PanelLeft,
   PanelTopClose,
   PanelTopOpen,
+  Power,
   Plus,
   RefreshCw,
   Search,
@@ -54,7 +55,8 @@ type MenuId =
   | "tools"
   | "settings"
   | "macros"
-  | "help";
+  | "help"
+  | "exit";
 
 const MENU_LABEL_KEYS: Record<MenuId, string> = {
   terminal: "menu.terminal",
@@ -65,6 +67,7 @@ const MENU_LABEL_KEYS: Record<MenuId, string> = {
   settings: "menu.settings",
   macros: "menu.macros",
   help: "menu.help",
+  exit: "ribbon.exit",
 };
 
 export function MenuBar({ activeTabClosable, ribbonVisible, quickConnectVisible, onCommand }: MenuBarProps) {
@@ -77,7 +80,7 @@ export function MenuBar({ activeTabClosable, ribbonVisible, quickConnectVisible,
     source: string;
   } | null>(null);
   const items: MenuId[] = [
-    "terminal", "sessions", "view", "x-server", "tools", "settings", "macros", "help",
+    "terminal", "sessions", "view", "x-server", "tools", "settings", "macros", "help", "exit",
   ];
   const hasSessions = sessions.length > 0;
 
@@ -173,6 +176,11 @@ export function MenuBar({ activeTabClosable, ribbonVisible, quickConnectVisible,
   const openMenu = (event: React.MouseEvent<HTMLButtonElement>, menu: MenuId) => {
     event.preventDefault();
     event.stopPropagation();
+
+    if (menu === "exit") {
+      onCommand("exit");
+      return;
+    }
 
     const rect = event.currentTarget.getBoundingClientRect();
     const showMenu = (menuItems: MenuItem[]) => ctx.showAt(rect.left, rect.bottom, menuItems);
@@ -292,10 +300,16 @@ export function MenuBar({ activeTabClosable, ribbonVisible, quickConnectVisible,
             className="px-1 hover:bg-[var(--taomni-hover)] rounded"
             onClick={(event) => openMenu(event, id)}
             onMouseEnter={(event) => {
+              if (id === "exit") {
+                if (ctx.isOpen) ctx.close();
+                return;
+              }
               if (ctx.isOpen) openMenu(event, id);
             }}
             type="button"
+            title={id === "exit" ? t("ribbon.exit") : undefined}
           >
+            {id === "exit" && <Power className="w-3 h-3 inline-block mr-1 align-[-1px]" style={{ color: "#b22222" }} />}
             <span className="underline-offset-2">
               <span className="underline">{label[0]}</span>
               {label.slice(1)}
