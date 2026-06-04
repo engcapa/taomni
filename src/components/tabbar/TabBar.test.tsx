@@ -114,4 +114,27 @@ describe("TabBar overflow navigation", () => {
     expect(screen.queryByTestId("tab-scroll-left")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tab-scroll-right")).not.toBeInTheDocument();
   });
+
+  it("lists all open tabs from the more menu and switches to the selected tab", () => {
+    renderTabBar();
+
+    fireEvent.click(screen.getByTestId("tab-more"), { clientX: 500, clientY: 24 });
+
+    expect(screen.getByTestId("tab-more-tab-tab-0")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-more-tab-tab-11")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("context-menu-item-close-all-terminals")
+        .compareDocumentPosition(screen.getByTestId("tab-more-tab-tab-0")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    const menuChildren = Array.from(screen.getByTestId("context-menu").children);
+    const firstTabIndex = menuChildren.indexOf(screen.getByTestId("tab-more-tab-tab-0"));
+    expect(menuChildren[firstTabIndex - 1].tagName).toBe("DIV");
+    expect(menuChildren.at(-1)).toBe(screen.getByTestId("tab-more-tab-tab-11"));
+
+    fireEvent.click(screen.getByTestId("tab-more-tab-tab-5"));
+
+    expect(useAppStore.getState().activeTabId).toBe("tab-5");
+  });
 });

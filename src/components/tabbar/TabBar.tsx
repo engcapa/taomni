@@ -367,6 +367,14 @@ export function TabBar({
   };
 
   const handleMore = (event: React.MouseEvent) => {
+    const tabItems: MenuItem[] = tabs.map((tab) => ({
+      label: tab.title,
+      testId: `tab-more-tab-${tab.id}`,
+      icon: <TabIcon tab={tab} />,
+      checked: tab.id === activeTabId,
+      onClick: () => setActiveTab(tab.id),
+    }));
+
     ctx.show(event, [
       {
         label: compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact"),
@@ -376,6 +384,8 @@ export function TabBar({
       },
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.closeAllTerminals"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.type === "terminal" && t.closable).map((t) => t.id)) },
+      ...(tabItems.length ? [{ label: "", separator: true, onClick: () => {} }] : []),
+      ...tabItems,
     ]);
   };
 

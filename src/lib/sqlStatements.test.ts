@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitSqlStatements } from "./sqlStatements";
+import { splitSqlStatements, sqlStatementsForExecution } from "./sqlStatements";
 
 describe("splitSqlStatements", () => {
   it("splits semicolon-delimited SQL scripts into executable statements", () => {
@@ -31,5 +31,25 @@ describe("splitSqlStatements", () => {
 
   it("ignores empty and comment-only statements", () => {
     expect(splitSqlStatements("; /* comment only */ ; -- trailing")).toEqual([]);
+  });
+
+  it("splits MySQL scripts for execution into separate result statements", () => {
+    expect(sqlStatementsForExecution("MySQL", "select 1; select 2;")).toEqual([
+      "select 1",
+      "select 2",
+    ]);
+  });
+
+  it("continues splitting Presto scripts so each request sends one statement", () => {
+    expect(sqlStatementsForExecution("Presto", "select 1; select 2;")).toEqual([
+      "select 1",
+      "select 2",
+    ]);
+  });
+
+  it("does not split engines that still rely on backend single-call execution semantics", () => {
+    expect(sqlStatementsForExecution("PostgreSQL", "select 1; select 2;")).toEqual([
+      "select 1; select 2;",
+    ]);
   });
 });
