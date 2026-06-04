@@ -36,7 +36,7 @@ import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
-import { isTauriRuntime } from "../lib/runtime";
+import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
 import { openSftpWindow } from "../lib/sftp";
 import { openDetachedWindow } from "../lib/detachWindowing";
 import { sftpOpenPath, sftpStat, effectiveFileType } from "../lib/sftp";
@@ -102,6 +102,27 @@ const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 const RIBBON_VISIBLE_KEY = "taomni.ribbonVisible";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
+
+function macCommandDigitIndex(event: KeyboardEvent): number | null {
+  if (
+    getAppPlatform() !== "macos" ||
+    !event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return null;
+  }
+
+  const digit =
+    /^[1-9]$/.test(event.key)
+      ? event.key
+      : event.code.match(/^(?:Digit|Numpad)([1-9])$/)?.[1];
+  if (!digit) return null;
+
+  const number = Number.parseInt(digit, 10);
+  return number === 9 ? -1 : number - 1;
+}
 
 function readRibbonVisible(): boolean {
   try {
@@ -1436,6 +1457,19 @@ export function MainLayout() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      const tabIndex = macCommandDigitIndex(event);
+      if (tabIndex !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const state = useAppStore.getState();
+        const target = tabIndex === -1 ? state.tabs.at(-1) : state.tabs[tabIndex];
+        if (target && target.id !== state.activeTabId) {
+          setActiveTab(target.id);
+        }
+        return;
+      }
+
       const primary = event.ctrlKey || event.metaKey;
       if (!primary || !event.shiftKey || event.altKey) return;
 
@@ -1460,7 +1494,7 @@ export function MainLayout() {
 
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
-  }, [handleCommand]);
+  }, [handleCommand, setActiveTab]);
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
