@@ -235,6 +235,8 @@ interface TerminalEventLogEntry {
   detail: string;
 }
 
+type TerminalConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "reconnecting";
+
 export function TerminalPanel({
   tabId,
   tabTitle = "Terminal",
@@ -292,6 +294,8 @@ export function TerminalPanel({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const connectionStateRef = useRef<TerminalConnectionState>("idle");
+  const reconnectSshRef = useRef<(() => void) | null>(null);
   // Mirrors `sessionIdRef.current` as state so the registry-effect below
   // re-runs whenever the backend session id changes.
   const [registeredSessionId, setRegisteredSessionId] = useState<string | null>(null);
@@ -621,7 +625,7 @@ export function TerminalPanel({
 
   const sendTerminalInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
-    if (!sid || readOnlyRef.current) return;
+    if (!sid || readOnlyRef.current || connectionStateRef.current !== "connected") return;
     if (macroRecordingRef.current && !macroPlaybackRef.current) {
       macroBufferRef.current += data;
     }
@@ -634,17 +638,40 @@ export function TerminalPanel({
   // MultiExec mode forwards the same data to all selected terminals.
   const writeBroadcastInput = useCallback((data: string) => {
     if (readOnlyRef.current) return;
+    if (!sessionIdRef.current || connectionStateRef.current !== "connected") {
+      if (ssh && connectionStateRef.current === "disconnected") {
+        setStatusMessage("SSH disconnected; press Enter to reconnect");
+      }
+      return;
+    }
     trackPending(data);
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(data);
     }
     sendTerminalInput(data);
-  }, [sendTerminalInput, trackPending]);
+  }, [sendTerminalInput, setStatusMessage, ssh, trackPending]);
 
   const writeXtermInput = useCallback((data: string) => {
     if (readOnlyRef.current) return;
     const filtered = imeGuardRef.current?.filterTerminalData(data) ?? data;
     if (filtered === null) {
+      return;
+    }
+
+    if (
+      ssh &&
+      !adoptedTerminalRef.current &&
+      connectionStateRef.current === "disconnected" &&
+      (filtered === "\r" || filtered === "\n" || filtered === "\r\n")
+    ) {
+      reconnectSshRef.current?.();
+      return;
+    }
+
+    if (connectionStateRef.current !== "connected") {
+      if (ssh && connectionStateRef.current === "disconnected") {
+        setStatusMessage("SSH disconnected; press Enter to reconnect");
+      }
       return;
     }
 
@@ -692,11 +719,11 @@ export function TerminalPanel({
       onInputBroadcastRef.current?.(filtered);
     }
     sendTerminalInput(filtered);
-  }, [sendTerminalInput, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
+  }, [sendTerminalInput, setStatusMessage, ssh, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
-    if (!sid || readOnlyRef.current) return;
+    if (!sid || readOnlyRef.current || connectionStateRef.current !== "connected") return;
     if (macroRecordingRef.current && !macroPlaybackRef.current) {
       macroBufferRef.current += data;
     }
@@ -1697,7 +1724,11 @@ export function TerminalPanel({
       (bytes) => {
         let b64 = "";
         for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
-        return writeTerminal(sid, btoa(b64)).catch((err) => {
+        const activeSid = sessionIdRef.current;
+        if (!activeSid || connectionStateRef.current !== "connected") {
+          return Promise.reject(new Error("Terminal is not connected"));
+        }
+        return writeTerminal(activeSid, btoa(b64)).catch((err) => {
           console.error(err);
           throw err;
         });
@@ -1778,14 +1809,31 @@ export function TerminalPanel({
 
     const handleRawOutput = (raw: Uint8Array) => zmodem.consume(raw);
 
-    // SSH connections may demand a second factor (MFA/OTP) via
-    // keyboard-interactive auth. Register the prompt listener BEFORE the
-    // backend can emit — the createSshTerminal call below doesn't resolve until
-    // auth completes, and the MFA event only fires after the SSH handshake +
-    // password round-trip to the remote host, so this local listener is always
-    // in place by the time a prompt arrives.
-    if (ssh && !adopted) {
-      void listenSshAuthPrompt(sid, (payload) => {
+    type ConnectMode = "initial" | "reconnect";
+    type ConnectResult = { sessionId: string; shellId: string | null };
+
+    const cancelPendingMfa = () => {
+      if (pendingMfaRequestIdRef.current) {
+        void submitSshAuthResponse(pendingMfaRequestIdRef.current, null).catch(() => {});
+        pendingMfaRequestIdRef.current = null;
+      }
+      setMfaPrompt(null);
+    };
+
+    const clearConnectionListeners = () => {
+      unlistenExit?.();
+      unlistenExit = null;
+      unlistenForwardError?.();
+      unlistenForwardError = null;
+      unlistenAuthPrompt?.();
+      unlistenAuthPrompt = null;
+    };
+
+    const registerSshAuthPrompt = (targetSid: string) => {
+      // SSH connections may demand a second factor (MFA/OTP) via
+      // keyboard-interactive auth. Register before createSshTerminal, because
+      // the backend emits prompts before that call resolves.
+      void listenSshAuthPrompt(targetSid, (payload) => {
         if (destroyed) {
           // Window/panel gone — cancel so the backend stops waiting.
           void submitSshAuthResponse(payload.requestId, null).catch(() => {});
@@ -1805,126 +1853,197 @@ export function TerminalPanel({
           /* listener registration failed — connect proceeds; if the server
              demands MFA it'll fail with a clear auth error. */
         });
-    }
+    };
 
-    const connectPromise = adopted
-      ? attachTerminalOutput(sid, handleRawOutput).then(() => ({
-          sessionId: sid,
-          shellId: null,
-        }))
-      : ssh
-      ? createSshTerminal(
-          sid,
-          ssh.host,
-          ssh.port,
-          ssh.username,
-          ssh.authMethod,
-          ssh.authData,
-          cols,
-          rows,
-          (() => {
-            const ns = getSessionNetworkSettings(ssh.optionsJson);
-            return JSON.stringify(toNetworkSettingsPayload(ns));
-          })(),
-          handleRawOutput,
-          // X11 forwarding: enabled per-session (defaults on, matching the
-          // SessionEditor default). Trusted mode unless the expert option
-          // explicitly opts into untrusted.
-          (() => {
-            const opts = parseSessionOptions(ssh.optionsJson);
-            return opts.x11 !== false;
-          })(),
-          (() => {
-            const opts = parseSessionOptions(ssh.optionsJson);
-            return opts.x11Trusted !== false;
-          })(),
-        ).then<{ sessionId: string; shellId: string | null }>((sessionId) => ({
-          sessionId,
-          shellId: null,
-        }))
-      : createLocalTerminal(
-          sid,
-          cols,
-          rows,
-          localShell?.id,
-          localShell?.args,
-          undefined,
-          handleRawOutput,
-        ).then(({ sessionId, shellId }) => ({ sessionId, shellId }));
+    const markDisconnected = (endedSid: string) => {
+      if (sessionIdRef.current !== endedSid) return;
 
-    if (adopted) {
-      appendEvent("connection", `Reattaching terminal ${sid}`);
-    } else if (ssh) {
-      appendEvent("connection", `Connecting to ${ssh.username}@${ssh.host}:${ssh.port}`);
-      appendEvent("auth", `Using ${ssh.authMethod} authentication`);
-      term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
-    } else {
-      appendEvent("connection", `Starting ${localShell?.name ?? "local terminal"}`);
-    }
+      clearConnectionListeners();
+      connectionStateRef.current = "disconnected";
+      sessionIdRef.current = null;
+      setRegisteredSessionId(null);
+      zmodemRef.current = null;
+      pendingRef.current = "";
+      invalidatedRef.current = false;
+      suggestionRef.current = null;
+      bumpGhost();
+      refreshSuggestion();
+      onDetachedStateChangeRef.current?.({ snapshotText: getBufferText(term) });
 
-    connectPromise
-      .then(async ({ sessionId: connectedSid, shellId }) => {
-        if (destroyed) {
-          const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
-          // Adopted panels never own the backend session — don't close
-          // it on unmount even if it appears we were the only mount.
-          // The original detacher / reattacher owns lifecycle.
-          if (preserveSessionOnUnmountRef.current || detachPending || adopted) {
-            onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
-          } else {
-            closeTerminal(connectedSid).catch(() => {});
-          }
-          return;
+      appendEvent("disconnect", "Terminal session ended");
+      if (loggingActiveRef.current && outputLogRef.current) {
+        flushRecordedOutput("Session ended; saved recorded output");
+      }
+
+      if (ssh && !adopted) {
+        term.write("\r\n\x1b[33m[SSH disconnected] Press Enter to reconnect.\x1b[0m\r\n");
+        setStatusMessage("SSH disconnected; press Enter to reconnect");
+        window.setTimeout(focusTerminal, 0);
+      } else {
+        term.write("\r\n\x1b[33m[Session ended]\x1b[0m\r\n");
+      }
+    };
+
+    const handleConnected = async ({ sessionId: connectedSid, shellId }: ConnectResult, mode: ConnectMode) => {
+      if (destroyed) {
+        const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
+        // Adopted panels never own the backend session — don't close it on
+        // unmount even if it appears we were the only mount. The original
+        // detacher / reattacher owns lifecycle.
+        if (preserveSessionOnUnmountRef.current || detachPending || adopted) {
+          onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
+        } else {
+          closeTerminal(connectedSid).catch(() => {});
         }
-        sessionIdRef.current = connectedSid;
-        setRegisteredSessionId(connectedSid);
-        zmodemRef.current = zmodem;
-        if (shellId) setResolvedLocalShellId(shellId);
-        onSessionReadyRef.current?.(connectedSid);
-        onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
-        appendEvent("connection", `${adopted ? "Reattached" : "Connected"} (${connectedSid})`);
-        if (ssh && !adopted) {
+        return;
+      }
+
+      connectionStateRef.current = "connected";
+      sessionIdRef.current = connectedSid;
+      setRegisteredSessionId(connectedSid);
+      zmodemRef.current = zmodem;
+      if (shellId) setResolvedLocalShellId(shellId);
+      pendingMfaRequestIdRef.current = null;
+      setMfaPrompt(null);
+      onSessionReadyRef.current?.(connectedSid);
+      onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
+      appendEvent(
+        "connection",
+        `${adopted ? "Reattached" : mode === "reconnect" ? "Reconnected" : "Connected"} (${connectedSid})`,
+      );
+      if (ssh && !adopted) {
+        if (mode === "reconnect") {
+          term.write(`\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`);
+          setStatusMessage("SSH reconnected");
+          window.setTimeout(focusTerminal, 0);
+        } else {
           term.write(formatSshInfoBanner(ssh));
         }
+      }
 
-        unlistenExit = await listenTerminalExit(connectedSid, () => {
-          appendEvent("disconnect", "Terminal session ended");
-          if (loggingActiveRef.current && outputLogRef.current) {
-            flushRecordedOutput("Session ended; saved recorded output");
-          }
-          term.write("\r\n\x1b[33m[Session ended]\x1b[0m\r\n");
-        });
+      unlistenExit = await listenTerminalExit(connectedSid, () => markDisconnected(connectedSid));
 
-        // Surface per-row local-forward errors (parse, bind, accept,
-        // direct-tcpip open) in the same event log the user already sees
-        // for connection / auth / disconnect events. Also re-broadcast
-        // as a window-level CustomEvent keyed by the persisted session
-        // config id so an open SessionEditor can show the failure
-        // inline next to the offending forward row.
-        unlistenForwardError = await listenTerminalForwardError(connectedSid, (err) => {
-          appendEvent(
-            "error",
-            `Local forward ${err.local} → ${err.remote}: ${err.message}`,
+      // Surface per-row local-forward errors (parse, bind, accept,
+      // direct-tcpip open) in the same event log the user already sees
+      // for connection / auth / disconnect events. Also re-broadcast
+      // as a window-level CustomEvent keyed by the persisted session
+      // config id so an open SessionEditor can show the failure
+      // inline next to the offending forward row.
+      unlistenForwardError = await listenTerminalForwardError(connectedSid, (err) => {
+        appendEvent(
+          "error",
+          `Local forward ${err.local} → ${err.remote}: ${err.message}`,
+        );
+        if (ssh?.sessionId) {
+          window.dispatchEvent(
+            new CustomEvent("taomni:forward-error", {
+              detail: {
+                sessionConfigId: ssh.sessionId,
+                local: err.local,
+                remote: err.remote,
+                message: err.message,
+              },
+            }),
           );
-          if (ssh?.sessionId) {
-            window.dispatchEvent(
-              new CustomEvent("taomni:forward-error", {
-                detail: {
-                  sessionConfigId: ssh.sessionId,
-                  local: err.local,
-                  remote: err.remote,
-                  message: err.message,
-                },
-              }),
-            );
-          }
-        });
-      })
-      .catch((err) => {
-        console.error("Failed to create terminal:", err);
-        appendEvent("error", `Connection failed: ${String(err)}`);
-        term.write(`\x1b[31mConnection failed: ${err}\x1b[0m\r\n`);
+        }
       });
+    };
+
+    const handleConnectFailure = (err: unknown, mode: ConnectMode) => {
+      if (destroyed) return;
+      console.error("Failed to create terminal:", err);
+      cancelPendingMfa();
+      connectionStateRef.current = ssh ? "disconnected" : "idle";
+      sessionIdRef.current = null;
+      setRegisteredSessionId(null);
+      zmodemRef.current = null;
+      const message = String(err);
+      const label = ssh && mode === "reconnect" ? "Reconnect failed" : "Connection failed";
+      appendEvent("error", `${label}: ${message}`);
+      if (ssh && !adopted) {
+        term.write(`\r\n\x1b[31m[${label}] ${message}\x1b[0m\r\n\x1b[33mPress Enter to retry.\x1b[0m\r\n`);
+        setStatusMessage(`${label}; press Enter to retry`);
+        window.setTimeout(focusTerminal, 0);
+      } else {
+        term.write(`\x1b[31m${label}: ${message}\x1b[0m\r\n`);
+      }
+    };
+
+    const startSshConnection = (targetSid: string, mode: ConnectMode) => {
+      if (!ssh || adopted || destroyed) return;
+
+      clearConnectionListeners();
+      cancelPendingMfa();
+      connectionStateRef.current = mode === "reconnect" ? "reconnecting" : "connecting";
+      sessionIdRef.current = null;
+      setRegisteredSessionId(null);
+      zmodemRef.current = null;
+      registerSshAuthPrompt(targetSid);
+
+      appendEvent(
+        "connection",
+        `${mode === "reconnect" ? "Reconnecting" : "Connecting"} to ${ssh.username}@${ssh.host}:${ssh.port}`,
+      );
+      appendEvent("auth", `Using ${ssh.authMethod} authentication`);
+      if (mode === "reconnect") {
+        term.write(`\r\n\x1b[33m[Reconnecting to ${ssh.username}@${ssh.host}:${ssh.port}...]\x1b[0m\r\n`);
+        setStatusMessage("Reconnecting SSH terminal");
+      } else {
+        term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
+      }
+
+      const ns = getSessionNetworkSettings(ssh.optionsJson);
+      const opts = parseSessionOptions(ssh.optionsJson);
+      createSshTerminal(
+        targetSid,
+        ssh.host,
+        ssh.port,
+        ssh.username,
+        ssh.authMethod,
+        ssh.authData,
+        cols,
+        rows,
+        JSON.stringify(toNetworkSettingsPayload(ns)),
+        handleRawOutput,
+        // X11 forwarding: enabled per-session (defaults on, matching the
+        // SessionEditor default). Trusted mode unless the expert option
+        // explicitly opts into untrusted.
+        opts.x11 !== false,
+        opts.x11Trusted !== false,
+      )
+        .then((sessionId) => handleConnected({ sessionId, shellId: null }, mode))
+        .catch((err) => handleConnectFailure(err, mode));
+    };
+
+    reconnectSshRef.current = () => {
+      if (!ssh || adopted || destroyed) return;
+      if (connectionStateRef.current !== "disconnected") return;
+      startSshConnection(createTerminalSessionId(), "reconnect");
+    };
+
+    if (adopted) {
+      connectionStateRef.current = "connecting";
+      appendEvent("connection", `Reattaching terminal ${sid}`);
+      attachTerminalOutput(sid, handleRawOutput)
+        .then(() => handleConnected({ sessionId: sid, shellId: null }, "initial"))
+        .catch((err) => handleConnectFailure(err, "initial"));
+    } else if (ssh) {
+      startSshConnection(sid, "initial");
+    } else {
+      connectionStateRef.current = "connecting";
+      appendEvent("connection", `Starting ${localShell?.name ?? "local terminal"}`);
+      createLocalTerminal(
+        sid,
+        cols,
+        rows,
+        localShell?.id,
+        localShell?.args,
+        undefined,
+        handleRawOutput,
+      )
+        .then(({ sessionId, shellId }) => handleConnected({ sessionId, shellId }, "initial"))
+        .catch((err) => handleConnectFailure(err, "initial"));
+    }
 
     return () => {
       destroyed = true;
@@ -1960,6 +2079,8 @@ export function TerminalPanel({
       fitAddonRef.current = null;
       searchAddonRef.current = null;
       sessionIdRef.current = null;
+      connectionStateRef.current = "idle";
+      reconnectSshRef.current = null;
       setRegisteredSessionId(null);
       zmodemRef.current = null;
       imeGuardRef.current = null;

@@ -70,8 +70,8 @@ describe("WelcomePanel", () => {
     expect(brandMark).not.toHaveTextContent("N");
     expect(brandMark).toHaveClass("w-12", "h-12");
 
-    expect(screen.getByTestId("welcome-version")).toHaveTextContent("Version 0.2.4");
-    expect(screen.getByTestId("welcome-version-footer")).toHaveTextContent("v0.2.4");
+    expect(screen.getByTestId("welcome-version")).toHaveTextContent("Version 0.2.5");
+    expect(screen.getByTestId("welcome-version-footer")).toHaveTextContent("v0.2.5");
 
     await waitFor(() => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();

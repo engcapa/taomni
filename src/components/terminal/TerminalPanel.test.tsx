@@ -66,36 +66,44 @@ const webglMocks = vi.hoisted(() => ({
   ctor: vi.fn().mockImplementation(() => ({})),
 }));
 
-const ipcMocks = vi.hoisted(() => ({
-  closeTerminal: vi.fn(async () => undefined),
-  createLocalTerminal: vi.fn(async (sessionId: string) => ({ sessionId, shellId: "default" })),
-  createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
-  listenSshAuthPrompt: vi.fn(async () => vi.fn()),
-  submitSshAuthResponse: vi.fn(async () => undefined),
-  createTerminalSessionId: vi.fn(() => "terminal-session"),
-  encodeBase64: vi.fn((value: string) => btoa(value)),
-  listenTerminalExit: vi.fn(async () => vi.fn()),
-  listenTerminalForwardError: vi.fn(async () => vi.fn()),
-  listSystemFonts: vi.fn(async () => ["Source Code Pro"]),
-  readFileBytes: vi.fn(async () => new Uint8Array()),
-  readStreamClose: vi.fn(async () => undefined),
-  readStreamOpen: vi.fn(async () => ({ handleId: "read-handle", size: 0, mtime: 0 })),
-  readStreamRead: vi.fn(async () => new Uint8Array()),
-  resizeTerminal: vi.fn(async () => undefined),
-  selectSaveDirectory: vi.fn(async () => null),
-  selectUploadFile: vi.fn(async (): Promise<string[]> => []),
-  sendTerminalSignal: vi.fn(async () => undefined),
-  writeTerminal: vi.fn(async () => undefined),
-  writeStreamAbort: vi.fn(async () => undefined),
-  writeStreamAppend: vi.fn(async () => undefined),
-  writeStreamClose: vi.fn(async () => undefined),
-  writeStreamOpen: vi.fn(async () => "stream-handle"),
-  checkFileExists: vi.fn(async () => false),
-  historyAppend: vi.fn(async () => undefined),
-  historyMatchPrefix: vi.fn(async () => [] as string[]),
-  historyListRecent: vi.fn(async () => [] as string[]),
-  historyClear: vi.fn(async () => undefined),
-}));
+const ipcMocks = vi.hoisted(() => {
+  const terminalExitHandlers = new Map<string, () => void>();
+
+  return {
+    terminalExitHandlers,
+    closeTerminal: vi.fn(async () => undefined),
+    createLocalTerminal: vi.fn(async (sessionId: string) => ({ sessionId, shellId: "default" })),
+    createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
+    listenSshAuthPrompt: vi.fn(async () => vi.fn()),
+    submitSshAuthResponse: vi.fn(async () => undefined),
+    createTerminalSessionId: vi.fn(() => "terminal-session"),
+    encodeBase64: vi.fn((value: string) => btoa(value)),
+    listenTerminalExit: vi.fn(async (sessionId: string, callback: () => void) => {
+      terminalExitHandlers.set(sessionId, callback);
+      return vi.fn(() => terminalExitHandlers.delete(sessionId));
+    }),
+    listenTerminalForwardError: vi.fn(async () => vi.fn()),
+    listSystemFonts: vi.fn(async () => ["Source Code Pro"]),
+    readFileBytes: vi.fn(async () => new Uint8Array()),
+    readStreamClose: vi.fn(async () => undefined),
+    readStreamOpen: vi.fn(async () => ({ handleId: "read-handle", size: 0, mtime: 0 })),
+    readStreamRead: vi.fn(async () => new Uint8Array()),
+    resizeTerminal: vi.fn(async () => undefined),
+    selectSaveDirectory: vi.fn(async () => null),
+    selectUploadFile: vi.fn(async (): Promise<string[]> => []),
+    sendTerminalSignal: vi.fn(async () => undefined),
+    writeTerminal: vi.fn(async () => undefined),
+    writeStreamAbort: vi.fn(async () => undefined),
+    writeStreamAppend: vi.fn(async () => undefined),
+    writeStreamClose: vi.fn(async () => undefined),
+    writeStreamOpen: vi.fn(async () => "stream-handle"),
+    checkFileExists: vi.fn(async () => false),
+    historyAppend: vi.fn(async () => undefined),
+    historyMatchPrefix: vi.fn(async () => [] as string[]),
+    historyListRecent: vi.fn(async () => [] as string[]),
+    historyClear: vi.fn(async () => undefined),
+  };
+});
 
 vi.mock("@xterm/xterm", () => ({
   Terminal: terminalMocks.terminalCtor,
@@ -155,6 +163,17 @@ describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
+    ipcMocks.terminalExitHandlers.clear();
+    ipcMocks.createTerminalSessionId.mockImplementation(() => "terminal-session");
+    ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
+      sessionId,
+      shellId: "default",
+    }));
+    ipcMocks.createSshTerminal.mockImplementation(async (sessionId: string) => sessionId);
+    ipcMocks.listenTerminalExit.mockImplementation(async (sessionId: string, callback: () => void) => {
+      ipcMocks.terminalExitHandlers.set(sessionId, callback);
+      return vi.fn(() => ipcMocks.terminalExitHandlers.delete(sessionId));
+    });
     webglMocks.ctor.mockClear();
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -795,6 +814,101 @@ describe("TerminalPanel focus behavior", () => {
     await Promise.resolve();
 
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("reconnects an SSH terminal with Enter after exit while keeping the same xterm instance", async () => {
+    ipcMocks.createTerminalSessionId
+      .mockReturnValueOnce("terminal-session")
+      .mockReturnValueOnce("terminal-session-reconnect");
+    const onSessionReady = vi.fn();
+
+    render(<TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    ipcMocks.terminalExitHandlers.get("terminal-session")?.();
+
+    await waitFor(() => {
+      expect(term.write).toHaveBeenCalledWith(expect.stringContaining("Press Enter to reconnect"));
+    });
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalledWith("terminal-session", btoa("\r"));
+
+    terminalMocks.state.onDataHandler?.("\r");
+
+    await waitFor(() => {
+      expect(ipcMocks.createSshTerminal).toHaveBeenCalledTimes(2);
+    });
+    expect(ipcMocks.createSshTerminal).toHaveBeenLastCalledWith(
+      "terminal-session-reconnect",
+      sshInfo.host,
+      sshInfo.port,
+      sshInfo.username,
+      sshInfo.authMethod,
+      sshInfo.authData,
+      80,
+      24,
+      expect.any(String),
+      expect.any(Function),
+      true,
+      true,
+    );
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session-reconnect");
+    });
+    expect(terminalMocks.terminalCtor).toHaveBeenCalledTimes(1);
+    expect(term.write).toHaveBeenCalledWith(expect.stringContaining("[Reconnecting"));
+    expect(term.write).toHaveBeenCalledWith(expect.stringContaining("[Reconnected"));
+
+    ipcMocks.writeTerminal.mockClear();
+    terminalMocks.state.onDataHandler?.("whoami\r");
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session-reconnect",
+        btoa("whoami\r"),
+      );
+    });
+  });
+
+  it("shows a retry prompt when SSH reconnect fails and does not write Enter to the old session", async () => {
+    ipcMocks.createTerminalSessionId
+      .mockReturnValueOnce("terminal-session")
+      .mockReturnValueOnce("terminal-session-reconnect");
+    ipcMocks.createSshTerminal
+      .mockImplementationOnce(async (sessionId: string) => sessionId)
+      .mockImplementationOnce(async () => {
+        throw new Error("network down");
+      });
+    const onSessionReady = vi.fn();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      render(<TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      ipcMocks.terminalExitHandlers.get("terminal-session")?.();
+
+      ipcMocks.writeTerminal.mockClear();
+      terminalMocks.state.onDataHandler?.("\r");
+
+      await waitFor(() => {
+        expect(term.write).toHaveBeenCalledWith(expect.stringContaining("[Reconnect failed]"));
+        expect(term.write).toHaveBeenCalledWith(expect.stringContaining("Press Enter to retry"));
+      });
+      expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+
+      terminalMocks.state.onDataHandler?.("ls\r");
+      expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("accepts OSC 52 clipboard writes from SSH terminals when enabled", async () => {
