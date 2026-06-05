@@ -74,12 +74,22 @@ pub enum RdpControl {
     Key(KeyEvent),
     Pointer(PointerEvent),
     Wheel(PointerWheelEvent),
-    Resize { width: u16, height: u16 },
+    Resize {
+        width: u16,
+        height: u16,
+    },
     /// Ask the server to redraw the whole desktop (TS_REFRESH_RECT_PDU).
     Refresh,
-    ClipboardOffer { formats: u32 },
-    ClipboardData { format: u32, data: Vec<u8> },
-    ClipboardFiles { paths: Vec<String> },
+    ClipboardOffer {
+        formats: u32,
+    },
+    ClipboardData {
+        format: u32,
+        data: Vec<u8>,
+    },
+    ClipboardFiles {
+        paths: Vec<String>,
+    },
     Ack,
     Disconnect,
 }

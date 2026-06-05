@@ -33,10 +33,7 @@ pub(crate) fn is_wayland_session() -> bool {
     if std::env::var_os("WAYLAND_DISPLAY").is_some() {
         return true;
     }
-    matches!(
-        std::env::var("XDG_SESSION_TYPE").as_deref(),
-        Ok("wayland")
-    )
+    matches!(std::env::var("XDG_SESSION_TYPE").as_deref(), Ok("wayland"))
 }
 
 /// Attempt to build a Wayland capturer. Currently always returns `Err` with the

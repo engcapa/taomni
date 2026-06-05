@@ -88,6 +88,11 @@ const MAX_ROW_LIMIT = 1_000_000;
 const QUERY_WORKSPACE_CACHE_VERSION = 1;
 const QUERY_AUTO_SAVE_MS = 5000;
 
+function createRuntimeDbSessionId(baseSessionId: string): string {
+  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${baseSessionId}::${suffix}`;
+}
+
 type ResultSubTab = "results" | "messages";
 
 interface ResultSheet {
@@ -389,7 +394,7 @@ export default function DbClientTab({
 }: DbClientTabProps) {
   const t = useT();
   const queryTabMenu = useContextMenu();
-  const [connected, setConnected] = useState(false);
+  const [connectionSessionId, setConnectionSessionId] = useState<string | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
   const [panels, setPanels] = useState<PanelState[]>(() => [newPanel()]);
   const [activePanelId, setActivePanelId] = useState<string>(() => panels[0].id);
@@ -446,16 +451,23 @@ export default function DbClientTab({
   // Connect on mount, disconnect on unmount.
   useEffect(() => {
     let cancelled = false;
-    void dbConnect(info)
+    const runtimeSessionId = createRuntimeDbSessionId(sessionId);
+    setConnectionSessionId(null);
+    setConnError(null);
+    void dbConnect({ ...info, sessionId: runtimeSessionId })
       .then(() => {
-        if (!cancelled) setConnected(true);
+        if (cancelled) {
+          void dbDisconnect(runtimeSessionId).catch(() => undefined);
+          return;
+        }
+        setConnectionSessionId(runtimeSessionId);
       })
       .catch((err) => {
         if (!cancelled) setConnError(String(err));
       });
     return () => {
       cancelled = true;
-      void dbDisconnect(sessionId).catch(() => undefined);
+      void dbDisconnect(runtimeSessionId).catch(() => undefined);
       Object.values(timersRef.current).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -633,7 +645,8 @@ export default function DbClientTab({
       timersRef.current[sheetId] = timer;
       let sawDone = false;
       try {
-        await dbExecuteStream(sessionId, sql, maxRows, (event) => {
+        if (!connectionSessionId) throw new Error("Database connection is still starting.");
+        await dbExecuteStream(connectionSessionId, sql, maxRows, (event) => {
           if (event.kind === "columns") {
             updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
@@ -695,7 +708,7 @@ export default function DbClientTab({
         }
       }
     },
-    [patchSheet, sessionId, updateSheet],
+    [connectionSessionId, patchSheet, updateSheet],
   );
 
   const runQuery = useCallback(
@@ -811,8 +824,10 @@ export default function DbClientTab({
             },
       ),
     );
-    void dbCancel(sessionId).catch(() => undefined);
-  }, [sessionId]);
+    if (connectionSessionId) {
+      void dbCancel(connectionSessionId).catch(() => undefined);
+    }
+  }, [connectionSessionId]);
 
   const refreshSheet = useCallback(
     async (panelId: string, sheetId: string, mode: QueryRefreshMode) => {
@@ -856,7 +871,8 @@ export default function DbClientTab({
       const tableName = qualifiedName(info.engine, schema, target.table, info.catalog);
       let described: DbColumnDescription[] = [];
       try {
-        described = await dbDescribeTable(sessionId, schema, target.table);
+        if (!connectionSessionId) throw new Error("Database connection is still starting.");
+        described = await dbDescribeTable(connectionSessionId, schema, target.table);
       } catch {
         described = [];
       }
@@ -891,14 +907,15 @@ export default function DbClientTab({
       }
       if (statements.length === 0) return;
       for (const sql of statements) {
-        await dbExecute(sessionId, sql);
+        if (!connectionSessionId) throw new Error("Database connection is still starting.");
+        await dbExecute(connectionSessionId, sql);
       }
       setStatusMessage(
         `Submitted grid changes: ${payload.counts.inserted} added, ${payload.counts.updated} modified, ${payload.counts.deleted} deleted.`,
       );
       await refreshSheet(panelId, sheetId, "clearView");
     },
-    [activeSchema, info.catalog, info.engine, panels, refreshSheet, sessionId, setStatusMessage],
+    [activeSchema, connectionSessionId, info.catalog, info.engine, panels, refreshSheet, setStatusMessage],
   );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
@@ -929,7 +946,8 @@ export default function DbClientTab({
       const sheet = newResultSheet(sql, (panel?.sheets.length ?? 0) + 1, rowLimit);
       sheet.title = "Schema";
       try {
-        const result = await dbExecute(sessionId, sql);
+        if (!connectionSessionId) throw new Error("Database connection is still starting.");
+        const result = await dbExecute(connectionSessionId, sql);
         setActiveSchema(schema);
         setPanels((prev) =>
           prev.map((p) =>
@@ -975,7 +993,7 @@ export default function DbClientTab({
         );
       }
     },
-    [activePanelId, activeSchema, info.catalog, info.engine, maxResultSheets, panels, rowLimit, sessionId],
+    [activePanelId, activeSchema, connectionSessionId, info.catalog, info.engine, maxResultSheets, panels, rowLimit],
   );
   const insertIntoActive = useCallback(
     (text: string) => {
@@ -1003,7 +1021,9 @@ export default function DbClientTab({
 
   const cleanupClosedPanels = (closingPanels: PanelState[]) => {
     if (closingPanels.some((panel) => panel.sheets.some((sheet) => sheet.running))) {
-      void dbCancel(sessionId).catch(() => undefined);
+      if (connectionSessionId) {
+        void dbCancel(connectionSessionId).catch(() => undefined);
+      }
     }
     closingPanels.forEach((panel) => {
       panel.sheets.forEach((sheet) => {
@@ -1116,7 +1136,9 @@ export default function DbClientTab({
   const closeResultSheet = (panelId: string, sheetId: string) => {
     const sheet = panels.find((p) => p.id === panelId)?.sheets.find((s) => s.id === sheetId);
     if (sheet?.running) {
-      void dbCancel(sessionId).catch(() => undefined);
+      if (connectionSessionId) {
+        void dbCancel(connectionSessionId).catch(() => undefined);
+      }
     }
     if (timersRef.current[sheetId]) {
       clearInterval(timersRef.current[sheetId]);
@@ -1379,9 +1401,9 @@ export default function DbClientTab({
           onResize={handleSchemaResize}
         >
           <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
-            {connected && (
+            {connectionSessionId && (
               <SchemaTree
-                sessionId={sessionId}
+                sessionId={connectionSessionId}
                 engine={info.engine}
                 onInsertTable={insertIntoActive}
                 onQuickSelect={quickSelect}

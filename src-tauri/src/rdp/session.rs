@@ -344,11 +344,14 @@ impl ClipboardBridge {
         let list = PackedFileList {
             files: files
                 .into_iter()
-                .map(|file| IronClipboardFileDescriptor {
-                    attributes: Some(file.attributes),
-                    last_write_time: None,
-                    file_size: (!file.is_directory).then_some(file.size),
-                    name: file.name,
+                .map(|file| {
+                    let descriptor = IronClipboardFileDescriptor::new(file.name)
+                        .with_attributes(file.attributes);
+                    if file.is_directory {
+                        descriptor
+                    } else {
+                        descriptor.with_file_size(file.size)
+                    }
                 })
                 .collect(),
         };
@@ -371,7 +374,7 @@ impl ClipboardBridge {
         if request.flags.contains(FileContentsFlags::SIZE) {
             return FileContentsResponse::new_size_response(request.stream_id, file.size);
         }
-        if !request.flags.contains(FileContentsFlags::DATA) || file.is_directory {
+        if !request.flags.contains(FileContentsFlags::RANGE) || file.is_directory {
             return FileContentsResponse::new_error(request.stream_id);
         }
         read_clipboard_file_range(&file.path, request.position, request.requested_size)
@@ -1213,7 +1216,8 @@ where
             }
             ClipboardAction::RequestRemoteData(format) => {
                 let messages = {
-                    let Some(cliprdr) = active_stage.get_svc_processor::<CliprdrClient>() else {
+                    let Some(cliprdr) = active_stage.get_svc_processor_mut::<CliprdrClient>()
+                    else {
                         send_status(
                             out_tx,
                             "clipboard-unavailable",
@@ -1246,7 +1250,8 @@ where
             }
             ClipboardAction::SubmitFormatData(response) => {
                 let messages = {
-                    let Some(cliprdr) = active_stage.get_svc_processor::<CliprdrClient>() else {
+                    let Some(cliprdr) = active_stage.get_svc_processor_mut::<CliprdrClient>()
+                    else {
                         send_status(
                             out_tx,
                             "clipboard-unavailable",
@@ -1262,7 +1267,8 @@ where
             }
             ClipboardAction::SubmitFileContents(response) => {
                 let messages = {
-                    let Some(cliprdr) = active_stage.get_svc_processor::<CliprdrClient>() else {
+                    let Some(cliprdr) = active_stage.get_svc_processor_mut::<CliprdrClient>()
+                    else {
                         send_status(
                             out_tx,
                             "clipboard-unavailable",
@@ -1292,7 +1298,7 @@ where
     S: FramedWrite,
 {
     let messages = {
-        let Some(cliprdr) = active_stage.get_svc_processor::<CliprdrClient>() else {
+        let Some(cliprdr) = active_stage.get_svc_processor_mut::<CliprdrClient>() else {
             send_status(
                 out_tx,
                 "clipboard-unavailable",
@@ -1388,6 +1394,9 @@ where
                 );
                 return Ok(ActiveOutputFlow::Reactivate(*sequence));
             }
+            ActiveStageOutput::MultitransportRequest(_) | ActiveStageOutput::AutoDetect(_) => {
+                // Optional RDP transports are not established by this client.
+            }
         }
     }
     Ok(ActiveOutputFlow::Continue)
@@ -1470,7 +1479,10 @@ where
 /// Write any bytes a reactivation step produced to the framed transport.
 /// Reactivation states may legitimately emit nothing (e.g. the Font Map
 /// `WaitForResponse` transition), so an empty buffer is not an error.
-async fn flush_reactivation_output<S>(framed: &mut Framed<S>, output: &WriteBuf) -> Result<(), String>
+async fn flush_reactivation_output<S>(
+    framed: &mut Framed<S>,
+    output: &WriteBuf,
+) -> Result<(), String>
 where
     S: FramedWrite,
 {
@@ -1670,8 +1682,8 @@ fn next_remote_file_request(
         .insert(stream_id, RemoteFileStream { index, position });
     FileContentsRequest {
         stream_id,
-        index: index as u32,
-        flags: FileContentsFlags::DATA,
+        index: index as i32,
+        flags: FileContentsFlags::RANGE,
         position,
         requested_size,
         data_id: None,
@@ -1927,6 +1939,8 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
         keyboard_functional_keys_count: 12,
         ime_file_name: String::new(),
         dig_product_id: String::new(),
+        alternate_shell: String::new(),
+        work_dir: String::new(),
         desktop_size: connector::DesktopSize { width, height },
         desktop_scale_factor: 0,
         bitmap: Some(connector::BitmapConfig {
@@ -1947,6 +1961,8 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
         hardware_id: None,
         license_cache: None::<Arc<dyn connector::LicenseCache>>,
         timezone_info: TimezoneInfo::default(),
+        compression_type: None,
+        multitransport_flags: None,
     }
 }
 
@@ -2228,7 +2244,7 @@ mod tests {
         let data = bridge.local_file_contents_response(&FileContentsRequest {
             stream_id: 8,
             index: 0,
-            flags: FileContentsFlags::DATA,
+            flags: FileContentsFlags::RANGE,
             position: 2,
             requested_size: 3,
             data_id: None,
@@ -2242,12 +2258,9 @@ mod tests {
         let (mut handle, out_tx, _ctrl_rx) = RdpSessionHandle::new();
         let bridge = ClipboardBridge::new(out_tx);
         bridge.start_remote_file_receive(PackedFileList {
-            files: vec![IronClipboardFileDescriptor {
-                attributes: Some(ClipboardFileAttributes::NORMAL),
-                last_write_time: None,
-                file_size: Some(3),
-                name: "remote.txt".to_owned(),
-            }],
+            files: vec![IronClipboardFileDescriptor::new("remote.txt")
+                .with_attributes(ClipboardFileAttributes::NORMAL)
+                .with_file_size(3)],
         });
 
         let actions = bridge.drain_actions();

@@ -8,9 +8,16 @@ use std::{
 };
 
 use futures::TryStreamExt;
-use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode};
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
-use sqlx::{Column, Row, TypeInfo};
+use sqlx_core::column::Column;
+use sqlx_core::pool::Pool;
+use sqlx_core::query::query;
+use sqlx_core::row::Row;
+use sqlx_core::sql_str::AssertSqlSafe;
+use sqlx_core::type_info::TypeInfo;
+use sqlx_core::types::{BigDecimal, Uuid};
+use sqlx_core::Error as SqlxError;
+use sqlx_mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions, MySqlRow, MySqlSslMode};
+use sqlx_postgres::{PgConnectOptions, PgPoolOptions, PgRow, PgSslMode, Postgres};
 use tokio_util::sync::CancellationToken;
 
 use super::{
@@ -95,16 +102,16 @@ pub async fn connect_postgres(
 // Ping
 // ---------------------------------------------------------------------------
 
-pub async fn ping_mysql(pool: &sqlx::Pool<sqlx::MySql>) -> Result<String, String> {
-    sqlx::query("SELECT 1")
+pub async fn ping_mysql(pool: &Pool<MySql>) -> Result<String, String> {
+    query("SELECT 1")
         .execute(pool)
         .await
         .map_err(|e| format!("MySQL ping failed: {e}"))?;
     Ok("MySQL connection OK".into())
 }
 
-pub async fn ping_postgres(pool: &sqlx::Pool<sqlx::Postgres>) -> Result<String, String> {
-    sqlx::query("SELECT 1")
+pub async fn ping_postgres(pool: &Pool<Postgres>) -> Result<String, String> {
+    query("SELECT 1")
         .execute(pool)
         .await
         .map_err(|e| format!("PostgreSQL ping failed: {e}"))?;
@@ -118,7 +125,7 @@ pub async fn ping_postgres(pool: &sqlx::Pool<sqlx::Postgres>) -> Result<String, 
 /// Decode the i-th column of a MySQL row to an optional display string. The
 /// column's SQL type name drives which concrete `try_get` is attempted, with a
 /// raw-bytes / lossy-utf8 fallback so unknown types never panic.
-fn mysql_value_to_string(row: &sqlx::mysql::MySqlRow, i: usize) -> Option<String> {
+fn mysql_value_to_string(row: &MySqlRow, i: usize) -> Option<String> {
     let col = &row.columns()[i];
     let type_name = col.type_info().name().to_uppercase();
     macro_rules! try_as {
@@ -137,7 +144,7 @@ fn mysql_value_to_string(row: &sqlx::mysql::MySqlRow, i: usize) -> Option<String
         "BIGINT" => try_as!(i64),
         "FLOAT" => try_as!(f32),
         "DOUBLE" | "REAL" => try_as!(f64),
-        "DECIMAL" | "NUMERIC" => try_as!(sqlx::types::BigDecimal),
+        "DECIMAL" | "NUMERIC" => try_as!(BigDecimal),
         "DATE" => try_as!(chrono::NaiveDate),
         "TIME" => try_as!(chrono::NaiveTime),
         "DATETIME" | "TIMESTAMP" => try_as!(chrono::NaiveDateTime),
@@ -159,7 +166,7 @@ fn mysql_value_to_string(row: &sqlx::mysql::MySqlRow, i: usize) -> Option<String
 }
 
 /// Decode the i-th column of a PostgreSQL row to an optional display string.
-fn pg_value_to_string(row: &sqlx::postgres::PgRow, i: usize) -> Option<String> {
+fn pg_value_to_string(row: &PgRow, i: usize) -> Option<String> {
     let col = &row.columns()[i];
     let type_name = col.type_info().name().to_uppercase();
     macro_rules! try_as {
@@ -176,12 +183,12 @@ fn pg_value_to_string(row: &sqlx::postgres::PgRow, i: usize) -> Option<String> {
         "INT8" => try_as!(i64),
         "FLOAT4" => try_as!(f32),
         "FLOAT8" => try_as!(f64),
-        "NUMERIC" => try_as!(sqlx::types::BigDecimal),
+        "NUMERIC" => try_as!(BigDecimal),
         "DATE" => try_as!(chrono::NaiveDate),
         "TIME" => try_as!(chrono::NaiveTime),
         "TIMESTAMP" => try_as!(chrono::NaiveDateTime),
         "TIMESTAMPTZ" => try_as!(chrono::DateTime<chrono::Utc>),
-        "UUID" => try_as!(sqlx::types::Uuid),
+        "UUID" => try_as!(Uuid),
         "JSON" | "JSONB" => {
             if let Ok(v) = row.try_get::<Option<serde_json::Value>, _>(i) {
                 return v.map(|x| x.to_string());
@@ -262,13 +269,13 @@ fn limit_warning(limit_reached: bool, max_rows: Option<u64>) -> Vec<String> {
 // ---------------------------------------------------------------------------
 
 pub async fn execute_mysql(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     sql: &str,
     token: &CancellationToken,
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
     if is_query(sql) {
-        let fetch = sqlx::query(sql).fetch_all(pool);
+        let fetch = query(AssertSqlSafe(sql)).fetch_all(pool);
         let rows = tokio::select! {
             _ = token.cancelled() => return Err("Query cancelled".into()),
             r = fetch => r.map_err(|e| format!("Query failed: {e}"))?,
@@ -301,7 +308,7 @@ pub async fn execute_mysql(
             warnings: Vec::new(),
         })
     } else {
-        let exec = sqlx::query(sql).execute(pool);
+        let exec = query(AssertSqlSafe(sql)).execute(pool);
         let res = tokio::select! {
             _ = token.cancelled() => return Err("Query cancelled".into()),
             r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
@@ -317,13 +324,13 @@ pub async fn execute_mysql(
 }
 
 pub async fn execute_postgres(
-    pool: &sqlx::Pool<sqlx::Postgres>,
+    pool: &Pool<Postgres>,
     sql: &str,
     token: &CancellationToken,
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
     if is_query(sql) {
-        let fetch = sqlx::query(sql).fetch_all(pool);
+        let fetch = query(AssertSqlSafe(sql)).fetch_all(pool);
         let rows = tokio::select! {
             _ = token.cancelled() => return Err("Query cancelled".into()),
             r = fetch => r.map_err(|e| format!("Query failed: {e}"))?,
@@ -356,7 +363,7 @@ pub async fn execute_postgres(
             warnings: Vec::new(),
         })
     } else {
-        let exec = sqlx::query(sql).execute(pool);
+        let exec = query(AssertSqlSafe(sql)).execute(pool);
         let res = tokio::select! {
             _ = token.cancelled() => return Err("Query cancelled".into()),
             r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
@@ -372,7 +379,7 @@ pub async fn execute_postgres(
 }
 
 pub async fn execute_mysql_stream(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     sql: &str,
     max_rows: Option<u64>,
     token: &CancellationToken,
@@ -380,7 +387,7 @@ pub async fn execute_mysql_stream(
 ) -> Result<(), String> {
     let start = Instant::now();
     if is_query(sql) {
-        let mut stream = sqlx::query(sql).fetch(pool);
+        let mut stream = query(AssertSqlSafe(sql)).fetch(pool);
         let mut columns_sent = false;
         let mut row_count = 0_u64;
         let max_rows = max_rows.filter(|value| *value > 0);
@@ -441,7 +448,7 @@ pub async fn execute_mysql_stream(
             },
         )
     } else {
-        let exec = sqlx::query(sql).execute(pool);
+        let exec = query(AssertSqlSafe(sql)).execute(pool);
         let res = tokio::select! {
             _ = token.cancelled() => return Err("Query cancelled".into()),
             r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
@@ -458,7 +465,7 @@ pub async fn execute_mysql_stream(
 }
 
 pub async fn execute_postgres_stream(
-    pool: &sqlx::Pool<sqlx::Postgres>,
+    pool: &Pool<Postgres>,
     sql: &str,
     max_rows: Option<u64>,
     token: &CancellationToken,
@@ -466,7 +473,7 @@ pub async fn execute_postgres_stream(
 ) -> Result<(), String> {
     let start = Instant::now();
     if is_query(sql) {
-        let mut stream = sqlx::query(sql).fetch(pool);
+        let mut stream = query(AssertSqlSafe(sql)).fetch(pool);
         let mut columns_sent = false;
         let mut row_count = 0_u64;
         let max_rows = max_rows.filter(|value| *value > 0);
@@ -527,7 +534,7 @@ pub async fn execute_postgres_stream(
             },
         )
     } else {
-        let exec = sqlx::query(sql).execute(pool);
+        let exec = query(AssertSqlSafe(sql)).execute(pool);
         let res = tokio::select! {
             _ = token.cancelled() => return Err("Query cancelled".into()),
             r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
@@ -566,20 +573,16 @@ fn add_mysql_schema_name(names: &mut BTreeSet<String>, name: Option<String>) {
     }
 }
 
-async fn current_mysql_database(
-    pool: &sqlx::Pool<sqlx::MySql>,
-) -> Result<Option<String>, sqlx::Error> {
-    sqlx::query("SELECT DATABASE()")
+async fn current_mysql_database(pool: &Pool<MySql>) -> Result<Option<String>, SqlxError> {
+    query("SELECT DATABASE()")
         .fetch_optional(pool)
         .await?
         .and_then(|r| r.try_get::<Option<String>, _>(0).ok().flatten())
         .map_or(Ok(None), |db| Ok(Some(db)))
 }
 
-async fn list_schemas_mysql_show(
-    pool: &sqlx::Pool<sqlx::MySql>,
-) -> Result<Vec<String>, sqlx::Error> {
-    let rows = sqlx::query("SHOW DATABASES").fetch_all(pool).await?;
+async fn list_schemas_mysql_show(pool: &Pool<MySql>) -> Result<Vec<String>, SqlxError> {
+    let rows = query("SHOW DATABASES").fetch_all(pool).await?;
     Ok(rows
         .iter()
         .filter_map(|r| mysql_value_to_string(r, 0))
@@ -594,7 +597,7 @@ fn mysql_table_kind(table_type: &str) -> String {
     }
 }
 
-fn mysql_non_unique_is_unique(row: &sqlx::mysql::MySqlRow, index: usize) -> bool {
+fn mysql_non_unique_is_unique(row: &MySqlRow, index: usize) -> bool {
     if let Ok(v) = row.try_get::<i64, _>(index) {
         return v == 0;
     }
@@ -605,14 +608,14 @@ fn mysql_non_unique_is_unique(row: &sqlx::mysql::MySqlRow, index: usize) -> bool
 }
 
 async fn list_tables_mysql_show(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     schema: Option<&str>,
-) -> Result<Vec<TableInfo>, sqlx::Error> {
+) -> Result<Vec<TableInfo>, SqlxError> {
     let sql = match schema {
         Some(schema) => format!("SHOW FULL TABLES FROM {}", quote_mysql_ident(schema)),
         None => "SHOW FULL TABLES".to_string(),
     };
-    let rows = sqlx::query(&sql).fetch_all(pool).await?;
+    let rows = query(AssertSqlSafe(sql)).fetch_all(pool).await?;
     Ok(rows
         .iter()
         .filter_map(|r| {
@@ -628,15 +631,15 @@ async fn list_tables_mysql_show(
 }
 
 async fn describe_table_mysql_show(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     schema: Option<&str>,
     table: &str,
-) -> Result<Vec<ColumnDescription>, sqlx::Error> {
+) -> Result<Vec<ColumnDescription>, SqlxError> {
     let sql = format!(
         "SHOW FULL COLUMNS FROM {}",
         quote_mysql_table(schema, table)
     );
-    let rows = sqlx::query(&sql).fetch_all(pool).await?;
+    let rows = query(AssertSqlSafe(sql)).fetch_all(pool).await?;
     Ok(rows
         .iter()
         .filter_map(|r| {
@@ -657,12 +660,12 @@ async fn describe_table_mysql_show(
 }
 
 async fn list_indexes_mysql_show(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     schema: Option<&str>,
     table: &str,
-) -> Result<Vec<IndexInfo>, sqlx::Error> {
+) -> Result<Vec<IndexInfo>, SqlxError> {
     let sql = format!("SHOW INDEX FROM {}", quote_mysql_table(schema, table));
-    let rows = sqlx::query(&sql).fetch_all(pool).await?;
+    let rows = query(AssertSqlSafe(sql)).fetch_all(pool).await?;
     let mut parsed: Vec<(String, i64, String, bool)> = rows
         .iter()
         .filter_map(|r| {
@@ -688,11 +691,11 @@ async fn list_indexes_mysql_show(
     ))
 }
 
-pub async fn list_schemas_mysql(pool: &sqlx::Pool<sqlx::MySql>) -> Result<Vec<SchemaInfo>, String> {
+pub async fn list_schemas_mysql(pool: &Pool<MySql>) -> Result<Vec<SchemaInfo>, String> {
     let mut names = BTreeSet::new();
     let mut errors = Vec::new();
 
-    match sqlx::query(
+    match query(
         "SELECT schema_name FROM information_schema.schemata \
          WHERE schema_name NOT IN ('information_schema','mysql','sys','performance_schema') \
          ORDER BY schema_name",
@@ -734,7 +737,7 @@ pub async fn list_schemas_mysql(pool: &sqlx::Pool<sqlx::MySql>) -> Result<Vec<Sc
 }
 
 pub async fn list_tables_mysql(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     schema: Option<&str>,
 ) -> Result<Vec<TableInfo>, String> {
     let q = if schema.is_some() {
@@ -744,7 +747,7 @@ pub async fn list_tables_mysql(
         "SELECT table_name, table_type, table_rows FROM information_schema.tables \
          WHERE table_schema = DATABASE() ORDER BY table_name"
     };
-    let mut query = sqlx::query(q);
+    let mut query = query(q);
     if let Some(s) = schema {
         query = query.bind(s);
     }
@@ -800,7 +803,7 @@ pub async fn list_tables_mysql(
 }
 
 pub async fn describe_table_mysql(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<ColumnDescription>, String> {
@@ -808,12 +811,7 @@ pub async fn describe_table_mysql(
              FROM information_schema.columns \
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ? \
              ORDER BY ordinal_position";
-    let rows = match sqlx::query(q)
-        .bind(schema)
-        .bind(table)
-        .fetch_all(pool)
-        .await
-    {
+    let rows = match query(q).bind(schema).bind(table).fetch_all(pool).await {
         Ok(rows) if !rows.is_empty() => rows,
         Ok(_) => {
             return describe_table_mysql_show(pool, schema, table)
@@ -850,7 +848,7 @@ pub async fn describe_table_mysql(
 }
 
 pub async fn list_indexes_mysql(
-    pool: &sqlx::Pool<sqlx::MySql>,
+    pool: &Pool<MySql>,
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<IndexInfo>, String> {
@@ -858,12 +856,7 @@ pub async fn list_indexes_mysql(
              FROM information_schema.statistics \
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ? \
              ORDER BY index_name, seq_in_index";
-    let rows = match sqlx::query(q)
-        .bind(schema)
-        .bind(table)
-        .fetch_all(pool)
-        .await
-    {
+    let rows = match query(q).bind(schema).bind(table).fetch_all(pool).await {
         Ok(rows) if !rows.is_empty() => rows,
         Ok(_) => {
             return list_indexes_mysql_show(pool, schema, table)
@@ -892,10 +885,8 @@ pub async fn list_indexes_mysql(
 // Schema introspection — PostgreSQL
 // ---------------------------------------------------------------------------
 
-pub async fn list_schemas_postgres(
-    pool: &sqlx::Pool<sqlx::Postgres>,
-) -> Result<Vec<SchemaInfo>, String> {
-    let rows = sqlx::query(
+pub async fn list_schemas_postgres(pool: &Pool<Postgres>) -> Result<Vec<SchemaInfo>, String> {
+    let rows = query(
         "SELECT schema_name FROM information_schema.schemata \
          WHERE schema_name NOT LIKE 'pg_%' AND schema_name <> 'information_schema' \
          ORDER BY schema_name",
@@ -911,11 +902,11 @@ pub async fn list_schemas_postgres(
 }
 
 pub async fn list_tables_postgres(
-    pool: &sqlx::Pool<sqlx::Postgres>,
+    pool: &Pool<Postgres>,
     schema: Option<&str>,
 ) -> Result<Vec<TableInfo>, String> {
     let schema = schema.unwrap_or("public");
-    let rows = sqlx::query(
+    let rows = query(
         "SELECT t.table_name, t.table_type, \
                 CASE WHEN c.reltuples >= 0 THEN c.reltuples::bigint ELSE NULL END AS row_count \
          FROM information_schema.tables t \
@@ -946,7 +937,7 @@ pub async fn list_tables_postgres(
         })
         .collect();
     // Materialized views live in pg_matviews, not information_schema.
-    if let Ok(mvs) = sqlx::query("SELECT matviewname FROM pg_matviews WHERE schemaname = $1")
+    if let Ok(mvs) = query("SELECT matviewname FROM pg_matviews WHERE schemaname = $1")
         .bind(schema)
         .fetch_all(pool)
         .await
@@ -966,12 +957,12 @@ pub async fn list_tables_postgres(
 }
 
 pub async fn describe_table_postgres(
-    pool: &sqlx::Pool<sqlx::Postgres>,
+    pool: &Pool<Postgres>,
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<ColumnDescription>, String> {
     let schema = schema.unwrap_or("public");
-    let rows = sqlx::query(
+    let rows = query(
         "SELECT c.column_name, c.data_type, c.is_nullable, c.column_default, \
             COALESCE(pk.is_pk, false) AS is_pk \
          FROM information_schema.columns c \
@@ -1012,12 +1003,12 @@ pub async fn describe_table_postgres(
 }
 
 pub async fn list_indexes_postgres(
-    pool: &sqlx::Pool<sqlx::Postgres>,
+    pool: &Pool<Postgres>,
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<IndexInfo>, String> {
     let schema = schema.unwrap_or("public");
-    let rows = sqlx::query(
+    let rows = query(
         "SELECT i.relname AS index_name, a.attname AS column_name, ix.indisunique AS is_unique \
          FROM pg_class t \
          JOIN pg_namespace n ON n.oid = t.relnamespace \

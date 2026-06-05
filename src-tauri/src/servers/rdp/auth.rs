@@ -20,7 +20,11 @@ impl AuthConfig {
     /// Build from raw config fields, enforcing the "must have credentials" rule.
     /// Returns `Err` with a user-facing message when username or password is
     /// missing, so the leaf can surface it as a startup error.
-    pub(crate) fn from_fields(username: &str, password: &str, domain: &str) -> Result<Self, String> {
+    pub(crate) fn from_fields(
+        username: &str,
+        password: &str,
+        domain: &str,
+    ) -> Result<Self, String> {
         let username = username.trim();
         if username.is_empty() || password.is_empty() {
             return Err(

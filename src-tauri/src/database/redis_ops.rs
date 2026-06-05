@@ -7,26 +7,32 @@ use tokio::sync::Mutex as AsyncMutex;
 use super::{DbConfig, DbHandle, RedisKeyEntry, RedisScanPage, RedisValue};
 
 pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHandle, String> {
-    let addr = if config.ssl {
-        redis::ConnectionAddr::TcpTls {
-            host: config.host.clone(),
-            port: config.port,
-            insecure: false,
-            tls_params: None,
-        }
+    let scheme = if config.ssl { "rediss" } else { "redis" };
+    let host = if config.host.contains(':') && !config.host.starts_with('[') {
+        format!("[{}]", config.host)
     } else {
-        redis::ConnectionAddr::Tcp(config.host.clone(), config.port)
+        config.host.clone()
     };
-    let info = redis::ConnectionInfo {
-        addr,
-        redis: redis::RedisConnectionInfo {
-            db: config.db_index.unwrap_or(0),
-            username: config.username.clone().filter(|u| !u.is_empty()),
-            password: password.map(|p| p.to_string()),
-            protocol: redis::ProtocolVersion::RESP2,
-        },
+    let username = config.username.as_deref().filter(|u| !u.is_empty());
+    let password = password.filter(|p| !p.is_empty());
+    let auth = match (username, password) {
+        (Some(user), Some(pass)) => {
+            format!(
+                "{}:{}@",
+                urlencoding::encode(user),
+                urlencoding::encode(pass)
+            )
+        }
+        (Some(user), None) => format!("{}@", urlencoding::encode(user)),
+        (None, Some(pass)) => format!(":{}@", urlencoding::encode(pass)),
+        (None, None) => String::new(),
     };
-    let client = redis::Client::open(info).map_err(|e| format!("Redis open failed: {e}"))?;
+    let url = format!(
+        "{scheme}://{auth}{host}:{}/{}",
+        config.port,
+        config.db_index.unwrap_or(0)
+    );
+    let client = redis::Client::open(url).map_err(|e| format!("Redis open failed: {e}"))?;
     let conn = client
         .get_multiplexed_async_connection()
         .await
@@ -419,7 +425,7 @@ fn value_to_string(value: &Value) -> Option<String> {
         Value::Double(d) => Some(d.to_string()),
         Value::Boolean(b) => Some(b.to_string()),
         Value::VerbatimString { text, .. } => Some(text.clone()),
-        Value::BigNumber(n) => Some(n.to_string()),
+        Value::BigNumber(n) => Some(String::from_utf8_lossy(n).into_owned()),
         Value::Array(items) | Value::Set(items) => Some(
             items
                 .iter()
@@ -453,5 +459,6 @@ fn value_to_string(value: &Value) -> Option<String> {
             e.code(),
             e.details().unwrap_or("")
         )),
+        _ => None,
     }
 }

@@ -91,10 +91,7 @@ pub async fn set_status(app: &AppHandle, registry: &ServerRegistry, status: Serv
 /// Each leaf performs its own fallible setup (bind socket / locate binary)
 /// and returns `Err` synchronously on failure so the caller can map it to an
 /// `Error` status.
-pub async fn start(
-    ctx: ServerCtx,
-    config: super::ServerConfig,
-) -> Result<ServerStarted, String> {
+pub async fn start(ctx: ServerCtx, config: super::ServerConfig) -> Result<ServerStarted, String> {
     match ctx.server_type {
         ServerType::Ssh => super::ssh::start(ctx, config).await,
         ServerType::Ftp => super::ftp::start(ctx, config).await,

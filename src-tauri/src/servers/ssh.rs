@@ -18,14 +18,14 @@
 //! (an SSH server that accepts anyone is almost never what the user wants).
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use russh::keys::key::{self, KeyPair, PublicKey};
+use russh::keys::{Algorithm, PrivateKey, PublicKey};
 use russh::server::{Auth, Config as RusshConfig, Handler as ServerHandler, Msg, Server, Session};
-use russh::{Channel, ChannelId, CryptoVec, MethodSet};
+use russh::{Channel, ChannelId, MethodKind, MethodSet};
 use russh_sftp::protocol::{
     File, FileAttributes, Handle as SftpHandle, Name, Status, StatusCode, Version,
 };
@@ -109,63 +109,82 @@ struct SshConnection {
     authed_user: Option<String>,
 }
 
-#[async_trait]
 impl ServerHandler for SshConnection {
     type Error = russh::Error;
 
-    async fn auth_password(&mut self, user: &str, password: &str) -> Result<Auth, Self::Error> {
-        if !self.policy.user_allowed(user) {
-            self.log.line(format!("password auth rejected: user '{}' not allowed", user));
-            return Ok(reject());
-        }
-        match &self.policy.password {
-            Some(expected) if expected == password => {
-                self.authed_user = Some(user.to_string());
-                self.log.line(format!("password auth accepted for '{}'", user));
-                Ok(Auth::Accept)
-            }
-            Some(_) => {
-                self.log.line(format!("password auth rejected for '{}'", user));
-                Ok(reject())
-            }
-            None => Ok(reject()),
-        }
-    }
-
-    async fn auth_publickey(
+    fn auth_password(
         &mut self,
         user: &str,
-        offered: &key::PublicKey,
-    ) -> Result<Auth, Self::Error> {
-        if !self.policy.user_allowed(user) {
-            self.log.line(format!("publickey auth rejected: user '{}' not allowed", user));
-            return Ok(reject());
-        }
-        match &self.policy.authorized_key {
-            Some(authorized) if authorized == offered => {
-                self.authed_user = Some(user.to_string());
-                self.log.line(format!("publickey auth accepted for '{}'", user));
-                Ok(Auth::Accept)
+        password: &str,
+    ) -> impl Future<Output = Result<Auth, Self::Error>> + Send {
+        async move {
+            if !self.policy.user_allowed(user) {
+                self.log.line(format!(
+                    "password auth rejected: user '{}' not allowed",
+                    user
+                ));
+                return Ok(reject());
             }
-            _ => {
-                self.log.line(format!("publickey auth rejected for '{}'", user));
-                Ok(reject())
+            match &self.policy.password {
+                Some(expected) if expected == password => {
+                    self.authed_user = Some(user.to_string());
+                    self.log
+                        .line(format!("password auth accepted for '{}'", user));
+                    Ok(Auth::Accept)
+                }
+                Some(_) => {
+                    self.log
+                        .line(format!("password auth rejected for '{}'", user));
+                    Ok(reject())
+                }
+                None => Ok(reject()),
             }
         }
     }
 
-    async fn channel_open_session(
+    fn auth_publickey(
+        &mut self,
+        user: &str,
+        offered: &PublicKey,
+    ) -> impl Future<Output = Result<Auth, Self::Error>> + Send {
+        async move {
+            if !self.policy.user_allowed(user) {
+                self.log.line(format!(
+                    "publickey auth rejected: user '{}' not allowed",
+                    user
+                ));
+                return Ok(reject());
+            }
+            match &self.policy.authorized_key {
+                Some(authorized) if authorized == offered => {
+                    self.authed_user = Some(user.to_string());
+                    self.log
+                        .line(format!("publickey auth accepted for '{}'", user));
+                    Ok(Auth::Accept)
+                }
+                _ => {
+                    self.log
+                        .line(format!("publickey auth rejected for '{}'", user));
+                    Ok(reject())
+                }
+            }
+        }
+    }
+
+    fn channel_open_session(
         &mut self,
         channel: Channel<Msg>,
         _session: &mut Session,
-    ) -> Result<bool, Self::Error> {
-        // Park the channel; either a shell or an sftp subsystem will claim it.
-        let mut pending = self.pending_channels.lock().await;
-        pending.insert(channel.id(), channel);
-        Ok(true)
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        async move {
+            // Park the channel; either a shell or an sftp subsystem will claim it.
+            let mut pending = self.pending_channels.lock().await;
+            pending.insert(channel.id(), channel);
+            Ok(true)
+        }
     }
 
-    async fn pty_request(
+    fn pty_request(
         &mut self,
         channel: ChannelId,
         _term: &str,
@@ -175,46 +194,56 @@ impl ServerHandler for SshConnection {
         _pix_height: u32,
         _modes: &[(russh::Pty, u32)],
         session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        // Acknowledge the PTY and open the shell at the requested size. Most
-        // clients send pty-req immediately before shell-req; opening here means
-        // window dimensions are honored from the first byte. shell_request is
-        // idempotent and won't open a second shell.
-        session.channel_success(channel);
-        self.ensure_shell(channel, col_width as u16, row_height as u16, session)
-            .await;
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            // Acknowledge the PTY and open the shell at the requested size. Most
+            // clients send pty-req immediately before shell-req; opening here means
+            // window dimensions are honored from the first byte. shell_request is
+            // idempotent and won't open a second shell.
+            session.channel_success(channel);
+            self.ensure_shell(channel, col_width as u16, row_height as u16, session)
+                .await;
+            Ok(())
+        }
     }
 
-    async fn shell_request(
+    fn shell_request(
         &mut self,
         channel: ChannelId,
         session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        // If a PTY was requested first, the shell already exists; otherwise open
-        // one with a sensible default size (dumb, no-pty clients).
-        if !self.shells.contains_key(&channel) {
-            self.ensure_shell(channel, 80, 24, session).await;
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            // If a PTY was requested first, the shell already exists; otherwise open
+            // one with a sensible default size (dumb, no-pty clients).
+            if !self.shells.contains_key(&channel) {
+                self.ensure_shell(channel, 80, 24, session).await;
+            }
+            session.channel_success(channel);
+            Ok(())
         }
-        session.channel_success(channel);
-        Ok(())
     }
 
-    async fn data(
+    fn data(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         _session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(shell) = self.shells.get_mut(&channel) {
-            if let Err(e) = shell.writer.write_all(data).and_then(|_| shell.writer.flush()) {
-                self.log.line(format!("shell write error: {}", e));
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if let Some(shell) = self.shells.get_mut(&channel) {
+                if let Err(e) = shell
+                    .writer
+                    .write_all(data)
+                    .and_then(|_| shell.writer.flush())
+                {
+                    self.log.line(format!("shell write error: {}", e));
+                }
             }
+            Ok(())
         }
-        Ok(())
     }
 
-    async fn window_change_request(
+    fn window_change_request(
         &mut self,
         channel: ChannelId,
         col_width: u32,
@@ -222,69 +251,78 @@ impl ServerHandler for SshConnection {
         _pix_width: u32,
         _pix_height: u32,
         _session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(shell) = self.shells.get(&channel) {
-            let _ = crate::terminal::pty::resize_pty(
-                shell.master.as_ref(),
-                col_width as u16,
-                row_height as u16,
-            );
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if let Some(shell) = self.shells.get(&channel) {
+                let _ = crate::terminal::pty::resize_pty(
+                    shell.master.as_ref(),
+                    col_width as u16,
+                    row_height as u16,
+                );
+            }
+            Ok(())
         }
-        Ok(())
     }
 
-    async fn subsystem_request(
+    fn subsystem_request(
         &mut self,
         channel_id: ChannelId,
         name: &str,
         session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        if name == "sftp" {
-            let channel = {
-                let mut pending = self.pending_channels.lock().await;
-                pending.remove(&channel_id)
-            };
-            let Some(channel) = channel else {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if name == "sftp" {
+                let channel = {
+                    let mut pending = self.pending_channels.lock().await;
+                    pending.remove(&channel_id)
+                };
+                let Some(channel) = channel else {
+                    session.channel_failure(channel_id);
+                    return Ok(());
+                };
+                session.channel_success(channel_id);
+                self.log.line(format!(
+                    "sftp subsystem opened (root {})",
+                    self.root.display()
+                ));
+                let handler = SftpHandler::new(self.root.clone(), self.log.clone());
+                russh_sftp::server::run(channel.into_stream(), handler).await;
+                Ok(())
+            } else {
                 session.channel_failure(channel_id);
-                return Ok(());
-            };
-            session.channel_success(channel_id);
-            self.log.line(format!(
-                "sftp subsystem opened (root {})",
-                self.root.display()
-            ));
-            let handler = SftpHandler::new(self.root.clone(), self.log.clone());
-            russh_sftp::server::run(channel.into_stream(), handler).await;
-            Ok(())
-        } else {
-            session.channel_failure(channel_id);
+                Ok(())
+            }
+        }
+    }
+
+    fn channel_eof(
+        &mut self,
+        channel: ChannelId,
+        session: &mut Session,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            self.shells.remove(&channel);
+            session.close(channel);
             Ok(())
         }
     }
 
-    async fn channel_eof(
-        &mut self,
-        channel: ChannelId,
-        session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        self.shells.remove(&channel);
-        session.close(channel);
-        Ok(())
-    }
-
-    async fn channel_close(
+    fn channel_close(
         &mut self,
         channel: ChannelId,
         _session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        self.shells.remove(&channel);
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            self.shells.remove(&channel);
+            Ok(())
+        }
     }
 }
 
 fn reject() -> Auth {
     Auth::Reject {
         proceed_with_methods: None,
+        partial_success: false,
     }
 }
 
@@ -362,7 +400,7 @@ impl SshConnection {
                     maybe = rx.recv() => {
                         match maybe {
                             Some(chunk) => {
-                                if handle.data(channel, CryptoVec::from_slice(&chunk)).await.is_err() {
+                                if handle.data(channel, chunk).await.is_err() {
                                     break;
                                 }
                             }
@@ -510,7 +548,11 @@ impl russh_sftp::server::Handler for SftpHandler {
         })
     }
 
-    async fn stat(&mut self, id: u32, path: String) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
+    async fn stat(
+        &mut self,
+        id: u32,
+        path: String,
+    ) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
         let p = self.resolve(&path)?;
         let meta = std::fs::metadata(&p).map_err(|e| io_to_status(&e))?;
         Ok(russh_sftp::protocol::Attrs {
@@ -519,7 +561,11 @@ impl russh_sftp::server::Handler for SftpHandler {
         })
     }
 
-    async fn lstat(&mut self, id: u32, path: String) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
+    async fn lstat(
+        &mut self,
+        id: u32,
+        path: String,
+    ) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
         let p = self.resolve(&path)?;
         let meta = std::fs::symlink_metadata(&p).map_err(|e| io_to_status(&e))?;
         Ok(russh_sftp::protocol::Attrs {
@@ -528,7 +574,11 @@ impl russh_sftp::server::Handler for SftpHandler {
         })
     }
 
-    async fn fstat(&mut self, id: u32, handle: String) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
+    async fn fstat(
+        &mut self,
+        id: u32,
+        handle: String,
+    ) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
         let file = self.files.get(&handle).ok_or(StatusCode::Failure)?.clone();
         let guard = file.lock().await;
         let meta = guard.metadata().map_err(|e| io_to_status(&e))?;
@@ -545,7 +595,13 @@ impl russh_sftp::server::Handler for SftpHandler {
             return Err(StatusCode::NoSuchFile);
         }
         let handle = self.alloc_handle("dir");
-        self.dirs.insert(handle.clone(), DirState { path: p, sent: false });
+        self.dirs.insert(
+            handle.clone(),
+            DirState {
+                path: p,
+                sent: false,
+            },
+        );
         Ok(SftpHandle { id, handle })
     }
 
@@ -579,7 +635,8 @@ impl russh_sftp::server::Handler for SftpHandler {
         let opts: std::fs::OpenOptions = pflags.into();
         let file = opts.open(&p).map_err(|e| io_to_status(&e))?;
         let handle = self.alloc_handle("file");
-        self.files.insert(handle.clone(), Arc::new(Mutex::new(file)));
+        self.files
+            .insert(handle.clone(), Arc::new(Mutex::new(file)));
         Ok(SftpHandle { id, handle })
     }
 
@@ -593,7 +650,9 @@ impl russh_sftp::server::Handler for SftpHandler {
         use std::io::{Read, Seek, SeekFrom};
         let file = self.files.get(&handle).ok_or(StatusCode::Failure)?.clone();
         let mut guard = file.lock().await;
-        guard.seek(SeekFrom::Start(offset)).map_err(|e| io_to_status(&e))?;
+        guard
+            .seek(SeekFrom::Start(offset))
+            .map_err(|e| io_to_status(&e))?;
         let mut buf = vec![0u8; len as usize];
         let n = guard.read(&mut buf).map_err(|e| io_to_status(&e))?;
         if n == 0 {
@@ -613,7 +672,9 @@ impl russh_sftp::server::Handler for SftpHandler {
         use std::io::{Seek, SeekFrom, Write};
         let file = self.files.get(&handle).ok_or(StatusCode::Failure)?.clone();
         let mut guard = file.lock().await;
-        guard.seek(SeekFrom::Start(offset)).map_err(|e| io_to_status(&e))?;
+        guard
+            .seek(SeekFrom::Start(offset))
+            .map_err(|e| io_to_status(&e))?;
         guard.write_all(&data).map_err(|e| io_to_status(&e))?;
         Ok(ok_status(id))
     }
@@ -705,7 +766,11 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     // Build the auth policy from config. Refuse to start a wide-open server.
     let password = {
         let p = config.str_field("password", "");
-        if p.is_empty() { None } else { Some(p.to_string()) }
+        if p.is_empty() {
+            None
+        } else {
+            Some(p.to_string())
+        }
     };
     let authorized_key = {
         let line = config.str_field("authorizedKey", "").trim().to_string();
@@ -747,12 +812,16 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         .await
         .map_err(|e| format!("cannot bind {}:{} for SSH — {}", bind, port, e))?;
 
-    let host_key = KeyPair::generate_ed25519();
+    let host_key = PrivateKey::random(&mut rand::rng(), Algorithm::Ed25519)
+        .map_err(|e| format!("generate SSH host key: {e}"))?;
+    let mut methods = MethodSet::empty();
+    methods.push(MethodKind::Password);
+    methods.push(MethodKind::PublicKey);
     let russh_config = Arc::new(RusshConfig {
         inactivity_timeout: None,
         auth_rejection_time: std::time::Duration::from_secs(2),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
-        methods: MethodSet::PASSWORD | MethodSet::PUBLICKEY,
+        methods,
         keys: vec![host_key],
         ..Default::default()
     });
@@ -843,8 +912,7 @@ fn parse_authorized_key(line: &str) -> Result<PublicKey, String> {
     let b64 = parts
         .next()
         .ok_or_else(|| "authorizedKey must be in 'ssh-... AAAA...' OpenSSH format".to_string())?;
-    russh::keys::parse_public_key_base64(b64)
-        .map_err(|e| format!("invalid authorizedKey: {}", e))
+    russh::keys::parse_public_key_base64(b64).map_err(|e| format!("invalid authorizedKey: {}", e))
 }
 
 #[cfg(test)]
@@ -854,7 +922,10 @@ mod tests {
     #[test]
     fn confine_keeps_simple_paths_under_root() {
         let root = Path::new("/srv/share");
-        assert_eq!(confine_path(root, "/").unwrap(), PathBuf::from("/srv/share"));
+        assert_eq!(
+            confine_path(root, "/").unwrap(),
+            PathBuf::from("/srv/share")
+        );
         assert_eq!(
             confine_path(root, "/a/b.txt").unwrap(),
             PathBuf::from("/srv/share/a/b.txt")

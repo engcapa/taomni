@@ -6,11 +6,11 @@
 
 mod support;
 
-use taomni_lib::llm::router::LlmRouter;
-use taomni_lib::llm::{ChatRequest, TaskKind};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use support::mock_provider::{MockEvent, MockLlm};
+use taomni_lib::llm::router::LlmRouter;
+use taomni_lib::llm::{ChatRequest, TaskKind};
 
 fn build_router_with_three() -> LlmRouter {
     let mut r = LlmRouter::new("chat");

@@ -5,11 +5,11 @@
 
 mod support;
 
-use taomni_lib::llm::router::LlmRouter;
-use taomni_lib::llm::{ChatRequest, TaskKind};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use support::mock_provider::{MockEvent, MockLlm};
+use taomni_lib::llm::router::LlmRouter;
+use taomni_lib::llm::{ChatRequest, TaskKind};
 
 #[tokio::test(flavor = "current_thread")]
 async fn voice_intent_completes_within_budget() {

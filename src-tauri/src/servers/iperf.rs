@@ -52,10 +52,8 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         args.push("--forceflush".into());
     }
 
-    ctx.log.line(format!(
-        "starting {} server on {}:{}",
-        program, bind, port
-    ));
+    ctx.log
+        .line(format!("starting {} server on {}:{}", program, bind, port));
     ctx.log.line(
         "note: bandwidth limit and UDP mode are client-side options; the server \
          accepts whatever each client negotiates",

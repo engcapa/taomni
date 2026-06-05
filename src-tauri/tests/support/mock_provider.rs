@@ -5,11 +5,11 @@
 
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream, StreamExt};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use taomni_lib::llm::{
     ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError, LlmResult, TokenUsage,
 };
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use tokio::time::sleep;
 
 #[derive(Debug, Clone)]

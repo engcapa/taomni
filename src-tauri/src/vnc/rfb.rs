@@ -295,6 +295,7 @@ impl RfbConnection {
     /// RealVNC RSA-AES authentication (RA2/RA2ne, 128- and 256-bit variants).
     fn vnc_auth_ra2(&mut self, sec_type: u8, username: &str, password: &str) -> Result<(), String> {
         use rsa::pkcs1v15::Pkcs1v15Encrypt;
+        use rsa::rand_core::RngCore;
         use rsa::traits::PublicKeyParts;
         use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 
@@ -331,8 +332,7 @@ impl RfbConnection {
 
         // 2. Generate a client key pair matching the server key size and send
         //    the public key in RealVNC's fixed-width format.
-        use rand::RngCore;
-        let mut rng = rand::thread_rng();
+        let mut rng = rsa::rand_core::OsRng;
         let client_privkey = RsaPrivateKey::new(&mut rng, key_bits)
             .map_err(|e| format!("RA2: gen client key: {}", e))?;
         let client_pubkey = RsaPublicKey::from(&client_privkey);
@@ -1169,14 +1169,14 @@ impl AesEax {
     }
 
     fn encrypt_block(&self, block: &mut [u8; 16]) {
-        use aes::cipher::{generic_array::GenericArray, BlockEncrypt};
+        use aes::cipher::{Array, BlockCipherEncrypt};
 
         match &self.key {
             AesKey::Aes128(cipher) => {
-                cipher.encrypt_block(GenericArray::from_mut_slice(block));
+                cipher.encrypt_block(Array::from_mut_slice(block));
             }
             AesKey::Aes256(cipher) => {
-                cipher.encrypt_block(GenericArray::from_mut_slice(block));
+                cipher.encrypt_block(Array::from_mut_slice(block));
             }
         }
     }
@@ -1347,7 +1347,7 @@ pub enum ServerMessage {
 
 /// VNC DES authentication: encrypt the 16-byte challenge with a key derived from the password.
 fn vnc_des_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
-    use des::cipher::{BlockEncrypt, KeyInit};
+    use des::cipher::{Array, BlockCipherEncrypt, KeyInit};
     use des::Des;
 
     // Build key: password truncated/padded to 8 bytes, each byte's bits reversed
@@ -1362,12 +1362,12 @@ fn vnc_des_encrypt(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
 
     let mut response = [0u8; 16];
     cipher.encrypt_block_b2b(
-        generic_array::GenericArray::from_slice(&challenge[..8]),
-        generic_array::GenericArray::from_mut_slice(&mut response[..8]),
+        Array::from_slice(&challenge[..8]),
+        Array::from_mut_slice(&mut response[..8]),
     );
     cipher.encrypt_block_b2b(
-        generic_array::GenericArray::from_slice(&challenge[8..]),
-        generic_array::GenericArray::from_mut_slice(&mut response[8..]),
+        Array::from_slice(&challenge[8..]),
+        Array::from_mut_slice(&mut response[8..]),
     );
 
     response

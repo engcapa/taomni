@@ -166,7 +166,10 @@ mod tests {
         migrate_app_data_dir(&new);
 
         // New dir already populated → legacy left untouched, new data intact.
-        assert_eq!(std::fs::read_to_string(new.join(NEW_DB_NAME)).unwrap(), "current-data");
+        assert_eq!(
+            std::fs::read_to_string(new.join(NEW_DB_NAME)).unwrap(),
+            "current-data"
+        );
         assert!(legacy.exists());
         std::fs::remove_dir_all(&tmp).ok();
     }

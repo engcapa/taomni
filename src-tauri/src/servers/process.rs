@@ -23,9 +23,8 @@ pub async fn spawn_supervised(
     program: &str,
     args: Vec<String>,
 ) -> Result<ServerStarted, String> {
-    let resolved = which::which(program).map_err(|_| {
-        format!("{program} not found in PATH — install it to use this server")
-    })?;
+    let resolved = which::which(program)
+        .map_err(|_| format!("{program} not found in PATH — install it to use this server"))?;
 
     let mut child = Command::new(&resolved)
         .args(&args)

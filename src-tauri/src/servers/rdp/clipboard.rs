@@ -18,7 +18,7 @@
 use std::sync::{Arc, Mutex};
 
 use ironrdp::cliprdr::backend::{
-    CliprdrBackend, CliprdrBackendFactory, ClipboardMessage, ClipboardMessageProxy,
+    ClipboardMessage, ClipboardMessageProxy, CliprdrBackend, CliprdrBackendFactory,
 };
 use ironrdp::cliprdr::pdu::{
     ClipboardFormat, ClipboardFormatId, ClipboardGeneralCapabilityFlags, FileContentsRequest,
@@ -186,7 +186,9 @@ impl ClipboardBackend {
         }
         match arboard::Clipboard::new().and_then(|mut c| c.set_text(text)) {
             Ok(()) => {}
-            Err(e) => self.log.line(format!("clipboard: failed to set host text: {}", e)),
+            Err(e) => self
+                .log
+                .line(format!("clipboard: failed to set host text: {}", e)),
         }
     }
 }
@@ -223,7 +225,11 @@ impl CliprdrBackend for ClipboardBackend {
         }
     }
 
-    fn on_process_negotiated_capabilities(&mut self, _capabilities: ClipboardGeneralCapabilityFlags) {}
+    fn on_process_negotiated_capabilities(
+        &mut self,
+        _capabilities: ClipboardGeneralCapabilityFlags,
+    ) {
+    }
 
     fn on_remote_copy(&mut self, available_formats: &[ClipboardFormat]) {
         // The client copied something. If it offers Unicode text, pull it.
@@ -259,7 +265,9 @@ impl CliprdrBackend for ClipboardBackend {
         }
         match response.to_unicode_string() {
             Ok(text) => self.set_host_text(text),
-            Err(e) => self.log.line(format!("clipboard: bad unicode from client: {}", e)),
+            Err(e) => self
+                .log
+                .line(format!("clipboard: bad unicode from client: {}", e)),
         }
     }
 
@@ -267,10 +275,13 @@ impl CliprdrBackend for ClipboardBackend {
         // File transfer is out of scope (text only).
     }
 
-    fn on_file_contents_response(&mut self, _response: ironrdp::cliprdr::pdu::FileContentsResponse<'_>) {}
+    fn on_file_contents_response(
+        &mut self,
+        _response: ironrdp::cliprdr::pdu::FileContentsResponse<'_>,
+    ) {
+    }
 
     fn on_lock(&mut self, _data_id: LockDataId) {}
 
     fn on_unlock(&mut self, _data_id: LockDataId) {}
 }
-

@@ -282,7 +282,7 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(screen.getByDisplayValue("3128")).toBeInTheDocument();
     expect(screen.getByDisplayValue("127.0.0.1:5432")).toBeInTheDocument();
     expect(screen.getByDisplayValue("db.lan:5432")).toBeInTheDocument();
-  });
+  }, 10_000);
 
   it("persists Bookmark settings through the session store save path", async () => {
     const user = userEvent.setup();

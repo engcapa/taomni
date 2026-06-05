@@ -1,7 +1,7 @@
 //! Verifies the SHA-256 helper in models::downloader.
 
-use taomni_lib::models::downloader::sha256_file;
 use std::io::Write;
+use taomni_lib::models::downloader::sha256_file;
 use tempfile::NamedTempFile;
 
 #[test]

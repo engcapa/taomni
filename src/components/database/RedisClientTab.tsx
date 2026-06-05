@@ -10,6 +10,11 @@ import { RedisNewKeyDialog } from "./RedisNewKeyDialog";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 
+function createRuntimeDbSessionId(baseSessionId: string): string {
+  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${baseSessionId}::${suffix}`;
+}
+
 interface RedisClientTabProps {
   tabId: string;
   info: DbConnectInfo;
@@ -18,14 +23,13 @@ interface RedisClientTabProps {
 
 export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
   const sessionId = info.sessionId;
-  const [connected, setConnected] = useState(false);
+  const [connectionSessionId, setConnectionSessionId] = useState<string | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dbIndex, setDbIndex] = useState<number>(info.dbIndex ?? 0);
   const [reloadToken, setReloadToken] = useState(0);
   const [showNewKey, setShowNewKey] = useState(false);
   const [cliCollapsed, setCliCollapsed] = useState(false);
-  const connectedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const { fontSize: dbFontSize } = useDbSessionFontSize(visible, rootRef);
   const dbFontStyle = useMemo(
@@ -38,18 +42,23 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
 
   useEffect(() => {
     let cancelled = false;
-    void dbConnect(info)
+    const runtimeSessionId = createRuntimeDbSessionId(sessionId);
+    setConnectionSessionId(null);
+    setConnError(null);
+    void dbConnect({ ...info, sessionId: runtimeSessionId })
       .then(() => {
-        if (cancelled) return;
-        connectedRef.current = true;
-        setConnected(true);
+        if (cancelled) {
+          void dbDisconnect(runtimeSessionId).catch(() => undefined);
+          return;
+        }
+        setConnectionSessionId(runtimeSessionId);
       })
       .catch((err) => {
         if (!cancelled) setConnError(String(err));
       });
     return () => {
       cancelled = true;
-      void dbDisconnect(sessionId).catch(() => undefined);
+      void dbDisconnect(runtimeSessionId).catch(() => undefined);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -57,8 +66,9 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
   const reload = useCallback(() => setReloadToken((t) => t + 1), []);
 
   const switchDbIndex = async (idx: number) => {
+    if (!connectionSessionId) return;
     try {
-      await redisExec(sessionId, `SELECT ${idx}`);
+      await redisExec(connectionSessionId, `SELECT ${idx}`);
       setDbIndex(idx);
       setSelectedKey(null);
       reload();
@@ -115,9 +125,9 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
           <PanelGroup direction="horizontal" autoSaveId="redis-client" className="h-full">
             <Panel defaultSize={32} minSize={18} maxSize={55}>
               <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
-                {connected && (
+                {connectionSessionId && (
                   <RedisKeyBrowser
-                    sessionId={sessionId}
+                    sessionId={connectionSessionId}
                     separator=":"
                     reloadToken={reloadToken}
                     selectedKey={selectedKey}
@@ -130,7 +140,8 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
                         danger: true,
                       });
                       if (!confirmed) return;
-                      await redisDelKey(sessionId, key).catch(() => undefined);
+                      if (!connectionSessionId) return;
+                      await redisDelKey(connectionSessionId, key).catch(() => undefined);
                       if (selectedKey === key) setSelectedKey(null);
                       reload();
                     }}
@@ -144,8 +155,9 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
                       if (input === null) return;
                       const secs = parseInt(input, 10);
                       if (Number.isNaN(secs)) return;
-                      if (secs === -1) await redisExec(sessionId, `PERSIST ${key}`).catch(() => undefined);
-                      else await redisExec(sessionId, `EXPIRE ${key} ${secs}`).catch(() => undefined);
+                      if (!connectionSessionId) return;
+                      if (secs === -1) await redisExec(connectionSessionId, `PERSIST ${key}`).catch(() => undefined);
+                      else await redisExec(connectionSessionId, `EXPIRE ${key} ${secs}`).catch(() => undefined);
                       reload();
                     }}
                   />
@@ -155,7 +167,7 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
             <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
             <Panel>
               <RedisValuePanel
-                sessionId={sessionId}
+                sessionId={connectionSessionId ?? ""}
                 redisKey={selectedKey}
                 onDeleted={() => {
                   setSelectedKey(null);
@@ -171,7 +183,7 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
         )}
         <Panel defaultSize={cliCollapsed ? 8 : 30} minSize={cliCollapsed ? 4 : 12} maxSize={cliCollapsed ? 8 : 70}>
           <RedisCli
-            sessionId={sessionId}
+            sessionId={connectionSessionId ?? ""}
             collapsed={cliCollapsed}
             onToggleCollapse={() => setCliCollapsed((v) => !v)}
           />
@@ -180,7 +192,7 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
 
       {showNewKey && (
         <RedisNewKeyDialog
-          sessionId={sessionId}
+          sessionId={connectionSessionId ?? ""}
           onClose={() => setShowNewKey(false)}
           onCreated={(key) => {
             setShowNewKey(false);

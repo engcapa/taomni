@@ -907,7 +907,9 @@ describe("MainLayout attached SFTP sidebar", () => {
         },
       });
     });
-    expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-engine", "Presto");
+    await waitFor(() => {
+      expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-engine", "Presto");
+    });
     expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-catalog", "hive");
     expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-database", "sales");
   });

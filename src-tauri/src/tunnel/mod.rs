@@ -616,7 +616,9 @@ pub async fn upsert_tunnel(
         let is_password = matches!(config.ssh.auth_method, TunnelAuthMethod::Password);
         let wants_session = is_password && !config.ssh.save_auth.unwrap_or(false);
         match (wants_session, config.ssh.auth_data.as_deref()) {
-            (true, Some(raw)) if !raw.is_empty() && !raw.starts_with(crate::vault::VAULT_REF_PREFIX) => {
+            (true, Some(raw))
+                if !raw.is_empty() && !raw.starts_with(crate::vault::VAULT_REF_PREFIX) =>
+            {
                 // Fresh plaintext typed by the user: refresh the cache.
                 map.insert(config.id.clone(), raw.to_string());
             }

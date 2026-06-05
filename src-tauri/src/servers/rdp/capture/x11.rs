@@ -308,7 +308,10 @@ impl X11Capturer {
         if ptr == libc::MAP_FAILED {
             // Detach the segment we just created before bailing.
             let _ = conn.shm_detach(seg);
-            bail!("mmap of SHM segment failed: {}", std::io::Error::last_os_error());
+            bail!(
+                "mmap of SHM segment failed: {}",
+                std::io::Error::last_os_error()
+            );
         }
         let ptr = NonNull::new(ptr.cast::<u8>()).context("mmap returned null")?;
 
@@ -418,7 +421,15 @@ impl X11Capturer {
             Backend::Plain => {
                 let reply = self
                     .conn
-                    .get_image(ImageFormat::Z_PIXMAP, self.root, x as i16, y as i16, w, h, !0)
+                    .get_image(
+                        ImageFormat::Z_PIXMAP,
+                        self.root,
+                        x as i16,
+                        y as i16,
+                        w,
+                        h,
+                        !0,
+                    )
                     .context("get_image")?
                     .reply()
                     .context("get_image reply")?;
@@ -759,7 +770,10 @@ mod tests {
             "next_updates should return within the wait budget"
         );
         for f in &next {
-            assert!(f.x + f.width <= w && f.y + f.height <= h, "region in bounds");
+            assert!(
+                f.x + f.width <= w && f.y + f.height <= h,
+                "region in bounds"
+            );
             assert_eq!(f.stride, usize::from(f.width) * 4, "tightly packed");
             assert_eq!(
                 f.data.len(),
@@ -820,9 +834,16 @@ mod tests {
             h: 10,
         };
         // Union spans x:[10,110), y:[5,30) → (10,5,100,25).
-        assert_eq!(a.union(b), DamageRect { x: 10, y: 5, w: 100, h: 25 });
+        assert_eq!(
+            a.union(b),
+            DamageRect {
+                x: 10,
+                y: 5,
+                w: 100,
+                h: 25
+            }
+        );
         // Union is commutative.
         assert_eq!(a.union(b), b.union(a));
     }
 }
-

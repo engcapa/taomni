@@ -141,7 +141,8 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         }
         SecurityMode::Tls | SecurityMode::Hybrid => {
             let id = tls::identity(&ctx.app).map_err(|e| format!("RDP TLS setup failed: {}", e))?;
-            ctx.log.line("loaded self-signed TLS certificate (clients will see a trust warning)");
+            ctx.log
+                .line("loaded self-signed TLS certificate (clients will see a trust warning)");
             Some(id)
         }
     };
@@ -171,7 +172,11 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         size.width,
         size.height,
         security,
-        if view_only { "view-only" } else { "interactive" }
+        if view_only {
+            "view-only"
+        } else {
+            "interactive"
+        }
     ));
 
     let params = ServerParams {
@@ -330,4 +335,3 @@ fn build_server(params: &ServerParams, log: &LogEmitter) -> anyhow::Result<RdpSe
     };
     Ok(server)
 }
-

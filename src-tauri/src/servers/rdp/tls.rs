@@ -48,10 +48,10 @@ fn ensure_cert(app: &AppHandle) -> Result<(PathBuf, PathBuf)> {
         }
     }
 
-    let certified = rcgen::generate_simple_self_signed(sans)
-        .context("generating self-signed certificate")?;
+    let certified =
+        rcgen::generate_simple_self_signed(sans).context("generating self-signed certificate")?;
     let cert_pem = certified.cert.pem();
-    let key_pem = certified.key_pair.serialize_pem();
+    let key_pem = certified.signing_key.serialize_pem();
 
     write_private(&cert_path, cert_pem.as_bytes()).context("writing cert.pem")?;
     write_private(&key_path, key_pem.as_bytes()).context("writing key.pem")?;
@@ -130,18 +130,19 @@ mod tests {
         let cert_path = dir.join("cert.pem");
         let key_path = dir.join("key.pem");
 
-        let certified =
-            rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
         write_private(&cert_path, certified.cert.pem().as_bytes()).unwrap();
-        write_private(&key_path, certified.key_pair.serialize_pem().as_bytes()).unwrap();
+        write_private(&key_path, certified.signing_key.serialize_pem().as_bytes()).unwrap();
 
         let identity = TlsIdentityCtx::init_from_paths(&cert_path, &key_path)
             .expect("load self-signed identity");
         assert!(!identity.certs.is_empty(), "at least one cert loaded");
-        assert!(!identity.pub_key.is_empty(), "SPKI public key extracted (needed for NLA)");
+        assert!(
+            !identity.pub_key.is_empty(),
+            "SPKI public key extracted (needed for NLA)"
+        );
         identity.make_acceptor().expect("build rustls TlsAcceptor");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
-

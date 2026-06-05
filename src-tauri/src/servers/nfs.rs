@@ -22,13 +22,18 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     #[cfg(target_os = "linux")]
     {
         let has_exportfs = which::which("exportfs").is_ok();
-        let has_nfsd = which::which("rpc.nfsd").is_ok() || std::path::Path::new("/proc/fs/nfsd").exists();
+        let has_nfsd =
+            which::which("rpc.nfsd").is_ok() || std::path::Path::new("/proc/fs/nfsd").exists();
 
         if has_exportfs || has_nfsd {
             for line in [
-                "NFS export requires root and OS configuration; Taomni cannot start it directly.".to_string(),
+                "NFS export requires root and OS configuration; Taomni cannot start it directly."
+                    .to_string(),
                 "To export a directory over NFS on Linux:".to_string(),
-                format!("  1. Add to /etc/exports:  {} *(rw,sync,no_subtree_check)", export_dir),
+                format!(
+                    "  1. Add to /etc/exports:  {} *(rw,sync,no_subtree_check)",
+                    export_dir
+                ),
                 "  2. Apply exports:        sudo exportfs -ra".to_string(),
                 "  3. Ensure the server is running:  sudo systemctl start nfs-server".to_string(),
                 "  4. Verify:               showmount -e localhost".to_string(),
