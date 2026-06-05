@@ -80,6 +80,11 @@ import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { AppThemeSwitcher } from "../settings/AppThemeSwitcher";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import {
+  PathMappingsEditor,
+  parsePathMappings as parsePathMappingsFromOptions,
+} from "../filebrowser/PathMappingsEditor";
+import type { SftpPathMapping } from "../../types";
 
 /* ------------------------------------------------------------------ */
 /*  Local types                                                        */
@@ -90,7 +95,7 @@ type Proto =
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
   | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database";
+type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -1289,6 +1294,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     parseRdpOptions(session?.options_json),
   );
 
+  /* --- SFTP path mappings --- */
+  const [pathMappings, setPathMappings] = useState<SftpPathMapping[]>(() =>
+    parsePathMappingsFromOptions(session?.options_json),
+  );
+
   /* --- network settings --- */
   const [networkSettings, setNetworkSettings] = useState<NetworkSettingsValue>(
     () => getSessionNetworkSettings(session?.options_json),
@@ -1410,6 +1420,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       networkSettings: networkSettingsValue.proxySaveAuth
         ? { ...networkSettingsValue, proxyPass: proxyPassValue }
         : { ...networkSettingsValue, proxyPass: "" },
+      // SFTP deployment path mappings (only stored for SFTP sessions).
+      ...(proto === "SFTP" ? { pathMappings } : {}),
       ...wslOverrides,
       ...rdpOverrides,
       ...dbOverrides,
@@ -1603,6 +1615,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
     setRdpOptions(parseRdpOptions(session?.options_json));
+    setPathMappings(parsePathMappingsFromOptions(session?.options_json));
     setSaveError(null);
     setTestResult(null);
   };
@@ -1760,6 +1773,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         ...(isSSH
           ? [{ id: "advanced" as SectionTab, label: t("sessionEditor2.sectionAdvancedSsh"), icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
           : []),
+        // SFTP gets a dedicated path mappings tab
+        ...(proto === "SFTP"
+          ? [{ id: "mappings" as SectionTab, label: t("pathMappings.sectionTitle"), icon: <Folder className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+          : []),
         // RDP gets a dedicated options tab in place of the Terminal tab
         // (terminal appearance is meaningless for a graphical RDP session).
         ...(isRdp
@@ -1781,7 +1798,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           ? (isRdp ? "rdp" : "terminal")
           : section === "rdp" && !isRdp
             ? "terminal"
-            : section === "terminal" && isRdp
+            : section === "mappings" && proto !== "SFTP"
+              ? "terminal"
+              : section === "terminal" && isRdp
               ? "rdp"
               : section === "database"
                 ? "terminal"
@@ -2034,6 +2053,28 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           className="flex-1 min-h-0 overflow-auto px-4 py-3 border-x border-b"
           style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-bg)" }}
         >
+          {activeSection === "mappings" && proto === "SFTP" && (
+            <div data-testid="session-sftp-mappings-section" className="flex flex-col gap-3">
+              <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                {t("pathMappings.sectionDescription")}
+              </div>
+              <PathMappingsEditor
+                mappings={pathMappings}
+                onChange={setPathMappings}
+                canBrowseLocal
+                onBrowseLocal={async (_index, current) => {
+                  const { selectFolderPath } = await import("../../lib/ipc");
+                  try {
+                    const result = await selectFolderPath(current || undefined);
+                    return result ?? null;
+                  } catch {
+                    return null;
+                  }
+                }}
+              />
+            </div>
+          )}
+
           {activeSection === "advanced" && isSSH && (
             <AdvancedSshSettings
               t={t}

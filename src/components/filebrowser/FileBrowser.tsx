@@ -13,13 +13,16 @@ import {
   Maximize2,
   X,
   ArrowLeftRight,
+  Map,
 } from "lucide-react";
 import { FilePanel, isPreviewable } from "./FilePanel";
 import { FileTransferQueue } from "./FileTransferQueue";
 import { ChmodDialog } from "./ChmodDialog";
+import { PathMappingsEditor, resolveRemoteByMapping, resolveLocalByMapping } from "./PathMappingsEditor";
 import { useSftpStore, type PaneSide } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
 import { joinPath, basename, sftpStat, effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
+import type { SftpPathMapping } from "../../types";
 import {
   listenSshAuthPrompt,
   submitSshAuthResponse,
@@ -78,6 +81,8 @@ interface FileBrowserProps {
   orientationScope?: string;
   /** When set (attached sidebar), sends a `cd <path>\n` to the parent terminal. */
   onOpenTerminalHere?: (path: string) => void;
+  /** Deployment path mappings for this session. */
+  pathMappings?: import("../../types").SftpPathMapping[];
 }
 
 export function FileBrowser(props: FileBrowserProps) {
@@ -99,6 +104,9 @@ export function FileBrowser(props: FileBrowserProps) {
   // Per-pane filter strings (case-insensitive substring match).
   const [localFilter, setLocalFilter] = useState("");
   const [remoteFilter, setRemoteFilter] = useState("");
+  // Path mappings panel state — local editable copy derived from props
+  const [showMappings, setShowMappings] = useState(false);
+  const [mappings, setMappings] = useState<SftpPathMapping[]>(props.pathMappings ?? []);
 
   const orientationScope = props.orientationScope ?? props.sessionId;
   const [orientation, setOrientationState] = useState<Orientation>(() =>
@@ -408,7 +416,9 @@ export function FileBrowser(props: FileBrowserProps) {
         onClick: () => {
           const remoteDir = session?.remote.path ?? "/";
           for (const item of targets) {
-            void controller.upload(item, remoteDir);
+            // Use path mapping if available — check if the local file's path matches a mapping
+            const mappedRemote = resolveRemoteByMapping(item.path, mappings);
+            void controller.upload(item, mappedRemote ?? remoteDir);
           }
         },
       });
@@ -429,7 +439,7 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       return items;
     },
-    [controller, deleteEntries, handleOpenLocal, renameEntry, session?.remote.path, t],
+    [controller, deleteEntries, handleOpenLocal, mappings, renameEntry, session?.remote.path, t],
   );
 
   const remoteContext = useCallback(
@@ -521,33 +531,42 @@ export function FileBrowser(props: FileBrowserProps) {
       for (const path of paths) {
         try {
           const entry = await sftpStat(props.sessionId, path, "local");
-          await controller.upload(entry, remoteDir);
+          // Use path mapping if available
+          const mappedRemote = resolveRemoteByMapping(entry.path, mappings);
+          await controller.upload(entry, mappedRemote ?? remoteDir);
         } catch (err) {
           setStatus(t("fileBrowser.statusUploadFailed", { error: err instanceof Error ? err.message : String(err) }));
         }
       }
     },
-    [controller, props.sessionId, session?.remote.path, setStatus, t],
+    [controller, mappings, props.sessionId, session?.remote.path, setStatus, t],
   );
 
   const handleCrossPaneToLocal = useCallback(
     async (entries: FileEntry[]) => {
       const localDir = session?.local.path ?? "";
       for (const entry of entries) {
-        await controller.download(entry, localDir, { openAfter: false });
+        // Use path mapping if available — map remote path back to local
+        const mappedLocal = resolveLocalByMapping(entry.path, mappings);
+        const targetDir = mappedLocal
+          ? (entry.fileType === "dir" ? mappedLocal : mappedLocal.replace(/[/\\][^/\\]*$/, "") || localDir)
+          : localDir;
+        await controller.download(entry, targetDir, { openAfter: false });
       }
     },
-    [controller, session?.local.path],
+    [controller, mappings, session?.local.path],
   );
 
   const handleCrossPaneToRemote = useCallback(
     async (entries: FileEntry[]) => {
       const remoteDir = session?.remote.path ?? "/";
       for (const entry of entries) {
-        await controller.upload(entry, remoteDir);
+        // Use path mapping if available
+        const mappedRemote = resolveRemoteByMapping(entry.path, mappings);
+        await controller.upload(entry, mappedRemote ?? remoteDir);
       }
     },
-    [controller, session?.remote.path],
+    [controller, mappings, session?.remote.path],
   );
 
   const banner = useMemo(() => {
@@ -569,6 +588,25 @@ export function FileBrowser(props: FileBrowserProps) {
         >
           <span className="truncate flex-1">{props.title ?? t("fileBrowser.headerSftp")}</span>
           <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
+          {mappings.length > 0 && (
+            <button
+              data-testid="sftp-mappings-toggle"
+              type="button"
+              className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)]"
+              title={t("fileBrowser.pathMappingsToggleTitle")}
+              style={{ color: showMappings ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+              onClick={() => setShowMappings((v) => !v)}
+            >
+              <Map className="w-3 h-3" />
+              <span className="text-[10px]">{t("fileBrowser.pathMappingsToggle")}</span>
+              <span
+                className="text-[10px] rounded-full px-1"
+                style={{ background: "var(--taomni-accent)", color: "white", minWidth: "14px", textAlign: "center" }}
+              >
+                {mappings.length}
+              </span>
+            </button>
+          )}
           {props.onDetach && (
             <button
               data-testid="sftp-detach"
@@ -618,6 +656,97 @@ export function FileBrowser(props: FileBrowserProps) {
           </button>
           {!props.showHeader && (
             <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
+          )}
+          {!props.showHeader && mappings.length > 0 && (
+            <button
+              data-testid="sftp-mappings-toggle"
+              type="button"
+              className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] shrink-0"
+              title={t("fileBrowser.pathMappingsToggleTitle")}
+              style={{ color: showMappings ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+              onClick={() => setShowMappings((v) => !v)}
+            >
+              <Map className="w-3 h-3" />
+              <span>{t("fileBrowser.pathMappingsToggle")}</span>
+              <span
+                className="text-[10px] rounded-full px-1"
+                style={{ background: "var(--taomni-accent)", color: "white", minWidth: "14px", textAlign: "center" }}
+              >
+                {mappings.length}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+      {/* Standalone mappings toolbar — shown for non-header tabs that have mappings */}
+      {!props.showHeader && !showCwdToolbar && mappings.length > 0 && (
+        <div
+          className="text-[11px] px-2 py-1 border-b shrink-0 flex items-center gap-2"
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+        >
+          <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
+          <div className="flex-1" />
+          <button
+            data-testid="sftp-mappings-toggle"
+            type="button"
+            className="px-1.5 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)]"
+            title={t("fileBrowser.pathMappingsToggleTitle")}
+            style={{ color: showMappings ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+            onClick={() => setShowMappings((v) => !v)}
+          >
+            <Map className="w-3 h-3" />
+            <span>{t("fileBrowser.pathMappingsToggle")}</span>
+            <span
+              className="text-[10px] rounded-full px-1"
+              style={{ background: "var(--taomni-accent)", color: "white", minWidth: "14px", textAlign: "center" }}
+            >
+              {mappings.length}
+            </span>
+          </button>
+        </div>
+      )}
+      {/* Path mappings panel — shown when user toggles the Mappings button */}
+      {showMappings && (
+        <div
+          data-testid="sftp-mappings-panel"
+          className="border-b shrink-0 px-3 py-2"
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+        >
+          <div className="text-[11px] font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: "var(--taomni-accent)" }}>
+            <Map className="w-3 h-3" />
+            {t("fileBrowser.pathMappingsTitle")}
+          </div>
+          <PathMappingsEditor
+            mappings={mappings}
+            onChange={setMappings}
+            compact
+          />
+          {mappings.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {mappings.map((m, i) => (
+                m.localPath && m.remotePath ? (
+                  <button
+                    key={i}
+                    type="button"
+                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] inline-flex items-center gap-1"
+                    style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
+                    title={`${t("fileBrowser.pathMappingsNavigateLocal")}: ${m.localPath}`}
+                    onClick={() => {
+                      if (m.localPath && session?.attached) {
+                        void navigate(props.sessionId, "local", m.localPath);
+                      }
+                      if (m.remotePath && session?.attached) {
+                        void navigate(props.sessionId, "remote", m.remotePath);
+                      }
+                    }}
+                  >
+                    <span className="font-mono truncate max-w-[120px]">{m.localPath}</span>
+                    <span>→</span>
+                    <span className="font-mono truncate max-w-[120px]">{m.remotePath}</span>
+                  </button>
+                ) : null
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -749,7 +878,9 @@ export function FileBrowser(props: FileBrowserProps) {
               onUploadSelected={(entries) => {
                 const remoteDir = session?.remote.path ?? "/";
                 for (const entry of entries) {
-                  void controller.upload(entry, remoteDir);
+                  // Use path mapping if available
+                  const mappedRemote = resolveRemoteByMapping(entry.path, mappings);
+                  void controller.upload(entry, mappedRemote ?? remoteDir);
                 }
               }}
               onDeleteSelected={(entries) => {

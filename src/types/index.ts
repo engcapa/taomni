@@ -74,6 +74,12 @@ export interface Tab {
   hasNewOutput?: boolean;
 }
 
+/** A single local ↔ remote path mapping entry. */
+export interface SftpPathMapping {
+  localPath: string;
+  remotePath: string;
+}
+
 export interface SftpTabInfo {
   sessionId: string;
   host: string;
@@ -84,6 +90,8 @@ export interface SftpTabInfo {
   networkSettingsJson?: string | null;
   initialPath?: string;
   attachedToTerminal?: boolean;
+  /** Deployment path mappings: local ↔ remote directory pairs. */
+  pathMappings?: SftpPathMapping[];
 }
 
 export interface LocalShellSelection {

@@ -78,6 +78,7 @@ import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
+import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
@@ -884,6 +885,7 @@ export function MainLayout() {
   const openSftpTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const tabId = `sftp-${session.id}-${Date.now()}`;
     const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
+    const pathMappings = parsePathMappings(session.options_json);
     addTab({
       id: tabId,
       type: "sftp",
@@ -899,6 +901,7 @@ export function MainLayout() {
         authData,
         networkSettingsJson: JSON.stringify(ns),
         attachedToTerminal: false,
+        pathMappings: pathMappings.length > 0 ? pathMappings : undefined,
       },
     });
     void markConnected(session.id);
@@ -2040,6 +2043,7 @@ export function MainLayout() {
                         authData={tab.sftp.authData}
                         networkSettingsJson={tab.sftp.networkSettingsJson ?? null}
                         initialPath={tab.sftp.initialPath}
+                        pathMappings={tab.sftp.pathMappings}
                         detachable
                         onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}
                       />
