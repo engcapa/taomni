@@ -84,7 +84,10 @@ fn parse_display(display: &str) -> Result<(String, u32, u32), String> {
     let host = &display[..colon];
     let rest = &display[colon + 1..];
     if rest.is_empty() {
-        return Err(format!("malformed DISPLAY '{}': no display number", display));
+        return Err(format!(
+            "malformed DISPLAY '{}': no display number",
+            display
+        ));
     }
     let (disp_str, screen_str) = match rest.split_once('.') {
         Some((d, s)) => (d, Some(s)),
@@ -452,9 +455,7 @@ fn provider_label(reachable: bool) -> String {
     #[cfg(target_os = "linux")]
     {
         // WSLg sets WAYLAND_DISPLAY + a /mnt/wslg path; otherwise assume Xorg.
-        if std::env::var("WSL_DISTRO_NAME").is_ok()
-            || std::path::Path::new("/mnt/wslg").exists()
-        {
+        if std::env::var("WSL_DISTRO_NAME").is_ok() || std::path::Path::new("/mnt/wslg").exists() {
             return "WSLg".to_string();
         }
         return "Xorg".to_string();

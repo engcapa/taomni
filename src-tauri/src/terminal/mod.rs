@@ -283,7 +283,10 @@ pub async fn create_ssh_terminal(
                 )))
             }
             Err(e) => {
-                tracing::warn!("X11 enabled but no local display ({}); connecting without forwarding", e);
+                tracing::warn!(
+                    "X11 enabled but no local display ({}); connecting without forwarding",
+                    e
+                );
                 None
             }
         }
@@ -647,8 +650,18 @@ pub async fn test_ssh_connection(
     };
 
     let start = std::time::Instant::now();
-    let (handle, channel, _rx) =
-        ssh::connect_ssh(&host, port, &username, auth, 80, 24, network.as_ref(), None, None).await?;
+    let (handle, channel, _rx) = ssh::connect_ssh(
+        &host,
+        port,
+        &username,
+        auth,
+        80,
+        24,
+        network.as_ref(),
+        None,
+        None,
+    )
+    .await?;
     let elapsed = start.elapsed();
 
     // Close the test connection

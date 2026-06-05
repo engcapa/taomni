@@ -37,7 +37,11 @@ const OPT_ECHO: u8 = 1;
 const OPT_SGA: u8 = 3;
 
 pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
-    let port = if config.port == 0 { DEFAULT_PORT } else { config.port };
+    let port = if config.port == 0 {
+        DEFAULT_PORT
+    } else {
+        config.port
+    };
     let addr = format!("{}:{}", config.bind_address, port);
 
     let listener = TcpListener::bind(&addr)
@@ -87,8 +91,7 @@ async fn handle_client(
     log: &super::engine::LogEmitter,
 ) -> Result<(), String> {
     // Spawn the shell inside a PTY (80x24 default geometry).
-    let (mut handle, mut reader, shell_id) =
-        create_pty(80, 24, None, None, None).map_err(|e| e)?;
+    let (mut handle, mut reader, shell_id) = create_pty(80, 24, None, None, None).map_err(|e| e)?;
     log.line(format!("spawned shell ({})", shell_id));
 
     // PTY stdout -> async task, via a blocking reader thread.
@@ -123,10 +126,7 @@ async fn handle_client(
     // Initial negotiation: server WILL ECHO + WILL SGA -> client switches to
     // character mode and lets us echo.
     let hello = [IAC, WILL, OPT_ECHO, IAC, WILL, OPT_SGA];
-    stream
-        .write_all(&hello)
-        .await
-        .map_err(|e| e.to_string())?;
+    stream.write_all(&hello).await.map_err(|e| e.to_string())?;
 
     let mut parser = Telnet::default();
     let mut sock_buf = [0u8; 8192];

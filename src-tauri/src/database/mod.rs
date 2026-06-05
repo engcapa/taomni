@@ -13,6 +13,9 @@ pub mod redis_ops;
 pub mod sql;
 
 use serde::{Deserialize, Serialize};
+use sqlx_core::pool::Pool;
+use sqlx_mysql::MySql;
+use sqlx_postgres::Postgres;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::ipc::Channel;
@@ -189,8 +192,8 @@ pub struct IndexInfo {
 /// `AppState::db_connections`; SQL pools are internally `Send + Sync` so they
 /// need no extra lock, while the Redis multiplexed connection is cloneable.
 pub enum DbHandle {
-    MySql(sqlx::Pool<sqlx::MySql>),
-    Postgres(sqlx::Pool<sqlx::Postgres>),
+    MySql(Pool<MySql>),
+    Postgres(Pool<Postgres>),
     ClickHouse(clickhouse::ClickHouseClient),
     Presto(presto::PrestoClient),
     Redis(AsyncMutex<redis::aio::MultiplexedConnection>),

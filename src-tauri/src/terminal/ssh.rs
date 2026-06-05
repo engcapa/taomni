@@ -1,7 +1,7 @@
-use async_trait::async_trait;
-use russh::client::KeyboardInteractiveAuthResponse;
-use russh::keys::key::{self as ssh_key, PublicKey, SignatureHash};
-use russh::{client, kex, ChannelId, Pty};
+use russh::client::{self, KeyboardInteractiveAuthResponse};
+use russh::keys::ssh_key::{Algorithm as SshAlgorithm, EcdsaCurve, HashAlg};
+use russh::keys::{self, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
+use russh::{kex, ChannelId, Pty};
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
@@ -22,64 +22,71 @@ pub struct SshHandler {
     pub x11: Option<Arc<XForward>>,
 }
 
-#[async_trait]
 impl client::Handler for SshHandler {
     type Error = russh::Error;
 
-    async fn check_server_key(
+    fn check_server_key(
         &mut self,
         _server_public_key: &PublicKey,
-    ) -> Result<bool, Self::Error> {
-        // TODO: proper host key verification
-        Ok(true)
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        async {
+            // TODO: proper host key verification
+            Ok(true)
+        }
     }
 
-    async fn data(
+    fn data(
         &mut self,
         _channel: ChannelId,
         data: &[u8],
         _session: &mut client::Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(tx) = self.output_tx.lock().await.as_ref() {
-            let _ = tx.send(data.to_vec());
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if let Some(tx) = self.output_tx.lock().await.as_ref() {
+                let _ = tx.send(data.to_vec());
+            }
+            Ok(())
         }
-        Ok(())
     }
 
-    async fn extended_data(
+    fn extended_data(
         &mut self,
         _channel: ChannelId,
         _ext: u32,
         data: &[u8],
         _session: &mut client::Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(tx) = self.output_tx.lock().await.as_ref() {
-            let _ = tx.send(data.to_vec());
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if let Some(tx) = self.output_tx.lock().await.as_ref() {
+                let _ = tx.send(data.to_vec());
+            }
+            Ok(())
         }
-        Ok(())
     }
 
     /// The remote opened an X11 channel (a forwarded X client wants to talk to
     /// our display). Bridge it to the local X server. We spawn the pump as a
     /// detached task so the SSH event loop keeps servicing other channels; the
     /// task ends when either side closes, and is torn down with the session.
-    async fn server_channel_open_x11(
+    fn server_channel_open_x11(
         &mut self,
         channel: russh::Channel<client::Msg>,
         _originator_address: &str,
         _originator_port: u32,
         _session: &mut client::Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(forward) = self.x11.clone() {
-            tokio::spawn(async move {
-                let stream = channel.into_stream();
-                if let Err(e) = x11_forward::bridge(forward, stream).await {
-                    tracing::debug!("X11 forward bridge ended: {}", e);
-                }
-            });
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if let Some(forward) = self.x11.clone() {
+                tokio::spawn(async move {
+                    let stream = channel.into_stream();
+                    if let Err(e) = x11_forward::bridge(forward, stream).await {
+                        tracing::debug!("X11 forward bridge ended: {}", e);
+                    }
+                });
+            }
+            // If X11 wasn't enabled for this session, dropping `channel` closes it.
+            Ok(())
         }
-        // If X11 wasn't enabled for this session, dropping `channel` closes it.
-        Ok(())
     }
 }
 
@@ -136,14 +143,24 @@ const COMPAT_KEX_ORDER: &[kex::Name] = &[
     kex::EXTENSION_OPENSSH_STRICT_KEX_AS_SERVER,
 ];
 
-const COMPAT_HOST_KEY_ORDER: &[ssh_key::Name] = &[
-    ssh_key::ED25519,
-    ssh_key::ECDSA_SHA2_NISTP256,
-    ssh_key::ECDSA_SHA2_NISTP384,
-    ssh_key::ECDSA_SHA2_NISTP521,
-    ssh_key::RSA_SHA2_512,
-    ssh_key::RSA_SHA2_256,
-    ssh_key::SSH_RSA,
+const COMPAT_HOST_KEY_ORDER: &[SshAlgorithm] = &[
+    SshAlgorithm::Ed25519,
+    SshAlgorithm::Ecdsa {
+        curve: EcdsaCurve::NistP256,
+    },
+    SshAlgorithm::Ecdsa {
+        curve: EcdsaCurve::NistP384,
+    },
+    SshAlgorithm::Ecdsa {
+        curve: EcdsaCurve::NistP521,
+    },
+    SshAlgorithm::Rsa {
+        hash: Some(HashAlg::Sha512),
+    },
+    SshAlgorithm::Rsa {
+        hash: Some(HashAlg::Sha256),
+    },
+    SshAlgorithm::Rsa { hash: None },
 ];
 
 const DEFAULT_PTY_MODES: &[(Pty, u32)] = &[
@@ -232,7 +249,7 @@ async fn authenticate(
                 .authenticate_password(username, &password)
                 .await
                 .map_err(|e| format!("SSH auth failed: {}", e))?;
-            if ok {
+            if ok.success() {
                 return Ok(());
             }
             if let Some(prompter) = prompter {
@@ -248,7 +265,7 @@ async fn authenticate(
         }
         SshAuth::PrivateKey(key_path) => {
             let key_path = shellexpand::tilde(&key_path).to_string();
-            let key = russh_keys::load_secret_key(&key_path, None)
+            let key = keys::load_secret_key(&key_path, None)
                 .map_err(|e| format!("Failed to load key {}: {}", key_path, e))?;
             authenticate_private_key(handle, username, key).await?;
         }
@@ -283,7 +300,7 @@ async fn authenticate_keyboard_interactive(
     loop {
         match response {
             KeyboardInteractiveAuthResponse::Success => return Ok(()),
-            KeyboardInteractiveAuthResponse::Failure => {
+            KeyboardInteractiveAuthResponse::Failure { .. } => {
                 return Err("SSH authentication rejected (MFA/keyboard-interactive)".to_string());
             }
             KeyboardInteractiveAuthResponse::InfoRequest {
@@ -354,19 +371,24 @@ fn looks_like_password_prompt(prompt: &str) -> bool {
 async fn authenticate_private_key(
     handle: &mut client::Handle<SshHandler>,
     username: &str,
-    key: ssh_key::KeyPair,
+    key: PrivateKey,
 ) -> Result<(), String> {
-    let attempts = private_key_auth_attempts(&key);
+    let best_rsa_hash = handle
+        .best_supported_rsa_hash()
+        .await
+        .map_err(|e| format!("SSH key auth failed while probing RSA algorithms: {}", e))?
+        .flatten();
+    let attempts = private_key_auth_attempts(key, best_rsa_hash);
     let mut tried = Vec::with_capacity(attempts.len());
 
     for key in attempts {
-        let algorithm = key.name().to_string();
+        let algorithm = key.algorithm().as_str().to_string();
         tried.push(algorithm.clone());
         let ok = handle
-            .authenticate_publickey(username, Arc::new(key))
+            .authenticate_publickey(username, key)
             .await
             .map_err(|e| format!("SSH key auth failed using {}: {}", algorithm, e))?;
-        if ok {
+        if ok.success() {
             return Ok(());
         }
     }
@@ -377,21 +399,28 @@ async fn authenticate_private_key(
     ))
 }
 
-fn private_key_auth_attempts(key: &ssh_key::KeyPair) -> Vec<ssh_key::KeyPair> {
-    let rsa_attempts = [
-        SignatureHash::SHA2_512,
-        SignatureHash::SHA2_256,
-        SignatureHash::SHA1,
-    ]
-    .into_iter()
-    .filter_map(|hash| key.with_signature_hash(hash))
-    .collect::<Vec<_>>();
-
-    if rsa_attempts.is_empty() {
-        vec![key.clone()]
-    } else {
-        rsa_attempts
+fn private_key_auth_attempts(
+    key: PrivateKey,
+    best_rsa_hash: Option<HashAlg>,
+) -> Vec<PrivateKeyWithHashAlg> {
+    let key = Arc::new(key);
+    if !matches!(key.algorithm(), SshAlgorithm::Rsa { .. }) {
+        return vec![PrivateKeyWithHashAlg::new(key, None)];
     }
+
+    let mut hashes = Vec::new();
+    if let Some(hash) = best_rsa_hash {
+        hashes.push(Some(hash));
+    }
+    for hash in [Some(HashAlg::Sha512), Some(HashAlg::Sha256), None] {
+        if !hashes.contains(&hash) {
+            hashes.push(hash);
+        }
+    }
+    hashes
+        .into_iter()
+        .map(|hash| PrivateKeyWithHashAlg::new(key.clone(), hash))
+        .collect()
 }
 
 pub async fn connect_ssh(

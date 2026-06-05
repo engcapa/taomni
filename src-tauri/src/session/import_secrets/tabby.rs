@@ -27,7 +27,7 @@
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use serde_yaml::Value as YamlValue;
+use serde_yml::Value as YamlValue;
 use zeroize::Zeroizing;
 
 use super::crypto::{aes_256_cbc_decrypt_pkcs7, pbkdf2_sha512, SecretCryptoError};
@@ -86,12 +86,12 @@ pub enum TabbySecret {
 /// Decrypt `vault:` block in a Tabby `config.yaml` and extract the
 /// secrets we know how to map onto Taomni sessions.
 pub fn decrypt_vault_yaml(yaml: &str, password: &str) -> Result<Vec<TabbySecret>, TabbyVaultError> {
-    let doc: YamlValue = serde_yaml::from_str(yaml)
+    let doc: YamlValue = serde_yml::from_str(yaml)
         .map_err(|e| TabbyVaultError::MalformedHeader(format!("yaml parse: {e}")))?;
 
     let vault = doc
         .as_mapping()
-        .and_then(|m| m.get(YamlValue::String("vault".to_string())))
+        .and_then(|m| m.get("vault"))
         .ok_or(TabbyVaultError::MissingVaultBlock)?;
 
     let vault_map = vault
@@ -99,7 +99,7 @@ pub fn decrypt_vault_yaml(yaml: &str, password: &str) -> Result<Vec<TabbySecret>
         .ok_or_else(|| TabbyVaultError::MalformedHeader("vault is not a mapping".into()))?;
 
     let version = vault_map
-        .get(YamlValue::String("version".to_string()))
+        .get("version")
         .and_then(YamlValue::as_u64)
         .ok_or_else(|| TabbyVaultError::MalformedHeader("missing vault.version".into()))?;
     if version != TABBY_VAULT_VERSION {
@@ -107,15 +107,15 @@ pub fn decrypt_vault_yaml(yaml: &str, password: &str) -> Result<Vec<TabbySecret>
     }
 
     let contents_b64 = vault_map
-        .get(YamlValue::String("contents".to_string()))
+        .get("contents")
         .and_then(YamlValue::as_str)
         .ok_or_else(|| TabbyVaultError::MalformedHeader("missing vault.contents".into()))?;
     let key_salt_hex = vault_map
-        .get(YamlValue::String("keySalt".to_string()))
+        .get("keySalt")
         .and_then(YamlValue::as_str)
         .ok_or_else(|| TabbyVaultError::MalformedHeader("missing vault.keySalt".into()))?;
     let iv_hex = vault_map
-        .get(YamlValue::String("iv".to_string()))
+        .get("iv")
         .and_then(YamlValue::as_str)
         .ok_or_else(|| TabbyVaultError::MalformedHeader("missing vault.iv".into()))?;
 
@@ -263,7 +263,7 @@ mod tests {
     use super::*;
     use aes::Aes256;
     use cbc::cipher::block_padding::Pkcs7;
-    use cbc::cipher::{BlockEncryptMut, KeyIvInit};
+    use cbc::cipher::{BlockModeEncrypt, KeyIvInit};
 
     type Aes256CbcEnc = cbc::Encryptor<Aes256>;
 
@@ -276,8 +276,9 @@ mod tests {
         let pad = block_size - (pt_len % block_size);
         let mut buf = vec![0u8; pt_len + pad];
         buf[..pt_len].copy_from_slice(plaintext_json.as_bytes());
-        let ct_len = Aes256CbcEnc::new(key.as_slice().into(), &iv.into())
-            .encrypt_padded_mut::<Pkcs7>(&mut buf, pt_len)
+        let ct_len = Aes256CbcEnc::new_from_slices(key.as_slice(), &iv)
+            .expect("key and iv lengths are fixed")
+            .encrypt_padded::<Pkcs7>(&mut buf, pt_len)
             .expect("encrypt")
             .len();
         buf.truncate(ct_len);

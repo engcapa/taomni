@@ -14,7 +14,7 @@
 // the legacy service and, on a hit, copies the secret under the new service
 // (best-effort) so subsequent reads are fast.
 
-use keyring::Entry;
+use keyring_core::{Entry, Error as KeyringError};
 
 const SERVICE: &str = "taomni.ai";
 const LEGACY_SERVICE: &str = "newmob.ai";
@@ -36,7 +36,7 @@ pub fn put(kind: &str, name: &str, secret: &str) -> Result<(), String> {
 pub fn get(kind: &str, name: &str) -> Result<Option<String>, String> {
     match entry(kind, name)?.get_password() {
         Ok(s) => Ok(Some(s)),
-        Err(keyring::Error::NoEntry) => get_legacy_and_migrate(kind, name),
+        Err(KeyringError::NoEntry) => get_legacy_and_migrate(kind, name),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -48,12 +48,11 @@ fn get_legacy_and_migrate(kind: &str, name: &str) -> Result<Option<String>, Stri
     match legacy_entry(kind, name)?.get_password() {
         Ok(secret) => {
             // Best-effort copy forward; ignore failures (e.g. read-only store).
-            let _ = entry(kind, name).and_then(|e| {
-                e.set_password(&secret).map_err(|err| err.to_string())
-            });
+            let _ = entry(kind, name)
+                .and_then(|e| e.set_password(&secret).map_err(|err| err.to_string()));
             Ok(Some(secret))
         }
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(KeyringError::NoEntry) => Ok(None),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -66,7 +65,7 @@ pub fn delete(kind: &str, name: &str) -> Result<(), String> {
     }
     match entry(kind, name)?.delete_credential() {
         Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(KeyringError::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
     }
 }

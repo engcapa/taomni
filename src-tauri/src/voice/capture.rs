@@ -44,7 +44,7 @@ pub fn start() -> Result<u32, String> {
     let supported = device
         .default_input_config()
         .map_err(|e| format!("default_input_config: {e}"))?;
-    let device_sr = supported.sample_rate().0;
+    let device_sr = supported.sample_rate();
     let channels = supported.channels();
 
     let config: StreamConfig = supported.clone().into();

@@ -42,9 +42,7 @@ pub fn save_server_config(
 
 /// Load every persisted server config as a `serverType -> json` map. Rows whose
 /// stored JSON fails to parse are skipped rather than failing the whole load.
-pub fn load_server_configs(
-    conn: &Connection,
-) -> SqlResult<HashMap<String, serde_json::Value>> {
+pub fn load_server_configs(conn: &Connection) -> SqlResult<HashMap<String, serde_json::Value>> {
     let mut stmt = conn.prepare("SELECT server_type, config_json FROM server_configs")?;
     let rows = stmt.query_map([], |row| {
         let server_type: String = row.get(0)?;

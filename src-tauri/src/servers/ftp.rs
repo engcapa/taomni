@@ -22,8 +22,8 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::io::AsyncBufReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 
 use super::engine::{LogEmitter, ServerCtx, ServerStarted};
@@ -42,7 +42,11 @@ struct FtpOpts {
 }
 
 pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
-    let port = if config.port == 0 { DEFAULT_PORT } else { config.port };
+    let port = if config.port == 0 {
+        DEFAULT_PORT
+    } else {
+        config.port
+    };
     let bind = config.bind_address.clone();
 
     let root = {
@@ -197,7 +201,8 @@ impl Session {
                     self.user = Some(arg.clone());
                     self.authenticated = false;
                     if self.opts.allow_anonymous
-                        && (arg.eq_ignore_ascii_case("anonymous") || arg.eq_ignore_ascii_case("ftp"))
+                        && (arg.eq_ignore_ascii_case("anonymous")
+                            || arg.eq_ignore_ascii_case("ftp"))
                     {
                         write_half
                             .write_all(b"331 Anonymous login ok, send your email as password.\r\n")
@@ -213,9 +218,7 @@ impl Session {
                         self.authenticated = true;
                         write_half.write_all(b"230 Login successful.\r\n").await?;
                     } else {
-                        write_half
-                            .write_all(b"530 Login incorrect.\r\n")
-                            .await?;
+                        write_half.write_all(b"530 Login incorrect.\r\n").await?;
                     }
                 }
                 "ACCT" => {
@@ -362,9 +365,7 @@ impl Session {
         match self.resolve(arg) {
             Some((real, vpath)) if real.is_dir() => {
                 self.vpath = vpath;
-                write_half
-                    .write_all(b"250 Directory changed.\r\n")
-                    .await?;
+                write_half.write_all(b"250 Directory changed.\r\n").await?;
             }
             _ => {
                 write_half
@@ -417,9 +418,7 @@ impl Session {
         let listener = match self.pasv.take() {
             Some(l) => l,
             None => {
-                write_half
-                    .write_all(b"425 Use PASV first.\r\n")
-                    .await?;
+                write_half.write_all(b"425 Use PASV first.\r\n").await?;
                 return Ok(None);
             }
         };
@@ -490,9 +489,7 @@ impl Session {
             Some((real, _)) if real.is_file() => real,
             _ => {
                 self.pasv = None;
-                write_half
-                    .write_all(b"550 File not found.\r\n")
-                    .await?;
+                write_half.write_all(b"550 File not found.\r\n").await?;
                 return Ok(());
             }
         };
@@ -526,9 +523,7 @@ impl Session {
                 log.line(format!("RETR {} -> 226", path.display()));
             }
             Err(e) => {
-                write_half
-                    .write_all(b"426 Transfer aborted.\r\n")
-                    .await?;
+                write_half.write_all(b"426 Transfer aborted.\r\n").await?;
                 log.line(format!("RETR failed: {}", e));
             }
         }
@@ -554,9 +549,7 @@ impl Session {
             Some(d) => d,
             None => return Ok(()),
         };
-        write_half
-            .write_all(b"150 Ok to send data.\r\n")
-            .await?;
+        write_half.write_all(b"150 Ok to send data.\r\n").await?;
 
         let result = async {
             let mut file = tokio::fs::File::create(&path).await?;
@@ -578,9 +571,7 @@ impl Session {
                 log.line(format!("STOR {} -> 226", path.display()));
             }
             Err(e) => {
-                write_half
-                    .write_all(b"426 Transfer aborted.\r\n")
-                    .await?;
+                write_half.write_all(b"426 Transfer aborted.\r\n").await?;
                 log.line(format!("STOR failed: {}", e));
             }
         }

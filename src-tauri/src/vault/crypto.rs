@@ -1,7 +1,6 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use argon2::{Algorithm, Argon2, Params, Version};
-use rand::RngCore;
 use zeroize::Zeroizing;
 
 /// Constant plaintext encrypted under the root key on init. Successful
@@ -40,13 +39,13 @@ impl std::error::Error for CryptoError {}
 
 pub fn random_salt() -> [u8; SALT_LEN] {
     let mut s = [0u8; SALT_LEN];
-    rand::rngs::OsRng.fill_bytes(&mut s);
+    rand::fill(&mut s);
     s
 }
 
 pub fn random_nonce() -> [u8; NONCE_LEN] {
     let mut n = [0u8; NONCE_LEN];
-    rand::rngs::OsRng.fill_bytes(&mut n);
+    rand::fill(&mut n);
     n
 }
 

@@ -11,19 +11,19 @@
 //! [`engine::set_status`] (which updates the registry and emits
 //! `server://status/<type>`), and `autostart_servers` runs at startup.
 
-pub mod engine;
-pub mod db;
-pub mod process;
-pub mod ssh;
-pub mod http;
-pub mod ftp;
-pub mod tftp;
-pub mod telnet;
 pub mod cron;
-pub mod vnc;
-pub mod nfs;
+pub mod db;
+pub mod engine;
+pub mod ftp;
+pub mod http;
 pub mod iperf;
+pub mod nfs;
+pub mod process;
 pub mod rdp;
+pub mod ssh;
+pub mod telnet;
+pub mod tftp;
+pub mod vnc;
 
 use std::collections::HashMap;
 
@@ -393,19 +393,23 @@ pub async fn get_server_status(
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
     let s = state.servers.statuses.lock().await;
-    Ok(s.get(&st).cloned().unwrap_or_else(|| ServerStatus::stopped(st)))
+    Ok(s.get(&st)
+        .cloned()
+        .unwrap_or_else(|| ServerStatus::stopped(st)))
 }
 
 #[tauri::command]
-pub async fn list_server_statuses(
-    state: State<'_, AppState>,
-) -> Result<Vec<ServerStatus>, String> {
+pub async fn list_server_statuses(state: State<'_, AppState>) -> Result<Vec<ServerStatus>, String> {
     let s = state.servers.statuses.lock().await;
     // Return a status for every known server type so the UI has a complete
     // list even before anything has started.
     let out = ServerType::all()
         .into_iter()
-        .map(|st| s.get(&st).cloned().unwrap_or_else(|| ServerStatus::stopped(st)))
+        .map(|st| {
+            s.get(&st)
+                .cloned()
+                .unwrap_or_else(|| ServerStatus::stopped(st))
+        })
         .collect();
     Ok(out)
 }
@@ -463,9 +467,7 @@ pub async fn autostart_servers(app: AppHandle) {
             continue;
         }
         let state: State<AppState> = app.state();
-        if let Err(e) =
-            start_local_server(app.clone(), state, type_str.clone(), value).await
-        {
+        if let Err(e) = start_local_server(app.clone(), state, type_str.clone(), value).await {
             tracing::warn!("autostart server {}: {}", type_str, e);
         }
     }

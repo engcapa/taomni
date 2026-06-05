@@ -12,8 +12,8 @@
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::io::AsyncBufReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 
 use super::engine::{LogEmitter, ServerCtx, ServerStarted};
@@ -30,7 +30,11 @@ struct HttpOpts {
 }
 
 pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
-    let port = if config.port == 0 { DEFAULT_PORT } else { config.port };
+    let port = if config.port == 0 {
+        DEFAULT_PORT
+    } else {
+        config.port
+    };
     let bind = config.bind_address.clone();
 
     // Resolve the document root, falling back to the home directory.
@@ -163,7 +167,16 @@ async fn handle_conn(
         // Try an index.html first, then optionally a directory listing.
         let index = resolved.join("index.html");
         if index.is_file() {
-            serve_file(&mut stream, &index, head_only, opts, log, &method, &raw_target).await?;
+            serve_file(
+                &mut stream,
+                &index,
+                head_only,
+                opts,
+                log,
+                &method,
+                &raw_target,
+            )
+            .await?;
         } else if opts.directory_listing {
             let body = render_listing(&opts.root, &resolved, &decoded);
             log.line(format!("{} {} -> 200 (listing)", method, raw_target));
@@ -182,7 +195,16 @@ async fn handle_conn(
             write_simple(&mut stream, 403, "Forbidden", opts.cors, !head_only).await?;
         }
     } else if resolved.is_file() {
-        serve_file(&mut stream, &resolved, head_only, opts, log, &method, &raw_target).await?;
+        serve_file(
+            &mut stream,
+            &resolved,
+            head_only,
+            opts,
+            log,
+            &method,
+            &raw_target,
+        )
+        .await?;
     } else {
         log.line(format!("{} {} -> 404", method, raw_target));
         write_simple(&mut stream, 404, "Not Found", opts.cors, !head_only).await?;
@@ -361,10 +383,16 @@ fn render_listing(root: &Path, dir: &Path, url_path: &str) -> String {
 
     let mut html = String::new();
     html.push_str("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
-    html.push_str(&format!("<title>Index of {}</title>", html_escape(display_path)));
+    html.push_str(&format!(
+        "<title>Index of {}</title>",
+        html_escape(display_path)
+    ));
     html.push_str("<style>body{font-family:system-ui,monospace;margin:2rem;}a{text-decoration:none;}li{margin:2px 0;}</style>");
     html.push_str("</head><body>");
-    html.push_str(&format!("<h2>Index of {}</h2><ul>", html_escape(display_path)));
+    html.push_str(&format!(
+        "<h2>Index of {}</h2><ul>",
+        html_escape(display_path)
+    ));
 
     // Parent link (unless we're at the served root).
     if dir != root {

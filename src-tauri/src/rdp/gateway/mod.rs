@@ -40,7 +40,6 @@ use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-use rand::RngCore as _;
 use tokio::io::{
     AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, DuplexStream, ReadBuf,
 };
@@ -746,7 +745,7 @@ fn build_ntlm_authenticate_authorization(
 
 fn random_client_challenge() -> [u8; 8] {
     let mut challenge = [0u8; 8];
-    rand::thread_rng().fill_bytes(&mut challenge);
+    rand::fill(&mut challenge);
     challenge
 }
 

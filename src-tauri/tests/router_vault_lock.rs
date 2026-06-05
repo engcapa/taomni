@@ -10,10 +10,10 @@
 //!    unlock dialog. After unlock, AppAiCtx::rebuild_router resolves the
 //!    key cleanly and the provider becomes usable — no Save click needed.
 
+use std::collections::HashMap;
 use taomni_lib::ai::config::{AiConfig, FallbackConfig, LlmConfig, LlmProviderConfig};
 use taomni_lib::llm::router::build_router_from_ai;
 use taomni_lib::vault::Vault;
-use std::collections::HashMap;
 use tempfile::TempDir;
 
 const MASTER_PASSWORD: &str = "correct horse battery";

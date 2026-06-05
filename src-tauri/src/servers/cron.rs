@@ -163,8 +163,7 @@ impl CronSchedule {
         let dow = now.weekday().num_days_from_sunday() as u32; // 0=Sun
 
         // Allow 7 as Sunday in the expression in addition to 0.
-        let dow_match =
-            self.dow.contains(dow) || (dow == 0 && self.dow.contains(7));
+        let dow_match = self.dow.contains(dow) || (dow == 0 && self.dow.contains(7));
         // Standard cron rule: when both DOM and DOW are restricted (neither is
         // `*`), a match on EITHER fires the job; otherwise both must match.
         let day_ok = if self.dom.is_wildcard || self.dow.is_wildcard {
@@ -250,10 +249,7 @@ impl FieldMatcher {
     }
 
     fn contains(&self, value: u32) -> bool {
-        self.allowed
-            .get(value as usize)
-            .copied()
-            .unwrap_or(false)
+        self.allowed.get(value as usize).copied().unwrap_or(false)
     }
 }
 

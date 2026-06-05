@@ -132,9 +132,8 @@ pub async fn mcp_server_status() -> Result<McpServerInfo, String> {
 }
 
 fn generate_token() -> String {
-    use rand::RngCore;
     let mut buf = [0u8; 24];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand::fill(&mut buf);
     buf.iter().map(|b| format!("{:02x}", b)).collect()
 }
 

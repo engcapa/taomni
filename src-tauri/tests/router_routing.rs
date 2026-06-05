@@ -3,11 +3,11 @@
 
 mod support;
 
-use taomni_lib::llm::router::{FallbackConfig, LlmRouter};
-use taomni_lib::llm::{ChatRequest, TaskKind};
 use std::sync::Arc;
 use std::time::Duration;
 use support::mock_provider::{MockEvent, MockLlm};
+use taomni_lib::llm::router::{FallbackConfig, LlmRouter};
+use taomni_lib::llm::{ChatRequest, TaskKind};
 
 fn req() -> ChatRequest {
     ChatRequest::simple("test sys", "ping")

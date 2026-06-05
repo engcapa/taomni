@@ -32,7 +32,11 @@ const OP_ACK: u16 = 4;
 const OP_ERROR: u16 = 5;
 
 pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
-    let port = if config.port == 0 { DEFAULT_PORT } else { config.port };
+    let port = if config.port == 0 {
+        DEFAULT_PORT
+    } else {
+        config.port
+    };
     let bind = config.bind_address.clone();
 
     let root = resolve_root(&config);

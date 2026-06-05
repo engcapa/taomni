@@ -1,11 +1,11 @@
 [package]
 name = "taomni"
-version = "0.2.7"
+version = "0.2.8"
 description = "AI-native remote workspace for developers"
 authors = ["engcapa"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.94"
 
 [lib]
 name = "taomni_lib"
@@ -24,73 +24,80 @@ uuid = { version = "1", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 log = "0.4"
-portable-pty = "0.8"
+portable-pty = "0.9"
 base64 = "0.22"
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 chrono = "0.4"
-russh = "0.46"
-russh-keys = "0.46"
-russh-sftp = "2"
+russh = { version = "0.61", features = ["async-trait"] }
+russh-sftp = "2.3"
 tokio-util = { version = "0.7", features = ["compat", "io"] }
 futures = "0.3"
 async-trait = "0.1"
 async-stream = "0.3"
-thiserror = "1"
-reqwest = { version = "0.12", features = ["rustls-tls", "json", "stream"], default-features = false }
+thiserror = "2"
+reqwest = { version = "0.13", features = ["rustls", "json", "stream", "query"], default-features = false }
 heck = "0.5"
 regex = "1"
-rig-core = { version = "=0.37.0", default-features = false, features = ["derive"] }
+rig-core = { version = "=0.38.1", default-features = false, features = ["derive"] }
 urlencoding = "2"
 url = "2"
-which = "6"
+which = "8"
 shellexpand = "3"
 libc = "0.2"
 font-kit = "0.14"
-dirs = "5"
+dirs = "6"
 flate2 = "1"
-tungstenite = "0.24"
-tokio-tungstenite = "0.24"
-ironrdp = { version = "0.14.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor"] }
-ironrdp-tls = { version = "0.2.0", features = ["rustls"] }
-ironrdp-tokio = { version = "0.8.0", features = ["reqwest-rustls-ring"] }
+tungstenite = "0.29"
+tokio-tungstenite = "0.29"
+ironrdp = { version = "0.15.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor"] }
+ironrdp-tls = { version = "0.2.1", features = ["rustls"] }
+ironrdp-tokio = { version = "0.9.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 # RDP server (servers/rdp.rs): self-signed TLS cert + cross-platform input injection.
-rcgen = "0.13"
+rcgen = "0.14"
 # Input injection for the RDP server. Use the pure-Rust `x11rb` backend (not the
 # default `xdo`, which needs the libxdo C library) and the `wayland` backend so
 # Wayland sessions work without extra system deps. Both features are Linux-only
 # inside enigo; Windows/macOS use their native backends regardless.
-enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
+enigo = { version = "0.6", default-features = false, features = ["x11rb", "wayland"] }
 # RDP server display updates carry pixel data as `bytes::Bytes` (ironrdp-server API).
 bytes = "1"
 anyhow = "1"
-aes = "0.8"
-cbc = "0.1"
-des = "0.8"
-generic-array = "0.14"
+aes = "0.9"
+cbc = "0.2"
+des = "0.9"
+generic-array = "1"
 rsa = "0.9"
-sha2 = "0.10"
-sha1 = "0.10"
-rand = "0.8"
-pbkdf2 = "0.12"
+sha2 = "0.11"
+sha1 = "0.11"
+rand = "0.10"
+pbkdf2 = "0.13"
 hex = "0.4"
-serde_yaml = "0.9"
-x509-cert = "0.2"
+serde_yml = "0.0.13"
 arboard = "3"
 argon2 = "0.5"
 aes-gcm = "0.10"
 zeroize = { version = "1", features = ["zeroize_derive"] }
-keyring = "3"
-hound = "3.5"
-cpal = { version = "0.15", optional = true }
+keyring = "4"
+keyring-core = "1"
+cpal = { version = "0.17", optional = true }
 ash = { version = "0.38", optional = true }
 llama-cpp-2 = { version = "0.1", optional = true }
 plist = "1.9"
 # Database client backends (MySQL / PostgreSQL via sqlx, Redis via redis-rs,
 # ClickHouse via the existing reqwest HTTP client). Values are returned to the
 # frontend as strings, so no decimal/bigdecimal type features are required.
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "mysql", "postgres", "chrono", "bigdecimal", "uuid", "json"] }
-redis = { version = "0.27", default-features = false, features = ["tokio-comp", "tokio-rustls-comp", "streams"] }
+sqlx-core = { version = "0.9", default-features = false, features = ["_rt-tokio", "_tls-rustls-ring-webpki", "chrono", "bigdecimal", "uuid", "json"] }
+sqlx-mysql = { version = "0.9", default-features = false, features = ["chrono", "bigdecimal", "uuid", "json"] }
+sqlx-postgres = { version = "0.9", default-features = false, features = ["chrono", "bigdecimal", "uuid", "json"] }
+redis = { version = "1.2", default-features = false, features = ["tokio-comp", "tokio-rustls-comp", "streams"] }
+
+[patch.crates-io]
+ironrdp-connector = { path = "vendor/ironrdp-connector" }
+picky = { path = "vendor/picky" }
+picky-krb = { path = "vendor/picky-krb" }
+sspi = { path = "vendor/sspi" }
+winscard = { path = "vendor/winscard" }
 
 [features]
 default = []
@@ -113,12 +120,3 @@ x11rb = { version = "0.13", features = ["shm", "damage"] }
 
 [dev-dependencies]
 tempfile = "3"
-
-# russh 0.46 vendored with a one-line fix: write_auth_request_if_needed now
-# sets auth_request.current = KeyboardInteractive when starting KI after
-# another method (e.g. password partial-success), so USERAUTH_INFO_REQUEST
-# (MFA prompts) are correctly parsed instead of silently dropped.
-# Upstream bug is unfixed through russh 0.61; remove this patch when upstream
-# ships a fix.
-[patch.crates-io]
-russh = { path = "vendor/russh" }

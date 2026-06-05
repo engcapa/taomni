@@ -69,10 +69,9 @@ impl XForward {
 
         // Untrusted: generate a fake cookie of the same length as the real one
         // (or 16 bytes) to advertise.
-        use rand::RngCore;
         let len = display.auth_cookie.len().max(16);
         let mut fake = vec![0u8; len];
-        rand::thread_rng().fill_bytes(&mut fake);
+        rand::fill(fake.as_mut_slice());
         XForward {
             advertised_cookie_hex: hex::encode(&fake),
             advertised_protocol: protocol,

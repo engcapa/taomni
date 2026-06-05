@@ -44,13 +44,18 @@ impl RdpDisplay {
             Ok(cap) => {
                 let (w, h) = cap.desktop_size();
                 match (NonZeroU16::new(w), NonZeroU16::new(h)) {
-                    (Some(_), Some(_)) => (DesktopSize { width: w, height: h }, true),
+                    (Some(_), Some(_)) => (
+                        DesktopSize {
+                            width: w,
+                            height: h,
+                        },
+                        true,
+                    ),
                     _ => (fallback, false),
                 }
             }
             Err(e) => {
-                let msg =
-                    format!("screen capture unavailable: {} — serving placeholder", e);
+                let msg = format!("screen capture unavailable: {} — serving placeholder", e);
                 log.line(msg.clone());
                 tracing::warn!("RDP display: {}", msg);
                 (fallback, false)

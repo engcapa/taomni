@@ -186,22 +186,34 @@ impl RdpServerInputHandler for RdpInput {
         match event {
             KeyboardEvent::Pressed { code, extended } => {
                 if let Some(raw) = rdp_scancode_to_raw(code, extended) {
-                    self.send(InputCmd::Raw { code: raw, dir: Press });
+                    self.send(InputCmd::Raw {
+                        code: raw,
+                        dir: Press,
+                    });
                 }
             }
             KeyboardEvent::Released { code, extended } => {
                 if let Some(raw) = rdp_scancode_to_raw(code, extended) {
-                    self.send(InputCmd::Raw { code: raw, dir: Release });
+                    self.send(InputCmd::Raw {
+                        code: raw,
+                        dir: Release,
+                    });
                 }
             }
             KeyboardEvent::UnicodePressed(c) => {
                 if let Some(ch) = char::from_u32(u32::from(c)) {
-                    self.send(InputCmd::Key { key: Key::Unicode(ch), dir: Press });
+                    self.send(InputCmd::Key {
+                        key: Key::Unicode(ch),
+                        dir: Press,
+                    });
                 }
             }
             KeyboardEvent::UnicodeReleased(c) => {
                 if let Some(ch) = char::from_u32(u32::from(c)) {
-                    self.send(InputCmd::Key { key: Key::Unicode(ch), dir: Release });
+                    self.send(InputCmd::Key {
+                        key: Key::Unicode(ch),
+                        dir: Release,
+                    });
                 }
             }
             KeyboardEvent::Synchronize(_flags) => {
@@ -221,63 +233,112 @@ impl RdpServerInputHandler for RdpInput {
                 });
             }
             MouseEvent::LeftPressed => {
-                self.send(InputCmd::Button { button: Button::Left, dir: Press });
+                self.send(InputCmd::Button {
+                    button: Button::Left,
+                    dir: Press,
+                });
             }
             MouseEvent::LeftReleased => {
-                self.send(InputCmd::Button { button: Button::Left, dir: Release });
+                self.send(InputCmd::Button {
+                    button: Button::Left,
+                    dir: Release,
+                });
             }
             MouseEvent::RightPressed => {
-                self.send(InputCmd::Button { button: Button::Right, dir: Press });
+                self.send(InputCmd::Button {
+                    button: Button::Right,
+                    dir: Press,
+                });
             }
             MouseEvent::RightReleased => {
-                self.send(InputCmd::Button { button: Button::Right, dir: Release });
+                self.send(InputCmd::Button {
+                    button: Button::Right,
+                    dir: Release,
+                });
             }
             MouseEvent::MiddlePressed => {
-                self.send(InputCmd::Button { button: Button::Middle, dir: Press });
+                self.send(InputCmd::Button {
+                    button: Button::Middle,
+                    dir: Press,
+                });
             }
             MouseEvent::MiddleReleased => {
-                self.send(InputCmd::Button { button: Button::Middle, dir: Release });
+                self.send(InputCmd::Button {
+                    button: Button::Middle,
+                    dir: Release,
+                });
             }
             MouseEvent::Button4Pressed => {
                 // `Button::Back`/`Forward` don't exist on macOS in enigo 0.3.
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.send(InputCmd::Button { button: Button::Back, dir: Press });
+                self.send(InputCmd::Button {
+                    button: Button::Back,
+                    dir: Press,
+                });
             }
             MouseEvent::Button4Released => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.send(InputCmd::Button { button: Button::Back, dir: Release });
+                self.send(InputCmd::Button {
+                    button: Button::Back,
+                    dir: Release,
+                });
             }
             MouseEvent::Button5Pressed => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.send(InputCmd::Button { button: Button::Forward, dir: Press });
+                self.send(InputCmd::Button {
+                    button: Button::Forward,
+                    dir: Press,
+                });
             }
             MouseEvent::Button5Released => {
                 #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
-                self.send(InputCmd::Button { button: Button::Forward, dir: Release });
+                self.send(InputCmd::Button {
+                    button: Button::Forward,
+                    dir: Release,
+                });
             }
             MouseEvent::VerticalScroll { value } => {
                 // RDP wheel units are 120 per notch; positive = up. enigo's
                 // `scroll` uses positive = down, so invert and normalize.
                 let notches = -(i32::from(value) / 120);
                 let notches = if notches == 0 {
-                    if value > 0 { -1 } else if value < 0 { 1 } else { 0 }
+                    if value > 0 {
+                        -1
+                    } else if value < 0 {
+                        1
+                    } else {
+                        0
+                    }
                 } else {
                     notches
                 };
                 if notches != 0 {
-                    self.send(InputCmd::Scroll { length: notches, axis: Axis::Vertical });
+                    self.send(InputCmd::Scroll {
+                        length: notches,
+                        axis: Axis::Vertical,
+                    });
                 }
             }
             MouseEvent::Scroll { x, y } => {
                 if x != 0 {
-                    self.send(InputCmd::Scroll { length: x, axis: Axis::Horizontal });
+                    self.send(InputCmd::Scroll {
+                        length: x,
+                        axis: Axis::Horizontal,
+                    });
                 }
                 if y != 0 {
-                    self.send(InputCmd::Scroll { length: y, axis: Axis::Vertical });
+                    self.send(InputCmd::Scroll {
+                        length: y,
+                        axis: Axis::Vertical,
+                    });
                 }
             }
             MouseEvent::RelMove { x, y } => {
-                self.send(InputCmd::MoveMouse { x, y, coord: Coordinate::Rel });
+                self.send(InputCmd::MoveMouse {
+                    x,
+                    y,
+                    coord: Coordinate::Rel,
+                });
             }
         }
     }

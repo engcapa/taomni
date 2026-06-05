@@ -8,6 +8,7 @@
 // just look them up. NoEntry is a normal miss; other errors are
 // surfaced per-entry so a single broken record doesn't fail the batch.
 
+use keyring_core::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -30,7 +31,7 @@ pub struct KeychainHit {
 }
 
 fn lookup_one(query: &KeychainQuery) -> KeychainHit {
-    match keyring::Entry::new(&query.service, &query.account) {
+    match Entry::new(&query.service, &query.account) {
         Ok(entry) => match entry.get_password() {
             Ok(secret) => KeychainHit {
                 service: query.service.clone(),
@@ -39,7 +40,7 @@ fn lookup_one(query: &KeychainQuery) -> KeychainHit {
                 value: Some(secret),
                 error: None,
             },
-            Err(keyring::Error::NoEntry) => KeychainHit {
+            Err(KeyringError::NoEntry) => KeychainHit {
                 service: query.service.clone(),
                 account: query.account.clone(),
                 found: false,
