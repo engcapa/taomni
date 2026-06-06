@@ -12,10 +12,11 @@ import {
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
+  Group as PanelGroup,
   Panel,
-  PanelGroup,
-  PanelResizeHandle,
-  type ImperativePanelHandle,
+  Separator as PanelResizeHandle,
+  type PanelImperativeHandle,
+  type PanelSize,
 } from "react-resizable-panels";
 import { MenuBar } from "../components/menubar/MenuBar";
 import { Ribbon, type RibbonCommand } from "../components/menubar/Ribbon";
@@ -78,6 +79,7 @@ import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
+import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout";
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
@@ -289,7 +291,7 @@ export function MainLayout() {
     return profiles;
   }, [sessions]);
   const tabsRef = useRef(tabs);
-  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const lastSidebarSizeRef = useRef(22);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
@@ -757,7 +759,7 @@ export function MainLayout() {
       if (compactMode || sidebarCollapsed || tabMaximizedId) {
         panel.collapse();
       } else {
-        panel.resize(lastSidebarSizeRef.current);
+        panel.resize(`${lastSidebarSizeRef.current}%`);
       }
     });
 
@@ -1743,23 +1745,28 @@ export function MainLayout() {
           </div>
         )}
 
-        <PanelGroup direction="horizontal" autoSaveId="main-layout" className="flex-1 min-w-0">
+        <PanelGroup
+          orientation="horizontal"
+          id="main-layout"
+          defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
+          onLayoutChanged={saveResizableLayout("main-layout")}
+          className="flex-1 min-w-0"
+        >
           <Panel
-            ref={sidebarPanelRef}
-            defaultSize={22}
-            minSize={15}
-            maxSize={40}
+            panelRef={sidebarPanelRef}
+            id="sidebar"
+            defaultSize="22%"
+            minSize="15%"
+            maxSize="40%"
             collapsible
             collapsedSize={0}
-            onCollapse={() => {
-              if (!compactMode) setSidebarCollapsed(true);
-            }}
-            onExpand={() => {
-              if (!compactMode && !chromeHidden) setSidebarCollapsed(false);
-            }}
-            onResize={(size) => {
-              if (size > 2) {
-                lastSidebarSizeRef.current = size;
+            onResize={(size: PanelSize) => {
+              const percentage = size.asPercentage;
+              if (percentage > 2) {
+                lastSidebarSizeRef.current = percentage;
+              }
+              if (!compactMode && !chromeHidden) {
+                setSidebarCollapsed(percentage <= 2);
               }
             }}
           >
@@ -1779,7 +1786,7 @@ export function MainLayout() {
             className={compactMode || sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
           />
 
-          <Panel>
+          <Panel id="content">
             <div className="h-full flex flex-col min-w-0">
               {!compactMode && !chromeHidden && (
                 <TabBar
@@ -1994,19 +2001,25 @@ export function MainLayout() {
                               stays mounted across sidebar open/close. */}
                           <div className={terminalSplitVisible ? "flex-1 min-h-0" : "h-full"}>
                             <PanelGroup
-                              direction="horizontal"
-                              autoSaveId={`terminal-sftp-${tab.id}`}
+                              orientation="horizontal"
+                              id={`terminal-sftp-${tab.id}`}
+                              defaultLayout={loadResizableLayout(
+                                `terminal-sftp-${tab.id}`,
+                                sftpSidebarNode ? ["terminal", "sftp"] : ["terminal"],
+                              )}
+                              onLayoutChanged={saveResizableLayout(`terminal-sftp-${tab.id}`)}
                             >
-                              <Panel defaultSize={62} minSize={25} className="min-w-0">
+                              <Panel id="terminal" defaultSize="62%" minSize="25%" className="min-w-0">
                                 <div className="h-full">{terminalNode}</div>
                               </Panel>
                               {sftpSidebarNode && (
                                 <>
                                   <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
                                   <Panel
-                                    defaultSize={38}
-                                    minSize={20}
-                                    maxSize={70}
+                                    id="sftp"
+                                    defaultSize="38%"
+                                    minSize="20%"
+                                    maxSize="70%"
                                     className="min-w-0"
                                   >
                                     <div

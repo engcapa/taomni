@@ -39,7 +39,7 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 // Configure marked once. We want GFM (tables, task lists), no auto-IDs (we
 // don't surface them anywhere), and a single newline = <br/> so terminal-style
 // output reads naturally.
-marked.setOptions({
+marked.use({
   gfm: true,
   breaks: true,
 });

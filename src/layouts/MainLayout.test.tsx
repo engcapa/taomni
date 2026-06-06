@@ -49,21 +49,30 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 
-vi.mock("react-resizable-panels", () => ({
-  PanelGroup: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+vi.mock("react-resizable-panels", () => {
+  const Group = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className} data-testid="panel-group">{children}</div>
-  ),
-  Panel: forwardRef<unknown, { children: React.ReactNode }>(({ children }, ref) => {
-    useImperativeHandle(ref, () => ({
+  );
+  const Panel = forwardRef<unknown, { children: React.ReactNode; panelRef?: React.Ref<unknown> }>(({ children, panelRef }, ref) => {
+    const handle = {
       collapse: vi.fn(),
       resize: vi.fn(),
-    }));
+    };
+    useImperativeHandle(ref, () => handle);
+    useImperativeHandle(panelRef, () => handle);
     return <div data-testid="panel">{children}</div>;
-  }),
-  PanelResizeHandle: ({ className, "data-testid": testId }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string }) => (
+  });
+  const Separator = ({ className, "data-testid": testId }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string }) => (
     <div className={className} data-testid={testId ?? "panel-resize-handle"} />
-  ),
-}));
+  );
+  return {
+    Group,
+    Panel,
+    Separator,
+    PanelGroup: Group,
+    PanelResizeHandle: Separator,
+  };
+});
 
 vi.mock("../components/menubar/MenuBar", () => ({
   MenuBar: () => <div data-testid="menu-bar" />,

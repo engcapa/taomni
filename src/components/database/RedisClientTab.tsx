@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import { dbConnect, dbDisconnect, redisDelKey, redisExec } from "../../lib/ipc";
@@ -9,6 +9,7 @@ import { RedisCli } from "./RedisCli";
 import { RedisNewKeyDialog } from "./RedisNewKeyDialog";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 
 function createRuntimeDbSessionId(baseSessionId: string): string {
   const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -120,10 +121,16 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
         </div>
       </div>
 
-      <PanelGroup direction="vertical" className="flex-1 min-h-0">
-        <Panel defaultSize={cliCollapsed ? 92 : 70} minSize={30}>
-          <PanelGroup direction="horizontal" autoSaveId="redis-client" className="h-full">
-            <Panel defaultSize={32} minSize={18} maxSize={55}>
+      <PanelGroup orientation="vertical" className="flex-1 min-h-0">
+        <Panel defaultSize={`${cliCollapsed ? 92 : 70}%`} minSize="30%">
+          <PanelGroup
+            orientation="horizontal"
+            id="redis-client"
+            defaultLayout={loadResizableLayout("redis-client", ["keys", "value"])}
+            onLayoutChanged={saveResizableLayout("redis-client")}
+            className="h-full"
+          >
+            <Panel id="keys" defaultSize="32%" minSize="18%" maxSize="55%">
               <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
                 {connectionSessionId && (
                   <RedisKeyBrowser
@@ -165,7 +172,7 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
               </div>
             </Panel>
             <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-            <Panel>
+            <Panel id="value">
               <RedisValuePanel
                 sessionId={connectionSessionId ?? ""}
                 redisKey={selectedKey}
@@ -181,7 +188,11 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
         {!cliCollapsed && (
           <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
         )}
-        <Panel defaultSize={cliCollapsed ? 8 : 30} minSize={cliCollapsed ? 4 : 12} maxSize={cliCollapsed ? 8 : 70}>
+        <Panel
+          defaultSize={`${cliCollapsed ? 8 : 30}%`}
+          minSize={`${cliCollapsed ? 4 : 12}%`}
+          maxSize={`${cliCollapsed ? 8 : 70}%`}
+        >
           <RedisCli
             sessionId={connectionSessionId ?? ""}
             collapsed={cliCollapsed}
