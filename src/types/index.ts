@@ -2,7 +2,7 @@ import type { SshConnectInfo } from "../components/terminal/TerminalPanel";
 import type { TerminalProfile } from "../lib/terminalProfile";
 import type { RdpOptions } from "./rdp";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell";
 
 export interface VncConnectInfo {
   sessionId: string;
@@ -39,6 +39,23 @@ export interface DbConnectInfo {
   dbIndex?: number | null;
 }
 
+/**
+ * Connection parameters for the JVM-free HBase shell UI. The backend talks to
+ * an HBase REST/Stargate-compatible endpoint directly.
+ */
+export interface HBaseConnectInfo {
+  sessionId: string;
+  workspaceSessionId?: string;
+  host: string;
+  port: number;
+  username?: string | null;
+  password?: string;
+  ssl?: boolean;
+  timeoutSecs?: number | null;
+  restPath?: string | null;
+  namespace?: string | null;
+}
+
 export interface RdpConnectInfo {
   sessionId: string;
   host: string;
@@ -70,6 +87,7 @@ export interface Tab {
   vnc?: VncConnectInfo;
   rdp?: RdpConnectInfo;
   db?: DbConnectInfo;
+  hbase?: HBaseConnectInfo;
   fileBrowser?: FileBrowserTabInfo;
   hasNewOutput?: boolean;
 }

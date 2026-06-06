@@ -872,9 +872,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "redis_get_key":
     case "redis_set_key":
     case "redis_del_key":
-    case "redis_exec": {
+    case "redis_exec":
+    case "hbase_connect":
+    case "hbase_ping":
+    case "hbase_disconnect":
+    case "hbase_list_tables":
+    case "hbase_describe_table":
+    case "hbase_execute": {
       throw new Error(
-        "Database connections are not available in browser preview. Use the desktop build of Taomni.",
+        "Database and HBase connections are not available in browser preview. Use the desktop build of Taomni.",
       );
     }
     default:

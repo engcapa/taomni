@@ -27,6 +27,10 @@ const dbClientMock = vi.hoisted(() => ({
   props: [] as Array<{ tabId?: string; info?: Record<string, unknown>; visible?: boolean }>,
 }));
 
+const hbaseShellMock = vi.hoisted(() => ({
+  props: [] as Array<{ tabId?: string; info?: Record<string, unknown>; visible?: boolean }>,
+}));
+
 const vaultMock = vi.hoisted(() => {
   const mock = {
     state: "empty",
@@ -201,6 +205,23 @@ vi.mock("../components/database/RedisClientTab", () => ({
   default: () => <div data-testid="redis-client-tab" />,
 }));
 
+vi.mock("../components/database/HBaseShellTab", () => ({
+  default: (props: { tabId?: string; info?: Record<string, unknown>; visible?: boolean }) => {
+    hbaseShellMock.props.push(props);
+    return (
+      <div
+        data-testid="hbase-shell-tab"
+        data-tab-id={props.tabId ?? ""}
+        data-host={String(props.info?.host ?? "")}
+        data-port={String(props.info?.port ?? "")}
+        data-namespace={String(props.info?.namespace ?? "")}
+        data-rest-path={String(props.info?.restPath ?? "")}
+        data-visible={props.visible ? "true" : "false"}
+      />
+    );
+  },
+}));
+
 vi.mock("../lib/ipc", () => ({
   encodeBase64: (value: string) => btoa(value),
   exitApp: vi.fn(async () => undefined),
@@ -244,6 +265,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     sidebarMock.props = [];
     quickConnectMock.props = [];
     dbClientMock.props = [];
+    hbaseShellMock.props = [];
     vaultMock.state = "empty";
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
@@ -912,6 +934,57 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
     expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-catalog", "hive");
     expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-database", "sales");
+  });
+
+  it("opens saved HBaseShell sessions as independent HBase shell tabs", async () => {
+    const hbaseSession: SessionConfig = {
+      id: "hbase-1",
+      name: "HBase REST",
+      session_type: "HBaseShell",
+      group_path: null,
+      host: "hbase-rest.example.test",
+      port: 8080,
+      username: "root",
+      auth_method: "None",
+      options_json: JSON.stringify({
+        hbaseNamespace: "prod",
+        hbaseRestPath: "/gateway/hbase",
+        dbSsl: true,
+        dbTimeout: "25",
+      }),
+      created_at: 10,
+      updated_at: 10,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+
+    render(<MainLayout />);
+
+    act(() => {
+      latestSidebarProps().onConnectSession?.(hbaseSession);
+    });
+
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((candidate) => candidate.sessionId === "hbase-1");
+      expect(tab).toMatchObject({
+        type: "hbase-shell",
+        title: "HBase hbase-rest.example.test:8080/prod",
+        hbase: {
+          host: "hbase-rest.example.test",
+          port: 8080,
+          username: "root",
+          namespace: "prod",
+          restPath: "/gateway/hbase",
+          ssl: true,
+          timeoutSecs: 25,
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("hbase-shell-tab")).toHaveAttribute("data-host", "hbase-rest.example.test");
+    });
+    expect(screen.getByTestId("hbase-shell-tab")).toHaveAttribute("data-namespace", "prod");
+    expect(screen.getByTestId("hbase-shell-tab")).toHaveAttribute("data-rest-path", "/gateway/hbase");
   });
 });
 
