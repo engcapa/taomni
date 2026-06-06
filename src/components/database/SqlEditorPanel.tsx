@@ -1,7 +1,21 @@
 import { useEffect, useRef } from "react";
 import { EditorState, Compartment } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  rectangularSelection,
+  crosshairCursor,
+} from "@codemirror/view";
+import {
+  addCursorAbove,
+  addCursorBelow,
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+} from "@codemirror/commands";
 import {
   sql,
   MySQL,
@@ -86,6 +100,11 @@ export function SqlEditorPanel({
         lineNumbers(),
         highlightActiveLine(),
         EditorState.allowMultipleSelections.of(true),
+        rectangularSelection({
+          eventFilter: (event) =>
+            event.button === 0 && (event.altKey || (event.ctrlKey && event.shiftKey)),
+        }),
+        crosshairCursor(),
         history(),
         bracketMatching(),
         closeBrackets(),
@@ -97,6 +116,8 @@ export function SqlEditorPanel({
         keymap.of([
           { key: "F5", run: () => (runHandler(), true) },
           { key: "Mod-Enter", run: () => (runHandler(), true) },
+          { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
+          { key: "Shift-Alt-ArrowDown", run: addCursorBelow },
           ...closeBracketsKeymap,
           ...defaultKeymap,
           ...historyKeymap,

@@ -228,6 +228,16 @@ interface KeywordHighlight extends SearchMatch {
   kind: "error" | "warning" | "success";
 }
 
+export interface TerminalBlockSelectionCell {
+  row: number;
+  col: number;
+}
+
+export interface TerminalBlockSelection {
+  anchor: TerminalBlockSelectionCell;
+  focus: TerminalBlockSelectionCell;
+}
+
 interface TerminalEventLogEntry {
   id: number;
   time: string;
@@ -344,6 +354,7 @@ export function TerminalPanel({
     rect: { top: number; left: number; right: number; bottom: number };
     text: string;
   } | null>(null);
+  const [blockSelection, setBlockSelection] = useState<TerminalBlockSelection | null>(null);
   const [commonCommands, setCommonCommands] = useState<UserCommonCommand[]>(initialProfile.commonCommands);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -385,6 +396,8 @@ export function TerminalPanel({
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
   const suppressNativePasteUntilRef = useRef(0);
   const middleClickSelectionRef = useRef("");
+  const blockSelectionRef = useRef<TerminalBlockSelection | null>(null);
+  const blockSelectionTextRef = useRef("");
   const lastMacMiddlePasteAtRef = useRef(0);
   const lastCwdRequestTokenRef = useRef(cwdRequestToken);
   const quickFontOptions = useMemo(() => {
@@ -761,12 +774,56 @@ export function TerminalPanel({
     }
   }, [setStatusMessage]);
 
-  const copySelection = useCallback(() => {
+  const showTerminalSelectionToolbar = useCallback((text: string) => {
+    if (!text || text.trim().length < 2) {
+      setSelectionToolbar(null);
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    setSelectionToolbar({
+      text,
+      rect: {
+        top: rect.top + 24,
+        left: rect.left + rect.width / 3,
+        right: rect.right,
+        bottom: rect.bottom,
+      },
+    });
+  }, []);
+
+  const updateTerminalBlockSelection = useCallback((next: TerminalBlockSelection | null) => {
+    blockSelectionRef.current = next;
+    const term = termRef.current;
+    blockSelectionTextRef.current = next && term ? collectTerminalBlockSelectionText(term, next) : "";
+    setBlockSelection(next);
+    if (!next) {
+      setSelectionToolbar(null);
+    }
+  }, []);
+
+  const getActiveTerminalSelectionText = useCallback(() => {
+    const term = termRef.current;
+    if (!term) return "";
+    const block = blockSelectionRef.current;
+    if (block) {
+      const text = blockSelectionTextRef.current || collectTerminalBlockSelectionText(term, block);
+      if (text) return text;
+    }
+    return term.getSelection();
+  }, []);
+
+  const clearTerminalBlockSelection = useCallback(() => {
+    updateTerminalBlockSelection(null);
+  }, [updateTerminalBlockSelection]);
+
+  const copySelection = useCallback(async () => {
     const term = termRef.current;
     if (!term) return;
-    void writeClipboardText(term.getSelection(), "Copied selection");
+    await writeClipboardText(getActiveTerminalSelectionText(), "Copied selection");
     focusTerminal();
-  }, [focusTerminal, writeClipboardText]);
+  }, [focusTerminal, getActiveTerminalSelectionText, writeClipboardText]);
 
   const copyAll = useCallback(() => {
     const term = termRef.current;
@@ -778,7 +835,7 @@ export function TerminalPanel({
   const copyFormattedSelection = useCallback(async () => {
     const term = termRef.current;
     if (!term) return;
-    const text = term.getSelection();
+    const text = getActiveTerminalSelectionText();
     if (!text) {
       setStatusMessage("Nothing to copy");
       return;
@@ -795,7 +852,7 @@ export function TerminalPanel({
     } finally {
       focusTerminal();
     }
-  }, [focusTerminal, fontFamily, fontSize, setStatusMessage, themeName, writeClipboardText]);
+  }, [focusTerminal, fontFamily, fontSize, getActiveTerminalSelectionText, setStatusMessage, themeName, writeClipboardText]);
 
   const pasteTextIntoTerminal = useCallback(async (text: string): Promise<boolean> => {
     if (readOnlyRef.current) {
@@ -983,8 +1040,9 @@ export function TerminalPanel({
     setActiveSearchIndex(-1);
     searchAddonRef.current?.clearDecorations();
     termRef.current?.clearSelection();
+    clearTerminalBlockSelection();
     focusTerminal();
-  }, [focusTerminal]);
+  }, [clearTerminalBlockSelection, focusTerminal]);
 
   const runSearch = useCallback((direction: "next" | "previous" = "next") => {
     const terminal = termRef.current;
@@ -998,6 +1056,7 @@ export function TerminalPanel({
     }
 
     searchAddonRef.current?.clearDecorations();
+    clearTerminalBlockSelection();
     const result = findAndSelectBufferText(
       terminal,
       term,
@@ -1013,7 +1072,7 @@ export function TerminalPanel({
       setActiveSearchIndex(-1);
       setSearchStatus("No matches");
     }
-  }, [searchValue]);
+  }, [clearTerminalBlockSelection, searchValue]);
 
   const renameTerminal = useCallback(async () => {
     if (!tabId) return;
@@ -1144,6 +1203,29 @@ export function TerminalPanel({
     return true;
   }, [sendUntrackedInput, refreshSuggestion, bumpGhost]);
 
+  const extendTerminalBlockSelectionByKeyboard = useCallback((key: string) => {
+    const term = termRef.current;
+    if (!term) return false;
+    const current = blockSelectionRef.current;
+    const cursor = current?.focus ?? terminalCursorCell(term);
+    if (!cursor) return false;
+
+    const anchor = current?.anchor ?? cursor;
+    const nextFocus: TerminalBlockSelectionCell = { ...cursor };
+    if (key === "ArrowUp") nextFocus.row -= 1;
+    if (key === "ArrowDown") nextFocus.row += 1;
+    if (key === "ArrowLeft") nextFocus.col -= 1;
+    if (key === "ArrowRight") nextFocus.col += 1;
+    nextFocus.row = Math.max(0, Math.min(term.buffer.active.length - 1, nextFocus.row));
+    nextFocus.col = Math.max(0, Math.min(term.cols - 1, nextFocus.col));
+
+    term.clearSelection();
+    const next = { anchor, focus: nextFocus };
+    updateTerminalBlockSelection(next);
+    showTerminalSelectionToolbar(collectTerminalBlockSelectionText(term, next));
+    return true;
+  }, [showTerminalSelectionToolbar, updateTerminalBlockSelection]);
+
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
   const effectiveReadOnly = readOnly || inputLocked;
 
@@ -1151,6 +1233,20 @@ export function TerminalPanel({
     if (event.key === "F11") {
       event.preventDefault();
       setFullscreen((v) => !v);
+      return false;
+    }
+    if (
+      event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey &&
+      (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "ArrowLeft" || event.key === "ArrowRight")
+    ) {
+      if (extendTerminalBlockSelectionByKeyboard(event.key)) {
+        event.preventDefault();
+        return false;
+      }
+    }
+    if (event.key === "Escape" && blockSelectionRef.current) {
+      event.preventDefault();
+      clearTerminalBlockSelection();
       return false;
     }
     if (
@@ -1179,9 +1275,9 @@ export function TerminalPanel({
     // Cross-platform copy/paste shortcuts
     if (isMac) {
       if (event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "c") {
-        if (termRef.current?.hasSelection()) {
+        if (getActiveTerminalSelectionText()) {
           event.preventDefault();
-          copySelection();
+          void copySelection();
           return false;
         }
         return true; // no selection: pass through (sends ETX)
@@ -1195,9 +1291,9 @@ export function TerminalPanel({
     } else {
       // Windows / Linux
       if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "c") {
-        if (termRef.current?.hasSelection()) {
+        if (getActiveTerminalSelectionText()) {
           event.preventDefault();
-          copySelection();
+          void copySelection();
           return false;
         }
         return true; // no selection: pass through
@@ -1264,8 +1360,11 @@ export function TerminalPanel({
   }, [
     acceptInlineSuggestion,
     closeSearch,
+    clearTerminalBlockSelection,
     decreaseFontSize,
     executeMacro,
+    extendTerminalBlockSelectionByKeyboard,
+    getActiveTerminalSelectionText,
     increaseFontSize,
     isLocal,
     openSearch,
@@ -1276,12 +1375,12 @@ export function TerminalPanel({
   ]);
 
   const buildContextMenu = useCallback((): MenuItem[] => {
-    const hasSelection = termRef.current?.hasSelection() ?? false;
+    const hasSelection = !!getActiveTerminalSelectionText();
     const copyShortcut = isMac ? "Cmd+C" : "Ctrl+Shift+C";
     const pasteShortcut = isMac ? "Cmd+V" : "Ctrl+Shift+V / Shift+Insert";
 
     return [
-      { label: "Copy", shortcut: copyShortcut, onClick: copySelection, disabled: !hasSelection },
+      { label: "Copy", shortcut: copyShortcut, onClick: () => void copySelection(), disabled: !hasSelection },
       { label: "Copy All", onClick: copyAll },
       { label: "Copy formatted text (HTML/RTF)", onClick: () => void copyFormattedSelection(), disabled: !hasSelection },
       { label: "Paste", shortcut: pasteShortcut, onClick: () => void pasteFromClipboard(), disabled: effectiveReadOnly },
@@ -1378,7 +1477,7 @@ export function TerminalPanel({
           // Pull the last 50 lines from the buffer; if there's a selection,
           // prefer that. Both paths route to a fresh AI thread via
           // explainSelection (already redacts via chat::redact server-side).
-          const selected = term.getSelection();
+          const selected = getActiveTerminalSelectionText();
           const text = selected && selected.trim()
             ? selected
             : getLastBufferLines(term, 50);
@@ -1400,6 +1499,7 @@ export function TerminalPanel({
     fontFamily,
     fontLigatures,
     fullscreen,
+    getActiveTerminalSelectionText,
     increaseFontSize,
     openSearch,
     pasteFromClipboard,
@@ -1435,8 +1535,8 @@ export function TerminalPanel({
     if (rightClickBehavior === "copy-or-paste") {
       event.preventDefault();
       event.stopPropagation();
-      if (termRef.current?.hasSelection()) {
-        copySelection();
+      if (getActiveTerminalSelectionText()) {
+          void copySelection();
       } else {
         void pasteFromClipboard();
       }
@@ -1448,6 +1548,7 @@ export function TerminalPanel({
     buildContextMenu,
     contextMenu,
     copySelection,
+    getActiveTerminalSelectionText,
     pasteFromClipboard,
     rightClickBehavior,
   ]);
@@ -1459,7 +1560,7 @@ export function TerminalPanel({
       return;
     }
 
-    const selection = termRef.current?.getSelection() || middleClickSelectionRef.current;
+    const selection = getActiveTerminalSelectionText() || middleClickSelectionRef.current;
     middleClickSelectionRef.current = "";
     if (selection) {
       writeBroadcastInput(formatPasteForTerminal(termRef.current, selection));
@@ -1467,7 +1568,7 @@ export function TerminalPanel({
       return;
     }
     void pasteFromClipboard();
-  }, [focusTerminal, pasteFromClipboard, setStatusMessage, writeBroadcastInput]);
+  }, [focusTerminal, getActiveTerminalSelectionText, pasteFromClipboard, setStatusMessage, writeBroadcastInput]);
 
   const shouldHandleMacMiddlePaste = useCallback(() => {
     const now = Date.now();
@@ -1475,6 +1576,57 @@ export function TerminalPanel({
     lastMacMiddlePasteAtRef.current = now;
     return true;
   }, []);
+
+  const finishTerminalBlockSelection = useCallback((selection: TerminalBlockSelection | null) => {
+    if (!selection) return;
+    const term = termRef.current;
+    if (!term) return;
+    const text = blockSelectionTextRef.current || collectTerminalBlockSelectionText(term, selection);
+    if (copyOnSelectRef.current && text) {
+      void writeClipboardText(text, "");
+    }
+    showTerminalSelectionToolbar(text);
+  }, [showTerminalSelectionToolbar, writeClipboardText]);
+
+  const startTerminalBlockSelection = useCallback((event: ReactMouseEvent) => {
+    const term = termRef.current;
+    const container = containerRef.current;
+    if (!term || !container) return false;
+
+    const anchor = terminalCellFromMouseEvent(term, container, event);
+    if (!anchor) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+    term.clearSelection();
+
+    const initial = { anchor, focus: anchor };
+    updateTerminalBlockSelection(initial);
+    setSelectionToolbar(null);
+
+    let latest = initial;
+    const onMove = (moveEvent: globalThis.MouseEvent) => {
+      const focus = terminalCellFromMouseEvent(term, container, moveEvent);
+      if (!focus) return;
+      latest = { anchor, focus };
+      updateTerminalBlockSelection(latest);
+    };
+    const onUp = (upEvent: globalThis.MouseEvent) => {
+      const focus = terminalCellFromMouseEvent(term, container, upEvent);
+      if (focus) {
+        latest = { anchor, focus };
+        updateTerminalBlockSelection(latest);
+      }
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      finishTerminalBlockSelection(latest);
+      focusTerminal();
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return true;
+  }, [finishTerminalBlockSelection, focusTerminal, updateTerminalBlockSelection]);
 
   // Middle-click paste: if the terminal has a current selection, paste it at
   // the cursor; otherwise fall back to the system clipboard. Linux/Windows use
@@ -1488,11 +1640,18 @@ export function TerminalPanel({
   }, [isMac, pasteMiddleClickSelectionOrClipboard, shouldHandleMacMiddlePaste]);
 
   const handleTerminalMouseDownCapture = useCallback((event: ReactMouseEvent) => {
+    if (event.button === 0) {
+      if (isTerminalBlockSelectionMouseEvent(event)) {
+        startTerminalBlockSelection(event);
+        return;
+      }
+      clearTerminalBlockSelection();
+    }
     if (event.button === 1) {
       suppressNativePasteUntilRef.current = Date.now() + 500;
-      middleClickSelectionRef.current = termRef.current?.getSelection() ?? "";
+      middleClickSelectionRef.current = getActiveTerminalSelectionText();
     }
-  }, []);
+  }, [clearTerminalBlockSelection, getActiveTerminalSelectionText, startTerminalBlockSelection]);
 
   const handleTerminalMouseUpCapture = useCallback((event: ReactMouseEvent) => {
     if (!isMac || event.button !== 1) return;
@@ -1653,17 +1812,12 @@ export function TerminalPanel({
 
     term.onData(writeXtermInput);
     term.onBinary(writeBinaryInput);
-    term.onSelectionChange(() => {
-      if (!copyOnSelectRef.current) return;
-      const selected = term.getSelection();
-      if (!selected) return;
-      navigator.clipboard?.writeText(selected).catch(() => {});
-    });
     term.attachCustomKeyEventHandler((event) => {
       if (event.type !== "keydown") return true;
       return handleShortcutKey(event);
     });
     const selectionDisposable = term.onSelectionChange(() => {
+      if (blockSelectionRef.current) return;
       if (copyOnSelectRef.current && term.hasSelection()) {
         void writeClipboardText(term.getSelection(), "");
       }
@@ -1672,26 +1826,7 @@ export function TerminalPanel({
       // contains useful content (ignore single-char accidental drags).
       if (term.hasSelection()) {
         const text = term.getSelection();
-        if (text && text.trim().length >= 2) {
-          // The xterm.js `core` API isn't public; pick the bounding rect of
-          // the visible terminal element and pin the toolbar to its top-right.
-          const container = containerRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            // Place above the visible terminal, anchored ~1/3 across.
-            setSelectionToolbar({
-              text,
-              rect: {
-                top: rect.top + 24,
-                left: rect.left + rect.width / 3,
-                right: rect.right,
-                bottom: rect.bottom,
-              },
-            });
-          }
-        } else {
-          setSelectionToolbar(null);
-        }
+        showTerminalSelectionToolbar(text);
       } else {
         setSelectionToolbar(null);
       }
@@ -2236,6 +2371,16 @@ export function TerminalPanel({
     [fontSize, fullscreen, showScrollbar, syntaxMode, viewportVersion],
   );
 
+  const blockSelectionHighlights = useMemo(
+    () => getVisibleTerminalBlockSelectionHighlights(
+      termRef.current,
+      panelRef.current,
+      containerRef.current,
+      blockSelection,
+    ),
+    [blockSelection, fontSize, fullscreen, showScrollbar, viewportVersion],
+  );
+
   const inlineGhost = useMemo(
     () => computeInlineGhost(
       termRef.current,
@@ -2515,6 +2660,23 @@ export function TerminalPanel({
             <div
               key={`${highlight.row}-${highlight.col}-${highlight.active ? "active" : "match"}`}
               className={highlight.active ? "terminal-search-hit terminal-search-hit-active" : "terminal-search-hit"}
+              style={{
+                left: highlight.left,
+                top: highlight.top,
+                width: highlight.width,
+                height: highlight.height,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {blockSelectionHighlights.length > 0 && (
+        <div className="absolute inset-0 z-[35] pointer-events-none">
+          {blockSelectionHighlights.map((highlight) => (
+            <div
+              key={`block-${highlight.row}`}
+              className="terminal-block-selection"
               style={{
                 left: highlight.left,
                 top: highlight.top,
@@ -2818,6 +2980,72 @@ function getLastBufferLines(term: Terminal, lineCount: number): string {
   return lines.join("\n");
 }
 
+export function collectTerminalBlockSelectionText(
+  term: Pick<Terminal, "buffer" | "cols">,
+  selection: TerminalBlockSelection,
+): string {
+  const range = normalizeTerminalBlockSelection(selection, term.cols);
+  const lines: string[] = [];
+
+  for (let row = range.startRow; row <= range.endRow; row += 1) {
+    const line = term.buffer.active.getLine(row);
+    const text = line ? line.translateToString(false) : "";
+    lines.push(text.padEnd(range.endCol, " ").slice(range.startCol, range.endCol).trimEnd());
+  }
+
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop();
+  }
+  return lines.join("\n");
+}
+
+function normalizeTerminalBlockSelection(selection: TerminalBlockSelection, cols: number) {
+  const startRow = Math.min(selection.anchor.row, selection.focus.row);
+  const endRow = Math.max(selection.anchor.row, selection.focus.row);
+  const startCol = Math.max(0, Math.min(selection.anchor.col, selection.focus.col));
+  const endCol = Math.min(Math.max(startCol + 1, Math.max(selection.anchor.col, selection.focus.col) + 1), cols);
+  return { startRow, endRow, startCol, endCol };
+}
+
+function terminalCursorCell(term: Terminal): TerminalBlockSelectionCell | null {
+  const buffer = term.buffer.active;
+  if (buffer.length === 0) return null;
+  return {
+    row: Math.max(0, Math.min(buffer.length - 1, buffer.baseY + buffer.cursorY)),
+    col: Math.max(0, Math.min(term.cols - 1, buffer.cursorX)),
+  };
+}
+
+function isTerminalBlockSelectionMouseEvent(
+  event: Pick<MouseEvent, "button" | "altKey" | "ctrlKey" | "shiftKey">,
+): boolean {
+  return event.button === 0 && (event.altKey || (event.ctrlKey && event.shiftKey));
+}
+
+function terminalCellFromMouseEvent(
+  term: Terminal,
+  container: HTMLDivElement,
+  event: Pick<MouseEvent, "clientX" | "clientY">,
+): TerminalBlockSelectionCell | null {
+  const screen = container.querySelector<HTMLElement>(".xterm-screen");
+  if (!screen || term.cols <= 0 || term.rows <= 0 || term.buffer.active.length <= 0) return null;
+
+  const rect = screen.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  const cellWidth = rect.width / term.cols;
+  const cellHeight = rect.height / term.rows;
+  const visibleCol = Math.floor((event.clientX - rect.left) / cellWidth);
+  const visibleRow = Math.floor((event.clientY - rect.top) / cellHeight);
+  const col = Math.max(0, Math.min(term.cols - 1, visibleCol));
+  const row = Math.max(
+    0,
+    Math.min(term.buffer.active.length - 1, term.buffer.active.viewportY + Math.max(0, Math.min(term.rows - 1, visibleRow))),
+  );
+
+  return { row, col };
+}
+
 function findAndSelectBufferText(
   term: Terminal,
   query: string,
@@ -3019,6 +3247,47 @@ function getVisibleSearchHighlights(
       width: Math.max(cellWidth, match.length * cellWidth),
       height: cellHeight,
     }));
+}
+
+function getVisibleTerminalBlockSelectionHighlights(
+  term: Terminal | null,
+  panel: HTMLDivElement | null,
+  container: HTMLDivElement | null,
+  selection: TerminalBlockSelection | null,
+) {
+  if (!term || !panel || !container || !selection) return [];
+
+  const screen = container.querySelector<HTMLElement>(".xterm-screen");
+  if (!screen) return [];
+
+  const screenRect = screen.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  if (screenRect.width === 0 || screenRect.height === 0 || term.cols === 0 || term.rows === 0) {
+    return [];
+  }
+
+  const range = normalizeTerminalBlockSelection(selection, term.cols);
+  const cellWidth = screenRect.width / term.cols;
+  const cellHeight = screenRect.height / term.rows;
+  const viewportTop = term.buffer.active.viewportY;
+  const viewportBottom = viewportTop + term.rows - 1;
+  const baseLeft = screenRect.left - panelRect.left;
+  const baseTop = screenRect.top - panelRect.top;
+  const startRow = Math.max(range.startRow, viewportTop);
+  const endRow = Math.min(range.endRow, viewportBottom);
+  const highlights: Array<{ row: number; left: number; top: number; width: number; height: number }> = [];
+
+  for (let row = startRow; row <= endRow; row += 1) {
+    highlights.push({
+      row,
+      left: baseLeft + range.startCol * cellWidth,
+      top: baseTop + (row - viewportTop) * cellHeight,
+      width: Math.max(cellWidth, (range.endCol - range.startCol) * cellWidth),
+      height: cellHeight,
+    });
+  }
+
+  return highlights;
 }
 
 function getVisibleKeywordHighlights(

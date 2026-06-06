@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -120,6 +121,17 @@ interface OpenColumnFilter {
   columnIndex: number;
   left: number;
   top: number;
+}
+
+interface GridCellCoord {
+  rowId: string;
+  colIdx: number;
+}
+
+interface GridBlockSelection {
+  anchor: GridCellCoord;
+  focus: GridCellCoord;
+  dragging: boolean;
 }
 
 interface ExportOptions {
@@ -727,6 +739,10 @@ function nowTimestampText(): string {
   return `${nowDateText()} ${nowTimeText()}`;
 }
 
+function isGridBlockSelectionMouseEvent(event: Pick<MouseEvent<HTMLElement>, "button" | "altKey" | "ctrlKey" | "shiftKey">): boolean {
+  return event.button === 0 && (event.altKey || (event.ctrlKey && event.shiftKey));
+}
+
 /** A virtualised result grid with a compact database-client toolbar. */
 export function QueryResultGrid({
   result,
@@ -752,6 +768,7 @@ export function QueryResultGrid({
     () => new Set(result.columns.map((_, index) => index)),
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [cellBlockSelection, setCellBlockSelection] = useState<GridBlockSelection | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [activeCell, setActiveCell] = useState<{ rowId: string; colIdx: number } | null>(null);
   const [editingCell, setEditingCell] = useState<{ rowId: string; colIdx: number } | null>(null);
@@ -774,6 +791,7 @@ export function QueryResultGrid({
   useEffect(() => {
     setRows(makeRows(result));
     setSelectedIds(new Set());
+    setCellBlockSelection(null);
     setLastSelectedId(null);
     setActiveCell(null);
     setEditingCell(null);
@@ -784,6 +802,7 @@ export function QueryResultGrid({
     setColumnWidths({});
     setColumnFilters({});
     setOpenColumnFilter(null);
+    setCellBlockSelection(null);
     setExportColumns(defaultExportColumns(result.columns));
   }, [result.columns]);
 
@@ -803,6 +822,15 @@ export function QueryResultGrid({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [openColumnFilter]);
+
+  useEffect(() => {
+    if (!cellBlockSelection?.dragging) return;
+    const finishDrag = () => {
+      setCellBlockSelection((current) => current ? { ...current, dragging: false } : current);
+    };
+    document.addEventListener("mouseup", finishDrag);
+    return () => document.removeEventListener("mouseup", finishDrag);
+  }, [cellBlockSelection?.dragging]);
 
   const visibleColumnIndexes = useMemo(
     () => result.columns.map((_, index) => index).filter((index) => visibleColumns.has(index)),
@@ -871,6 +899,29 @@ export function QueryResultGrid({
     () => orderedRows.filter((row) => selectedIds.has(row.id) && row.status !== "deleted"),
     [orderedRows, selectedIds],
   );
+  const cellBlockRange = useMemo(() => {
+    if (!cellBlockSelection) return null;
+    const anchorRow = orderedRows.findIndex((row) => row.id === cellBlockSelection.anchor.rowId);
+    const focusRow = orderedRows.findIndex((row) => row.id === cellBlockSelection.focus.rowId);
+    const anchorCol = visibleColumnIndexes.indexOf(cellBlockSelection.anchor.colIdx);
+    const focusCol = visibleColumnIndexes.indexOf(cellBlockSelection.focus.colIdx);
+    if (anchorRow < 0 || focusRow < 0 || anchorCol < 0 || focusCol < 0) return null;
+
+    const [rowStart, rowEnd] = anchorRow <= focusRow ? [anchorRow, focusRow] : [focusRow, anchorRow];
+    const [colStart, colEnd] = anchorCol <= focusCol ? [anchorCol, focusCol] : [focusCol, anchorCol];
+    const rowsInRange = orderedRows
+      .slice(rowStart, rowEnd + 1)
+      .filter((row) => row.status !== "deleted");
+    const colIdxs = visibleColumnIndexes.slice(colStart, colEnd + 1);
+    return {
+      rows: rowsInRange,
+      rowIds: new Set(rowsInRange.map((row) => row.id)),
+      colIdxs,
+      colIdxSet: new Set(colIdxs),
+    };
+  }, [cellBlockSelection, orderedRows, visibleColumnIndexes]);
+  const selectionRows = cellBlockRange?.rows ?? selectedRows;
+  const selectionRowCount = selectionRows.length;
   const nonDeletedOrderedRows = useMemo(
     () => orderedRows.filter((row) => row.status !== "deleted"),
     [orderedRows],
@@ -975,7 +1026,56 @@ export function QueryResultGrid({
     document.addEventListener("mouseup", onUp);
   };
 
+  const startCellBlockSelection = (event: MouseEvent<HTMLElement>, rowId: string, colIdx: number) => {
+    if (!isGridBlockSelectionMouseEvent(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const cell = { rowId, colIdx };
+    setSelectedIds(new Set());
+    setLastSelectedId(null);
+    setActiveCell(cell);
+    setCellBlockSelection({ anchor: cell, focus: cell, dragging: true });
+    containerRef.current?.focus();
+  };
+
+  const extendCellBlockSelection = (rowId: string, colIdx: number) => {
+    setCellBlockSelection((current) => {
+      if (!current?.dragging) return current;
+      return { ...current, focus: { rowId, colIdx } };
+    });
+  };
+
+  const extendCellBlockSelectionByKeyboard = (key: string) => {
+    const origin = cellBlockSelection?.anchor ?? activeCell;
+    const focus = cellBlockSelection?.focus ?? activeCell;
+    if (!origin || !focus || orderedRows.length === 0 || visibleColumnIndexes.length === 0) return false;
+
+    const currentRowPos = orderedRows.findIndex((row) => row.id === focus.rowId);
+    const currentColPos = visibleColumnIndexes.indexOf(focus.colIdx);
+    if (currentRowPos < 0 || currentColPos < 0) return false;
+
+    let nextRowPos = currentRowPos;
+    let nextColPos = currentColPos;
+    if (key === "ArrowUp") nextRowPos -= 1;
+    if (key === "ArrowDown") nextRowPos += 1;
+    if (key === "ArrowLeft") nextColPos -= 1;
+    if (key === "ArrowRight") nextColPos += 1;
+    nextRowPos = Math.max(0, Math.min(orderedRows.length - 1, nextRowPos));
+    nextColPos = Math.max(0, Math.min(visibleColumnIndexes.length - 1, nextColPos));
+
+    const next = {
+      rowId: orderedRows[nextRowPos].id,
+      colIdx: visibleColumnIndexes[nextColPos],
+    };
+    setSelectedIds(new Set());
+    setLastSelectedId(null);
+    setActiveCell(next);
+    setCellBlockSelection({ anchor: origin, focus: next, dragging: false });
+    return true;
+  };
+
   const selectRow = (rowId: string, event: MouseEvent<HTMLElement>) => {
+    setCellBlockSelection(null);
     const orderedIds = orderedRows.map((row) => row.id);
     setSelectedIds((current) => {
       if (event.shiftKey && lastSelectedId && orderedIds.includes(lastSelectedId)) {
@@ -1070,6 +1170,7 @@ export function QueryResultGrid({
     };
     setRows((current) => [...current, row]);
     setSelectedIds(new Set([row.id]));
+    setCellBlockSelection(null);
     setActiveCell(result.columns.length > 0 ? { rowId: row.id, colIdx: 0 } : null);
     setStatus("Added a new grid row.");
   };
@@ -1159,6 +1260,7 @@ export function QueryResultGrid({
         })),
       );
       setSelectedIds(new Set());
+      setCellBlockSelection(null);
       setActiveCell(null);
       setStatus(`Submitted ${changes.length} grid change(s).`);
     } catch (err) {
@@ -1169,8 +1271,13 @@ export function QueryResultGrid({
   };
 
   const rowsForTarget = (target: ExportTarget): GridRow[] => {
-    if (target === "selection" && selectedRows.length > 0) return selectedRows;
+    if (target === "selection" && selectionRows.length > 0) return selectionRows;
     return nonDeletedOrderedRows;
+  };
+
+  const columnsForTarget = (target: ExportTarget, columns: ExportColumnConfig[]): ExportColumnConfig[] => {
+    if (target !== "selection" || !cellBlockRange) return columns;
+    return columns.filter((_, index) => cellBlockRange.colIdxSet.has(index));
   };
 
   const exportWithOptions = async (
@@ -1181,12 +1288,13 @@ export function QueryResultGrid({
     openAfter = false,
   ) => {
     const rowsToExport = rowsForTarget(target);
-    if (rowsToExport.length === 0 || columns.filter((column) => column.export).length === 0) {
+    const columnsToExport = columnsForTarget(target, columns);
+    if (rowsToExport.length === 0 || columnsToExport.filter((column) => column.export).length === 0) {
       setStatus("No result rows are available for export.");
       return;
     }
     try {
-      const serialized = serializeResult(result.columns, rowsToExport, columns, options, sourceSql);
+      const serialized = serializeResult(result.columns, rowsToExport, columnsToExport, options, sourceSql);
       const bytes = encodeOutput(serialized.text, options.encoding);
       const filename = `query-results-${Date.now()}.${serialized.extension}`;
       if (openAfter && !isTauriRuntime()) {
@@ -1266,8 +1374,8 @@ export function QueryResultGrid({
     const rowsToCopy = rowsForTarget(target);
     if (rowsToCopy.length === 0) return;
     const options = { ...DEFAULT_EXPORT_OPTIONS, outputFormat: "csv" as const, columnDelimiter: "\t" };
-    const visibleExportColumns = exportColumns.filter((_, index) => visibleColumns.has(index));
-    const serialized = serializeResult(result.columns, rowsToCopy, visibleExportColumns, options, sourceSql);
+    const columnsToCopy = columnsForTarget(target, exportColumns).filter((_, index) => visibleColumns.has(index));
+    const serialized = serializeResult(result.columns, rowsToCopy, columnsToCopy, options, sourceSql);
     try {
       await writeText(serialized.text);
       setStatus(`Copied ${rowsToCopy.length} row(s).`);
@@ -1276,7 +1384,47 @@ export function QueryResultGrid({
     }
   };
 
+  const handleGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (editingCell) return;
+    if (
+      event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey &&
+      (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "ArrowLeft" || event.key === "ArrowRight")
+    ) {
+      if (extendCellBlockSelectionByKeyboard(event.key)) {
+        event.preventDefault();
+      }
+      return;
+    }
+    if (event.key === "Escape" && cellBlockSelection) {
+      event.preventDefault();
+      setCellBlockSelection(null);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "c") {
+      if (selectionRowCount > 0 || activeCell) {
+        event.preventDefault();
+        if (selectionRowCount > 0) {
+          void copyRows("selection");
+        } else if (activeCell) {
+          const row = rows.find((candidate) => candidate.id === activeCell.rowId);
+          void writeText(row?.values[activeCell.colIdx] ?? "");
+          setStatus("Copied cell.");
+        }
+      }
+    }
+  };
+
   const cellMenu = (row: GridRow, colIdx: number): MenuItem[] => [
+    ...(cellBlockRange?.rowIds.has(row.id) && cellBlockRange.colIdxSet.has(colIdx)
+      ? [
+          {
+            label: "Copy block selection",
+            icon: <Copy className="w-3.5 h-3.5" />,
+            onClick: () => void copyRows("selection"),
+          },
+          { separator: true, label: "block-selection-separator" },
+        ]
+      : []),
     {
       label: "Copy cell",
       icon: <Copy className="w-3.5 h-3.5" />,
@@ -1432,7 +1580,7 @@ export function QueryResultGrid({
               {
                 label: "Export Selection...",
                 icon: <Download className="w-3.5 h-3.5" />,
-                disabled: selectedRows.length === 0,
+                disabled: selectionRowCount === 0,
                 onClick: () => {
                   setExportTarget("selection");
                   setExportDialogOpen(true);
@@ -1456,7 +1604,7 @@ export function QueryResultGrid({
               {
                 label: "Open Selection as Spreadsheet...",
                 icon: <FileSpreadsheet className="w-3.5 h-3.5" />,
-                disabled: selectedRows.length === 0,
+                disabled: selectionRowCount === 0,
                 onClick: () => openSpreadsheet("selection"),
               },
               { separator: true, label: "open-separator" },
@@ -1468,7 +1616,7 @@ export function QueryResultGrid({
               {
                 label: "Open Selection in Web Browser...",
                 icon: <ExternalLink className="w-3.5 h-3.5" />,
-                disabled: selectedRows.length === 0,
+                disabled: selectionRowCount === 0,
                 onClick: () => openBrowser("selection"),
               },
             ])
@@ -1508,7 +1656,7 @@ export function QueryResultGrid({
               {
                 label: "Copy Selection",
                 icon: <Copy className="w-3.5 h-3.5" />,
-                disabled: selectedRows.length === 0,
+                disabled: selectionRowCount === 0,
                 onClick: () => void copyRows("selection"),
               },
             ])
@@ -1638,7 +1786,7 @@ export function QueryResultGrid({
                 style={{ borderRight: "1px solid var(--taomni-divider)" }}
               >
                 <span>#</span>
-                <span className="text-[10px]">{selectedRows.length || ""}</span>
+                <span className="text-[10px]">{selectionRowCount || ""}</span>
               </div>
               {visibleColumnIndexes.map((columnIndex) => {
                 const col = result.columns[columnIndex];
@@ -1689,7 +1837,9 @@ export function QueryResultGrid({
             ref={containerRef}
             data-testid="query-result-grid-scroll"
             className="flex-1 min-h-0 overflow-auto taomni-scroll-y"
+            tabIndex={0}
             onScroll={onScroll}
+            onKeyDown={handleGridKeyDown}
           >
             <div style={{ height: total * ROW_HEIGHT, position: "relative" }}>
               {visible.map((rowIndex, i) => {
@@ -1733,6 +1883,7 @@ export function QueryResultGrid({
                       const active = activeCell?.rowId === row.id && activeCell.colIdx === columnIndex;
                       const editing = editingCell?.rowId === row.id && editingCell.colIdx === columnIndex;
                       const searchHit = !!searchNeedle && (cell ?? "").toLowerCase().includes(searchNeedle);
+                      const blockSelected = !!cellBlockRange?.rowIds.has(row.id) && cellBlockRange.colIdxSet.has(columnIndex);
                       return (
                         <div
                           key={columnIndex}
@@ -1743,10 +1894,18 @@ export function QueryResultGrid({
                             ...columnStyle(columnIndex),
                             borderRight: "1px solid var(--taomni-divider)",
                             outline: active ? "1px solid var(--taomni-accent)" : undefined,
-                            background: searchHit ? "rgba(230, 168, 23, 0.22)" : undefined,
+                            background: blockSelected
+                              ? "var(--taomni-editor-selection-bg)"
+                              : searchHit
+                                ? "rgba(230, 168, 23, 0.22)"
+                                : undefined,
                           }}
                           title={cell ?? "NULL"}
+                          onMouseDown={(event) => startCellBlockSelection(event, row.id, columnIndex)}
+                          onMouseEnter={() => extendCellBlockSelection(row.id, columnIndex)}
                           onClick={(event) => {
+                            if (event.altKey) return;
+                            setCellBlockSelection(null);
                             setActiveCell({ rowId: row.id, colIdx: columnIndex });
                             selectRow(row.id, event);
                           }}

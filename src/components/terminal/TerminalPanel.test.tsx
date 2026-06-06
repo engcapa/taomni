@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TerminalPanel } from "./TerminalPanel";
+import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPanel";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 
@@ -160,6 +160,29 @@ function encodeOsc52Text(text: string): string {
   }
   return `c;${btoa(binary)}`;
 }
+
+describe("terminal block selection helpers", () => {
+  it("extracts fixed-column text across terminal buffer rows", () => {
+    const rows = ["alpha bravo", "xy", "123456789"];
+    const term = {
+      cols: 12,
+      buffer: {
+        active: {
+          getLine: (row: number) => ({
+            translateToString: () => rows[row] ?? "",
+          }),
+        },
+      },
+    };
+
+    expect(
+      collectTerminalBlockSelectionText(term as never, {
+        anchor: { row: 2, col: 5 },
+        focus: { row: 0, col: 2 },
+      }),
+    ).toBe("pha\n\n3456");
+  });
+});
 
 const sshInfo = {
   host: "example.test",
