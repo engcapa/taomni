@@ -1641,6 +1641,10 @@ export function TerminalPanel({
 
   const handleTerminalMouseDownCapture = useCallback((event: ReactMouseEvent) => {
     if (event.button === 0) {
+      const target = event.target;
+      if (!(target instanceof Node) || !containerRef.current?.contains(target)) {
+        return;
+      }
       if (isTerminalBlockSelectionMouseEvent(event)) {
         startTerminalBlockSelection(event);
         return;
