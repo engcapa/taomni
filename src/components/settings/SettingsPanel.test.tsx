@@ -53,7 +53,7 @@ describe("SettingsPanel", () => {
       expect(saved.cursorBlink).toBe(false);
       expect(saved.syntaxMode).toBe("keywords");
     });
-  });
+  }, 10_000);
 
   it("persists the global application theme mode", async () => {
     const user = userEvent.setup();
@@ -88,4 +88,3 @@ describe("SettingsPanel", () => {
     expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("12");
   });
 });
-

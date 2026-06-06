@@ -11,49 +11,51 @@ const terminalMocks = vi.hoisted(() => {
   const state = {
     onDataHandler: null as ((data: string) => void) | null,
   };
-  const terminalCtor = vi.fn().mockImplementation(() => ({
-    cols: 80,
-    rows: 24,
-    buffer: {
-      active: {
-        length: 0,
-        viewportY: 0,
-        getLine: vi.fn(),
+  const terminalCtor = vi.fn().mockImplementation(function () {
+    return {
+      cols: 80,
+      rows: 24,
+      buffer: {
+        active: {
+          length: 0,
+          viewportY: 0,
+          getLine: vi.fn(),
+        },
       },
-    },
-    modes,
-    parser: {
-      registerOscHandler: vi.fn((ident: number, handler: (data: string) => boolean | Promise<boolean>) => {
-        oscHandlers.set(ident, handler);
+      modes,
+      parser: {
+        registerOscHandler: vi.fn((ident: number, handler: (data: string) => boolean | Promise<boolean>) => {
+          oscHandlers.set(ident, handler);
+          return { dispose: vi.fn() };
+        }),
+      },
+      loadAddon: vi.fn(),
+      open: vi.fn((el: HTMLElement) => {
+        const screen = document.createElement("div");
+        screen.className = "xterm-screen";
+        el.appendChild(screen);
+      }),
+      onData: vi.fn((handler: (data: string) => void) => {
+        state.onDataHandler = handler;
         return { dispose: vi.fn() };
       }),
-    },
-    loadAddon: vi.fn(),
-    open: vi.fn((el: HTMLElement) => {
-      const screen = document.createElement("div");
-      screen.className = "xterm-screen";
-      el.appendChild(screen);
-    }),
-    onData: vi.fn((handler: (data: string) => void) => {
-      state.onDataHandler = handler;
-      return { dispose: vi.fn() };
-    }),
-    onBinary: vi.fn(() => ({ dispose: vi.fn() })),
-    onScroll: vi.fn(() => ({ dispose: vi.fn() })),
-    onRender: vi.fn(() => ({ dispose: vi.fn() })),
-    onResize: vi.fn(() => ({ dispose: vi.fn() })),
-    onSelectionChange: vi.fn(() => ({ dispose: vi.fn() })),
-    attachCustomKeyEventHandler: vi.fn(),
-    refresh: vi.fn(),
-    write: vi.fn(),
-    focus,
-    dispose: vi.fn(),
-    getSelection: vi.fn(() => ""),
-    hasSelection: vi.fn(() => false),
-    clearSelection: vi.fn(),
-    scrollToLine: vi.fn(),
-    select: vi.fn(),
-  }));
+      onBinary: vi.fn(() => ({ dispose: vi.fn() })),
+      onScroll: vi.fn(() => ({ dispose: vi.fn() })),
+      onRender: vi.fn(() => ({ dispose: vi.fn() })),
+      onResize: vi.fn(() => ({ dispose: vi.fn() })),
+      onSelectionChange: vi.fn(() => ({ dispose: vi.fn() })),
+      attachCustomKeyEventHandler: vi.fn(),
+      refresh: vi.fn(),
+      write: vi.fn(),
+      focus,
+      dispose: vi.fn(),
+      getSelection: vi.fn(() => ""),
+      hasSelection: vi.fn(() => false),
+      clearSelection: vi.fn(),
+      scrollToLine: vi.fn(),
+      select: vi.fn(),
+    };
+  });
 
   return { focus, modes, terminalCtor, oscHandlers, state };
 });
@@ -63,7 +65,9 @@ const fitMocks = vi.hoisted(() => ({
 }));
 
 const webglMocks = vi.hoisted(() => ({
-  ctor: vi.fn().mockImplementation(() => ({})),
+  ctor: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 const ipcMocks = vi.hoisted(() => {
@@ -110,19 +114,25 @@ vi.mock("@xterm/xterm", () => ({
 }));
 
 vi.mock("@xterm/addon-fit", () => ({
-  FitAddon: vi.fn().mockImplementation(() => ({ fit: fitMocks.fit })),
+  FitAddon: vi.fn().mockImplementation(function () {
+    return { fit: fitMocks.fit };
+  }),
 }));
 
 vi.mock("@xterm/addon-search", () => ({
-  SearchAddon: vi.fn().mockImplementation(() => ({
-    clearDecorations: vi.fn(),
-    findNext: vi.fn(),
-    findPrevious: vi.fn(),
-  })),
+  SearchAddon: vi.fn().mockImplementation(function () {
+    return {
+      clearDecorations: vi.fn(),
+      findNext: vi.fn(),
+      findPrevious: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock("@xterm/addon-web-links", () => ({
-  WebLinksAddon: vi.fn().mockImplementation(() => ({})),
+  WebLinksAddon: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 vi.mock("@xterm/addon-webgl", () => ({

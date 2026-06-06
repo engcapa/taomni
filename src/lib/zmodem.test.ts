@@ -14,7 +14,7 @@ const zmodemMock = vi.hoisted(() => {
     sender: (octets: number[]) => void;
   } | null = null;
 
-  const Sentry = vi.fn().mockImplementation((opts) => {
+  const Sentry = vi.fn().mockImplementation(function (opts) {
     options = opts;
     return { consume: vi.fn() };
   });
