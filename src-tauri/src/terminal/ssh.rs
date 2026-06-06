@@ -1,11 +1,12 @@
 use russh::client::{self, KeyboardInteractiveAuthResponse};
 use russh::keys::ssh_key::{Algorithm as SshAlgorithm, EcdsaCurve, HashAlg};
 use russh::keys::{self, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
-use russh::{kex, ChannelId, Pty};
+use russh::{client::Msg, kex, ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty};
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
 use crate::terminal::network::{establish_transport, NetworkSettings};
@@ -436,7 +437,7 @@ pub async fn connect_ssh(
 ) -> Result<
     (
         client::Handle<SshHandler>,
-        russh::Channel<client::Msg>,
+        ChannelWriteHalf<Msg>,
         tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>,
     ),
     String,
@@ -446,7 +447,7 @@ pub async fn connect_ssh(
     let config = build_client_config(network);
 
     let handler = SshHandler {
-        output_tx: Arc::new(Mutex::new(Some(output_tx))),
+        output_tx: Arc::new(Mutex::new(None)),
         x11: x11.clone(),
     };
 
@@ -499,7 +500,26 @@ pub async fn connect_ssh(
         .await
         .map_err(|e| format!("Failed to request shell: {}", e))?;
 
-    Ok((handle, channel, output_rx))
+    let (read_half, write_half) = channel.split();
+    spawn_terminal_output_pump(read_half, output_tx);
+
+    Ok((handle, write_half, output_rx))
+}
+
+fn spawn_terminal_output_pump(mut read_half: ChannelReadHalf, output_tx: UnboundedSender<Vec<u8>>) {
+    tokio::spawn(async move {
+        while let Some(msg) = read_half.wait().await {
+            match msg {
+                ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
+                    if output_tx.send(data.to_vec()).is_err() {
+                        break;
+                    }
+                }
+                ChannelMsg::Eof | ChannelMsg::Close => break,
+                _ => {}
+            }
+        }
+    });
 }
 
 /// Authenticate against the server and return the handle without opening a
@@ -548,4 +568,101 @@ pub async fn connect_ssh_authenticated_with_prompter(
 
     authenticate(&mut handle, username, auth, prompter).await?;
     Ok(handle)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::time::{timeout, Duration};
+
+    fn live_ssh_target() -> Option<(String, u16, String, String)> {
+        let host = std::env::var("TAOMNI_LIVE_SSH_HOST").ok()?;
+        let username = std::env::var("TAOMNI_LIVE_SSH_USER").ok()?;
+        let password = std::env::var("TAOMNI_LIVE_SSH_PASSWORD").ok()?;
+        let port = std::env::var("TAOMNI_LIVE_SSH_PORT")
+            .ok()
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(22);
+        Some((host, port, username, password))
+    }
+
+    async fn read_until(
+        rx: &mut tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>,
+        needle: &[u8],
+    ) -> Vec<u8> {
+        timeout(Duration::from_secs(12), async {
+            let mut transcript = Vec::new();
+            while let Some(chunk) = rx.recv().await {
+                transcript.extend_from_slice(&chunk);
+                if transcript.windows(needle.len()).any(|w| w == needle) {
+                    return transcript;
+                }
+            }
+            transcript
+        })
+        .await
+        .expect("timed out waiting for SSH terminal output")
+    }
+
+    #[tokio::test]
+    #[ignore = "requires TAOMNI_LIVE_SSH_HOST/USER/PASSWORD"]
+    async fn live_terminal_survives_vi_quit_and_followup_input() {
+        let Some((host, port, username, password)) = live_ssh_target() else {
+            eprintln!("skipping live SSH smoke: TAOMNI_LIVE_SSH_* is not set");
+            return;
+        };
+
+        let (handle, channel, mut rx) = connect_ssh(
+            &host,
+            port,
+            &username,
+            SshAuth::Password(password),
+            80,
+            24,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("connect live SSH terminal");
+
+        channel
+            .data_bytes(b"printf 'TAOMNI_BEFORE_VI\\n'; vi -Nu NONE -n /tmp/taomni-russh-smoke; printf 'TAOMNI_AFTER_VI\\n'\r".to_vec())
+            .await
+            .expect("start vi smoke");
+        let before = read_until(&mut rx, b"TAOMNI_BEFORE_VI").await;
+        assert!(
+            before
+                .windows(b"TAOMNI_BEFORE_VI".len())
+                .any(|w| w == b"TAOMNI_BEFORE_VI"),
+            "did not see pre-vi marker"
+        );
+
+        channel
+            .data_bytes(b":q!\r".to_vec())
+            .await
+            .expect("quit vi");
+        let after = read_until(&mut rx, b"TAOMNI_AFTER_VI").await;
+        assert!(
+            after
+                .windows(b"TAOMNI_AFTER_VI".len())
+                .any(|w| w == b"TAOMNI_AFTER_VI"),
+            "did not return from vi"
+        );
+
+        channel
+            .data_bytes(b"printf 'TAOMNI_STILL_RESPONSIVE\\n'\r".to_vec())
+            .await
+            .expect("write after vi");
+        let still_responsive = read_until(&mut rx, b"TAOMNI_STILL_RESPONSIVE").await;
+        assert!(
+            still_responsive
+                .windows(b"TAOMNI_STILL_RESPONSIVE".len())
+                .any(|w| w == b"TAOMNI_STILL_RESPONSIVE"),
+            "terminal did not accept follow-up input after vi"
+        );
+
+        drop(channel);
+        drop(handle);
+    }
 }
