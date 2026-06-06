@@ -5,6 +5,7 @@ import {
   keymap,
   lineNumbers,
   highlightActiveLine,
+  drawSelection,
   rectangularSelection,
   crosshairCursor,
 } from "@codemirror/view";
@@ -100,6 +101,11 @@ export function SqlEditorPanel({
         lineNumbers(),
         highlightActiveLine(),
         EditorState.allowMultipleSelections.of(true),
+        // drawSelection renders the multi-range / rectangular selection layer;
+        // without it CodeMirror falls back to the native browser selection,
+        // which can only show a single contiguous range, so block selection
+        // and multi-cursors never become visible.
+        drawSelection(),
         rectangularSelection({
           eventFilter: (event) =>
             event.button === 0 && (event.altKey || (event.ctrlKey && event.shiftKey)),
@@ -140,7 +146,9 @@ export function SqlEditorPanel({
             color: "var(--taomni-text)",
           },
           ".cm-content": {
-            backgroundColor: "var(--taomni-bg)",
+            // No backgroundColor here: the root "&" already paints --taomni-bg.
+            // drawSelection() renders the selection as a z-index:-1 layer *below*
+            // .cm-content, so an opaque content background would hide it.
             color: "var(--taomni-text)",
           },
           ".cm-gutters": {
@@ -153,7 +161,10 @@ export function SqlEditorPanel({
             color: "var(--taomni-text)",
           },
           ".cm-activeLine": {
-            backgroundColor: "var(--taomni-hover)",
+            // Translucent so the drawSelection() layer (rendered beneath the
+            // content) stays visible when the cursor's line is selected.
+            backgroundColor:
+              "color-mix(in srgb, var(--taomni-hover) 55%, transparent)",
           },
           ".cm-scroller": { fontFamily: "var(--taomni-mono-font, monospace)", overflow: "auto" },
           ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
