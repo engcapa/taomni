@@ -9,6 +9,7 @@ use crate::ai::AppAiCtx;
 use crate::database::DbSession;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
+use crate::hbase::HBaseSession;
 use crate::rdp::ws::RdpSession;
 use crate::servers::ServerRegistry;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
@@ -45,6 +46,8 @@ pub struct AppState {
     /// keyed by session id. Each `DbSession` wraps the per-engine connection
     /// handle plus a cancellation token for in-flight queries.
     pub db_connections: Arc<RwLock<HashMap<String, Arc<DbSession>>>>,
+    /// Live JVM-free HBase shell sessions over HBase REST/Stargate.
+    pub hbase_sessions: Arc<RwLock<HashMap<String, Arc<HBaseSession>>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
     /// Pending keyboard-interactive auth rounds, keyed by request id. See
@@ -72,6 +75,7 @@ impl AppState {
             vnc_sessions: Arc::new(RwLock::new(HashMap::new())),
             rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
             db_connections: Arc::new(RwLock::new(HashMap::new())),
+            hbase_sessions: Arc::new(RwLock::new(HashMap::new())),
             read_handles: Arc::new(Mutex::new(HashMap::new())),
             write_handles: Arc::new(Mutex::new(HashMap::new())),
             ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),

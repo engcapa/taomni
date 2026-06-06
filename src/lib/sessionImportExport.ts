@@ -35,6 +35,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   ClickHouse: 9000,
   Presto: 8080,
   Redis: 6379,
+  HBaseShell: 8080,
 };
 
 const MOBAXTERM_TYPE_TO_SESSION: Record<string, string> = {
@@ -2385,6 +2386,8 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyString(source, output, "dbHttpPort", 16);
   copyString(source, output, "dbChProtocol", 16);
   copyString(source, output, "dbRedisIndex", 16);
+  copyString(source, output, "hbaseNamespace", MAX_NAME_LENGTH);
+  copyString(source, output, "hbaseRestPath", MAX_PATH_LENGTH);
   copyBoolean(source, output, "dbSsl");
 
   if ("terminalProfile" in source) {

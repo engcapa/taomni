@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { DbConnectInfo } from "../types";
+import type { DbConnectInfo, HBaseConnectInfo } from "../types";
 
 export interface LocalShellOption {
   id: string;
@@ -888,4 +888,92 @@ export async function redisDelKey(sessionId: string, key: string): Promise<void>
 
 export async function redisExec(sessionId: string, rawCommand: string): Promise<string> {
   return invoke<string>("redis_exec", { sessionId, rawCommand });
+}
+
+// --- HBase shell client (JVM-free HBase REST/Stargate) ---
+
+function toHBaseConfigPayload(info: HBaseConnectInfo): Record<string, unknown> {
+  return {
+    host: info.host,
+    port: info.port,
+    username: info.username ?? null,
+    password: info.password ?? null,
+    ssl: info.ssl ?? false,
+    timeoutSecs: info.timeoutSecs ?? null,
+    restPath: info.restPath ?? null,
+    namespace: info.namespace ?? null,
+  };
+}
+
+export interface HBaseConnectResult {
+  ok: boolean;
+}
+
+export interface HBaseTableInfo {
+  name: string;
+}
+
+export interface HBaseColumnFamily {
+  name: string;
+  attributes: Record<string, string>;
+}
+
+export interface HBaseTableSchema {
+  name: string;
+  columnFamilies: HBaseColumnFamily[];
+}
+
+export interface HBaseShellResult {
+  command: string;
+  message: string;
+  columns: string[];
+  rows: string[][];
+  warnings: string[];
+  durationMs: number;
+}
+
+export async function hbaseConnect(info: HBaseConnectInfo): Promise<HBaseConnectResult> {
+  return withVaultLockedNotice(() =>
+    invoke<HBaseConnectResult>("hbase_connect", {
+      sessionId: info.sessionId,
+      config: toHBaseConfigPayload(info),
+    }),
+  );
+}
+
+export async function hbasePing(sessionId: string): Promise<string> {
+  return invoke<string>("hbase_ping", { sessionId });
+}
+
+export async function hbaseTestConnection(info: HBaseConnectInfo): Promise<string> {
+  const probeId = `hbase-test-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+  const probe: HBaseConnectInfo = { ...info, sessionId: probeId };
+  await hbaseConnect(probe);
+  try {
+    return await hbasePing(probeId);
+  } finally {
+    await hbaseDisconnect(probeId).catch(() => undefined);
+  }
+}
+
+export async function hbaseDisconnect(sessionId: string): Promise<void> {
+  return invoke("hbase_disconnect", { sessionId });
+}
+
+export async function hbaseListTables(sessionId: string): Promise<HBaseTableInfo[]> {
+  return invoke<HBaseTableInfo[]>("hbase_list_tables", { sessionId });
+}
+
+export async function hbaseDescribeTable(
+  sessionId: string,
+  table: string,
+): Promise<HBaseTableSchema> {
+  return invoke<HBaseTableSchema>("hbase_describe_table", { sessionId, table });
+}
+
+export async function hbaseExecute(
+  sessionId: string,
+  command: string,
+): Promise<HBaseShellResult> {
+  return invoke<HBaseShellResult>("hbase_execute", { sessionId, command });
 }

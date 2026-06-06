@@ -39,6 +39,7 @@ pub enum SessionType {
     ClickHouse,
     Presto,
     Redis,
+    HBaseShell,
 }
 
 impl SessionType {
@@ -58,6 +59,7 @@ impl SessionType {
             Self::ClickHouse => "ClickHouse",
             Self::Presto => "Presto",
             Self::Redis => "Redis",
+            Self::HBaseShell => "HBaseShell",
         }
     }
 
@@ -77,6 +79,7 @@ impl SessionType {
             "ClickHouse" => Self::ClickHouse,
             "Presto" => Self::Presto,
             "Redis" => Self::Redis,
+            "HBaseShell" => Self::HBaseShell,
             _ => Self::SSH,
         }
     }
@@ -93,6 +96,7 @@ impl SessionType {
             Self::ClickHouse => 9000,
             Self::Presto => 8080,
             Self::Redis => 6379,
+            Self::HBaseShell => 8080,
             Self::Serial | Self::LocalShell | Self::File => 0,
         }
     }

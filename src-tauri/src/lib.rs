@@ -6,6 +6,7 @@ mod chat;
 mod config;
 mod database;
 mod filebrowser;
+mod hbase;
 mod history;
 pub mod llm;
 mod migrate;
@@ -213,6 +214,12 @@ pub fn run() {
             database::redis_set_key,
             database::redis_del_key,
             database::redis_exec,
+            hbase::hbase_connect,
+            hbase::hbase_ping,
+            hbase::hbase_disconnect,
+            hbase::hbase_list_tables,
+            hbase::hbase_describe_table,
+            hbase::hbase_execute,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,

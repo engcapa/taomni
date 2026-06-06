@@ -31,13 +31,14 @@ import {
   selectPrivateKeyFile,
   testSshConnection,
   dbTestConnection,
+  hbaseTestConnection,
   vaultPut,
   isVaultReference,
   isVaultLockedError,
   listWslDistros,
   type WslDistro,
 } from "../../lib/ipc";
-import type { DbConnectInfo } from "../../types";
+import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
 import { getAppPlatform } from "../../lib/runtime";
 import {
   getSessionNetworkSettings,
@@ -93,7 +94,7 @@ import type { SftpPathMapping } from "../../types";
 type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
-  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis";
+  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell";
 
 type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings";
 
@@ -117,6 +118,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "ClickHouse", icon: <Database className="w-7 h-7" />, color: "#e6a817" },
   { id: "Presto",     icon: <Database className="w-7 h-7" />, color: "#5a4fcf" },
   { id: "Redis",      icon: <Database className="w-7 h-7" />, color: "#d82c20" },
+  { id: "HBaseShell", icon: <Database className="w-7 h-7" />, color: "#1d7f8c" },
 ];
 
 const DEFAULT_PORTS: Record<string, number> = {
@@ -124,6 +126,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
   MySQL: 3306, PostgreSQL: 5432, ClickHouse: 9000, Presto: 8080, Redis: 6379,
+  HBaseShell: 8080,
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Presto", "Redis"];
@@ -1142,6 +1145,125 @@ function DatabaseSettings({
   );
 }
 
+function HBaseSettings({
+  username, setUsername,
+  password, setPassword,
+  passwordRef, clearPasswordRef,
+  showPwd, setShowPwd,
+  saveInVault, setSaveInVault,
+  vaultState,
+  namespace, setNamespace,
+  restPath, setRestPath,
+  ssl, setSsl,
+  timeoutSecs, setTimeoutSecs,
+}: {
+  username: string; setUsername: (v: string) => void;
+  password: string; setPassword: (v: string) => void;
+  passwordRef: string; clearPasswordRef: () => void;
+  showPwd: boolean; setShowPwd: (v: boolean) => void;
+  saveInVault: boolean; setSaveInVault: (v: boolean) => void;
+  vaultState: "empty" | "locked" | "unlocked";
+  namespace: string; setNamespace: (v: string) => void;
+  restPath: string; setRestPath: (v: string) => void;
+  ssl: boolean; setSsl: (v: boolean) => void;
+  timeoutSecs: string; setTimeoutSecs: (v: string) => void;
+}) {
+  return (
+    <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <Field label="Username">
+        <input
+          className="taomni-input w-64"
+          value={username}
+          aria-label="HBase username"
+          placeholder="(optional) REST basic auth user"
+          onChange={(e) => setUsername(e.target.value)}
+        />
+      </Field>
+
+      <Field label="Password">
+        <div className="relative">
+          <input
+            className="taomni-input pr-7 w-64"
+            type={showPwd ? "text" : "password"}
+            value={password}
+            aria-label="HBase password"
+            placeholder={passwordRef ? "•••••• (saved in vault)" : ""}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordRef) clearPasswordRef();
+            }}
+          />
+          <button
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
+            onClick={() => setShowPwd(!showPwd)}
+            title="Show / hide password"
+            type="button"
+          >
+            {showPwd
+              ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+              : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          </button>
+        </div>
+        <label
+          className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+          title={vaultState === "empty" ? "Set up the vault first to save passwords" : "Encrypt and store this password in the vault"}
+        >
+          <input
+            type="checkbox"
+            className="taomni-checkbox"
+            data-testid="hbase-save-in-vault"
+            checked={saveInVault}
+            onChange={(e) => setSaveInVault(e.target.checked)}
+            disabled={vaultState === "empty"}
+          />
+          Save in vault
+        </label>
+        <span className="taomni-pill">
+          <Shield className="w-3 h-3" /> Encrypted
+        </span>
+      </Field>
+
+      <Field label="Namespace">
+        <input
+          className="taomni-input w-64"
+          value={namespace}
+          aria-label="HBase namespace"
+          placeholder="(optional) default namespace"
+          onChange={(e) => setNamespace(e.target.value)}
+        />
+      </Field>
+
+      <Field label="REST path">
+        <input
+          className="taomni-input w-64"
+          value={restPath}
+          aria-label="HBase REST path"
+          placeholder="(optional) gateway prefix"
+          onChange={(e) => setRestPath(e.target.value)}
+        />
+        <span className="ml-2 text-[var(--taomni-text-muted)]">Leave empty for Stargate root.</span>
+      </Field>
+
+      <Field label="SSL / TLS">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={ssl} onChange={setSsl} />
+          Use HTTPS
+        </label>
+      </Field>
+
+      <Field label="Timeout">
+        <input
+          className="taomni-input w-20"
+          value={timeoutSecs}
+          aria-label="HBase timeout seconds"
+          onChange={(e) => setTimeoutSecs(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">seconds</span>
+      </Field>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
@@ -1245,6 +1367,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [dbHttpPort, setDbHttpPort] = useState(() => optionString(initialOptions, "dbHttpPort", "8123"));
   const [dbChProtocol, setDbChProtocol] = useState(() => optionString(initialOptions, "dbChProtocol", "HTTP"));
   const [dbRedisIndex, setDbRedisIndex] = useState(() => optionString(initialOptions, "dbRedisIndex", "0"));
+  const [hbaseNamespace, setHBaseNamespace] = useState(() => optionString(initialOptions, "hbaseNamespace", ""));
+  const [hbaseRestPath, setHBaseRestPath] = useState(() => optionString(initialOptions, "hbaseRestPath", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -1317,6 +1441,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isSSH = ["SSH", "SFTP"].includes(proto);
   const isRdp = proto === "RDP";
   const isDb = DB_PROTOS.includes(proto);
+  const isHBase = proto === "HBaseShell";
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -1346,8 +1471,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // For File proto only the Bookmark sub-tab is meaningful; jump there so
     // the user lands on the relevant content.
     if (p === "File") setSection("bookmark");
-    // DB protos open straight to the dedicated Database settings tab.
-    if (DB_PROTOS.includes(p)) setSection("database");
+    // Data-client protos open straight to the dedicated settings tab.
+    if (DB_PROTOS.includes(p) || p === "HBaseShell") setSection("database");
   };
 
   /* Keep authMethod in sync with the radio group */
@@ -1401,6 +1526,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           dbRedisIndex,
         }
       : {};
+    const hbaseOverrides: Record<string, unknown> = isHBase
+      ? {
+          hbaseNamespace,
+          hbaseRestPath,
+          dbSsl,
+          dbTimeout,
+        }
+      : {};
 
     return JSON.stringify({
       ...previousOptions,
@@ -1425,6 +1558,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...wslOverrides,
       ...rdpOverrides,
       ...dbOverrides,
+      ...hbaseOverrides,
     });
   };
 
@@ -1484,14 +1618,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // building the config so the reference lands in options_json.
     let nextPasswordRef = passwordRef;
     if (
-      (isSSH || isDb) &&
-      (isDb || authMethod === "Password") &&
+      (isSSH || isDb || isHBase) &&
+      (isDb || isHBase || authMethod === "Password") &&
       saveInVault &&
       vaultState !== "empty" &&
       password.length > 0
     ) {
       try {
-        const kind = isDb ? "db-password" : "ssh-password";
+        const kind = isHBase ? "hbase-password" : isDb ? "db-password" : "ssh-password";
         const label = `${username || "user"}@${host || "?"}:${port}`;
         const result = await vaultPut(kind, label, password);
         nextPasswordRef = result.reference;
@@ -1611,6 +1745,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setDbHttpPort(optionString(nextOptions, "dbHttpPort", "8123"));
     setDbChProtocol(optionString(nextOptions, "dbChProtocol", "HTTP"));
     setDbRedisIndex(optionString(nextOptions, "dbRedisIndex", "0"));
+    setHBaseNamespace(optionString(nextOptions, "hbaseNamespace", ""));
+    setHBaseRestPath(optionString(nextOptions, "hbaseRestPath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -1739,6 +1875,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     dbIndex: proto === "Redis" ? parseInt(dbRedisIndex) || 0 : null,
   });
 
+  const buildHBaseConnectInfo = (): HBaseConnectInfo => ({
+    sessionId: session?.id ?? "hbase-editor-test",
+    host,
+    port: parseInt(port) || DEFAULT_PORTS.HBaseShell,
+    username: username || null,
+    password: password || passwordRef || undefined,
+    ssl: dbSsl,
+    timeoutSecs: parseInt(dbTimeout) || null,
+    restPath: hbaseRestPath || null,
+    namespace: hbaseNamespace || null,
+  });
+
   const handleTestDbConnection = async () => {
     if (!host) {
       setTestResult({ ok: false, msg: t("sessionEditor2.errHostRequired") });
@@ -1760,13 +1908,30 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
+  const handleTestHBaseConnection = async () => {
+    if (!host) {
+      setTestResult({ ok: false, msg: t("sessionEditor2.errHostRequired") });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const msg = await hbaseTestConnection(buildHBaseConnectInfo());
+      setTestResult({ ok: true, msg });
+    } catch (err) {
+      setTestResult({ ok: false, msg: String(err) });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = proto === "File"
     ? [
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
-    : isDb
+    : isDb || isHBase
     ? [
-        { id: "database", label: t("sessionEditor2.sectionDatabase"), icon: <Database className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "database", label: isHBase ? "HBase settings" : t("sessionEditor2.sectionDatabase"), icon: <Database className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : [
@@ -1792,7 +1957,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const activeSection =
     proto === "File"
       ? "bookmark"
-      : isDb
+      : isDb || isHBase
         ? (section === "database" || section === "bookmark" ? section : "database")
         : section === "advanced" && !isSSH
           ? (isRdp ? "rdp" : "terminal")
@@ -2136,6 +2301,22 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               />
             </div>
           )}
+          {activeSection === "database" && isHBase && (
+            <div data-testid="session-hbase-section">
+              <HBaseSettings
+                username={username} setUsername={(v) => { setUsername(v); setSpecifyUser(true); }}
+                password={password} setPassword={setPassword}
+                passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
+                showPwd={showPwd} setShowPwd={setShowPwd}
+                saveInVault={saveInVault} setSaveInVault={setSaveInVault}
+                vaultState={vaultState}
+                namespace={hbaseNamespace} setNamespace={setHBaseNamespace}
+                restPath={hbaseRestPath} setRestPath={setHBaseRestPath}
+                ssl={dbSsl} setSsl={setDbSsl}
+                timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
+              />
+            </div>
+          )}
           {activeSection === "network" && (
             <NetworkSettings
               t={t}
@@ -2182,6 +2363,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               className="taomni-btn flex items-center gap-1.5"
               data-testid="db-test-connection"
               onClick={() => void handleTestDbConnection()}
+              disabled={testing}
+              type="button"
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
+            </button>
+          )}
+          {isHBase && (
+            <button
+              className="taomni-btn flex items-center gap-1.5"
+              data-testid="hbase-test-connection"
+              onClick={() => void handleTestHBaseConnection()}
               disabled={testing}
               type="button"
             >

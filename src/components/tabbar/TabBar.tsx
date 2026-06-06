@@ -555,6 +555,8 @@ function dbEngineColor(engine?: string): string {
       return "#5a4fcf";
     case "Redis":
       return "#d82c20";
+    case "HBaseShell":
+      return "#1d7f8c";
     default:
       return "#2b5d8b";
   }
@@ -570,6 +572,8 @@ function TabIcon({ tab }: { tab: Tab }) {
     case "database":
     case "redis":
       return <DatabaseIcon className="w-3 h-3" style={{ color: dbEngineColor(tab.db?.engine) }} />;
+    case "hbase-shell":
+      return <DatabaseIcon className="w-3 h-3" style={{ color: dbEngineColor("HBaseShell") }} />;
     case "sftp":
       return <Folder className="w-3 h-3" style={{ color: "#3b7ac2" }} />;
     case "rdp":

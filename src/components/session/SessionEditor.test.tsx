@@ -16,6 +16,7 @@ const ipcMocks = vi.hoisted(() => ({
   deleteSessionGroup: vi.fn(),
   listSystemFonts: vi.fn(),
   listWslDistros: vi.fn(),
+  hbaseTestConnection: vi.fn(),
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -52,6 +53,7 @@ describe("SessionEditor SSH settings tabs", () => {
     ipcMocks.saveSessionGroup.mockResolvedValue(undefined);
     ipcMocks.testSshConnection.mockResolvedValue("Connection successful");
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
+    ipcMocks.hbaseTestConnection.mockResolvedValue("HBase REST connection OK");
     ipcMocks.listWslDistros.mockResolvedValue([
       { name: "Ubuntu", isDefault: true, state: "Stopped", version: 2 },
     ]);
@@ -438,6 +440,35 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(savedOptions).toMatchObject({
       dbCatalog: "hive",
       dbDatabase: "sales",
+      dbTimeout: "15",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists HBase shell REST settings through the session store save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });
+
+    await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "hbase-rest.example.com");
+    await user.type(screen.getByLabelText("HBase username"), "root");
+    await user.type(screen.getByLabelText("HBase namespace"), "prod");
+    await user.type(screen.getByLabelText("HBase REST path"), "/gateway/hbase");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "HBaseShell",
+      host: "hbase-rest.example.com",
+      port: 8080,
+      username: "root",
+    });
+    expect(savedOptions).toMatchObject({
+      hbaseNamespace: "prod",
+      hbaseRestPath: "/gateway/hbase",
       dbTimeout: "15",
     });
     expect(onClose).toHaveBeenCalledTimes(1);

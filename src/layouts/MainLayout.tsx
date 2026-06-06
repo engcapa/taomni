@@ -59,7 +59,7 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo } from "../types";
 import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -92,6 +92,7 @@ const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 const RdpPanel = lazy(() => import("../components/rdp/RdpPanel"));
 const DbClientTab = lazy(() => import("../components/database/DbClientTab"));
 const RedisClientTab = lazy(() => import("../components/database/RedisClientTab"));
+const HBaseShellTab = lazy(() => import("../components/database/HBaseShellTab"));
 
 interface PendingAuth {
   session: SessionConfig;
@@ -219,6 +220,29 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
     httpPort: engine === "ClickHouse" ? (num("dbHttpPort") ?? 8123) : null,
     protocol: engine === "ClickHouse" ? str("dbChProtocol", "HTTP").toLowerCase() : null,
     dbIndex: engine === "Redis" ? (num("dbRedisIndex") ?? 0) : null,
+  };
+}
+
+function sessionToHBaseConnectInfo(session: SessionConfig, password?: string): HBaseConnectInfo {
+  const opts = parseSessionOptions(session.options_json);
+  const str = (key: string, fallback = ""): string =>
+    typeof opts[key] === "string" ? (opts[key] as string) : fallback;
+  const num = (key: string): number | null => {
+    const raw = opts[key];
+    const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  return {
+    sessionId: session.id,
+    workspaceSessionId: session.id,
+    host: session.host,
+    port: session.port,
+    username: session.username,
+    password,
+    ssl: opts.dbSsl === true,
+    timeoutSecs: num("dbTimeout"),
+    restPath: str("hbaseRestPath") || null,
+    namespace: str("hbaseNamespace") || null,
   };
 }
 
@@ -980,6 +1004,21 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [addTab, markConnected]);
 
+  const openHBaseShellTab = useCallback((session: SessionConfig, password?: string) => {
+    const id = `hbase-shell-${session.id}-${Date.now()}`;
+    const info = sessionToHBaseConnectInfo(session, password);
+    const title = `HBase ${session.host}:${session.port}${info.namespace ? `/${info.namespace}` : ""}`;
+    addTab({
+      id,
+      type: "hbase-shell",
+      title,
+      sessionId: session.id,
+      closable: true,
+      hbase: info,
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   // Open a local path or URL: URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
@@ -1184,6 +1223,15 @@ export function MainLayout() {
       } else {
         openDbTab(session, undefined);
       }
+    } else if (session.session_type === "HBaseShell") {
+      const ref = passwordRefFromOptions(session);
+      if (ref) {
+        const vaultState = useVaultStore.getState().state;
+        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+        openHBaseShellTab(session, ref);
+      } else {
+        openHBaseShellTab(session, undefined);
+      }
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
@@ -1199,6 +1247,7 @@ export function MainLayout() {
     openVncTab,
     openRdpTab,
     openDbTab,
+    openHBaseShellTab,
     queueVaultUnlock,
   ]);
 
@@ -1506,6 +1555,7 @@ export function MainLayout() {
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
   const dbTabs = tabs.filter((t) => t.type === "database" && t.db);
   const redisTabs = tabs.filter((t) => t.type === "redis" && t.db);
+  const hbaseTabs = tabs.filter((t) => t.type === "hbase-shell" && t.hbase);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
   const effectiveMultiExecSelectedCount = terminalSplitActive
@@ -2177,6 +2227,24 @@ export function MainLayout() {
                   );
                 })}
 
+                {/* HBase shell UI tabs - always mounted so command history and
+                    active REST sessions survive tab switches. */}
+                {hbaseTabs.map((tab) => {
+                  if (!tab.hbase) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <Suspense fallback={<DbLoadingPanel />}>
+                        <HBaseShellTab tabId={tab.id} info={tab.hbase} visible={isActive} />
+                      </Suspense>
+                    </div>
+                  );
+                })}
+
                 {activeTab?.type === "nettools" && (
                   <TunnelManager
                     onStatusMessage={setStatusMessage}
@@ -2194,6 +2262,7 @@ export function MainLayout() {
                   activeTab.type !== "file-browser" &&
                   activeTab.type !== "database" &&
                   activeTab.type !== "redis" &&
+                  activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "nettools" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
