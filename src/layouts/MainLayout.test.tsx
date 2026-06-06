@@ -888,9 +888,10 @@ describe("MainLayout attached SFTP sidebar", () => {
         password: "rdp-pw",
       });
     });
-    expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-host", "win.example.test");
-    expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-port", "3390");
-    expect(screen.getByTestId("rdp-panel")).toHaveAttribute("data-username", "alice");
+    const rdpPanel = await screen.findByTestId("rdp-panel");
+    expect(rdpPanel).toHaveAttribute("data-host", "win.example.test");
+    expect(rdpPanel).toHaveAttribute("data-port", "3390");
+    expect(rdpPanel).toHaveAttribute("data-username", "alice");
   });
 
   it("opens saved Presto sessions as database tabs with catalog context", async () => {

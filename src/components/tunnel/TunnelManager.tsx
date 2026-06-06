@@ -802,7 +802,7 @@ function ActivityLog({
   expanded: boolean;
   onToggle: () => void;
   onClear: () => void;
-  listRef: React.RefObject<HTMLDivElement>;
+  listRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const t = useT();
   const errorCount = logs.filter((l) => l.level === "error").length;
