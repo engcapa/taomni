@@ -29,7 +29,7 @@ function writeStoredFontSize(value: number): void {
   }
 }
 
-export function useDbSessionFontSize(visible: boolean, rootRef: RefObject<HTMLElement>) {
+export function useDbSessionFontSize(visible: boolean, rootRef: RefObject<HTMLElement | null>) {
   const [fontSize, setFontSize] = useState(readStoredFontSize);
 
   useEffect(() => {

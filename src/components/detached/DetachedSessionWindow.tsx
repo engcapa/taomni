@@ -23,6 +23,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -390,7 +391,7 @@ function renderInner(
     osFullscreen: boolean;
   },
   onTerminalStateChange: (state: TerminalReattachState) => void,
-): JSX.Element | null {
+): ReactElement | null {
   switch (kind) {
     case "rdp": {
       const p = params as DetachedRdpParams;

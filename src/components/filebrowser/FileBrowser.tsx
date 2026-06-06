@@ -5,7 +5,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import {
   Link2,
   Rows,
@@ -33,6 +33,7 @@ import { MfaPrompt } from "../session/MfaPrompt";
 import { useAppStore } from "../../stores/appStore";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
+import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 
 type Orientation = "horizontal" | "vertical";
 
@@ -788,13 +789,12 @@ export function FileBrowser(props: FileBrowserProps) {
           // Re-mount the panel group when orientation flips so
           // react-resizable-panels reads new sizes cleanly.
           key={orientation}
-          direction={orientation}
-          // v2: pane order changed (REMOTE on top/left). Bumping the
-          // autoSaveId ensures any persisted v1 sizes don't flip the
-          // visual order back the wrong way for returning users.
-          autoSaveId={`sftp-browser-v2-${orientationScope}-${orientation}`}
+          orientation={orientation}
+          id={`sftp-browser-v2-${orientationScope}-${orientation}`}
+          defaultLayout={loadResizableLayout(`sftp-browser-v2-${orientationScope}-${orientation}`, ["remote", "local"])}
+          onLayoutChanged={saveResizableLayout(`sftp-browser-v2-${orientationScope}-${orientation}`)}
         >
-          <Panel defaultSize={50} minSize={15} className="flex flex-col min-h-0 min-w-0">
+          <Panel id="remote" defaultSize="50%" minSize="15%" className="flex flex-col min-h-0 min-w-0">
             <FilePanel
               sessionId={props.sessionId}
               side="remote"
@@ -850,7 +850,7 @@ export function FileBrowser(props: FileBrowserProps) {
                 : "h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize"
             }
           />
-          <Panel defaultSize={50} minSize={15} className="flex flex-col min-h-0 min-w-0">
+          <Panel id="local" defaultSize="50%" minSize="15%" className="flex flex-col min-h-0 min-w-0">
             <FilePanel
               sessionId={props.sessionId}
               side="local"

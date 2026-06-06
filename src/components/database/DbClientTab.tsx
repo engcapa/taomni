@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
-import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
+import {
+  Group as PanelGroup,
+  Panel,
+  Separator as PanelResizeHandle,
+  type PanelImperativeHandle,
+  type PanelSize,
+} from "react-resizable-panels";
 import {
   Play,
   SquareDashedMousePointer,
@@ -423,7 +429,7 @@ export default function DbClientTab({
   const autoSaveInFlightRef = useRef(false);
   const lastAutoSavedDocRef = useRef<Record<string, string>>({});
   const rootRef = useRef<HTMLDivElement>(null);
-  const schemaPanelRef = useRef<ImperativePanelHandle | null>(null);
+  const schemaPanelRef = useRef<PanelImperativeHandle | null>(null);
   const lastVisibleSchemaWidthRef = useRef(24);
   const [schemaCollapsed, setSchemaCollapsed] = useState(false);
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
@@ -1226,7 +1232,7 @@ export default function DbClientTab({
 
   const expandSchemaPanel = () => {
     const nextSize = clampInt(lastVisibleSchemaWidthRef.current || 24, 12, 50);
-    schemaPanelRef.current?.resize(nextSize);
+    schemaPanelRef.current?.resize(`${nextSize}%`);
     setSchemaCollapsed(false);
     try {
       localStorage.setItem(widthKey(info.engine), String(nextSize));
@@ -1235,13 +1241,14 @@ export default function DbClientTab({
     }
   };
 
-  const handleSchemaResize = (size: number) => {
-    if (size > 0) {
-      lastVisibleSchemaWidthRef.current = size;
+  const handleSchemaResize = (size: PanelSize) => {
+    const percentage = size.asPercentage;
+    if (percentage > 0) {
+      lastVisibleSchemaWidthRef.current = percentage;
     }
-    setSchemaCollapsed(size === 0);
+    setSchemaCollapsed(percentage === 0);
     try {
-      localStorage.setItem(widthKey(info.engine), String(size));
+      localStorage.setItem(widthKey(info.engine), String(percentage));
     } catch {
       /* ignore */
     }
@@ -1388,16 +1395,15 @@ export default function DbClientTab({
           </span>
         </button>
       )}
-      <PanelGroup direction="horizontal" autoSaveId={`db-client-${info.engine}`} className="flex-1 min-h-0">
+      <PanelGroup orientation="horizontal" id={`db-client-${info.engine}`} className="flex-1 min-h-0">
         <Panel
-          ref={schemaPanelRef}
-          defaultSize={initialWidth}
-          minSize={12}
+          panelRef={schemaPanelRef}
+          id="schema"
+          defaultSize={`${initialWidth}%`}
+          minSize="12%"
           collapsedSize={0}
           collapsible
-          maxSize={50}
-          onCollapse={() => setSchemaCollapsed(true)}
-          onExpand={() => setSchemaCollapsed(false)}
+          maxSize="50%"
           onResize={handleSchemaResize}
         >
           <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
@@ -1415,7 +1421,7 @@ export default function DbClientTab({
           </div>
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-        <Panel>
+        <Panel id="workspace">
           {/* Panel tab strip */}
           <div className="h-full flex flex-col min-w-0">
             <div
@@ -1505,8 +1511,8 @@ export default function DbClientTab({
                   onClose={() => setHistoryPanelId(null)}
                 />
               )}
-              <PanelGroup direction="vertical" className="flex-1 min-h-0">
-                <Panel defaultSize={45} minSize={15}>
+              <PanelGroup orientation="vertical" className="flex-1 min-h-0">
+                <Panel defaultSize="45%" minSize="15%">
                   <div
                     className="h-full w-full"
                     onContextMenu={(event) => openPanelMenu(event, activePanel)}
@@ -1525,7 +1531,7 @@ export default function DbClientTab({
                   </div>
                 </Panel>
                 <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
-                <Panel minSize={15}>
+                <Panel minSize="15%">
                   <ResultArea
                     panel={activePanel}
                     onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}

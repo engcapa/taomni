@@ -31,7 +31,7 @@ pub enum ActiveTerminal {
         child: Mutex<Box<dyn portable_pty::Child + Send + Sync>>,
     },
     Ssh {
-        channel: AsyncMutex<russh::Channel<russh::client::Msg>>,
+        channel: Arc<AsyncMutex<russh::ChannelWriteHalf<russh::client::Msg>>>,
         #[allow(dead_code)]
         handle: Arc<russh::client::Handle<ssh::SshHandler>>,
         /// Listener tasks for any session-attached local port forwards.
@@ -332,7 +332,7 @@ pub async fn create_ssh_terminal(
     };
 
     let terminal = ActiveTerminal::Ssh {
-        channel: AsyncMutex::new(channel),
+        channel: Arc::new(AsyncMutex::new(channel)),
         handle: handle_arc,
         forwards: AsyncMutex::new(forward_handles),
     };
@@ -474,8 +474,10 @@ pub async fn write_terminal(
             w.flush().map_err(|e| format!("Flush failed: {}", e))?;
         }
         ActiveTerminal::Ssh { channel, .. } => {
+            let channel = Arc::clone(channel);
+            drop(terminals);
             let ch = channel.lock().await;
-            ch.data(&bytes[..])
+            ch.data_bytes(bytes)
                 .await
                 .map_err(|e| format!("SSH write failed: {}", e))?;
         }
@@ -502,6 +504,8 @@ pub async fn resize_terminal(
             pty::resize_pty(&**m, cols, rows)
         }
         ActiveTerminal::Ssh { channel, .. } => {
+            let channel = Arc::clone(channel);
+            drop(terminals);
             let ch = channel.lock().await;
             ch.window_change(cols as u32, rows as u32, 0, 0)
                 .await
@@ -526,6 +530,8 @@ pub async fn send_terminal_signal(
         ActiveTerminal::Local { child, .. } => send_local_signal(child, &signal),
         ActiveTerminal::Ssh { channel, .. } => {
             let sig = ssh_signal_from_name(&signal)?;
+            let channel = Arc::clone(channel);
+            drop(terminals);
             let ch = channel.lock().await;
             ch.signal(sig)
                 .await

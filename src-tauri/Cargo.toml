@@ -96,6 +96,7 @@ redis = { version = "1.2", default-features = false, features = ["tokio-comp", "
 ironrdp-connector = { path = "vendor/ironrdp-connector" }
 picky = { path = "vendor/picky" }
 picky-krb = { path = "vendor/picky-krb" }
+portable-pty = { path = "vendor/portable-pty" }
 sspi = { path = "vendor/sspi" }
 winscard = { path = "vendor/winscard" }
 

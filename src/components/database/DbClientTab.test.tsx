@@ -22,18 +22,27 @@ const ipcMock = vi.hoisted(() => ({
   dbDescribeTable: vi.fn(async () => []),
 }));
 
-vi.mock("react-resizable-panels", () => ({
-  PanelGroup: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+vi.mock("react-resizable-panels", () => {
+  const Group = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className} data-testid="panel-group">{children}</div>
-  ),
-  Panel: forwardRef<unknown, { children: React.ReactNode }>(({ children }, ref) => {
-    useImperativeHandle(ref, () => ({
+  );
+  const Panel = forwardRef<unknown, { children: React.ReactNode; panelRef?: React.Ref<unknown> }>(({ children, panelRef }, ref) => {
+    const handle = {
       resize: vi.fn(),
-    }));
+    };
+    useImperativeHandle(ref, () => handle);
+    useImperativeHandle(panelRef, () => handle);
     return <div data-testid="panel">{children}</div>;
-  }),
-  PanelResizeHandle: () => <div data-testid="panel-resize-handle" />,
-}));
+  });
+  const Separator = () => <div data-testid="panel-resize-handle" />;
+  return {
+    Group,
+    Panel,
+    Separator,
+    PanelGroup: Group,
+    PanelResizeHandle: Separator,
+  };
+});
 
 vi.mock("../../lib/ipc", () => ({
   checkFileExists: vi.fn(async () => false),

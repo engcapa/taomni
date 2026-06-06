@@ -1,4 +1,5 @@
 import { Terminal as TerminalIcon, FileText, Server, X } from "lucide-react";
+import type { ReactElement } from "react";
 import type { AttachmentRef } from "../../lib/chat/composerRefs";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
@@ -42,7 +43,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   );
 }
 
-function describe(attachment: AttachmentRef, t: TranslateFn): { icon: JSX.Element; label: string } {
+function describe(attachment: AttachmentRef, t: TranslateFn): { icon: ReactElement; label: string } {
   if (attachment.kind === "terminal") {
     return {
       icon: <TerminalIcon className="w-2.5 h-2.5" />,
