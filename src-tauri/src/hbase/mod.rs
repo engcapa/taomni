@@ -306,8 +306,45 @@ async fn send_json(
     let resp = req
         .send()
         .await
-        .map_err(|e| format!("HBase REST request failed: {e}"))?;
+        .map_err(|e| describe_request_error("HBase REST request failed", &e))?;
     response_json(resp).await
+}
+
+/// Build a diagnostic message that exposes the underlying transport cause.
+///
+/// `reqwest::Error`'s top-level `Display` is the unhelpful
+/// "error sending request for url (...)"; the real reason (connection refused,
+/// timed out, DNS failure, TLS handshake) only lives in its `source()` chain.
+/// We classify the failure and append the deepest distinct cause so the user
+/// can tell a routing/firewall problem from a wrong port or a TLS mismatch.
+fn describe_request_error(context: &str, err: &reqwest::Error) -> String {
+    use std::error::Error;
+
+    let kind = if err.is_timeout() {
+        "timed out"
+    } else if err.is_connect() {
+        "connection failed"
+    } else if err.is_redirect() {
+        "too many redirects"
+    } else {
+        "send failed"
+    };
+
+    let mut causes: Vec<String> = Vec::new();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        let msg = cause.to_string();
+        if causes.last().map(String::as_str) != Some(msg.as_str()) {
+            causes.push(msg);
+        }
+        source = cause.source();
+    }
+
+    if causes.is_empty() {
+        format!("{context} ({kind}): {err}")
+    } else {
+        format!("{context} ({kind}): {}", causes.join(": "))
+    }
 }
 
 async fn response_json(resp: reqwest::Response) -> Result<Value, String> {
@@ -594,7 +631,7 @@ async fn create_scanner(session: &HBaseSession, path: &str, body: Value) -> Resu
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("HBase scanner create failed: {e}"))?;
+        .map_err(|e| describe_request_error("HBase scanner create failed", &e))?;
     let status = resp.status();
     let headers = resp.headers().clone();
     if !status.is_success() {
@@ -622,7 +659,7 @@ async fn read_scanner(
             .request(Method::GET, location.to_string())
             .send()
             .await
-            .map_err(|e| format!("HBase scanner read failed: {e}"))?;
+            .map_err(|e| describe_request_error("HBase scanner read failed", &e))?;
         if resp.status() == StatusCode::NO_CONTENT {
             break;
         }
@@ -1153,6 +1190,28 @@ mod tests {
         assert_eq!(
             scanner_location("http://hbase.example:8080/gateway/hbase", &headers).as_deref(),
             Some("http://hbase.example:8080/gateway/hbase/t/scanner/1")
+        );
+    }
+
+    #[tokio::test]
+    async fn describe_request_error_surfaces_transport_cause() {
+        // Port 1 on loopback has no listener, so the connect is refused
+        // immediately and deterministically (no network access needed).
+        let err = Client::new()
+            .get("http://127.0.0.1:1/version/cluster")
+            .send()
+            .await
+            .expect_err("connecting to a closed port must fail");
+        let message = describe_request_error("HBase REST request failed", &err);
+        assert!(
+            message.starts_with("HBase REST request failed (connection failed):"),
+            "unexpected message: {message}"
+        );
+        // The opaque top-level "error sending request" text must be replaced by
+        // a concrete underlying cause from the source() chain.
+        assert!(
+            !message.contains("error sending request"),
+            "diagnostic still hides the real cause: {message}"
         );
     }
 }
