@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TerminalPanel } from "./TerminalPanel";
+import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPanel";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 
@@ -160,6 +160,29 @@ function encodeOsc52Text(text: string): string {
   }
   return `c;${btoa(binary)}`;
 }
+
+describe("terminal block selection helpers", () => {
+  it("extracts fixed-column text across terminal buffer rows", () => {
+    const rows = ["alpha bravo", "xy", "123456789"];
+    const term = {
+      cols: 12,
+      buffer: {
+        active: {
+          getLine: (row: number) => ({
+            translateToString: () => rows[row] ?? "",
+          }),
+        },
+      },
+    };
+
+    expect(
+      collectTerminalBlockSelectionText(term as never, {
+        anchor: { row: 2, col: 5 },
+        focus: { row: 0, col: 2 },
+      }),
+    ).toBe("pha\n\n3456");
+  });
+});
 
 const sshInfo = {
   host: "example.test",
@@ -605,6 +628,44 @@ describe("TerminalPanel focus behavior", () => {
       );
     });
     expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();
+  });
+
+  it("keeps a block selection alive when pressing the floating selection toolbar", async () => {
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    term.buffer.active.length = 4;
+    term.buffer.active.viewportY = 0;
+    term.buffer.active.getLine.mockImplementation((row: number) => ({
+      translateToString: () => ["alpha bravo", "charlie delta", "echo foxtrot", ""][row] ?? "",
+    }));
+
+    const screenEl = screen.getByTestId("terminal-pane").querySelector(".xterm-screen") as HTMLElement;
+    vi.spyOn(screenEl, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 800,
+      bottom: 240,
+      width: 800,
+      height: 240,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.mouseDown(screenEl, { button: 0, ctrlKey: true, shiftKey: true, clientX: 10, clientY: 10 });
+    fireEvent.mouseMove(document, { clientX: 70, clientY: 20 });
+    fireEvent.mouseUp(document, { clientX: 70, clientY: 20 });
+
+    const copyButton = await screen.findByTitle("Copy (Ctrl+C)");
+    fireEvent.mouseDown(copyButton, { button: 0 });
+
+    expect(screen.getByTitle("Copy (Ctrl+C)")).toBeInTheDocument();
   });
 
   it("pastes the captured terminal selection on macOS middle mouse up", async () => {

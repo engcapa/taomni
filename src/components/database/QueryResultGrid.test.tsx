@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryResultGrid } from "./QueryResultGrid";
 import type { DbQueryResult } from "../../lib/ipc";
+import { writeText } from "../../lib/clipboard";
 
 vi.mock("../../lib/ipc", () => ({
   readFileBytes: vi.fn(),
@@ -25,6 +26,11 @@ vi.mock("../../lib/runtime", () => ({
 vi.mock("../../lib/sftp", () => ({
   sftpOpenPath: vi.fn(),
 }));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function wideResult(): DbQueryResult {
   return {
@@ -90,5 +96,17 @@ describe("QueryResultGrid", () => {
 
     expect(screen.getByText("Ann")).toBeInTheDocument();
     expect(screen.queryByText("Anne")).not.toBeInTheDocument();
+  });
+
+  it("copies only the rectangular cell block selected with Alt drag", () => {
+    render(<QueryResultGrid result={filterResult()} />);
+
+    const grid = screen.getByTestId("query-result-grid-scroll");
+    fireEvent.mouseDown(screen.getByTitle("Ann"), { button: 0, altKey: true });
+    fireEvent.mouseEnter(screen.getByTitle("inactive"), { buttons: 1, altKey: true });
+    fireEvent.mouseUp(document);
+    fireEvent.keyDown(grid, { key: "c", ctrlKey: true });
+
+    expect(vi.mocked(writeText)).toHaveBeenLastCalledWith("name\tstatus\nAnn\tactive\nAnne\tinactive");
   });
 });
