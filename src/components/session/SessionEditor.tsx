@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
+import { ensureVaultReady } from "../../lib/vaultGate";
 import {
   selectFilePath,
   selectFolderPath,
@@ -436,7 +437,7 @@ function AdvancedSshSettings({
               className="flex items-center gap-1 text-[11px] cursor-pointer"
               title={
                 vaultState === "empty"
-                  ? t("sessionEditor2.saveInVaultTitleEmpty")
+                  ? t("sessionEditor2.saveInVaultTitleSetup")
                   : t("sessionEditor2.saveInVaultTitleDefault")
               }
             >
@@ -446,7 +447,6 @@ function AdvancedSshSettings({
                 data-testid="session-save-in-vault"
                 checked={saveInVault}
                 onChange={(e) => setSaveInVault(e.target.checked)}
-                disabled={vaultState === "empty"}
               />
               {t("sessionEditor2.saveInVault")}
             </label>
@@ -1035,7 +1035,7 @@ function DatabaseSettings({
         </div>
         <label
           className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
-          title={vaultState === "empty" ? "Set up the vault first to save passwords" : "Encrypt and store this password in the vault"}
+          title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
         >
           <input
             type="checkbox"
@@ -1043,7 +1043,6 @@ function DatabaseSettings({
             data-testid="db-save-in-vault"
             checked={saveInVault}
             onChange={(e) => setSaveInVault(e.target.checked)}
-            disabled={vaultState === "empty"}
           />
           Save in vault
         </label>
@@ -1262,7 +1261,7 @@ function HBaseSettings({
         </div>
         <label
           className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
-          title={vaultState === "empty" ? "Set up the vault first to save passwords" : "Encrypt and store this password in the vault"}
+          title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
         >
           <input
             type="checkbox"
@@ -1270,7 +1269,6 @@ function HBaseSettings({
             data-testid="hbase-save-in-vault"
             checked={saveInVault}
             onChange={(e) => setSaveInVault(e.target.checked)}
-            disabled={vaultState === "empty"}
           />
           Save in vault
         </label>
@@ -1687,9 +1685,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       (isSSH || isDb || isHBase) &&
       (isDb || isHBase || authMethod === "Password") &&
       saveInVault &&
-      vaultState !== "empty" &&
       password.length > 0
     ) {
+      // The vault must be unlocked to encrypt the password. If it is empty or
+      // locked, pop the on-demand gate (set master password / unlock) instead
+      // of failing with a text hint. Bail out of the save if the user cancels.
+      const ready = await ensureVaultReady(t("vault.gateReasonSession"));
+      if (!ready) {
+        setSaveError(t("sessionEditor2.errVaultLockedSave"));
+        return;
+      }
       try {
         const kind = isHBase ? "hbase-password" : isDb ? "db-password" : "ssh-password";
         const label = `${username || "user"}@${host || "?"}:${port}`;
@@ -1716,10 +1721,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     let nextProxyPass = networkSettings.proxyPass;
     if (
       networkSettings.proxySaveAuth &&
-      vaultState !== "empty" &&
       networkSettings.proxyPass.length > 0 &&
       !isVaultReference(networkSettings.proxyPass)
     ) {
+      const ready = await ensureVaultReady(t("vault.gateReasonProxy"));
+      if (!ready) {
+        setSaveError(t("sessionEditor2.errVaultLockedProxy"));
+        return;
+      }
       try {
         const label = `proxy://${networkSettings.proxyHost}:${networkSettings.proxyPort}`;
         const result = await vaultPut("proxy-password", label, networkSettings.proxyPass);

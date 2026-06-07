@@ -73,10 +73,10 @@ import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, type SessionConfig } from "../lib/ipc";
 import {
   vaultPut,
-  isVaultLockedError,
   VAULT_LOCKED_EVENT,
 } from "../lib/ipc";
 import { useVaultStore } from "../stores/vaultStore";
+import { ensureVaultReady } from "../lib/vaultGate";
 import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
 import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
@@ -1295,34 +1295,33 @@ export function MainLayout() {
     let credential: string = password;
 
     if (saveToVault) {
-      try {
-        const kind =
-          session.session_type === "VNC"
-            ? "vnc-password"
-            : session.session_type === "RDP"
-              ? "rdp-password"
-              : "ssh-password";
-        const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
-        const result = await vaultPut(kind, label, password);
-        credential = result.reference;
+      // Make sure the vault is ready (set master password if empty, unlock if
+      // locked) via the on-demand gate before encrypting. If the user cancels
+      // the gate, fall back to a one-shot connect with the typed plaintext.
+      const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
+      if (ready) {
+        try {
+          const kind =
+            session.session_type === "VNC"
+              ? "vnc-password"
+              : session.session_type === "RDP"
+                ? "rdp-password"
+                : "ssh-password";
+          const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
+          const result = await vaultPut(kind, label, password);
+          credential = result.reference;
 
-        // Persist the vault reference back into options_json so future
-        // connects find it without re-prompting.
-        const opts = parseSessionOptions(session.options_json);
-        const updated = JSON.stringify({ ...opts, passwordRef: result.reference });
-        await updateSession({ ...session, options_json: updated });
-      } catch (err) {
-        if (isVaultLockedError(err)) {
-          awaitingVaultUnlockRef.current = true;
-          pendingVaultActionRef.current = () => {
-            awaitingVaultUnlockRef.current = false;
-            continueConnectQueueRef.current();
-          };
-          setVaultUnlockReason("Unlock the vault to save this password.");
+          // Persist the vault reference back into options_json so future
+          // connects find it without re-prompting.
+          const opts = parseSessionOptions(session.options_json);
+          const updated = JSON.stringify({ ...opts, passwordRef: result.reference });
+          await updateSession({ ...session, options_json: updated });
+        } catch (err) {
+          // On any vault error, fall back to one-shot connect with the typed
+          // plaintext — don't block the user.
+          console.error("Failed to save password to vault:", err);
+          credential = password;
         }
-        // On any vault error, fall back to one-shot connect with the typed
-        // plaintext — don't block the user.
-        credential = password;
       }
     }
 

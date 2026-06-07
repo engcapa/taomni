@@ -13,6 +13,7 @@ import { dispatchNativeFileDrop, isOsFileDrag } from "./lib/osFileDrop";
 import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { useAppStore } from "./stores/appStore";
 import { AppDialogProvider } from "./lib/appDialogs";
+import { VaultGateProvider } from "./lib/vaultGate";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -101,7 +102,11 @@ function App() {
       : <MainLayout />;
   }
 
-  return <AppDialogProvider>{content}</AppDialogProvider>;
+  return (
+    <AppDialogProvider>
+      <VaultGateProvider>{content}</VaultGateProvider>
+    </AppDialogProvider>
+  );
 }
 
 export default App;
