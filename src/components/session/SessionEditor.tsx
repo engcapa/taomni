@@ -78,7 +78,6 @@ import {
 } from "../../types/rdp";
 import { RdpOptionsForm } from "./forms/RdpOptionsForm";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
-import { AppThemeSwitcher } from "../settings/AppThemeSwitcher";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import {
@@ -1994,7 +1993,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             {isEdit ? t("sessionEditor2.titleEdit") : t("sessionEditor2.titleNew")}
           </div>
           <div className="ml-auto flex items-center gap-2 text-[11px] opacity-95">
-            <AppThemeSwitcher compact />
             <button
               title={t("sessionEditor2.helpTitle")}
               className="hover:bg-white/15 rounded p-0.5"
