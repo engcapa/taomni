@@ -220,7 +220,7 @@ pub async fn create_local_terminal(
 /// - Manual mode: just resolve a `vault:` reference in `jump_password`.
 ///
 /// No-op when the session does not use a jump host.
-fn resolve_jump_credentials(
+pub(crate) fn resolve_jump_credentials(
     state: &State<'_, AppState>,
     network: &mut network::NetworkSettings,
 ) -> Result<(), String> {

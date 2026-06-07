@@ -108,7 +108,7 @@ pub enum SshAuth {
 ///   host. The jump host's `Handle` is held alongside the channel stream so
 ///   the jump connection stays alive exactly as long as the tunnelled stream;
 ///   dropping the transport tears the jump connection down with it.
-pub enum SshTransport {
+pub(crate) enum SshTransport {
     Tcp(TcpStream),
     Jump {
         stream: ChannelStream<Msg>,
@@ -171,7 +171,11 @@ impl AsyncWrite for SshTransport {
 /// The jump credentials are expected to already be resolved into `network`
 /// (host/port/user + plaintext password or key path) by the caller; vault
 /// references must be resolved before this point.
-async fn build_ssh_transport(
+///
+/// Exposed to the database layer, which bridges this transport to a local
+/// loopback listener so non-SSH clients (sqlx / redis-rs / reqwest) can reach
+/// a target through the same proxy/jump machinery.
+pub(crate) async fn build_ssh_transport(
     host: &str,
     port: u16,
     network: Option<&NetworkSettings>,

@@ -495,96 +495,26 @@ function TerminalSettings({
   );
 }
 
-function NetworkSettings({
+/** Proxy selector + (HTTP/SOCKS5) proxy fields or the SSH jump-host section.
+ *  Shared by the SSH Network tab and the database Network tab so both speak
+ *  the same `NetworkSettings` shape and persistence path. */
+function ProxyJumpFields({
   t,
   value,
   onChange,
-  sessionConfigId,
   sshSessions = [],
 }: {
   t: TranslateFn;
   value: NetworkSettingsValue;
   onChange: (next: NetworkSettingsValue) => void;
-  /** When set, the Network tab subscribes to runtime forward errors
-   *  for this saved session and renders the latest failure inline next
-   *  to the offending row. */
-  sessionConfigId?: string;
-  /** Saved SSH sessions selectable as a jump host (current session excluded). */
   sshSessions?: { id: string; name: string; host: string; port: number }[];
 }) {
-  const [newFwdLocal, setNewFwdLocal] = useState("");
-  const [newFwdRemote, setNewFwdRemote] = useState("");
-  const [newFwdDesc, setNewFwdDesc] = useState("");
-  // Per-row latest forward error, keyed by `${local}->${remote}`.
-  const [forwardErrors, setForwardErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!sessionConfigId) return;
-    const onErr = (ev: Event) => {
-      const detail = (ev as CustomEvent<{
-        sessionConfigId: string;
-        local: string;
-        remote: string;
-        message: string;
-      }>).detail;
-      if (!detail || detail.sessionConfigId !== sessionConfigId) return;
-      setForwardErrors((m) => ({
-        ...m,
-        [`${detail.local}->${detail.remote}`]: detail.message,
-      }));
-    };
-    window.addEventListener("taomni:forward-error", onErr as EventListener);
-    return () => window.removeEventListener("taomni:forward-error", onErr as EventListener);
-  }, [sessionConfigId]);
-
   const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
   const proxy = proxyKindToLabel(value.proxyKind);
-  const proxyHost = value.proxyHost;
-  const proxyPort = value.proxyPort;
-  const proxyUser = value.proxyUser;
-  const proxyPass = value.proxyPass;
-  const proxySave = value.proxySaveAuth;
-  const keepAlive = value.keepAlive;
-  const keepAliveInterval = value.keepAliveIntervalSecs;
-  const tcpNodelay = value.tcpNodelay;
-  const disableNagle = value.disableNagle;
-  const ipVersion = ipKindToLabel(value.ipVersion);
-  const forwards = value.localForwards;
-
-  const setProxy = (label: string) => patch({ proxyKind: proxyLabelToKind(label) });
-  const setProxyHost = (v: string) => patch({ proxyHost: v });
-  const setProxyPort = (v: string) => patch({ proxyPort: v });
-  const setProxyUser = (v: string) => patch({ proxyUser: v });
-  const setProxyPass = (v: string) => patch({ proxyPass: v });
-  const setProxySave = (v: boolean) => patch({ proxySaveAuth: v });
-  const setKeepAlive = (v: boolean) => patch({ keepAlive: v });
-  const setKeepAliveInterval = (v: string) => patch({ keepAliveIntervalSecs: v });
-  const setIpVersion = (label: string) => patch({ ipVersion: ipLabelToKind(label) });
   const isJump = value.proxyKind === "ssh-tunnel";
   const jumpManual = value.jumpSessionId.trim() === "";
-  const setJumpSession = (id: string) => patch({ jumpSessionId: id });
-  const setForwards = (
-    updater: (items: NetworkSettingsValue["localForwards"]) => NetworkSettingsValue["localForwards"],
-  ) => patch({ localForwards: updater(value.localForwards) });
-
-  const addForward = () => {
-    if (!newFwdLocal.trim() || !newFwdRemote.trim()) return;
-    setForwards((items) => [
-      ...items,
-      {
-        id: crypto.randomUUID(),
-        local: newFwdLocal.trim(),
-        remote: newFwdRemote.trim(),
-        desc: newFwdDesc.trim(),
-      },
-    ]);
-    setNewFwdLocal("");
-    setNewFwdRemote("");
-    setNewFwdDesc("");
-  };
-
   return (
-    <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <>
       <Field label={t("sessionEditor2.fieldProxy")}>
         <Select
           value={proxy}
@@ -595,7 +525,7 @@ function NetworkSettings({
             t("sessionEditor2.proxyLocalSshTunnel"),
             t("sessionEditor2.proxySystem"),
           ]}
-          onChange={setProxy}
+          onChange={(label) => patch({ proxyKind: proxyLabelToKind(label) })}
         />
       </Field>
 
@@ -606,7 +536,7 @@ function NetworkSettings({
               className="taomni-input w-72"
               value={value.jumpSessionId}
               aria-label={t("sessionEditor2.jumpViaAria")}
-              onChange={(e) => setJumpSession(e.target.value)}
+              onChange={(e) => patch({ jumpSessionId: e.target.value })}
             >
               <option value="">{t("sessionEditor2.jumpManualOption")}</option>
               {sshSessions.map((s) => (
@@ -686,23 +616,23 @@ function NetworkSettings({
         </>
       )}
 
-      {!isJump && (
+      {!isJump && value.proxyKind !== "none" && (
         <>
           <Field label={t("sessionEditor2.fieldProxyHost")}>
             <input
               className="taomni-input w-64"
               placeholder={t("sessionEditor2.proxyHostPlaceholder")}
-              value={proxyHost}
+              value={value.proxyHost}
               aria-label={t("sessionEditor2.proxyHostAria")}
-              onChange={(e) => setProxyHost(e.target.value)}
+              onChange={(e) => patch({ proxyHost: e.target.value })}
             />
             <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
             <input
               className="taomni-input w-16 ml-1"
               placeholder={t("sessionEditor2.proxyPortPlaceholder")}
-              value={proxyPort}
+              value={value.proxyPort}
               aria-label={t("sessionEditor2.proxyPortAria")}
-              onChange={(e) => setProxyPort(e.target.value)}
+              onChange={(e) => patch({ proxyPort: e.target.value })}
             />
           </Field>
 
@@ -710,24 +640,124 @@ function NetworkSettings({
             <input
               className="taomni-input w-32"
               placeholder={t("sessionEditor2.proxyUserPlaceholder")}
-              value={proxyUser}
+              value={value.proxyUser}
               aria-label={t("sessionEditor2.proxyUserAria")}
-              onChange={(e) => setProxyUser(e.target.value)}
+              onChange={(e) => patch({ proxyUser: e.target.value })}
             />
             <input
               className="taomni-input w-40 ml-1"
               type="password"
               placeholder={t("sessionEditor2.proxyPassPlaceholder")}
-              value={proxyPass}
+              value={value.proxyPass}
               aria-label={t("sessionEditor2.proxyPassAria")}
-              onChange={(e) => setProxyPass(e.target.value)}
+              onChange={(e) => patch({ proxyPass: e.target.value })}
             />
             <label className="ml-2 flex items-center gap-1.5">
-              <Checkbox checked={proxySave} onChange={setProxySave} /> {t("sessionEditor2.proxySaveInVault")}
+              <Checkbox checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
             </label>
           </Field>
         </>
       )}
+    </>
+  );
+}
+
+/** Network tab for database sessions: proxy + SSH jump host only (no
+ *  keep-alive / TCP / local-forward rows, which are SSH-terminal specific). */
+function DbNetworkSettings({
+  t,
+  value,
+  onChange,
+  sshSessions = [],
+}: {
+  t: TranslateFn;
+  value: NetworkSettingsValue;
+  onChange: (next: NetworkSettingsValue) => void;
+  sshSessions?: { id: string; name: string; host: string; port: number }[];
+}) {
+  return (
+    <div data-testid="db-network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} />
+    </div>
+  );
+}
+
+function NetworkSettings({
+  t,
+  value,
+  onChange,
+  sessionConfigId,
+  sshSessions = [],
+}: {
+  t: TranslateFn;
+  value: NetworkSettingsValue;
+  onChange: (next: NetworkSettingsValue) => void;
+  /** When set, the Network tab subscribes to runtime forward errors
+   *  for this saved session and renders the latest failure inline next
+   *  to the offending row. */
+  sessionConfigId?: string;
+  /** Saved SSH sessions selectable as a jump host (current session excluded). */
+  sshSessions?: { id: string; name: string; host: string; port: number }[];
+}) {
+  const [newFwdLocal, setNewFwdLocal] = useState("");
+  const [newFwdRemote, setNewFwdRemote] = useState("");
+  const [newFwdDesc, setNewFwdDesc] = useState("");
+  // Per-row latest forward error, keyed by `${local}->${remote}`.
+  const [forwardErrors, setForwardErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!sessionConfigId) return;
+    const onErr = (ev: Event) => {
+      const detail = (ev as CustomEvent<{
+        sessionConfigId: string;
+        local: string;
+        remote: string;
+        message: string;
+      }>).detail;
+      if (!detail || detail.sessionConfigId !== sessionConfigId) return;
+      setForwardErrors((m) => ({
+        ...m,
+        [`${detail.local}->${detail.remote}`]: detail.message,
+      }));
+    };
+    window.addEventListener("taomni:forward-error", onErr as EventListener);
+    return () => window.removeEventListener("taomni:forward-error", onErr as EventListener);
+  }, [sessionConfigId]);
+
+  const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
+  const keepAlive = value.keepAlive;
+  const keepAliveInterval = value.keepAliveIntervalSecs;
+  const tcpNodelay = value.tcpNodelay;
+  const disableNagle = value.disableNagle;
+  const ipVersion = ipKindToLabel(value.ipVersion);
+  const forwards = value.localForwards;
+
+  const setKeepAlive = (v: boolean) => patch({ keepAlive: v });
+  const setKeepAliveInterval = (v: string) => patch({ keepAliveIntervalSecs: v });
+  const setIpVersion = (label: string) => patch({ ipVersion: ipLabelToKind(label) });
+  const setForwards = (
+    updater: (items: NetworkSettingsValue["localForwards"]) => NetworkSettingsValue["localForwards"],
+  ) => patch({ localForwards: updater(value.localForwards) });
+
+  const addForward = () => {
+    if (!newFwdLocal.trim() || !newFwdRemote.trim()) return;
+    setForwards((items) => [
+      ...items,
+      {
+        id: crypto.randomUUID(),
+        local: newFwdLocal.trim(),
+        remote: newFwdRemote.trim(),
+        desc: newFwdDesc.trim(),
+      },
+    ]);
+    setNewFwdLocal("");
+    setNewFwdRemote("");
+    setNewFwdDesc("");
+  };
+
+  return (
+    <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} />
 
       <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
@@ -2091,6 +2121,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     : isDb || isHBase
     ? [
         { id: "database", label: isHBase ? "HBase settings" : t("sessionEditor2.sectionDatabase"), icon: <Database className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        // DB engines can tunnel through a proxy / SSH jump host; HBase does not
+        // (yet) route through the loopback forwarder, so no Network tab for it.
+        ...(isDb
+          ? [{ id: "network" as SectionTab, label: t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+          : []),
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : [
@@ -2117,7 +2152,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     proto === "File"
       ? "bookmark"
       : isDb || isHBase
-        ? (section === "database" || section === "bookmark" ? section : "database")
+        ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
           ? (isRdp ? "rdp" : "terminal")
           : section === "rdp" && !isRdp
@@ -2475,12 +2510,22 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               />
             </div>
           )}
-          {activeSection === "network" && (
+          {activeSection === "network" && !isDb && (
             <NetworkSettings
               t={t}
               value={networkSettings}
               onChange={setNetworkSettings}
               sessionConfigId={session?.id}
+              sshSessions={sessions
+                .filter((s) => s.session_type === "SSH" && s.id !== session?.id)
+                .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
+            />
+          )}
+          {activeSection === "network" && isDb && (
+            <DbNetworkSettings
+              t={t}
+              value={networkSettings}
+              onChange={setNetworkSettings}
               sshSessions={sessions
                 .filter((s) => s.session_type === "SSH" && s.id !== session?.id)
                 .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}

@@ -209,6 +209,11 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
     return Number.isFinite(n) ? n : null;
   };
   const engine = session.session_type as DbConnectInfo["engine"];
+  // Only attach network settings when a proxy / SSH jump host is actually
+  // selected; a direct connection sends none so the backend skips the
+  // loopback forwarder entirely.
+  const ns = getSessionNetworkSettings(session.options_json);
+  const networkSettings = ns.proxyKind !== "none" ? toNetworkSettingsPayload(ns) : null;
   return {
     sessionId: session.id,
     workspaceSessionId: session.id,
@@ -224,6 +229,7 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
     httpPort: engine === "ClickHouse" ? (num("dbHttpPort") ?? 8123) : null,
     protocol: engine === "ClickHouse" ? str("dbChProtocol", "HTTP").toLowerCase() : null,
     dbIndex: engine === "Redis" ? (num("dbRedisIndex") ?? 0) : null,
+    networkSettings,
   };
 }
 
