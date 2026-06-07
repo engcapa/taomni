@@ -451,6 +451,8 @@ describe("SessionEditor SSH settings tabs", () => {
 
     await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
     await user.type(screen.getByLabelText("Remote host"), "hbase-rest.example.com");
+    // Switch to REST mode so the REST-only fields render.
+    await user.selectOptions(screen.getByTestId("hbase-connection-mode"), "rest");
     await user.type(screen.getByLabelText("HBase username"), "root");
     await user.type(screen.getByLabelText("HBase namespace"), "prod");
     await user.type(screen.getByLabelText("HBase REST path"), "/gateway/hbase");
@@ -469,7 +471,35 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(savedOptions).toMatchObject({
       hbaseNamespace: "prod",
       hbaseRestPath: "/gateway/hbase",
+      hbaseConnectionMode: "rest",
       dbTimeout: "15",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists HBase native RPC settings (ZooKeeper quorum) through the save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });
+
+    await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "hbase.example.com");
+    // Native is the default mode; the ZK quorum field should be present.
+    await user.type(screen.getByLabelText("HBase ZooKeeper quorum"), "zk1:2181,zk2:2181");
+    await user.type(screen.getByLabelText("HBase namespace"), "prod");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "HBaseShell",
+      host: "hbase.example.com",
+    });
+    expect(savedOptions).toMatchObject({
+      hbaseConnectionMode: "native",
+      hbaseZkQuorum: "zk1:2181,zk2:2181",
+      hbaseNamespace: "prod",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });

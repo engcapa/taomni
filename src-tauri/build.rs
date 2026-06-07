@@ -3,7 +3,47 @@ use std::path::Path;
 
 fn main() {
     enforce_asr_llm_isolation();
+    compile_hbase_protos();
     tauri_build::build();
+}
+
+/// Compile the vendored HBase 2.6.x protobuf definitions into Rust types for
+/// the native RPC client (src/hbase/native). The generated module is written to
+/// `OUT_DIR/hbase.pb.rs` (package `hbase.pb`) and included via
+/// `src/hbase/native/proto.rs`. The shaded `google.protobuf.Any` lives under the
+/// vendor path `proto/org/apache/hbase/thirdparty/...` that HBase's protos import.
+fn compile_hbase_protos() {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
+    let proto_root = Path::new(&manifest_dir).join("proto");
+    if !proto_root.exists() {
+        return;
+    }
+    println!("cargo:rerun-if-changed=proto");
+
+    let mut protos: Vec<std::path::PathBuf> = Vec::new();
+    collect_protos(&proto_root, &mut protos);
+    if protos.is_empty() {
+        return;
+    }
+
+    let mut config = prost_build::Config::new();
+    config
+        .compile_protos(&protos, &[proto_root.as_path()])
+        .expect("failed to compile vendored HBase protobuf definitions");
+}
+
+fn collect_protos(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_protos(&path, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("proto") {
+            out.push(path);
+        }
+    }
 }
 
 /// Compile-time guardrail: asr/* must not import llm/* and vice versa.

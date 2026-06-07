@@ -54,6 +54,14 @@ export interface HBaseConnectInfo {
   timeoutSecs?: number | null;
   restPath?: string | null;
   namespace?: string | null;
+  /** "native" (RegionServer/Master RPC via ZooKeeper) or "rest" (Stargate). */
+  connectionMode?: "native" | "rest" | null;
+  /** ZooKeeper quorum for native mode, e.g. "zk1:2181,zk2:2181". */
+  zkQuorum?: string | null;
+  /** ZooKeeper root znode for native mode (default "/hbase"). */
+  zkRoot?: string | null;
+  /** Effective user for native simple auth (default "root"). */
+  effectiveUser?: string | null;
 }
 
 export interface RdpConnectInfo {
