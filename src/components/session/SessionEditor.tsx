@@ -633,7 +633,6 @@ function NetworkSettings({
           options={[
             t("sessionEditor2.proxyNone"),
             t("sessionEditor2.proxyHttp"),
-            t("sessionEditor2.proxySocks4"),
             t("sessionEditor2.proxySocks5"),
             t("sessionEditor2.proxyLocalSshTunnel"),
             t("sessionEditor2.proxySystem"),

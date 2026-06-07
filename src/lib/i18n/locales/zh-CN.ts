@@ -1760,7 +1760,6 @@ export const zhCN: DeepPartial<typeof en> = {
     fieldProxy: "代理",
     proxyNone: "无 — 直连",
     proxyHttp: "HTTP CONNECT",
-    proxySocks4: "SOCKS 4",
     proxySocks5: "SOCKS 5",
     proxyLocalSshTunnel: "本地 SSH 隧道",
     proxySystem: "系统代理",

@@ -504,7 +504,9 @@ mod tests {
 
     #[tokio::test]
     async fn establish_transport_rejects_unsupported_proxy_kinds() {
-        for kind in ["socks4", "ssh-tunnel", "system"] {
+        // `socks4` is no longer offered by the UI but a legacy/hand-crafted
+        // value must still be safely rejected rather than mishandled.
+        for kind in ["socks4", "system"] {
             let mut n = NetworkSettings::default();
             n.proxy_kind = kind.into();
             n.proxy_host = "127.0.0.1".into();

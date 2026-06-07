@@ -1,6 +1,6 @@
 import { parseSessionOptions } from "./terminalProfile";
 
-export type ProxyKind = "none" | "http" | "socks4" | "socks5" | "ssh-tunnel" | "system";
+export type ProxyKind = "none" | "http" | "socks5" | "ssh-tunnel" | "system";
 export type IpVersion = "auto" | "ipv4" | "ipv6";
 
 export interface NetworkForward {
@@ -46,7 +46,6 @@ export const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
 const PROXY_LABEL_TO_KIND: Record<string, ProxyKind> = {
   "None — direct connection": "none",
   "HTTP CONNECT": "http",
-  "SOCKS 4": "socks4",
   "SOCKS 5": "socks5",
   "Local SSH tunnel": "ssh-tunnel",
   "System proxy": "system",
@@ -55,7 +54,6 @@ const PROXY_LABEL_TO_KIND: Record<string, ProxyKind> = {
 const KIND_TO_PROXY_LABEL: Record<ProxyKind, string> = {
   none: "None — direct connection",
   http: "HTTP CONNECT",
-  socks4: "SOCKS 4",
   socks5: "SOCKS 5",
   "ssh-tunnel": "Local SSH tunnel",
   system: "System proxy",

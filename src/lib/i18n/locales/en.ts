@@ -1764,7 +1764,6 @@ const dict = {
     fieldProxy: "Proxy",
     proxyNone: "None — direct connection",
     proxyHttp: "HTTP CONNECT",
-    proxySocks4: "SOCKS 4",
     proxySocks5: "SOCKS 5",
     proxyLocalSshTunnel: "Local SSH tunnel",
     proxySystem: "System proxy",
