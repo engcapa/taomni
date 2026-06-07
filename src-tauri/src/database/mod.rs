@@ -735,6 +735,7 @@ mod live_tests {
             http_port: None,
             protocol: None,
             db_index: None,
+            network_settings: None,
         };
 
         let handle = sql::connect_postgres(&config, config.password.as_deref())
