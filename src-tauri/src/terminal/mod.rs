@@ -210,6 +210,67 @@ pub async fn create_local_terminal(
     })
 }
 
+/// Resolve SSH jump-host credentials into the manual `jump_*` fields of
+/// `network`, so [`ssh::build_ssh_transport`] has a self-contained config.
+///
+/// - Session mode (`jump_session_id` set): look the jump session up in the
+///   sessions DB, copy host/port/user/auth, and resolve its saved password
+///   (`passwordRef` in options_json) or key path. A vault-locked password
+///   surfaces as `VAULT_LOCKED`.
+/// - Manual mode: just resolve a `vault:` reference in `jump_password`.
+///
+/// No-op when the session does not use a jump host.
+fn resolve_jump_credentials(
+    state: &State<'_, AppState>,
+    network: &mut network::NetworkSettings,
+) -> Result<(), String> {
+    if !network.uses_jump_host() {
+        return Ok(());
+    }
+
+    if !network.jump_session_id.trim().is_empty() {
+        let jump = {
+            let db = state
+                .db
+                .lock()
+                .map_err(|_| "session database is unavailable".to_string())?;
+            crate::session::db::get_session(&db, &network.jump_session_id)
+                .map_err(|e| format!("jump session not found: {}", e))?
+        };
+        if jump.session_type != crate::session::models::SessionType::SSH {
+            return Err("selected jump session is not an SSH session".into());
+        }
+        network.jump_host = jump.host.clone();
+        network.jump_port = jump.port;
+        network.jump_user = jump.username.clone().unwrap_or_default();
+        match &jump.auth_method {
+            crate::session::models::AuthMethod::PrivateKey { key_path } => {
+                network.jump_auth_kind = "PrivateKey".into();
+                network.jump_key_path = key_path.clone();
+            }
+            _ => {
+                network.jump_auth_kind = "Password".into();
+                // Saved SSH sessions stash the password as a `vault:` ref under
+                // `passwordRef` in options_json; manual auth has none.
+                let pass_ref = serde_json::from_str::<serde_json::Value>(&jump.options_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("passwordRef")
+                            .and_then(|r| r.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .unwrap_or_default();
+                network.jump_password = pass_ref;
+            }
+        }
+    }
+
+    // Resolve any `vault:` reference in the (manual or session-derived)
+    // password into plaintext.
+    network.resolve_jump_secret(&state.vault)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn create_ssh_terminal(
     session_id: String,
@@ -256,6 +317,7 @@ pub async fn create_ssh_terminal(
     let network = match network {
         Some(mut n) => {
             n.resolve_proxy_pass(&state.vault)?;
+            resolve_jump_credentials(&state, &mut n)?;
             Some(n)
         }
         None => None,
@@ -650,6 +712,7 @@ pub async fn test_ssh_connection(
     let network = match network {
         Some(mut n) => {
             n.resolve_proxy_pass(&state.vault)?;
+            resolve_jump_credentials(&state, &mut n)?;
             Some(n)
         }
         None => None,

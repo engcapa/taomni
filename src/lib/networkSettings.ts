@@ -2,6 +2,7 @@ import { parseSessionOptions } from "./terminalProfile";
 
 export type ProxyKind = "none" | "http" | "socks5" | "ssh-tunnel" | "system";
 export type IpVersion = "auto" | "ipv4" | "ipv6";
+export type JumpAuthKind = "Password" | "PrivateKey";
 
 export interface NetworkForward {
   id: string;
@@ -23,6 +24,21 @@ export interface NetworkSettings {
   disableNagle: boolean;
   ipVersion: IpVersion;
   localForwards: NetworkForward[];
+  // --- SSH jump host (proxyKind === "ssh-tunnel") ---
+  /** When set, the jump host is a saved SSH session resolved by the backend.
+   *  Empty means use the manual jump fields below. */
+  jumpSessionId: string;
+  jumpHost: string;
+  jumpPort: string;
+  jumpUser: string;
+  /** "Password" | "PrivateKey" */
+  jumpAuthKind: JumpAuthKind;
+  /** Password or vault:<id> ref; used when jumpAuthKind === "Password". */
+  jumpPassword: string;
+  /** Private key path; used when jumpAuthKind === "PrivateKey". */
+  jumpKeyPath: string;
+  /** Persist the manual jump password to the vault on save. */
+  jumpSaveAuth: boolean;
 }
 
 export const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
@@ -41,6 +57,14 @@ export const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   disableNagle: true,
   ipVersion: "auto",
   localForwards: [],
+  jumpSessionId: "",
+  jumpHost: "",
+  jumpPort: "22",
+  jumpUser: "",
+  jumpAuthKind: "Password",
+  jumpPassword: "",
+  jumpKeyPath: "",
+  jumpSaveAuth: false,
 };
 
 const PROXY_LABEL_TO_KIND: Record<string, ProxyKind> = {
@@ -136,6 +160,14 @@ export function normalizeNetworkSettings(input: unknown): NetworkSettings {
         : readBoolean(src.tcpNodelay, DEFAULT_NETWORK_SETTINGS.tcpNodelay),
     ipVersion: (IP_LABEL_TO_KIND[ipVersionRaw] ?? (ipVersionRaw as IpVersion)) || "auto",
     localForwards: normalizeForwards(src.localForwards),
+    jumpSessionId: readString(src.jumpSessionId, ""),
+    jumpHost: readString(src.jumpHost, ""),
+    jumpPort: readString(src.jumpPort, DEFAULT_NETWORK_SETTINGS.jumpPort),
+    jumpUser: readString(src.jumpUser, ""),
+    jumpAuthKind: readString(src.jumpAuthKind, "Password") === "PrivateKey" ? "PrivateKey" : "Password",
+    jumpPassword: readString(src.jumpPassword, ""),
+    jumpKeyPath: readString(src.jumpKeyPath, ""),
+    jumpSaveAuth: readBoolean(src.jumpSaveAuth, false),
   };
 }
 
@@ -158,11 +190,19 @@ export interface NetworkSettingsPayload {
   tcpNodelay: boolean;
   ipVersion: IpVersion;
   localForwards: { local: string; remote: string }[];
+  jumpSessionId: string;
+  jumpHost: string;
+  jumpPort: number;
+  jumpUser: string;
+  jumpAuthKind: JumpAuthKind;
+  jumpPassword: string;
+  jumpKeyPath: string;
 }
 
 export function toNetworkSettingsPayload(ns: NetworkSettings): NetworkSettingsPayload {
   const port = parseInt(ns.proxyPort, 10);
   const interval = parseInt(ns.keepAliveIntervalSecs, 10);
+  const jumpPort = parseInt(ns.jumpPort, 10);
   return {
     proxyKind: ns.proxyKind,
     proxyHost: ns.proxyHost.trim(),
@@ -178,5 +218,12 @@ export function toNetworkSettingsPayload(ns: NetworkSettings): NetworkSettingsPa
     localForwards: ns.localForwards
       .filter((f) => f.local.trim() && f.remote.trim())
       .map((f) => ({ local: f.local.trim(), remote: f.remote.trim() })),
+    jumpSessionId: ns.jumpSessionId.trim(),
+    jumpHost: ns.jumpHost.trim(),
+    jumpPort: Number.isFinite(jumpPort) && jumpPort > 0 ? jumpPort : 22,
+    jumpUser: ns.jumpUser.trim(),
+    jumpAuthKind: ns.jumpAuthKind,
+    jumpPassword: ns.jumpPassword,
+    jumpKeyPath: ns.jumpKeyPath.trim(),
   };
 }

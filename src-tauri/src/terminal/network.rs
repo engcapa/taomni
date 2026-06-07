@@ -42,6 +42,33 @@ pub struct NetworkSettings {
     pub ip_version: String,
     #[serde(default)]
     pub local_forwards: Vec<NetworkForward>,
+
+    // --- SSH jump host (proxy_kind == "ssh-tunnel") ---
+    /// When set, the jump host is taken from a saved SSH session; the backend
+    /// resolves host/port/user/auth from the sessions DB. When empty, the
+    /// manual `jump_*` fields below are used instead.
+    #[serde(default)]
+    pub jump_session_id: String,
+    #[serde(default)]
+    pub jump_host: String,
+    #[serde(default)]
+    pub jump_port: u16,
+    #[serde(default)]
+    pub jump_user: String,
+    /// "Password" | "PrivateKey".
+    #[serde(default = "default_jump_auth_kind")]
+    pub jump_auth_kind: String,
+    /// Password, or a `vault:<id>` reference. Used when `jump_auth_kind` is
+    /// "Password". Resolved to plaintext by `resolve_jump_secret`.
+    #[serde(default)]
+    pub jump_password: String,
+    /// Private key file path. Used when `jump_auth_kind` is "PrivateKey".
+    #[serde(default)]
+    pub jump_key_path: String,
+}
+
+fn default_jump_auth_kind() -> String {
+    "Password".into()
 }
 
 fn default_proxy_kind() -> String {
@@ -89,6 +116,21 @@ impl NetworkSettings {
             self.proxy_pass = (*plain).clone();
         }
         Ok(())
+    }
+
+    /// If `jump_password` is a `vault:<id>` reference, replace it in-place with
+    /// the resolved plaintext. Mirrors `resolve_proxy_pass` for the SSH jump
+    /// host credential; surfaces `VAULT_LOCKED` when the vault is locked.
+    pub fn resolve_jump_secret(&mut self, vault: &crate::vault::Vault) -> Result<(), String> {
+        if let Some(plain) = vault.resolve(&self.jump_password)? {
+            self.jump_password = (*plain).clone();
+        }
+        Ok(())
+    }
+
+    /// True when this session should be tunnelled through an SSH jump host.
+    pub fn uses_jump_host(&self) -> bool {
+        self.proxy_kind == "ssh-tunnel"
     }
 }
 
@@ -456,6 +498,37 @@ mod tests {
         assert!(NetworkSettings::from_json(Some("")).is_none());
         assert!(NetworkSettings::from_json(Some("   ")).is_none());
         assert!(NetworkSettings::from_json(Some("not-json")).is_none());
+    }
+
+    #[test]
+    fn from_json_parses_jump_host_fields() {
+        let raw = r#"{
+            "proxyKind": "ssh-tunnel",
+            "jumpSessionId": "",
+            "jumpHost": "bastion.lan",
+            "jumpPort": 2222,
+            "jumpUser": "ops",
+            "jumpAuthKind": "PrivateKey",
+            "jumpKeyPath": "~/.ssh/id_ed25519"
+        }"#;
+        let n = NetworkSettings::from_json(Some(raw)).expect("parsed");
+        assert!(n.uses_jump_host());
+        assert_eq!(n.jump_host, "bastion.lan");
+        assert_eq!(n.jump_port, 2222);
+        assert_eq!(n.jump_user, "ops");
+        assert_eq!(n.jump_auth_kind, "PrivateKey");
+        assert_eq!(n.jump_key_path, "~/.ssh/id_ed25519");
+    }
+
+    #[test]
+    fn jump_defaults_apply_when_fields_absent() {
+        // A bare proxy config without any jump_* keys still deserializes; the
+        // jump fields take their serde defaults and uses_jump_host() is false.
+        let n = NetworkSettings::from_json(Some(r#"{"proxyKind":"none"}"#)).expect("parsed");
+        assert!(!n.uses_jump_host());
+        assert_eq!(n.jump_auth_kind, "Password");
+        assert_eq!(n.jump_port, 0);
+        assert!(n.jump_host.is_empty());
     }
 
     #[test]

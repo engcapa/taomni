@@ -124,10 +124,6 @@ describe("SessionEditor SSH settings tabs", () => {
         sshBrowser: "Disabled",
         followPath: false,
         osc7AutoInject: false,
-        useJump: true,
-        jumpHost: "bastion.example.com",
-        jumpUser: "jump",
-        jumpPort: "2222",
       }),
       created_at: 1,
       updated_at: 1,
@@ -146,10 +142,6 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(screen.getByDisplayValue("Disabled")).toBeInTheDocument();
     expect(screen.queryByText("Follow SSH path (experimental)")).not.toBeInTheDocument();
     expect(screen.queryByText("Auto-inject OSC 7 cwd reporting")).not.toBeInTheDocument();
-    expect(checkboxInLabel("Enable jump host")).toBeChecked();
-    expect(screen.getByDisplayValue("bastion.example.com")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("jump")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("2222")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "OK" }));
 
@@ -161,10 +153,6 @@ describe("SessionEditor SSH settings tabs", () => {
       startupCmd: "tmux new -A -s main",
       doNotExit: true,
       sshBrowser: "Disabled",
-      useJump: true,
-      jumpHost: "bastion.example.com",
-      jumpUser: "jump",
-      jumpPort: "2222",
     });
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("followPath");
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("osc7AutoInject");
