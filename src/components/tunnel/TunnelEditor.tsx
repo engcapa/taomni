@@ -17,6 +17,7 @@ import { defaultTunnel } from "../../lib/tunnel";
 import type { SessionConfig } from "../../lib/ipc";
 import { vaultPut, isVaultReference, isVaultLockedError } from "../../lib/ipc";
 import { useVaultStore } from "../../stores/vaultStore";
+import { ensureVaultReady } from "../../lib/vaultGate";
 import { useT } from "../../lib/i18n";
 
 interface Props {
@@ -130,10 +131,17 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
       if (
         next.ssh.authMethod === "Password" &&
         next.ssh.saveAuth &&
-        vaultState !== "empty" &&
         next.ssh.authData &&
         !isVaultReference(next.ssh.authData)
       ) {
+        // Vault must be unlocked to encrypt. Pop the on-demand gate (set master
+        // password / unlock) if it isn't; bail out if the user cancels.
+        const ready = await ensureVaultReady(t("vault.gateReasonTunnel"));
+        if (!ready) {
+          setError(t("tunnels.editor.errVaultLocked"));
+          setBusy(false);
+          return;
+        }
         const label = `${next.ssh.username || "user"}@${next.ssh.host || "?"}:${next.ssh.port}`;
         const result = await vaultPut("tunnel-password", label, next.ssh.authData);
         next = {
@@ -371,7 +379,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   className="flex items-center gap-1.5 text-[11px]"
                   title={
                     vaultState === "empty"
-                      ? t("tunnels.editor.vaultEmptyHint")
+                      ? t("tunnels.editor.vaultSetupHint")
                       : undefined
                   }
                 >
@@ -380,19 +388,11 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                     className="taomni-checkbox"
                     checked={!!draft.ssh.saveAuth}
                     onChange={(e) => updateSsh("saveAuth", e.target.checked)}
-                    disabled={
-                      draft.ssh.authMethod === "Agent" ||
-                      (vaultState === "empty" && !draft.ssh.saveAuth)
-                    }
+                    disabled={draft.ssh.authMethod === "Agent"}
                   />
                   {t("tunnels.editor.saveCredentials")}
                 </label>
               </Field>
-              {draft.ssh.saveAuth && draft.ssh.authMethod === "Password" && vaultState === "empty" && (
-                <div className="text-[10.5px] pl-[6.25rem]" style={{ color: "#a04b00" }}>
-                  {t("tunnels.editor.vaultNotInit")}
-                </div>
-              )}
             </DiagramCard>
 
             {/* Right column: Remote/SOCKS endpoint */}

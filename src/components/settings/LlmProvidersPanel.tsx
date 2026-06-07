@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { useAiStore, type AiConfig, type LlmProviderConfig } from "../../stores/aiStore";
 import { useVaultStore } from "../../stores/vaultStore";
-import { isVaultLockedError, VAULT_LOCKED_EVENT } from "../../lib/ipc";
+import { isVaultLockedError } from "../../lib/ipc";
+import { ensureVaultReady } from "../../lib/vaultGate";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -221,26 +222,31 @@ export function LlmProvidersPanel() {
     return <div className="text-[12px] text-[var(--taomni-text-muted)] p-3">{t("aiSettings.loading")}</div>;
   }
 
-  const handleSave = () => {
-    // The aiStore only triggers the unlock dialog when it spots a *plaintext*
-    // API key that needs encrypting. But the user may have already saved
-    // every key as a `vault:<id>` reference — in that case saving silently
-    // succeeds even with a locked vault, which is correct (no secrets are
-    // touched), yet feels broken because the user expected to be prompted.
-    // To match the user's mental model, if the vault is locked when Save is
-    // clicked, surface the unlock dialog and queue the save for after.
-    if (vaultState === "locked") {
-      pendingVaultSaveRef.current = config;
+  const handleSave = async () => {
+    // Determine whether any provider carries a *plaintext* API key that would
+    // need to be encrypted into the vault on save. (Keys already stored as a
+    // `vault:<id>` reference, the local sidecar's literal "local", and
+    // llama-server runtimes need no vault.)
+    const hasPlaintextKey = Object.values(config.llm.providers).some(
+      (p) =>
+        p.api_key &&
+        p.api_key.length > 0 &&
+        !p.api_key.startsWith("vault:") &&
+        p.runtime !== "llama-server" &&
+        p.api_key !== "local",
+    );
+
+    // If we have a plaintext key to encrypt but the vault isn't unlocked, pop
+    // the on-demand gate (set a master password if empty, unlock if locked)
+    // before saving. This replaces the old text-only warning + manual trip to
+    // the vault settings. Bail out if the user cancels.
+    if (hasPlaintextKey && vaultState !== "unlocked") {
       setSaveOk(false);
-      setSaveError(t("aiSettings.llmVaultLockedSettings"));
-      window.dispatchEvent(
-        new CustomEvent(VAULT_LOCKED_EVENT, {
-          detail: {
-            reason: t("aiSettings.llmVaultLockedReason"),
-          },
-        }),
-      );
-      return;
+      const ready = await ensureVaultReady(t("vault.gateReasonLlm"));
+      if (!ready) {
+        setSaveError(t("aiSettings.llmVaultLockedSettings"));
+        return;
+      }
     }
     void runSave(config);
   };
@@ -262,7 +268,7 @@ export function LlmProvidersPanel() {
         <button
           type="button"
           className="taomni-btn h-7 px-3 text-[12px]"
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           disabled={saving}
         >
           {saving ? t("aiSettings.llmSaving") : t("aiSettings.llmSave")}

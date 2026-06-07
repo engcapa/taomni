@@ -67,7 +67,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             className="flex items-center gap-1.5 mt-3 text-[11px] cursor-pointer"
             title={
               vaultState === "empty"
-                ? t("authPrompt.saveTooltipEmpty")
+                ? t("authPrompt.saveTooltipSetup")
                 : t("authPrompt.saveTooltipDefault")
             }
           >
@@ -77,12 +77,9 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
               className="taomni-checkbox"
               checked={save}
               onChange={(e) => setSave(e.target.checked)}
-              disabled={vaultState === "empty"}
             />
             <span style={{ color: "var(--taomni-text-muted)" }}>
-              {vaultState === "empty"
-                ? t("authPrompt.saveToVaultUnsetup")
-                : t("authPrompt.saveToVault")}
+              {t("authPrompt.saveToVault")}
             </span>
           </label>
         </div>
