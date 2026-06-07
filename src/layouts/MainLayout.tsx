@@ -20,6 +20,8 @@ import {
 } from "react-resizable-panels";
 import { MenuBar } from "../components/menubar/MenuBar";
 import { Ribbon, type RibbonCommand } from "../components/menubar/Ribbon";
+import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
+import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -263,6 +265,7 @@ export function MainLayout() {
     toggleSidebar,
     setSidebarCollapsed,
     toggleCompactMode,
+    setCompactMode,
     toggleXServer,
     setStatusMessage,
     multiExecActive,
@@ -303,6 +306,11 @@ export function MainLayout() {
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
   const [ribbonVisible, setRibbonVisible] = useState(readRibbonVisible);
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
+  // On macOS we render a native global menu bar instead of the in-app
+  // <MenuBar>. The native menu lives at the top of the screen, matching
+  // standard macOS apps, and replaces compact mode entirely on that platform.
+  const nativeMenu = isTauriRuntime() && getAppPlatform() === "macos";
+  const importExport = useSessionImportExport();
   const exitRequestInFlightRef = useRef(false);
   const { confirm: confirmAppExit, render: appExitConfirmDialog } = useConfirmDialog();
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
@@ -779,7 +787,7 @@ export function MainLayout() {
         useServersStore.getState().openDialog();
         return;
       }
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "m") {
+      if (!nativeMenu && event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "m") {
         event.preventDefault();
         toggleCompactMode();
       }
@@ -805,7 +813,7 @@ export function MainLayout() {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCompactMode, toggleGlobalChat, toggleTabChat]);
+  }, [nativeMenu, toggleCompactMode, toggleGlobalChat, toggleTabChat]);
 
   // Hydrate server configs + statuses once on mount so the servers dialog
   // opens with persisted settings and live run state.
@@ -1509,6 +1517,66 @@ export function MainLayout() {
     toggleXServer,
   ]);
 
+  // Route a native-menu activation to the right place: session import/export
+  // is handled by the shared hook, everything else reuses handleCommand.
+  const dispatchMenuAction = useCallback((action: MenuActionId) => {
+    switch (action) {
+      case "import-json": importExport.importJson(); break;
+      case "import-moba": importExport.importMoba(); break;
+      case "import-csv": importExport.importCsv(); break;
+      case "import-openssh": importExport.importOpenSsh(); break;
+      case "export-json": importExport.exportJson(); break;
+      case "export-moba": importExport.exportMoba(); break;
+      case "export-csv": importExport.exportCsv(); break;
+      case "export-html": importExport.exportHtml(); break;
+      default:
+        handleCommand(action);
+    }
+  }, [handleCommand, importExport]);
+
+  const dispatchMenuActionRef = useRef(dispatchMenuAction);
+  useEffect(() => {
+    dispatchMenuActionRef.current = dispatchMenuAction;
+  }, [dispatchMenuAction]);
+
+  // Compact mode does not exist on macOS — if a previous (cross-platform)
+  // run left it enabled in localStorage, clear it on mount so the native
+  // menu layout renders correctly.
+  useEffect(() => {
+    if (nativeMenu && compactMode) {
+      setCompactMode(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nativeMenu]);
+
+  // Build + install the macOS global menu. Rebuilt whenever a piece of state
+  // shown in the menu changes (checkmarks, enabled state) — all low-frequency,
+  // so a full rebuild is simpler and cheaper than mutating individual items.
+  useEffect(() => {
+    if (!nativeMenu) return;
+    let cancelled = false;
+    const spec = buildAppMenuSpec({
+      activeTabClosable: !!activeTab?.closable,
+      hasSessions: importExport.hasSessions,
+      ribbonVisible,
+      quickConnectVisible,
+      t,
+    });
+    void installAppMenu(spec, (action) => dispatchMenuActionRef.current(action)).catch((err) => {
+      if (!cancelled) console.error("Failed to install application menu", err);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    nativeMenu,
+    activeTab?.closable,
+    importExport.hasSessions,
+    ribbonVisible,
+    quickConnectVisible,
+    t,
+  ]);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const tabIndex = macCommandDigitIndex(event);
@@ -1696,12 +1764,14 @@ export function MainLayout() {
       {!compactMode && !chromeHidden && <AppTitleBar onClose={requestAppExit} />}
       {!compactMode && !chromeHidden && (
         <>
-          <MenuBar
-            activeTabClosable={!!activeTab?.closable}
-            ribbonVisible={ribbonVisible}
-            quickConnectVisible={quickConnectVisible}
-            onCommand={handleCommand}
-          />
+          {!nativeMenu && (
+            <MenuBar
+              activeTabClosable={!!activeTab?.closable}
+              ribbonVisible={ribbonVisible}
+              quickConnectVisible={quickConnectVisible}
+              onCommand={handleCommand}
+            />
+          )}
           {ribbonVisible && (
             <Ribbon
               xServerEnabled={xServerEnabled}
@@ -2356,6 +2426,10 @@ export function MainLayout() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+
+      {/* Session import preview — driven by the native macOS menu's
+          import actions (no-op elsewhere, where <MenuBar> hosts its own). */}
+      {nativeMenu && importExport.previewNode}
 
       <ServersDialog />
       {appExitConfirmDialog}

@@ -3,6 +3,7 @@ import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
+import { getAppPlatform } from "../../lib/runtime";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { PttButton } from "./PttButton";
@@ -28,6 +29,10 @@ export function TitleBarTrayControls() {
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
+
+  // Compact mode is removed on macOS — the global menu bar replaces the
+  // condensed in-app chrome there. The toggle stays on Windows/Linux.
+  const compactAvailable = getAppPlatform() !== "macos";
 
   const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
   const current = THEME_MODES[currentIndex] ?? THEME_MODES[0];
@@ -63,15 +68,17 @@ export function TitleBarTrayControls() {
         >
           {current.icon}
         </TrayButton>
-        <TrayButton
-          testId="compact-toggle"
-          title={compactTitle}
-          ariaLabel={compactTitle}
-          active={compactMode}
-          onClick={toggleCompactMode}
-        >
-          {compactMode ? <PanelTopOpen className="w-[16px] h-[16px]" /> : <PanelTopClose className="w-[16px] h-[16px]" />}
-        </TrayButton>
+        {compactAvailable && (
+          <TrayButton
+            testId="compact-toggle"
+            title={compactTitle}
+            ariaLabel={compactTitle}
+            active={compactMode}
+            onClick={toggleCompactMode}
+          >
+            {compactMode ? <PanelTopOpen className="w-[16px] h-[16px]" /> : <PanelTopClose className="w-[16px] h-[16px]" />}
+          </TrayButton>
+        )}
       </div>
 
       <TrayGroupSeparator />
