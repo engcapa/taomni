@@ -1,0 +1,12 @@
+// Vendored shaded Any definition. HBase 2.x relocates google.protobuf.Any
+// under org/apache/hbase/thirdparty/... at build time via hbase-thirdparty.
+// The repository does not ship this file, so we vendor the canonical
+// google.protobuf.Any here at the import path HBase's .proto files expect.
+syntax = "proto2";
+package google.protobuf;
+option java_package = "org.apache.hbase.thirdparty.google.protobuf";
+option java_outer_classname = "AnyProto";
+message Any {
+  optional string type_url = 1;
+  optional bytes value = 2;
+}

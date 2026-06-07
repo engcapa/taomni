@@ -247,6 +247,10 @@ function sessionToHBaseConnectInfo(session: SessionConfig, password?: string): H
     timeoutSecs: num("dbTimeout"),
     restPath: str("hbaseRestPath") || null,
     namespace: str("hbaseNamespace") || null,
+    connectionMode: str("hbaseConnectionMode") === "rest" ? "rest" : "native",
+    zkQuorum: str("hbaseZkQuorum") || null,
+    zkRoot: str("hbaseZkRoot") || null,
+    effectiveUser: str("hbaseEffectiveUser") || null,
   };
 }
 

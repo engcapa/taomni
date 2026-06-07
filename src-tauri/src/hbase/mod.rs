@@ -4,6 +4,13 @@
 //! helper process. The frontend sends HBase-shell-like commands, we parse the
 //! small command language here, and each operation is translated into REST API
 //! calls against an HBase-compatible endpoint such as Stargate/Lindorm REST.
+//!
+//! The `native` submodule provides an alternative transport that speaks the
+//! native RegionServer/Master RPC protocol directly (bootstrapped via
+//! ZooKeeper), for clusters that do not expose a REST gateway.
+
+pub mod native;
+
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use reqwest::header::{HeaderMap, ACCEPT, CONTENT_TYPE, LOCATION};
@@ -36,15 +43,48 @@ pub struct HBaseConfig {
     /// Optional namespace automatically prefixed to unqualified table names.
     #[serde(default)]
     pub namespace: Option<String>,
+    /// Transport to use: `"native"` (RegionServer/Master RPC via ZooKeeper) or
+    /// `"rest"` (HBase REST/Stargate gateway). Defaults to native.
+    #[serde(default)]
+    pub connection_mode: Option<String>,
+    /// Comma-separated ZooKeeper quorum (`host:port,...`) for native mode. When
+    /// omitted, falls back to `host:port` (treating `port` as the ZK port).
+    #[serde(default)]
+    pub zk_quorum: Option<String>,
+    /// ZooKeeper root znode for native mode (default `/hbase`).
+    #[serde(default)]
+    pub zk_root: Option<String>,
+    /// Effective user for native simple auth (default `root`).
+    #[serde(default)]
+    pub effective_user: Option<String>,
 }
 
+impl HBaseConfig {
+    /// True when the native RPC transport should be used. Native is the
+    /// default; only an explicit `"rest"` selects the REST backend.
+    fn is_native(&self) -> bool {
+        !matches!(
+            self.connection_mode.as_deref().map(str::trim),
+            Some("rest") | Some("REST")
+        )
+    }
+}
+
+/// REST/Stargate transport session (legacy backend).
 #[derive(Debug, Clone)]
-pub struct HBaseSession {
+pub struct RestSession {
     client: Client,
     base_url: String,
     username: Option<String>,
     password: Option<String>,
     namespace: Option<String>,
+}
+
+/// A live HBase session, backed by either the native RPC client or the REST
+/// gateway. The map in `AppState` stores these behind an `Arc`.
+pub enum HBaseSession {
+    Native(native::client::NativeClient),
+    Rest(RestSession),
 }
 
 #[derive(Debug, Serialize)]
@@ -141,8 +181,8 @@ pub async fn hbase_connect(
     config: HBaseConfig,
 ) -> Result<HBaseConnectResult, String> {
     let password = resolve_secret(&state, config.password.as_deref())?;
-    let session = Arc::new(HBaseSession::new(&config, password)?);
-    ping_session(&session).await?;
+    let session = Arc::new(build_session(&config, password).await?);
+    ping_backend(&session).await?;
     let mut map = state.hbase_sessions.write().await;
     map.insert(session_id, session);
     Ok(HBaseConnectResult { ok: true })
@@ -151,7 +191,7 @@ pub async fn hbase_connect(
 #[tauri::command]
 pub async fn hbase_ping(state: State<'_, AppState>, session_id: String) -> Result<String, String> {
     let session = get_session(&state, &session_id).await?;
-    ping_session(&session).await
+    ping_backend(&session).await
 }
 
 #[tauri::command]
@@ -169,7 +209,10 @@ pub async fn hbase_list_tables(
     session_id: String,
 ) -> Result<Vec<HBaseTableInfo>, String> {
     let session = get_session(&state, &session_id).await?;
-    list_tables(&session).await
+    match session.as_ref() {
+        HBaseSession::Rest(rest) => list_tables(rest).await,
+        HBaseSession::Native(client) => native_list_tables(client).await,
+    }
 }
 
 #[tauri::command]
@@ -179,7 +222,10 @@ pub async fn hbase_describe_table(
     table: String,
 ) -> Result<HBaseTableSchema, String> {
     let session = get_session(&state, &session_id).await?;
-    describe_table(&session, &table).await
+    match session.as_ref() {
+        HBaseSession::Rest(rest) => describe_table(rest, &table).await,
+        HBaseSession::Native(client) => native_describe_table(client, &table).await,
+    }
 }
 
 #[tauri::command]
@@ -191,12 +237,75 @@ pub async fn hbase_execute(
     let session = get_session(&state, &session_id).await?;
     let parsed = parse_shell_command(&command)?;
     let started = Instant::now();
-    let mut result = execute_command(&session, parsed, command.trim().to_string()).await?;
+    let raw = command.trim().to_string();
+    let mut result = match session.as_ref() {
+        HBaseSession::Rest(rest) => execute_command(rest, parsed, raw).await?,
+        HBaseSession::Native(client) => native_execute(client, parsed, raw).await?,
+    };
     result.duration_ms = started.elapsed().as_millis() as u64;
     Ok(result)
 }
 
-impl HBaseSession {
+/// Build a session for the configured transport, resolving any secrets.
+async fn build_session(
+    config: &HBaseConfig,
+    password: Option<String>,
+) -> Result<HBaseSession, String> {
+    if config.is_native() {
+        Ok(HBaseSession::Native(build_native_client(config)?))
+    } else {
+        Ok(HBaseSession::Rest(RestSession::new(config, password)?))
+    }
+}
+
+/// Construct the native client from the connection config.
+fn build_native_client(
+    config: &HBaseConfig,
+) -> Result<native::client::NativeClient, String> {
+    let host = config.host.trim();
+    if host.is_empty() {
+        return Err("HBase host is required".into());
+    }
+    // ZK quorum: explicit field wins; otherwise treat host:port as the quorum.
+    let zk_quorum = match config.zk_quorum.as_deref().map(str::trim) {
+        Some(q) if !q.is_empty() => q.to_string(),
+        _ => format!("{host}:{}", config.port),
+    };
+    let cfg = native::client::NativeConfig {
+        zk_quorum,
+        zk_root: config
+            .zk_root
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or("/hbase")
+            .to_string(),
+        effective_user: config
+            .effective_user
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or("root")
+            .to_string(),
+        namespace: config
+            .namespace
+            .clone()
+            .filter(|s| !s.trim().is_empty()),
+        timeout: Duration::from_secs(config.timeout_secs.unwrap_or(15).clamp(1, 300)),
+        auth: native::auth::AuthMethod::Simple,
+    };
+    Ok(native::client::NativeClient::new(cfg))
+}
+
+/// Ping whichever backend the session uses.
+async fn ping_backend(session: &HBaseSession) -> Result<String, String> {
+    match session {
+        HBaseSession::Rest(rest) => ping_session(rest).await,
+        HBaseSession::Native(client) => client.ping().await.map_err(|e| e.to_string()),
+    }
+}
+
+impl RestSession {
     fn new(config: &HBaseConfig, password: Option<String>) -> Result<Self, String> {
         let host = config.host.trim();
         if host.is_empty() {
@@ -278,7 +387,7 @@ async fn get_session(
         .ok_or_else(|| format!("No active HBase shell session for {session_id}"))
 }
 
-async fn ping_session(session: &HBaseSession) -> Result<String, String> {
+async fn ping_session(session: &RestSession) -> Result<String, String> {
     let value = get_json(session, "/version/cluster?format=json").await?;
     if let Some(version) = value.get("Version").and_then(Value::as_str) {
         Ok(format!("HBase REST connection OK ({version})"))
@@ -289,12 +398,12 @@ async fn ping_session(session: &HBaseSession) -> Result<String, String> {
     }
 }
 
-async fn get_json(session: &HBaseSession, path: &str) -> Result<Value, String> {
+async fn get_json(session: &RestSession, path: &str) -> Result<Value, String> {
     send_json(session, Method::GET, path, None).await
 }
 
 async fn send_json(
-    session: &HBaseSession,
+    session: &RestSession,
     method: Method,
     path: &str,
     body: Option<Value>,
@@ -364,7 +473,7 @@ async fn response_json(resp: reqwest::Response) -> Result<Value, String> {
     }
 }
 
-async fn list_tables(session: &HBaseSession) -> Result<Vec<HBaseTableInfo>, String> {
+async fn list_tables(session: &RestSession) -> Result<Vec<HBaseTableInfo>, String> {
     let value = get_json(session, "/?format=json").await?;
     Ok(extract_table_names(&value)
         .into_iter()
@@ -404,7 +513,7 @@ fn extract_table_names(value: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-async fn describe_table(session: &HBaseSession, table: &str) -> Result<HBaseTableSchema, String> {
+async fn describe_table(session: &RestSession, table: &str) -> Result<HBaseTableSchema, String> {
     let table = session.table_name(table);
     let path = format!("/{}/schema?format=json", enc(&table));
     let value = get_json(session, &path).await?;
@@ -448,7 +557,7 @@ fn parse_schema(fallback_name: &str, value: &Value) -> HBaseTableSchema {
 }
 
 async fn execute_command(
-    session: &HBaseSession,
+    session: &RestSession,
     command: ShellCommand,
     raw: String,
 ) -> Result<HBaseShellResult, String> {
@@ -586,7 +695,7 @@ async fn execute_command(
 }
 
 async fn scan_table(
-    session: &HBaseSession,
+    session: &RestSession,
     table: &str,
     limit: usize,
     start_row: Option<String>,
@@ -624,7 +733,7 @@ async fn scan_table(
     }
 }
 
-async fn create_scanner(session: &HBaseSession, path: &str, body: Value) -> Result<String, String> {
+async fn create_scanner(session: &RestSession, path: &str, body: Value) -> Result<String, String> {
     let resp = session
         .request(Method::PUT, session.url(path))
         .header(CONTENT_TYPE, "application/json")
@@ -646,7 +755,7 @@ async fn create_scanner(session: &HBaseSession, path: &str, body: Value) -> Resu
 }
 
 async fn read_scanner(
-    session: &HBaseSession,
+    session: &RestSession,
     location: &str,
     limit: usize,
 ) -> Result<Vec<Vec<String>>, String> {
@@ -696,7 +805,7 @@ fn scanner_location(base_url: &str, headers: &HeaderMap) -> Option<String> {
 }
 
 async fn scan_wildcard(
-    session: &HBaseSession,
+    session: &RestSession,
     table: &str,
     limit: usize,
 ) -> Result<Vec<Vec<String>>, String> {
@@ -741,20 +850,17 @@ fn parse_shell_command(input: &str) -> Result<ShellCommand, String> {
         "get" => {
             let table = required_arg(&args, 0, "get table")?;
             let row = required_arg(&args, 1, "get row")?;
-            let opts = args
-                .get(2)
-                .map(|s| parse_options(s))
-                .transpose()?
-                .unwrap_or_default();
-            let column = opts.get("COLUMN").cloned().or_else(|| {
-                args.get(2).and_then(|v| {
-                    if v.trim_start().starts_with('{') {
-                        None
-                    } else {
-                        Some(strip_quotes(v))
-                    }
-                })
-            });
+            // The third arg is either an option map (`{COLUMN=>'cf:q'}`) or a
+            // bare column literal (`'cf:q'`). Only parse it as a map when it
+            // actually looks like one, so a bare column doesn't error out.
+            let third = args.get(2).map(|s| s.trim());
+            let column = match third {
+                Some(s) if s.starts_with('{') => {
+                    parse_options(s)?.get("COLUMN").cloned()
+                }
+                Some(s) if !s.is_empty() => Some(strip_quotes(s)),
+                _ => None,
+            };
             Ok(ShellCommand::Get { table, row, column })
         }
         "scan" => {
@@ -1116,9 +1222,214 @@ fn deb64(value: &str) -> String {
         .unwrap_or_else(|_| value.to_string())
 }
 
+// ---- native backend dispatch -----------------------------------------------
+
+use native::client::{NativeClient, ResultRow};
+
+async fn native_list_tables(client: &NativeClient) -> Result<Vec<HBaseTableInfo>, String> {
+    client
+        .list_tables()
+        .await
+        .map(|names| names.into_iter().map(|name| HBaseTableInfo { name }).collect())
+        .map_err(|e| e.to_string())
+}
+
+async fn native_describe_table(
+    client: &NativeClient,
+    table: &str,
+) -> Result<HBaseTableSchema, String> {
+    let (name, families) = client.describe_table(table).await.map_err(|e| e.to_string())?;
+    Ok(HBaseTableSchema {
+        name,
+        column_families: families
+            .into_iter()
+            .map(|f| HBaseColumnFamily {
+                name: f.name,
+                attributes: f.attributes,
+            })
+            .collect(),
+    })
+}
+
+/// Render result-row cells into the shell's ROW/COLUMN/TIMESTAMP/VALUE table.
+fn rows_to_cell_table(raw: String, rows: Vec<ResultRow>) -> HBaseShellResult {
+    let body: Vec<Vec<String>> = rows
+        .into_iter()
+        .map(|r| {
+            vec![
+                String::from_utf8_lossy(&r.row).into_owned(),
+                String::from_utf8_lossy(&r.column).into_owned(),
+                r.timestamp.to_string(),
+                String::from_utf8_lossy(&r.value).into_owned(),
+            ]
+        })
+        .collect();
+    table_result(
+        raw,
+        format!("{} cell(s)", body.len()),
+        vec!["ROW", "COLUMN", "TIMESTAMP", "VALUE"],
+        body,
+    )
+}
+
+/// Execute a parsed shell command against the native client.
+async fn native_execute(
+    client: &NativeClient,
+    command: ShellCommand,
+    raw: String,
+) -> Result<HBaseShellResult, String> {
+    match command {
+        ShellCommand::Help => Ok(help_result(raw)),
+        ShellCommand::List => {
+            let tables = client.list_tables().await.map_err(|e| e.to_string())?;
+            Ok(table_result(
+                raw,
+                format!("{} table(s)", tables.len()),
+                vec!["TABLE"],
+                tables.into_iter().map(|name| vec![name]).collect(),
+            ))
+        }
+        ShellCommand::Status => {
+            let pairs = client.cluster_status().await.map_err(|e| e.to_string())?;
+            Ok(table_result(
+                raw,
+                "Cluster status".into(),
+                vec!["KEY", "VALUE"],
+                pairs.into_iter().map(|(k, v)| vec![k, v]).collect(),
+            ))
+        }
+        ShellCommand::Version => {
+            let msg = client.ping().await.map_err(|e| e.to_string())?;
+            Ok(message_result(raw, msg))
+        }
+        ShellCommand::Describe { table } => {
+            let schema = native_describe_table(client, &table).await?;
+            let rows = schema
+                .column_families
+                .into_iter()
+                .map(|family| {
+                    vec![
+                        family.name,
+                        family
+                            .attributes
+                            .into_iter()
+                            .map(|(k, v)| format!("{k}={v}"))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            Ok(table_result(
+                raw,
+                format!("Schema for {}", schema.name),
+                vec!["COLUMN FAMILY", "ATTRIBUTES"],
+                rows,
+            ))
+        }
+        ShellCommand::Create { table, families } => {
+            let specs: Vec<(String, BTreeMap<String, String>)> = families
+                .into_iter()
+                .map(|f| (f.name, f.attributes))
+                .collect();
+            client
+                .create_table(&table, &specs)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(message_result(raw, format!("Created table {table}")))
+        }
+        ShellCommand::Drop { table } => {
+            client.drop_table(&table).await.map_err(|e| e.to_string())?;
+            Ok(message_result(raw, format!("Dropped table {table}")))
+        }
+        ShellCommand::Get { table, row, column } => {
+            let rows = client
+                .get(&table, row.as_bytes(), column.as_deref())
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(rows_to_cell_table(raw, rows))
+        }
+        ShellCommand::Scan {
+            table,
+            limit,
+            start_row,
+            stop_row,
+            columns,
+        } => {
+            let rows = client
+                .scan(
+                    &table,
+                    limit,
+                    start_row.as_deref().map(str::as_bytes),
+                    stop_row.as_deref().map(str::as_bytes),
+                    &columns,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(rows_to_cell_table(raw, rows))
+        }
+        ShellCommand::Put {
+            table,
+            row,
+            column,
+            value,
+        } => {
+            client
+                .put(&table, row.as_bytes(), &column, value.as_bytes())
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(message_result(raw, "1 cell written".into()))
+        }
+        ShellCommand::Delete { table, row, column } => {
+            client
+                .delete(&table, row.as_bytes(), &column)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(message_result(raw, "Cell deleted".into()))
+        }
+        ShellCommand::DeleteAll { table, row } => {
+            client
+                .delete_all(&table, row.as_bytes())
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(message_result(raw, "Row deleted".into()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_get_with_bare_column() {
+        // A bare quoted column must not be mistaken for an option map.
+        match parse_shell_command("get 't1', 'row2', 'cf1:name'").unwrap() {
+            ShellCommand::Get { table, row, column } => {
+                assert_eq!(table, "t1");
+                assert_eq!(row, "row2");
+                assert_eq!(column.as_deref(), Some("cf1:name"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_get_with_column_map() {
+        match parse_shell_command("get 't1', 'row2', {COLUMN=>'cf1:name'}").unwrap() {
+            ShellCommand::Get { column, .. } => {
+                assert_eq!(column.as_deref(), Some("cf1:name"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_get_without_column() {
+        match parse_shell_command("get 't1', 'row2'").unwrap() {
+            ShellCommand::Get { column, .. } => assert!(column.is_none()),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
 
     #[test]
     fn parses_scan_options() {
@@ -1215,3 +1526,77 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod native_shell_live_tests {
+    //! End-to-end test of the shell-command path (parse + native_execute)
+    //! against a live standalone HBase. Gated by HBASE_LIVE_TEST=1.
+    use super::*;
+
+    fn client() -> Option<NativeClient> {
+        if std::env::var("HBASE_LIVE_TEST").ok().as_deref() != Some("1") {
+            return None;
+        }
+        let zk = std::env::var("HBASE_ZK").unwrap_or_else(|_| "127.0.0.1:2181".into());
+        Some(NativeClient::new(native::client::NativeConfig {
+            zk_quorum: zk,
+            zk_root: "/hbase".into(),
+            effective_user: "test".into(),
+            namespace: None,
+            timeout: std::time::Duration::from_secs(20),
+            auth: native::auth::AuthMethod::Simple,
+        }))
+    }
+
+    async fn run(c: &NativeClient, cmd: &str) -> HBaseShellResult {
+        let parsed = parse_shell_command(cmd).expect("parse");
+        native_execute(c, parsed, cmd.to_string())
+            .await
+            .unwrap_or_else(|e| panic!("exec `{cmd}` failed: {e}"))
+    }
+
+    #[tokio::test]
+    async fn shell_path_lifecycle() {
+        let Some(c) = client() else { return };
+        let t = "taomni_shell_it";
+        // Best-effort cleanup; tolerate "table not found" if it's absent.
+        let _ = native_execute(
+            &c,
+            parse_shell_command(&format!("drop '{t}'")).unwrap(),
+            format!("drop '{t}'"),
+        )
+        .await;
+
+        let r = run(&c, &format!("create '{t}', {{NAME=>'cf', VERSIONS=>3}}")).await;
+        println!("create msg: {}", r.message);
+
+        let list = run(&c, "list").await;
+        assert!(list.rows.iter().any(|row| row[0] == t), "list missing {t}");
+
+        run(&c, &format!("put '{t}', 'r1', 'cf:a', 'v1'")).await;
+        run(&c, &format!("put '{t}', 'r2', 'cf:a', 'v2'")).await;
+
+        let got = run(&c, &format!("get '{t}', 'r1'")).await;
+        assert_eq!(got.rows.len(), 1);
+        assert_eq!(got.rows[0][3], "v1");
+
+        let scanned = run(&c, &format!("scan '{t}', {{LIMIT=>50}}")).await;
+        assert!(scanned.rows.len() >= 2, "scan rows: {}", scanned.rows.len());
+
+        let desc = run(&c, &format!("describe '{t}'")).await;
+        assert!(desc.rows.iter().any(|r| r[0] == "cf"));
+
+        run(&c, &format!("deleteall '{t}', 'r1'")).await;
+        let after = run(&c, &format!("get '{t}', 'r1'")).await;
+        assert_eq!(after.rows.len(), 0);
+
+        run(&c, &format!("drop '{t}'")).await;
+        let list2 = run(&c, "list").await;
+        assert!(!list2.rows.iter().any(|row| row[0] == t));
+        println!("shell-path lifecycle OK");
+    }
+}
+
+
+
+

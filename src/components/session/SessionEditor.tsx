@@ -1153,6 +1153,10 @@ function HBaseSettings({
   vaultState,
   namespace, setNamespace,
   restPath, setRestPath,
+  connectionMode, setConnectionMode,
+  zkQuorum, setZkQuorum,
+  zkRoot, setZkRoot,
+  effectiveUser, setEffectiveUser,
   ssl, setSsl,
   timeoutSecs, setTimeoutSecs,
 }: {
@@ -1164,11 +1168,64 @@ function HBaseSettings({
   vaultState: "empty" | "locked" | "unlocked";
   namespace: string; setNamespace: (v: string) => void;
   restPath: string; setRestPath: (v: string) => void;
+  connectionMode: string; setConnectionMode: (v: string) => void;
+  zkQuorum: string; setZkQuorum: (v: string) => void;
+  zkRoot: string; setZkRoot: (v: string) => void;
+  effectiveUser: string; setEffectiveUser: (v: string) => void;
   ssl: boolean; setSsl: (v: boolean) => void;
   timeoutSecs: string; setTimeoutSecs: (v: string) => void;
 }) {
+  const isNative = connectionMode !== "rest";
   return (
     <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <Field label="Mode">
+        <select
+          className="taomni-input w-64"
+          data-testid="hbase-connection-mode"
+          aria-label="HBase connection mode"
+          value={isNative ? "native" : "rest"}
+          onChange={(e) => setConnectionMode(e.target.value)}
+        >
+          <option value="native">Native RPC (ZooKeeper + RegionServer)</option>
+          <option value="rest">REST / Stargate gateway</option>
+        </select>
+        <span className="ml-2 text-[var(--taomni-text-muted)]">
+          {isNative ? "No gateway needed; talks the native protocol." : "Requires an HBase REST server."}
+        </span>
+      </Field>
+
+      {isNative && (
+        <>
+          <Field label="ZK quorum">
+            <input
+              className="taomni-input w-64"
+              value={zkQuorum}
+              aria-label="HBase ZooKeeper quorum"
+              placeholder="(optional) zk1:2181,zk2:2181 — defaults to host:port"
+              onChange={(e) => setZkQuorum(e.target.value)}
+            />
+          </Field>
+          <Field label="ZK root">
+            <input
+              className="taomni-input w-64"
+              value={zkRoot}
+              aria-label="HBase ZooKeeper root"
+              placeholder="(optional) /hbase"
+              onChange={(e) => setZkRoot(e.target.value)}
+            />
+          </Field>
+          <Field label="Effective user">
+            <input
+              className="taomni-input w-64"
+              value={effectiveUser}
+              aria-label="HBase effective user"
+              placeholder="(optional) defaults to root"
+              onChange={(e) => setEffectiveUser(e.target.value)}
+            />
+          </Field>
+        </>
+      )}
+
       <Field label="Username">
         <input
           className="taomni-input w-64"
@@ -1232,16 +1289,18 @@ function HBaseSettings({
         />
       </Field>
 
-      <Field label="REST path">
-        <input
-          className="taomni-input w-64"
-          value={restPath}
-          aria-label="HBase REST path"
-          placeholder="(optional) gateway prefix"
-          onChange={(e) => setRestPath(e.target.value)}
-        />
-        <span className="ml-2 text-[var(--taomni-text-muted)]">Leave empty for Stargate root.</span>
-      </Field>
+      {!isNative && (
+        <Field label="REST path">
+          <input
+            className="taomni-input w-64"
+            value={restPath}
+            aria-label="HBase REST path"
+            placeholder="(optional) gateway prefix"
+            onChange={(e) => setRestPath(e.target.value)}
+          />
+          <span className="ml-2 text-[var(--taomni-text-muted)]">Leave empty for Stargate root.</span>
+        </Field>
+      )}
 
       <Field label="SSL / TLS">
         <label className="flex items-center gap-1.5">
@@ -1368,6 +1427,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [dbRedisIndex, setDbRedisIndex] = useState(() => optionString(initialOptions, "dbRedisIndex", "0"));
   const [hbaseNamespace, setHBaseNamespace] = useState(() => optionString(initialOptions, "hbaseNamespace", ""));
   const [hbaseRestPath, setHBaseRestPath] = useState(() => optionString(initialOptions, "hbaseRestPath", ""));
+  const [hbaseConnectionMode, setHBaseConnectionMode] = useState(() => optionString(initialOptions, "hbaseConnectionMode", "native"));
+  const [hbaseZkQuorum, setHBaseZkQuorum] = useState(() => optionString(initialOptions, "hbaseZkQuorum", ""));
+  const [hbaseZkRoot, setHBaseZkRoot] = useState(() => optionString(initialOptions, "hbaseZkRoot", ""));
+  const [hbaseEffectiveUser, setHBaseEffectiveUser] = useState(() => optionString(initialOptions, "hbaseEffectiveUser", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -1529,6 +1592,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ? {
           hbaseNamespace,
           hbaseRestPath,
+          hbaseConnectionMode,
+          hbaseZkQuorum,
+          hbaseZkRoot,
+          hbaseEffectiveUser,
           dbSsl,
           dbTimeout,
         }
@@ -1746,6 +1813,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setDbRedisIndex(optionString(nextOptions, "dbRedisIndex", "0"));
     setHBaseNamespace(optionString(nextOptions, "hbaseNamespace", ""));
     setHBaseRestPath(optionString(nextOptions, "hbaseRestPath", ""));
+    setHBaseConnectionMode(optionString(nextOptions, "hbaseConnectionMode", "native"));
+    setHBaseZkQuorum(optionString(nextOptions, "hbaseZkQuorum", ""));
+    setHBaseZkRoot(optionString(nextOptions, "hbaseZkRoot", ""));
+    setHBaseEffectiveUser(optionString(nextOptions, "hbaseEffectiveUser", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -1884,6 +1955,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     timeoutSecs: parseInt(dbTimeout) || null,
     restPath: hbaseRestPath || null,
     namespace: hbaseNamespace || null,
+    connectionMode: hbaseConnectionMode === "rest" ? "rest" : "native",
+    zkQuorum: hbaseZkQuorum || null,
+    zkRoot: hbaseZkRoot || null,
+    effectiveUser: hbaseEffectiveUser || null,
   });
 
   const handleTestDbConnection = async () => {
@@ -2310,6 +2385,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 vaultState={vaultState}
                 namespace={hbaseNamespace} setNamespace={setHBaseNamespace}
                 restPath={hbaseRestPath} setRestPath={setHBaseRestPath}
+                connectionMode={hbaseConnectionMode} setConnectionMode={setHBaseConnectionMode}
+                zkQuorum={hbaseZkQuorum} setZkQuorum={setHBaseZkQuorum}
+                zkRoot={hbaseZkRoot} setZkRoot={setHBaseZkRoot}
+                effectiveUser={hbaseEffectiveUser} setEffectiveUser={setHBaseEffectiveUser}
                 ssl={dbSsl} setSsl={setDbSsl}
                 timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
               />
