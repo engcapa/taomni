@@ -296,10 +296,6 @@ function AdvancedSshSettings({
   vaultState,
   usePrivKey, setUsePrivKey,
   keyPath, setKeyPath,
-  useJump, setUseJump,
-  jumpHost, setJumpHost,
-  jumpUser, setJumpUser,
-  jumpPort, setJumpPort,
   onBrowseKey,
 }: {
   t: TranslateFn;
@@ -319,10 +315,6 @@ function AdvancedSshSettings({
   vaultState: "empty" | "locked" | "unlocked";
   usePrivKey: boolean; setUsePrivKey: (v: boolean) => void;
   keyPath: string; setKeyPath: (v: string) => void;
-  useJump: boolean; setUseJump: (v: boolean) => void;
-  jumpHost: string; setJumpHost: (v: string) => void;
-  jumpUser: string; setJumpUser: (v: string) => void;
-  jumpPort: string; setJumpPort: (v: string) => void;
   onBrowseKey: () => void;
 }) {
   return (
@@ -475,46 +467,6 @@ function AdvancedSshSettings({
         </button>
       </Field>
 
-      <Field label={t("sessionEditor2.fieldJumpHost")}>
-        <div className="flex flex-col gap-1.5 w-full">
-          <label className="flex items-center gap-1.5">
-            <Checkbox checked={useJump} onChange={setUseJump} /> {t("sessionEditor2.enableJumpHost")}
-          </label>
-          <div
-            className="flex items-center gap-2 pl-1"
-            style={{ opacity: useJump ? 1 : 0.5 }}
-          >
-            <span className="text-[var(--taomni-text-muted)] w-16 text-right">{t("sessionEditor2.jumpGateway")}</span>
-            <input
-              className="taomni-input w-56"
-              value={jumpHost}
-              onChange={(e) => setJumpHost(e.target.value)}
-              disabled={!useJump}
-              aria-label={t("sessionEditor2.jumpHostAria")}
-            />
-            <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.jumpUserLabel")}</span>
-            <input
-              className="taomni-input w-32"
-              value={jumpUser}
-              onChange={(e) => setJumpUser(e.target.value)}
-              disabled={!useJump}
-              aria-label={t("sessionEditor2.jumpUserAria")}
-            />
-            <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.jumpPortLabel")}</span>
-            <input
-              className="taomni-input w-16"
-              value={jumpPort}
-              onChange={(e) => setJumpPort(e.target.value)}
-              disabled={!useJump}
-              aria-label={t("sessionEditor2.jumpPortAria")}
-            />
-            <button className="taomni-btn" disabled type="button" title={t("sessionEditor2.testChainTitle")}>
-              {t("sessionEditor2.testChain")}
-            </button>
-          </div>
-        </div>
-      </Field>
-
       <Field label={t("sessionEditor2.fieldExpertSsh")}>
         <button className="taomni-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
         <span className="ml-2 text-[var(--taomni-text-muted)]">
@@ -543,11 +495,199 @@ function TerminalSettings({
   );
 }
 
+/** Proxy selector + (HTTP/SOCKS5) proxy fields or the SSH jump-host section.
+ *  Shared by the SSH Network tab and the database Network tab so both speak
+ *  the same `NetworkSettings` shape and persistence path. */
+function ProxyJumpFields({
+  t,
+  value,
+  onChange,
+  sshSessions = [],
+}: {
+  t: TranslateFn;
+  value: NetworkSettingsValue;
+  onChange: (next: NetworkSettingsValue) => void;
+  sshSessions?: { id: string; name: string; host: string; port: number }[];
+}) {
+  const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
+  const proxy = proxyKindToLabel(value.proxyKind);
+  const isJump = value.proxyKind === "ssh-tunnel";
+  const jumpManual = value.jumpSessionId.trim() === "";
+  return (
+    <>
+      <Field label={t("sessionEditor2.fieldProxy")}>
+        <Select
+          value={proxy}
+          options={[
+            t("sessionEditor2.proxyNone"),
+            t("sessionEditor2.proxyHttp"),
+            t("sessionEditor2.proxySocks5"),
+            t("sessionEditor2.proxyLocalSshTunnel"),
+            t("sessionEditor2.proxySystem"),
+          ]}
+          onChange={(label) => patch({ proxyKind: proxyLabelToKind(label) })}
+        />
+      </Field>
+
+      {isJump && (
+        <>
+          <Field label={t("sessionEditor2.fieldJumpVia")}>
+            <select
+              className="taomni-input w-72"
+              value={value.jumpSessionId}
+              aria-label={t("sessionEditor2.jumpViaAria")}
+              onChange={(e) => patch({ jumpSessionId: e.target.value })}
+            >
+              <option value="">{t("sessionEditor2.jumpManualOption")}</option>
+              {sshSessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.host}:{s.port})
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {jumpManual && (
+            <>
+              <Field label={t("sessionEditor2.fieldJumpHost")}>
+                <input
+                  className="taomni-input w-64"
+                  placeholder={t("sessionEditor2.jumpHostPlaceholder")}
+                  value={value.jumpHost}
+                  aria-label={t("sessionEditor2.jumpHostAria")}
+                  onChange={(e) => patch({ jumpHost: e.target.value })}
+                />
+                <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
+                <input
+                  className="taomni-input w-16 ml-1"
+                  placeholder="22"
+                  value={value.jumpPort}
+                  aria-label={t("sessionEditor2.jumpPortAria")}
+                  onChange={(e) => patch({ jumpPort: e.target.value })}
+                />
+              </Field>
+
+              <Field label={t("sessionEditor2.fieldJumpUser")}>
+                <input
+                  className="taomni-input w-32"
+                  placeholder={t("sessionEditor2.jumpUserPlaceholder")}
+                  value={value.jumpUser}
+                  aria-label={t("sessionEditor2.jumpUserAria")}
+                  onChange={(e) => patch({ jumpUser: e.target.value })}
+                />
+                <select
+                  className="taomni-input w-28 ml-2"
+                  value={value.jumpAuthKind}
+                  aria-label={t("sessionEditor2.jumpAuthAria")}
+                  onChange={(e) => patch({ jumpAuthKind: e.target.value === "PrivateKey" ? "PrivateKey" : "Password" })}
+                >
+                  <option value="Password">{t("sessionEditor2.jumpAuthPassword")}</option>
+                  <option value="PrivateKey">{t("sessionEditor2.jumpAuthKey")}</option>
+                </select>
+              </Field>
+
+              {value.jumpAuthKind === "Password" ? (
+                <Field label={t("sessionEditor2.fieldJumpPassword")}>
+                  <input
+                    className="taomni-input w-64"
+                    type="password"
+                    placeholder={t("sessionEditor2.jumpPasswordPlaceholder")}
+                    value={value.jumpPassword}
+                    aria-label={t("sessionEditor2.jumpPasswordAria")}
+                    onChange={(e) => patch({ jumpPassword: e.target.value })}
+                  />
+                  <label className="ml-2 flex items-center gap-1.5">
+                    <Checkbox checked={value.jumpSaveAuth} onChange={(v) => patch({ jumpSaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+                  </label>
+                </Field>
+              ) : (
+                <Field label={t("sessionEditor2.fieldJumpKey")}>
+                  <input
+                    className="taomni-input w-72"
+                    placeholder={t("sessionEditor2.jumpKeyPlaceholder")}
+                    value={value.jumpKeyPath}
+                    aria-label={t("sessionEditor2.jumpKeyAria")}
+                    onChange={(e) => patch({ jumpKeyPath: e.target.value })}
+                  />
+                </Field>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {!isJump && value.proxyKind !== "none" && (
+        <>
+          <Field label={t("sessionEditor2.fieldProxyHost")}>
+            <input
+              className="taomni-input w-64"
+              placeholder={t("sessionEditor2.proxyHostPlaceholder")}
+              value={value.proxyHost}
+              aria-label={t("sessionEditor2.proxyHostAria")}
+              onChange={(e) => patch({ proxyHost: e.target.value })}
+            />
+            <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
+            <input
+              className="taomni-input w-16 ml-1"
+              placeholder={t("sessionEditor2.proxyPortPlaceholder")}
+              value={value.proxyPort}
+              aria-label={t("sessionEditor2.proxyPortAria")}
+              onChange={(e) => patch({ proxyPort: e.target.value })}
+            />
+          </Field>
+
+          <Field label={t("sessionEditor2.fieldProxyAuth")}>
+            <input
+              className="taomni-input w-32"
+              placeholder={t("sessionEditor2.proxyUserPlaceholder")}
+              value={value.proxyUser}
+              aria-label={t("sessionEditor2.proxyUserAria")}
+              onChange={(e) => patch({ proxyUser: e.target.value })}
+            />
+            <input
+              className="taomni-input w-40 ml-1"
+              type="password"
+              placeholder={t("sessionEditor2.proxyPassPlaceholder")}
+              value={value.proxyPass}
+              aria-label={t("sessionEditor2.proxyPassAria")}
+              onChange={(e) => patch({ proxyPass: e.target.value })}
+            />
+            <label className="ml-2 flex items-center gap-1.5">
+              <Checkbox checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+            </label>
+          </Field>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Network tab for database sessions: proxy + SSH jump host only (no
+ *  keep-alive / TCP / local-forward rows, which are SSH-terminal specific). */
+function DbNetworkSettings({
+  t,
+  value,
+  onChange,
+  sshSessions = [],
+}: {
+  t: TranslateFn;
+  value: NetworkSettingsValue;
+  onChange: (next: NetworkSettingsValue) => void;
+  sshSessions?: { id: string; name: string; host: string; port: number }[];
+}) {
+  return (
+    <div data-testid="db-network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} />
+    </div>
+  );
+}
+
 function NetworkSettings({
   t,
   value,
   onChange,
   sessionConfigId,
+  sshSessions = [],
 }: {
   t: TranslateFn;
   value: NetworkSettingsValue;
@@ -556,6 +696,8 @@ function NetworkSettings({
    *  for this saved session and renders the latest failure inline next
    *  to the offending row. */
   sessionConfigId?: string;
+  /** Saved SSH sessions selectable as a jump host (current session excluded). */
+  sshSessions?: { id: string; name: string; host: string; port: number }[];
 }) {
   const [newFwdLocal, setNewFwdLocal] = useState("");
   const [newFwdRemote, setNewFwdRemote] = useState("");
@@ -583,12 +725,6 @@ function NetworkSettings({
   }, [sessionConfigId]);
 
   const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
-  const proxy = proxyKindToLabel(value.proxyKind);
-  const proxyHost = value.proxyHost;
-  const proxyPort = value.proxyPort;
-  const proxyUser = value.proxyUser;
-  const proxyPass = value.proxyPass;
-  const proxySave = value.proxySaveAuth;
   const keepAlive = value.keepAlive;
   const keepAliveInterval = value.keepAliveIntervalSecs;
   const tcpNodelay = value.tcpNodelay;
@@ -596,12 +732,6 @@ function NetworkSettings({
   const ipVersion = ipKindToLabel(value.ipVersion);
   const forwards = value.localForwards;
 
-  const setProxy = (label: string) => patch({ proxyKind: proxyLabelToKind(label) });
-  const setProxyHost = (v: string) => patch({ proxyHost: v });
-  const setProxyPort = (v: string) => patch({ proxyPort: v });
-  const setProxyUser = (v: string) => patch({ proxyUser: v });
-  const setProxyPass = (v: string) => patch({ proxyPass: v });
-  const setProxySave = (v: boolean) => patch({ proxySaveAuth: v });
   const setKeepAlive = (v: boolean) => patch({ keepAlive: v });
   const setKeepAliveInterval = (v: string) => patch({ keepAliveIntervalSecs: v });
   const setIpVersion = (label: string) => patch({ ipVersion: ipLabelToKind(label) });
@@ -627,59 +757,7 @@ function NetworkSettings({
 
   return (
     <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <Field label={t("sessionEditor2.fieldProxy")}>
-        <Select
-          value={proxy}
-          options={[
-            t("sessionEditor2.proxyNone"),
-            t("sessionEditor2.proxyHttp"),
-            t("sessionEditor2.proxySocks4"),
-            t("sessionEditor2.proxySocks5"),
-            t("sessionEditor2.proxyLocalSshTunnel"),
-            t("sessionEditor2.proxySystem"),
-          ]}
-          onChange={setProxy}
-        />
-      </Field>
-
-      <Field label={t("sessionEditor2.fieldProxyHost")}>
-        <input
-          className="taomni-input w-64"
-          placeholder={t("sessionEditor2.proxyHostPlaceholder")}
-          value={proxyHost}
-          aria-label={t("sessionEditor2.proxyHostAria")}
-          onChange={(e) => setProxyHost(e.target.value)}
-        />
-        <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
-        <input
-          className="taomni-input w-16 ml-1"
-          placeholder={t("sessionEditor2.proxyPortPlaceholder")}
-          value={proxyPort}
-          aria-label={t("sessionEditor2.proxyPortAria")}
-          onChange={(e) => setProxyPort(e.target.value)}
-        />
-      </Field>
-
-      <Field label={t("sessionEditor2.fieldProxyAuth")}>
-        <input
-          className="taomni-input w-32"
-          placeholder={t("sessionEditor2.proxyUserPlaceholder")}
-          value={proxyUser}
-          aria-label={t("sessionEditor2.proxyUserAria")}
-          onChange={(e) => setProxyUser(e.target.value)}
-        />
-        <input
-          className="taomni-input w-40 ml-1"
-          type="password"
-          placeholder={t("sessionEditor2.proxyPassPlaceholder")}
-          value={proxyPass}
-          aria-label={t("sessionEditor2.proxyPassAria")}
-          onChange={(e) => setProxyPass(e.target.value)}
-        />
-        <label className="ml-2 flex items-center gap-1.5">
-          <Checkbox checked={proxySave} onChange={setProxySave} /> {t("sessionEditor2.proxySaveInVault")}
-        </label>
-      </Field>
+      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} />
 
       <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
@@ -1394,10 +1472,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [usePrivKey, setUsePrivKey] = useState(
     extractAuthType(session?.auth_method) === "PrivateKey",
   );
-  const [useJump, setUseJump] = useState(() => optionBoolean(initialOptions, "useJump", false));
-  const [jumpHost, setJumpHost] = useState(() => optionString(initialOptions, "jumpHost", ""));
-  const [jumpUser, setJumpUser] = useState(() => optionString(initialOptions, "jumpUser", ""));
-  const [jumpPort, setJumpPort] = useState(() => optionString(initialOptions, "jumpPort", "22"));
 
   /* --- bookmark --- */
   const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
@@ -1557,10 +1631,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     passwordRefValue = passwordRef,
     networkSettingsValue = networkSettings,
     proxyPassValue = networkSettings.proxyPass,
+    jumpPasswordValue = networkSettings.jumpPassword,
   }: {
     passwordRefValue?: string;
     networkSettingsValue?: NetworkSettingsValue;
     proxyPassValue?: string;
+    jumpPasswordValue?: string;
   } = {}): string => {
     const previousOptions = stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json));
     const wslOverrides: Record<string, unknown> =
@@ -1601,9 +1677,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
     return JSON.stringify({
       ...previousOptions,
-      x11, x11Trusted, compression, startupCmd, jumpHost: jumpHost || "",
-      jumpUser, jumpPort, description, tags, doNotExit, disableAiWrite,
-      remoteEnv, sshBrowser, usePrivKey, useJump,
+      x11, x11Trusted, compression, startupCmd,
+      description, tags, doNotExit, disableAiWrite,
+      remoteEnv, sshBrowser, usePrivKey,
       fileEmbedInTab, fileExtraArgs,
       terminalProfile,
       // SSH password vault reference (vault:<id>). Empty string means no
@@ -1613,10 +1689,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       // "Save in vault". `options_json` lands in the SQLite session row
       // in plaintext, so this is the gate keeping secrets out at rest.
       // When proxySaveAuth is on AND the value is already a vault: ref,
-      // we keep it (the resolution happens server-side).
-      networkSettings: networkSettingsValue.proxySaveAuth
-        ? { ...networkSettingsValue, proxyPass: proxyPassValue }
-        : { ...networkSettingsValue, proxyPass: "" },
+      // we keep it (the resolution happens server-side). The jump-host
+      // password is gated the same way via jumpSaveAuth.
+      networkSettings: {
+        ...networkSettingsValue,
+        proxyPass: networkSettingsValue.proxySaveAuth ? proxyPassValue : "",
+        jumpPassword: networkSettingsValue.jumpSaveAuth ? jumpPasswordValue : "",
+      },
       // SFTP deployment path mappings (only stored for SFTP sessions).
       ...(proto === "SFTP" ? { pathMappings } : {}),
       ...wslOverrides,
@@ -1744,11 +1823,42 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       }
     }
 
+    // And once more for the SSH jump-host password (manual mode only — when a
+    // jump session is selected, its own saved credential is resolved
+    // server-side and there is no separate jump password to persist).
+    let nextJumpPass = networkSettings.jumpPassword;
+    if (
+      networkSettings.jumpSaveAuth &&
+      networkSettings.jumpSessionId.trim() === "" &&
+      networkSettings.jumpPassword.length > 0 &&
+      !isVaultReference(networkSettings.jumpPassword)
+    ) {
+      const ready = await ensureVaultReady(t("vault.gateReasonProxy"));
+      if (!ready) {
+        setSaveError(t("sessionEditor2.errVaultLockedProxy"));
+        return;
+      }
+      try {
+        const label = `jump://${networkSettings.jumpUser}@${networkSettings.jumpHost}:${networkSettings.jumpPort}`;
+        const result = await vaultPut("jump-password", label, networkSettings.jumpPassword);
+        nextJumpPass = result.reference;
+        setNetworkSettings({ ...networkSettings, jumpPassword: result.reference });
+      } catch (err) {
+        if (isVaultLockedError(err)) {
+          setSaveError(t("sessionEditor2.errVaultLockedProxy"));
+        } else {
+          setSaveError(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
+    }
+
     setPasswordRef(nextPasswordRef);
     const config = buildConfig({
       options_json: buildOptionsJson({
         passwordRefValue: nextPasswordRef,
         proxyPassValue: nextProxyPass,
+        jumpPasswordValue: nextJumpPass,
       }),
     });
 
@@ -1805,10 +1915,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
     setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
     setUsePrivKey(nextAuth === "PrivateKey");
-    setUseJump(optionBoolean(nextOptions, "useJump", false));
-    setJumpHost(optionString(nextOptions, "jumpHost", ""));
-    setJumpUser(optionString(nextOptions, "jumpUser", ""));
-    setJumpPort(optionString(nextOptions, "jumpPort", "22"));
     setDescription(optionString(nextOptions, "description", ""));
     setTags(optionString(nextOptions, "tags", ""));
     setFileEmbedInTab(optionBoolean(nextOptions, "fileEmbedInTab", true));
@@ -1952,6 +2058,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     httpPort: proto === "ClickHouse" ? parseInt(dbHttpPort) || 8123 : null,
     protocol: proto === "ClickHouse" ? dbChProtocol.toLowerCase() : null,
     dbIndex: proto === "Redis" ? parseInt(dbRedisIndex) || 0 : null,
+    // Route the test probe through the same proxy / SSH jump host the saved
+    // connection uses. Only attach when a proxy/jump is actually selected so a
+    // direct connection skips the backend loopback forwarder entirely (mirrors
+    // sessionToDbConnectInfo in MainLayout).
+    networkSettings:
+      networkSettings.proxyKind !== "none"
+        ? toNetworkSettingsPayload(networkSettings)
+        : null,
   });
 
   const buildHBaseConnectInfo = (): HBaseConnectInfo => ({
@@ -2015,6 +2129,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     : isDb || isHBase
     ? [
         { id: "database", label: isHBase ? "HBase settings" : t("sessionEditor2.sectionDatabase"), icon: <Database className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        // DB engines can tunnel through a proxy / SSH jump host; HBase does not
+        // (yet) route through the loopback forwarder, so no Network tab for it.
+        ...(isDb
+          ? [{ id: "network" as SectionTab, label: t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+          : []),
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : [
@@ -2041,7 +2160,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     proto === "File"
       ? "bookmark"
       : isDb || isHBase
-        ? (section === "database" || section === "bookmark" ? section : "database")
+        ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
           ? (isRdp ? "rdp" : "terminal")
           : section === "rdp" && !isRdp
@@ -2347,10 +2466,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 }
               }}
               keyPath={keyPath} setKeyPath={setKeyPath}
-              useJump={useJump} setUseJump={setUseJump}
-              jumpHost={jumpHost} setJumpHost={setJumpHost}
-              jumpUser={jumpUser} setJumpUser={setJumpUser}
-              jumpPort={jumpPort} setJumpPort={setJumpPort}
               onBrowseKey={handleBrowseKey}
             />
           )}
@@ -2403,12 +2518,25 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               />
             </div>
           )}
-          {activeSection === "network" && (
+          {activeSection === "network" && !isDb && (
             <NetworkSettings
               t={t}
               value={networkSettings}
               onChange={setNetworkSettings}
               sessionConfigId={session?.id}
+              sshSessions={sessions
+                .filter((s) => s.session_type === "SSH" && s.id !== session?.id)
+                .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
+            />
+          )}
+          {activeSection === "network" && isDb && (
+            <DbNetworkSettings
+              t={t}
+              value={networkSettings}
+              onChange={setNetworkSettings}
+              sshSessions={sessions
+                .filter((s) => s.session_type === "SSH" && s.id !== session?.id)
+                .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
             />
           )}
           {activeSection === "bookmark" && (

@@ -2,10 +2,14 @@ use russh::client::{self, KeyboardInteractiveAuthResponse};
 use russh::keys::ssh_key::{Algorithm as SshAlgorithm, EcdsaCurve, HashAlg};
 use russh::keys::{self, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
 use russh::{client::Msg, kex, ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty};
+use russh::ChannelStream;
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::TcpStream;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
@@ -95,6 +99,142 @@ pub enum SshAuth {
     Password(String),
     PrivateKey(String),
     Agent,
+}
+
+/// The byte transport an SSH session is layered on top of.
+///
+/// - `Tcp` — a direct or proxied (HTTP CONNECT / SOCKS5) TCP socket.
+/// - `Jump` — a `direct-tcpip` channel opened on an intermediate SSH jump
+///   host. The jump host's `Handle` is held alongside the channel stream so
+///   the jump connection stays alive exactly as long as the tunnelled stream;
+///   dropping the transport tears the jump connection down with it.
+pub(crate) enum SshTransport {
+    Tcp(TcpStream),
+    Jump {
+        stream: ChannelStream<Msg>,
+        // Kept solely to own the jump connection's lifetime. Dropped together
+        // with `stream`.
+        #[allow(dead_code)]
+        jump: Arc<client::Handle<SshHandler>>,
+    },
+}
+
+impl AsyncRead for SshTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        match self.get_mut() {
+            Self::Tcp(s) => Pin::new(s).poll_read(cx, buf),
+            Self::Jump { stream, .. } => Pin::new(stream).poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncWrite for SshTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        match self.get_mut() {
+            Self::Tcp(s) => Pin::new(s).poll_write(cx, buf),
+            Self::Jump { stream, .. } => Pin::new(stream).poll_write(cx, buf),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.get_mut() {
+            Self::Tcp(s) => Pin::new(s).poll_flush(cx),
+            Self::Jump { stream, .. } => Pin::new(stream).poll_flush(cx),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.get_mut() {
+            Self::Tcp(s) => Pin::new(s).poll_shutdown(cx),
+            Self::Jump { stream, .. } => Pin::new(stream).poll_shutdown(cx),
+        }
+    }
+}
+
+/// Resolve the byte transport for an SSH connection to `host:port`.
+///
+/// When `network` selects an SSH jump host (`proxy_kind == "ssh-tunnel"`), we
+/// first open an authenticated connection to the jump host (single level — the
+/// jump connection itself is always direct, never chained), then open a
+/// `direct-tcpip` channel through it to the final target and hand back its
+/// stream. Otherwise this is a direct or proxied TCP socket via
+/// [`establish_transport`].
+///
+/// The jump credentials are expected to already be resolved into `network`
+/// (host/port/user + plaintext password or key path) by the caller; vault
+/// references must be resolved before this point.
+///
+/// Exposed to the database layer, which bridges this transport to a local
+/// loopback listener so non-SSH clients (sqlx / redis-rs / reqwest) can reach
+/// a target through the same proxy/jump machinery.
+pub(crate) async fn build_ssh_transport(
+    host: &str,
+    port: u16,
+    network: Option<&NetworkSettings>,
+) -> Result<SshTransport, String> {
+    match network {
+        Some(n) if n.uses_jump_host() => {
+            if n.jump_host.trim().is_empty() {
+                return Err("SSH jump host is empty".into());
+            }
+            if n.jump_port == 0 {
+                return Err("SSH jump port must be greater than 0".into());
+            }
+            let jump_auth = match n.jump_auth_kind.as_str() {
+                "PrivateKey" => {
+                    let path = if n.jump_key_path.trim().is_empty() {
+                        "~/.ssh/id_ed25519".to_string()
+                    } else {
+                        n.jump_key_path.clone()
+                    };
+                    SshAuth::PrivateKey(path)
+                }
+                _ => SshAuth::Password(n.jump_password.clone()),
+            };
+
+            // The jump connection is always direct: pass no network settings so
+            // it cannot itself recurse into another jump/proxy hop. Boxed to
+            // break the async-recursion cycle the compiler sees (this fn ->
+            // connect_ssh_authenticated_with -> ... -> this fn); the runtime
+            // path never actually recurses because `network` is `None` here.
+            let jump = Box::pin(connect_ssh_authenticated_with(
+                &n.jump_host,
+                n.jump_port,
+                &n.jump_user,
+                jump_auth,
+                None,
+            ))
+            .await
+            .map_err(|e| format!("jump host {}:{}: {}", n.jump_host, n.jump_port, e))?;
+            let jump = Arc::new(jump);
+
+            let channel = jump
+                .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
+                .await
+                .map_err(|e| {
+                    format!(
+                        "jump host could not open channel to {}:{}: {}",
+                        host, port, e
+                    )
+                })?;
+            Ok(SshTransport::Jump {
+                stream: channel.into_stream(),
+                jump,
+            })
+        }
+        other => {
+            let stream = establish_transport(host, port, other).await?;
+            Ok(SshTransport::Tcp(stream))
+        }
+    }
 }
 
 /// A single prompt inside a keyboard-interactive auth round (e.g. the
@@ -451,7 +591,7 @@ pub async fn connect_ssh(
         x11: x11.clone(),
     };
 
-    let stream = establish_transport(host, port, network).await?;
+    let stream = build_ssh_transport(host, port, network).await?;
     let mut handle = client::connect_stream(config, stream, handler)
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
@@ -561,7 +701,7 @@ pub async fn connect_ssh_authenticated_with_prompter(
         x11: None,
     };
 
-    let stream = establish_transport(host, port, network).await?;
+    let stream = build_ssh_transport(host, port, network).await?;
     let mut handle = client::connect_stream(config, stream, handler)
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
@@ -663,6 +803,138 @@ mod tests {
         );
 
         drop(channel);
+        drop(handle);
+    }
+
+    // -----------------------------------------------------------------------
+    // Strategy 2: drive a real SSH connection through an in-process proxy
+    // bridging to the live target. Verifies the proxy → SSH handshake path
+    // end-to-end against a real server. Requires TAOMNI_LIVE_SSH_*.
+    // -----------------------------------------------------------------------
+
+    /// In-process no-auth SOCKS5 proxy that connects to whatever target the
+    /// client requests and pumps bytes both ways. Returns the listening port.
+    async fn spawn_socks5_bridge() -> u16 {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            while let Ok((mut c, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut head = [0u8; 2];
+                    if c.read_exact(&mut head).await.is_err() {
+                        return;
+                    }
+                    let mut methods = vec![0u8; head[1] as usize];
+                    let _ = c.read_exact(&mut methods).await;
+                    let _ = c.write_all(&[0x05, 0x00]).await;
+                    let mut req = [0u8; 4];
+                    if c.read_exact(&mut req).await.is_err() {
+                        return;
+                    }
+                    let host = match req[3] {
+                        0x01 => {
+                            let mut a = [0u8; 4];
+                            let _ = c.read_exact(&mut a).await;
+                            std::net::Ipv4Addr::from(a).to_string()
+                        }
+                        0x03 => {
+                            let mut l = [0u8; 1];
+                            let _ = c.read_exact(&mut l).await;
+                            let mut d = vec![0u8; l[0] as usize];
+                            let _ = c.read_exact(&mut d).await;
+                            String::from_utf8_lossy(&d).to_string()
+                        }
+                        0x04 => {
+                            let mut a = [0u8; 16];
+                            let _ = c.read_exact(&mut a).await;
+                            std::net::Ipv6Addr::from(a).to_string()
+                        }
+                        _ => return,
+                    };
+                    let mut p = [0u8; 2];
+                    let _ = c.read_exact(&mut p).await;
+                    let dport = u16::from_be_bytes(p);
+                    let _ = c
+                        .write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+                        .await;
+                    if let Ok(mut up) = TcpStream::connect((host.as_str(), dport)).await {
+                        let _ = tokio::io::copy_bidirectional(&mut c, &mut up).await;
+                    }
+                });
+            }
+        });
+        port
+    }
+
+    #[tokio::test]
+    #[ignore = "requires TAOMNI_LIVE_SSH_HOST/USER/PASSWORD"]
+    async fn live_ssh_through_socks5_proxy() {
+        let Some((host, port, username, password)) = live_ssh_target() else {
+            eprintln!("skipping: TAOMNI_LIVE_SSH_* is not set");
+            return;
+        };
+        let proxy_port = spawn_socks5_bridge().await;
+
+        let mut net = NetworkSettings::default();
+        net.proxy_kind = "socks5".into();
+        net.proxy_host = "127.0.0.1".into();
+        net.proxy_port = proxy_port;
+
+        let handle = connect_ssh_authenticated_with(
+            &host,
+            port,
+            &username,
+            SshAuth::Password(password),
+            Some(&net),
+        )
+        .await
+        .expect("authenticate over socks5 proxy to live SSH");
+        drop(handle);
+    }
+
+    /// Live SSH jump-host test. Requires the live SSH target as the jump host
+    /// plus `TAOMNI_INTERNAL_HOST` (and optional `TAOMNI_INTERNAL_PORT`,
+    /// default 22) reachable *from* that jump host — typically a private-network
+    /// address only the jump host can route to. Credentials for the inner
+    /// target reuse the same TAOMNI_LIVE_SSH_USER/PASSWORD by default, or
+    /// TAOMNI_INTERNAL_USER/PASSWORD when set.
+    #[tokio::test]
+    #[ignore = "requires TAOMNI_LIVE_SSH_* + TAOMNI_INTERNAL_HOST"]
+    async fn live_ssh_through_jump_host() {
+        let Some((jump_host, jump_port, jump_user, jump_pass)) = live_ssh_target() else {
+            eprintln!("skipping: TAOMNI_LIVE_SSH_* is not set");
+            return;
+        };
+        let Ok(inner_host) = std::env::var("TAOMNI_INTERNAL_HOST") else {
+            eprintln!("skipping: TAOMNI_INTERNAL_HOST is not set");
+            return;
+        };
+        let inner_port = std::env::var("TAOMNI_INTERNAL_PORT")
+            .ok()
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(22);
+        let inner_user = std::env::var("TAOMNI_INTERNAL_USER").unwrap_or(jump_user.clone());
+        let inner_pass = std::env::var("TAOMNI_INTERNAL_PASSWORD").unwrap_or(jump_pass.clone());
+
+        let mut net = NetworkSettings::default();
+        net.proxy_kind = "ssh-tunnel".into();
+        net.jump_host = jump_host;
+        net.jump_port = jump_port;
+        net.jump_user = jump_user;
+        net.jump_auth_kind = "Password".into();
+        net.jump_password = jump_pass;
+
+        let handle = connect_ssh_authenticated_with(
+            &inner_host,
+            inner_port,
+            &inner_user,
+            SshAuth::Password(inner_pass),
+            Some(&net),
+        )
+        .await
+        .expect("authenticate to internal host through SSH jump");
         drop(handle);
     }
 }

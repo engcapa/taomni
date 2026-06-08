@@ -1,5 +1,6 @@
 import type { SshConnectInfo } from "../components/terminal/TerminalPanel";
 import type { TerminalProfile } from "../lib/terminalProfile";
+import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 
 export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell";
@@ -37,6 +38,10 @@ export interface DbConnectInfo {
   protocol?: string | null;
   /** Redis logical DB index (0-15). */
   dbIndex?: number | null;
+  /** Per-session network settings (proxy / SSH jump host). The backend routes
+   *  the connection through a loopback forwarder when this requests a proxy or
+   *  jump host. Serialized as the same camelCase payload SSH uses. */
+  networkSettings?: NetworkSettingsPayload | null;
 }
 
 /**

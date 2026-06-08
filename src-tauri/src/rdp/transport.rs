@@ -146,7 +146,7 @@ mod tests {
     #[tokio::test]
     async fn rejects_unsupported_proxy_kind_for_rdp() {
         let mut net = NetworkSettings::default();
-        net.proxy_kind = "socks4".into();
+        net.proxy_kind = "system".into();
         net.proxy_host = "127.0.0.1".into();
         net.proxy_port = 1080;
         let res = open_transport("example.com", 3389, Some(&net), None).await;

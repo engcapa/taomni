@@ -695,6 +695,7 @@ function toDbConfigPayload(info: DbConnectInfo): Record<string, unknown> {
     httpPort: info.httpPort ?? null,
     protocol: info.protocol ?? null,
     dbIndex: info.dbIndex ?? null,
+    networkSettings: info.networkSettings ?? null,
   };
 }
 

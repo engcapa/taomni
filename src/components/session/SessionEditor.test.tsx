@@ -17,6 +17,7 @@ const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
   listWslDistros: vi.fn(),
   hbaseTestConnection: vi.fn(),
+  dbTestConnection: vi.fn(),
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -54,6 +55,7 @@ describe("SessionEditor SSH settings tabs", () => {
     ipcMocks.testSshConnection.mockResolvedValue("Connection successful");
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
     ipcMocks.hbaseTestConnection.mockResolvedValue("HBase REST connection OK");
+    ipcMocks.dbTestConnection.mockResolvedValue("Database connection OK");
     ipcMocks.listWslDistros.mockResolvedValue([
       { name: "Ubuntu", isDefault: true, state: "Stopped", version: 2 },
     ]);
@@ -124,10 +126,6 @@ describe("SessionEditor SSH settings tabs", () => {
         sshBrowser: "Disabled",
         followPath: false,
         osc7AutoInject: false,
-        useJump: true,
-        jumpHost: "bastion.example.com",
-        jumpUser: "jump",
-        jumpPort: "2222",
       }),
       created_at: 1,
       updated_at: 1,
@@ -146,10 +144,6 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(screen.getByDisplayValue("Disabled")).toBeInTheDocument();
     expect(screen.queryByText("Follow SSH path (experimental)")).not.toBeInTheDocument();
     expect(screen.queryByText("Auto-inject OSC 7 cwd reporting")).not.toBeInTheDocument();
-    expect(checkboxInLabel("Enable jump host")).toBeChecked();
-    expect(screen.getByDisplayValue("bastion.example.com")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("jump")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("2222")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "OK" }));
 
@@ -161,10 +155,6 @@ describe("SessionEditor SSH settings tabs", () => {
       startupCmd: "tmux new -A -s main",
       doNotExit: true,
       sshBrowser: "Disabled",
-      useJump: true,
-      jumpHost: "bastion.example.com",
-      jumpUser: "jump",
-      jumpPort: "2222",
     });
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("followPath");
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("osc7AutoInject");
@@ -285,6 +275,51 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(screen.getByDisplayValue("127.0.0.1:5432")).toBeInTheDocument();
     expect(screen.getByDisplayValue("db.lan:5432")).toBeInTheDocument();
   }, 10_000);
+
+  it("forwards proxy/jump network settings when testing a DB connection", async () => {
+    const user = userEvent.setup();
+    // A saved MySQL session reachable only through an SSH jump host.
+    const dbSession = {
+      id: "db-1",
+      name: "prod-mysql",
+      session_type: "MySQL",
+      group_path: null,
+      host: "db.internal",
+      port: 3306,
+      username: "app",
+      auth_method: "Password" as const,
+      options_json: JSON.stringify({
+        networkSettings: {
+          proxyKind: "ssh-tunnel",
+          jumpHost: "bastion.corp",
+          jumpPort: "22",
+          jumpUser: "ops",
+          jumpAuthKind: "Password",
+        },
+      }),
+      created_at: 1,
+      updated_at: 1,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    renderEditor(dbSession);
+
+    await user.click(screen.getByTestId("db-test-connection"));
+
+    await waitFor(() => expect(ipcMocks.dbTestConnection).toHaveBeenCalledTimes(1));
+    const info = ipcMocks.dbTestConnection.mock.calls[0][0];
+    expect(info.engine).toBe("MySQL");
+    expect(info.host).toBe("db.internal");
+    // The probe must carry the jump-host settings; otherwise the backend dials
+    // the unreachable target directly and the test fails even though a saved
+    // connection (which forwards them) would succeed.
+    expect(info.networkSettings).toMatchObject({
+      proxyKind: "ssh-tunnel",
+      jumpHost: "bastion.corp",
+      jumpUser: "ops",
+      jumpPort: 22,
+    });
+  });
 
   it("persists Bookmark settings through the session store save path", async () => {
     const user = userEvent.setup();

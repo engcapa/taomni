@@ -8,6 +8,7 @@
 //! `db_cancel`.
 
 pub mod clickhouse;
+pub mod forward;
 pub mod presto;
 pub mod redis_ops;
 pub mod sql;
@@ -62,6 +63,12 @@ pub struct DbConfig {
     /// Redis logical DB index (0-15).
     #[serde(default)]
     pub db_index: Option<i64>,
+    /// Per-session network settings (proxy / SSH jump host). When present and
+    /// non-`none`, the connection is routed through a loopback forwarder so the
+    /// engine client reaches the target via the proxy/jump path. Mirrors the
+    /// SSH terminal's `networkSettings` payload (camelCase).
+    #[serde(default)]
+    pub network_settings: Option<crate::terminal::network::NetworkSettings>,
 }
 
 /// A column descriptor in a query result set.
@@ -206,10 +213,13 @@ pub struct DbSession {
     pub cancel: AsyncMutex<CancellationToken>,
     shutdown: CancellationToken,
     keepalive: Option<JoinHandle<()>>,
+    /// Loopback forwarder task when the connection is routed through a proxy /
+    /// SSH jump host. Aborted on close to release the bound local port.
+    forward: Option<JoinHandle<()>>,
 }
 
 impl DbSession {
-    fn new(handle: DbHandle) -> Self {
+    fn with_forward(handle: DbHandle, forward: Option<JoinHandle<()>>) -> Self {
         let shutdown = CancellationToken::new();
         let keepalive = start_keepalive(&handle, shutdown.clone());
         Self {
@@ -217,6 +227,7 @@ impl DbSession {
             cancel: AsyncMutex::new(CancellationToken::new()),
             shutdown,
             keepalive,
+            forward,
         }
     }
 
@@ -307,6 +318,9 @@ async fn close_session(session: Arc<DbSession>) {
     if let Some(task) = &session.keepalive {
         task.abort();
     }
+    if let Some(task) = &session.forward {
+        task.abort();
+    }
     session.cancel.lock().await.cancel();
     match &session.handle {
         DbHandle::MySql(pool) => pool.close().await,
@@ -357,15 +371,30 @@ pub async fn db_connect(
     config: DbConfig,
 ) -> Result<DbConnectResult, String> {
     let password = resolve_secret(&state, config.password.as_deref())?;
+
+    // If the session is routed through a proxy / SSH jump host, stand up a
+    // loopback forwarder and point the engine client at 127.0.0.1:<local>.
+    // The forwarder bridges each connection to the real target through the
+    // same proxy/jump machinery the SSH terminal uses.
+    let (config, forward_task) = match prepare_network_forward(&state, &config).await? {
+        Some((effective, task)) => (effective, Some(task)),
+        None => (config, None),
+    };
+
     let handle = match config.engine.as_str() {
         "MySQL" => sql::connect_mysql(&config, password.as_deref()).await?,
         "PostgreSQL" => sql::connect_postgres(&config, password.as_deref()).await?,
         "ClickHouse" => clickhouse::connect(&config, password.as_deref()).await?,
         "Presto" => presto::connect(&config, password.as_deref()).await?,
         "Redis" => redis_ops::connect(&config, password.as_deref()).await?,
-        other => return Err(format!("Unsupported database engine: {other}")),
+        other => {
+            if let Some(task) = forward_task {
+                task.abort();
+            }
+            return Err(format!("Unsupported database engine: {other}"));
+        }
     };
-    let session = Arc::new(DbSession::new(handle));
+    let session = Arc::new(DbSession::with_forward(handle, forward_task));
     let previous = {
         let mut map = state.db_connections.write().await;
         // If a stale session exists under this id, close it after releasing the map lock.
@@ -375,6 +404,54 @@ pub async fn db_connect(
         close_session(previous).await;
     }
     Ok(DbConnectResult { ok: true })
+}
+
+/// The TCP port an engine actually dials for `config` — ClickHouse uses its
+/// HTTP port (default 8123); every other engine uses `config.port`.
+fn engine_target_port(config: &DbConfig) -> u16 {
+    if config.engine == "ClickHouse" {
+        config.http_port.unwrap_or(8123)
+    } else {
+        config.port
+    }
+}
+
+/// When `config.network_settings` requests a proxy or SSH jump host, resolve
+/// its secrets, start a loopback forwarder to the engine's real target, and
+/// return an effective `DbConfig` whose host/port point at the local forward
+/// plus the listener task. Returns `None` for direct connections.
+async fn prepare_network_forward(
+    state: &State<'_, AppState>,
+    config: &DbConfig,
+) -> Result<Option<(DbConfig, JoinHandle<()>)>, String> {
+    let mut net = match &config.network_settings {
+        Some(n) => n.clone(),
+        None => return Ok(None),
+    };
+    let uses_proxy = !matches!(net.proxy_kind.as_str(), "" | "none");
+    if !uses_proxy {
+        return Ok(None);
+    }
+
+    // Resolve proxy + jump credentials (vault refs → plaintext, session-mode
+    // jump host → DB lookup) exactly like the SSH terminal path.
+    net.resolve_proxy_pass(&state.vault)?;
+    crate::terminal::resolve_jump_credentials(state, &mut net)?;
+
+    let target_host = config.host.clone();
+    let target_port = engine_target_port(config);
+    let fwd = forward::start(target_host, target_port, net).await?;
+
+    // Rewrite the effective config to dial the loopback listener. ClickHouse
+    // keys off http_port, so redirect that; everyone else uses `port`.
+    let mut effective = config.clone();
+    effective.host = "127.0.0.1".to_string();
+    if config.engine == "ClickHouse" {
+        effective.http_port = Some(fwd.local_port);
+    } else {
+        effective.port = fwd.local_port;
+    }
+    Ok(Some((effective, fwd.task)))
 }
 
 #[tauri::command]
@@ -658,6 +735,7 @@ mod live_tests {
             http_port: None,
             protocol: None,
             db_index: None,
+            network_settings: None,
         };
 
         let handle = sql::connect_postgres(&config, config.password.as_deref())
