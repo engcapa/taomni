@@ -1,6 +1,6 @@
 [package]
 name = "taomni"
-version = "0.2.9"
+version = "0.2.10"
 description = "AI-native remote workspace for developers"
 authors = ["engcapa"]
 license = "MIT"
