@@ -2058,6 +2058,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     httpPort: proto === "ClickHouse" ? parseInt(dbHttpPort) || 8123 : null,
     protocol: proto === "ClickHouse" ? dbChProtocol.toLowerCase() : null,
     dbIndex: proto === "Redis" ? parseInt(dbRedisIndex) || 0 : null,
+    // Route the test probe through the same proxy / SSH jump host the saved
+    // connection uses. Only attach when a proxy/jump is actually selected so a
+    // direct connection skips the backend loopback forwarder entirely (mirrors
+    // sessionToDbConnectInfo in MainLayout).
+    networkSettings:
+      networkSettings.proxyKind !== "none"
+        ? toNetworkSettingsPayload(networkSettings)
+        : null,
   });
 
   const buildHBaseConnectInfo = (): HBaseConnectInfo => ({
