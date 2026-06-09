@@ -1241,6 +1241,7 @@ function HBaseSettings({
   servicePrincipal, setServicePrincipal,
   principal, setPrincipal,
   keytabPath, setKeytabPath,
+  krb5ConfPath, setKrb5ConfPath,
 }: {
   username: string; setUsername: (v: string) => void;
   password: string; setPassword: (v: string) => void;
@@ -1260,6 +1261,7 @@ function HBaseSettings({
   servicePrincipal: string; setServicePrincipal: (v: string) => void;
   principal: string; setPrincipal: (v: string) => void;
   keytabPath: string; setKeytabPath: (v: string) => void;
+  krb5ConfPath: string; setKrb5ConfPath: (v: string) => void;
 }) {
   const isNative = connectionMode !== "rest";
   return (
@@ -1344,8 +1346,18 @@ function HBaseSettings({
                   onChange={(e) => setKeytabPath(e.target.value)}
                 />
                 <span className="ml-2 text-[var(--taomni-text-muted)]">
-                  Auto-runs kinit on connect.
+                  Auto-authenticates using keytab on connect.
                 </span>
+              </Field>
+              <Field label="Krb5 config path">
+                <input
+                  className="taomni-input w-64"
+                  data-testid="hbase-krb5-conf-path"
+                  aria-label="HBase krb5 config file path"
+                  value={krb5ConfPath}
+                  placeholder="(optional) /etc/krb5.conf"
+                  onChange={(e) => setKrb5ConfPath(e.target.value)}
+                />
               </Field>
               {keytabPath.trim() && (
                 <Field label="Principal">
@@ -1574,6 +1586,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [hbaseServicePrincipal, setHBaseServicePrincipal] = useState(() => optionString(initialOptions, "hbaseServicePrincipal", ""));
   const [hbasePrincipal, setHBasePrincipal] = useState(() => optionString(initialOptions, "hbasePrincipal", ""));
   const [hbaseKeytabPath, setHBaseKeytabPath] = useState(() => optionString(initialOptions, "hbaseKeytabPath", ""));
+  const [hbaseKrb5ConfPath, setHBaseKrb5ConfPath] = useState(() => optionString(initialOptions, "hbaseKrb5ConfPath", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -1745,6 +1758,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           hbaseServicePrincipal,
           hbasePrincipal,
           hbaseKeytabPath,
+          hbaseKrb5ConfPath,
           dbSsl,
           dbTimeout,
         }
@@ -2020,6 +2034,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBaseServicePrincipal(optionString(nextOptions, "hbaseServicePrincipal", ""));
     setHBasePrincipal(optionString(nextOptions, "hbasePrincipal", ""));
     setHBaseKeytabPath(optionString(nextOptions, "hbaseKeytabPath", ""));
+    setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -2174,6 +2189,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     servicePrincipal: hbaseServicePrincipal || null,
     principal: hbasePrincipal || null,
     keytabPath: hbaseKeytabPath || null,
+    krb5ConfPath: hbaseKrb5ConfPath || null,
   });
 
   const handleTestDbConnection = async () => {
@@ -2665,6 +2681,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 servicePrincipal={hbaseServicePrincipal} setServicePrincipal={setHBaseServicePrincipal}
                 principal={hbasePrincipal} setPrincipal={setHBasePrincipal}
                 keytabPath={hbaseKeytabPath} setKeytabPath={setHBaseKeytabPath}
+                krb5ConfPath={hbaseKrb5ConfPath} setKrb5ConfPath={setHBaseKrb5ConfPath}
               />
             </div>
           )}

@@ -71,6 +71,9 @@ pub struct HBaseConfig {
     /// refresh the system ticket cache automatically.
     #[serde(default)]
     pub keytab_path: Option<String>,
+    /// Absolute path to a custom krb5.conf file.
+    #[serde(default)]
+    pub krb5_conf_path: Option<String>,
 }
 
 impl HBaseConfig {
@@ -277,26 +280,27 @@ async fn build_session(
     }
 }
 
-/// If both `keytab_path` and `principal` are set, run `kinit -kt` to
-/// refresh the system Kerberos ticket cache. This is a synchronous
-/// subprocess call — the kinit binary is expected to be on `$PATH`.
+/// Sets the environment variables needed for programmatic Kerberos keytab
+/// authentication, avoiding the need for an external `kinit` subprocess.
 fn try_keytab_kinit(config: &HBaseConfig) -> Result<(), String> {
+    if let Some(krb5_conf) = config.krb5_conf_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        std::env::set_var("KRB5_CONFIG", krb5_conf);
+    }
+
     let keytab = match config.keytab_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         Some(k) => k,
-        None => return Ok(()), // no keytab → rely on existing ticket cache
+        None => return Ok(()), // no keytab configured
     };
     let principal = config.principal.as_deref().map(str::trim).filter(|s| !s.is_empty())
         .ok_or_else(|| "Keytab auth requires a client principal (e.g. user@REALM)".to_string())?;
 
-    let output = std::process::Command::new("kinit")
-        .args(["-kt", keytab, principal])
-        .output()
-        .map_err(|e| format!("Failed to run kinit: {e}. Is MIT Kerberos installed?"))?;
+    // Set the client keytab path variable so MIT Kerberos/Heimdal auto-authenticates.
+    std::env::set_var("KRB5_CLIENT_KTNAME", keytab);
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("kinit -kt failed ({}): {}", output.status, stderr.trim()));
-    }
+    // Isolate the ticket cache for this connection so we don't read or pollute the system cache.
+    let cache_name = format!("MEMORY:taomni_hbase_{}", principal);
+    std::env::set_var("KRB5CCNAME", &cache_name);
+
     Ok(())
 }
 

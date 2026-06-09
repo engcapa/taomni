@@ -75,6 +75,8 @@ export interface HBaseConnectInfo {
   principal?: string | null;
   /** Absolute path to a keytab file for automatic kinit. */
   keytabPath?: string | null;
+  /** Absolute path to a custom krb5.conf file. */
+  krb5ConfPath?: string | null;
 }
 
 export interface RdpConnectInfo {

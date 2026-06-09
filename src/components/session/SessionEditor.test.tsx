@@ -583,6 +583,41 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists HBase Kerberos settings including krb5.conf path and keytab", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });
+
+    await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "hbase.example.com");
+    await user.selectOptions(screen.getByTestId("hbase-auth-method"), "kerberos");
+    await user.type(screen.getByLabelText("HBase service principal"), "hbase/_HOST@EMR.367593.COM");
+    await user.type(screen.getByLabelText("HBase keytab file path"), "/path/to/keytab");
+
+    await waitFor(() => expect(screen.getByLabelText("HBase client principal")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("HBase client principal"), "user@EMR.367593.COM");
+
+    await user.type(screen.getByLabelText("HBase krb5 config file path"), "/path/to/krb5.conf");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "HBaseShell",
+      host: "hbase.example.com",
+    });
+    expect(savedOptions).toMatchObject({
+      hbaseConnectionMode: "native",
+      hbaseAuthMethod: "kerberos",
+      hbaseServicePrincipal: "hbase/_HOST@EMR.367593.COM",
+      hbasePrincipal: "user@EMR.367593.COM",
+      hbaseKeytabPath: "/path/to/keytab",
+      hbaseKrb5ConfPath: "/path/to/krb5.conf",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists edited Terminal settings for an existing session", async () => {
     const user = userEvent.setup();
     const session = {
