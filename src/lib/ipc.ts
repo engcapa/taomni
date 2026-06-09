@@ -911,6 +911,7 @@ function toHBaseConfigPayload(info: HBaseConnectInfo): Record<string, unknown> {
     servicePrincipal: info.servicePrincipal ?? null,
     principal: info.principal ?? null,
     keytabPath: info.keytabPath ?? null,
+    krb5ConfPath: info.krb5ConfPath ?? null,
   };
 }
 
