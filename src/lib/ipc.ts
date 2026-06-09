@@ -907,6 +907,10 @@ function toHBaseConfigPayload(info: HBaseConnectInfo): Record<string, unknown> {
     zkQuorum: info.zkQuorum ?? null,
     zkRoot: info.zkRoot ?? null,
     effectiveUser: info.effectiveUser ?? null,
+    authMethod: info.authMethod ?? null,
+    servicePrincipal: info.servicePrincipal ?? null,
+    principal: info.principal ?? null,
+    keytabPath: info.keytabPath ?? null,
   };
 }
 

@@ -22,6 +22,7 @@ import {
   Network,
   HelpCircle,
   Database,
+  Info,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
@@ -1236,6 +1237,10 @@ function HBaseSettings({
   effectiveUser, setEffectiveUser,
   ssl, setSsl,
   timeoutSecs, setTimeoutSecs,
+  authMethod, setAuthMethod,
+  servicePrincipal, setServicePrincipal,
+  principal, setPrincipal,
+  keytabPath, setKeytabPath,
 }: {
   username: string; setUsername: (v: string) => void;
   password: string; setPassword: (v: string) => void;
@@ -1251,6 +1256,10 @@ function HBaseSettings({
   effectiveUser: string; setEffectiveUser: (v: string) => void;
   ssl: boolean; setSsl: (v: boolean) => void;
   timeoutSecs: string; setTimeoutSecs: (v: string) => void;
+  authMethod: string; setAuthMethod: (v: string) => void;
+  servicePrincipal: string; setServicePrincipal: (v: string) => void;
+  principal: string; setPrincipal: (v: string) => void;
+  keytabPath: string; setKeytabPath: (v: string) => void;
 }) {
   const isNative = connectionMode !== "rest";
   return (
@@ -1300,6 +1309,64 @@ function HBaseSettings({
               onChange={(e) => setEffectiveUser(e.target.value)}
             />
           </Field>
+          <Field label="Auth method">
+            <select
+              className="taomni-input w-64"
+              data-testid="hbase-auth-method"
+              aria-label="HBase auth method"
+              value={authMethod}
+              onChange={(e) => setAuthMethod(e.target.value)}
+            >
+              <option value="simple">Simple (effective user only)</option>
+              <option value="kerberos">Kerberos (GSSAPI)</option>
+            </select>
+          </Field>
+
+          {authMethod === "kerberos" && (
+            <>
+              <Field label="Service principal">
+                <input
+                  className="taomni-input w-64"
+                  data-testid="hbase-service-principal"
+                  aria-label="HBase service principal"
+                  value={servicePrincipal}
+                  placeholder="hbase/_HOST@REALM"
+                  onChange={(e) => setServicePrincipal(e.target.value)}
+                />
+              </Field>
+              <Field label="Keytab path">
+                <input
+                  className="taomni-input w-64"
+                  data-testid="hbase-keytab-path"
+                  aria-label="HBase keytab file path"
+                  value={keytabPath}
+                  placeholder="(optional) /etc/security/keytabs/user.keytab"
+                  onChange={(e) => setKeytabPath(e.target.value)}
+                />
+                <span className="ml-2 text-[var(--taomni-text-muted)]">
+                  Auto-runs kinit on connect.
+                </span>
+              </Field>
+              {keytabPath.trim() && (
+                <Field label="Principal">
+                  <input
+                    className="taomni-input w-64"
+                    data-testid="hbase-principal"
+                    aria-label="HBase client principal"
+                    value={principal}
+                    placeholder="user@EXAMPLE.COM"
+                    onChange={(e) => setPrincipal(e.target.value)}
+                  />
+                </Field>
+              )}
+              {!keytabPath.trim() && (
+                <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-1.5 pl-1">
+                  <Info className="w-3 h-3 shrink-0" />
+                  No keytab configured. Run <code className="taomni-mono">kinit</code> manually before connecting.
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -1503,6 +1570,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [hbaseZkQuorum, setHBaseZkQuorum] = useState(() => optionString(initialOptions, "hbaseZkQuorum", ""));
   const [hbaseZkRoot, setHBaseZkRoot] = useState(() => optionString(initialOptions, "hbaseZkRoot", ""));
   const [hbaseEffectiveUser, setHBaseEffectiveUser] = useState(() => optionString(initialOptions, "hbaseEffectiveUser", ""));
+  const [hbaseAuthMethod, setHBaseAuthMethod] = useState(() => optionString(initialOptions, "hbaseAuthMethod", "simple"));
+  const [hbaseServicePrincipal, setHBaseServicePrincipal] = useState(() => optionString(initialOptions, "hbaseServicePrincipal", ""));
+  const [hbasePrincipal, setHBasePrincipal] = useState(() => optionString(initialOptions, "hbasePrincipal", ""));
+  const [hbaseKeytabPath, setHBaseKeytabPath] = useState(() => optionString(initialOptions, "hbaseKeytabPath", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -1670,6 +1741,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           hbaseZkQuorum,
           hbaseZkRoot,
           hbaseEffectiveUser,
+          hbaseAuthMethod,
+          hbaseServicePrincipal,
+          hbasePrincipal,
+          hbaseKeytabPath,
           dbSsl,
           dbTimeout,
         }
@@ -1932,6 +2007,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBaseZkQuorum(optionString(nextOptions, "hbaseZkQuorum", ""));
     setHBaseZkRoot(optionString(nextOptions, "hbaseZkRoot", ""));
     setHBaseEffectiveUser(optionString(nextOptions, "hbaseEffectiveUser", ""));
+    setHBaseAuthMethod(optionString(nextOptions, "hbaseAuthMethod", "simple"));
+    setHBaseServicePrincipal(optionString(nextOptions, "hbaseServicePrincipal", ""));
+    setHBasePrincipal(optionString(nextOptions, "hbasePrincipal", ""));
+    setHBaseKeytabPath(optionString(nextOptions, "hbaseKeytabPath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -2082,6 +2161,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     zkQuorum: hbaseZkQuorum || null,
     zkRoot: hbaseZkRoot || null,
     effectiveUser: hbaseEffectiveUser || null,
+    authMethod: hbaseAuthMethod === "kerberos" ? "kerberos" : "simple",
+    servicePrincipal: hbaseServicePrincipal || null,
+    principal: hbasePrincipal || null,
+    keytabPath: hbaseKeytabPath || null,
   });
 
   const handleTestDbConnection = async () => {
@@ -2515,6 +2598,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 effectiveUser={hbaseEffectiveUser} setEffectiveUser={setHBaseEffectiveUser}
                 ssl={dbSsl} setSsl={setDbSsl}
                 timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
+                authMethod={hbaseAuthMethod} setAuthMethod={setHBaseAuthMethod}
+                servicePrincipal={hbaseServicePrincipal} setServicePrincipal={setHBaseServicePrincipal}
+                principal={hbasePrincipal} setPrincipal={setHBasePrincipal}
+                keytabPath={hbaseKeytabPath} setKeytabPath={setHBaseKeytabPath}
               />
             </div>
           )}

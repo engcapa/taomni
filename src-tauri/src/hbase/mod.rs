@@ -57,6 +57,20 @@ pub struct HBaseConfig {
     /// Effective user for native simple auth (default `root`).
     #[serde(default)]
     pub effective_user: Option<String>,
+    /// Authentication method for native mode: "simple" (default) or "kerberos".
+    #[serde(default)]
+    pub auth_method: Option<String>,
+    /// Service principal for Kerberos auth, e.g. "hbase/host@REALM".
+    #[serde(default)]
+    pub service_principal: Option<String>,
+    /// Client principal for keytab-based Kerberos auth, e.g. "user@REALM".
+    #[serde(default)]
+    pub principal: Option<String>,
+    /// Absolute path to a keytab file. When set together with `principal`,
+    /// Taomni runs `kinit -kt <keytab> <principal>` before connecting to
+    /// refresh the system ticket cache automatically.
+    #[serde(default)]
+    pub keytab_path: Option<String>,
 }
 
 impl HBaseConfig {
@@ -252,10 +266,38 @@ async fn build_session(
     password: Option<String>,
 ) -> Result<HBaseSession, String> {
     if config.is_native() {
+        // If keytab + principal are configured, run kinit to refresh the
+        // ticket cache before establishing the GSSAPI connection.
+        if config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
+            try_keytab_kinit(config)?;
+        }
         Ok(HBaseSession::Native(build_native_client(config)?))
     } else {
         Ok(HBaseSession::Rest(RestSession::new(config, password)?))
     }
+}
+
+/// If both `keytab_path` and `principal` are set, run `kinit -kt` to
+/// refresh the system Kerberos ticket cache. This is a synchronous
+/// subprocess call — the kinit binary is expected to be on `$PATH`.
+fn try_keytab_kinit(config: &HBaseConfig) -> Result<(), String> {
+    let keytab = match config.keytab_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(k) => k,
+        None => return Ok(()), // no keytab → rely on existing ticket cache
+    };
+    let principal = config.principal.as_deref().map(str::trim).filter(|s| !s.is_empty())
+        .ok_or_else(|| "Keytab auth requires a client principal (e.g. user@REALM)".to_string())?;
+
+    let output = std::process::Command::new("kinit")
+        .args(["-kt", keytab, principal])
+        .output()
+        .map_err(|e| format!("Failed to run kinit: {e}. Is MIT Kerberos installed?"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("kinit -kt failed ({}): {}", output.status, stderr.trim()));
+    }
+    Ok(())
 }
 
 /// Construct the native client from the connection config.
@@ -292,7 +334,19 @@ fn build_native_client(
             .clone()
             .filter(|s| !s.trim().is_empty()),
         timeout: Duration::from_secs(config.timeout_secs.unwrap_or(15).clamp(1, 300)),
-        auth: native::auth::AuthMethod::Simple,
+        auth: match config.auth_method.as_deref().map(str::trim) {
+            Some("kerberos") | Some("Kerberos") | Some("KERBEROS") => {
+                let spn = config.service_principal
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| "Kerberos auth requires a service principal (e.g. hbase/host@REALM)".to_string())?;
+                native::auth::AuthMethod::Kerberos {
+                    service_principal: spn.to_string(),
+                }
+            }
+            _ => native::auth::AuthMethod::Simple,
+        },
     };
     Ok(native::client::NativeClient::new(cfg))
 }
