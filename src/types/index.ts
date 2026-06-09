@@ -67,6 +67,16 @@ export interface HBaseConnectInfo {
   zkRoot?: string | null;
   /** Effective user for native simple auth (default "root"). */
   effectiveUser?: string | null;
+  /** Auth method for native mode: "simple" (default) or "kerberos". */
+  authMethod?: "simple" | "kerberos" | null;
+  /** Service principal for Kerberos auth, e.g. "hbase/host@REALM". */
+  servicePrincipal?: string | null;
+  /** Client principal for keytab-based Kerberos, e.g. "user@REALM". */
+  principal?: string | null;
+  /** Absolute path to a keytab file for automatic kinit. */
+  keytabPath?: string | null;
+  /** Absolute path to a custom krb5.conf file. */
+  krb5ConfPath?: string | null;
 }
 
 export interface RdpConnectInfo {

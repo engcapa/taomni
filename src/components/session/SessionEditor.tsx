@@ -22,6 +22,7 @@ import {
   Network,
   HelpCircle,
   Database,
+  Info,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
@@ -1236,6 +1237,11 @@ function HBaseSettings({
   effectiveUser, setEffectiveUser,
   ssl, setSsl,
   timeoutSecs, setTimeoutSecs,
+  authMethod, setAuthMethod,
+  servicePrincipal, setServicePrincipal,
+  principal, setPrincipal,
+  keytabPath, setKeytabPath,
+  krb5ConfPath, setKrb5ConfPath,
 }: {
   username: string; setUsername: (v: string) => void;
   password: string; setPassword: (v: string) => void;
@@ -1251,6 +1257,11 @@ function HBaseSettings({
   effectiveUser: string; setEffectiveUser: (v: string) => void;
   ssl: boolean; setSsl: (v: boolean) => void;
   timeoutSecs: string; setTimeoutSecs: (v: string) => void;
+  authMethod: string; setAuthMethod: (v: string) => void;
+  servicePrincipal: string; setServicePrincipal: (v: string) => void;
+  principal: string; setPrincipal: (v: string) => void;
+  keytabPath: string; setKeytabPath: (v: string) => void;
+  krb5ConfPath: string; setKrb5ConfPath: (v: string) => void;
 }) {
   const isNative = connectionMode !== "rest";
   return (
@@ -1300,6 +1311,74 @@ function HBaseSettings({
               onChange={(e) => setEffectiveUser(e.target.value)}
             />
           </Field>
+          <Field label="Auth method">
+            <select
+              className="taomni-input w-64"
+              data-testid="hbase-auth-method"
+              aria-label="HBase auth method"
+              value={authMethod}
+              onChange={(e) => setAuthMethod(e.target.value)}
+            >
+              <option value="simple">Simple (effective user only)</option>
+              <option value="kerberos">Kerberos (GSSAPI)</option>
+            </select>
+          </Field>
+
+          {authMethod === "kerberos" && (
+            <>
+              <Field label="Service principal">
+                <input
+                  className="taomni-input w-64"
+                  data-testid="hbase-service-principal"
+                  aria-label="HBase service principal"
+                  value={servicePrincipal}
+                  placeholder="hbase/_HOST@REALM"
+                  onChange={(e) => setServicePrincipal(e.target.value)}
+                />
+              </Field>
+              <Field label="Keytab path">
+                <input
+                  className="taomni-input w-64"
+                  data-testid="hbase-keytab-path"
+                  aria-label="HBase keytab file path"
+                  value={keytabPath}
+                  placeholder="(optional) /etc/security/keytabs/user.keytab"
+                  onChange={(e) => setKeytabPath(e.target.value)}
+                />
+                <span className="ml-2 text-[var(--taomni-text-muted)]">
+                  Auto-authenticates using keytab on connect.
+                </span>
+              </Field>
+              <Field label="Krb5 config path">
+                <input
+                  className="taomni-input w-64"
+                  data-testid="hbase-krb5-conf-path"
+                  aria-label="HBase krb5 config file path"
+                  value={krb5ConfPath}
+                  placeholder="(optional) /etc/krb5.conf"
+                  onChange={(e) => setKrb5ConfPath(e.target.value)}
+                />
+              </Field>
+              {keytabPath.trim() && (
+                <Field label="Principal">
+                  <input
+                    className="taomni-input w-64"
+                    data-testid="hbase-principal"
+                    aria-label="HBase client principal"
+                    value={principal}
+                    placeholder="user@EXAMPLE.COM"
+                    onChange={(e) => setPrincipal(e.target.value)}
+                  />
+                </Field>
+              )}
+              {!keytabPath.trim() && (
+                <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-1.5 pl-1">
+                  <Info className="w-3 h-3 shrink-0" />
+                  No keytab configured. Run <code className="taomni-mono">kinit</code> manually before connecting.
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -1503,6 +1582,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [hbaseZkQuorum, setHBaseZkQuorum] = useState(() => optionString(initialOptions, "hbaseZkQuorum", ""));
   const [hbaseZkRoot, setHBaseZkRoot] = useState(() => optionString(initialOptions, "hbaseZkRoot", ""));
   const [hbaseEffectiveUser, setHBaseEffectiveUser] = useState(() => optionString(initialOptions, "hbaseEffectiveUser", ""));
+  const [hbaseAuthMethod, setHBaseAuthMethod] = useState(() => optionString(initialOptions, "hbaseAuthMethod", "simple"));
+  const [hbaseServicePrincipal, setHBaseServicePrincipal] = useState(() => optionString(initialOptions, "hbaseServicePrincipal", ""));
+  const [hbasePrincipal, setHBasePrincipal] = useState(() => optionString(initialOptions, "hbasePrincipal", ""));
+  const [hbaseKeytabPath, setHBaseKeytabPath] = useState(() => optionString(initialOptions, "hbaseKeytabPath", ""));
+  const [hbaseKrb5ConfPath, setHBaseKrb5ConfPath] = useState(() => optionString(initialOptions, "hbaseKrb5ConfPath", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -1670,6 +1754,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           hbaseZkQuorum,
           hbaseZkRoot,
           hbaseEffectiveUser,
+          hbaseAuthMethod,
+          hbaseServicePrincipal,
+          hbasePrincipal,
+          hbaseKeytabPath,
+          hbaseKrb5ConfPath,
           dbSsl,
           dbTimeout,
         }
@@ -1761,8 +1850,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // building the config so the reference lands in options_json.
     let nextPasswordRef = passwordRef;
     if (
-      (isSSH || isDb || isHBase) &&
-      (isDb || isHBase || authMethod === "Password") &&
+      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC") &&
+      (isDb || isHBase || proto === "RDP" || proto === "VNC" || authMethod === "Password") &&
       saveInVault &&
       password.length > 0
     ) {
@@ -1775,7 +1864,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         return;
       }
       try {
-        const kind = isHBase ? "hbase-password" : isDb ? "db-password" : "ssh-password";
+        const kind =
+          proto === "RDP"
+            ? "rdp-password"
+            : proto === "VNC"
+              ? "vnc-password"
+              : isHBase
+                ? "hbase-password"
+                : isDb
+                  ? "db-password"
+                  : "ssh-password";
         const label = `${username || "user"}@${host || "?"}:${port}`;
         const result = await vaultPut(kind, label, password);
         nextPasswordRef = result.reference;
@@ -1932,6 +2030,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBaseZkQuorum(optionString(nextOptions, "hbaseZkQuorum", ""));
     setHBaseZkRoot(optionString(nextOptions, "hbaseZkRoot", ""));
     setHBaseEffectiveUser(optionString(nextOptions, "hbaseEffectiveUser", ""));
+    setHBaseAuthMethod(optionString(nextOptions, "hbaseAuthMethod", "simple"));
+    setHBaseServicePrincipal(optionString(nextOptions, "hbaseServicePrincipal", ""));
+    setHBasePrincipal(optionString(nextOptions, "hbasePrincipal", ""));
+    setHBaseKeytabPath(optionString(nextOptions, "hbaseKeytabPath", ""));
+    setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -2082,6 +2185,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     zkQuorum: hbaseZkQuorum || null,
     zkRoot: hbaseZkRoot || null,
     effectiveUser: hbaseEffectiveUser || null,
+    authMethod: hbaseAuthMethod === "kerberos" ? "kerberos" : "simple",
+    servicePrincipal: hbaseServicePrincipal || null,
+    principal: hbasePrincipal || null,
+    keytabPath: hbaseKeytabPath || null,
+    krb5ConfPath: hbaseKrb5ConfPath || null,
   });
 
   const handleTestDbConnection = async () => {
@@ -2319,6 +2427,60 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   );
                 })()}
               </div>
+
+              {(proto === "RDP" || proto === "VNC") && (
+                <>
+                  <label className="col-span-2 text-[12px] text-right">
+                    {t("sessionEditor2.passwordLabel")}
+                  </label>
+                  <div className="col-span-10 flex items-center gap-2">
+                    <div className="relative">
+                      <input
+                        data-testid="session-password"
+                        className="taomni-input pr-7 w-64"
+                        type={showPwd ? "text" : "password"}
+                        value={password}
+                        aria-label={t("sessionEditor2.passwordLabel")}
+                        placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (passwordRef) setPasswordRef("");
+                        }}
+                      />
+                      <button
+                        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
+                        onClick={() => setShowPwd(!showPwd)}
+                        title={t("sessionEditor2.passwordShowHide")}
+                        type="button"
+                      >
+                        {showPwd
+                          ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+                          : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+                      </button>
+                    </div>
+                    <label
+                      className="flex items-center gap-1 text-[11px] cursor-pointer"
+                      title={
+                        vaultState === "empty"
+                          ? t("sessionEditor2.saveInVaultTitleSetup")
+                          : t("sessionEditor2.saveInVaultTitleDefault")
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        className="taomni-checkbox"
+                        data-testid="session-save-in-vault"
+                        checked={saveInVault}
+                        onChange={(e) => setSaveInVault(e.target.checked)}
+                      />
+                      {t("sessionEditor2.saveInVault")}
+                    </label>
+                    <span className="taomni-pill">
+                      <Shield className="w-3 h-3" /> {t("sessionEditor2.encryptedPill")}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -2515,6 +2677,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 effectiveUser={hbaseEffectiveUser} setEffectiveUser={setHBaseEffectiveUser}
                 ssl={dbSsl} setSsl={setDbSsl}
                 timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
+                authMethod={hbaseAuthMethod} setAuthMethod={setHBaseAuthMethod}
+                servicePrincipal={hbaseServicePrincipal} setServicePrincipal={setHBaseServicePrincipal}
+                principal={hbasePrincipal} setPrincipal={setHBasePrincipal}
+                keytabPath={hbaseKeytabPath} setKeytabPath={setHBaseKeytabPath}
+                krb5ConfPath={hbaseKrb5ConfPath} setKrb5ConfPath={setHBaseKrb5ConfPath}
               />
             </div>
           )}

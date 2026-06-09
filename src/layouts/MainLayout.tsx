@@ -257,6 +257,11 @@ function sessionToHBaseConnectInfo(session: SessionConfig, password?: string): H
     zkQuorum: str("hbaseZkQuorum") || null,
     zkRoot: str("hbaseZkRoot") || null,
     effectiveUser: str("hbaseEffectiveUser") || null,
+    authMethod: (str("hbaseAuthMethod") as any) || null,
+    servicePrincipal: str("hbaseServicePrincipal") || null,
+    principal: str("hbasePrincipal") || null,
+    keytabPath: str("hbaseKeytabPath") || null,
+    krb5ConfPath: str("hbaseKrb5ConfPath") || null,
   };
 }
 

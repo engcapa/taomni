@@ -113,7 +113,7 @@ sspi = { path = "vendor/sspi" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = []
+default = ["hbase-kerberos"]
 voice-capture = ["dep:cpal"]
 asr-sherpa-onnx = []
 vulkan-detect = ["dep:ash"]

@@ -57,6 +57,23 @@ pub struct HBaseConfig {
     /// Effective user for native simple auth (default `root`).
     #[serde(default)]
     pub effective_user: Option<String>,
+    /// Authentication method for native mode: "simple" (default) or "kerberos".
+    #[serde(default)]
+    pub auth_method: Option<String>,
+    /// Service principal for Kerberos auth, e.g. "hbase/host@REALM".
+    #[serde(default)]
+    pub service_principal: Option<String>,
+    /// Client principal for keytab-based Kerberos auth, e.g. "user@REALM".
+    #[serde(default)]
+    pub principal: Option<String>,
+    /// Absolute path to a keytab file. When set together with `principal`,
+    /// Taomni runs `kinit -kt <keytab> <principal>` before connecting to
+    /// refresh the system ticket cache automatically.
+    #[serde(default)]
+    pub keytab_path: Option<String>,
+    /// Absolute path to a custom krb5.conf file.
+    #[serde(default)]
+    pub krb5_conf_path: Option<String>,
 }
 
 impl HBaseConfig {
@@ -252,10 +269,39 @@ async fn build_session(
     password: Option<String>,
 ) -> Result<HBaseSession, String> {
     if config.is_native() {
+        // If keytab + principal are configured, run kinit to refresh the
+        // ticket cache before establishing the GSSAPI connection.
+        if config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
+            try_keytab_kinit(config)?;
+        }
         Ok(HBaseSession::Native(build_native_client(config)?))
     } else {
         Ok(HBaseSession::Rest(RestSession::new(config, password)?))
     }
+}
+
+/// Sets the environment variables needed for programmatic Kerberos keytab
+/// authentication, avoiding the need for an external `kinit` subprocess.
+fn try_keytab_kinit(config: &HBaseConfig) -> Result<(), String> {
+    if let Some(krb5_conf) = config.krb5_conf_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        std::env::set_var("KRB5_CONFIG", krb5_conf);
+    }
+
+    let keytab = match config.keytab_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(k) => k,
+        None => return Ok(()), // no keytab configured
+    };
+    let principal = config.principal.as_deref().map(str::trim).filter(|s| !s.is_empty())
+        .ok_or_else(|| "Keytab auth requires a client principal (e.g. user@REALM)".to_string())?;
+
+    // Set the client keytab path variable so MIT Kerberos/Heimdal auto-authenticates.
+    std::env::set_var("KRB5_CLIENT_KTNAME", keytab);
+
+    // Isolate the ticket cache for this connection so we don't read or pollute the system cache.
+    let cache_name = format!("MEMORY:taomni_hbase_{}", principal);
+    std::env::set_var("KRB5CCNAME", &cache_name);
+
+    Ok(())
 }
 
 /// Construct the native client from the connection config.
@@ -292,7 +338,19 @@ fn build_native_client(
             .clone()
             .filter(|s| !s.trim().is_empty()),
         timeout: Duration::from_secs(config.timeout_secs.unwrap_or(15).clamp(1, 300)),
-        auth: native::auth::AuthMethod::Simple,
+        auth: match config.auth_method.as_deref().map(str::trim) {
+            Some("kerberos") | Some("Kerberos") | Some("KERBEROS") => {
+                let spn = config.service_principal
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| "Kerberos auth requires a service principal (e.g. hbase/host@REALM)".to_string())?;
+                native::auth::AuthMethod::Kerberos {
+                    service_principal: spn.to_string(),
+                }
+            }
+            _ => native::auth::AuthMethod::Simple,
+        },
     };
     Ok(native::client::NativeClient::new(cfg))
 }
