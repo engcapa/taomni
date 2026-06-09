@@ -150,10 +150,14 @@ impl RpcConnection {
             .map_err(|e| RpcError::Transport(format!("flush preamble: {e}")))?;
 
         // Kerberos: negotiate SASL/GSSAPI before the ConnectionHeader.
+        // HBase Java uses `_HOST` as a placeholder in service principals
+        // (e.g. `hbase/_HOST@REALM`) that is automatically replaced with
+        // the actual hostname of the server being connected to.
         match auth {
             AuthMethod::Simple => {}
             AuthMethod::Kerberos { service_principal } => {
-                run_sasl(&mut read_half, &mut write_half, service_principal).await?;
+                let resolved_spn = resolve_host_placeholder(service_principal, addr);
+                run_sasl(&mut read_half, &mut write_half, &resolved_spn).await?;
             }
         }
 
@@ -388,4 +392,52 @@ async fn run_sasl(
     Err(RpcError::Transport(
         "Kerberos auth requires building taomni with the `hbase-kerberos` feature".into(),
     ))
+}
+
+/// Replace the `_HOST` placeholder in a Kerberos service principal with the
+/// actual hostname extracted from `addr` (`host:port`).
+///
+/// HBase Java uses `_HOST` as a convention in `hbase.regionserver.kerberos.principal`
+/// (e.g. `hbase/_HOST@REALM`). At connect time the Java client substitutes the
+/// real server hostname. We mirror that behavior here so users can configure
+/// `hbase/_HOST@REALM` once and have it work for every RegionServer/Master.
+fn resolve_host_placeholder(spn: &str, addr: &str) -> String {
+    if !spn.contains("_HOST") {
+        return spn.to_string();
+    }
+    // addr is "host:port"; extract just the host part.
+    let host = addr
+        .rsplit_once(':')
+        .map(|(h, _)| h)
+        .unwrap_or(addr);
+    spn.replace("_HOST", host)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_host_replaces_placeholder() {
+        assert_eq!(
+            resolve_host_placeholder("hbase/_HOST@EMR.367593.COM", "emr-header-1.cluster-367593:16000"),
+            "hbase/emr-header-1.cluster-367593@EMR.367593.COM"
+        );
+    }
+
+    #[test]
+    fn resolve_host_no_placeholder_unchanged() {
+        assert_eq!(
+            resolve_host_placeholder("hbase/myhost@REALM", "otherhost:16000"),
+            "hbase/myhost@REALM"
+        );
+    }
+
+    #[test]
+    fn resolve_host_bare_addr_no_port() {
+        assert_eq!(
+            resolve_host_placeholder("hbase/_HOST@R", "myhost"),
+            "hbase/myhost@R"
+        );
+    }
 }
