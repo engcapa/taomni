@@ -20,7 +20,7 @@ const ipcMocks = vi.hoisted(() => ({
   dbTestConnection: vi.fn(),
   vaultPut: vi.fn(async () => ({ id: "vault-pwd", reference: "vault:pwd" })),
   isVaultReference: (val: string) => typeof val === "string" && val.startsWith("vault:"),
-  isVaultLockedError: (err: any) => false,
+  isVaultLockedError: (_err: any) => false,
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -471,7 +471,7 @@ describe("SessionEditor SSH settings tabs", () => {
     await user.type(screen.getByLabelText("Remote host"), "rdp.example.com");
     await user.type(screen.getByLabelText("Password"), "secret123");
 
-    const saveCheckbox = screen.getByRole("checkbox", { name: /save in vault/i });
+    const saveCheckbox = screen.getByRole("checkbox", { name: /save in vault/i }) as HTMLInputElement;
     if (!saveCheckbox.checked) {
       await user.click(saveCheckbox);
     }
