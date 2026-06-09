@@ -1836,8 +1836,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // building the config so the reference lands in options_json.
     let nextPasswordRef = passwordRef;
     if (
-      (isSSH || isDb || isHBase) &&
-      (isDb || isHBase || authMethod === "Password") &&
+      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC") &&
+      (isDb || isHBase || proto === "RDP" || proto === "VNC" || authMethod === "Password") &&
       saveInVault &&
       password.length > 0
     ) {
@@ -1850,7 +1850,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         return;
       }
       try {
-        const kind = isHBase ? "hbase-password" : isDb ? "db-password" : "ssh-password";
+        const kind =
+          proto === "RDP"
+            ? "rdp-password"
+            : proto === "VNC"
+              ? "vnc-password"
+              : isHBase
+                ? "hbase-password"
+                : isDb
+                  ? "db-password"
+                  : "ssh-password";
         const label = `${username || "user"}@${host || "?"}:${port}`;
         const result = await vaultPut(kind, label, password);
         nextPasswordRef = result.reference;
@@ -2402,6 +2411,60 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   );
                 })()}
               </div>
+
+              {(proto === "RDP" || proto === "VNC") && (
+                <>
+                  <label className="col-span-2 text-[12px] text-right">
+                    {t("sessionEditor2.passwordLabel")}
+                  </label>
+                  <div className="col-span-10 flex items-center gap-2">
+                    <div className="relative">
+                      <input
+                        data-testid="session-password"
+                        className="taomni-input pr-7 w-64"
+                        type={showPwd ? "text" : "password"}
+                        value={password}
+                        aria-label={t("sessionEditor2.passwordLabel")}
+                        placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (passwordRef) setPasswordRef("");
+                        }}
+                      />
+                      <button
+                        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
+                        onClick={() => setShowPwd(!showPwd)}
+                        title={t("sessionEditor2.passwordShowHide")}
+                        type="button"
+                      >
+                        {showPwd
+                          ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+                          : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+                      </button>
+                    </div>
+                    <label
+                      className="flex items-center gap-1 text-[11px] cursor-pointer"
+                      title={
+                        vaultState === "empty"
+                          ? t("sessionEditor2.saveInVaultTitleSetup")
+                          : t("sessionEditor2.saveInVaultTitleDefault")
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        className="taomni-checkbox"
+                        data-testid="session-save-in-vault"
+                        checked={saveInVault}
+                        onChange={(e) => setSaveInVault(e.target.checked)}
+                      />
+                      {t("sessionEditor2.saveInVault")}
+                    </label>
+                    <span className="taomni-pill">
+                      <Shield className="w-3 h-3" /> {t("sessionEditor2.encryptedPill")}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

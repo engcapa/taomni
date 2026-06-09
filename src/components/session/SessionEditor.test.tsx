@@ -18,6 +18,9 @@ const ipcMocks = vi.hoisted(() => ({
   listWslDistros: vi.fn(),
   hbaseTestConnection: vi.fn(),
   dbTestConnection: vi.fn(),
+  vaultPut: vi.fn(async () => ({ id: "vault-pwd", reference: "vault:pwd" })),
+  isVaultReference: (val: string) => typeof val === "string" && val.startsWith("vault:"),
+  isVaultLockedError: (err: any) => false,
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -26,6 +29,10 @@ vi.mock("../../lib/ipc", () => ({
 
 vi.mock("../../lib/runtime", () => ({
   getAppPlatform: () => "windows",
+}));
+
+vi.mock("../../lib/vaultGate", () => ({
+  ensureVaultReady: vi.fn(async () => true),
 }));
 
 function renderEditor(
@@ -45,7 +52,11 @@ function checkboxInLabel(text: string): HTMLInputElement {
 
 describe("SessionEditor SSH settings tabs", () => {
   beforeEach(() => {
-    Object.values(ipcMocks).forEach((mock) => mock.mockReset());
+    Object.values(ipcMocks).forEach((mock) => {
+      if (typeof mock === "function" && "mockReset" in mock) {
+        (mock as any).mockReset();
+      }
+    });
     window.localStorage.clear();
     ipcMocks.listSessions.mockResolvedValue([]);
     ipcMocks.listSessionGroups.mockResolvedValue([]);
@@ -59,6 +70,7 @@ describe("SessionEditor SSH settings tabs", () => {
     ipcMocks.listWslDistros.mockResolvedValue([
       { name: "Ubuntu", isDefault: true, state: "Stopped", version: 2 },
     ]);
+    ipcMocks.vaultPut.mockResolvedValue({ id: "vault-pwd", reference: "vault:pwd" });
   });
 
   afterEach(() => {
@@ -447,6 +459,38 @@ describe("SessionEditor SSH settings tabs", () => {
         label: "SHAREDIR",
         path: "D:\\shared",
       },
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists RDP session password through the vault save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "RDP" });
+
+    await waitFor(() => expect(screen.getByTestId("session-rdp-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "rdp.example.com");
+    await user.type(screen.getByLabelText("Password"), "secret123");
+
+    const saveCheckbox = screen.getByRole("checkbox", { name: /save in vault/i });
+    if (!saveCheckbox.checked) {
+      await user.click(saveCheckbox);
+    }
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.vaultPut).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.vaultPut).toHaveBeenCalledWith("rdp-password", "user@rdp.example.com:3389", "secret123");
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "RDP",
+      host: "rdp.example.com",
+      port: 3389,
+    });
+    expect(savedOptions).toMatchObject({
+      passwordRef: "vault:pwd",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
