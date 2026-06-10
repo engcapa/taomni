@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useModalDraggable } from "../../hooks/useModalDraggable";
+import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import {
   X,
   Terminal as TerminalIcon,
@@ -1364,28 +1366,24 @@ function HBaseSettings({
         </span>
       </Field>
 
-      {!isNative && (
-        <>
-          <Field label="Remote host">
-            <input
-              className="taomni-input w-64"
-              value={host}
-              aria-label="HBase REST host"
-              placeholder="e.g. localhost or EMR header IP"
-              onChange={(e) => setHost(e.target.value)}
-            />
-          </Field>
-          <Field label="Port">
-            <input
-              className="taomni-input w-32"
-              value={port}
-              aria-label="HBase REST port"
-              placeholder="8080"
-              onChange={(e) => setPort(e.target.value)}
-            />
-          </Field>
-        </>
-      )}
+      <Field label="Remote host">
+        <input
+          className="taomni-input w-64"
+          value={host}
+          aria-label="Remote host"
+          placeholder="e.g. localhost or EMR header IP"
+          onChange={(e) => setHost(e.target.value)}
+        />
+      </Field>
+      <Field label="Port">
+        <input
+          className="taomni-input w-32"
+          value={port}
+          aria-label={isNative ? "HBase port" : "HBase REST port"}
+          placeholder={isNative ? "2181" : "8080"}
+          onChange={(e) => setPort(e.target.value)}
+        />
+      </Field>
 
       {isNative && (
         <>
@@ -2449,19 +2447,44 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 ? "terminal"
                 : section;
 
+  const { containerRef, handleRef } = useModalDraggable();
+
+  const handleShortcutTest = () => {
+    if (testing) return;
+    if (isSSH && needsHost) {
+      handleTestConnection();
+    } else if (isDb) {
+      void handleTestDbConnection();
+    } else if (isHBase) {
+      void handleTestHBaseConnection();
+    }
+  };
+
+  useModalShortcuts({
+    onCancel: onClose,
+    onSave: () => {
+      void handleSave();
+    },
+    onTest: handleShortcutTest,
+  });
+
+  const shortcuts = getShortcutSuffixes();
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: "rgba(20,30,45,0.4)" }}
     >
       <div
+        ref={containerRef}
         data-testid="session-editor"
         className="w-[1020px] max-w-[96%] max-h-[92vh] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
         style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         {/* Modal title bar */}
         <div
-          className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0"
+          ref={handleRef}
+          className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
             background: "linear-gradient(to bottom,#5895c8,#2b5d8b)",
             color: "white",
@@ -2905,9 +2928,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               onClick={handleTestConnection}
               disabled={testing}
               type="button"
+              aria-label={testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
             >
               <FlaskConical className="w-3.5 h-3.5" />
-              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
+              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}{shortcuts.test}
             </button>
           )}
           {isDb && (
@@ -2917,9 +2941,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               onClick={() => void handleTestDbConnection()}
               disabled={testing}
               type="button"
+              aria-label={testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
             >
               <FlaskConical className="w-3.5 h-3.5" />
-              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
+              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}{shortcuts.test}
             </button>
           )}
           {isHBase && (
@@ -2929,9 +2954,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               onClick={() => void handleTestHBaseConnection()}
               disabled={testing}
               type="button"
+              aria-label={testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
             >
               <FlaskConical className="w-3.5 h-3.5" />
-              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
+              {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}{shortcuts.test}
             </button>
           )}
           <button className="taomni-btn flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>
@@ -2940,7 +2966,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           <button className="taomni-btn flex items-center gap-1.5" type="button" onClick={handleReset}>
             <RotateCcw className="w-3.5 h-3.5" /> {t("sessionEditor2.reset")}
           </button>
-
+          
           {(testResult || saveError) && (
             <span
               className="text-[11px]"
@@ -2969,8 +2995,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               {t("sessionEditor2.delete")}
             </button>
           )}
-          <button className="taomni-btn" onClick={onClose} type="button">
-            {t("sessionEditor2.cancel")}
+          <button
+            className="taomni-btn"
+            onClick={onClose}
+            type="button"
+            aria-label={t("sessionEditor2.cancel")}
+          >
+            {t("sessionEditor2.cancel")}{shortcuts.cancel}
           </button>
           <button
             className="taomni-btn"
@@ -2978,8 +3009,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             data-primary="true"
             onClick={handleSave}
             type="button"
+            aria-label={t("sessionEditor2.ok")}
           >
-            {t("sessionEditor2.ok")}
+            {t("sessionEditor2.ok")}{shortcuts.save}
           </button>
         </div>
       </div>
