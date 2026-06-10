@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useModalDraggable } from "../../hooks/useModalDraggable";
+import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import {
   X,
   Save as SaveIcon,
@@ -183,16 +185,29 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
   const forwardedLabel = isRemote ? t("tunnels.editor.localPort") : t("tunnels.editor.forwardedPort");
   const destLabel = isRemote ? t("tunnels.editor.bindAddress") : t("tunnels.editor.remoteServer");
 
+  const { containerRef, handleRef } = useModalDraggable();
+
+  useModalShortcuts({
+    onCancel: onCancel,
+    onSave: () => {
+      void handleSave();
+    },
+  });
+
+  const shortcuts = getShortcutSuffixes();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.45)" }}>
       <div
+        ref={containerRef}
         data-testid="tunnel-editor"
         className="w-[940px] max-w-[96%] max-h-[92vh] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
         style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         {/* Title bar */}
         <div
-          className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0"
+          ref={handleRef}
+          className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "white" }}
         >
           <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
@@ -498,10 +513,10 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             onClick={handleSave}
             disabled={busy}
           >
-            <SaveIcon className="w-3.5 h-3.5" /> {busy ? t("tunnels.editor.saving") : t("tunnels.editor.save")}
+            <SaveIcon className="w-3.5 h-3.5" /> {busy ? t("tunnels.editor.saving") : t("tunnels.editor.save")}{shortcuts.save}
           </button>
           <button type="button" className="taomni-btn flex items-center gap-1.5" data-testid="tunnel-editor-cancel" onClick={onCancel} disabled={busy}>
-            <XCircle className="w-3.5 h-3.5" /> {t("tunnels.editor.cancel")}
+            <XCircle className="w-3.5 h-3.5" /> {t("tunnels.editor.cancel")}{shortcuts.cancel}
           </button>
         </div>
       </div>
