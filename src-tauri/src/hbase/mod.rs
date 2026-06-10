@@ -99,9 +99,12 @@ pub struct RestSession {
     namespace: Option<String>,
 }
 
-/// A live HBase session, backed by either the native RPC client or the REST
-/// gateway. The map in `AppState` stores these behind an `Arc`.
-pub enum HBaseSession {
+pub struct HBaseSession {
+    pub inner: HBaseSessionInner,
+    pub cancel: tokio::sync::Mutex<tokio_util::sync::CancellationToken>,
+}
+
+pub enum HBaseSessionInner {
     Native(native::client::NativeClient),
     Rest(RestSession),
 }
@@ -200,17 +203,33 @@ pub async fn hbase_connect(
     config: HBaseConfig,
 ) -> Result<HBaseConnectResult, String> {
     let password = resolve_secret(&state, config.password.as_deref())?;
-    let session = Arc::new(build_session(&config, password).await?);
-    ping_backend(&session).await?;
+    let session_inner = build_session(&config, password).await?;
+    ping_backend(&session_inner).await?;
+    let session = Arc::new(HBaseSession {
+        inner: session_inner,
+        cancel: tokio::sync::Mutex::new(tokio_util::sync::CancellationToken::new()),
+    });
     let mut map = state.hbase_sessions.write().await;
     map.insert(session_id, session);
     Ok(HBaseConnectResult { ok: true })
 }
 
 #[tauri::command]
+pub async fn hbase_cancel(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<(), String> {
+    let session = get_session(&state, &session_id).await?;
+    let mut guard = session.cancel.lock().await;
+    guard.cancel();
+    *guard = tokio_util::sync::CancellationToken::new();
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn hbase_ping(state: State<'_, AppState>, session_id: String) -> Result<String, String> {
     let session = get_session(&state, &session_id).await?;
-    ping_backend(&session).await
+    ping_backend(&session.inner).await
 }
 
 #[tauri::command]
@@ -311,16 +330,39 @@ pub async fn hbase_parse_keytab_principal(path: String) -> Result<String, String
     Err("No principal found in keytab".into())
 }
 
+async fn run_cancellable<F, T>(
+    cancel_mutex: &tokio::sync::Mutex<tokio_util::sync::CancellationToken>,
+    future: F,
+) -> Result<T, String>
+where
+    F: std::future::Future<Output = Result<T, String>>,
+{
+    let token = {
+        let mut guard = cancel_mutex.lock().await;
+        if guard.is_cancelled() {
+            *guard = tokio_util::sync::CancellationToken::new();
+        }
+        guard.clone()
+    };
+    tokio::select! {
+        res = future => res,
+        _ = token.cancelled() => Err("Operation cancelled".to_string()),
+    }
+}
+
 #[tauri::command]
 pub async fn hbase_list_tables(
     state: State<'_, AppState>,
     session_id: String,
 ) -> Result<Vec<HBaseTableInfo>, String> {
     let session = get_session(&state, &session_id).await?;
-    match session.as_ref() {
-        HBaseSession::Rest(rest) => list_tables(rest).await,
-        HBaseSession::Native(client) => native_list_tables(client).await,
-    }
+    let fut = async {
+        match &session.inner {
+            HBaseSessionInner::Rest(rest) => list_tables(rest).await,
+            HBaseSessionInner::Native(client) => native_list_tables(client).await,
+        }
+    };
+    run_cancellable(&session.cancel, fut).await
 }
 
 #[tauri::command]
@@ -330,10 +372,13 @@ pub async fn hbase_describe_table(
     table: String,
 ) -> Result<HBaseTableSchema, String> {
     let session = get_session(&state, &session_id).await?;
-    match session.as_ref() {
-        HBaseSession::Rest(rest) => describe_table(rest, &table).await,
-        HBaseSession::Native(client) => native_describe_table(client, &table).await,
-    }
+    let fut = async {
+        match &session.inner {
+            HBaseSessionInner::Rest(rest) => describe_table(rest, &table).await,
+            HBaseSessionInner::Native(client) => native_describe_table(client, &table).await,
+        }
+    };
+    run_cancellable(&session.cancel, fut).await
 }
 
 #[tauri::command]
@@ -346,12 +391,15 @@ pub async fn hbase_execute(
     let parsed = parse_shell_command(&command)?;
     let started = Instant::now();
     let raw = command.trim().to_string();
-    let mut result = match session.as_ref() {
-        HBaseSession::Rest(rest) => execute_command(rest, parsed, raw).await?,
-        HBaseSession::Native(client) => native_execute(client, parsed, raw).await?,
+    let fut = async {
+        let mut result = match &session.inner {
+            HBaseSessionInner::Rest(rest) => execute_command(rest, parsed, raw).await?,
+            HBaseSessionInner::Native(client) => native_execute(client, parsed, raw).await?,
+        };
+        result.duration_ms = started.elapsed().as_millis() as u64;
+        Ok(result)
     };
-    result.duration_ms = started.elapsed().as_millis() as u64;
-    Ok(result)
+    run_cancellable(&session.cancel, fut).await
 }
 
 fn parse_hbase_site_xml(path: &str) -> Result<BTreeMap<String, String>, String> {
@@ -390,7 +438,7 @@ fn parse_hbase_site_xml(path: &str) -> Result<BTreeMap<String, String>, String> 
 async fn build_session(
     config: &HBaseConfig,
     password: Option<String>,
-) -> Result<HBaseSession, String> {
+) -> Result<HBaseSessionInner, String> {
     let mut resolved_config = config.clone();
     if let Some(hbase_site) = config.hbase_site_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let props = parse_hbase_site_xml(hbase_site)?;
@@ -442,9 +490,9 @@ async fn build_session(
         if resolved_config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
             try_keytab_kinit(&resolved_config)?;
         }
-        Ok(HBaseSession::Native(build_native_client(&resolved_config)?))
+        Ok(HBaseSessionInner::Native(build_native_client(&resolved_config)?))
     } else {
-        Ok(HBaseSession::Rest(RestSession::new(&resolved_config, password)?))
+        Ok(HBaseSessionInner::Rest(RestSession::new(&resolved_config, password)?))
     }
 }
 
@@ -530,10 +578,10 @@ fn build_native_client(
 }
 
 /// Ping whichever backend the session uses.
-async fn ping_backend(session: &HBaseSession) -> Result<String, String> {
+async fn ping_backend(session: &HBaseSessionInner) -> Result<String, String> {
     match session {
-        HBaseSession::Rest(rest) => ping_session(rest).await,
-        HBaseSession::Native(client) => client.ping().await.map_err(|e| e.to_string()),
+        HBaseSessionInner::Rest(rest) => ping_session(rest).await,
+        HBaseSessionInner::Native(client) => client.ping().await.map_err(|e| e.to_string()),
     }
 }
 

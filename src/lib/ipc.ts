@@ -970,6 +970,10 @@ export async function hbaseDisconnect(sessionId: string): Promise<void> {
   return invoke("hbase_disconnect", { sessionId });
 }
 
+export async function hbaseCancel(sessionId: string): Promise<void> {
+  return invoke("hbase_cancel", { sessionId });
+}
+
 export async function hbaseListTables(sessionId: string): Promise<HBaseTableInfo[]> {
   return invoke<HBaseTableInfo[]>("hbase_list_tables", { sessionId });
 }

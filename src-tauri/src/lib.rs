@@ -217,6 +217,7 @@ pub fn run() {
             hbase::hbase_connect,
             hbase::hbase_ping,
             hbase::hbase_disconnect,
+            hbase::hbase_cancel,
             hbase::hbase_list_tables,
             hbase::hbase_describe_table,
             hbase::hbase_execute,
