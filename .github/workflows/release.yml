@@ -21,6 +21,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Linux / Windows – unchanged matrix build
+  # ---------------------------------------------------------------------------
   build:
     name: Bundle (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
@@ -28,12 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: ""
             rust-targets: ""
@@ -126,3 +123,156 @@ jobs:
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: ${{ matrix.args }}
+
+  # ---------------------------------------------------------------------------
+  # macOS – single arm64 runner, cross-compiles both architectures
+  # ---------------------------------------------------------------------------
+  build-macos:
+    name: Bundle (macOS)
+    runs-on: macos-latest          # arm64 (Apple Silicon) runner
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # -----------------------------------------------------------------------
+      # Install MIT Kerberos for both architectures.
+      #
+      # macOS ships Apple's GSS.framework (a Heimdal fork) whose public headers
+      # do NOT declare the IOV functions (gss_wrap_iov, gss_unwrap_iov,
+      # gss_wrap_iov_length) that libgssapi 0.11 unconditionally imports.
+      # Using MIT Kerberos (which fully supports IOV) fixes the build.
+      #
+      # arm64 : native Homebrew at /opt/homebrew
+      # x86_64: Homebrew under Rosetta 2 at /usr/local
+      # -----------------------------------------------------------------------
+      - name: Install MIT Kerberos (arm64 – native)
+        run: brew install krb5
+
+      - name: Install MIT Kerberos (x86_64 – Rosetta 2)
+        run: |
+          # Bootstrap x86_64 Homebrew if it isn't already present
+          if [ ! -x /usr/local/bin/brew ]; then
+            arch -x86_64 /bin/bash -c \
+              "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          arch -x86_64 /usr/local/bin/brew install krb5
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            tag="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="${{ inputs.tag }}"
+          fi
+
+          if [ -n "$tag" ] && [ "$tag" != "v$version" ]; then
+            echo "Release tag '$tag' must match package.json version 'v$version'." >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # ---------- aarch64-apple-darwin (native) ----------
+      - name: Build and upload release bundle (aarch64)
+        if: steps.version.outputs.tag != ''
+        uses: tauri-apps/tauri-action@action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Point libgssapi-sys at Homebrew MIT Kerberos (arm64)
+          LIBGSSAPI_IMPL: mit
+          LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
+          PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
+        with:
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: Taomni v${{ steps.version.outputs.version }}
+          releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
+          generateReleaseNotes: true
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
+          args: --target aarch64-apple-darwin
+
+      - name: Build workflow bundle (aarch64)
+        if: steps.version.outputs.tag == ''
+        uses: tauri-apps/tauri-action@action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIBGSSAPI_IMPL: mit
+          LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
+          PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
+        with:
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
+          args: --target aarch64-apple-darwin
+
+      # ---------- x86_64-apple-darwin (cross-compile) ----------
+      - name: Build and upload release bundle (x86_64)
+        if: steps.version.outputs.tag != ''
+        uses: tauri-apps/tauri-action@action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Point libgssapi-sys at x86_64 MIT Kerberos under /usr/local
+          LIBGSSAPI_IMPL: mit
+          LIBGSSAPI_PREFIX: /usr/local/opt/krb5
+          PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
+          PKG_CONFIG_ALLOW_CROSS: "1"
+        with:
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: Taomni v${{ steps.version.outputs.version }}
+          releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
+          generateReleaseNotes: true
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
+          args: --target x86_64-apple-darwin
+
+      - name: Build workflow bundle (x86_64)
+        if: steps.version.outputs.tag == ''
+        uses: tauri-apps/tauri-action@action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIBGSSAPI_IMPL: mit
+          LIBGSSAPI_PREFIX: /usr/local/opt/krb5
+          PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
+          PKG_CONFIG_ALLOW_CROSS: "1"
+        with:
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
+          args: --target x86_64-apple-darwin
