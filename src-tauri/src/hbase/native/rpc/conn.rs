@@ -155,9 +155,9 @@ impl RpcConnection {
         // the actual hostname of the server being connected to.
         match auth {
             AuthMethod::Simple => {}
-            AuthMethod::Kerberos { service_principal } => {
+            AuthMethod::Kerberos { service_principal, client_principal } => {
                 let resolved_spn = resolve_host_placeholder(service_principal, addr);
-                run_sasl(&mut read_half, &mut write_half, &resolved_spn).await?;
+                run_sasl(&mut read_half, &mut write_half, &resolved_spn, client_principal.as_deref()).await?;
             }
         }
 
@@ -371,8 +371,9 @@ async fn run_sasl(
     read: &mut tokio::net::tcp::OwnedReadHalf,
     write: &mut tokio::net::tcp::OwnedWriteHalf,
     service_principal: &str,
+    client_principal: Option<&str>,
 ) -> Result<(), RpcError> {
-    let ok = super::super::auth::kerberos::sasl_connect(read, write, service_principal)
+    let ok = super::super::auth::kerberos::sasl_connect(read, write, service_principal, client_principal)
         .await
         .map_err(RpcError::Transport)?;
     if !ok {
@@ -388,6 +389,7 @@ async fn run_sasl(
     _read: &mut tokio::net::tcp::OwnedReadHalf,
     _write: &mut tokio::net::tcp::OwnedWriteHalf,
     _service_principal: &str,
+    _client_principal: Option<&str>,
 ) -> Result<(), RpcError> {
     Err(RpcError::Transport(
         "Kerberos auth requires building taomni with the `hbase-kerberos` feature".into(),

@@ -220,6 +220,8 @@ pub fn run() {
             hbase::hbase_list_tables,
             hbase::hbase_describe_table,
             hbase::hbase_execute,
+            hbase::hbase_parse_site_xml,
+            hbase::hbase_parse_keytab_principal,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,

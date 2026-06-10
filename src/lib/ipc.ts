@@ -987,3 +987,11 @@ export async function hbaseExecute(
 ): Promise<HBaseShellResult> {
   return invoke<HBaseShellResult>("hbase_execute", { sessionId, command });
 }
+
+export async function hbaseParseSiteXml(path: string): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>("hbase_parse_site_xml", { path });
+}
+
+export async function hbaseParseKeytabPrincipal(path: string): Promise<string> {
+  return invoke<string>("hbase_parse_keytab_principal", { path });
+}

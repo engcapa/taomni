@@ -77,6 +77,8 @@ export interface HBaseConnectInfo {
   keytabPath?: string | null;
   /** Absolute path to a custom krb5.conf file. */
   krb5ConfPath?: string | null;
+  /** Absolute path to a custom hbase-site.xml file. */
+  hbaseSitePath?: string | null;
 }
 
 export interface RdpConnectInfo {
