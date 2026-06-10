@@ -34,6 +34,8 @@ import {
   testSshConnection,
   dbTestConnection,
   hbaseTestConnection,
+  hbaseParseSiteXml,
+  hbaseParseKeytabPrincipal,
   vaultPut,
   isVaultReference,
   isVaultLockedError,
@@ -900,6 +902,15 @@ function BookmarkSettings({
   const [reconnect, setReconnect] = useState(true);
   const [shortcut, setShortcut] = useState("");
 
+  const handleBrowseBgImage = async () => {
+    try {
+      const selected = await selectFilePath(bgImage || undefined);
+      if (selected) setBgImage(selected.trim());
+    } catch (err) {
+      alert("Failed to choose file: " + err);
+    }
+  };
+
   return (
     <div data-testid="bookmark-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label={t("sessionEditor2.fieldSessionName")}>
@@ -944,7 +955,14 @@ function BookmarkSettings({
           aria-label={t("sessionEditor2.backgroundImageAria")}
           onChange={(e) => setBgImage(e.target.value)}
         />
-        <button className="taomni-btn ml-1" type="button" disabled title={t("sessionEditor2.backgroundImageTitle")}>{t("sessionEditor2.backgroundImageBrowse")}</button>
+        <button
+          className="taomni-btn ml-1"
+          type="button"
+          title={t("sessionEditor2.backgroundImageTitle")}
+          onClick={handleBrowseBgImage}
+        >
+          {t("sessionEditor2.backgroundImageBrowse")}
+        </button>
         <span className="ml-2 text-[var(--taomni-text-muted)]">{t("sessionEditor2.backgroundImageOpacity")}</span>
         <input
           className="taomni-input w-16 ml-1"
@@ -1223,6 +1241,8 @@ function DatabaseSettings({
 }
 
 function HBaseSettings({
+  host, setHost,
+  port, setPort,
   username, setUsername,
   password, setPassword,
   passwordRef, clearPasswordRef,
@@ -1242,7 +1262,10 @@ function HBaseSettings({
   principal, setPrincipal,
   keytabPath, setKeytabPath,
   krb5ConfPath, setKrb5ConfPath,
+  hbaseSitePath, setHBaseSitePath,
 }: {
+  host: string; setHost: (v: string) => void;
+  port: string; setPort: (v: string) => void;
   username: string; setUsername: (v: string) => void;
   password: string; setPassword: (v: string) => void;
   passwordRef: string; clearPasswordRef: () => void;
@@ -1262,8 +1285,67 @@ function HBaseSettings({
   principal: string; setPrincipal: (v: string) => void;
   keytabPath: string; setKeytabPath: (v: string) => void;
   krb5ConfPath: string; setKrb5ConfPath: (v: string) => void;
+  hbaseSitePath: string; setHBaseSitePath: (v: string) => void;
 }) {
   const isNative = connectionMode !== "rest";
+
+  const handleBrowseSiteXml = async () => {
+    try {
+      const selected = await selectFilePath(hbaseSitePath || undefined);
+      if (selected) setHBaseSitePath(selected.trim());
+    } catch (err) {
+      alert("Failed to choose file: " + err);
+    }
+  };
+
+  const handleBrowseKeytab = async () => {
+    try {
+      const selected = await selectFilePath(keytabPath || undefined);
+      if (selected) setKeytabPath(selected.trim());
+    } catch (err) {
+      alert("Failed to choose file: " + err);
+    }
+  };
+
+  const handleBrowseKrb5Conf = async () => {
+    try {
+      const selected = await selectFilePath(krb5ConfPath || undefined);
+      if (selected) setKrb5ConfPath(selected.trim());
+    } catch (err) {
+      alert("Failed to choose file: " + err);
+    }
+  };
+
+  const handleAnalyzeSiteXml = async () => {
+    if (!hbaseSitePath.trim()) return;
+    try {
+      const props = await hbaseParseSiteXml(hbaseSitePath.trim());
+      if (props["hbase.zookeeper.quorum"]) {
+        setZkQuorum(props["hbase.zookeeper.quorum"]);
+      }
+      if (props["zookeeper.znode.parent"]) {
+        setZkRoot(props["zookeeper.znode.parent"]);
+      }
+      if (props["hbase.regionserver.kerberos.principal"] || props["hbase.master.kerberos.principal"]) {
+        setServicePrincipal(props["hbase.regionserver.kerberos.principal"] || props["hbase.master.kerberos.principal"]);
+      }
+    } catch (err) {
+      alert("Failed to parse hbase-site.xml: " + err);
+    }
+  };
+
+  const handleAnalyzeKeytab = async () => {
+    if (!keytabPath.trim()) return;
+    try {
+      const parsedPrincipal = await hbaseParseKeytabPrincipal(keytabPath.trim());
+      if (parsedPrincipal) {
+        setPrincipal(parsedPrincipal);
+      }
+    } catch (err) {
+      alert("Failed to parse keytab: " + err);
+    }
+  };
+
   return (
     <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label="Mode">
@@ -1282,8 +1364,57 @@ function HBaseSettings({
         </span>
       </Field>
 
+      {!isNative && (
+        <>
+          <Field label="Remote host">
+            <input
+              className="taomni-input w-64"
+              value={host}
+              aria-label="HBase REST host"
+              placeholder="e.g. localhost or EMR header IP"
+              onChange={(e) => setHost(e.target.value)}
+            />
+          </Field>
+          <Field label="Port">
+            <input
+              className="taomni-input w-32"
+              value={port}
+              aria-label="HBase REST port"
+              placeholder="8080"
+              onChange={(e) => setPort(e.target.value)}
+            />
+          </Field>
+        </>
+      )}
+
       {isNative && (
         <>
+          <Field label="HBase-site.xml path">
+            <input
+              className="taomni-input w-96 min-w-0"
+              value={hbaseSitePath}
+              aria-label="HBase site config file path"
+              placeholder="(optional) /etc/hbase/conf/hbase-site.xml"
+              onChange={(e) => setHBaseSitePath(e.target.value)}
+            />
+            <button
+              type="button"
+              className="taomni-btn px-2 shrink-0 py-1"
+              title="Browse file"
+              onClick={handleBrowseSiteXml}
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              className="taomni-btn px-2 shrink-0 py-1"
+              title="Auto-analyze hbase-site.xml and populate fields"
+              disabled={!hbaseSitePath.trim()}
+              onClick={handleAnalyzeSiteXml}
+            >
+              Analyze
+            </button>
+          </Field>
           <Field label="ZK quorum">
             <input
               className="taomni-input w-64"
@@ -1338,26 +1469,51 @@ function HBaseSettings({
               </Field>
               <Field label="Keytab path">
                 <input
-                  className="taomni-input w-64"
+                  className="taomni-input w-96 min-w-0"
                   data-testid="hbase-keytab-path"
                   aria-label="HBase keytab file path"
                   value={keytabPath}
                   placeholder="(optional) /etc/security/keytabs/user.keytab"
                   onChange={(e) => setKeytabPath(e.target.value)}
                 />
-                <span className="ml-2 text-[var(--taomni-text-muted)]">
+                <button
+                  type="button"
+                  className="taomni-btn px-2 shrink-0 py-1"
+                  title="Browse file"
+                  onClick={handleBrowseKeytab}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  className="taomni-btn px-2 shrink-0 py-1"
+                  title="Auto-analyze keytab and extract principal"
+                  disabled={!keytabPath.trim()}
+                  onClick={handleAnalyzeKeytab}
+                >
+                  Parse
+                </button>
+                <span className="w-full text-[var(--taomni-text-muted)] mt-0.5 pl-1 block">
                   Auto-authenticates using keytab on connect.
                 </span>
               </Field>
               <Field label="Krb5 config path">
                 <input
-                  className="taomni-input w-64"
+                  className="taomni-input w-96 min-w-0"
                   data-testid="hbase-krb5-conf-path"
                   aria-label="HBase krb5 config file path"
                   value={krb5ConfPath}
                   placeholder="(optional) /etc/krb5.conf"
                   onChange={(e) => setKrb5ConfPath(e.target.value)}
                 />
+                <button
+                  type="button"
+                  className="taomni-btn px-2 shrink-0 py-1"
+                  title="Browse file"
+                  onClick={handleBrowseKrb5Conf}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
               </Field>
               {keytabPath.trim() && (
                 <Field label="Principal">
@@ -1587,6 +1743,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [hbasePrincipal, setHBasePrincipal] = useState(() => optionString(initialOptions, "hbasePrincipal", ""));
   const [hbaseKeytabPath, setHBaseKeytabPath] = useState(() => optionString(initialOptions, "hbaseKeytabPath", ""));
   const [hbaseKrb5ConfPath, setHBaseKrb5ConfPath] = useState(() => optionString(initialOptions, "hbaseKrb5ConfPath", ""));
+  const [hbaseSitePath, setHBaseSitePath] = useState(() => optionString(initialOptions, "hbaseSitePath", ""));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -1655,7 +1812,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [saveError, setSaveError] = useState<string | null>(null);
 
   /* --- derived --- */
-  const needsHost = !["Serial", "File", "Shell", "WSL"].includes(proto);
+  const needsHost = !["Serial", "File", "Shell", "WSL", "HBaseShell"].includes(proto);
   const isSSH = ["SSH", "SFTP"].includes(proto);
   const isRdp = proto === "RDP";
   const isDb = DB_PROTOS.includes(proto);
@@ -1759,6 +1916,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           hbasePrincipal,
           hbaseKeytabPath,
           hbaseKrb5ConfPath,
+          hbaseSitePath,
           dbSsl,
           dbTimeout,
         }
@@ -1833,6 +1991,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (proto === "Presto" && !dbCatalog.trim()) return "Presto catalog is required.";
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
     if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
+    if (proto === "HBaseShell") {
+      if (hbaseConnectionMode === "rest" && !host.trim()) {
+        return "HBase REST host is required.";
+      }
+      if (hbaseConnectionMode === "native" && !hbaseSitePath.trim() && !hbaseZkQuorum.trim() && !host.trim()) {
+        return "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.";
+      }
+    }
     return null;
   };
 
@@ -2035,6 +2201,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBasePrincipal(optionString(nextOptions, "hbasePrincipal", ""));
     setHBaseKeytabPath(optionString(nextOptions, "hbaseKeytabPath", ""));
     setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
+    setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
@@ -2190,6 +2357,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     principal: hbasePrincipal || null,
     keytabPath: hbaseKeytabPath || null,
     krb5ConfPath: hbaseKrb5ConfPath || null,
+    hbaseSitePath: hbaseSitePath || null,
   });
 
   const handleTestDbConnection = async () => {
@@ -2663,6 +2831,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           {activeSection === "database" && isHBase && (
             <div data-testid="session-hbase-section">
               <HBaseSettings
+                host={host} setHost={setHost}
+                port={port} setPort={setPort}
                 username={username} setUsername={(v) => { setUsername(v); setSpecifyUser(true); }}
                 password={password} setPassword={setPassword}
                 passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
@@ -2682,6 +2852,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 principal={hbasePrincipal} setPrincipal={setHBasePrincipal}
                 keytabPath={hbaseKeytabPath} setKeytabPath={setHBaseKeytabPath}
                 krb5ConfPath={hbaseKrb5ConfPath} setKrb5ConfPath={setHBaseKrb5ConfPath}
+                hbaseSitePath={hbaseSitePath} setHBaseSitePath={setHBaseSitePath}
               />
             </div>
           )}

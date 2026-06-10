@@ -74,6 +74,8 @@ pub struct HBaseConfig {
     /// Absolute path to a custom krb5.conf file.
     #[serde(default)]
     pub krb5_conf_path: Option<String>,
+    #[serde(default)]
+    pub hbase_site_path: Option<String>,
 }
 
 impl HBaseConfig {
@@ -97,9 +99,12 @@ pub struct RestSession {
     namespace: Option<String>,
 }
 
-/// A live HBase session, backed by either the native RPC client or the REST
-/// gateway. The map in `AppState` stores these behind an `Arc`.
-pub enum HBaseSession {
+pub struct HBaseSession {
+    pub inner: HBaseSessionInner,
+    pub cancel: tokio::sync::Mutex<tokio_util::sync::CancellationToken>,
+}
+
+pub enum HBaseSessionInner {
     Native(native::client::NativeClient),
     Rest(RestSession),
 }
@@ -198,17 +203,33 @@ pub async fn hbase_connect(
     config: HBaseConfig,
 ) -> Result<HBaseConnectResult, String> {
     let password = resolve_secret(&state, config.password.as_deref())?;
-    let session = Arc::new(build_session(&config, password).await?);
-    ping_backend(&session).await?;
+    let session_inner = build_session(&config, password).await?;
+    ping_backend(&session_inner).await?;
+    let session = Arc::new(HBaseSession {
+        inner: session_inner,
+        cancel: tokio::sync::Mutex::new(tokio_util::sync::CancellationToken::new()),
+    });
     let mut map = state.hbase_sessions.write().await;
     map.insert(session_id, session);
     Ok(HBaseConnectResult { ok: true })
 }
 
 #[tauri::command]
+pub async fn hbase_cancel(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<(), String> {
+    let session = get_session(&state, &session_id).await?;
+    let mut guard = session.cancel.lock().await;
+    guard.cancel();
+    *guard = tokio_util::sync::CancellationToken::new();
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn hbase_ping(state: State<'_, AppState>, session_id: String) -> Result<String, String> {
     let session = get_session(&state, &session_id).await?;
-    ping_backend(&session).await
+    ping_backend(&session.inner).await
 }
 
 #[tauri::command]
@@ -221,15 +242,127 @@ pub async fn hbase_disconnect(
 }
 
 #[tauri::command]
+pub async fn hbase_parse_site_xml(path: String) -> Result<BTreeMap<String, String>, String> {
+    parse_hbase_site_xml(&path)
+}
+
+#[tauri::command]
+pub async fn hbase_parse_keytab_principal(path: String) -> Result<String, String> {
+    let data = std::fs::read(&path)
+        .map_err(|e| format!("Failed to read keytab file: {e}"))?;
+    
+    if data.len() < 2 {
+        return Err("Truncated keytab file".into());
+    }
+    
+    let version = u16::from_be_bytes([data[0], data[1]]);
+    if version != 0x0502 && version != 0x0501 {
+        return Err(format!("Unsupported keytab version: 0x{:04x}", version));
+    }
+    
+    let mut cursor = 2;
+    while cursor < data.len() {
+        if cursor + 4 > data.len() {
+            break;
+        }
+        let size = i32::from_be_bytes([
+            data[cursor],
+            data[cursor + 1],
+            data[cursor + 2],
+            data[cursor + 3],
+        ]);
+        cursor += 4;
+        
+        if size < 0 {
+            cursor += (-size) as usize;
+            continue;
+        }
+        if size == 0 {
+            break;
+        }
+        
+        let entry_end = cursor + size as usize;
+        if entry_end > data.len() {
+            break;
+        }
+        
+        if cursor + 2 > entry_end { break; }
+        let num_components = u16::from_be_bytes([data[cursor], data[cursor + 1]]);
+        cursor += 2;
+        
+        if cursor + 2 > entry_end { break; }
+        let realm_len = u16::from_be_bytes([data[cursor], data[cursor + 1]]) as usize;
+        cursor += 2;
+        if cursor + realm_len > entry_end { break; }
+        let realm = String::from_utf8_lossy(&data[cursor..cursor + realm_len]).into_owned();
+        cursor += realm_len;
+        
+        let mut components = Vec::new();
+        let mut component_parse_failed = false;
+        for _ in 0..num_components {
+            if cursor + 2 > entry_end {
+                component_parse_failed = true;
+                break;
+            }
+            let comp_len = u16::from_be_bytes([data[cursor], data[cursor + 1]]) as usize;
+            cursor += 2;
+            if cursor + comp_len > entry_end {
+                component_parse_failed = true;
+                break;
+            }
+            let comp = String::from_utf8_lossy(&data[cursor..cursor + comp_len]).into_owned();
+            cursor += comp_len;
+            components.push(comp);
+        }
+        
+        if component_parse_failed {
+            break;
+        }
+        
+        if !components.is_empty() {
+            let principal = format!("{}@{}", components.join("/"), realm);
+            return Ok(principal);
+        }
+        
+        cursor = entry_end;
+    }
+    
+    Err("No principal found in keytab".into())
+}
+
+async fn run_cancellable<F, T>(
+    cancel_mutex: &tokio::sync::Mutex<tokio_util::sync::CancellationToken>,
+    future: F,
+) -> Result<T, String>
+where
+    F: std::future::Future<Output = Result<T, String>>,
+{
+    let token = {
+        let mut guard = cancel_mutex.lock().await;
+        if guard.is_cancelled() {
+            *guard = tokio_util::sync::CancellationToken::new();
+        }
+        guard.clone()
+    };
+    tokio::select! {
+        res = future => res,
+        _ = token.cancelled() => Err("Operation cancelled".to_string()),
+    }
+}
+
+#[tauri::command]
 pub async fn hbase_list_tables(
     state: State<'_, AppState>,
     session_id: String,
 ) -> Result<Vec<HBaseTableInfo>, String> {
     let session = get_session(&state, &session_id).await?;
-    match session.as_ref() {
-        HBaseSession::Rest(rest) => list_tables(rest).await,
-        HBaseSession::Native(client) => native_list_tables(client).await,
-    }
+    let fut = async {
+        match &session.inner {
+            HBaseSessionInner::Rest(rest) => list_tables(rest).await,
+            HBaseSessionInner::Native(client) => native_list_tables(client).await,
+        }
+    };
+    run_cancellable(&session.cancel, fut).await
 }
 
 #[tauri::command]
@@ -239,10 +372,13 @@ pub async fn hbase_describe_table(
     table: String,
 ) -> Result<HBaseTableSchema, String> {
     let session = get_session(&state, &session_id).await?;
-    match session.as_ref() {
-        HBaseSession::Rest(rest) => describe_table(rest, &table).await,
-        HBaseSession::Native(client) => native_describe_table(client, &table).await,
-    }
+    let fut = async {
+        match &session.inner {
+            HBaseSessionInner::Rest(rest) => describe_table(rest, &table).await,
+            HBaseSessionInner::Native(client) => native_describe_table(client, &table).await,
+        }
+    };
+    run_cancellable(&session.cancel, fut).await
 }
 
 #[tauri::command]
@@ -255,28 +391,108 @@ pub async fn hbase_execute(
     let parsed = parse_shell_command(&command)?;
     let started = Instant::now();
     let raw = command.trim().to_string();
-    let mut result = match session.as_ref() {
-        HBaseSession::Rest(rest) => execute_command(rest, parsed, raw).await?,
-        HBaseSession::Native(client) => native_execute(client, parsed, raw).await?,
+    let fut = async {
+        let mut result = match &session.inner {
+            HBaseSessionInner::Rest(rest) => execute_command(rest, parsed, raw).await?,
+            HBaseSessionInner::Native(client) => native_execute(client, parsed, raw).await?,
+        };
+        result.duration_ms = started.elapsed().as_millis() as u64;
+        Ok(result)
     };
-    result.duration_ms = started.elapsed().as_millis() as u64;
-    Ok(result)
+    run_cancellable(&session.cancel, fut).await
+}
+
+fn parse_hbase_site_xml(path: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read hbase-site.xml: {e}"))?;
+
+    // Remove XML comments
+    while let Some(comment_start) = content.find("<!--") {
+        if let Some(comment_end) = content[comment_start..].find("-->") {
+            content.replace_range(comment_start..comment_start + comment_end + 3, "");
+        } else {
+            break;
+        }
+    }
+
+    let mut properties = BTreeMap::new();
+    let re_property = regex::Regex::new(r"(?s)<property>(.*?)</property>").unwrap();
+    let re_name = regex::Regex::new(r"<name>\s*([^\s<]+)\s*</name>").unwrap();
+    let re_value = regex::Regex::new(r"(?s)<value>\s*(.*?)\s*</value>").unwrap();
+
+    for cap in re_property.captures_iter(&content) {
+        let block = &cap[1];
+        if let Some(name_cap) = re_name.captures(block) {
+            let name = name_cap[1].trim();
+            if let Some(value_cap) = re_value.captures(block) {
+                let value = value_cap[1].trim();
+                properties.insert(name.to_string(), value.to_string());
+            }
+        }
+    }
+
+    Ok(properties)
 }
 
 /// Build a session for the configured transport, resolving any secrets.
 async fn build_session(
     config: &HBaseConfig,
     password: Option<String>,
-) -> Result<HBaseSession, String> {
-    if config.is_native() {
+) -> Result<HBaseSessionInner, String> {
+    let mut resolved_config = config.clone();
+    if let Some(hbase_site) = config.hbase_site_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let props = parse_hbase_site_xml(hbase_site)?;
+
+        // ZK quorum
+        if resolved_config.zk_quorum.is_none() || resolved_config.zk_quorum.as_deref().map(str::trim).unwrap_or("").is_empty() {
+            if let Some(quorum) = props.get("hbase.zookeeper.quorum") {
+                resolved_config.zk_quorum = Some(quorum.clone());
+            }
+        }
+
+        // ZK root
+        if resolved_config.zk_root.is_none() || resolved_config.zk_root.as_deref().map(str::trim).unwrap_or("").is_empty() {
+            if let Some(root) = props.get("zookeeper.znode.parent") {
+                resolved_config.zk_root = Some(root.clone());
+            }
+        }
+
+        // Service principal
+        if resolved_config.service_principal.is_none() || resolved_config.service_principal.as_deref().map(str::trim).unwrap_or("").is_empty() {
+            if let Some(principal) = props.get("hbase.regionserver.kerberos.principal")
+                .or_else(|| props.get("hbase.master.kerberos.principal")) {
+                resolved_config.service_principal = Some(principal.clone());
+            }
+        }
+
+        // Fallback host and port from ZK quorum if empty
+        if resolved_config.host.trim().is_empty() {
+            if let Some(quorum) = &resolved_config.zk_quorum {
+                let first_zk = quorum.split(',').next().unwrap_or("").trim();
+                if !first_zk.is_empty() {
+                    if let Some((h, p)) = first_zk.split_once(':') {
+                        resolved_config.host = h.to_string();
+                        if let Ok(parsed_p) = p.parse::<u16>() {
+                            resolved_config.port = parsed_p;
+                        }
+                    } else {
+                        resolved_config.host = first_zk.to_string();
+                        resolved_config.port = 2181;
+                    }
+                }
+            }
+        }
+    }
+
+    if resolved_config.is_native() {
         // If keytab + principal are configured, run kinit to refresh the
         // ticket cache before establishing the GSSAPI connection.
-        if config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
-            try_keytab_kinit(config)?;
+        if resolved_config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
+            try_keytab_kinit(&resolved_config)?;
         }
-        Ok(HBaseSession::Native(build_native_client(config)?))
+        Ok(HBaseSessionInner::Native(build_native_client(&resolved_config)?))
     } else {
-        Ok(HBaseSession::Rest(RestSession::new(config, password)?))
+        Ok(HBaseSessionInner::Rest(RestSession::new(&resolved_config, password)?))
     }
 }
 
@@ -345,8 +561,14 @@ fn build_native_client(
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
                     .ok_or_else(|| "Kerberos auth requires a service principal (e.g. hbase/host@REALM)".to_string())?;
+                let client_principal = config.principal
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(String::from);
                 native::auth::AuthMethod::Kerberos {
                     service_principal: spn.to_string(),
+                    client_principal,
                 }
             }
             _ => native::auth::AuthMethod::Simple,
@@ -356,10 +578,10 @@ fn build_native_client(
 }
 
 /// Ping whichever backend the session uses.
-async fn ping_backend(session: &HBaseSession) -> Result<String, String> {
+async fn ping_backend(session: &HBaseSessionInner) -> Result<String, String> {
     match session {
-        HBaseSession::Rest(rest) => ping_session(rest).await,
-        HBaseSession::Native(client) => client.ping().await.map_err(|e| e.to_string()),
+        HBaseSessionInner::Rest(rest) => ping_session(rest).await,
+        HBaseSessionInner::Native(client) => client.ping().await.map_err(|e| e.to_string()),
     }
 }
 

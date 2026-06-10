@@ -27,8 +27,11 @@ pub enum AuthMethod {
     /// Simple auth (effective user only); preamble byte 0x50.
     Simple,
     /// Kerberos/GSSAPI; preamble byte 0x51. Carries the service principal name
-    /// (SPN), e.g. `hbase/host@REALM`.
-    Kerberos { service_principal: String },
+    /// (SPN), e.g. `hbase/host@REALM`, and the optional client principal name.
+    Kerberos {
+        service_principal: String,
+        client_principal: Option<String>,
+    },
 }
 
 impl AuthMethod {
@@ -57,6 +60,7 @@ pub mod kerberos {
         read: &mut R,
         write: &mut W,
         service_principal: &str,
+        client_principal: Option<&str>,
     ) -> Result<bool, String>
     where
         R: AsyncReadExt + Unpin,
@@ -64,7 +68,7 @@ pub mod kerberos {
     {
         // Initial token.
         let (mut pending, token) =
-            ClientCtx::new(InitiateFlags::empty(), None, service_principal, None)
+            ClientCtx::new(InitiateFlags::empty(), client_principal, service_principal, None)
                 .map_err(|e| format!("GSSAPI init failed: {e}"))?;
         write_token(write, &token).await?;
 
@@ -155,7 +159,8 @@ mod tests {
         assert_eq!(AuthMethod::Simple.preamble_byte(), 0x50);
         assert_eq!(
             AuthMethod::Kerberos {
-                service_principal: "hbase/h@R".into()
+                service_principal: "hbase/h@R".into(),
+                client_principal: None,
             }
             .preamble_byte(),
             0x51
