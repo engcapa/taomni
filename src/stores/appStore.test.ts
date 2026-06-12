@@ -68,6 +68,63 @@ describe("appStore.moveTab", () => {
   });
 });
 
+describe("appStore.duplicateTab", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [tab("a"), tab("b"), tab("c"), tab("d")],
+      activeTabId: "a",
+    });
+  });
+
+  it("inserts the copy immediately to the right of the original (issue #120)", () => {
+    useAppStore.getState().duplicateTab("b");
+    const ids = useAppStore.getState().tabs.map((t) => t.id);
+    expect(ids).toHaveLength(5);
+    // Copy sits at index 2, right after the source "b" — not at the end.
+    expect(ids.slice(0, 2)).toEqual(["a", "b"]);
+    expect(ids.slice(3)).toEqual(["c", "d"]);
+    expect(ids[2]).not.toBe("b");
+  });
+
+  it("activates the new copy", () => {
+    useAppStore.getState().duplicateTab("b");
+    const { tabs, activeTabId } = useAppStore.getState();
+    expect(activeTabId).toBe(tabs[2].id);
+  });
+
+  it("carries over the source tab fields with a fresh closable copy", () => {
+    useAppStore.setState({
+      tabs: [tab("a"), tab("locked", { closable: false, title: "Server", hasNewOutput: true })],
+      activeTabId: "a",
+    });
+    useAppStore.getState().duplicateTab("locked");
+    const copy = useAppStore.getState().tabs[2];
+    expect(copy.title).toBe("Server");
+    expect(copy.type).toBe("terminal");
+    expect(copy.closable).toBe(true);
+    expect(copy.hasNewOutput).toBe(false);
+  });
+
+  it("mints a unique id distinct from the source", () => {
+    useAppStore.getState().duplicateTab("a");
+    const ids = useAppStore.getState().tabs.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("is a no-op for an unknown id", () => {
+    const before = useAppStore.getState().tabs;
+    useAppStore.getState().duplicateTab("missing");
+    expect(useAppStore.getState().tabs).toBe(before);
+  });
+
+  it("duplicates the last tab adjacently, which is also the end", () => {
+    useAppStore.getState().duplicateTab("d");
+    const ids = useAppStore.getState().tabs.map((t) => t.id);
+    expect(ids.slice(0, 4)).toEqual(["a", "b", "c", "d"]);
+    expect(ids).toHaveLength(5);
+  });
+});
+
 describe("appStore.uiAppearance", () => {
   it("allows setting and persisting uiFontFamily", () => {
     const font = "Outfit, sans-serif";
