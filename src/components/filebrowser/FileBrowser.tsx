@@ -206,11 +206,16 @@ export function FileBrowser(props: FileBrowserProps) {
 
   // Tear down the SFTP channel when this view unmounts. The store
   // ref-counts attaches, so a sidebar + detached window with the same
-  // session id are safe.
+  // session id are safe. We do not detach the attached sidebar session on
+  // unmount so that the session, its navigated folders, and active transfers
+  // are preserved when the user merely hides the sidebar.
   useEffect(() => {
     const sid = props.sessionId;
+    const isAttachedSidebar = sid.startsWith("attached-") && !sid.endsWith("__detached");
     return () => {
-      void detach(sid);
+      if (!isAttachedSidebar) {
+        void detach(sid);
+      }
     };
   }, [props.sessionId, detach]);
 

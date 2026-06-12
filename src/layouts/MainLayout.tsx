@@ -39,6 +39,7 @@ import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
+import { useSftpStore } from "../stores/sftpStore";
 import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
 import { openSftpWindow } from "../lib/sftp";
 import { openDetachedWindow } from "../lib/detachWindowing";
@@ -318,6 +319,7 @@ export function MainLayout() {
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
+  const [sftpDetachedTabs, setSftpDetachedTabs] = useState<Record<string, boolean>>({});
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
   const [ribbonVisible, setRibbonVisible] = useState(readRibbonVisible);
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
@@ -379,6 +381,33 @@ export function MainLayout() {
   const toggleAttachedSidebar = useCallback((tabId: string) => {
     setAttachedSidebars((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
   }, []);
+
+  const prevTabIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const currentIds = tabs.filter((t) => t.type === "terminal").map((t) => t.id);
+    const prevIds = prevTabIdsRef.current;
+
+    // Find closed tabs
+    const closedIds = prevIds.filter((id) => !currentIds.includes(id));
+    if (closedIds.length > 0) {
+      const store = useSftpStore.getState();
+      for (const closedId of closedIds) {
+        const sftpSessionId = `attached-${closedId}`;
+        const detachedSessionId = `attached-${closedId}__detached`;
+        void store.detach(sftpSessionId);
+        void store.detach(detachedSessionId);
+      }
+      setSftpDetachedTabs((prev) => {
+        const next = { ...prev };
+        for (const closedId of closedIds) {
+          delete next[closedId];
+        }
+        return next;
+      });
+    }
+
+    prevTabIdsRef.current = currentIds;
+  }, [tabs]);
 
   const handleTerminalCwd = useCallback((tabId: string, cwd: string) => {
     setTerminalCwds((prev) => (prev[tabId] === cwd ? prev : { ...prev, [tabId]: cwd }));
@@ -1963,7 +1992,31 @@ export function MainLayout() {
                                 ? (data) => broadcastToSelectedTerminals(data, tab.id)
                                 : undefined
                             }
-                            sftpToggle={!terminalSplitVisible && tab.ssh ? { open: sidebarOpen, onToggle: () => toggleAttachedSidebar(tab.id) } : undefined}
+                            sftpToggle={!terminalSplitVisible && tab.ssh ? {
+                              open: sidebarOpen,
+                              onToggle: () => {
+                                if (sftpDetachedTabs[tab.id] && tab.ssh) {
+                                  openDetachedSftp(
+                                    {
+                                      sessionId: `attached-${tab.id}`,
+                                      host: tab.ssh.host,
+                                      port: tab.ssh.port,
+                                      username: tab.ssh.username,
+                                      authMethod: tab.ssh.authMethod,
+                                      authData: tab.ssh.authData,
+                                      networkSettingsJson: JSON.stringify(
+                                        toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+                                      ),
+                                      initialPath: terminalCwds[tab.id],
+                                      attachedToTerminal: true,
+                                    },
+                                    `${tab.title} — SFTP`,
+                                  );
+                                } else {
+                                  toggleAttachedSidebar(tab.id);
+                                }
+                              }
+                            } : undefined}
                             chatToggle={!terminalSplitVisible ? {
                               open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
@@ -2000,7 +2053,9 @@ export function MainLayout() {
                             const escaped = p.replace(/'/g, "'\\''");
                             void writeTerminal(sid, encodeBase64(`cd '${escaped}'\n`));
                           }}
-                          onDetach={() =>
+                          onDetach={() => {
+                            setSftpDetachedTabs((prev) => ({ ...prev, [tab.id]: true }));
+                            setAttachedSidebars((prev) => ({ ...prev, [tab.id]: false }));
                             openDetachedSftp(
                               {
                                 sessionId: `attached-${tab.id}`,
@@ -2016,8 +2071,8 @@ export function MainLayout() {
                                 attachedToTerminal: true,
                               },
                               `${tab.title} — SFTP`,
-                            )
-                          }
+                            );
+                          }}
                         />
                       ) : null;
                       const gridColumn = index % splitGridColumns + 1;

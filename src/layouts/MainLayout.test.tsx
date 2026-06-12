@@ -31,6 +31,10 @@ const hbaseShellMock = vi.hoisted(() => ({
   props: [] as Array<{ tabId?: string; info?: Record<string, unknown>; visible?: boolean }>,
 }));
 
+const sftpSidebarMock = vi.hoisted(() => ({
+  props: [] as any[],
+}));
+
 const vaultMock = vi.hoisted(() => {
   const mock = {
     state: "empty",
@@ -190,7 +194,15 @@ vi.mock("../components/rdp/RdpPanel", () => ({
 }));
 
 vi.mock("../components/filebrowser/SftpSidebar", () => ({
-  SftpSidebar: () => <div data-testid="sftp-sidebar" />,
+  SftpSidebar: (props: any) => {
+    sftpSidebarMock.props.push(props);
+    return (
+      <div data-testid="sftp-sidebar">
+        <button data-testid="sftp-mock-close" onClick={props.onClose}>Close</button>
+        <button data-testid="sftp-mock-detach" onClick={props.onDetach}>Detach</button>
+      </div>
+    );
+  },
 }));
 
 vi.mock("../components/database/DbClientTab", () => ({
@@ -275,6 +287,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     quickConnectMock.props = [];
     dbClientMock.props = [];
     hbaseShellMock.props = [];
+    sftpSidebarMock.props = [];
     vaultMock.state = "empty";
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
@@ -335,6 +348,35 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+  });
+
+  it("toggles the attached SFTP sidebar and handles detaching and reopening behavior", () => {
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null as any);
+    render(<MainLayout />);
+
+    // Click SFTP button to open sidebar
+    fireEvent.click(screen.getByRole("button", { name: /sftp/i }));
+    expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
+
+    // Click Close inside the mock sidebar (should hide sidebar)
+    fireEvent.click(screen.getByTestId("sftp-mock-close"));
+    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
+
+    // Click SFTP button to show sidebar again
+    fireEvent.click(screen.getByRole("button", { name: /sftp/i }));
+    expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
+
+    // Click Detach in the mock sidebar (should open detached window and close sidebar)
+    fireEvent.click(screen.getByTestId("sftp-mock-detach"));
+    expect(windowOpenSpy).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
+
+    // Click SFTP button now that it's detached (should call window.open again, NOT open sidebar)
+    fireEvent.click(screen.getByRole("button", { name: /sftp/i }));
+    expect(windowOpenSpy).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
+
+    windowOpenSpy.mockRestore();
   });
 
   it("hides outer chrome in compact mode without remounting the terminal", () => {
