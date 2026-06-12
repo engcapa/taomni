@@ -45,6 +45,13 @@ interface AppState {
   tabMaximizedId: string | null;
 
   addTab: (tab: Tab) => void;
+  /**
+   * Duplicate an existing tab, inserting the copy immediately to the right of
+   * the original (not at the end of the strip) and activating it. See issue
+   * #120: a duplicated session should sit next to its source for quick
+   * switching/comparison.
+   */
+  duplicateTab: (id: string) => void;
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
@@ -198,6 +205,27 @@ export const useAppStore = create<AppState>((set) => ({
         activeTabId: tab.id,
         terminalSplitActive: tab.type === "terminal" ? s.terminalSplitActive : false,
         statusMessage: tr("status.openedTab", { title: tab.title }),
+      };
+    }),
+
+  duplicateTab: (id) =>
+    set((s) => {
+      const idx = s.tabs.findIndex((t) => t.id === id);
+      if (idx === -1) return s;
+      const source = s.tabs[idx];
+      const copy: Tab = {
+        ...source,
+        id: `dup-${crypto.randomUUID()}`,
+        closable: true,
+        hasNewOutput: false,
+      };
+      const next = s.tabs.slice();
+      next.splice(idx + 1, 0, copy);
+      return {
+        tabs: next,
+        activeTabId: copy.id,
+        terminalSplitActive: copy.type === "terminal" ? s.terminalSplitActive : false,
+        statusMessage: tr("status.openedTab", { title: copy.title }),
       };
     }),
 

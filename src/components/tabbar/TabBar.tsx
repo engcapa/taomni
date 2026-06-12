@@ -83,7 +83,7 @@ export function TabBar({
     setActiveTab,
     removeTab,
     removeTabs,
-    addTab,
+    duplicateTab,
     moveTab,
     moveTabToIndex,
     updateTabTitle,
@@ -356,7 +356,7 @@ export function TabBar({
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.rename"), icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
       { label: t("tabs.duplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => {
-        addTab({ ...tab, id: `dup-${Date.now()}`, closable: true });
+        duplicateTab(tab.id);
       }, disabled: tab.type === "welcome" },
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
