@@ -40,7 +40,7 @@ import {
 } from "../../lib/ipc";
 import { getAppPlatform } from "../../lib/runtime";
 import { OpenTabsMenu } from "./OpenTabsMenu";
-import { filterVisibleTabs } from "../../lib/tabFilter";
+import { filterVisibleTabs, getFilterChipText } from "../../lib/tabFilter";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 type TabScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean };
@@ -427,17 +427,19 @@ export function TabBar({
           className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[180px] shrink-0"
           style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
         >
-          {tabFilter.kind === "group" ? (
+          {tabFilter.kind === "group" || tabFilter.kind === "multi" ? (
             <Folder className="w-3 h-3 shrink-0" />
           ) : (
             <Search className="w-3 h-3 shrink-0" />
           )}
           <span className="truncate">
-            {tabFilter.kind === "group"
-              ? tabFilter.path === ""
-                ? t("tabs.filterUngrouped")
-                : tabFilter.path
-              : tabFilter.text}
+            {tabFilter.kind === "query"
+              ? tabFilter.text
+              : tabFilter.kind === "multi"
+                ? getFilterChipText(tabFilter, sessions, tabs, t)
+                : tabFilter.path === ""
+                  ? t("tabs.filterUngrouped")
+                  : tabFilter.path}
           </span>
           <X className="w-3 h-3 shrink-0" />
         </button>

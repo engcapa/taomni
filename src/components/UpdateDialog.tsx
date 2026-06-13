@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useUpdateStore } from "../stores/updateStore";
 import { useT, type TranslateFn } from "../lib/i18n";
 
@@ -23,28 +24,45 @@ function archLabel(t: TranslateFn, os: string | null, target: string): string {
 export function UpdateDialog() {
   const t = useT();
   const s = useUpdateStore();
-  if (!s.dialogOpen) return null;
 
-  const showArch = s.candidates.length > 1;
   const downloading = s.status === "downloading";
   const percent = s.progress?.percent ?? null;
   const installing = downloading && percent === 100;
   const canDownload =
     s.status === "available" && s.targetStatus !== "checking" && s.targetStatus !== "unavailable";
-  const dismissable = !downloading;
-
-  const title =
-    s.status === "error"
-      ? t("update.errorTitle")
-      : s.status === "ready"
-        ? t("update.readyTitle")
-        : s.status === "uptodate"
-          ? t("update.upToDateTitle")
-          : t("update.title");
+  const dismissable = true;
 
   const close = () => {
     if (dismissable) s.closeDialog();
   };
+
+  useEffect(() => {
+    if (!s.dialogOpen) return;
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        close();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [s.dialogOpen, dismissable]);
+
+  if (!s.dialogOpen) return null;
+
+  const showArch = s.candidates.length > 1;
+
+  const title =
+    s.status === "checking"
+      ? t("update.checkButton")
+      : s.status === "error"
+        ? t("update.errorTitle")
+        : s.status === "ready"
+          ? t("update.readyTitle")
+          : s.status === "uptodate"
+            ? t("update.upToDateTitle")
+            : t("update.title");
 
   return (
     <div
@@ -65,6 +83,13 @@ export function UpdateDialog() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-lg font-semibold mb-3">{title}</div>
+
+        {s.status === "checking" && (
+          <div className="text-[13px] mb-4 flex items-center gap-2" style={{ color: "var(--taomni-text-muted)" }}>
+            <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[var(--taomni-text-muted)] border-t-transparent inline-block" />
+            {t("update.statusChecking")}
+          </div>
+        )}
 
         {s.status === "uptodate" && (
           <div className="text-[13px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
@@ -216,9 +241,9 @@ export function UpdateDialog() {
               </button>
             </>
           )}
-          {(s.status === "uptodate" || s.status === "checking") && (
+          {(s.status === "uptodate" || s.status === "checking" || s.status === "downloading") && (
             <button type="button" className="taomni-btn h-8 px-4" onClick={s.closeDialog}>
-              {t("common.close")}
+              {s.status === "downloading" ? t("common.cancel") : t("common.close")}
             </button>
           )}
         </div>

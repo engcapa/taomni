@@ -14,7 +14,8 @@ import { normalizeGroupPath } from "./sessionPaths";
  */
 export type TabFilter =
   | { kind: "group"; path: string }
-  | { kind: "query"; text: string };
+  | { kind: "query"; text: string }
+  | { kind: "multi"; paths: string[]; tabIds: string[] };
 
 /**
  * The directory a tab belongs to, derived from its saved session's
@@ -67,7 +68,12 @@ export function tabMatchesFilter(
     if (!q) return true;
     return tabSearchText(tab).includes(q);
   }
-  return tabGroupKey(tab, sessions) === filter.path;
+  if (filter.kind === "multi") {
+    const { paths, tabIds } = filter;
+    const key = tabGroupKey(tab, sessions);
+    return paths.includes(key) || tabIds.includes(tab.id);
+  }
+  return tabGroupKey(tab, sessions) === (filter as any).path;
 }
 
 export function filterVisibleTabs(
@@ -77,4 +83,29 @@ export function filterVisibleTabs(
 ): Tab[] {
   if (!filter) return [...tabs];
   return tabs.filter((tab) => tabMatchesFilter(tab, sessions, filter));
+}
+
+export function getFilterChipText(
+  filter: TabFilter,
+  _sessions: readonly SessionConfig[],
+  tabs: readonly Tab[],
+  t: (key: string, args?: any) => string,
+): string {
+  if (filter.kind === "query") return filter.text;
+  if (filter.kind === "multi") {
+    const parts: string[] = [];
+    for (const p of filter.paths) {
+      parts.push(p === "" ? t("tabs.filterUngrouped") : p);
+    }
+    for (const id of filter.tabIds) {
+      const tab = tabs.find((t) => t.id === id);
+      if (tab) {
+        parts.push(tab.title);
+      }
+    }
+    if (parts.length === 0) return t("tabs.filterClear");
+    if (parts.length <= 2) return parts.join(", ");
+    return t("tabs.filterCount", { count: parts.length }) || `${parts.length} filters`;
+  }
+  return "";
 }

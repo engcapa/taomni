@@ -245,6 +245,7 @@ export const zhCN: DeepPartial<typeof en> = {
   about: {
     title: "关于 Taomni",
     version: "版本 {version}",
+    versionTooltip: "点击检查更新",
     description: "为开发者打造的 AI 原生远程工作台，功能齐全却小巧精致：终端、SSH、SFTP、RDP/VNC、隧道与数据库客户端集于一身。",
   },
   update: {
@@ -529,6 +530,7 @@ export const zhCN: DeepPartial<typeof en> = {
     filterByDir: "只看此目录",
     filterNoMatch: "没有符合当前过滤条件的标签",
     filterClear: "清除过滤",
+    filterCount: "{count} 个过滤项",
   },
   multiExec: {
     title: "多终端同步执行",

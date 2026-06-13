@@ -135,6 +135,85 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
     }
   };
 
+  const toggleGroup = (groupKey: string) => {
+    if (query) {
+      setQuery("");
+    }
+    let newPaths = tabFilter?.kind === "multi" ? [...tabFilter.paths] : [];
+    let newTabIds = tabFilter?.kind === "multi" ? [...tabFilter.tabIds] : [];
+
+    if (tabFilter?.kind === "group") {
+      newPaths = [tabFilter.path];
+    }
+
+    const group = groups.find((g) => g.key === groupKey);
+    const groupTabIds = group ? group.tabs.map((t) => t.id) : [];
+
+    if (newPaths.includes(groupKey)) {
+      newPaths = newPaths.filter((p) => p !== groupKey);
+      newTabIds = newTabIds.filter((id) => !groupTabIds.includes(id));
+    } else {
+      newPaths.push(groupKey);
+      newTabIds = newTabIds.filter((id) => !groupTabIds.includes(id));
+    }
+
+    const nextFilter: TabFilter | null =
+      newPaths.length > 0 || newTabIds.length > 0
+        ? { kind: "multi", paths: newPaths, tabIds: newTabIds }
+        : null;
+
+    applyFilter(nextFilter);
+  };
+
+  const toggleTab = (tab: Tab) => {
+    if (query) {
+      setQuery("");
+    }
+    const groupKey = tabGroupKey(tab, sessions);
+    const group = groups.find((g) => g.key === groupKey);
+    const groupTabIds = group ? group.tabs.map((t) => t.id) : [tab.id];
+
+    let newPaths = tabFilter?.kind === "multi" ? [...tabFilter.paths] : [];
+    let newTabIds = tabFilter?.kind === "multi" ? [...tabFilter.tabIds] : [];
+
+    if (tabFilter?.kind === "group") {
+      newPaths = [tabFilter.path];
+    }
+
+    const isGroupChecked = newPaths.includes(groupKey);
+    const isTabChecked = isGroupChecked || newTabIds.includes(tab.id);
+
+    if (isTabChecked) {
+      if (isGroupChecked) {
+        newPaths = newPaths.filter((p) => p !== groupKey);
+        const otherGroupTabs = groupTabIds.filter((id) => id !== tab.id);
+        for (const id of otherGroupTabs) {
+          if (!newTabIds.includes(id)) {
+            newTabIds.push(id);
+          }
+        }
+      } else {
+        newTabIds = newTabIds.filter((id) => id !== tab.id);
+      }
+    } else {
+      if (!newTabIds.includes(tab.id)) {
+        newTabIds.push(tab.id);
+      }
+      const allChecked = groupTabIds.every((id) => newTabIds.includes(id));
+      if (allChecked) {
+        newPaths.push(groupKey);
+        newTabIds = newTabIds.filter((id) => !groupTabIds.includes(id));
+      }
+    }
+
+    const nextFilter: TabFilter | null =
+      newPaths.length > 0 || newTabIds.length > 0
+        ? { kind: "multi", paths: newPaths, tabIds: newTabIds }
+        : null;
+
+    applyFilter(nextFilter);
+  };
+
   const onQueryChange = (text: string) => {
     setQuery(text);
     applyFilter(text.trim() ? { kind: "query", text } : null);
@@ -225,7 +304,12 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
           const slug =
             (group.key || "ungrouped").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") ||
             "ungrouped";
-          const isGroupFilter = tabFilter?.kind === "group" && tabFilter.path === group.key;
+          const isGroupFilter =
+            tabFilter?.kind === "group"
+              ? tabFilter.path === group.key
+              : tabFilter?.kind === "multi"
+                ? tabFilter.paths.includes(group.key)
+                : false;
           const isCollapsed = collapsed[group.key] ?? false;
           const label = group.key === "" ? t("tabs.filterUngrouped") : group.key;
           return (
@@ -243,11 +327,18 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
                 >
                   {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
+                <input
+                  type="checkbox"
+                  className="taomni-checkbox mr-1 shrink-0"
+                  checked={isGroupFilter}
+                  onChange={() => toggleGroup(group.key)}
+                  data-testid={`open-tabs-group-checkbox-${slug}`}
+                />
                 <button
                   type="button"
                   className="flex-1 flex items-center gap-1 min-w-0 text-left hover:opacity-80"
                   title={t("tabs.filterByDir")}
-                  onClick={() => applyFilter({ kind: "group", path: group.key })}
+                  onClick={() => toggleGroup(group.key)}
                   data-testid={`open-tabs-group-${slug}`}
                 >
                   <span className={`flex-1 truncate ${muted}`}>{label}</span>
@@ -258,19 +349,36 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
                 group.tabs.map((tab) => {
                   const isActive = tab.id === activeTabId;
                   const hidden = !tabMatchesFilter(tab, sessions, tabFilter);
+                  const isChecked =
+                    tabFilter?.kind === "group"
+                      ? tabFilter.path === group.key
+                      : tabFilter?.kind === "multi"
+                        ? tabFilter.tabIds.includes(tab.id) || tabFilter.paths.includes(group.key)
+                        : false;
                   return (
-                    <button
+                    <div
                       key={tab.id}
-                      type="button"
-                      data-testid={`open-tabs-tab-${tab.id}`}
-                      onClick={() => pickTab(tab)}
                       className={`w-full pl-6 pr-3 py-1 flex items-center gap-2 text-left hover:bg-[var(--taomni-hover)] ${hidden ? "opacity-50" : ""}`}
                     >
-                      <span className="w-4 flex-shrink-0 flex items-center justify-center">
-                        {isActive ? <Check className="w-3 h-3" /> : <TabIcon tab={tab} />}
-                      </span>
-                      <span className="flex-1 truncate">{tab.title}</span>
-                    </button>
+                      <input
+                        type="checkbox"
+                        className="taomni-checkbox shrink-0"
+                        checked={isChecked}
+                        onChange={() => toggleTab(tab)}
+                        data-testid={`open-tabs-tab-checkbox-${tab.id}`}
+                      />
+                      <button
+                        type="button"
+                        data-testid={`open-tabs-tab-${tab.id}`}
+                        onClick={() => pickTab(tab)}
+                        className="flex-1 flex items-center gap-2 min-w-0 text-left"
+                      >
+                        <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                          {isActive ? <Check className="w-3 h-3" /> : <TabIcon tab={tab} />}
+                        </span>
+                        <span className="flex-1 truncate">{tab.title}</span>
+                      </button>
+                    </div>
                   );
                 })}
             </div>
