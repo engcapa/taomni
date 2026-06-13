@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Tab } from "../types";
 import { t as tr } from "../lib/i18n";
 import { detectXServer, type XServerStatus } from "../lib/ipc";
+import type { TabFilter } from "../lib/tabFilter";
 
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
@@ -44,6 +45,14 @@ interface AppState {
    */
   tabMaximizedId: string | null;
 
+  /**
+   * Transient focus filter for the open-tab strip (issue #121). When set, the
+   * strip only renders tabs matching the filter; the rest are hidden, not
+   * closed. Session-scoped — reset on reload and cleared whenever a new tab is
+   * opened so the new tab is always visible.
+   */
+  tabFilter: TabFilter | null;
+
   addTab: (tab: Tab) => void;
   /**
    * Duplicate an existing tab, inserting the copy immediately to the right of
@@ -83,6 +92,8 @@ interface AppState {
   setUiFontSize: (size: number) => void;
   setTabMaximized: (tabId: string | null) => void;
   toggleTabMaximized: (tabId: string) => void;
+  setTabFilter: (filter: TabFilter | null) => void;
+  clearTabFilter: () => void;
 }
 
 function readCompactMode() {
@@ -196,6 +207,7 @@ export const useAppStore = create<AppState>((set) => ({
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
   tabMaximizedId: null,
+  tabFilter: null,
 
   addTab: (tab) =>
     set((s) => {
@@ -203,6 +215,8 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         tabs: nextTabs,
         activeTabId: tab.id,
+        // A freshly opened tab must be visible, so drop any active focus filter.
+        tabFilter: null,
         terminalSplitActive: tab.type === "terminal" ? s.terminalSplitActive : false,
         statusMessage: tr("status.openedTab", { title: tab.title }),
       };
@@ -224,6 +238,8 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         tabs: next,
         activeTabId: copy.id,
+        // A freshly opened tab must be visible, so drop any active focus filter.
+        tabFilter: null,
         terminalSplitActive: copy.type === "terminal" ? s.terminalSplitActive : false,
         statusMessage: tr("status.openedTab", { title: copy.title }),
       };
@@ -504,4 +520,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (!s.tabs.some((t) => t.id === tabId)) return s;
       return { tabMaximizedId: s.tabMaximizedId === tabId ? null : tabId };
     }),
+
+  setTabFilter: (filter) => set({ tabFilter: filter }),
+  clearTabFilter: () => set({ tabFilter: null }),
 }));

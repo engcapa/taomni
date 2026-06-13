@@ -5,9 +5,8 @@ import {
   Folder,
   Monitor,
   Network as NetworkIcon,
-  PanelTopClose,
-  PanelTopOpen,
   MoreHorizontal,
+  Search,
   Copy,
   Trash2,
   FileText,
@@ -40,6 +39,8 @@ import {
   type SessionConfig,
 } from "../../lib/ipc";
 import { getAppPlatform } from "../../lib/runtime";
+import { OpenTabsMenu } from "./OpenTabsMenu";
+import { filterVisibleTabs } from "../../lib/tabFilter";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 type TabScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean };
@@ -87,7 +88,8 @@ export function TabBar({
     moveTab,
     moveTabToIndex,
     updateTabTitle,
-    toggleCompactMode,
+    tabFilter,
+    setTabFilter,
     multiExecActive,
     multiExecSelectedTabIds,
     toggleMultiExecTab,
@@ -102,6 +104,8 @@ export function TabBar({
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [shellsLoaded, setShellsLoaded] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreWrapRef = useRef<HTMLDivElement>(null);
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const tabElementRefs = useRef(new Map<string, HTMLDivElement>());
   const [tabScrollState, setTabScrollState] = useState<TabScrollState>({
@@ -237,6 +241,13 @@ export function TabBar({
     [sessions],
   );
 
+  // Tabs actually rendered in the strip. The focus filter (issue #121) hides
+  // non-matching tabs here without closing them; the `…` menu still lists all.
+  const visibleTabs = useMemo(
+    () => filterVisibleTabs(tabs, sessions, tabFilter),
+    [tabs, sessions, tabFilter],
+  );
+
   useEffect(() => {
     if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
       setEditingTabId(null);
@@ -366,29 +377,6 @@ export function TabBar({
     ]);
   };
 
-  const handleMore = (event: React.MouseEvent) => {
-    const tabItems: MenuItem[] = tabs.map((tab) => ({
-      label: tab.title,
-      testId: `tab-more-tab-${tab.id}`,
-      icon: <TabIcon tab={tab} />,
-      checked: tab.id === activeTabId,
-      onClick: () => setActiveTab(tab.id),
-    }));
-
-    ctx.show(event, [
-      {
-        label: compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact"),
-        icon: compactMode ? <PanelTopOpen className="w-3 h-3" /> : <PanelTopClose className="w-3 h-3" />,
-        shortcut: "Ctrl+Shift+M",
-        onClick: toggleCompactMode,
-      },
-      { label: "", separator: true, onClick: () => {} },
-      { label: t("tabs.closeAllTerminals"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.type === "terminal" && t.closable).map((t) => t.id)) },
-      ...(tabItems.length ? [{ label: "", separator: true, onClick: () => {} }] : []),
-      ...tabItems,
-    ]);
-  };
-
   const computeDropSide = (rect: DOMRect, clientX: number): "before" | "after" => {
     return clientX < rect.left + rect.width / 2 ? "before" : "after";
   };
@@ -430,6 +418,30 @@ export function TabBar({
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
       {ctx.render}
+      {tabFilter && (
+        <button
+          type="button"
+          data-testid="tab-filter-chip"
+          onClick={() => setTabFilter(null)}
+          title={t("tabs.filterClear")}
+          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[180px] shrink-0"
+          style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
+        >
+          {tabFilter.kind === "group" ? (
+            <Folder className="w-3 h-3 shrink-0" />
+          ) : (
+            <Search className="w-3 h-3 shrink-0" />
+          )}
+          <span className="truncate">
+            {tabFilter.kind === "group"
+              ? tabFilter.path === ""
+                ? t("tabs.filterUngrouped")
+                : tabFilter.path
+              : tabFilter.text}
+          </span>
+          <X className="w-3 h-3 shrink-0" />
+        </button>
+      )}
       {tabScrollState.overflow && (
         <IconBtn
           testId="tab-scroll-left"
@@ -445,7 +457,16 @@ export function TabBar({
         className="taomni-tab-scroll flex items-end min-w-0 overflow-x-auto overflow-y-hidden"
         onScroll={updateTabScrollState}
       >
-        {tabs.map((tab) => {
+        {tabFilter && visibleTabs.length === 0 && (
+          <div
+            data-testid="tab-filter-empty"
+            className="self-center px-3 text-[12px] whitespace-nowrap"
+            style={{ color: "var(--taomni-text-muted)" }}
+          >
+            {t("tabs.filterNoMatch")}
+          </div>
+        )}
+        {visibleTabs.map((tab) => {
           const isSelected = multiExecActive && tab.type === "terminal" && multiExecSelectedTabIds.has(tab.id);
           const dropSide = dropIndicator && dropIndicator.tabId === tab.id ? dropIndicator.side : undefined;
           return (
@@ -537,7 +558,16 @@ export function TabBar({
 
       <div className="flex-1 self-stretch" data-window-drag />
       <div className="flex items-center gap-1 pr-1 pb-0.5">
-        <IconBtn testId="tab-more" title={t("tabs.more")} icon={<MoreHorizontal className="w-3.5 h-3.5" />} onClick={handleMore} />
+        <div ref={moreWrapRef} className="relative">
+          <IconBtn
+            testId="tab-more"
+            title={t("tabs.more")}
+            icon={<MoreHorizontal className="w-3.5 h-3.5" />}
+            active={moreOpen}
+            onClick={() => setMoreOpen((v) => !v)}
+          />
+          <OpenTabsMenu open={moreOpen} onClose={() => setMoreOpen(false)} anchorRef={moreWrapRef} />
+        </div>
       </div>
     </div>
   );
@@ -562,7 +592,7 @@ function dbEngineColor(engine?: string): string {
   }
 }
 
-function TabIcon({ tab }: { tab: Tab }) {
+export function TabIcon({ tab }: { tab: Tab }) {
   if (tab.type === "terminal" && tab.ssh) {
     return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }
