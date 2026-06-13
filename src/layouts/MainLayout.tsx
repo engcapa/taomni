@@ -100,6 +100,7 @@ const RdpPanel = lazy(() => import("../components/rdp/RdpPanel"));
 const DbClientTab = lazy(() => import("../components/database/DbClientTab"));
 const RedisClientTab = lazy(() => import("../components/database/RedisClientTab"));
 const HBaseShellTab = lazy(() => import("../components/database/HBaseShellTab"));
+const ProxyTestTab = lazy(() => import("../components/proxy/ProxyTestTab"));
 
 interface PendingAuth {
   session: SessionConfig;
@@ -1098,6 +1099,30 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [addTab, markConnected]);
 
+  const openProxyTestTab = useCallback((session: SessionConfig) => {
+    const id = `proxy-test-${session.id}-${Date.now()}`;
+    const options = parseSessionOptions(session.options_json);
+    const proxyKind = (options.proxyKind === "socks5" ? "socks5" : "http") as "http" | "socks5";
+    const title = `${proxyKind === "http" ? "HTTP" : "SOCKS5"} ${session.host}:${session.port}`;
+    addTab({
+      id,
+      type: "proxy-test",
+      title,
+      sessionId: session.id,
+      closable: true,
+      proxyTest: {
+        sessionId: session.id,
+        proxyKind,
+        host: session.host,
+        port: session.port,
+        username: session.username,
+        password: passwordRefFromOptions(session) || undefined,
+        testUrl: typeof options.testUrl === "string" ? options.testUrl : "www.google.com:443",
+      },
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   // Open a local path or URL: URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
@@ -1311,6 +1336,8 @@ export function MainLayout() {
       } else {
         openHBaseShellTab(session, undefined);
       }
+    } else if (session.session_type === "Proxy") {
+      openProxyTestTab(session);
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
@@ -1327,6 +1354,7 @@ export function MainLayout() {
     openRdpTab,
     openDbTab,
     openHBaseShellTab,
+    openProxyTestTab,
     queueVaultUnlock,
   ]);
 
@@ -2429,6 +2457,12 @@ export function MainLayout() {
                   />
                 )}
 
+                {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
+                  <Suspense fallback={null}>
+                    <ProxyTestTab info={activeTab.proxyTest} />
+                  </Suspense>
+                )}
+
                 {/* Non-terminal, non-sftp, non-vnc, non-rdp, non-welcome, non-settings, non-nettools tabs */}
                 {activeTab &&
                   activeTab.type !== "welcome" &&
@@ -2441,7 +2475,8 @@ export function MainLayout() {
                   activeTab.type !== "redis" &&
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "settings" &&
-                  activeTab.type !== "nettools" && (
+                  activeTab.type !== "nettools" &&
+                  activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
 

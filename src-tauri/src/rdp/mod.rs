@@ -246,6 +246,7 @@ pub async fn rdp_connect(
     apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
     let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
     if let Some(n) = network.as_mut() {
+        crate::terminal::resolve_proxy_session(&state, n)?;
         n.resolve_proxy_pass(&state.vault)?;
     }
 
@@ -315,6 +316,7 @@ pub async fn rdp_test_connection(
     apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
     let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
     if let Some(n) = network.as_mut() {
+        crate::terminal::resolve_proxy_session(&state, n)?;
         n.resolve_proxy_pass(&state.vault)?;
     }
 

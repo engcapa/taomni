@@ -3,7 +3,7 @@ import type { TerminalProfile } from "../lib/terminalProfile";
 import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test";
 
 export interface VncConnectInfo {
   sessionId: string;
@@ -92,6 +92,16 @@ export interface RdpConnectInfo {
   networkSettingsJson?: string | null;
 }
 
+export interface ProxyTestTabInfo {
+  sessionId: string;
+  proxyKind: "http" | "socks5";
+  host: string;
+  port: number;
+  username?: string | null;
+  password?: string;
+  testUrl?: string;
+}
+
 export interface FileBrowserTabInfo {
   initialPath: string;
 }
@@ -114,6 +124,7 @@ export interface Tab {
   db?: DbConnectInfo;
   hbase?: HBaseConnectInfo;
   fileBrowser?: FileBrowserTabInfo;
+  proxyTest?: ProxyTestTabInfo;
   hasNewOutput?: boolean;
 }
 

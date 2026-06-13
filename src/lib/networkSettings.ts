@@ -18,6 +18,9 @@ export interface NetworkSettings {
   proxyUser: string;
   proxyPass: string;
   proxySaveAuth: boolean;
+  /** When set and proxyKind is "http" or "socks5", the proxy config is
+   *  loaded from a saved Proxy session. Empty means use manual fields. */
+  proxySessionId: string;
   keepAlive: boolean;
   keepAliveIntervalSecs: string;
   tcpNodelay: boolean;
@@ -48,6 +51,7 @@ export const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   proxyUser: "",
   proxyPass: "",
   proxySaveAuth: false,
+  proxySessionId: "",
   keepAlive: true,
   keepAliveIntervalSecs: "60",
   // Backend honours `tcpNodelay` only; `disableNagle` is the
@@ -147,6 +151,7 @@ export function normalizeNetworkSettings(input: unknown): NetworkSettings {
     proxyUser: readString(src.proxyUser, ""),
     proxyPass: readString(src.proxyPass, ""),
     proxySaveAuth: readBoolean(src.proxySaveAuth, false),
+    proxySessionId: readString(src.proxySessionId, ""),
     keepAlive: readBoolean(src.keepAlive, DEFAULT_NETWORK_SETTINGS.keepAlive),
     keepAliveIntervalSecs: readString(src.keepAliveIntervalSecs, DEFAULT_NETWORK_SETTINGS.keepAliveIntervalSecs),
     tcpNodelay: readBoolean(src.tcpNodelay, DEFAULT_NETWORK_SETTINGS.tcpNodelay),
@@ -185,6 +190,7 @@ export interface NetworkSettingsPayload {
   proxyPort: number;
   proxyUser: string;
   proxyPass: string;
+  proxySessionId: string;
   keepAlive: boolean;
   keepAliveIntervalSecs: number;
   tcpNodelay: boolean;
@@ -209,6 +215,7 @@ export function toNetworkSettingsPayload(ns: NetworkSettings): NetworkSettingsPa
     proxyPort: Number.isFinite(port) && port > 0 ? port : 0,
     proxyUser: ns.proxyUser,
     proxyPass: ns.proxyPass,
+    proxySessionId: ns.proxySessionId.trim(),
     keepAlive: ns.keepAlive,
     keepAliveIntervalSecs: Number.isFinite(interval) && interval > 0 ? interval : 0,
     // The "Disable Nagle algorithm" toggle is the inverse name of TCP_NODELAY;

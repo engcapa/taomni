@@ -271,6 +271,47 @@ pub(crate) fn resolve_jump_credentials(
     Ok(())
 }
 
+/// If `proxy_session_id` is set on the network settings, load the saved Proxy
+/// session from the DB and override the proxy_kind/host/port/user/pass fields.
+pub(crate) fn resolve_proxy_session(
+    state: &State<'_, AppState>,
+    network: &mut network::NetworkSettings,
+) -> Result<(), String> {
+    let id = network.proxy_session_id.trim();
+    if id.is_empty() {
+        return Ok(());
+    }
+
+    let proxy_session = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::session::db::get_session(&db, id)
+            .map_err(|e| format!("proxy session not found: {}", e))?
+    };
+
+    // Read proxyKind from options_json
+    let proxy_kind = serde_json::from_str::<serde_json::Value>(&proxy_session.options_json)
+        .ok()
+        .and_then(|v| v.get("proxyKind").and_then(|k| k.as_str()).map(|s| s.to_string()))
+        .unwrap_or_else(|| "http".to_string());
+
+    network.proxy_kind = proxy_kind;
+    network.proxy_host = proxy_session.host.clone();
+    network.proxy_port = proxy_session.port;
+    network.proxy_user = proxy_session.username.clone().unwrap_or_default();
+
+    // Read password from vault ref in options_json
+    let pass_ref = serde_json::from_str::<serde_json::Value>(&proxy_session.options_json)
+        .ok()
+        .and_then(|v| v.get("passwordRef").and_then(|r| r.as_str()).map(|s| s.to_string()))
+        .unwrap_or_default();
+    network.proxy_pass = pass_ref;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn create_ssh_terminal(
     session_id: String,
@@ -316,6 +357,7 @@ pub async fn create_ssh_terminal(
     let network = network::NetworkSettings::from_json(network_settings_json.as_deref());
     let network = match network {
         Some(mut n) => {
+            resolve_proxy_session(&state, &mut n)?;
             n.resolve_proxy_pass(&state.vault)?;
             resolve_jump_credentials(&state, &mut n)?;
             Some(n)
@@ -711,6 +753,7 @@ pub async fn test_ssh_connection(
     let network = network::NetworkSettings::from_json(network_settings_json.as_deref());
     let network = match network {
         Some(mut n) => {
+            resolve_proxy_session(&state, &mut n)?;
             n.resolve_proxy_pass(&state.vault)?;
             resolve_jump_credentials(&state, &mut n)?;
             Some(n)
@@ -741,6 +784,43 @@ pub async fn test_ssh_connection(
         "Connection successful ({:.0}ms)",
         elapsed.as_millis()
     ))
+}
+
+/// Test proxy connectivity by establishing a TCP connection through the proxy
+/// to a user-specified test target (default: www.google.com:443). Returns timing on
+/// success or an error message on failure.
+#[tauri::command]
+pub async fn test_proxy_connection(
+    proxy_kind: String,
+    proxy_host: String,
+    proxy_port: u16,
+    proxy_user: String,
+    proxy_pass: String,
+    test_host: String,
+    test_port: u16,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let resolved_pass = state
+        .vault
+        .resolve(&proxy_pass)?
+        .map(|z| (*z).clone())
+        .unwrap_or(proxy_pass);
+
+    let ns = network::NetworkSettings {
+        proxy_kind,
+        proxy_host,
+        proxy_port,
+        proxy_user,
+        proxy_pass: resolved_pass,
+        ..Default::default()
+    };
+
+    let start = std::time::Instant::now();
+    let stream = network::establish_transport(&test_host, test_port, Some(&ns)).await?;
+    drop(stream);
+    let elapsed = start.elapsed();
+
+    Ok(format!("OK ({:.0}ms)", elapsed.as_millis()))
 }
 
 /// Deliver the user's answer to a pending keyboard-interactive (MFA/OTP) auth

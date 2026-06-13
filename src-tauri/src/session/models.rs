@@ -40,6 +40,7 @@ pub enum SessionType {
     Presto,
     Redis,
     HBaseShell,
+    Proxy,
 }
 
 impl SessionType {
@@ -60,6 +61,7 @@ impl SessionType {
             Self::Presto => "Presto",
             Self::Redis => "Redis",
             Self::HBaseShell => "HBaseShell",
+            Self::Proxy => "Proxy",
         }
     }
 
@@ -80,6 +82,7 @@ impl SessionType {
             "Presto" => Self::Presto,
             "Redis" => Self::Redis,
             "HBaseShell" => Self::HBaseShell,
+            "Proxy" => Self::Proxy,
             _ => Self::SSH,
         }
     }
@@ -97,6 +100,7 @@ impl SessionType {
             Self::Presto => 8080,
             Self::Redis => 6379,
             Self::HBaseShell => 8080,
+            Self::Proxy => 3128,
             Self::Serial | Self::LocalShell | Self::File => 0,
         }
     }
@@ -136,4 +140,40 @@ pub struct SessionGroup {
     pub parent_id: Option<String>,
     pub sort_order: i32,
     pub icon: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_type_proxy_round_trips() {
+        assert_eq!(SessionType::Proxy.as_str(), "Proxy");
+        assert_eq!(SessionType::from_str("Proxy"), SessionType::Proxy);
+    }
+
+    #[test]
+    fn session_config_deserializes_proxy_type() {
+        // Mirrors the payload the frontend sends to the `save_session`
+        // Tauri command. Before `Proxy` was a SessionType variant, serde
+        // rejected this at the IPC boundary and the session was never saved.
+        let json = r#"{
+            "id": "abc",
+            "name": "SOCKS5 1.2.3.4:1080",
+            "session_type": "Proxy",
+            "group_path": null,
+            "host": "1.2.3.4",
+            "port": 1080,
+            "username": null,
+            "auth_method": "None",
+            "options_json": "{\"proxyKind\":\"socks5\"}",
+            "created_at": 0,
+            "updated_at": 0,
+            "last_connected_at": null,
+            "sort_order": 0
+        }"#;
+        let config: SessionConfig =
+            serde_json::from_str(json).expect("Proxy session_type must deserialize");
+        assert_eq!(config.session_type, SessionType::Proxy);
+    }
 }
