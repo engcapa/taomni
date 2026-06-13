@@ -23,6 +23,14 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "url": "^https?://"
+        }
+      ]
+    }
   ]
 }
