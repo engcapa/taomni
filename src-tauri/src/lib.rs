@@ -13,6 +13,7 @@ mod migrate;
 pub mod models;
 mod nettools;
 pub mod perf;
+mod proxy;
 mod rdp;
 mod serial;
 mod servers;
@@ -303,6 +304,9 @@ pub fn run() {
             voice::commands::voice_stop_capture,
             voice::commands::voice_stop_and_transcribe,
             update::updater_platform,
+            proxy::get_app_proxy_config,
+            proxy::save_app_proxy_config,
+            proxy::get_app_proxy_url,
             exit_app,
         ])
         .run(tauri::generate_context!())

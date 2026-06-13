@@ -2080,8 +2080,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // building the config so the reference lands in options_json.
     let nextPasswordRef = passwordRef;
     if (
-      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC") &&
-      (isDb || isHBase || proto === "RDP" || proto === "VNC" || authMethod === "Password") &&
+      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy) &&
+      (isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || authMethod === "Password") &&
       saveInVault &&
       password.length > 0
     ) {
@@ -2099,11 +2099,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             ? "rdp-password"
             : proto === "VNC"
               ? "vnc-password"
-              : isHBase
-                ? "hbase-password"
-                : isDb
-                  ? "db-password"
-                  : "ssh-password";
+              : isProxy
+                ? "proxy-password"
+                : isHBase
+                  ? "hbase-password"
+                  : isDb
+                    ? "db-password"
+                    : "ssh-password";
         const label = `${username || "user"}@${host || "?"}:${port}`;
         const result = await vaultPut(kind, label, password);
         nextPasswordRef = result.reference;
@@ -2498,6 +2500,38 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     const proxyPort = parseInt(ns.proxyPort) || 3128;
     const now = Math.floor(Date.now() / 1000);
     const proxyName = `${ns.proxyKind === "http" ? "HTTP" : "SOCKS5"} ${ns.proxyHost}:${proxyPort}`;
+
+    // Carry the proxy password into the new Proxy session as a vault reference,
+    // mirroring how SSH passwords live in options_json.passwordRef. An existing
+    // vault: ref is reused as-is; fresh plaintext is encrypted first (which may
+    // require unlocking / creating the vault). Bail out if the gate is cancelled
+    // so we never drop the secret on the floor or store it in plaintext at rest.
+    let proxyPasswordRef = "";
+    if (ns.proxyPass.length > 0) {
+      if (isVaultReference(ns.proxyPass)) {
+        proxyPasswordRef = ns.proxyPass;
+      } else {
+        const ready = await ensureVaultReady(t("vault.gateReasonProxy"));
+        if (!ready) {
+          setTestResult({ ok: false, msg: t("sessionEditor2.errVaultLockedProxy") });
+          return;
+        }
+        try {
+          const label = `proxy://${ns.proxyHost}:${proxyPort}`;
+          const result = await vaultPut("proxy-password", label, ns.proxyPass);
+          proxyPasswordRef = result.reference;
+        } catch (err) {
+          setTestResult({
+            ok: false,
+            msg: isVaultLockedError(err)
+              ? t("sessionEditor2.errVaultLockedProxy")
+              : err instanceof Error ? err.message : String(err),
+          });
+          return;
+        }
+      }
+    }
+
     const config: SessionConfig = {
       id: crypto.randomUUID(),
       name: proxyName,
@@ -2507,7 +2541,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       port: proxyPort,
       username: ns.proxyUser || null,
       auth_method: ns.proxyUser ? "Password" : "None",
-      options_json: JSON.stringify({ proxyKind: ns.proxyKind === "http" ? "http" : "socks5", testUrl: "www.google.com:443" }),
+      options_json: JSON.stringify({
+        proxyKind: ns.proxyKind === "http" ? "http" : "socks5",
+        testUrl: "www.google.com:443",
+        ...(proxyPasswordRef ? { passwordRef: proxyPasswordRef } : {}),
+      }),
       created_at: now,
       updated_at: now,
       last_connected_at: null,
@@ -2753,7 +2791,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 })()}
               </div>
 
-              {(proto === "RDP" || proto === "VNC") && (
+              {(proto === "RDP" || proto === "VNC" || isProxy) && (
                 <>
                   <label className="col-span-2 text-[12px] text-right">
                     {t("sessionEditor2.passwordLabel")}

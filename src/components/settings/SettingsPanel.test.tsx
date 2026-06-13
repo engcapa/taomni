@@ -6,6 +6,8 @@ import { SettingsPanel } from "./SettingsPanel";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
+  getAppProxyConfig: vi.fn(),
+  listSessions: vi.fn(),
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -19,6 +21,19 @@ describe("SettingsPanel", () => {
   beforeEach(() => {
     ipcMocks.listSystemFonts.mockReset();
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
+    ipcMocks.getAppProxyConfig.mockReset();
+    ipcMocks.getAppProxyConfig.mockResolvedValue({
+      enabled: false,
+      mode: "manual",
+      session_id: "",
+      kind: "http",
+      host: "",
+      port: 3128,
+      username: "",
+      password_ref: "",
+    });
+    ipcMocks.listSessions.mockReset();
+    ipcMocks.listSessions.mockResolvedValue([]);
     window.localStorage.clear();
     setAppThemeMode("system");
   });
