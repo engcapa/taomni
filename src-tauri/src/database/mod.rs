@@ -12,6 +12,9 @@ pub mod forward;
 pub mod presto;
 pub mod redis_ops;
 pub mod sql;
+pub mod bookmarks;
+
+pub use bookmarks::*;
 
 use serde::{Deserialize, Serialize};
 use sqlx_core::pool::Pool;

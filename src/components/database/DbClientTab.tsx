@@ -22,6 +22,9 @@ import {
   Maximize2,
   Minimize2,
   ChevronRight,
+  Star,
+  BookMarked,
+  Database,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -43,6 +46,7 @@ import {
   type DbQueryResult,
 } from "../../lib/ipc";
 import { SchemaTree } from "./SchemaTree";
+import { BookmarksPanel } from "./BookmarksPanel";
 import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
 import {
   QueryResultGrid,
@@ -421,6 +425,8 @@ export default function DbClientTab({
   const [activeSchema, setActiveSchema] = useState<string | null>(info.database ?? null);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
+  const [leftPanelTab, setLeftPanelTab] = useState<"schema" | "bookmarks">("schema");
+  const addBookmarkTriggerRef = useRef<(() => void) | null>(null);
   const historyRef = useRef<Record<string, string[]>>({});
   const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
@@ -453,6 +459,19 @@ export default function DbClientTab({
   useEffect(() => {
     activePanelIdRef.current = activePanelId;
   }, [activePanelId]);
+
+  // Global keyboard shortcut to add a bookmark: Ctrl+Alt+B / Cmd+Alt+B
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        e.stopPropagation();
+        addBookmarkTriggerRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   // Connect on mount, disconnect on unmount.
   useEffect(() => {
@@ -1406,18 +1425,67 @@ export default function DbClientTab({
           maxSize="50%"
           onResize={handleSchemaResize}
         >
-          <div className="h-full" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
-            {connectionSessionId && (
-              <SchemaTree
-                sessionId={connectionSessionId}
-                engine={info.engine}
-                onInsertTable={insertIntoActive}
-                onQuickSelect={quickSelect}
-                quickSelectLimit={rowLimit}
-                onSchemasLoaded={onSchemasLoaded}
-                onSchemaLoaded={onSchemaLoaded}
-              />
-            )}
+          <div className="h-full flex flex-col min-h-0 bg-[var(--taomni-bg)]" style={{ borderRight: "1px solid var(--taomni-divider)" }}>
+            {/* Tab Headers */}
+            <div className="h-7 shrink-0 flex border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+              <button
+                type="button"
+                className="flex-1 text-[11px] font-semibold flex items-center justify-center gap-1.5 h-full transition-colors"
+                style={{
+                  color: leftPanelTab === "schema" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
+                  background: leftPanelTab === "schema" ? "var(--taomni-bg)" : "transparent",
+                  borderRight: "1px solid var(--taomni-divider)",
+                }}
+                onClick={() => setLeftPanelTab("schema")}
+              >
+                <Database className="w-3.5 h-3.5" />
+                Schema
+              </button>
+              <button
+                type="button"
+                className="flex-1 text-[11px] font-semibold flex items-center justify-center gap-1.5 h-full transition-colors"
+                style={{
+                  color: leftPanelTab === "bookmarks" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
+                  background: leftPanelTab === "bookmarks" ? "var(--taomni-bg)" : "transparent",
+                }}
+                onClick={() => setLeftPanelTab("bookmarks")}
+              >
+                <BookMarked className="w-3.5 h-3.5" />
+                Bookmarks
+              </button>
+            </div>
+            {/* Tab Body */}
+            <div className="flex-1 min-h-0">
+              {leftPanelTab === "schema" ? (
+                connectionSessionId && (
+                  <SchemaTree
+                    sessionId={connectionSessionId}
+                    engine={info.engine}
+                    onInsertTable={insertIntoActive}
+                    onQuickSelect={quickSelect}
+                    quickSelectLimit={rowLimit}
+                    onSchemasLoaded={onSchemasLoaded}
+                    onSchemaLoaded={onSchemaLoaded}
+                  />
+                )
+              ) : (
+                <BookmarksPanel
+                  engine={info.engine}
+                  activeSql={activePanel.doc}
+                  activeDatabase={activeSchema}
+                  onSelectBookmark={(sql) => {
+                    editorHandles.current[activePanel.id]?.setValue(sql);
+                    patchPanel(activePanel.id, { doc: sql, dirty: true });
+                  }}
+                  onRunBookmark={(sql) => {
+                    editorHandles.current[activePanel.id]?.setValue(sql);
+                    patchPanel(activePanel.id, { doc: sql, dirty: true });
+                    void runQuery(activePanel.id, sql);
+                  }}
+                  onAddTriggerRef={addBookmarkTriggerRef}
+                />
+              )}
+            </div>
           </div>
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
@@ -1490,6 +1558,7 @@ export default function DbClientTab({
                   setHistoryPanelId((current) => (current === activePanel.id ? null : activePanel.id))
                 }
                 onSave={() => void saveQueryFile(activePanel)}
+                onBookmark={() => addBookmarkTriggerRef.current?.()}
                 onSchemaChange={(schema) => void switchSchema(schema)}
                 rowLimit={rowLimit}
                 maxResultSheets={maxResultSheets}
@@ -1507,6 +1576,15 @@ export default function DbClientTab({
                     editorHandles.current[activePanel.id]?.setValue(sql);
                     patchPanel(activePanel.id, { doc: sql, dirty: true });
                     setHistoryPanelId(null);
+                  }}
+                  onBookmark={(sql) => {
+                    setLeftPanelTab("bookmarks");
+                    editorHandles.current[activePanel.id]?.setValue(sql);
+                    patchPanel(activePanel.id, { doc: sql, dirty: true });
+                    setHistoryPanelId(null);
+                    setTimeout(() => {
+                      addBookmarkTriggerRef.current?.();
+                    }, 50);
                   }}
                   onClose={() => setHistoryPanelId(null)}
                 />
@@ -1564,6 +1642,7 @@ function EditorToolbar({
   onFormat,
   onToggleHistory,
   onSave,
+  onBookmark,
   onSchemaChange,
   rowLimit,
   maxResultSheets,
@@ -1580,6 +1659,7 @@ function EditorToolbar({
   onFormat: () => void;
   onToggleHistory: () => void;
   onSave: () => void;
+  onBookmark: () => void;
   onSchemaChange: (schema: string) => void;
   rowLimit: number;
   maxResultSheets: number;
@@ -1611,6 +1691,9 @@ function EditorToolbar({
       </button>
       <button type="button" className={btn} onClick={onSave} title="Save query tab as SQL file">
         <Save className="w-3.5 h-3.5" /> Save
+      </button>
+      <button type="button" className={btn} onClick={onBookmark} title="Bookmark query">
+        <Star className="w-3.5 h-3.5 text-[var(--taomni-accent)]" /> Bookmark
       </button>
       <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
       <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
@@ -1661,32 +1744,49 @@ function EditorToolbar({
 function HistoryDropdown({
   history,
   onPick,
+  onBookmark,
   onClose,
 }: {
   history: string[];
   onPick: (sql: string) => void;
+  onBookmark: (sql: string) => void;
   onClose: () => void;
 }) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className="absolute right-2 top-9 z-50 w-[420px] max-h-[300px] overflow-auto rounded shadow-lg taomni-scroll-y"
+        className="absolute right-2 top-9 z-50 w-[420px] max-h-[300px] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
       >
         {history.length === 0 ? (
           <div className="px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]">No query history yet.</div>
         ) : (
           history.map((sql, i) => (
-            <button
+            <div
               key={i}
-              type="button"
-              className="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--taomni-hover)] truncate font-mono"
-              onClick={() => onPick(sql)}
-              title={sql}
+              className="flex items-center hover:bg-[var(--taomni-hover)] group border-b border-[var(--taomni-divider)] last:border-0"
             >
-              {sql.replace(/\s+/g, " ")}
-            </button>
+              <button
+                type="button"
+                className="flex-1 text-left px-3 py-2 text-[11px] truncate font-mono text-[var(--taomni-text)]"
+                onClick={() => onPick(sql)}
+                title={sql}
+              >
+                {sql.replace(/\s+/g, " ")}
+              </button>
+              <button
+                type="button"
+                className="p-1.5 mr-1 hover:bg-[var(--taomni-divider)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Bookmark this query"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBookmark(sql);
+                }}
+              >
+                <Star className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+              </button>
+            </div>
           ))
         )}
       </div>
