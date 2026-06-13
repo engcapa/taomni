@@ -124,6 +124,7 @@ import {
   shellQuoteStyleForTerminalDrop,
 } from "../../lib/osFileDrop";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { open as tauriOpen } from "@tauri-apps/plugin-shell";
 import { useT } from "../../lib/i18n";
 import "@xterm/xterm/css/xterm.css";
 
@@ -1760,7 +1761,20 @@ export function TerminalPanel({
     const searchAddon = new SearchAddon();
     searchAddonRef.current = searchAddon;
     term.loadAddon(searchAddon);
-    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(
+      new WebLinksAddon((event, uri) => {
+        if (isTauriRuntime()) {
+          tauriOpen(uri).catch((err) => {
+            console.error("Failed to open terminal link in system browser:", err);
+          });
+        } else {
+          const newWindow = window.open(uri, "_blank", "noopener,noreferrer");
+          if (newWindow) {
+            newWindow.opener = null;
+          }
+        }
+      })
+    );
     term.open(el);
 
     // OSC 7 — host writes its current working directory as `file://host/path`.

@@ -104,6 +104,8 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ steps.version.outputs.tag }}
           releaseName: Taomni v${{ steps.version.outputs.version }}
@@ -119,6 +121,8 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
@@ -215,6 +219,8 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Point libgssapi-sys at Homebrew MIT Kerberos (arm64)
           LIBGSSAPI_IMPL: mit
           LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
@@ -234,6 +240,8 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           LIBGSSAPI_IMPL: mit
           LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
           PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
@@ -248,6 +256,8 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Point libgssapi-sys at x86_64 MIT Kerberos under /usr/local
           LIBGSSAPI_IMPL: mit
           LIBGSSAPI_PREFIX: /usr/local/opt/krb5
@@ -268,6 +278,8 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           LIBGSSAPI_IMPL: mit
           LIBGSSAPI_PREFIX: /usr/local/opt/krb5
           PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
@@ -276,3 +288,101 @@ jobs:
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: --target x86_64-apple-darwin
+
+  # ---------------------------------------------------------------------------
+  # Compose a single, complete latest.json for tauri-plugin-updater.
+  #
+  # Each platform build uploads its own updater bundles + .sig files, but the
+  # updater needs ONE latest.json listing every platform. The per-arch macOS
+  # *.app.tar.gz assets share a filename and would collide on the release, so we
+  # rebuild from the uniquely-named per-arch workflow artifacts: re-upload each
+  # updater bundle under an arch-tagged name and overwrite latest.json. Runs
+  # after both build jobs. See claudedocs/auto-update-plan.md (must be verified
+  # by hand on the first signed release).
+  # ---------------------------------------------------------------------------
+  finalize-updater-manifest:
+    name: Compose latest.json
+    needs: [build, build-macos]
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release' || github.ref_type == 'tag' || inputs.tag != ''
+    steps:
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            tag="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="${{ inputs.tag }}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download workflow artifacts
+        if: steps.meta.outputs.tag != ''
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rebuild and upload latest.json
+        if: steps.meta.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          NOTES="$(gh release view "$TAG" --json body --jq '.body // ""' 2>/dev/null || true)"
+          PUB_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          platforms='{}'
+
+          arch_of() { case "$(echo "$1" | tr 'A-Z' 'a-z')" in *aarch64*|*arm64*) echo aarch64;; *) echo x86_64;; esac; }
+
+          record() {
+            # key, sig file, bundle file, release asset name
+            local key="$1" sig="$2" bundle="$3" asset="$4"
+            [ -f "$bundle" ] || { echo "::warning::missing bundle $bundle for $key"; return; }
+            cp -f "$bundle" "/tmp/$asset"
+            gh release upload "$TAG" "/tmp/$asset" --clobber
+            local sig_content; sig_content="$(cat "$sig")"
+            platforms="$(jq -n --argjson p "$platforms" --arg k "$key" \
+              --arg url "${BASE_URL}/${asset}" --arg sig "$sig_content" \
+              '$p + {($k): {signature:$sig, url:$url}}')"
+          }
+
+          # Pass 1: macOS, Linux, and Windows NSIS (NSIS is preferred over MSI).
+          while IFS= read -r sig; do
+            bundle="${sig%.sig}"; a="$(arch_of "$sig")"
+            case "$bundle" in
+              *.app.tar.gz)
+                [ "$a" = aarch64 ] && asset="Taomni_${VERSION}_aarch64.app.tar.gz" || asset="Taomni_${VERSION}_x64.app.tar.gz"
+                record "darwin-${a}" "$sig" "$bundle" "$asset" ;;
+              *.AppImage.tar.gz)
+                [ "$a" = aarch64 ] && asset="Taomni_${VERSION}_aarch64.AppImage.tar.gz" || asset="Taomni_${VERSION}_amd64.AppImage.tar.gz"
+                record "linux-${a}" "$sig" "$bundle" "$asset" ;;
+              *-setup.nsis.zip)
+                [ "$a" = aarch64 ] && asset="Taomni_${VERSION}_arm64-setup.nsis.zip" || asset="Taomni_${VERSION}_x64-setup.nsis.zip"
+                record "windows-${a}" "$sig" "$bundle" "$asset" ;;
+            esac
+          done < <(find artifacts -type f -name '*.sig' | sort)
+
+          # Pass 2: MSI fills only the Windows entries NSIS didn't provide.
+          while IFS= read -r sig; do
+            bundle="${sig%.sig}"; a="$(arch_of "$sig")"; key="windows-${a}"
+            if ! echo "$platforms" | jq -e --arg k "$key" 'has($k)' >/dev/null; then
+              [ "$a" = aarch64 ] && asset="Taomni_${VERSION}_arm64_en-US.msi.zip" || asset="Taomni_${VERSION}_x64_en-US.msi.zip"
+              record "$key" "$sig" "$bundle" "$asset"
+            fi
+          done < <(find artifacts -type f -name '*.msi.zip.sig' | sort)
+
+          jq -n --arg v "$VERSION" --arg n "$NOTES" --arg d "$PUB_DATE" --argjson p "$platforms" \
+            '{version:$v, notes:$n, pub_date:$d, platforms:$p}' > latest.json
+
+          echo "Composed latest.json:"; cat latest.json
+          count="$(jq '.platforms | length' latest.json)"
+          echo "Platform entries: $count"
+          [ "$count" -gt 0 ] || { echo "::error::latest.json has no platforms"; exit 1; }
+          gh release upload "$TAG" latest.json --clobber

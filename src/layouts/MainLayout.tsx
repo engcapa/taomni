@@ -68,6 +68,8 @@ import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
+import { UpdateDialog } from "../components/UpdateDialog";
+import { useUpdateStore } from "../stores/updateStore";
 import { ServersDialog } from "../components/servers/ServersDialog";
 import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
@@ -360,6 +362,29 @@ export function MainLayout() {
   useEffect(() => {
     void refreshVault().catch(() => undefined);
   }, [refreshVault]);
+
+  // Auto-update: silently check shortly after launch and then every 6 hours.
+  // Checks are non-intrusive — they only flip the store to "available" so the
+  // title-bar indicator lights up; the update window opens when the user clicks
+  // it (or "Check for updates" in About), never on its own. No-op outside the
+  // desktop app.
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const runCheck = () => {
+      const st = useUpdateStore.getState();
+      // Don't disturb the user mid-flow: skip while the window is open or a
+      // check/download/staged-install is in progress.
+      if (st.dialogOpen) return;
+      if (st.status === "checking" || st.status === "downloading" || st.status === "ready") return;
+      void st.check();
+    };
+    const initial = window.setTimeout(runCheck, 4000);
+    const interval = window.setInterval(runCheck, 6 * 60 * 60 * 1000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   // Listen for VAULT_LOCKED events emitted by ipc helpers (e.g. when an
   // SSH connect tries to resolve a vault: reference while the vault is
@@ -2530,6 +2555,7 @@ export function MainLayout() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      <UpdateDialog />
 
       {/* Session import preview — driven by the native macOS menu's
           import actions (no-op elsewhere, where <MenuBar> hosts its own). */}

@@ -566,7 +566,7 @@ function Field({
       className="flex items-center gap-2 text-[12px]"
       style={{ opacity: disabled ? 0.45 : 1 }}
     >
-      <label className="w-24 text-right shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{label}</label>
+      <label className="w-32 text-right shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{label}</label>
       <div className="flex items-center gap-1 flex-wrap">{children}</div>
     </div>
   );
