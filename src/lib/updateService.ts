@@ -48,6 +48,32 @@ function devOsToken(): string {
   }
 }
 
+/**
+ * Resolved application-proxy URL (Settings → Application Proxy), or undefined
+ * for a direct connection. `tauri-plugin-updater` applies the `proxy` option
+ * to BOTH the manifest check and the binary download, so threading it into
+ * `check()` is enough to route the whole update flow. Never throws — a proxy
+ * lookup failure degrades to a direct connection.
+ */
+async function appProxyUrl(): Promise<string | undefined> {
+  if (!isTauriRuntime()) return undefined;
+  try {
+    const url = await invoke<string | null>("get_app_proxy_url");
+    return url ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Merge target + proxy into the plugin's CheckOptions (undefined when empty). */
+function checkOptions(target?: string, proxy?: string): { target?: string; proxy?: string } | undefined {
+  const opts: { target?: string; proxy?: string } = {};
+  if (target) opts.target = target;
+  if (proxy) opts.proxy = proxy;
+  return Object.keys(opts).length > 0 ? opts : undefined;
+}
+
+
 export async function getUpdaterPlatform(): Promise<UpdaterPlatform> {
   if (!isTauriRuntime()) {
     const os = devOsToken();
@@ -65,7 +91,8 @@ export async function getUpdaterPlatform(): Promise<UpdaterPlatform> {
 export async function checkForUpdate(target?: string): Promise<AvailableUpdate | null> {
   if (!isTauriRuntime()) return null;
   const { check } = await import("@tauri-apps/plugin-updater");
-  const update = await check(target ? { target } : undefined);
+  const proxy = await appProxyUrl();
+  const update = await check(checkOptions(target, proxy));
 
   const key = target ?? "";
   const prev = updateCache.get(key);
@@ -100,7 +127,8 @@ export async function downloadAndInstall(
   let update = updateCache.get(key);
   if (!update) {
     const { check } = await import("@tauri-apps/plugin-updater");
-    update = (await check(target ? { target } : undefined)) ?? undefined;
+    const proxy = await appProxyUrl();
+    update = (await check(checkOptions(target, proxy))) ?? undefined;
     if (!update) throw new Error("No update is available for the selected package.");
     updateCache.set(key, update);
   }
