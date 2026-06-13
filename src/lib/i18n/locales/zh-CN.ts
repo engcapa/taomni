@@ -491,6 +491,12 @@ export const zhCN: DeepPartial<typeof en> = {
     recentSessionsEmpty: "（暂无最近会话）",
     newSession: "新建会话…",
     shellsLoading: "正在检测终端…",
+    filterPlaceholder: "过滤已打开标签…",
+    filterUngrouped: "本地 / 未分组",
+    filterShowAll: "显示全部标签",
+    filterByDir: "只看此目录",
+    filterNoMatch: "没有符合当前过滤条件的标签",
+    filterClear: "清除过滤",
   },
   multiExec: {
     title: "多终端同步执行",

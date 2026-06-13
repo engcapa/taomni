@@ -492,6 +492,12 @@ const dict = {
     recentSessionsEmpty: "(no recent sessions)",
     newSession: "New session…",
     shellsLoading: "Detecting shells…",
+    filterPlaceholder: "Filter open tabs…",
+    filterUngrouped: "Local / ungrouped",
+    filterShowAll: "Show all tabs",
+    filterByDir: "Show only this directory",
+    filterNoMatch: "No tabs match the current filter",
+    filterClear: "Clear filter",
   },
   multiExec: {
     title: "MultiExec",
