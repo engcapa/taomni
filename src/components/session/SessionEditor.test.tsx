@@ -495,6 +495,38 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists Proxy session password through the vault save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Proxy" });
+
+    await waitFor(() => expect(screen.getByTestId("session-proxy-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "proxy.corp");
+    await user.type(screen.getByLabelText("Password"), "s3cret");
+
+    const saveCheckbox = screen.getByRole("checkbox", { name: /save in vault/i }) as HTMLInputElement;
+    if (!saveCheckbox.checked) {
+      await user.click(saveCheckbox);
+    }
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.vaultPut).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.vaultPut).toHaveBeenCalledWith("proxy-password", "user@proxy.corp:3128", "s3cret");
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "Proxy",
+      host: "proxy.corp",
+      port: 3128,
+    });
+    expect(savedOptions).toMatchObject({
+      passwordRef: "vault:pwd",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists Presto database settings through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "Presto" });
