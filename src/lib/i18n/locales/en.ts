@@ -56,6 +56,7 @@ const dict = {
     cycleTheme: "Theme: {mode} ({resolved}). Click for {next}.",
     cycleThemeAria: "Cycle application theme",
     appThemeAria: "Application theme",
+    updateAvailable: "Update available: {version}. Click to view.",
     enterCompact: "Enter compact mode",
     exitCompact: "Exit compact mode",
     enableSplit: "Enable terminal split view",

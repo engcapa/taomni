@@ -1,8 +1,9 @@
-import { Monitor, Moon, Sun, PanelTopClose, PanelTopOpen, SplitSquareVertical, Users, Bot } from "lucide-react";
+import { Monitor, Moon, Sun, PanelTopClose, PanelTopOpen, SplitSquareVertical, Users, Bot, Download } from "lucide-react";
 import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
+import { useUpdateStore } from "../../stores/updateStore";
 import { getAppPlatform } from "../../lib/runtime";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
@@ -27,6 +28,9 @@ export function TitleBarTrayControls() {
   const drawerScope = useChatStore((s) => s.drawerScope);
   const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const updateStatus = useUpdateStore((s) => s.status);
+  const updateVersion = useUpdateStore((s) => s.availableVersion);
+  const openUpdateDialog = useUpdateStore((s) => s.openDialog);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
 
@@ -45,8 +49,37 @@ export function TitleBarTrayControls() {
   const chatTitle = chatOpenForGlobal ? t("titlebar.closeGlobalChat") : t("titlebar.openGlobalChat");
   const chatAria = chatOpenForGlobal ? t("titlebar.closeGlobalChatAria") : t("titlebar.openGlobalChatAria");
 
+  // Non-intrusive update hint: a small badge that appears only once a new
+  // version is available (or staged). Clicking it opens the update window —
+  // checks never pop it up on their own.
+  const updatePending = updateStatus === "available" || updateStatus === "ready";
+  const updateTitle = t("titlebar.updateAvailable", { version: updateVersion ?? "" });
+
   return (
     <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
+      {updatePending && (
+        <>
+          <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
+            <TrayButton
+              testId="titlebar-update-available"
+              title={updateTitle}
+              ariaLabel={updateTitle}
+              onClick={openUpdateDialog}
+            >
+              <span className="relative inline-flex">
+                <Download className="w-[16px] h-[16px]" />
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full"
+                  style={{ background: "#e5534b", boxShadow: "0 0 0 1.5px var(--taomni-chrome-bg)" }}
+                />
+              </span>
+            </TrayButton>
+          </div>
+          <TrayGroupSeparator />
+        </>
+      )}
+
       {/* Voice group */}
       <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <PttButton />

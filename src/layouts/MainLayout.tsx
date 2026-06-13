@@ -362,16 +362,27 @@ export function MainLayout() {
     void refreshVault().catch(() => undefined);
   }, [refreshVault]);
 
-  // Auto-update: silently check shortly after launch (delayed so it doesn't
-  // compete with first render). This only *surfaces* an update — nothing is
-  // downloaded or installed without the user's explicit confirmation. No-op
-  // outside the desktop app.
+  // Auto-update: silently check shortly after launch and then every 6 hours.
+  // Checks are non-intrusive — they only flip the store to "available" so the
+  // title-bar indicator lights up; the update window opens when the user clicks
+  // it (or "Check for updates" in About), never on its own. No-op outside the
+  // desktop app.
   useEffect(() => {
     if (!isTauriRuntime()) return;
-    const handle = window.setTimeout(() => {
-      void useUpdateStore.getState().check();
-    }, 4000);
-    return () => window.clearTimeout(handle);
+    const runCheck = () => {
+      const st = useUpdateStore.getState();
+      // Don't disturb the user mid-flow: skip while the window is open or a
+      // check/download/staged-install is in progress.
+      if (st.dialogOpen) return;
+      if (st.status === "checking" || st.status === "downloading" || st.status === "ready") return;
+      void st.check();
+    };
+    const initial = window.setTimeout(runCheck, 4000);
+    const interval = window.setInterval(runCheck, 6 * 60 * 60 * 1000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
   }, []);
 
   // Listen for VAULT_LOCKED events emitted by ipc helpers (e.g. when an

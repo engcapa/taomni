@@ -105,7 +105,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
         availableVersion: found.version,
         currentVersion: found.currentVersion,
         notes: found.notes,
-        dialogOpen: true,
+        // Non-intrusive: startup/periodic checks only light up the title-bar
+        // indicator. Only a manual check (About button) opens the window here;
+        // otherwise the user opens it by clicking the indicator.
+        dialogOpen: manual,
         targetStatus: nativeIsRecommended ? "ok" : "unknown",
       });
       // When we steer the user to a different arch (e.g. Rosetta → native
