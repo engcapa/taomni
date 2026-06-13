@@ -13,6 +13,7 @@ import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettin
 import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { LanguageSection } from "./LanguageSection";
 import { VaultSettings } from "../vault/VaultSettings";
+import { AppProxyPanel } from "./AppProxyPanel";
 import { useAppStore } from "../../stores/appStore";
 import { useSystemFonts } from "../../lib/systemFonts";
 import { LlmProvidersPanel } from "./LlmProvidersPanel";
@@ -195,6 +196,10 @@ export function SettingsPanel() {
 
         <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]">
           <VaultSettings />
+        </section>
+
+        <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+          <AppProxyPanel />
         </section>
 
         <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
