@@ -1762,7 +1762,7 @@ export function TerminalPanel({
     searchAddonRef.current = searchAddon;
     term.loadAddon(searchAddon);
     term.loadAddon(
-      new WebLinksAddon((event, uri) => {
+      new WebLinksAddon((_event, uri) => {
         if (isTauriRuntime()) {
           tauriOpen(uri).catch((err) => {
             console.error("Failed to open terminal link in system browser:", err);
