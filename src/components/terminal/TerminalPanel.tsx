@@ -1850,6 +1850,22 @@ export function TerminalPanel({
     });
     observer.observe(el);
 
+    // Pin the xterm host container against IME-induced focus scrolling. When a
+    // CJK IME composes, xterm moves its focused helper-textarea to the cursor
+    // cell and grows it to the preedit width; if the cursor sits near the right
+    // edge the caret lands past the viewport and the browser scrolls an ancestor
+    // to reveal it, shoving the terminal off-screen (it snaps back on commit, so
+    // it visibly oscillates). With `overflow:hidden` this container is now the
+    // nearest scroll container, so the focus-scroll lands here — reset it to keep
+    // the terminal fixed. The terminal's own scrollback lives on `.xterm-viewport`
+    // (a different element), so this never touches the user's scroll position.
+    // Guarded against the self-recursion of writing scrollLeft inside `scroll`.
+    const onContainerScroll = () => {
+      if (el.scrollLeft !== 0) el.scrollLeft = 0;
+      if (el.scrollTop !== 0) el.scrollTop = 0;
+    };
+    el.addEventListener("scroll", onContainerScroll, { passive: true });
+
     const { cols, rows } = term;
     const adopted = adoptedTerminalRef.current;
     const sid = adopted?.sessionId ?? createTerminalSessionId();
@@ -2187,6 +2203,7 @@ export function TerminalPanel({
     return () => {
       destroyed = true;
       observer.disconnect();
+      el.removeEventListener("scroll", onContainerScroll);
       selectionDisposable.dispose();
       scrollDisposable.dispose();
       renderDisposable.dispose();
@@ -2480,7 +2497,7 @@ export function TerminalPanel({
       onMouseUpCapture={handleTerminalMouseUpCapture}
       onAuxClick={handleMiddleClick}
     >
-      <div ref={containerRef} className="w-full h-full" />
+      <div ref={containerRef} className="w-full h-full overflow-hidden" />
 
       <FloatingToolbar
         storageKey={`mob.terminal.toolbar.${ssh ? "ssh" : "local"}`}
