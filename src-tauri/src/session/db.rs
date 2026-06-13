@@ -54,7 +54,21 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_voice_audit_time
-            ON voice_audit(created_at DESC);",
+            ON voice_audit(created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS sql_bookmarks (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            sql_content TEXT NOT NULL,
+            remarks TEXT,
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            engine TEXT NOT NULL,
+            database_name TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sql_bookmarks_engine ON sql_bookmarks(engine);",
     )?;
 
     // Chat tables (v2.4).
