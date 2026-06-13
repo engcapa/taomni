@@ -246,6 +246,7 @@ const dict = {
   about: {
     title: "About Taomni",
     version: "Version {version}",
+    versionTooltip: "Click to check for updates",
     description: "An AI-native remote workspace for developers — full-featured yet compact: terminal, SSH, SFTP, RDP/VNC, tunnels, and a database client in one refined desktop app.",
   },
   update: {
@@ -530,6 +531,7 @@ const dict = {
     filterByDir: "Show only this directory",
     filterNoMatch: "No tabs match the current filter",
     filterClear: "Clear filter",
+    filterCount: "{count} filters",
   },
   multiExec: {
     title: "MultiExec",

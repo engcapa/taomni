@@ -89,4 +89,16 @@ describe("tabMatchesFilter / filterVisibleTabs", () => {
     ).toEqual(["local"]);
     expect(tabMatchesFilter(tabs[0], sessions, { kind: "group", path: "" })).toBe(false);
   });
+
+  it("matches a multi-select filter by paths and/or tab IDs", () => {
+    expect(
+      filterVisibleTabs(tabs, sessions, { kind: "multi", paths: ["proj / cap"], tabIds: [] }).map((t) => t.id),
+    ).toEqual(["cap"]);
+    expect(
+      filterVisibleTabs(tabs, sessions, { kind: "multi", paths: [], tabIds: ["local"] }).map((t) => t.id),
+    ).toEqual(["local"]);
+    expect(
+      filterVisibleTabs(tabs, sessions, { kind: "multi", paths: ["proj / cap"], tabIds: ["local"] }).map((t) => t.id),
+    ).toEqual(["cap", "local"]);
+  });
 });

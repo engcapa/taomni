@@ -16,8 +16,6 @@ import {
   Server,
   ChevronDown,
   Search,
-  Eye,
-  EyeOff,
   FolderPlus,
   Save,
   RotateCcw,
@@ -297,7 +295,6 @@ function AdvancedSshSettings({
   remoteEnv, setRemoteEnv,
   sshBrowser, setSshBrowser,
   authRadio, setAuthRadio,
-  showPwd, setShowPwd,
   password, setPassword,
   passwordRef,
   clearPasswordRef,
@@ -316,7 +313,6 @@ function AdvancedSshSettings({
   remoteEnv: string; setRemoteEnv: (v: string) => void;
   sshBrowser: string; setSshBrowser: (v: string) => void;
   authRadio: string; setAuthRadio: (v: string) => void;
-  showPwd: boolean; setShowPwd: (v: boolean) => void;
   password: string; setPassword: (v: string) => void;
   passwordRef: string;
   clearPasswordRef: () => void;
@@ -411,29 +407,17 @@ function AdvancedSshSettings({
           </div>
           <div className="flex items-center gap-2 pl-1 flex-wrap">
             <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.passwordLabel")}</span>
-            <div className="relative">
-              <input
-                className="taomni-input pr-7 w-44"
-                type={showPwd ? "text" : "password"}
-                value={password}
-                aria-label={t("sessionEditor2.passwordAria")}
-                placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (passwordRef) clearPasswordRef();
-                }}
-              />
-              <button
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
-                onClick={() => setShowPwd(!showPwd)}
-                title={t("sessionEditor2.passwordShowHide")}
-                type="button"
-              >
-                {showPwd
-                  ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
-                  : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
-              </button>
-            </div>
+            <input
+              className="taomni-input w-44"
+              type="password"
+              value={password}
+              aria-label={t("sessionEditor2.passwordAria")}
+              placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordRef) clearPasswordRef();
+              }}
+            />
             <label
               className="flex items-center gap-1 text-[11px] cursor-pointer"
               title={
@@ -1119,7 +1103,6 @@ function DatabaseSettings({
   username, setUsername,
   password, setPassword,
   passwordRef, clearPasswordRef,
-  showPwd, setShowPwd,
   saveInVault, setSaveInVault,
   vaultState,
   catalog, setCatalog,
@@ -1134,7 +1117,6 @@ function DatabaseSettings({
   username: string; setUsername: (v: string) => void;
   password: string; setPassword: (v: string) => void;
   passwordRef: string; clearPasswordRef: () => void;
-  showPwd: boolean; setShowPwd: (v: boolean) => void;
   saveInVault: boolean; setSaveInVault: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
   catalog: string; setCatalog: (v: string) => void;
@@ -1161,10 +1143,9 @@ function DatabaseSettings({
       </Field>
 
       <Field label="Password">
-        <div className="relative">
           <input
-            className="taomni-input pr-7 w-64"
-            type={showPwd ? "text" : "password"}
+            className="taomni-input w-64"
+            type="password"
             value={password}
             aria-label="Database password"
             placeholder={passwordRef ? "•••••• (saved in vault)" : ""}
@@ -1173,17 +1154,6 @@ function DatabaseSettings({
               if (passwordRef) clearPasswordRef();
             }}
           />
-          <button
-            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
-            onClick={() => setShowPwd(!showPwd)}
-            title="Show / hide password"
-            type="button"
-          >
-            {showPwd
-              ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
-              : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
-          </button>
-        </div>
         <label
           className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
           title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
@@ -1300,7 +1270,6 @@ function HBaseSettings({
   username, setUsername,
   password, setPassword,
   passwordRef, clearPasswordRef,
-  showPwd, setShowPwd,
   saveInVault, setSaveInVault,
   vaultState,
   namespace, setNamespace,
@@ -1323,7 +1292,6 @@ function HBaseSettings({
   username: string; setUsername: (v: string) => void;
   password: string; setPassword: (v: string) => void;
   passwordRef: string; clearPasswordRef: () => void;
-  showPwd: boolean; setShowPwd: (v: boolean) => void;
   saveInVault: boolean; setSaveInVault: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
   namespace: string; setNamespace: (v: string) => void;
@@ -1599,10 +1567,9 @@ function HBaseSettings({
       </Field>
 
       <Field label="Password">
-        <div className="relative">
           <input
-            className="taomni-input pr-7 w-64"
-            type={showPwd ? "text" : "password"}
+            className="taomni-input w-64"
+            type="password"
             value={password}
             aria-label="HBase password"
             placeholder={passwordRef ? "•••••• (saved in vault)" : ""}
@@ -1611,17 +1578,6 @@ function HBaseSettings({
               if (passwordRef) clearPasswordRef();
             }}
           />
-          <button
-            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
-            onClick={() => setShowPwd(!showPwd)}
-            title="Show / hide password"
-            type="button"
-          >
-            {showPwd
-              ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
-              : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
-          </button>
-        </div>
         <label
           className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
           title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
@@ -1737,7 +1693,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     extractKeyPath(session?.auth_method),
   );
   const [password, setPassword] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
   const [passwordRef, setPasswordRef] = useState<string>(
     () => optionString(initialOptions, "passwordRef", ""),
   );
@@ -2232,7 +2187,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setAuthRadio(nextAuth === "PrivateKey" ? "privatekey" : nextAuth === "Agent" ? "agent" : nextAuth === "None" ? "gssapi" : "password");
     setKeyPath(extractKeyPath(session?.auth_method));
     setPassword("");
-    setShowPwd(false);
     const restoredRef = optionString(nextOptions, "passwordRef", "");
     setPasswordRef(restoredRef);
     setSaveInVault(!!restoredRef);
@@ -2797,11 +2751,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                     {t("sessionEditor2.passwordLabel")}
                   </label>
                   <div className="col-span-10 flex items-center gap-2">
-                    <div className="relative">
                       <input
                         data-testid="session-password"
-                        className="taomni-input pr-7 w-64"
-                        type={showPwd ? "text" : "password"}
+                        className="taomni-input w-64"
+                        type="password"
                         value={password}
                         aria-label={t("sessionEditor2.passwordLabel")}
                         placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
@@ -2810,17 +2763,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                           if (passwordRef) setPasswordRef("");
                         }}
                       />
-                      <button
-                        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5"
-                        onClick={() => setShowPwd(!showPwd)}
-                        title={t("sessionEditor2.passwordShowHide")}
-                        type="button"
-                      >
-                        {showPwd
-                          ? <EyeOff className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
-                          : <Eye className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
-                      </button>
-                    </div>
                     <label
                       className="flex items-center gap-1 text-[11px] cursor-pointer"
                       title={
@@ -2977,7 +2919,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               remoteEnv={remoteEnv} setRemoteEnv={setRemoteEnv}
               sshBrowser={sshBrowser} setSshBrowser={setSshBrowser}
               authRadio={authRadio} setAuthRadio={handleAuthRadio}
-              showPwd={showPwd} setShowPwd={setShowPwd}
               password={password} setPassword={setPassword}
               passwordRef={passwordRef}
               clearPasswordRef={() => setPasswordRef("")}
@@ -3010,7 +2951,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 username={username} setUsername={(v) => { setUsername(v); setSpecifyUser(true); }}
                 password={password} setPassword={setPassword}
                 passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
-                showPwd={showPwd} setShowPwd={setShowPwd}
                 saveInVault={saveInVault} setSaveInVault={setSaveInVault}
                 vaultState={vaultState}
                 catalog={dbCatalog} setCatalog={setDbCatalog}
@@ -3031,7 +2971,6 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 username={username} setUsername={(v) => { setUsername(v); setSpecifyUser(true); }}
                 password={password} setPassword={setPassword}
                 passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
-                showPwd={showPwd} setShowPwd={setShowPwd}
                 saveInVault={saveInVault} setSaveInVault={setSaveInVault}
                 vaultState={vaultState}
                 namespace={hbaseNamespace} setNamespace={setHBaseNamespace}

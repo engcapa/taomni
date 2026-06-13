@@ -9,25 +9,27 @@ export interface AboutDialogProps {
 export function AboutDialog({ onClose }: AboutDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const t = useT();
-  const { status: updateStatus, availableVersion, check } = useUpdateStore();
-
-  const updateStatusText =
-    updateStatus === "checking"
-      ? t("update.statusChecking")
-      : updateStatus === "uptodate"
-        ? t("update.statusUpToDate")
-        : updateStatus === "available"
-          ? t("update.statusAvailable", { version: availableVersion ?? "" })
-          : updateStatus === "error"
-            ? t("update.statusError")
-            : "";
+  const { check } = useUpdateStore();
 
   useEffect(() => {
     closeRef.current?.focus();
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") onClose();
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [onClose]);
+
+  const handleCheckUpdate = () => {
+    onClose();
+    void check({ manual: true });
   };
 
   return (
@@ -35,7 +37,6 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: "rgba(0,0,0,0.4)" }}
       onClick={onClose}
-      onKeyDown={handleKeyDown}
     >
       <div
         role="dialog"
@@ -56,9 +57,20 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           <div>
             <div className="text-lg font-semibold">{t("app.name")}</div>
             <div
+              tabIndex={0}
+              role="button"
               data-testid="about-version"
-              className="text-[12px] taomni-mono"
+              className="text-[12px] taomni-mono cursor-pointer hover:underline outline-none focus:underline"
               style={{ color: "var(--taomni-text-muted)" }}
+              title={t("about.versionTooltip")}
+              onClick={handleCheckUpdate}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  handleCheckUpdate();
+                }
+              }}
             >
               {t("about.version", { version: __APP_VERSION__ })}
             </div>
@@ -69,27 +81,15 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           {t("about.description")}
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              type="button"
-              className="taomni-btn h-8 px-3 text-[12px] shrink-0"
-              disabled={updateStatus === "checking"}
-              onClick={() => void check({ manual: true })}
-              data-testid="about-check-update"
-            >
-              {t("update.checkButton")}
-            </button>
-            {updateStatusText && (
-              <span
-                className="text-[12px] truncate"
-                style={{ color: "var(--taomni-text-muted)" }}
-                data-testid="about-update-status"
-              >
-                {updateStatusText}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center justify-between mt-4">
+          <button
+            type="button"
+            className="taomni-btn h-8 px-3 text-[12px]"
+            onClick={handleCheckUpdate}
+            data-testid="about-check-update"
+          >
+            {t("update.checkButton")}
+          </button>
           <button
             ref={closeRef}
             type="button"
