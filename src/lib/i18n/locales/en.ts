@@ -1683,6 +1683,7 @@ const dict = {
     contextImportExceed: "Import Exceed sessions",
     contextImportSecureCrt: "Import SCRT sessions",
     contextImportRdm: "Import RDM sessions",
+    contextImportZeroOmega: "Import ZeroOmega proxies",
     contextImportCsv: "Import sessions from a CSV file",
     fromXshFile: "From .xsh / .xts file",
     fromZipArchive: "From ZIP archive",

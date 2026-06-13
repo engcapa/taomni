@@ -59,6 +59,7 @@ import {
   parseXshellSessions,
   parseXshellZipSessions,
   parseXshellFile,
+  parseZeroOmegaProxies,
   createSessionImportResult,
   serializeCsvSessions,
   serializeMobaXtermSessions,
@@ -1131,6 +1132,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         label: t("sessionTree.contextImportRdm"),
         icon: <Upload className="w-3 h-3" />,
         onClick: () => importTextSessions(folderPath, "Remote Desktop Manager", ".rdm,.xml,text/xml,application/xml", parseXmlConnectionSessions),
+      },
+      {
+        label: t("sessionTree.contextImportZeroOmega"),
+        icon: <Upload className="w-3 h-3" />,
+        onClick: () => importTextSessions(folderPath, "ZeroOmega", ".bak,.json,application/json,text/plain", parseZeroOmegaProxies),
       },
       { label: "", separator: true },
       {
