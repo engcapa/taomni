@@ -295,7 +295,7 @@ pub(crate) fn resolve_proxy_session(
     let proxy_kind = serde_json::from_str::<serde_json::Value>(&proxy_session.options_json)
         .ok()
         .and_then(|v| v.get("proxyKind").and_then(|k| k.as_str()).map(|s| s.to_string()))
-        .unwrap_or_else(|| "socks5".to_string());
+        .unwrap_or_else(|| "http".to_string());
 
     network.proxy_kind = proxy_kind;
     network.proxy_host = proxy_session.host.clone();
@@ -787,7 +787,7 @@ pub async fn test_ssh_connection(
 }
 
 /// Test proxy connectivity by establishing a TCP connection through the proxy
-/// to a user-specified test target (default: google.com:80). Returns timing on
+/// to a user-specified test target (default: www.google.com:443). Returns timing on
 /// success or an error message on failure.
 #[tauri::command]
 pub async fn test_proxy_connection(

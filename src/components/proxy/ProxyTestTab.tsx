@@ -6,7 +6,7 @@ import type { ProxyTestTabInfo } from "../../types";
 
 export default function ProxyTestTab({ info }: { info: ProxyTestTabInfo }) {
   const t = useT();
-  const [testUrl, setTestUrl] = useState(info.testUrl || "google.com:80");
+  const [testUrl, setTestUrl] = useState(info.testUrl || "www.google.com:443");
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -15,7 +15,7 @@ export default function ProxyTestTab({ info }: { info: ProxyTestTabInfo }) {
     setResult(null);
     try {
       const [testHost, testPortStr] = testUrl.split(":");
-      const testPort = parseInt(testPortStr) || 80;
+      const testPort = parseInt(testPortStr) || 443;
       const msg = await testProxyConnection(
         info.proxyKind,
         info.host,

@@ -1102,7 +1102,7 @@ export function MainLayout() {
   const openProxyTestTab = useCallback((session: SessionConfig) => {
     const id = `proxy-test-${session.id}-${Date.now()}`;
     const options = parseSessionOptions(session.options_json);
-    const proxyKind = (options.proxyKind === "http" ? "http" : "socks5") as "http" | "socks5";
+    const proxyKind = (options.proxyKind === "socks5" ? "socks5" : "http") as "http" | "socks5";
     const title = `${proxyKind === "http" ? "HTTP" : "SOCKS5"} ${session.host}:${session.port}`;
     addTab({
       id,
@@ -1117,7 +1117,7 @@ export function MainLayout() {
         port: session.port,
         username: session.username,
         password: passwordRefFromOptions(session) || undefined,
-        testUrl: typeof options.testUrl === "string" ? options.testUrl : "google.com:80",
+        testUrl: typeof options.testUrl === "string" ? options.testUrl : "www.google.com:443",
       },
     });
     void markConnected(session.id);

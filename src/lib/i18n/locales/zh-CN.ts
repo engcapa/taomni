@@ -1905,7 +1905,7 @@ export const zhCN: DeepPartial<typeof en> = {
     proxySessionSaved: "代理会话已保存",
     proxyKindLabel: "代理类型",
     proxyTestUrl: "测试地址",
-    proxyTestUrlPlaceholder: "google.com:80",
+    proxyTestUrlPlaceholder: "www.google.com:443",
     proxyTestBtn: "测试连接",
     proxyTestTesting: "测试中…",
     proxyTestSuccess: "代理连接成功",

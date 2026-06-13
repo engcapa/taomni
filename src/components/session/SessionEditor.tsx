@@ -134,7 +134,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
   MySQL: 3306, PostgreSQL: 5432, ClickHouse: 9000, Presto: 8080, Redis: 6379,
-  HBaseShell: 8080, Proxy: 1080,
+  HBaseShell: 8080, Proxy: 3128,
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Presto", "Redis"];
@@ -1797,10 +1797,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   /* --- proxy session options --- */
   const [proxyKind, setProxyKind] = useState<"http" | "socks5">(() => {
-    const v = optionString(initialOptions, "proxyKind", "socks5");
-    return v === "http" ? "http" : "socks5";
+    const v = optionString(initialOptions, "proxyKind", "http");
+    return v === "socks5" ? "socks5" : "http";
   });
-  const [proxyTestUrl, setProxyTestUrl] = useState(() => optionString(initialOptions, "testUrl", "google.com:80"));
+  const [proxyTestUrl, setProxyTestUrl] = useState(() => optionString(initialOptions, "testUrl", "www.google.com:443"));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -2470,12 +2470,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setTesting(true);
     setTestResult(null);
     try {
-      const [testHost, testPortStr] = (proxyTestUrl || "google.com:80").split(":");
-      const testPort = parseInt(testPortStr) || 80;
+      const [testHost, testPortStr] = (proxyTestUrl || "www.google.com:443").split(":");
+      const testPort = parseInt(testPortStr) || 443;
       const msg = await testProxyConnection(
         proxyKind,
         host,
-        parseInt(port) || 1080,
+        parseInt(port) || 3128,
         username || "",
         password || passwordRef || "",
         testHost,
@@ -2495,7 +2495,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setTestResult({ ok: false, msg: t("sessionEditor2.proxyHostRequired") });
       return;
     }
-    const proxyPort = parseInt(ns.proxyPort) || 1080;
+    const proxyPort = parseInt(ns.proxyPort) || 3128;
     const now = Math.floor(Date.now() / 1000);
     const proxyName = `${ns.proxyKind === "http" ? "HTTP" : "SOCKS5"} ${ns.proxyHost}:${proxyPort}`;
     const config: SessionConfig = {
@@ -2507,7 +2507,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       port: proxyPort,
       username: ns.proxyUser || null,
       auth_method: ns.proxyUser ? "Password" : "None",
-      options_json: JSON.stringify({ proxyKind: ns.proxyKind === "http" ? "http" : "socks5", testUrl: "google.com:80" }),
+      options_json: JSON.stringify({ proxyKind: ns.proxyKind === "http" ? "http" : "socks5", testUrl: "www.google.com:443" }),
       created_at: now,
       updated_at: now,
       last_connected_at: null,

@@ -1909,7 +1909,7 @@ const dict = {
     proxySessionSaved: "Proxy session saved",
     proxyKindLabel: "Proxy type",
     proxyTestUrl: "Test URL",
-    proxyTestUrlPlaceholder: "google.com:80",
+    proxyTestUrlPlaceholder: "www.google.com:443",
     proxyTestBtn: "Test Connection",
     proxyTestTesting: "Testing…",
     proxyTestSuccess: "Proxy connection successful",
