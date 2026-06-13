@@ -55,6 +55,7 @@ export const zhCN: DeepPartial<typeof en> = {
     cycleTheme: "主题：{mode}（{resolved}）。点击切换到 {next}。",
     cycleThemeAria: "切换应用主题",
     appThemeAria: "应用主题",
+    updateAvailable: "发现新版本：{version}，点击查看。",
     enterCompact: "进入紧凑模式",
     exitCompact: "退出紧凑模式",
     enableSplit: "启用终端分屏视图",

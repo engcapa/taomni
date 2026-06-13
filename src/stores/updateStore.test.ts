@@ -69,7 +69,7 @@ describe("updateStore.check", () => {
     expect(get().dialogOpen).toBe(true);
   });
 
-  it("surfaces an available update and defaults to the native target", async () => {
+  it("surfaces an available update without auto-opening the window (startup)", async () => {
     mocked.getUpdaterPlatform.mockResolvedValue(platform());
     mocked.checkForUpdate.mockResolvedValue(update());
     await get().check();
@@ -79,9 +79,18 @@ describe("updateStore.check", () => {
     expect(s.notes).toBe("Notes");
     expect(s.selectedTarget).toBe("darwin-aarch64");
     expect(s.targetStatus).toBe("ok");
-    expect(s.dialogOpen).toBe(true);
+    expect(s.dialogOpen).toBe(false); // non-intrusive: indicator only
     expect(mocked.checkForUpdate).toHaveBeenCalledTimes(1);
     expect(mocked.checkForUpdate).toHaveBeenCalledWith("darwin-aarch64");
+  });
+
+  it("opens the window for an available update on a manual check", async () => {
+    mocked.getUpdaterPlatform.mockResolvedValue(platform());
+    mocked.checkForUpdate.mockResolvedValue(update());
+    await get().check({ manual: true });
+    const s = get();
+    expect(s.status).toBe("available");
+    expect(s.dialogOpen).toBe(true);
   });
 
   it("under Rosetta, recommends and validates the native arm64 build", async () => {

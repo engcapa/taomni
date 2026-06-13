@@ -27,8 +27,9 @@
 ## 3. 更新链路总览
 
 ```
-客户端启动(延迟 3-5s) → 静默 check()(原生架构)拉取 latest.json(GitHub Release)
-  → 比对 version → 有新版则【仅提示】(更新对话框:新版本号 + 更新说明),不自动下载
+客户端启动(延迟 3-5s)+ 之后每 6 小时 → 静默 check()(原生架构)拉取 latest.json(GitHub Release)
+  → 比对 version → 有新版则【非干扰提示】:仅点亮标题栏角标(不弹窗、不下载)
+  → 用户点角标(或 About 内「检查更新」)→ 打开更新对话框(新版本号 + 更新说明)
   → 用户在对话框内选择安装包架构(默认 = 当前运行架构;macOS 另可选 arm64/x86_64)
   → 用户点「下载并安装」(✅ 确认门 #1) → check({ target }) 取所选架构产物
   → 下载更新包(minisign 验签)→ 安装
@@ -36,7 +37,8 @@
 （未点确认 ⇒ 不下载;已安装未重启 ⇒ 下次启动生效）
 ```
 
-> **两道确认门**:① 下载/安装前必须用户点击,启动检测只"提示"不"动手";② 安装完成后不自动重启,由用户决定何时重启。
+> **非干扰式提示**:启动与每 6 小时的静默检查**只点亮标题栏角标**(`TitleBarTrayControls` 内,有新版/已就绪时显示带红点的下载图标),绝不自动弹窗。更新窗仅在用户点角标或 About「检查更新」时打开。检查在对话框打开、或正在检查/下载/已就绪时自动跳过,避免打断用户。
+> **两道确认门**:① 下载/安装前必须用户点击;② 安装完成后不自动重启,由用户决定何时重启。
 > **架构选择**:`check({ target })` 的 `target` 即 `latest.json` `platforms` 的 key(如 `darwin-x86_64`)。已核实 Tauri v2 updater JS `CheckOptions.target?: string` 支持按调用覆盖目标平台,因此无需自建下载器,仍由插件完成下载/验签/安装。
 
 `latest.json`(Tauri v2 格式)示例:
@@ -168,11 +170,12 @@ target key 规则:`{os}-{arch}`,`os ∈ {darwin, windows, linux}`,`arch` 取 `st
   `candidates / nativeTarget / recommendedTarget / isRosetta / selectedTarget`,和"所选架构在此版本是否可用"的校验态(`targetStatus: unknown | checking | ok | unavailable`)。
   - `selectedTarget` 默认 = `recommendedTarget`。
   - 切换 `selectedTarget` 时调 `check({ target })`:返回 null ⇒ `targetStatus = unavailable`(该架构无此版本),否则 `ok`。
-- 启动检查:`MainLayout` mount 后延迟 3-5s,先 `getPlatform()` 再静默 `check()`(原生架构),仅在有新版时把状态置 `available`(只提示、不下载)。
+- 启动检查:`MainLayout` mount 后延迟 3-5s,先 `getPlatform()` 再静默 `check()`(原生架构);**之后每 6 小时**用 `setInterval` 再查一次。两者都是**非干扰**:仅把状态置 `available` 点亮标题栏角标,不弹窗。守卫:对话框打开 / 正在 `checking|downloading|ready` 时跳过本次检查,避免打断用户。
 
 ### 4.8 前端 UI
 
 - 改 `src/components/AboutDialog.tsx`:加"检查更新"按钮 + 当前状态文案。
+- 改 `src/components/window/TitleBarTrayControls.tsx`:加**非干扰式更新角标**(状态 `available`/`ready` 时显示带红点的下载图标,点击 `openDialog()` 打开更新窗;两种标题栏布局——`AppTitleBar` 与 `CompactTitleBar`——都渲染该 tray,故各平台/各布局通用)。
 - 新增 `src/components/UpdateDialog.tsx`,自上而下:
   1. 新版本号 + 更新说明(`notes`)。
   2. **安装包/架构选择器**(仅 `candidates.length > 1` 时显示,默认选中 `recommendedTarget`):
@@ -230,7 +233,7 @@ target key 规则:`{os}-{arch}`,`os ∈ {darwin, windows, linux}`,`arch` 取 `st
 
 ## 9. 涉及文件清单
 
-**修改:** `src-tauri/Cargo.toml`、`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/capabilities/default.json`、`src-tauri/src/lib.rs`、`.github/workflows/release.yml`、`src/components/AboutDialog.tsx`、`src/layouts/MainLayout.tsx`、`src/lib/i18n/locales/en.ts`、`src/lib/i18n/locales/zh-CN.ts`
+**修改:** `src-tauri/Cargo.toml`、`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/capabilities/default.json`、`src-tauri/src/lib.rs`、`.github/workflows/release.yml`、`src/components/AboutDialog.tsx`、`src/components/window/TitleBarTrayControls.tsx`、`src/layouts/MainLayout.tsx`、`src/stubs/tauri-core.ts`、`src/lib/i18n/locales/en.ts`、`src/lib/i18n/locales/zh-CN.ts`
 
 **新增:** `src-tauri/src/update.rs`(架构探测命令)、`src/lib/updateService.ts`、`src/stores/updateStore.ts`、`src/components/UpdateDialog.tsx`、`src/stores/updateStore.test.ts`
 
