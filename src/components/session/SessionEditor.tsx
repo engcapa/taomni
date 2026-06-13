@@ -405,11 +405,11 @@ function AdvancedSshSettings({
               </label>
             ))}
           </div>
-          <div className="flex items-center gap-2 pl-1">
+          <div className="flex items-center gap-2 pl-1 flex-wrap">
             <span className="text-[var(--taomni-text-muted)]">{t("sessionEditor2.passwordLabel")}</span>
             <div className="relative">
               <input
-                className="taomni-input pr-7"
+                className="taomni-input pr-7 w-44"
                 type={showPwd ? "text" : "password"}
                 value={password}
                 aria-label={t("sessionEditor2.passwordAria")}

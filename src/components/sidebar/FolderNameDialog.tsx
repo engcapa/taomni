@@ -80,7 +80,7 @@ export function FolderNameDialog({
         >
           <span
             data-testid="folder-name-dialog-parent"
-            className="px-2 py-1 select-none whitespace-nowrap"
+            className="px-2 py-1 select-none whitespace-nowrap max-w-[180px] truncate"
             style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}
             title={parentLabel}
           >

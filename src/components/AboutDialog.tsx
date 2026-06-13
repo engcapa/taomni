@@ -73,7 +73,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
-              className="taomni-btn h-8 px-3 text-[12px]"
+              className="taomni-btn h-8 px-3 text-[12px] shrink-0"
               disabled={updateStatus === "checking"}
               onClick={() => void check({ manual: true })}
               data-testid="about-check-update"
