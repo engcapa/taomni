@@ -68,6 +68,8 @@ import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
+import { UpdateDialog } from "../components/UpdateDialog";
+import { useUpdateStore } from "../stores/updateStore";
 import { ServersDialog } from "../components/servers/ServersDialog";
 import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
@@ -359,6 +361,18 @@ export function MainLayout() {
   useEffect(() => {
     void refreshVault().catch(() => undefined);
   }, [refreshVault]);
+
+  // Auto-update: silently check shortly after launch (delayed so it doesn't
+  // compete with first render). This only *surfaces* an update — nothing is
+  // downloaded or installed without the user's explicit confirmation. No-op
+  // outside the desktop app.
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const handle = window.setTimeout(() => {
+      void useUpdateStore.getState().check();
+    }, 4000);
+    return () => window.clearTimeout(handle);
+  }, []);
 
   // Listen for VAULT_LOCKED events emitted by ipc helpers (e.g. when an
   // SSH connect tries to resolve a vault: reference while the vault is
@@ -2495,6 +2509,7 @@ export function MainLayout() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      <UpdateDialog />
 
       {/* Session import preview — driven by the native macOS menu's
           import actions (no-op elsewhere, where <MenuBar> hosts its own). */}

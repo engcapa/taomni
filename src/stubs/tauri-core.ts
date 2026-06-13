@@ -130,6 +130,20 @@ export class Channel<T = unknown> {
   onmessage: ((message: T) => void) | null = null;
 }
 
+// Base class mirrored from `@tauri-apps/api/core`. Plugins like
+// `@tauri-apps/plugin-updater` (Update extends Resource) import it, so the
+// browser build needs the symbol to exist. It's never exercised here — update
+// flows are guarded by isTauriRuntime() and no-op outside the desktop app.
+export class Resource {
+  readonly rid: number;
+  constructor(rid: number) {
+    this.rid = rid;
+  }
+  async close(): Promise<void> {
+    /* no-op in browser preview */
+  }
+}
+
 const writeStreams = new Map<string, { path: string; chunks: Uint8Array[] }>();
 const readStreams = new Map<string, { bytes: Uint8Array; offset: number }>();
 

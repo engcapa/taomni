@@ -21,6 +21,7 @@ mod state;
 mod tab;
 mod terminal;
 mod tunnel;
+mod update;
 pub mod vault;
 mod vnc;
 mod voice;
@@ -39,6 +40,11 @@ fn exit_app(app_handle: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Auto-update: unconditional (unlike the debug-only log plugin below).
+        // `process` provides relaunch() so the user can restart into the new
+        // version after install.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_data = app
                 .path()
@@ -294,6 +300,7 @@ pub fn run() {
             voice::commands::voice_start_capture,
             voice::commands::voice_stop_capture,
             voice::commands::voice_stop_and_transcribe,
+            update::updater_platform,
             exit_app,
         ])
         .run(tauri::generate_context!())

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useT } from "../lib/i18n";
+import { useUpdateStore } from "../stores/updateStore";
 
 export interface AboutDialogProps {
   onClose: () => void;
@@ -8,6 +9,18 @@ export interface AboutDialogProps {
 export function AboutDialog({ onClose }: AboutDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const t = useT();
+  const { status: updateStatus, availableVersion, check } = useUpdateStore();
+
+  const updateStatusText =
+    updateStatus === "checking"
+      ? t("update.statusChecking")
+      : updateStatus === "uptodate"
+        ? t("update.statusUpToDate")
+        : updateStatus === "available"
+          ? t("update.statusAvailable", { version: availableVersion ?? "" })
+          : updateStatus === "error"
+            ? t("update.statusError")
+            : "";
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -56,7 +69,27 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           {t("about.description")}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              className="taomni-btn h-8 px-3 text-[12px]"
+              disabled={updateStatus === "checking"}
+              onClick={() => void check({ manual: true })}
+              data-testid="about-check-update"
+            >
+              {t("update.checkButton")}
+            </button>
+            {updateStatusText && (
+              <span
+                className="text-[12px] truncate"
+                style={{ color: "var(--taomni-text-muted)" }}
+                data-testid="about-update-status"
+              >
+                {updateStatusText}
+              </span>
+            )}
+          </div>
           <button
             ref={closeRef}
             type="button"
