@@ -9,7 +9,7 @@ import { selectFolderPath, selectFilePath } from "../../lib/ipc";
  * (callers resolve i18n via `useT()`), so these primitives carry no copy.
  */
 
-const LABEL_WIDTH = 100;
+const LABEL_WIDTH = 120;
 
 /** A label + control row. Label is fixed-width, right-aligned, muted. */
 export function FormRow({ label, children }: { label: string; children: ReactNode }) {
