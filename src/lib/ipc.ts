@@ -216,6 +216,28 @@ export async function testSshConnection(
   );
 }
 
+export async function testProxyConnection(
+  proxyKind: string,
+  proxyHost: string,
+  proxyPort: number,
+  proxyUser: string,
+  proxyPass: string,
+  testHost: string,
+  testPort: number,
+): Promise<string> {
+  return withVaultLockedNotice(() =>
+    invoke<string>("test_proxy_connection", {
+      proxyKind,
+      proxyHost,
+      proxyPort,
+      proxyUser,
+      proxyPass,
+      testHost,
+      testPort,
+    }),
+  );
+}
+
 export async function writeTerminal(
   sessionId: string,
   data: string,

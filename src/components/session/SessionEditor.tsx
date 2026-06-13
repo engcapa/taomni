@@ -34,6 +34,7 @@ import {
   selectFolderPath,
   selectPrivateKeyFile,
   testSshConnection,
+  testProxyConnection,
   dbTestConnection,
   hbaseTestConnection,
   hbaseParseSiteXml,
@@ -99,9 +100,10 @@ import type { SftpPathMapping } from "../../types";
 type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
-  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell";
+  | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
+  | "Proxy";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings";
+type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -124,6 +126,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "Presto",     icon: <Database className="w-7 h-7" />, color: "#5a4fcf" },
   { id: "Redis",      icon: <Database className="w-7 h-7" />, color: "#d82c20" },
   { id: "HBaseShell", icon: <Database className="w-7 h-7" />, color: "#1d7f8c" },
+  { id: "Proxy",     icon: <Network className="w-7 h-7" />, color: "#6b7280" },
 ];
 
 const DEFAULT_PORTS: Record<string, number> = {
@@ -131,7 +134,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
   MySQL: 3306, PostgreSQL: 5432, ClickHouse: 9000, Presto: 8080, Redis: 6379,
-  HBaseShell: 8080,
+  HBaseShell: 8080, Proxy: 1080,
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Presto", "Redis"];
@@ -146,6 +149,7 @@ function protoToSessionType(p: Proto): string {
 }
 
 function sessionTypeToProto(type: string | undefined, optionsJson?: string | null): Proto {
+  if (type === "Proxy") return "Proxy";
   if (type === "LocalShell") {
     const options = parseSessionOptions(optionsJson);
     const path = typeof options.localShellPath === "string" ? options.localShellPath : "";
@@ -508,15 +512,21 @@ function ProxyJumpFields({
   value,
   onChange,
   sshSessions = [],
+  proxySessions = [],
+  onSaveAsProxySession,
 }: {
   t: TranslateFn;
   value: NetworkSettingsValue;
   onChange: (next: NetworkSettingsValue) => void;
   sshSessions?: { id: string; name: string; host: string; port: number }[];
+  proxySessions?: { id: string; name: string; host: string; port: number }[];
+  onSaveAsProxySession?: () => void;
 }) {
   const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
   const proxy = proxyKindToLabel(value.proxyKind);
   const isJump = value.proxyKind === "ssh-tunnel";
+  const isHttpOrSocks = value.proxyKind === "http" || value.proxyKind === "socks5";
+  const proxyManual = value.proxySessionId?.trim() === "";
   const jumpManual = value.jumpSessionId.trim() === "";
   return (
     <>
@@ -621,46 +631,80 @@ function ProxyJumpFields({
         </>
       )}
 
-      {!isJump && value.proxyKind !== "none" && (
+      {isHttpOrSocks && (
         <>
-          <Field label={t("sessionEditor2.fieldProxyHost")}>
-            <input
-              className="taomni-input w-64"
-              placeholder={t("sessionEditor2.proxyHostPlaceholder")}
-              value={value.proxyHost}
-              aria-label={t("sessionEditor2.proxyHostAria")}
-              onChange={(e) => patch({ proxyHost: e.target.value })}
-            />
-            <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
-            <input
-              className="taomni-input w-16 ml-1"
-              placeholder={t("sessionEditor2.proxyPortPlaceholder")}
-              value={value.proxyPort}
-              aria-label={t("sessionEditor2.proxyPortAria")}
-              onChange={(e) => patch({ proxyPort: e.target.value })}
-            />
-          </Field>
+          {proxySessions.length > 0 && (
+            <Field label={t("sessionEditor2.proxyViaSession")}>
+              <select
+                className="taomni-input w-72"
+                value={value.proxySessionId || ""}
+                onChange={(e) => patch({ proxySessionId: e.target.value })}
+              >
+                <option value="">{t("sessionEditor2.proxyManualOption")}</option>
+                {proxySessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.host}:{s.port})
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
 
-          <Field label={t("sessionEditor2.fieldProxyAuth")}>
-            <input
-              className="taomni-input w-32"
-              placeholder={t("sessionEditor2.proxyUserPlaceholder")}
-              value={value.proxyUser}
-              aria-label={t("sessionEditor2.proxyUserAria")}
-              onChange={(e) => patch({ proxyUser: e.target.value })}
-            />
-            <input
-              className="taomni-input w-40 ml-1"
-              type="password"
-              placeholder={t("sessionEditor2.proxyPassPlaceholder")}
-              value={value.proxyPass}
-              aria-label={t("sessionEditor2.proxyPassAria")}
-              onChange={(e) => patch({ proxyPass: e.target.value })}
-            />
-            <label className="ml-2 flex items-center gap-1.5">
-              <Checkbox checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
-            </label>
-          </Field>
+          {proxyManual && (
+            <>
+              <Field label={t("sessionEditor2.fieldProxyHost")}>
+                <input
+                  className="taomni-input w-64"
+                  placeholder={t("sessionEditor2.proxyHostPlaceholder")}
+                  value={value.proxyHost}
+                  aria-label={t("sessionEditor2.proxyHostAria")}
+                  onChange={(e) => patch({ proxyHost: e.target.value })}
+                />
+                <span className="text-[var(--taomni-text-muted)] ml-2">{t("sessionEditor2.portLabel")}</span>
+                <input
+                  className="taomni-input w-16 ml-1"
+                  placeholder={t("sessionEditor2.proxyPortPlaceholder")}
+                  value={value.proxyPort}
+                  aria-label={t("sessionEditor2.proxyPortAria")}
+                  onChange={(e) => patch({ proxyPort: e.target.value })}
+                />
+              </Field>
+
+              <Field label={t("sessionEditor2.fieldProxyAuth")}>
+                <input
+                  className="taomni-input w-32"
+                  placeholder={t("sessionEditor2.proxyUserPlaceholder")}
+                  value={value.proxyUser}
+                  aria-label={t("sessionEditor2.proxyUserAria")}
+                  onChange={(e) => patch({ proxyUser: e.target.value })}
+                />
+                <input
+                  className="taomni-input w-40 ml-1"
+                  type="password"
+                  placeholder={t("sessionEditor2.proxyPassPlaceholder")}
+                  value={value.proxyPass}
+                  aria-label={t("sessionEditor2.proxyPassAria")}
+                  onChange={(e) => patch({ proxyPass: e.target.value })}
+                />
+                <label className="ml-2 flex items-center gap-1.5">
+                  <Checkbox checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+                </label>
+              </Field>
+              {onSaveAsProxySession && (
+                <Field label="">
+                  <button
+                    className="taomni-btn flex items-center gap-1.5"
+                    type="button"
+                    onClick={onSaveAsProxySession}
+                    title={t("sessionEditor2.saveAsProxySessionTitle")}
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {t("sessionEditor2.saveAsProxySession")}
+                  </button>
+                </Field>
+              )}
+            </>
+          )}
         </>
       )}
     </>
@@ -674,15 +718,19 @@ function DbNetworkSettings({
   value,
   onChange,
   sshSessions = [],
+  proxySessions = [],
+  onSaveAsProxySession,
 }: {
   t: TranslateFn;
   value: NetworkSettingsValue;
   onChange: (next: NetworkSettingsValue) => void;
   sshSessions?: { id: string; name: string; host: string; port: number }[];
+  proxySessions?: { id: string; name: string; host: string; port: number }[];
+  onSaveAsProxySession?: () => void;
 }) {
   return (
     <div data-testid="db-network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} />
+      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} proxySessions={proxySessions} onSaveAsProxySession={onSaveAsProxySession} />
     </div>
   );
 }
@@ -693,6 +741,8 @@ function NetworkSettings({
   onChange,
   sessionConfigId,
   sshSessions = [],
+  proxySessions = [],
+  onSaveAsProxySession,
 }: {
   t: TranslateFn;
   value: NetworkSettingsValue;
@@ -703,6 +753,8 @@ function NetworkSettings({
   sessionConfigId?: string;
   /** Saved SSH sessions selectable as a jump host (current session excluded). */
   sshSessions?: { id: string; name: string; host: string; port: number }[];
+  proxySessions?: { id: string; name: string; host: string; port: number }[];
+  onSaveAsProxySession?: () => void;
 }) {
   const [newFwdLocal, setNewFwdLocal] = useState("");
   const [newFwdRemote, setNewFwdRemote] = useState("");
@@ -762,7 +814,7 @@ function NetworkSettings({
 
   return (
     <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} />
+      <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} proxySessions={proxySessions} onSaveAsProxySession={onSaveAsProxySession} />
 
       <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
@@ -1743,6 +1795,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [hbaseKrb5ConfPath, setHBaseKrb5ConfPath] = useState(() => optionString(initialOptions, "hbaseKrb5ConfPath", ""));
   const [hbaseSitePath, setHBaseSitePath] = useState(() => optionString(initialOptions, "hbaseSitePath", ""));
 
+  /* --- proxy session options --- */
+  const [proxyKind, setProxyKind] = useState<"http" | "socks5">(() => {
+    const v = optionString(initialOptions, "proxyKind", "socks5");
+    return v === "http" ? "http" : "socks5";
+  });
+  const [proxyTestUrl, setProxyTestUrl] = useState(() => optionString(initialOptions, "testUrl", "google.com:80"));
+
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
@@ -1815,6 +1874,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isRdp = proto === "RDP";
   const isDb = DB_PROTOS.includes(proto);
   const isHBase = proto === "HBaseShell";
+  const isProxy = proto === "Proxy";
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -1846,6 +1906,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (p === "File") setSection("bookmark");
     // Data-client protos open straight to the dedicated settings tab.
     if (DB_PROTOS.includes(p) || p === "HBaseShell") setSection("database");
+    // Proxy proto opens to its settings tab.
+    if (p === "Proxy") setSection("proxy");
   };
 
   /* Keep authMethod in sync with the radio group */
@@ -1901,6 +1963,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           dbRedisIndex,
         }
       : {};
+    const proxyOverrides: Record<string, unknown> = isProxy
+      ? { proxyKind, testUrl: proxyTestUrl }
+      : {};
     const hbaseOverrides: Record<string, unknown> = isHBase
       ? {
           hbaseNamespace,
@@ -1946,6 +2011,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...wslOverrides,
       ...rdpOverrides,
       ...dbOverrides,
+      ...proxyOverrides,
       ...hbaseOverrides,
     });
   };
@@ -2396,8 +2462,72 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
+  const handleTestProxyConnection = async () => {
+    if (!host) {
+      setTestResult({ ok: false, msg: t("sessionEditor2.proxyHostRequired") });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const [testHost, testPortStr] = (proxyTestUrl || "google.com:80").split(":");
+      const testPort = parseInt(testPortStr) || 80;
+      const msg = await testProxyConnection(
+        proxyKind,
+        host,
+        parseInt(port) || 1080,
+        username || "",
+        password || passwordRef || "",
+        testHost,
+        testPort,
+      );
+      setTestResult({ ok: true, msg });
+    } catch (err) {
+      setTestResult({ ok: false, msg: String(err) });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSaveAsProxySession = async () => {
+    const ns = networkSettings;
+    if (!ns.proxyHost.trim()) {
+      setTestResult({ ok: false, msg: t("sessionEditor2.proxyHostRequired") });
+      return;
+    }
+    const proxyPort = parseInt(ns.proxyPort) || 1080;
+    const now = Math.floor(Date.now() / 1000);
+    const proxyName = `${ns.proxyKind === "http" ? "HTTP" : "SOCKS5"} ${ns.proxyHost}:${proxyPort}`;
+    const config: SessionConfig = {
+      id: crypto.randomUUID(),
+      name: proxyName,
+      session_type: "Proxy",
+      group_path: null,
+      host: ns.proxyHost.trim(),
+      port: proxyPort,
+      username: ns.proxyUser || null,
+      auth_method: ns.proxyUser ? "Password" : "None",
+      options_json: JSON.stringify({ proxyKind: ns.proxyKind === "http" ? "http" : "socks5", testUrl: "google.com:80" }),
+      created_at: now,
+      updated_at: now,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    try {
+      await addSession(config);
+      setTestResult({ ok: true, msg: t("sessionEditor2.proxySessionSaved") });
+    } catch (err) {
+      setTestResult({ ok: false, msg: String(err) });
+    }
+  };
+
   const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = proto === "File"
     ? [
+        { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+      ]
+    : isProxy
+    ? [
+        { id: "proxy", label: t("sessionEditor2.proxyKindLabel"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : isDb || isHBase
@@ -2433,7 +2563,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const activeSection =
     proto === "File"
       ? "bookmark"
-      : isDb || isHBase
+      : isProxy
+        ? (section === "proxy" || section === "bookmark" ? section : "proxy")
+        : isDb || isHBase
         ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
           ? (isRdp ? "rdp" : "terminal")
@@ -2457,6 +2589,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       void handleTestDbConnection();
     } else if (isHBase) {
       void handleTestHBaseConnection();
+    } else if (isProxy) {
+      void handleTestProxyConnection();
     }
   };
 
@@ -2879,6 +3013,25 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               />
             </div>
           )}
+          {activeSection === "proxy" && isProxy && (
+            <div data-testid="session-proxy-section" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+              <Field label={t("sessionEditor2.proxyKindLabel")}>
+                <Select
+                  value={proxyKind === "http" ? t("sessionEditor2.proxyHttp") : t("sessionEditor2.proxySocks5")}
+                  options={[t("sessionEditor2.proxyHttp"), t("sessionEditor2.proxySocks5")]}
+                  onChange={(label) => setProxyKind(label === t("sessionEditor2.proxyHttp") ? "http" : "socks5")}
+                />
+              </Field>
+              <Field label={t("sessionEditor2.proxyTestUrl")}>
+                <input
+                  className="taomni-input w-64"
+                  placeholder={t("sessionEditor2.proxyTestUrlPlaceholder")}
+                  value={proxyTestUrl}
+                  onChange={(e) => setProxyTestUrl(e.target.value)}
+                />
+              </Field>
+            </div>
+          )}
           {activeSection === "network" && !isDb && (
             <NetworkSettings
               t={t}
@@ -2888,6 +3041,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               sshSessions={sessions
                 .filter((s) => s.session_type === "SSH" && s.id !== session?.id)
                 .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
+              proxySessions={sessions
+                .filter((s) => s.session_type === "Proxy" && s.id !== session?.id)
+                .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
+              onSaveAsProxySession={() => void handleSaveAsProxySession()}
             />
           )}
           {activeSection === "network" && isDb && (
@@ -2898,6 +3055,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               sshSessions={sessions
                 .filter((s) => s.session_type === "SSH" && s.id !== session?.id)
                 .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
+              proxySessions={sessions
+                .filter((s) => s.session_type === "Proxy" && s.id !== session?.id)
+                .map((s) => ({ id: s.id, name: s.name, host: s.host, port: s.port }))}
+              onSaveAsProxySession={() => void handleSaveAsProxySession()}
             />
           )}
           {activeSection === "bookmark" && (
@@ -2958,6 +3119,19 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             >
               <FlaskConical className="w-3.5 h-3.5" />
               {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}{shortcuts.test}
+            </button>
+          )}
+          {isProxy && (
+            <button
+              className="taomni-btn flex items-center gap-1.5"
+              data-testid="proxy-test-connection"
+              onClick={() => void handleTestProxyConnection()}
+              disabled={testing}
+              type="button"
+              aria-label={testing ? t("sessionEditor2.proxyTestTesting") : t("sessionEditor2.proxyTestBtn")}
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              {testing ? t("sessionEditor2.proxyTestTesting") : t("sessionEditor2.proxyTestBtn")}{shortcuts.test}
             </button>
           )}
           <button className="taomni-btn flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>

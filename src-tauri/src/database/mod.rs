@@ -435,6 +435,7 @@ async fn prepare_network_forward(
 
     // Resolve proxy + jump credentials (vault refs → plaintext, session-mode
     // jump host → DB lookup) exactly like the SSH terminal path.
+    crate::terminal::resolve_proxy_session(state, &mut net)?;
     net.resolve_proxy_pass(&state.vault)?;
     crate::terminal::resolve_jump_credentials(state, &mut net)?;
 

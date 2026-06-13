@@ -32,6 +32,11 @@ pub struct NetworkSettings {
     pub proxy_user: String,
     #[serde(default)]
     pub proxy_pass: String,
+    /// When set and proxy_kind is "http" or "socks5", the proxy config is
+    /// resolved from a saved Proxy session at connect time. Empty means use
+    /// the manual fields above.
+    #[serde(default)]
+    pub proxy_session_id: String,
     #[serde(default = "default_true")]
     pub keep_alive: bool,
     #[serde(default)]

@@ -109,6 +109,7 @@ pub fn run() {
             terminal::submit_ssh_auth_response,
             terminal::attach_terminal_output,
             terminal::test_ssh_connection,
+            terminal::test_proxy_connection,
             terminal::write_terminal,
             terminal::resize_terminal,
             terminal::send_terminal_signal,
