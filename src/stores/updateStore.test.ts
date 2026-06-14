@@ -84,6 +84,15 @@ describe("updateStore.check", () => {
     expect(mocked.checkForUpdate).toHaveBeenCalledWith("darwin-aarch64");
   });
 
+  it("uses undefined target for checking on single-candidate platforms (like Windows/Linux)", async () => {
+    mocked.getUpdaterPlatform.mockResolvedValue(
+      platform({ os: "linux", nativeTarget: "linux-x86_64", recommendedTarget: "linux-x86_64", candidates: ["linux-x86_64"] }),
+    );
+    mocked.checkForUpdate.mockResolvedValue(update());
+    await get().check();
+    expect(mocked.checkForUpdate).toHaveBeenCalledWith(undefined);
+  });
+
   it("opens the window for an available update on a manual check", async () => {
     mocked.getUpdaterPlatform.mockResolvedValue(platform());
     mocked.checkForUpdate.mockResolvedValue(update());
@@ -135,7 +144,11 @@ describe("updateStore.setSelectedTarget", () => {
 
 describe("updateStore.startDownload", () => {
   it("installs the selected target and reports progress, ending ready", async () => {
-    useUpdateStore.setState({ status: "available", selectedTarget: "darwin-aarch64" });
+    useUpdateStore.setState({
+      status: "available",
+      selectedTarget: "darwin-aarch64",
+      candidates: ["darwin-aarch64", "darwin-x86_64"],
+    });
     mocked.downloadAndInstall.mockImplementation(async (_t, onProgress) => {
       onProgress({ downloaded: 50, total: 100, percent: 50 });
     });
@@ -145,8 +158,25 @@ describe("updateStore.startDownload", () => {
     expect(get().progress).toEqual({ downloaded: 50, total: 100, percent: 50 });
   });
 
+  it("installs with undefined target on single-candidate platforms (like Windows/Linux)", async () => {
+    useUpdateStore.setState({
+      status: "available",
+      selectedTarget: "linux-x86_64",
+      candidates: ["linux-x86_64"],
+    });
+    mocked.downloadAndInstall.mockImplementation(async (_t, onProgress) => {
+      onProgress({ downloaded: 50, total: 100, percent: 50 });
+    });
+    await get().startDownload();
+    expect(mocked.downloadAndInstall).toHaveBeenCalledWith(undefined, expect.any(Function));
+  });
+
   it("moves to error state when the download fails", async () => {
-    useUpdateStore.setState({ status: "available", selectedTarget: "darwin-aarch64" });
+    useUpdateStore.setState({
+      status: "available",
+      selectedTarget: "darwin-aarch64",
+      candidates: ["darwin-aarch64", "darwin-x86_64"],
+    });
     mocked.downloadAndInstall.mockRejectedValue(new Error("boom"));
     await get().startDownload();
     expect(get().status).toBe("error");
