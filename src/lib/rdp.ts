@@ -167,13 +167,36 @@ export function normalizeRdpResizeSize(width: number, height: number): RdpResize
   return { width: normalizedWidth, height: normalizedHeight };
 }
 
+/** RDP rotation units per physical wheel notch (Windows `WHEEL_DELTA`). */
+const RDP_WHEEL_DELTA = 120;
+/** Approx. browser pixel delta produced by one physical wheel notch. */
+const PIXELS_PER_NOTCH = 100;
+/** Windows default "lines scrolled per wheel notch". */
+const LINES_PER_NOTCH = 3;
+
+/**
+ * Convert a browser `WheelEvent` delta into RDP rotation units.
+ *
+ * RDP measures wheel motion in units where one physical notch equals
+ * `WHEEL_DELTA` (120) — the value Windows passes to apps via `WM_MOUSEWHEEL`.
+ * We therefore first reduce the browser delta to a notch count (which depends
+ * on `deltaMode`) and then scale by 120. Sending the raw notch count instead
+ * (≈1 per notch) makes the server scroll ~1/120th of a line, which feels like
+ * nothing.
+ */
 export function wheelDeltaToRotationUnits(delta: number, deltaMode: number): number {
   if (!Number.isFinite(delta) || delta === 0) return 0;
 
-  const divisor = deltaMode === 1 ? 3 : deltaMode === 2 ? 1 : 120;
-  const rawUnits = delta / divisor;
-  const magnitude = Math.max(1, Math.round(Math.abs(rawUnits)));
-  return clampWheelRotationUnits(Math.sign(delta) * magnitude);
+  let notches: number;
+  if (deltaMode === 1) {
+    notches = delta / LINES_PER_NOTCH; // DOM_DELTA_LINE
+  } else if (deltaMode === 2) {
+    notches = delta; // DOM_DELTA_PAGE — treat one page as one notch
+  } else {
+    notches = delta / PIXELS_PER_NOTCH; // DOM_DELTA_PIXEL
+  }
+
+  return clampWheelRotationUnits(Math.round(notches * RDP_WHEEL_DELTA));
 }
 
 function clampWheelRotationUnits(rotationUnits: number): number {

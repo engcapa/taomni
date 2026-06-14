@@ -89,10 +89,16 @@ describe("rdp WS encoders", () => {
   });
 
   it("normalizes browser wheel deltas to RDP rotation units", () => {
-    expect(wheelDeltaToRotationUnits(120, 0)).toBe(1);
-    expect(wheelDeltaToRotationUnits(-120, 0)).toBe(-1);
-    expect(wheelDeltaToRotationUnits(3, 1)).toBe(1);
-    expect(wheelDeltaToRotationUnits(5000, 0)).toBe(42);
+    // One physical notch ≈ 100px (pixel mode) or 3 lines, and must map to
+    // one RDP notch (WHEEL_DELTA = 120) so the server scrolls a full step.
+    expect(wheelDeltaToRotationUnits(100, 0)).toBe(120);
+    expect(wheelDeltaToRotationUnits(-100, 0)).toBe(-120);
+    expect(wheelDeltaToRotationUnits(120, 0)).toBe(144);
+    expect(wheelDeltaToRotationUnits(3, 1)).toBe(120);
+    // Small/high-resolution deltas stay proportional for smooth scrolling.
+    expect(wheelDeltaToRotationUnits(10, 0)).toBe(12);
+    // Large deltas clamp to the 9-bit signed wire range.
+    expect(wheelDeltaToRotationUnits(5000, 0)).toBe(255);
     expect(wheelDeltaToRotationUnits(Number.NaN, 0)).toBe(0);
   });
 });
