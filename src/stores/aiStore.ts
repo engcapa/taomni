@@ -57,6 +57,13 @@ export interface CcBridgeConfig {
   default_model: string;
   permission_mode: string;
   max_turns: number;
+  /**
+   * Reference to a user-supplied Claude Code settings.json. Stored as a
+   * `vault:<id>` reference because the JSON usually contains an auth token;
+   * the raw JSON lives encrypted in the credential vault. Empty/undefined =
+   * use Claude Code's built-in defaults.
+   */
+  custom_settings_ref?: string;
 }
 
 export interface WebSearchConfig {
