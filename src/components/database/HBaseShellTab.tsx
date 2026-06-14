@@ -20,6 +20,7 @@ import {
 } from "react-resizable-panels";
 import type { HBaseConnectInfo } from "../../types";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
+import { splitHBaseStatements } from "../../lib/hbaseStatements";
 import {
   hbaseConnect,
   hbaseDisconnect,
@@ -269,16 +270,32 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
     async (nextCommand = command) => {
       const trimmed = nextCommand.trim();
       if (!trimmed || !connectionSessionId || running) return;
+      const statements = splitHBaseStatements(trimmed);
+      if (statements.length === 0) return;
       setRunning(true);
       setError(null);
+      let mutatedTables = false;
       try {
-        const nextResult = await hbaseExecute(connectionSessionId, trimmed);
-        setResult(nextResult);
-        setHistory((items) => [nextResult, ...items].slice(0, 40));
-        if (/^(create|drop)\b/i.test(trimmed)) void loadTables();
-      } catch (err) {
-        setError(String(err));
+        // The backend executes one statement per call, so run a multi-command
+        // block sequentially. Each statement gets its own history entry; on the
+        // first failure we surface the error and stop (later statements may
+        // depend on earlier ones).
+        for (const statement of statements) {
+          try {
+            const nextResult = await hbaseExecute(connectionSessionId, statement);
+            setResult(nextResult);
+            setHistory((items) => [nextResult, ...items].slice(0, 40));
+            if (/^(create|drop)\b/i.test(statement)) mutatedTables = true;
+          } catch (err) {
+            const detail = String(err);
+            setError(
+              statements.length > 1 ? `${statement}\n${detail}` : detail,
+            );
+            break;
+          }
+        }
       } finally {
+        if (mutatedTables) void loadTables();
         setRunning(false);
       }
     },
