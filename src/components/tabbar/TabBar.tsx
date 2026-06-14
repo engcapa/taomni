@@ -70,12 +70,20 @@ interface TabBarProps {
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
   onConnectSession: (session: SessionConfig) => void;
   onOpenSessionEditor: () => void;
+  /**
+   * Optional override for the "Duplicate tab" action. MainLayout supplies this
+   * so a duplicated local/SSH terminal can first resolve the source terminal's
+   * current directory and open the copy there. Falls back to the plain store
+   * action (no cwd handling) when not provided.
+   */
+  onDuplicateTab?: (id: string) => void;
 }
 
 export function TabBar({
   onStartLocalTerminal,
   onConnectSession,
   onOpenSessionEditor,
+  onDuplicateTab,
 }: TabBarProps) {
   const {
     tabs,
@@ -367,7 +375,7 @@ export function TabBar({
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.rename"), icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
       { label: t("tabs.duplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => {
-        duplicateTab(tab.id);
+        (onDuplicateTab ?? duplicateTab)(tab.id);
       }, disabled: tab.type === "welcome" },
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },

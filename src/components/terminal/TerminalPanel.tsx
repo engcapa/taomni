@@ -169,6 +169,12 @@ interface TerminalPanelProps {
   };
   terminalProfile?: TerminalProfile;
   adoptedTerminal?: AdoptedTerminalSession;
+  /**
+   * One-shot working directory for the initial connect. Local terminals launch
+   * the shell here; SSH terminals `cd` here right after the shell opens. Used
+   * when a terminal tab is duplicated so the copy lands in the source's cwd.
+   */
+  initialCwd?: string;
   preserveSessionOnUnmount?: boolean;
   detachedWindowControls?: DetachedTerminalWindowControls;
   onDetachedStateChange?: (state: TerminalReattachState) => void;
@@ -256,6 +262,7 @@ export function TerminalPanel({
   localShell,
   terminalProfile,
   adoptedTerminal,
+  initialCwd,
   preserveSessionOnUnmount = false,
   detachedWindowControls,
   onDetachedStateChange,
@@ -465,8 +472,10 @@ export function TerminalPanel({
   const isLocalPowerShell = useMemo(
     () =>
       isLocal &&
-      (resolvedLocalShellId === "powershell" || resolvedLocalShellId === "windows-powershell"),
-    [isLocal, resolvedLocalShellId],
+      (resolvedLocalShellId
+        ? (resolvedLocalShellId === "powershell" || resolvedLocalShellId === "windows-powershell")
+        : (localShell?.id === "powershell" || localShell?.id === "windows-powershell")),
+    [isLocal, resolvedLocalShellId, localShell?.id],
   );
   const suggestionsActive = inlineSuggestionsEnabled && !isLocalPowerShell;
   const history = useCommandHistory(historyHostKey, inlineSuggestionsMax);
@@ -1739,6 +1748,7 @@ export function TerminalPanel({
     let unlistenForwardError: UnlistenFn | null = null;
     let unlistenAuthPrompt: UnlistenFn | null = null;
     let detachImeGuard: (() => void) | null = null;
+    let cleanupImePositionLock: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
 
     const primaryFont = getPrimaryFontName(fontFamily);
@@ -1776,6 +1786,49 @@ export function TerminalPanel({
       })
     );
     term.open(el);
+
+    // Lock helper-textarea position during CJK IME composition to prevent candidate box jumping
+    // when background text animations (e.g. Claude Code spinners) trigger cursor repositioning.
+    const textarea = term.textarea;
+    if (textarea) {
+      let isComposing = false;
+      let lockedLeft = "";
+      let lockedTop = "";
+
+      const onCompositionStart = () => {
+        isComposing = true;
+        lockedLeft = textarea.style.left;
+        lockedTop = textarea.style.top;
+      };
+
+      const onCompositionEnd = () => {
+        isComposing = false;
+      };
+
+      textarea.addEventListener("compositionstart", onCompositionStart);
+      textarea.addEventListener("compositionend", onCompositionEnd);
+
+      const observer = new MutationObserver(() => {
+        if (isComposing) {
+          observer.disconnect();
+          if (textarea.style.left !== lockedLeft) {
+            textarea.style.left = lockedLeft;
+          }
+          if (textarea.style.top !== lockedTop) {
+            textarea.style.top = lockedTop;
+          }
+          observer.observe(textarea, { attributes: true, attributeFilter: ["style"] });
+        }
+      });
+
+      observer.observe(textarea, { attributes: true, attributeFilter: ["style"] });
+
+      cleanupImePositionLock = () => {
+        textarea.removeEventListener("compositionstart", onCompositionStart);
+        textarea.removeEventListener("compositionend", onCompositionEnd);
+        observer.disconnect();
+      };
+    }
 
     // OSC 7 — host writes its current working directory as `file://host/path`.
     // We listen for this so explicit SFTP "Sync" requests can learn the shell cwd.
@@ -2087,6 +2140,21 @@ export function TerminalPanel({
           window.setTimeout(focusTerminal, 0);
         } else {
           term.write(formatSshInfoBanner(ssh));
+          // Duplicated terminals carry the source's cwd. SSH can't set a
+          // start directory on the channel, so cd into it once the shell is
+          // up. Suppress the echoed command so the copy lands at a clean
+          // prompt in the target directory; the leading space also keeps it
+          // out of shell history (HISTCONTROL).
+          if (initialCwd) {
+            const escaped = initialCwd.replace(/'/g, "'\\''");
+            const cdCommand = ` cd '${escaped}'`;
+            injectedInputEchoSuppressorRef.current = createInputEchoSuppressor(cdCommand, 5000);
+            writeTerminal(connectedSid, encodeBase64(`${cdCommand}\r`)).catch(() => {
+              if (sessionIdRef.current === connectedSid) {
+                injectedInputEchoSuppressorRef.current = null;
+              }
+            });
+          }
         }
       }
 
@@ -2207,7 +2275,7 @@ export function TerminalPanel({
         rows,
         localShell?.id,
         localShell?.args,
-        undefined,
+        initialCwd,
         handleRawOutput,
       )
         .then(({ sessionId, shellId }) => handleConnected({ sessionId, shellId }, "initial"))
@@ -2233,6 +2301,7 @@ export function TerminalPanel({
         pendingMfaRequestIdRef.current = null;
       }
       detachImeGuard?.();
+      cleanupImePositionLock?.();
       if (loggingActiveRef.current && outputLogRef.current) {
         flushRecordedOutput("Terminal closed; saved recorded output");
       }

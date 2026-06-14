@@ -59,8 +59,14 @@ interface AppState {
    * the original (not at the end of the strip) and activating it. See issue
    * #120: a duplicated session should sit next to its source for quick
    * switching/comparison.
+   *
+   * The copy's title gets a `-<n>` suffix that increments across all open tabs
+   * sharing the same base name (so duplicating "Server" yields "Server-1",
+   * then "Server-2", and duplicating "Server-1" continues the same family).
+   * `overrides.terminalInitialCwd`, when provided, is carried onto the copy so
+   * a duplicated local/SSH terminal can open in the source terminal's cwd.
    */
-  duplicateTab: (id: string) => void;
+  duplicateTab: (id: string, overrides?: { terminalInitialCwd?: string }) => void;
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
@@ -183,6 +189,36 @@ function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
   return !!activeTabId && tabs.some((tab) => tab.id === activeTabId && tab.type === "terminal");
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Build the title for a duplicated tab. The base name is the source title with
+ * any trailing `-<digits>` stripped, so the whole "family" shares one counter.
+ * The returned title is `<base>-<n>` where `n` is one past the highest suffix
+ * already used by an open tab in that family.
+ *
+ * Examples (given the open titles in brackets):
+ *   "Server"   ["Server"]                       -> "Server-1"
+ *   "Server"   ["Server","Server-1"]            -> "Server-2"
+ *   "Server-1" ["Server","Server-1","Server-2"] -> "Server-3"
+ */
+export function computeDuplicateTitle(sourceTitle: string, openTitles: string[]): string {
+  const suffixMatch = /^(.*?)-(\d+)$/.exec(sourceTitle);
+  const base = suffixMatch ? suffixMatch[1] : sourceTitle;
+  const familyRe = new RegExp(`^${escapeRegExp(base)}-(\\d+)$`);
+  let maxSuffix = 0;
+  for (const title of openTitles) {
+    const m = familyRe.exec(title);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > maxSuffix) maxSuffix = n;
+    }
+  }
+  return `${base}-${maxSuffix + 1}`;
+}
+
 export const useAppStore = create<AppState>((set) => ({
   tabs: [
     {
@@ -222,7 +258,7 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  duplicateTab: (id) =>
+  duplicateTab: (id, overrides) =>
     set((s) => {
       const idx = s.tabs.findIndex((t) => t.id === id);
       if (idx === -1) return s;
@@ -230,8 +266,13 @@ export const useAppStore = create<AppState>((set) => ({
       const copy: Tab = {
         ...source,
         id: `dup-${crypto.randomUUID()}`,
+        title: computeDuplicateTitle(source.title, s.tabs.map((t) => t.title)),
         closable: true,
         hasNewOutput: false,
+        // Only terminal copies carry an initial cwd; clear any inherited value
+        // for other tab kinds (and when none was resolved).
+        terminalInitialCwd:
+          source.type === "terminal" ? overrides?.terminalInitialCwd : undefined,
       };
       const next = s.tabs.slice();
       next.splice(idx + 1, 0, copy);

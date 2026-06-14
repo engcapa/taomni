@@ -72,28 +72,42 @@ pub fn resolve_shell_with_id(
     if let Some(raw) = shell {
         let requested = raw.trim();
         if !requested.is_empty() {
-            if shell_args.is_none() {
-                if let Some(option) = list_local_shells()
-                    .into_iter()
-                    .find(|option| option.id == requested)
-                {
-                    let id = option.id;
-                    return (
-                        ShellLaunch {
-                            program: option.path,
-                            args: option.args,
-                        },
-                        id,
-                    );
-                }
+            // First, check if the requested string is one of our known shell IDs
+            if let Some(option) = list_local_shells()
+                .into_iter()
+                .find(|option| option.id == requested)
+            {
+                let id = option.id;
+                // If the user didn't override args, use option's default args, otherwise use user's args
+                let args = shell_args.unwrap_or(option.args);
+                return (
+                    ShellLaunch {
+                        program: option.path,
+                        args,
+                    },
+                    id,
+                );
             }
+
+            // Otherwise, it's a custom command. Let's inspect the program string to see if it looks like powershell.
+            let lower = requested.to_lowercase();
+            let is_ps = lower.contains("pwsh") || lower.contains("powershell");
+            let id = if is_ps {
+                if lower.contains("pwsh") || lower.contains("7") {
+                    "powershell".to_string()
+                } else {
+                    "windows-powershell".to_string()
+                }
+            } else {
+                "custom".to_string()
+            };
 
             return (
                 ShellLaunch {
                     program: requested.to_string(),
                     args: shell_args.unwrap_or_default(),
                 },
-                "custom".to_string(),
+                id,
             );
         }
     }

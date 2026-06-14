@@ -99,10 +99,46 @@ describe("appStore.duplicateTab", () => {
     });
     useAppStore.getState().duplicateTab("locked");
     const copy = useAppStore.getState().tabs[2];
-    expect(copy.title).toBe("Server");
+    // Copy gets the next sequence number in the "Server" family.
+    expect(copy.title).toBe("Server-1");
     expect(copy.type).toBe("terminal");
     expect(copy.closable).toBe(true);
     expect(copy.hasNewOutput).toBe(false);
+  });
+
+  it("increments the -N suffix across same-prefix open tabs", () => {
+    useAppStore.setState({
+      tabs: [
+        tab("s0", { title: "Server" }),
+        tab("s1", { title: "Server-1" }),
+        tab("other", { title: "Other" }),
+      ],
+      activeTabId: "s0",
+    });
+    const activeTitle = () => {
+      const { tabs, activeTabId } = useAppStore.getState();
+      return tabs.find((t) => t.id === activeTabId)?.title;
+    };
+    // Duplicating the base bumps to the next free family number.
+    useAppStore.getState().duplicateTab("s0");
+    expect(activeTitle()).toBe("Server-2");
+    // Duplicating an already-numbered member continues the same family.
+    useAppStore.getState().duplicateTab("s1");
+    expect(activeTitle()).toBe("Server-3");
+  });
+
+  it("only carries terminalInitialCwd onto terminal copies", () => {
+    useAppStore.setState({
+      tabs: [
+        tab("term", { title: "Local" }),
+        tab("rdp", { type: "rdp", title: "Desktop" }),
+      ],
+      activeTabId: "term",
+    });
+    useAppStore.getState().duplicateTab("term", { terminalInitialCwd: "/home/me" });
+    expect(useAppStore.getState().tabs[1].terminalInitialCwd).toBe("/home/me");
+    useAppStore.getState().duplicateTab("rdp", { terminalInitialCwd: "/home/me" });
+    expect(useAppStore.getState().tabs.find((t) => t.id !== "rdp" && t.title === "Desktop-1")?.terminalInitialCwd).toBeUndefined();
   });
 
   it("mints a unique id distinct from the source", () => {
