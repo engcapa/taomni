@@ -697,6 +697,12 @@ export async function ccGetCustomSettings(): Promise<string | null> {
   );
 }
 
+export async function ccGetProfileSettings(vaultRef: string): Promise<string | null> {
+  return withVaultLockedNotice(() =>
+    invoke<string | null>("cc_get_profile_settings", { vaultRef }),
+  );
+}
+
 // --- Third-party importer secret recovery ---
 
 export interface KeychainQuery {

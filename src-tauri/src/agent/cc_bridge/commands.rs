@@ -47,6 +47,25 @@ pub async fn cc_get_custom_settings(
     crate::agent::cc_bridge::config::resolve_custom_settings(&config.cc_bridge, &state.vault)
 }
 
+#[tauri::command]
+pub async fn cc_get_profile_settings(
+    vault_ref: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    if !vault_ref.starts_with("vault:") {
+        return Err("Invalid vault reference".into());
+    }
+    match state.vault.resolve(&vault_ref) {
+        Ok(Some(plaintext)) => Ok(Some(plaintext.to_string())),
+        Ok(None) => Ok(None),
+        Err(e) if e.contains(crate::vault::ERR_VAULT_LOCKED) => Err(format!(
+            "{}: unlock the credential vault to read settings.",
+            crate::vault::ERR_VAULT_LOCKED
+        )),
+        Err(e) => Err(e),
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CcSendRequest {
     pub thread_id: String,
