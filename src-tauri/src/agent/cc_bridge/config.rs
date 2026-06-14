@@ -22,25 +22,11 @@ pub struct CcBridgeConfig {
     /// "default" | "acceptEdits" | "plan" — never "bypassPermissions"
     pub permission_mode: String,
     pub max_turns: u32,
-    /// Optional reference to a user-supplied Claude Code `settings.json`.
-    /// Almost always a `vault:<id>` reference (the raw JSON usually carries an
-    /// `ANTHROPIC_AUTH_TOKEN`, so it's stored encrypted in the credential
-    /// vault and only resolved at launch time). Empty/None = use the built-in
-    /// default settings (safety deny-list only).
-    #[serde(default)]
-    pub custom_settings_ref: Option<String>,
-    /// Whether the custom settings are currently active. Allows toggling off
-    /// without deleting the vault entry. Defaults to true so existing configs
-    /// (written before this field existed) keep working after upgrade.
-    #[serde(default = "default_true")]
-    pub custom_settings_enabled: bool,
     #[serde(default)]
     pub custom_settings_profiles: Vec<CcCustomSettingsProfile>,
     #[serde(default)]
     pub active_profile_id: Option<String>,
 }
-
-fn default_true() -> bool { true }
 
 impl Default for CcBridgeConfig {
     fn default() -> Self {
@@ -51,8 +37,6 @@ impl Default for CcBridgeConfig {
             default_model: "sonnet".into(),
             permission_mode: "default".into(),
             max_turns: 20,
-            custom_settings_ref: None,
-            custom_settings_enabled: true,
             custom_settings_profiles: Vec::new(),
             active_profile_id: None,
         }
@@ -93,25 +77,18 @@ pub fn resolve_custom_settings(
     cfg: &CcBridgeConfig,
     vault: &Vault,
 ) -> Result<Option<String>, String> {
-    // 1. Resolve active profile if custom_settings_profiles has entries
-    if let Some(ref active_id) = cfg.active_profile_id {
-        if let Some(profile) = cfg.custom_settings_profiles.iter().find(|p| &p.id == active_id) {
-            if !profile.enabled {
-                return Ok(None);
-            }
-            return resolve_vault_ref(&profile.vault_ref, vault);
-        }
-    }
-
-    // 2. Legacy fallback
-    if !cfg.custom_settings_enabled {
+    let active_id = match cfg.active_profile_id.as_ref() {
+        Some(id) => id,
+        None => return Ok(None),
+    };
+    let profile = match cfg.custom_settings_profiles.iter().find(|p| &p.id == active_id) {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+    if !profile.enabled {
         return Ok(None);
     }
-    let reference = match cfg.custom_settings_ref.as_ref() {
-        Some(r) if !r.trim().is_empty() => r,
-        _ => return Ok(None),
-    };
-    resolve_vault_ref(reference, vault)
+    resolve_vault_ref(&profile.vault_ref, vault)
 }
 
 /// Build the effective CC `settings.json` value.

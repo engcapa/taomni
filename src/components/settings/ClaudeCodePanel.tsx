@@ -3,36 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle, Copy, Loader2, Terminal, XCircle, AlertTriangle } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
-import {
-  ccGetCustomSettings,
-  vaultPut,
-  vaultUpdate,
-  vaultDelete,
-  vaultStatus,
-  isVaultLockedError,
-  VAULT_LOCKED_EVENT,
-} from "../../lib/ipc";
-
-/** Starter shown in the editor the first time a user adds custom settings. */
-const SETTINGS_TEMPLATE = `{
-  "env": {
-    "ANTHROPIC_AUTH_TOKEN": "sk-key",
-    "ANTHROPIC_BASE_URL": "https://url"
-  },
-  "permissions": {
-    "allow": [
-      "Bash",
-      "Read",
-      "Edit",
-      "Write",
-      "WebFetch",
-      "Grep",
-      "Glob",
-      "LS"
-    ],
-    "defaultMode": "default"
-  }
-}`;
+import { ClaudeCodeSettingsDialog } from "./ClaudeCodeSettingsDialog";
+import { Sliders, Shield } from "lucide-react";
 
 interface CcStatusResult {
   status:
@@ -73,6 +45,7 @@ export function ClaudeCodePanel() {
   const { config, loadConfig, saveConfig } = useAiStore();
   const [status, setStatus] = useState<CcStatusResult | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [showCustomDialog, setShowCustomDialog] = useState(false);
   const t = useT();
 
   useEffect(() => {
@@ -95,113 +68,6 @@ export function ClaudeCodePanel() {
     }
   };
 
-  // --- Custom settings.json (advanced) ---
-  const [customEditing, setCustomEditing] = useState(false);
-  const [customDraft, setCustomDraft] = useState("");
-  const [customError, setCustomError] = useState<string | null>(null);
-  const [customBusy, setCustomBusy] = useState(false);
-  const [customSaved, setCustomSaved] = useState(false);
-
-  const openAddCustom = () => {
-    setCustomDraft(SETTINGS_TEMPLATE);
-    setCustomError(null);
-    setCustomEditing(true);
-  };
-
-  const openEditCustom = async () => {
-    setCustomBusy(true);
-    setCustomError(null);
-    try {
-      // Decrypt the stored settings from the vault for in-place editing.
-      const json = await ccGetCustomSettings();
-      setCustomDraft(json ?? SETTINGS_TEMPLATE);
-      setCustomEditing(true);
-    } catch (e) {
-      // A locked vault already triggers the unlock prompt via the ipc wrapper.
-      if (!isVaultLockedError(e)) setCustomError(String(e));
-    } finally {
-      setCustomBusy(false);
-    }
-  };
-
-  const cancelEditCustom = () => {
-    setCustomEditing(false);
-    setCustomDraft("");
-    setCustomError(null);
-  };
-
-  const saveCustom = async () => {
-    if (!config) return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(customDraft);
-    } catch (e) {
-      setCustomError(t("aiSettings.ccCustomInvalidJson", { error: (e as Error).message }));
-      return;
-    }
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      setCustomError(t("aiSettings.ccCustomNotObject"));
-      return;
-    }
-    const pretty = JSON.stringify(parsed, null, 2);
-
-    setCustomBusy(true);
-    setCustomError(null);
-    try {
-      // The settings JSON usually carries an auth token, so it must live in the
-      // vault — never plaintext in ai.json. Require an unlocked vault first.
-      const vstatus = await vaultStatus().catch(() => null);
-      if (!vstatus || vstatus.state !== "unlocked") {
-        window.dispatchEvent(
-          new CustomEvent(VAULT_LOCKED_EVENT, {
-            detail: { reason: t("aiSettings.ccCustomVaultRequired") },
-          }),
-        );
-        setCustomError(t("aiSettings.ccCustomVaultRequired"));
-        setCustomBusy(false);
-        return;
-      }
-
-      let ref = cc.custom_settings_ref;
-      if (ref && ref.startsWith("vault:")) {
-        await vaultUpdate(ref.slice("vault:".length), pretty);
-      } else {
-        const res = await vaultPut("cc_bridge:settings", "Claude Code settings.json", pretty);
-        ref = res.reference;
-      }
-      await saveConfig({ ...config, cc_bridge: { ...cc, custom_settings_ref: ref } });
-      setCustomEditing(false);
-      setCustomDraft("");
-      setCustomSaved(true);
-      setTimeout(() => setCustomSaved(false), 2500);
-    } catch (e) {
-      if (!isVaultLockedError(e)) setCustomError(String(e));
-    } finally {
-      setCustomBusy(false);
-    }
-  };
-
-  const removeCustom = async () => {
-    if (!config) return;
-    setCustomBusy(true);
-    setCustomError(null);
-    try {
-      const ref = cc.custom_settings_ref;
-      await saveConfig({ ...config, cc_bridge: { ...cc, custom_settings_ref: undefined } });
-      if (ref && ref.startsWith("vault:")) {
-        try {
-          await vaultDelete(ref.slice("vault:".length));
-        } catch {
-          // Entry may already be gone — clearing the reference is what matters.
-        }
-      }
-    } catch (e) {
-      setCustomError(String(e));
-    } finally {
-      setCustomBusy(false);
-    }
-  };
-
   if (!config) return null;
 
   const cc = config.cc_bridge;
@@ -216,6 +82,17 @@ export function ClaudeCodePanel() {
     if (isNotAuth) return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
     return <XCircle className="w-4 h-4 text-red-400" />;
   };
+
+  const hasProfiles = cc.custom_settings_profiles && cc.custom_settings_profiles.length > 0;
+  const profileCount = cc.custom_settings_profiles?.length ?? 0;
+
+  const activeProfileName = (() => {
+    if (cc.active_profile_id && cc.custom_settings_profiles) {
+      const active = cc.custom_settings_profiles.find(p => p.id === cc.active_profile_id);
+      if (active) return active.name;
+    }
+    return null;
+  })();
 
   return (
     <div className="space-y-3">
@@ -329,7 +206,7 @@ export function ClaudeCodePanel() {
 
       {/* Custom settings.json (advanced) */}
       {cc.enabled && (
-        <div className="space-y-2 pt-2 border-t border-[var(--taomni-divider)]">
+        <div className="space-y-3 pt-2 border-t border-[var(--taomni-divider)]">
           <div>
             <div className="text-[12px] font-semibold">{t("aiSettings.ccCustomTitle")}</div>
             <div className="text-[11px] text-[var(--taomni-text-muted)]">
@@ -337,123 +214,44 @@ export function ClaudeCodePanel() {
             </div>
           </div>
 
-          {!customEditing && !cc.custom_settings_ref && (
-            <button
-              type="button"
-              className="taomni-btn h-7 px-3 text-[12px]"
-              disabled={customBusy}
-              onClick={openAddCustom}
-            >
-              {t("aiSettings.ccCustomAdd")}
-            </button>
-          )}
-
-          {!customEditing && cc.custom_settings_ref && (
-            <div className="flex items-center gap-2">
-              {/* enable/disable toggle — keeps the vault entry intact */}
-              <div
-                className={`w-8 h-4 rounded-full transition-colors relative cursor-pointer shrink-0 ${
-                  cc.custom_settings_enabled !== false
-                    ? "bg-[var(--taomni-accent)]"
-                    : "bg-[var(--taomni-divider)]"
-                }`}
-                onClick={() =>
-                  saveConfig({
-                    ...config,
-                    cc_bridge: {
-                      ...cc,
-                      custom_settings_enabled: cc.custom_settings_enabled === false,
-                    },
-                  })
-                }
-                title={
-                  cc.custom_settings_enabled !== false
-                    ? t("aiSettings.ccCustomEnabled")
-                    : t("aiSettings.ccCustomDisabled")
-                }
-              >
-                <div
-                  className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-                    cc.custom_settings_enabled !== false ? "translate-x-4" : "translate-x-0.5"
-                  }`}
-                />
+          <div className="rounded border border-[var(--taomni-divider)] p-3 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-[11.5px]">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Shield className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                <span className="font-medium">
+                  {hasProfiles
+                    ? t("aiSettings.ccCustomProfilesSummary", { count: profileCount })
+                    : t("aiSettings.ccCustomDisabled")}
+                </span>
               </div>
-              <CheckCircle
-                className={`w-3.5 h-3.5 shrink-0 ${
-                  cc.custom_settings_enabled !== false ? "text-green-400" : "text-[var(--taomni-text-muted)]"
-                }`}
-              />
-              <span className="text-[11px] flex-1">
-                {t("aiSettings.ccCustomConfigured")}
-                {cc.custom_settings_enabled === false && (
-                  <span className="ml-1 text-[var(--taomni-text-muted)]">
-                    · {t("aiSettings.ccCustomDisabled")}
-                  </span>
-                )}
-              </span>
               <button
                 type="button"
-                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                disabled={customBusy}
-                onClick={openEditCustom}
+                className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
+                onClick={() => setShowCustomDialog(true)}
               >
-                {customBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : t("aiSettings.ccCustomEdit")}
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px] text-red-400"
-                disabled={customBusy}
-                onClick={removeCustom}
-              >
-                {t("aiSettings.ccCustomRemove")}
+                <Sliders className="w-3 h-3" />
+                {t("aiSettings.ccCustomManage")}
               </button>
             </div>
-          )}
 
-          {customEditing && (
-            <div className="space-y-2">
-              <textarea
-                className="taomni-input w-full font-mono text-[11px] leading-relaxed"
-                style={{ minHeight: 220 }}
-                spellCheck={false}
-                value={customDraft}
-                onChange={(e) => setCustomDraft(e.target.value)}
-                placeholder={t("aiSettings.ccCustomPlaceholder")}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
-                  disabled={customBusy}
-                  onClick={saveCustom}
-                >
-                  {customBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  {t("aiSettings.ccCustomSave")}
-                </button>
-                <button
-                  type="button"
-                  className="taomni-btn h-7 px-3 text-[12px]"
-                  disabled={customBusy}
-                  onClick={cancelEditCustom}
-                >
-                  {t("aiSettings.ccCustomCancel")}
-                </button>
+            {hasProfiles && activeProfileName && (
+              <div className="text-[10.5px] text-[var(--taomni-text-muted)] flex items-center gap-1">
+                <span className="px-1 text-[8px] bg-green-500/15 text-green-400 border border-green-500/35 rounded uppercase shrink-0 font-medium">
+                  {t("aiSettings.ccCustomActiveLabel")}
+                </span>
+                <span className="truncate">{activeProfileName}</span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {customError && (
-            <div className="text-[11px] text-red-400 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
-              {customError}
-            </div>
-          )}
-          {customSaved && (
-            <div className="text-[11px] text-green-400">{t("aiSettings.ccCustomSaved")}</div>
-          )}
           <div className="text-[10px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.ccCustomNote")}
           </div>
         </div>
+      )}
+
+      {showCustomDialog && (
+        <ClaudeCodeSettingsDialog onClose={() => setShowCustomDialog(false)} />
       )}
     </div>
   );

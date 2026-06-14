@@ -50,6 +50,14 @@ export interface AiConfig {
   chat_output_format?: string;
 }
 
+export interface CcCustomSettingsProfile {
+  id: string;
+  name: string;
+  enabled: boolean;
+  vault_ref: string;
+  created_at: number;
+}
+
 export interface CcBridgeConfig {
   enabled: boolean;
   binary: string;
@@ -57,18 +65,8 @@ export interface CcBridgeConfig {
   default_model: string;
   permission_mode: string;
   max_turns: number;
-  /**
-   * Reference to a user-supplied Claude Code settings.json. Stored as a
-   * `vault:<id>` reference because the JSON usually contains an auth token;
-   * the raw JSON lives encrypted in the credential vault. Empty/undefined =
-   * use Claude Code's built-in defaults.
-   */
-  custom_settings_ref?: string;
-  /**
-   * Whether the custom settings are currently active. Allows toggling off
-   * without deleting the vault entry. Defaults to true.
-   */
-  custom_settings_enabled?: boolean;
+  custom_settings_profiles?: CcCustomSettingsProfile[];
+  active_profile_id?: string;
 }
 
 export interface WebSearchConfig {
