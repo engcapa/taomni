@@ -74,9 +74,13 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiProviders = useAiStore((s) => s.config?.llm.providers);
+  const ccBridgeEnabled = useAiStore((s) => s.config?.cc_bridge.enabled);
   const globalOutputFormat = useAiStore((s) => s.config?.chat_output_format) ?? "md";
   const loadAiConfig = useAiStore((s) => s.loadConfig);
   const providerIds = Object.keys(aiProviders ?? {});
+  if (ccBridgeEnabled) {
+    providerIds.push("claude-code");
+  }
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
   const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
 
@@ -383,7 +387,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                 }}
               >
                 {providerIds.map((id) => (
-                  <option key={id} value={id}>{id}</option>
+                  <option key={id} value={id}>
+                    {id === "claude-code" ? "Claude Code (本机)" : id}
+                  </option>
                 ))}
               </select>
             ) : (

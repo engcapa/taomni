@@ -35,6 +35,10 @@ pub struct CcProcess {
     /// Set by `stop()` so the watchdog stops itself.
     stopped: AtomicBool,
     watchdog_started: AtomicBool,
+    /// Rolling capture of the child's stderr, used to surface spawn/runtime
+    /// errors (e.g. missing flags, auth failures) that would otherwise be
+    /// invisible and present as an empty assistant bubble.
+    stderr_buf: Arc<Mutex<String>>,
 }
 
 impl CcProcess {
@@ -45,6 +49,10 @@ impl CcProcess {
             "stream-json".into(),
             "--input-format".into(),
             "stream-json".into(),
+            // CC requires --verbose when combining --print with
+            // --output-format stream-json; without it the CLI exits
+            // immediately with an error.
+            "--verbose".into(),
             // v2.6 §22: surface partial assistant tokens so the UI can stream.
             "--include-partial-messages".into(),
         ];
@@ -60,6 +68,7 @@ impl CcProcess {
             needs_respawn: AtomicBool::new(false),
             stopped: AtomicBool::new(false),
             watchdog_started: AtomicBool::new(false),
+            stderr_buf: Arc::new(Mutex::new(String::new())),
         }
     }
 
@@ -78,10 +87,15 @@ impl CcProcess {
     ) -> Result<Vec<CcEvent>, String> {
         self.ensure_running().await?;
 
-        // Write the message as a JSON line to stdin.
+        // Write the message as a JSON line to stdin. CC's stream-json input
+        // format expects `message` to be a full Anthropic message object
+        // ({"role":"user","content":"..."}), not a bare string.
         let input = format!(
             "{}\n",
-            serde_json::json!({ "type": "user", "message": message })
+            serde_json::json!({
+                "type": "user",
+                "message": { "role": "user", "content": message }
+            })
         );
         {
             let mut stdin_guard = self.stdin.lock().await;
@@ -142,7 +156,7 @@ impl CcProcess {
         cmd.args(&self.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null());
+            .stderr(Stdio::piped());
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
@@ -153,6 +167,32 @@ impl CcProcess {
         };
 
         let stdin = child.stdin.take().ok_or("Failed to get CC stdin")?;
+
+        // Drain stderr into a rolling buffer so we can report why the CLI
+        // exited if it dies without producing usable stdout.
+        if let Some(stderr) = child.stderr.take() {
+            let buf = self.stderr_buf.clone();
+            {
+                let mut g = buf.lock().await;
+                g.clear();
+            }
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            let mut g = buf.lock().await;
+                            if g.len() < 8192 {
+                                g.push_str(&line);
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         *child_guard = Some(child);
         *self.stdin.lock().await = Some(stdin);
@@ -217,6 +257,7 @@ impl CcProcess {
         on_event: &mut F,
     ) -> Result<Vec<CcEvent>, String> {
         let mut events = Vec::new();
+        let mut terminal_seen = false;
         let mut child_guard = self.child.lock().await;
 
         let child = child_guard.as_mut().ok_or("CC process not running")?;
@@ -229,12 +270,12 @@ impl CcProcess {
         loop {
             line.clear();
             match tokio::time::timeout(
-                std::time::Duration::from_secs(30),
+                std::time::Duration::from_secs(120),
                 reader.read_line(&mut line),
             )
             .await
             {
-                Ok(Ok(0)) => break, // EOF
+                Ok(Ok(0)) => break, // EOF — process exited.
                 Ok(Ok(_)) => {
                     let trimmed = line.trim();
                     if trimmed.is_empty() {
@@ -245,13 +286,35 @@ impl CcProcess {
                         let done = matches!(event, CcEvent::Done | CcEvent::Error { .. });
                         events.push(event);
                         if done {
+                            terminal_seen = true;
                             break;
                         }
                     }
                 }
                 Ok(Err(e)) => return Err(format!("CC stdout read error: {}", e)),
-                Err(_) => return Err("CC response timed out after 30s".into()),
+                Err(_) => return Err("CC response timed out after 120s".into()),
             }
+        }
+
+        // EOF without a result/error event means the child died early (bad
+        // flags, auth failure, crash). Reap it, schedule a respawn and surface
+        // whatever it wrote to stderr so the user sees a real error instead of
+        // an empty bubble.
+        if !terminal_seen {
+            drop(child_guard);
+            if let Some(mut c) = self.child.lock().await.take() {
+                let _ = c.kill().await;
+            }
+            *self.stdin.lock().await = None;
+            self.needs_respawn.store(true, Ordering::SeqCst);
+            self.record_failure().await;
+            let stderr = self.stderr_buf.lock().await.trim().to_string();
+            let detail = if stderr.is_empty() {
+                "no stderr output".to_string()
+            } else {
+                stderr
+            };
+            return Err(format!("Claude Code exited unexpectedly: {}", detail));
         }
 
         Ok(events)

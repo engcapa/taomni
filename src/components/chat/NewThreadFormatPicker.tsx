@@ -167,7 +167,8 @@ export function NewThreadFormatPicker({
           </button>
           <button
             type="button"
-            className="taomni-btn h-7 px-3 text-[11px] bg-[var(--taomni-accent)] text-white"
+            className="taomni-btn h-7 px-3 text-[11px]"
+            data-primary="true"
             onClick={handleConfirm}
             disabled={submitting}
           >

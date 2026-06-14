@@ -108,12 +108,20 @@ pub fn parse_ndjson_line(line: &str) -> Option<CcEvent> {
             })
         }
         "result" => {
-            // CC final result event
-            if value.get("subtype").and_then(|v| v.as_str()) == Some("error") {
+            // CC final result event. Error variants use subtypes like
+            // "error_max_turns" / "error_during_execution", or set is_error.
+            let subtype = value.get("subtype").and_then(|v| v.as_str()).unwrap_or("");
+            let is_error = value
+                .get("is_error")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if is_error || subtype.starts_with("error") {
                 let msg = value
-                    .get("error")
+                    .get("result")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error")
+                    .or_else(|| value.get("error").and_then(|v| v.as_str()))
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("Claude Code reported an error")
                     .to_string();
                 Some(CcEvent::Error { message: msg })
             } else {
@@ -127,6 +135,33 @@ pub fn parse_ndjson_line(line: &str) -> Option<CcEvent> {
                 .unwrap_or("Unknown error")
                 .to_string();
             Some(CcEvent::Error { message: msg })
+        }
+        "stream_event" => {
+            // Streaming deltas (emitted with --include-partial-messages).
+            // {"type":"stream_event","event":{"delta":{"text":"Hi","type":"text_delta"},
+            //  "index":0,"type":"content_block_delta"},...}
+            let inner = value.get("event");
+            let inner_type = inner
+                .and_then(|e| e.get("type"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+            if inner_type == "content_block_delta" {
+                let delta = inner.and_then(|e| e.get("delta"));
+                if delta.and_then(|d| d.get("type")).and_then(|t| t.as_str()) == Some("text_delta")
+                {
+                    let text = delta
+                        .and_then(|d| d.get("text"))
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if !text.is_empty() {
+                        return Some(CcEvent::Partial { content: text });
+                    }
+                }
+            }
+            Some(CcEvent::Unknown {
+                raw: line.to_string(),
+            })
         }
         _ => Some(CcEvent::Unknown {
             raw: line.to_string(),
@@ -152,4 +187,92 @@ pub fn extract_session_id(events: &[CcEvent]) -> Option<String> {
         CcEvent::SessionInit { session_id } => Some(session_id.clone()),
         _ => None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_system_init_session_id() {
+        let line = r#"{"type":"system","subtype":"init","session_id":"abc-123","tools":[]}"#;
+        assert!(matches!(
+            parse_ndjson_line(line),
+            Some(CcEvent::SessionInit { session_id }) if session_id == "abc-123"
+        ));
+    }
+
+    #[test]
+    fn parses_stream_event_text_delta_as_partial() {
+        let line = r#"{"type":"stream_event","event":{"delta":{"text":"Hi","type":"text_delta"},"index":0,"type":"content_block_delta"},"session_id":"x"}"#;
+        assert!(matches!(
+            parse_ndjson_line(line),
+            Some(CcEvent::Partial { content }) if content == "Hi"
+        ));
+    }
+
+    #[test]
+    fn ignores_non_text_stream_events() {
+        let line = r#"{"type":"stream_event","event":{"type":"message_start","message":{"content":[]}},"session_id":"x"}"#;
+        assert!(matches!(
+            parse_ndjson_line(line),
+            Some(CcEvent::Unknown { .. })
+        ));
+    }
+
+    #[test]
+    fn parses_assistant_message_text() {
+        let line = r#"{"type":"assistant","message":{"content":[{"text":"Hi!","type":"text"}],"role":"assistant"}}"#;
+        assert!(matches!(
+            parse_ndjson_line(line),
+            Some(CcEvent::AssistantMessage { content }) if content == "Hi!"
+        ));
+    }
+
+    #[test]
+    fn parses_success_result_as_done() {
+        let line = r#"{"type":"result","subtype":"success","is_error":false,"result":"Hi!"}"#;
+        assert!(matches!(parse_ndjson_line(line), Some(CcEvent::Done)));
+    }
+
+    #[test]
+    fn parses_error_result_via_is_error() {
+        let line = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"boom"}"#;
+        assert!(matches!(
+            parse_ndjson_line(line),
+            Some(CcEvent::Error { message }) if message == "boom"
+        ));
+    }
+
+    #[test]
+    fn parses_error_result_max_turns_subtype() {
+        let line = r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#;
+        assert!(matches!(
+            parse_ndjson_line(line),
+            Some(CcEvent::Error { .. })
+        ));
+    }
+
+    #[test]
+    fn full_stream_yields_answer_and_done() {
+        let lines = [
+            r#"{"type":"system","subtype":"init","session_id":"s1","tools":[]}"#,
+            r#"{"type":"stream_event","event":{"delta":{"text":"Hi","type":"text_delta"},"index":0,"type":"content_block_delta"}}"#,
+            r#"{"type":"stream_event","event":{"delta":{"text":"!","type":"text_delta"},"index":0,"type":"content_block_delta"}}"#,
+            r#"{"type":"assistant","message":{"content":[{"text":"Hi!","type":"text"}],"role":"assistant"}}"#,
+            r#"{"type":"result","subtype":"success","is_error":false,"result":"Hi!"}"#,
+        ];
+        let events: Vec<CcEvent> = lines.iter().filter_map(|l| parse_ndjson_line(l)).collect();
+        assert_eq!(extract_session_id(&events).as_deref(), Some("s1"));
+        assert_eq!(extract_answer(&events), "Hi!");
+        let partials: Vec<&str> = events
+            .iter()
+            .filter_map(|e| match e {
+                CcEvent::Partial { content } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(partials, vec!["Hi", "!"]);
+        assert!(events.iter().any(|e| matches!(e, CcEvent::Done)));
+    }
 }
