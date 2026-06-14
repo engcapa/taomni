@@ -62,7 +62,7 @@ import {
 } from "../floating-toolbar/floatingToolbarStyles";
 import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
 import {
-  createInputEchoSuppressor,
+  createOsc7BlankingSuppressor,
   type InputEchoSuppressor,
 } from "../../lib/terminalOutputFilter";
 import { makeHostKey, useCommandHistory } from "../../lib/history";
@@ -95,6 +95,7 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
@@ -223,6 +224,12 @@ interface TerminalPanelProps {
 const DEFAULT_FONT_SIZE = 14;
 const CWD_QUERY_COMMAND =
   " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
+// PowerShell equivalent of the OSC 7 cwd probe. `printf` doesn't exist in
+// PowerShell, so we emit the escape sequence via [Console]::Write. The echo is
+// hidden by the OSC-7 blanking suppressor (which keys off the real escape byte
+// this prints at runtime), so no marker bookkeeping is needed here.
+const PS_CWD_QUERY_COMMAND =
+  "[Console]::Write([char]27+']7;file://'+$env:COMPUTERNAME+'/'+($PWD.ProviderPath.Replace('\\','/'))+[char]27+'\\')";
 const OSC52_MAX_DECODED_BYTES = 1024 * 1024;
 
 interface SearchMatch {
@@ -401,6 +408,8 @@ export function TerminalPanel({
   const macroPlaybackRef = useRef(false);
   const eventIdRef = useRef(0);
   const imeGuardRef = useRef<TerminalImeInputGuard | null>(null);
+  const isComposingRef = useRef(false);
+  const compositionBufferRef = useRef<Uint8Array[]>([]);
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
   const suppressNativePasteUntilRef = useRef(0);
   const middleClickSelectionRef = useRef("");
@@ -479,6 +488,28 @@ export function TerminalPanel({
   );
   const suggestionsActive = inlineSuggestionsEnabled && !isLocalPowerShell;
   const history = useCommandHistory(historyHostKey, inlineSuggestionsMax);
+
+  // Which command (if any) can probe this terminal's cwd via OSC 7. SSH and
+  // POSIX local shells use the `printf` form; PowerShell uses a [Console]::Write
+  // form; cmd.exe can't emit OSC 7 cleanly, so it has no probe. Resolved
+  // reactively because the backend reports the real local shell on connect.
+  const isLocalCmd = useMemo(
+    () =>
+      isLocal &&
+      (resolvedLocalShellId === "command-prompt" ||
+        /cmd\.exe|command[\s-]?prompt/i.test(`${localShell?.id ?? ""} ${localShell?.name ?? ""}`)),
+    [isLocal, resolvedLocalShellId, localShell?.id, localShell?.name],
+  );
+  const cwdProbeCommand = useMemo<string | null>(() => {
+    if (!isLocal) return CWD_QUERY_COMMAND; // SSH → remote POSIX shell.
+    if (isLocalCmd) return null;
+    if (isLocalPowerShell) return PS_CWD_QUERY_COMMAND;
+    return CWD_QUERY_COMMAND; // bash/zsh/git-bash/WSL/Unix default.
+  }, [isLocal, isLocalCmd, isLocalPowerShell]);
+  const cwdProbeCommandRef = useRef(cwdProbeCommand);
+  useEffect(() => {
+    cwdProbeCommandRef.current = cwdProbeCommand;
+  }, [cwdProbeCommand]);
 
   // Refs decouple the once-mounted xterm.onData callback from the live
   // history/enabled values. Without this, the initial writeXtermInput closure
@@ -764,8 +795,16 @@ export function TerminalPanel({
       return;
     }
 
-    injectedInputEchoSuppressorRef.current = createInputEchoSuppressor(CWD_QUERY_COMMAND, 5000);
-    writeTerminal(sid, encodeBase64(`${CWD_QUERY_COMMAND}\r`)).catch((err) => {
+    const command = cwdProbeCommandRef.current;
+    if (!command) {
+      // No way to read the cwd for this shell (e.g. cmd.exe).
+      setStatusMessage("This shell can't report its working directory");
+      return;
+    }
+
+    // Hide the probe's echo: drop everything until the OSC 7 reply it emits.
+    injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
+    writeTerminal(sid, encodeBase64(`${command}\r`)).catch((err) => {
       if (sessionIdRef.current === sid) injectedInputEchoSuppressorRef.current = null;
       setStatusMessage(err instanceof Error ? err.message : "Terminal cwd request failed");
     });
@@ -1796,13 +1835,22 @@ export function TerminalPanel({
       let lockedTop = "";
 
       const onCompositionStart = () => {
+        isComposingRef.current = true;
         isComposing = true;
         lockedLeft = textarea.style.left;
         lockedTop = textarea.style.top;
       };
 
       const onCompositionEnd = () => {
+        isComposingRef.current = false;
         isComposing = false;
+        // Flush any PTY output buffered during composition
+        if (compositionBufferRef.current.length > 0) {
+          for (const chunk of compositionBufferRef.current) {
+            term.write(chunk);
+          }
+          compositionBufferRef.current = [];
+        }
       };
 
       textarea.addEventListener("compositionstart", onCompositionStart);
@@ -1827,6 +1875,7 @@ export function TerminalPanel({
         textarea.removeEventListener("compositionstart", onCompositionStart);
         textarea.removeEventListener("compositionend", onCompositionEnd);
         observer.disconnect();
+        compositionBufferRef.current = [];
       };
     }
 
@@ -1966,7 +2015,11 @@ export function TerminalPanel({
             outputLogRef.current += new TextDecoder().decode(filtered);
           }
           onOutputRef.current?.();
-          term.write(filtered);
+          if (isComposingRef.current) {
+            compositionBufferRef.current.push(filtered);
+          } else {
+            term.write(filtered);
+          }
         },
         onStateChange: (state, progress) => {
           setZmodemState(state);
@@ -2140,20 +2193,27 @@ export function TerminalPanel({
           window.setTimeout(focusTerminal, 0);
         } else {
           term.write(formatSshInfoBanner(ssh));
-          // Duplicated terminals carry the source's cwd. SSH can't set a
-          // start directory on the channel, so cd into it once the shell is
-          // up. Suppress the echoed command so the copy lands at a clean
-          // prompt in the target directory; the leading space also keeps it
-          // out of shell history (HISTCONTROL).
+          // Duplicated terminals carry the source's cwd. SSH can't set a start
+          // directory on the channel, so cd into it once the shell is up. We
+          // append the OSC 7 cwd probe so the blanking suppressor can hide the
+          // whole line (echo + cd) and leave a clean prompt in the new dir.
+          //
+          // The injection is delayed briefly so the server's MOTD / login
+          // banner and first prompt render first — otherwise the blanking
+          // suppressor (which drops output until the OSC 7 reply) would eat
+          // them. By the time it fires, only the cd's own echo is in flight.
           if (initialCwd) {
             const escaped = initialCwd.replace(/'/g, "'\\''");
-            const cdCommand = ` cd '${escaped}'`;
-            injectedInputEchoSuppressorRef.current = createInputEchoSuppressor(cdCommand, 5000);
-            writeTerminal(connectedSid, encodeBase64(`${cdCommand}\r`)).catch(() => {
-              if (sessionIdRef.current === connectedSid) {
-                injectedInputEchoSuppressorRef.current = null;
-              }
-            });
+            const cdCommand = ` cd '${escaped}' &&${CWD_QUERY_COMMAND}`;
+            window.setTimeout(() => {
+              if (destroyed || sessionIdRef.current !== connectedSid) return;
+              injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
+              writeTerminal(connectedSid, encodeBase64(`${cdCommand}\r`)).catch(() => {
+                if (sessionIdRef.current === connectedSid) {
+                  injectedInputEchoSuppressorRef.current = null;
+                }
+              });
+            }, 500);
           }
         }
       }
@@ -2269,13 +2329,19 @@ export function TerminalPanel({
     } else {
       connectionStateRef.current = "connecting";
       appendEvent("connection", `Starting ${localShell?.name ?? "local terminal"}`);
+      // A duplicated terminal carries the source's cwd (from OSC 7). Translate
+      // it into a native start directory; skip it if it can't be mapped (e.g. a
+      // WSL/MSYS path with no Windows drive) so the shell still launches.
+      const startCwd = initialCwd
+        ? normalizeLocalStartCwd(initialCwd, getAppPlatform()) ?? undefined
+        : undefined;
       createLocalTerminal(
         sid,
         cols,
         rows,
         localShell?.id,
         localShell?.args,
-        initialCwd,
+        startCwd,
         handleRawOutput,
       )
         .then(({ sessionId, shellId }) => handleConnected({ sessionId, shellId }, "initial"))
