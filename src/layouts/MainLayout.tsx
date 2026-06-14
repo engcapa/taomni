@@ -142,25 +142,15 @@ function readRibbonVisible(): boolean {
   }
 }
 
-// Whether a local terminal's shell can answer the POSIX `printf` OSC 7 cwd
-// probe used when duplicating a tab. Windows-native shells (PowerShell, cmd)
-// would print an error instead, so we skip the probe for them and let the
-// duplicate open in the default directory. SSH terminals always run a POSIX
-// remote shell and are handled separately.
-//
-// Note: a LocalShellSelection identifies the shell by its executable PATH
-// (see TabBar's shellSelectionFor), not an enumerated id, so we match on the
-// path/name text rather than fixed ids.
+// Whether a local terminal's shell can answer an OSC 7 cwd probe when its tab
+// is duplicated. PowerShell and POSIX shells (bash/zsh/git-bash/WSL) can; cmd
+// can't emit OSC 7 cleanly, so it's skipped (the duplicate opens in the default
+// directory). SSH terminals always run a POSIX remote shell and are handled
+// separately. A LocalShellSelection identifies the shell by its executable
+// path (see TabBar's shellSelectionFor), so we match on the path/name text.
 function localShellSupportsCwdProbe(localShell?: LocalShellSelection): boolean {
   const hint = `${localShell?.id ?? ""} ${localShell?.name ?? ""}`.toLowerCase();
-  if (!hint.trim()) {
-    // No explicit shell → backend launches the platform default, which on
-    // Windows is PowerShell/cmd. Only assume a POSIX shell off Windows.
-    return getAppPlatform() !== "windows";
-  }
   if (
-    hint.includes("powershell") ||
-    hint.includes("pwsh") ||
     hint.includes("cmd.exe") ||
     hint.includes("command prompt") ||
     hint.includes("command-prompt")

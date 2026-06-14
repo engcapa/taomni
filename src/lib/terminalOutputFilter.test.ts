@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInputEchoSuppressor } from "./terminalOutputFilter";
+import { createInputEchoSuppressor, createOsc7BlankingSuppressor } from "./terminalOutputFilter";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -62,6 +62,59 @@ describe("terminal output filtering", () => {
 
     expect(text(suppressor.filter(bytes(prefix), 120))).toBe(clearLine);
     expect(text(suppressor.filter(bytes(" output"), 200))).toBe(`${prefix} output`);
+    expect(suppressor.done).toBe(true);
+  });
+});
+
+describe("OSC 7 blanking suppressor", () => {
+  const clearLine = "\r\x1b[2K";
+  const osc7 = "\x1b]7;file://host/D:/code\x1b\\";
+
+  it("drops a PowerShell probe echo (colors and all) and keeps the OSC 7 reply", () => {
+    const suppressor = createOsc7BlankingSuppressor(2500, 100);
+    // PSReadLine re-colorizes the echoed command; the escape is literal text.
+    const echoed =
+      "\x1b[93m[Console]\x1b[0m::Write([char]27+']7;file://'+$env:COMPUTERNAME+...)";
+    const newPrompt = "PS D:\\code> ";
+    const output = text(
+      suppressor.filter(bytes(`${echoed}\r\n${osc7}${newPrompt}`), 120),
+    );
+
+    expect(output).toBe(`${clearLine}${osc7}${newPrompt}`);
+    expect(output).not.toContain("Console");
+    expect(suppressor.done).toBe(true);
+  });
+
+  it("drops a wrapped bash probe echo across chunks", () => {
+    const suppressor = createOsc7BlankingSuppressor(2500, 100);
+    // A long echo that readline wrapped, arriving split — none of it should show.
+    const first = text(
+      suppressor.filter(bytes("$  printf '\\033]7;file://%s%s\\033\\\\' \"$HOST"), 110),
+    );
+    const second = text(
+      suppressor.filter(bytes(`NAME\" \"$PWD\"\r\n${osc7}user@host:~/x$ `), 120),
+    );
+
+    expect(first).toBe(clearLine); // line cleared, echo dropped
+    expect(second).toBe(`${osc7}user@host:~/x$ `);
+    expect(suppressor.done).toBe(true);
+  });
+
+  it("hides an SSH cd whose trailing probe emits the OSC 7", () => {
+    const suppressor = createOsc7BlankingSuppressor(2500, 100);
+    const echoed = " cd '/var/log' && printf '\\033]7;file://%s%s\\033\\\\' \"$HOSTNAME\" \"$PWD\"";
+    const osc7log = "\x1b]7;file://host/var/log\x1b\\";
+    const output = text(suppressor.filter(bytes(`${echoed}\r\n${osc7log}[root@host log]# `), 120));
+
+    expect(output).toBe(`${clearLine}${osc7log}[root@host log]# `);
+    expect(output).not.toContain("cd '/var/log'");
+    expect(suppressor.done).toBe(true);
+  });
+
+  it("stops dropping once the window expires so output is not lost forever", () => {
+    const suppressor = createOsc7BlankingSuppressor(50, 100);
+    expect(text(suppressor.filter(bytes("echoed command no osc7"), 120))).toBe(clearLine);
+    expect(text(suppressor.filter(bytes("later real output"), 200))).toBe("later real output");
     expect(suppressor.done).toBe(true);
   });
 });

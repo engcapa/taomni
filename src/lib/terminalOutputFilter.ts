@@ -190,6 +190,89 @@ export function createInputEchoSuppressor(
   return new ByteInputEchoSuppressor(text, ttlMs, now);
 }
 
+// ESC ] 7 ; — the start of an OSC 7 "report cwd" sequence.
+const OSC7_INTRODUCER = [0x1b, 0x5d, 0x37, 0x3b];
+
+/**
+ * Suppressor for an injected cwd-probe command (or a `cd` that ends with one).
+ *
+ * Rather than trying to match the echoed command text — which shell line
+ * editors (bash readline, zsh zle, PowerShell PSReadLine) defeat by
+ * interleaving color and cursor-movement escapes and wrapping long lines — this
+ * clears the current line, then drops *everything* until the real OSC 7 escape
+ * byte arrives, then passes the OSC 7 reply and all following output through.
+ *
+ * This is robust because the echoed command can never contain a real ESC
+ * (0x1B): the probe writes the escape as literal text (`[char]27`, `\033`), so
+ * the only real OSC 7 in the stream is the one the command emits when it runs.
+ * The result is the echoed command vanishing and the shell redrawing a clean
+ * prompt in its place.
+ */
+class Osc7BlankingSuppressor implements InputEchoSuppressor {
+  private readonly expiresAt: number;
+  private clearedLine = false;
+  private matched = 0;
+  private finished = false;
+
+  constructor(ttlMs: number, now: number) {
+    this.expiresAt = now + ttlMs;
+  }
+
+  get done(): boolean {
+    return this.finished;
+  }
+
+  filter(data: Uint8Array, now = Date.now()): Uint8Array {
+    if (this.finished) return data;
+
+    if (now > this.expiresAt) {
+      // Gave up waiting for the OSC 7 reply; stop dropping and let output flow.
+      this.finished = true;
+      return data;
+    }
+
+    const out: number[] = [];
+    if (!this.clearedLine) {
+      // Wipe the prompt line the echo is landing on; the shell will redraw a
+      // fresh prompt after the (dropped) command runs.
+      out.push(...CLEAR_CURRENT_LINE);
+      this.clearedLine = true;
+    }
+
+    for (let i = 0; i < data.length; i += 1) {
+      const byte = data[i];
+      if (byte === OSC7_INTRODUCER[this.matched]) {
+        this.matched += 1;
+        if (this.matched === OSC7_INTRODUCER.length) {
+          // Found the real OSC 7: emit it and everything after, untouched.
+          out.push(...OSC7_INTRODUCER);
+          for (let j = i + 1; j < data.length; j += 1) out.push(data[j]);
+          this.finished = true;
+          return new Uint8Array(out);
+        }
+      } else {
+        // Mismatch mid-introducer: those bytes were echo noise, so drop them
+        // and restart the match (the byte may itself be a fresh ESC).
+        this.matched = byte === OSC7_INTRODUCER[0] ? 1 : 0;
+      }
+      // Every other byte is dropped (the echoed command + its newline).
+    }
+
+    return new Uint8Array(out);
+  }
+}
+
+/** See {@link Osc7BlankingSuppressor}. The TTL bounds how long output is
+ *  dropped if the OSC 7 reply never arrives (e.g. the terminal was busy running
+ *  a foreground command when the probe was queued), so worst-case output loss
+ *  is short. */
+export function createOsc7BlankingSuppressor(
+  ttlMs = 1500,
+  now = Date.now(),
+): InputEchoSuppressor {
+  return new Osc7BlankingSuppressor(ttlMs, now);
+}
+
 function isPrefix(value: number[], prefix: Uint8Array): boolean {
   if (value.length > prefix.length) return false;
   for (let i = 0; i < value.length; i += 1) {
