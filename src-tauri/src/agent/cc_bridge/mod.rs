@@ -16,7 +16,7 @@ use tokio::time::timeout;
 pub const MIN_VERSION: &str = "1.0.0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum CcStatus {
     /// `claude` binary not found in PATH.
     NotFound,
@@ -105,12 +105,21 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
         }
     };
 
-    // Extract version number (output is like "Claude Code 1.2.3" or just "1.2.3").
+    // Extract version number (output can be like "Claude Code 1.2.3", "2.1.177 (Claude Code)", or "1.2.3").
     let version = version_str
         .split_whitespace()
-        .last()
-        .unwrap_or("")
-        .to_string();
+        .find(|s| {
+            let s_trim = s.trim_start_matches('v');
+            s_trim.chars().next().map_or(false, |c| c.is_ascii_digit()) && s_trim.contains('.')
+        })
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            version_str
+                .split_whitespace()
+                .last()
+                .unwrap_or("")
+                .to_string()
+        });
 
     if !version_ok(&version, MIN_VERSION) {
         return CcStatusResult {

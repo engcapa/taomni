@@ -400,6 +400,178 @@ pub async fn chat_stream(
     emit(&StreamEventOut::UserMessage {
         message: user_msg.clone(),
     });
+    if thread.provider_id == "claude-code" {
+        // Allocate the assistant message id and begin streaming.
+        let assistant_id = Uuid::new_v4().to_string();
+        let assistant_ts = now() + 1;
+        emit(&StreamEventOut::AssistantStart {
+            id: assistant_id.clone(),
+            thread_id: req.thread_id.clone(),
+            created_at: assistant_ts,
+        });
+
+        // 1. Verify Claude Code is enabled
+        let ai_config = AiConfig::load(&default_ai_config_path());
+        if !ai_config.cc_bridge.enabled || ai_config.fully_disabled || ai_config.full_local_mode {
+            emit(&StreamEventOut::Error {
+                id: assistant_id,
+                message: "Claude Code is unavailable in full-local / fully-disabled mode or is disabled.".into(),
+            });
+            return Ok(());
+        }
+
+        // 2. Find Claude Code CLI binary path
+        let binary = if ai_config.cc_bridge.binary == "auto" {
+            crate::agent::cc_bridge::find_claude_binary().ok_or("Claude Code CLI not found")?
+        } else {
+            ai_config.cc_bridge.binary.clone()
+        };
+
+        // 3. Write temp configs
+        let tmp_dir = std::env::temp_dir().join(format!("taomni-cc-{}", &req.thread_id[..8]));
+        let settings_path = tmp_dir.join("settings.json");
+        let mcp_path = tmp_dir.join(".mcp.json");
+        crate::agent::cc_bridge::config::write_temp_settings(
+            &ai_config.cc_bridge.permission_mode,
+            &crate::agent::cc_bridge::config::sensitive_deny_dirs(),
+            &settings_path,
+        ).map_err(|e| format!("Failed to write CC settings: {}", e))?;
+        crate::agent::cc_bridge::config::write_temp_mcp_config(&mcp_path)
+            .map_err(|e| format!("Failed to write CC MCP config: {}", e))?;
+
+        // 4. Resolve session
+        let resume_session = thread.cc_session_id.clone();
+
+        // 5. Build extra args
+        let mut extra_args = vec![
+            "--model".into(),
+            ai_config.cc_bridge.default_model.clone(),
+            "--max-turns".into(),
+            ai_config.cc_bridge.max_turns.to_string(),
+            "--settings".into(),
+            settings_path.to_string_lossy().to_string(),
+            "--mcp-config".into(),
+            mcp_path.to_string_lossy().to_string(),
+            "--permission-prompt-tool".into(),
+            crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
+        ];
+        if let Some(sid) = &resume_session {
+            extra_args.push("--resume".into());
+            extra_args.push(sid.clone());
+        }
+
+        // 6. Get or create process
+        let process = {
+            let mut registry = state.cc_processes.lock().await;
+            let existing = registry.get(&req.thread_id).cloned();
+            match existing {
+                Some(p) => p,
+                None => {
+                    let p = std::sync::Arc::new(crate::agent::cc_bridge::process::CcProcess::new(&binary, extra_args));
+                    registry.insert(req.thread_id.clone(), p.clone());
+                    p
+                }
+            }
+        };
+
+        // 7. Run process with callback to stream
+        let assistant_id_clone = assistant_id.clone();
+        let app_clone = app.clone();
+        let event_name_clone = event_name.clone();
+        let events = process.send_with_callback(&clean_content, move |evt| {
+            match evt {
+                crate::agent::cc_bridge::protocol::CcEvent::Partial { content } => {
+                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
+                        id: assistant_id_clone.clone(),
+                        content: content.clone(),
+                    });
+                }
+                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { id: _, name, input } => {
+                    let marker = format!(
+                        "\n[TOOL_CALL]{}\n",
+                        serde_json::json!({
+                            "tool": name,
+                            "args": input,
+                            "requires_confirmation": crate::agent::safety::requires_confirmation(name),
+                        })
+                    );
+                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
+                        id: assistant_id_clone.clone(),
+                        content: marker,
+                    });
+                }
+                _ => {}
+            }
+        }).await;
+
+        let events = match events {
+            Ok(ev) => ev,
+            Err(e) => {
+                emit(&StreamEventOut::Error {
+                    id: assistant_id,
+                    message: e,
+                });
+                return Ok(());
+            }
+        };
+
+        // 8. Extract final answer and persist
+        let mut final_content = String::new();
+        for event in &events {
+            match event {
+                crate::agent::cc_bridge::protocol::CcEvent::AssistantMessage { content } => {
+                    final_content.push_str(content);
+                }
+                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
+                    let marker = format!(
+                        "\n[TOOL_CALL]{}\n",
+                        serde_json::json!({
+                            "tool": name,
+                            "args": input,
+                            "requires_confirmation": crate::agent::safety::requires_confirmation(name),
+                        })
+                    );
+                    final_content.push_str(&marker);
+                }
+                _ => {}
+            }
+        }
+
+        let session_id = crate::agent::cc_bridge::protocol::extract_session_id(&events).or(resume_session);
+        if let Some(sid) = &session_id {
+            if let Ok(db) = state.db.lock() {
+                let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
+            }
+        }
+
+        let assistant_msg = store::ChatMessage {
+            id: assistant_id.clone(),
+            thread_id: req.thread_id.clone(),
+            role: "assistant".into(),
+            content: final_content.clone(),
+            created_at: assistant_ts,
+            redacted: false,
+        };
+
+        let is_first = history.is_empty();
+        {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
+            if is_first {
+                let title = user_msg.content.chars().take(40).collect::<String>();
+                store::update_thread_title(&db, &req.thread_id, &title).map_err(|e| e.to_string())?;
+            }
+        }
+
+        emit(&StreamEventOut::End {
+            id: assistant_id,
+            thread_id: req.thread_id,
+            content: final_content,
+            redacted_count,
+        });
+
+        return Ok(());
+    }
 
     // Build the LLM request.
     let ai_config = AiConfig::load(&default_ai_config_path());
