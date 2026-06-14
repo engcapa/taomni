@@ -1638,6 +1638,9 @@ export const zhCN: DeepPartial<typeof en> = {
     noEntries: "暂无条目。保存任意会话或隧道密码即可创建。",
     deleteEntry: "删除",
     confirmDeleteEntry: "确认删除条目“{label}”？引用该条目的会话在更新前将无法连接。",
+    manageEntries: "管理已保存凭据",
+    searchPlaceholder: "搜索凭据...",
+    noMatchingEntries: "没有找到匹配的条目。",
   },
   sessionTree: {
     folderCreated: "已创建文件夹 {label}",

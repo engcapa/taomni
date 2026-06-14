@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useModalDraggable } from "../../hooks/useModalDraggable";
+import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import {
   X,
@@ -2571,7 +2571,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 ? "terminal"
                 : section;
 
-  const { containerRef, handleRef } = useModalDraggable();
+  const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth: 600, minHeight: 400 });
 
   const handleShortcutTest = () => {
     if (testing) return;
