@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useVaultStore } from "../../stores/vaultStore";
 import { VaultSetupDialog } from "./VaultSetupDialog";
 import { VaultUnlockDialog } from "./VaultUnlockDialog";
+import { VaultEntriesDialog } from "./VaultEntriesDialog";
 import { useT } from "../../lib/i18n";
-import { confirmAppDialog } from "../../lib/appDialogs";
 
 type Action = null | "init" | "unlock" | "change-master";
 
@@ -18,7 +18,6 @@ export function VaultSettings() {
     lock,
     changeMaster,
     reloadEntries,
-    deleteEntry,
   } = useVaultStore();
 
   const [action, setAction] = useState<Action>(null);
@@ -28,6 +27,7 @@ export function VaultSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [showEntriesDialog, setShowEntriesDialog] = useState(false);
 
   useEffect(() => {
     void refresh().catch(() => undefined);
@@ -219,47 +219,26 @@ export function VaultSettings() {
       )}
 
       {state === "unlocked" && (
-        <div data-testid="vault-entries-section">
-          <div className="text-[12px] font-semibold mb-2">
+        <div data-testid="vault-entries-section" className="flex flex-col gap-2">
+          <div className="text-[12px] font-semibold">
             {t("vaultSettings.savedEntries", { count: entries.length })}
           </div>
-          {entries.length === 0 ? (
-            <div className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
-              {t("vaultSettings.noEntries")}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {entries.map((e) => (
-                <div
-                  key={e.id}
-                  data-testid={`vault-entry-${e.id}`}
-                  className="flex items-center gap-2 text-[12px] px-2 py-1 rounded"
-                  style={{ border: "1px solid var(--taomni-card-border)" }}
-                >
-                  <span className="flex-1">{e.label}</span>
-                  <span style={{ color: "var(--taomni-text-muted)" }}>{e.kind}</span>
-                  <button
-                    type="button"
-                    className="px-2 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
-                    onClick={() => {
-                      void confirmAppDialog({
-                        message: t("vaultSettings.confirmDeleteEntry", { label: e.label }),
-                        confirmLabel: t("common.delete"),
-                        danger: true,
-                      }).then((confirmed) => {
-                        if (!confirmed) return;
-                        void deleteEntry(e.id);
-                      });
-                    }}
-                    data-testid={`vault-entry-delete-${e.id}`}
-                  >
-                    {t("vaultSettings.deleteEntry")}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div>
+            <button
+              type="button"
+              data-testid="vault-manage-entries-button"
+              className="px-3 py-1 text-[12px] rounded text-white hover:opacity-90 transition-opacity"
+              style={{ background: "var(--taomni-accent)" }}
+              onClick={() => setShowEntriesDialog(true)}
+            >
+              {t("vaultSettings.manageEntries")}
+            </button>
+          </div>
         </div>
+      )}
+
+      {showEntriesDialog && (
+        <VaultEntriesDialog onClose={() => setShowEntriesDialog(false)} />
       )}
 
       {action === "init" && (

@@ -1642,6 +1642,9 @@ const dict = {
     noEntries: "No entries yet. Save a session or tunnel password to add one.",
     deleteEntry: "Delete",
     confirmDeleteEntry: "Delete vault entry \"{label}\"? Sessions referencing it will fail to connect until updated.",
+    manageEntries: "Manage Saved Credentials",
+    searchPlaceholder: "Search credentials...",
+    noMatchingEntries: "No matching entries found.",
   },
   sessionTree: {
     folderCreated: "Created folder {label}",

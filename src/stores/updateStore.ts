@@ -84,9 +84,11 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
         selectedTarget: platform.recommendedTarget,
       });
 
-      // Detect using the running binary's own target — the version field in
-      // latest.json is global, so this reliably tells us if a newer build exists.
-      const found = await checkForUpdate(platform.nativeTarget);
+      // For multi-candidate platforms (macOS Apple Silicon/Rosetta), use nativeTarget
+      // to check specifically. For single-candidate platforms (Win/Linux), use undefined
+      // to let Tauri auto-detect the installer-specific target (e.g. -deb, -appimage, -nsis, -msi).
+      const checkTarget = platform.candidates.length > 1 ? platform.nativeTarget : undefined;
+      const found = await checkForUpdate(checkTarget);
       if (!found) {
         set({
           status: "uptodate",
@@ -143,10 +145,11 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   startDownload: async () => {
-    const { selectedTarget } = get();
+    const { selectedTarget, candidates } = get();
     set({ status: "downloading", error: null, progress: { downloaded: 0, total: null, percent: 0 } });
     try {
-      await downloadAndInstall(selectedTarget ?? undefined, (p) => set({ progress: p }));
+      const downloadTarget = candidates.length > 1 ? (selectedTarget ?? undefined) : undefined;
+      await downloadAndInstall(downloadTarget, (p) => set({ progress: p }));
       set({ status: "ready" });
     } catch (e) {
       set({ status: "error", error: errMsg(e) });
