@@ -2014,6 +2014,8 @@ const dict = {
     ccCustomSubtitle: "Provide your own Claude Code settings (env, permissions, plugins). Stored encrypted in the vault and applied at launch via a temporary file.",
     ccCustomAdd: "Add custom settings.json",
     ccCustomConfigured: "Custom settings configured · encrypted in vault",
+    ccCustomEnabled: "Active",
+    ccCustomDisabled: "Disabled",
     ccCustomEdit: "Edit",
     ccCustomReplace: "Replace",
     ccCustomRemove: "Remove",

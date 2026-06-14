@@ -20,7 +20,14 @@ pub struct CcBridgeConfig {
     /// default settings (safety deny-list only).
     #[serde(default)]
     pub custom_settings_ref: Option<String>,
+    /// Whether the custom settings are currently active. Allows toggling off
+    /// without deleting the vault entry. Defaults to true so existing configs
+    /// (written before this field existed) keep working after upgrade.
+    #[serde(default = "default_true")]
+    pub custom_settings_enabled: bool,
 }
+
+fn default_true() -> bool { true }
 
 impl Default for CcBridgeConfig {
     fn default() -> Self {
@@ -32,6 +39,7 @@ impl Default for CcBridgeConfig {
             permission_mode: "default".into(),
             max_turns: 20,
             custom_settings_ref: None,
+            custom_settings_enabled: true,
         }
     }
 }
@@ -113,6 +121,10 @@ pub fn resolve_custom_settings(
     cfg: &CcBridgeConfig,
     vault: &Vault,
 ) -> Result<Option<String>, String> {
+    // Either not configured or explicitly disabled — fall through to defaults.
+    if !cfg.custom_settings_enabled {
+        return Ok(None);
+    }
     let reference = match cfg.custom_settings_ref.as_ref() {
         Some(r) if !r.trim().is_empty() => r,
         _ => return Ok(None),

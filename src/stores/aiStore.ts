@@ -64,6 +64,11 @@ export interface CcBridgeConfig {
    * use Claude Code's built-in defaults.
    */
   custom_settings_ref?: string;
+  /**
+   * Whether the custom settings are currently active. Allows toggling off
+   * without deleting the vault entry. Defaults to true.
+   */
+  custom_settings_enabled?: boolean;
 }
 
 export interface WebSearchConfig {

@@ -2010,6 +2010,8 @@ export const zhCN: DeepPartial<typeof en> = {
     ccCustomSubtitle: "填写你自己的 Claude Code 配置（env、permissions、plugins）。将加密保存到保险库，运行时通过临时文件应用。",
     ccCustomAdd: "添加自定义 settings.json",
     ccCustomConfigured: "已配置自定义设置 · 已加密保存在保险库",
+    ccCustomEnabled: "已启用",
+    ccCustomDisabled: "已禁用",
     ccCustomEdit: "编辑",
     ccCustomReplace: "替换",
     ccCustomRemove: "移除",

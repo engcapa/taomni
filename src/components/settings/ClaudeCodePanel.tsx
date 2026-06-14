@@ -350,8 +350,47 @@ export function ClaudeCodePanel() {
 
           {!customEditing && cc.custom_settings_ref && (
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
-              <span className="text-[11px] flex-1">{t("aiSettings.ccCustomConfigured")}</span>
+              {/* enable/disable toggle — keeps the vault entry intact */}
+              <div
+                className={`w-8 h-4 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                  cc.custom_settings_enabled !== false
+                    ? "bg-[var(--taomni-accent)]"
+                    : "bg-[var(--taomni-divider)]"
+                }`}
+                onClick={() =>
+                  saveConfig({
+                    ...config,
+                    cc_bridge: {
+                      ...cc,
+                      custom_settings_enabled: cc.custom_settings_enabled === false,
+                    },
+                  })
+                }
+                title={
+                  cc.custom_settings_enabled !== false
+                    ? t("aiSettings.ccCustomEnabled")
+                    : t("aiSettings.ccCustomDisabled")
+                }
+              >
+                <div
+                  className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                    cc.custom_settings_enabled !== false ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </div>
+              <CheckCircle
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  cc.custom_settings_enabled !== false ? "text-green-400" : "text-[var(--taomni-text-muted)]"
+                }`}
+              />
+              <span className="text-[11px] flex-1">
+                {t("aiSettings.ccCustomConfigured")}
+                {cc.custom_settings_enabled === false && (
+                  <span className="ml-1 text-[var(--taomni-text-muted)]">
+                    · {t("aiSettings.ccCustomDisabled")}
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
