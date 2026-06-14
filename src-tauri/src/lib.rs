@@ -272,6 +272,8 @@ pub fn run() {
             agent::search::key_storage::keyring_get,
             agent::search::key_storage::keyring_delete,
             agent::cc_bridge::commands::cc_detect,
+            agent::cc_bridge::commands::cc_get_custom_settings,
+            agent::cc_bridge::commands::cc_get_profile_settings,
             agent::cc_bridge::commands::cc_send_message,
             agent::cc_bridge::commands::cc_stream_message,
             agent::cc_bridge::commands::cc_stop_session,

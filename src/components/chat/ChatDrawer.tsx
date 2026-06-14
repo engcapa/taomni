@@ -388,7 +388,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               >
                 {providerIds.map((id) => (
                   <option key={id} value={id}>
-                    {id === "claude-code" ? "Claude Code (本机)" : id}
+                    {id === "claude-code" ? t("chat.claudeCodeLocal") : id}
                   </option>
                 ))}
               </select>

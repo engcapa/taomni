@@ -427,49 +427,79 @@ pub async fn chat_stream(
             ai_config.cc_bridge.binary.clone()
         };
 
-        // 3. Write temp configs
-        let tmp_dir = std::env::temp_dir().join(format!("taomni-cc-{}", &req.thread_id[..8]));
-        let settings_path = tmp_dir.join("settings.json");
-        let mcp_path = tmp_dir.join(".mcp.json");
-        crate::agent::cc_bridge::config::write_temp_settings(
-            &ai_config.cc_bridge.permission_mode,
-            &crate::agent::cc_bridge::config::sensitive_deny_dirs(),
-            &settings_path,
-        ).map_err(|e| format!("Failed to write CC settings: {}", e))?;
-        crate::agent::cc_bridge::config::write_temp_mcp_config(&mcp_path)
-            .map_err(|e| format!("Failed to write CC MCP config: {}", e))?;
-
-        // 4. Resolve session
+        // 3. Resolve session id for --resume continuity.
         let resume_session = thread.cc_session_id.clone();
 
-        // 5. Build extra args
-        let mut extra_args = vec![
-            "--model".into(),
-            ai_config.cc_bridge.default_model.clone(),
-            "--max-turns".into(),
-            ai_config.cc_bridge.max_turns.to_string(),
-            "--settings".into(),
-            settings_path.to_string_lossy().to_string(),
-            "--mcp-config".into(),
-            mcp_path.to_string_lossy().to_string(),
-            "--permission-prompt-tool".into(),
-            crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
-        ];
-        if let Some(sid) = &resume_session {
-            extra_args.push("--resume".into());
-            extra_args.push(sid.clone());
-        }
+        // 4. Get or create the per-thread CC process. Only a *new* process
+        //    materialises temp config files — a reused process keeps the
+        //    obscure settings file it was launched with (and which is scrubbed
+        //    when the session stops).
+        let existing = { state.cc_processes.lock().await.get(&req.thread_id).cloned() };
+        let process = match existing {
+            Some(p) => p,
+            None => {
+                // Resolve the user's custom settings.json from the vault (when
+                // configured). A locked vault means we can't read the token, so
+                // surface it as a stream error and let the UI prompt to unlock.
+                let custom = match crate::agent::cc_bridge::config::resolve_custom_settings(
+                    &ai_config.cc_bridge,
+                    &state.vault,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id.clone(),
+                            message: e,
+                        });
+                        return Ok(());
+                    }
+                };
+                let files = match crate::agent::cc_bridge::config::create_session_files(
+                    custom.as_deref(),
+                ) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id.clone(),
+                            message: e,
+                        });
+                        return Ok(());
+                    }
+                };
 
-        // 6. Get or create process
-        let process = {
-            let mut registry = state.cc_processes.lock().await;
-            let existing = registry.get(&req.thread_id).cloned();
-            match existing {
-                Some(p) => p,
-                None => {
-                    let p = std::sync::Arc::new(crate::agent::cc_bridge::process::CcProcess::new(&binary, extra_args));
-                    registry.insert(req.thread_id.clone(), p.clone());
-                    p
+                // Build extra args.
+                let mut extra_args = vec![
+                    "--model".into(),
+                    ai_config.cc_bridge.default_model.clone(),
+                    "--max-turns".into(),
+                    ai_config.cc_bridge.max_turns.to_string(),
+                    "--settings".into(),
+                    files.settings_path.to_string_lossy().to_string(),
+                    "--mcp-config".into(),
+                    files.mcp_path.to_string_lossy().to_string(),
+                    "--permission-prompt-tool".into(),
+                    crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
+                ];
+                if let Some(sid) = &resume_session {
+                    extra_args.push("--resume".into());
+                    extra_args.push(sid.clone());
+                }
+
+                let p = std::sync::Arc::new(crate::agent::cc_bridge::process::CcProcess::new(
+                    &binary,
+                    extra_args,
+                    Some(files.dir),
+                ));
+                // Re-check under the lock in case a concurrent send for the
+                // same thread created one first; if so, our `p` is dropped and
+                // its temp dir cleaned by the Drop impl.
+                let mut registry = state.cc_processes.lock().await;
+                match registry.get(&req.thread_id) {
+                    Some(existing) => existing.clone(),
+                    None => {
+                        registry.insert(req.thread_id.clone(), p.clone());
+                        p
+                    }
                 }
             }
         };

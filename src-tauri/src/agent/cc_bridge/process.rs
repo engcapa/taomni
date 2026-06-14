@@ -1,4 +1,5 @@
 use super::protocol::{parse_ndjson_line, CcEvent};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -39,10 +40,16 @@ pub struct CcProcess {
     /// errors (e.g. missing flags, auth failures) that would otherwise be
     /// invisible and present as an empty assistant bubble.
     stderr_buf: Arc<Mutex<String>>,
+    /// Obscure temp directory holding this session's `--settings` /
+    /// `--mcp-config` files. Owned by the process so the (possibly
+    /// credential-bearing) settings file is removed when the session ends —
+    /// see `stop()` and the `Drop` impl. `None` when the caller manages the
+    /// files itself.
+    temp_dir: Option<PathBuf>,
 }
 
 impl CcProcess {
-    pub fn new(binary: impl Into<String>, extra_args: Vec<String>) -> Self {
+    pub fn new(binary: impl Into<String>, extra_args: Vec<String>, temp_dir: Option<PathBuf>) -> Self {
         let mut args = vec![
             "--print".into(),
             "--output-format".into(),
@@ -69,6 +76,7 @@ impl CcProcess {
             stopped: AtomicBool::new(false),
             watchdog_started: AtomicBool::new(false),
             stderr_buf: Arc::new(Mutex::new(String::new())),
+            temp_dir,
         }
     }
 
@@ -327,5 +335,23 @@ impl CcProcess {
             let _ = child.kill().await;
         }
         *self.stdin.lock().await = None;
+        // Remove the session's temp files now that the process is gone. The
+        // settings file may carry the user's ANTHROPIC_AUTH_TOKEN, so we don't
+        // want it lingering in the temp directory after use.
+        if let Some(dir) = &self.temp_dir {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+    }
+}
+
+impl Drop for CcProcess {
+    /// Safety net: if the process is dropped without an explicit `stop()`
+    /// (e.g. the registry entry is replaced), still scrub the temp directory.
+    /// `stop()` sets `stopped` before the Arc is dropped, so the watchdog has
+    /// already exited by the time this runs.
+    fn drop(&mut self) {
+        if let Some(dir) = &self.temp_dir {
+            let _ = std::fs::remove_dir_all(dir);
+        }
     }
 }

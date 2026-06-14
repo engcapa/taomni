@@ -50,6 +50,14 @@ export interface AiConfig {
   chat_output_format?: string;
 }
 
+export interface CcCustomSettingsProfile {
+  id: string;
+  name: string;
+  enabled: boolean;
+  vault_ref: string;
+  created_at: number;
+}
+
 export interface CcBridgeConfig {
   enabled: boolean;
   binary: string;
@@ -57,6 +65,8 @@ export interface CcBridgeConfig {
   default_model: string;
   permission_mode: string;
   max_turns: number;
+  custom_settings_profiles?: CcCustomSettingsProfile[];
+  active_profile_id?: string;
 }
 
 export interface WebSearchConfig {

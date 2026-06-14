@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle, Copy, Loader2, Terminal, XCircle, AlertTriangle } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
+import { ClaudeCodeSettingsDialog } from "./ClaudeCodeSettingsDialog";
+import { Sliders, Shield } from "lucide-react";
 
 interface CcStatusResult {
   status:
@@ -43,6 +45,7 @@ export function ClaudeCodePanel() {
   const { config, loadConfig, saveConfig } = useAiStore();
   const [status, setStatus] = useState<CcStatusResult | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [showCustomDialog, setShowCustomDialog] = useState(false);
   const t = useT();
 
   useEffect(() => {
@@ -79,6 +82,17 @@ export function ClaudeCodePanel() {
     if (isNotAuth) return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
     return <XCircle className="w-4 h-4 text-red-400" />;
   };
+
+  const hasProfiles = cc.custom_settings_profiles && cc.custom_settings_profiles.length > 0;
+  const profileCount = cc.custom_settings_profiles?.length ?? 0;
+
+  const activeProfileName = (() => {
+    if (cc.active_profile_id && cc.custom_settings_profiles) {
+      const active = cc.custom_settings_profiles.find(p => p.id === cc.active_profile_id);
+      if (active) return active.name;
+    }
+    return null;
+  })();
 
   return (
     <div className="space-y-3">
@@ -138,6 +152,29 @@ export function ClaudeCodePanel() {
               </div>
             </div>
           ))}
+
+          {/* Manual binary path — fallback when claude isn't on the GUI PATH */}
+          <div className="pt-2 mt-1 border-t border-[var(--taomni-divider)]">
+            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+              {t("aiSettings.ccManualPathLabel")}
+            </label>
+            <input
+              type="text"
+              className="taomni-input h-7 w-full text-[12px] font-mono"
+              placeholder={t("aiSettings.ccManualPathPlaceholder")}
+              defaultValue={cc.binary === "auto" ? "" : cc.binary}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                const next = v === "" ? "auto" : v;
+                if (next !== cc.binary) {
+                  saveConfig({ ...config, cc_bridge: { ...cc, binary: next } });
+                }
+              }}
+            />
+            <div className="text-[10px] text-[var(--taomni-text-muted)] mt-1">
+              {t("aiSettings.ccManualPathHint")}
+            </div>
+          </div>
         </div>
       )}
 
@@ -188,6 +225,56 @@ export function ClaudeCodePanel() {
             {t("aiSettings.ccLocalModeNote")}
           </div>
         </div>
+      )}
+
+      {/* Custom settings.json (advanced) */}
+      {cc.enabled && (
+        <div className="space-y-3 pt-2 border-t border-[var(--taomni-divider)]">
+          <div>
+            <div className="text-[12px] font-semibold">{t("aiSettings.ccCustomTitle")}</div>
+            <div className="text-[11px] text-[var(--taomni-text-muted)]">
+              {t("aiSettings.ccCustomSubtitle")}
+            </div>
+          </div>
+
+          <div className="rounded border border-[var(--taomni-divider)] p-3 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-[11.5px]">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Shield className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                <span className="font-medium">
+                  {hasProfiles
+                    ? t("aiSettings.ccCustomProfilesSummary", { count: profileCount })
+                    : t("aiSettings.ccCustomDisabled")}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
+                onClick={() => setShowCustomDialog(true)}
+              >
+                <Sliders className="w-3 h-3" />
+                {t("aiSettings.ccCustomManage")}
+              </button>
+            </div>
+
+            {hasProfiles && activeProfileName && (
+              <div className="text-[10.5px] text-[var(--taomni-text-muted)] flex items-center gap-1">
+                <span className="px-1 text-[8px] bg-green-500/15 text-green-400 border border-green-500/35 rounded uppercase shrink-0 font-medium">
+                  {t("aiSettings.ccCustomActiveLabel")}
+                </span>
+                <span className="truncate">{activeProfileName}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="text-[10px] text-[var(--taomni-text-muted)]">
+            {t("aiSettings.ccCustomNote")}
+          </div>
+        </div>
+      )}
+
+      {showCustomDialog && (
+        <ClaudeCodeSettingsDialog onClose={() => setShowCustomDialog(false)} />
       )}
     </div>
   );
