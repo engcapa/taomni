@@ -2,6 +2,15 @@ use crate::vault::Vault;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CcCustomSettingsProfile {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub vault_ref: String,
+    pub created_at: u64,
+}
+
 /// Configuration for the Claude Code bridge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CcBridgeConfig {
@@ -25,6 +34,10 @@ pub struct CcBridgeConfig {
     /// (written before this field existed) keep working after upgrade.
     #[serde(default = "default_true")]
     pub custom_settings_enabled: bool,
+    #[serde(default)]
+    pub custom_settings_profiles: Vec<CcCustomSettingsProfile>,
+    #[serde(default)]
+    pub active_profile_id: Option<String>,
 }
 
 fn default_true() -> bool { true }
@@ -40,6 +53,8 @@ impl Default for CcBridgeConfig {
             max_turns: 20,
             custom_settings_ref: None,
             custom_settings_enabled: true,
+            custom_settings_profiles: Vec::new(),
+            active_profile_id: None,
         }
     }
 }
@@ -52,6 +67,51 @@ pub struct CcSessionFiles {
     pub dir: PathBuf,
     pub settings_path: PathBuf,
     pub mcp_path: PathBuf,
+}
+
+fn resolve_vault_ref(reference: &str, vault: &Vault) -> Result<Option<String>, String> {
+    match vault.resolve(reference) {
+        Ok(Some(plaintext)) => Ok(Some(plaintext.to_string())),
+        // Not a vault reference — treat the stored value as literal JSON.
+        Ok(None) => Ok(Some(reference.to_string())),
+        Err(e) if e.contains(crate::vault::ERR_VAULT_LOCKED) => Err(format!(
+            "{}: unlock the credential vault to use your custom Claude Code settings.",
+            crate::vault::ERR_VAULT_LOCKED
+        )),
+        Err(e) => Err(e),
+    }
+}
+
+/// Resolve the user's custom CC settings JSON from the config's vault
+/// reference.
+/// - `Ok(None)` — no custom settings configured.
+/// - `Ok(Some(json))` — the raw settings JSON (resolved from the vault, or
+///   taken literally when the field isn't a `vault:<id>` reference).
+/// - `Err("VAULT_LOCKED: …")` — a reference is set but the vault is locked;
+///   the caller surfaces this so the UI can prompt for unlock.
+pub fn resolve_custom_settings(
+    cfg: &CcBridgeConfig,
+    vault: &Vault,
+) -> Result<Option<String>, String> {
+    // 1. Resolve active profile if custom_settings_profiles has entries
+    if let Some(ref active_id) = cfg.active_profile_id {
+        if let Some(profile) = cfg.custom_settings_profiles.iter().find(|p| &p.id == active_id) {
+            if !profile.enabled {
+                return Ok(None);
+            }
+            return resolve_vault_ref(&profile.vault_ref, vault);
+        }
+    }
+
+    // 2. Legacy fallback
+    if !cfg.custom_settings_enabled {
+        return Ok(None);
+    }
+    let reference = match cfg.custom_settings_ref.as_ref() {
+        Some(r) if !r.trim().is_empty() => r,
+        _ => return Ok(None),
+    };
+    resolve_vault_ref(reference, vault)
 }
 
 /// Build the effective CC `settings.json` value.
@@ -108,37 +168,6 @@ pub fn build_settings_value(
     }
 
     Ok(root)
-}
-
-/// Resolve the user's custom CC settings JSON from the config's vault
-/// reference.
-/// - `Ok(None)` — no custom settings configured.
-/// - `Ok(Some(json))` — the raw settings JSON (resolved from the vault, or
-///   taken literally when the field isn't a `vault:<id>` reference).
-/// - `Err("VAULT_LOCKED: …")` — a reference is set but the vault is locked;
-///   the caller surfaces this so the UI can prompt for unlock.
-pub fn resolve_custom_settings(
-    cfg: &CcBridgeConfig,
-    vault: &Vault,
-) -> Result<Option<String>, String> {
-    // Either not configured or explicitly disabled — fall through to defaults.
-    if !cfg.custom_settings_enabled {
-        return Ok(None);
-    }
-    let reference = match cfg.custom_settings_ref.as_ref() {
-        Some(r) if !r.trim().is_empty() => r,
-        _ => return Ok(None),
-    };
-    match vault.resolve(reference) {
-        Ok(Some(plaintext)) => Ok(Some(plaintext.to_string())),
-        // Not a vault reference — treat the stored value as literal JSON.
-        Ok(None) => Ok(Some(reference.clone())),
-        Err(e) if e.contains(crate::vault::ERR_VAULT_LOCKED) => Err(format!(
-            "{}: unlock the credential vault to use your custom Claude Code settings.",
-            crate::vault::ERR_VAULT_LOCKED
-        )),
-        Err(e) => Err(e),
-    }
 }
 
 /// Write `value` to `out_path` (creating parents), pretty-printed.
