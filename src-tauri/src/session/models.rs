@@ -41,6 +41,16 @@ pub enum SessionType {
     Redis,
     HBaseShell,
     Proxy,
+    /// S3 and any S3-compatible object storage (AWS S3, Alibaba OSS via its
+    /// S3-compatible endpoint, MinIO, Cloudflare R2, Backblaze B2, Wasabi,
+    /// Tencent COS, Ceph, ...). The concrete provider + endpoint + addressing
+    /// style live in `options_json` (`provider`, `endpoint`, `region`,
+    /// `pathStyle`, `authType`, credential `vault:` refs, `defaultBucket`).
+    S3,
+    /// Azure Blob storage (official azure_storage_blob SDK). `options_json`
+    /// carries `accountName`, `endpointSuffix`, `authType` and the credential
+    /// `vault:` refs (account key / connection string / SAS / Entra ID).
+    AzureBlob,
 }
 
 impl SessionType {
@@ -62,6 +72,8 @@ impl SessionType {
             Self::Redis => "Redis",
             Self::HBaseShell => "HBaseShell",
             Self::Proxy => "Proxy",
+            Self::S3 => "S3",
+            Self::AzureBlob => "AzureBlob",
         }
     }
 
@@ -83,6 +95,8 @@ impl SessionType {
             "Redis" => Self::Redis,
             "HBaseShell" => Self::HBaseShell,
             "Proxy" => Self::Proxy,
+            "S3" => Self::S3,
+            "AzureBlob" => Self::AzureBlob,
             _ => Self::SSH,
         }
     }
@@ -101,6 +115,8 @@ impl SessionType {
             Self::Redis => 6379,
             Self::HBaseShell => 8080,
             Self::Proxy => 3128,
+            // Object storage speaks HTTPS; the real endpoint lives in options_json.
+            Self::S3 | Self::AzureBlob => 443,
             Self::Serial | Self::LocalShell | Self::File => 0,
         }
     }

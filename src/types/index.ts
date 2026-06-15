@@ -2,8 +2,9 @@ import type { SshConnectInfo } from "../components/terminal/TerminalPanel";
 import type { TerminalProfile } from "../lib/terminalProfile";
 import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
+import type { ObjectStorageConfig } from "./objectStorage";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage";
 
 export interface VncConnectInfo {
   sessionId: string;
@@ -106,6 +107,12 @@ export interface FileBrowserTabInfo {
   initialPath: string;
 }
 
+/** Connection parameters for an object-storage browser tab (S3 / Azure Blob). */
+export interface ObjectStorageTabInfo {
+  sessionId: string;
+  config: ObjectStorageConfig;
+}
+
 export interface Tab {
   id: string;
   type: TabKind;
@@ -125,6 +132,7 @@ export interface Tab {
   hbase?: HBaseConnectInfo;
   fileBrowser?: FileBrowserTabInfo;
   proxyTest?: ProxyTestTabInfo;
+  objectStorage?: ObjectStorageTabInfo;
   hasNewOutput?: boolean;
   /**
    * One-shot starting directory for a freshly opened local/SSH terminal tab.

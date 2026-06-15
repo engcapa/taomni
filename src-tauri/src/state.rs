@@ -10,6 +10,7 @@ use crate::database::DbSession;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::hbase::HBaseSession;
+use crate::objectstorage::ObjectStorageSession;
 use crate::rdp::ws::RdpSession;
 use crate::servers::ServerRegistry;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
@@ -48,6 +49,10 @@ pub struct AppState {
     pub db_connections: Arc<RwLock<HashMap<String, Arc<DbSession>>>>,
     /// Live JVM-free HBase shell sessions over HBase REST/Stargate.
     pub hbase_sessions: Arc<RwLock<HashMap<String, Arc<HBaseSession>>>>,
+    /// Live object-storage connections (S3 / S3-compatible / Azure Blob),
+    /// keyed by session id. Each holds the per-engine client handle plus a
+    /// cancellation token for in-flight list/transfer operations.
+    pub oss_sessions: Arc<RwLock<HashMap<String, Arc<ObjectStorageSession>>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
     /// Pending keyboard-interactive auth rounds, keyed by request id. See
@@ -76,6 +81,7 @@ impl AppState {
             rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
             db_connections: Arc::new(RwLock::new(HashMap::new())),
             hbase_sessions: Arc::new(RwLock::new(HashMap::new())),
+            oss_sessions: Arc::new(RwLock::new(HashMap::new())),
             read_handles: Arc::new(Mutex::new(HashMap::new())),
             write_handles: Arc::new(Mutex::new(HashMap::new())),
             ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),

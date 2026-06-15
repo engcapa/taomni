@@ -82,6 +82,12 @@ import {
   type RdpOptions,
 } from "../../types/rdp";
 import { RdpOptionsForm } from "./forms/RdpOptionsForm";
+import {
+  ObjectStorageSettings,
+  ossFormFromOptions,
+  type OssFormState,
+} from "./ObjectStorageSettings";
+import { engineForProvider } from "../../types/objectStorage";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
@@ -101,7 +107,7 @@ type Proto =
   | "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
   | "Proxy";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy";
+type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -137,17 +143,22 @@ const DEFAULT_PORTS: Record<string, number> = {
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "ClickHouse", "Presto", "Redis"];
 
-/** Map UI proto to the backend session_type string. */
+/** Map UI proto to the backend session_type string. Object storage ("S3"
+ * proto) is resolved to "S3" vs "AzureBlob" by the caller based on the
+ * selected provider. */
 function protoToSessionType(p: Proto): string {
   const map: Partial<Record<Proto, string>> = {
     Rlogin: "Telnet", Shell: "LocalShell",
-    Browser: "LocalShell", Mosh: "SSH", S3: "SFTP", WSL: "LocalShell",
+    Browser: "LocalShell", Mosh: "SSH", WSL: "LocalShell",
   };
   return map[p] ?? p;
 }
 
 function sessionTypeToProto(type: string | undefined, optionsJson?: string | null): Proto {
   if (type === "Proxy") return "Proxy";
+  // S3-family and Azure Blob both surface under the single "S3" (object
+  // storage) tile; the concrete provider lives in options_json.
+  if (type === "S3" || type === "AzureBlob") return "S3";
   if (type === "LocalShell") {
     const options = parseSessionOptions(optionsJson);
     const path = typeof options.localShellPath === "string" ? options.localShellPath : "";
@@ -1810,6 +1821,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     parsePathMappingsFromOptions(session?.options_json),
   );
 
+  /* --- object storage (S3 / Azure Blob) --- */
+  const [oss, setOss] = useState<OssFormState>(() => ossFormFromOptions(session?.options_json));
+
   /* --- network settings --- */
   const [networkSettings, setNetworkSettings] = useState<NetworkSettingsValue>(
     () => getSessionNetworkSettings(session?.options_json),
@@ -1824,12 +1838,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [saveError, setSaveError] = useState<string | null>(null);
 
   /* --- derived --- */
-  const needsHost = !["Serial", "File", "Shell", "WSL", "HBaseShell"].includes(proto);
+  const needsHost = !["Serial", "File", "Shell", "WSL", "HBaseShell", "S3"].includes(proto);
   const isSSH = ["SSH", "SFTP"].includes(proto);
   const isRdp = proto === "RDP";
   const isDb = DB_PROTOS.includes(proto);
   const isHBase = proto === "HBaseShell";
   const isProxy = proto === "Proxy";
+  const isObjectStorage = proto === "S3";
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -1863,6 +1878,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (DB_PROTOS.includes(p) || p === "HBaseShell") setSection("database");
     // Proxy proto opens to its settings tab.
     if (p === "Proxy") setSection("proxy");
+    // Object storage opens straight to its settings tab.
+    if (p === "S3") setSection("objectstorage");
   };
 
   /* Keep authMethod in sync with the radio group */
@@ -1888,11 +1905,15 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     networkSettingsValue = networkSettings,
     proxyPassValue = networkSettings.proxyPass,
     jumpPasswordValue = networkSettings.jumpPassword,
+    ossConfigValue,
   }: {
     passwordRefValue?: string;
     networkSettingsValue?: NetworkSettingsValue;
     proxyPassValue?: string;
     jumpPasswordValue?: string;
+    /** Resolved object-storage option map (secrets already swapped for vault
+     *  refs by handleSave). Falls back to current form state when omitted. */
+    ossConfigValue?: Record<string, unknown>;
   } = {}): string => {
     const previousOptions = stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json));
     const wslOverrides: Record<string, unknown> =
@@ -1921,6 +1942,30 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     const proxyOverrides: Record<string, unknown> = isProxy
       ? { proxyKind, testUrl: proxyTestUrl }
       : {};
+    const ossOverrides: Record<string, unknown> =
+      proto === "S3"
+        ? (ossConfigValue ?? {
+            provider: oss.provider,
+            endpoint: oss.endpoint,
+            region: oss.region,
+            pathStyle: oss.pathStyle,
+            accessKeyId: oss.accessKeyId,
+            secretAccessKey: oss.secretAccessKey,
+            sessionToken: oss.sessionToken,
+            defaultBucket: oss.defaultBucket,
+            awsAuth: oss.awsAuth,
+            awsProfile: oss.awsProfile,
+            accountName: oss.accountName,
+            accountKey: oss.accountKey,
+            connectionString: oss.connectionString,
+            sasToken: oss.sasToken,
+            endpointSuffix: oss.endpointSuffix,
+            defaultContainer: oss.defaultContainer,
+            azureAuth: oss.azureAuth,
+            azureBearerToken: oss.azureBearerToken,
+            storageClass: oss.storageClass,
+          })
+        : {};
     const hbaseOverrides: Record<string, unknown> = isHBase
       ? {
           hbaseNamespace,
@@ -1968,6 +2013,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...dbOverrides,
       ...proxyOverrides,
       ...hbaseOverrides,
+      ...ossOverrides,
     });
   };
 
@@ -1982,13 +2028,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     const displayName = name
       || (proto === "WSL"
         ? t("sessionEditor2.wslDefaultName", { distro: wslOptions.distro || "Linux" })
-        : (proto === "File" && host
-          ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
-          : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal")));
+        : proto === "S3"
+          ? (oss.defaultBucket || oss.defaultContainer || oss.accountName || oss.endpoint || "Object Storage")
+          : (proto === "File" && host
+            ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
+            : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal")));
     return {
       id: session?.id ?? crypto.randomUUID(),
       name: displayName,
-      session_type: protoToSessionType(proto),
+      session_type:
+        proto === "S3"
+          ? (engineForProvider(oss.provider) === "azure" ? "AzureBlob" : "S3")
+          : protoToSessionType(proto),
       group_path: toStoredGroupPath(groupPath),
       host,
       port: parseInt(port) || DEFAULT_PORTS[proto] || 0,
@@ -2139,11 +2190,77 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
 
     setPasswordRef(nextPasswordRef);
+
+    // Object-storage secrets: swap freshly-typed plaintext for vault refs when
+    // "Save secrets in vault" is on. When off, secrets are stored as plaintext
+    // in options_json (the backend resolve() accepts either form).
+    let ossConfigValue: Record<string, unknown> | undefined;
+    if (proto === "S3") {
+      const isAzure = engineForProvider(oss.provider) === "azure";
+      const label = oss.defaultBucket || oss.defaultContainer || oss.accountName || oss.endpoint || oss.provider;
+      const secretFields: Array<{ key: keyof OssFormState; kind: string }> = isAzure
+        ? [
+            { key: "accountKey", kind: "azure-account-key" },
+            { key: "sasToken", kind: "azure-sas" },
+            { key: "connectionString", kind: "azure-connstr" },
+            { key: "azureBearerToken", kind: "azure-bearer" },
+          ]
+        : [
+            { key: "secretAccessKey", kind: "s3-secret-key" },
+            { key: "sessionToken", kind: "s3-session-token" },
+          ];
+      const resolved: Record<string, string> = {};
+      for (const { key, kind } of secretFields) {
+        const value = oss[key] as string;
+        if (!value || isVaultReference(value) || !saveInVault) {
+          resolved[key] = value;
+          continue;
+        }
+        const ready = await ensureVaultReady(t("vault.gateReasonSession"));
+        if (!ready) {
+          setSaveError(t("sessionEditor2.errVaultLockedSave"));
+          return;
+        }
+        try {
+          const r = await vaultPut(kind, `${kind} ${label}`, value);
+          resolved[key] = r.reference;
+        } catch (err) {
+          if (isVaultLockedError(err)) setSaveError(t("sessionEditor2.errVaultLockedSave"));
+          else setSaveError(err instanceof Error ? err.message : String(err));
+          return;
+        }
+      }
+      const next: OssFormState = { ...oss, ...(resolved as Partial<OssFormState>) };
+      setOss(next);
+      ossConfigValue = {
+        provider: next.provider,
+        endpoint: next.endpoint,
+        region: next.region,
+        pathStyle: next.pathStyle,
+        accessKeyId: next.accessKeyId,
+        secretAccessKey: next.secretAccessKey,
+        sessionToken: next.sessionToken,
+        defaultBucket: next.defaultBucket,
+        awsAuth: next.awsAuth,
+        awsProfile: next.awsProfile,
+        accountName: next.accountName,
+        accountKey: next.accountKey,
+        connectionString: next.connectionString,
+        sasToken: next.sasToken,
+        endpointSuffix: next.endpointSuffix,
+        defaultContainer: next.defaultContainer,
+        azureAuth: next.azureAuth,
+        azureBearerToken: next.azureBearerToken,
+        storageClass: next.storageClass,
+      };
+    }
+
     const config = buildConfig({
       options_json: buildOptionsJson({
         passwordRefValue: nextPasswordRef,
         proxyPassValue: nextProxyPass,
         jumpPasswordValue: nextJumpPass,
+        ossConfigValue,
       }),
     });
 
@@ -2227,6 +2344,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setWslOptions(parseWslOptions(session?.options_json));
     setRdpOptions(parseRdpOptions(session?.options_json));
     setPathMappings(parsePathMappingsFromOptions(session?.options_json));
+    setOss(ossFormFromOptions(session?.options_json));
     setSaveError(null);
     setTestResult(null);
   };
@@ -2532,6 +2650,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           : []),
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
+    : isObjectStorage
+    ? [
+        { id: "objectstorage", label: "Object storage", icon: <Cloud className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        // Object storage (HTTPS) can route through an HTTP/SOCKS5 proxy or an
+        // SSH jump host, just like the DB engines.
+        { id: "network", label: t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+      ]
     : [
         ...(isSSH
           ? [{ id: "advanced" as SectionTab, label: t("sessionEditor2.sectionAdvancedSsh"), icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
@@ -2557,6 +2683,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ? "bookmark"
       : isProxy
         ? (section === "proxy" || section === "bookmark" ? section : "proxy")
+        : isObjectStorage
+        ? (section === "objectstorage" || section === "bookmark" || section === "network" ? section : "objectstorage")
         : isDb || isHBase
         ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
@@ -2990,6 +3118,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               />
             </div>
           )}
+          {activeSection === "objectstorage" && isObjectStorage && (
+            <div data-testid="session-objectstorage-wrap">
+              <ObjectStorageSettings
+                value={oss}
+                onChange={setOss}
+                saveInVault={saveInVault}
+                setSaveInVault={setSaveInVault}
+              />
+            </div>
+          )}
           {activeSection === "proxy" && isProxy && (
             <div data-testid="session-proxy-section" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
               <Field label={t("sessionEditor2.proxyKindLabel")}>
@@ -3009,7 +3147,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               </Field>
             </div>
           )}
-          {activeSection === "network" && !isDb && (
+          {activeSection === "network" && !isDb && !isObjectStorage && (
             <NetworkSettings
               t={t}
               value={networkSettings}
@@ -3024,7 +3162,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               onSaveAsProxySession={() => void handleSaveAsProxySession()}
             />
           )}
-          {activeSection === "network" && isDb && (
+          {activeSection === "network" && (isDb || isObjectStorage) && (
             <DbNetworkSettings
               t={t}
               value={networkSettings}

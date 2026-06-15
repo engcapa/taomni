@@ -108,6 +108,10 @@ zookeeper-client = { version = "0.11", features = ["tokio"] }
 # Cross-platform GSSAPI/Kerberos for native HBase secure (kerberos) auth. Behind
 # the `hbase-kerberos` feature so the default build needs no system GSSAPI libs.
 cross-krb5 = { version = "0.5", optional = true }
+rusty-s3 = "0.9.1"
+quick-xml = { version = "0.40.1", features = ["serialize"] }
+jiff = "0.2"
+hmac = "0.13.0"
 
 [patch.crates-io]
 ironrdp-connector = { path = "vendor/ironrdp-connector" }

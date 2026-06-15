@@ -12,6 +12,7 @@ pub mod llm;
 mod migrate;
 pub mod models;
 mod nettools;
+mod objectstorage;
 pub mod perf;
 mod proxy;
 mod rdp;
@@ -235,6 +236,28 @@ pub fn run() {
             hbase::hbase_execute,
             hbase::hbase_parse_site_xml,
             hbase::hbase_parse_keytab_principal,
+            objectstorage::storage_attach,
+            objectstorage::storage_detach,
+            objectstorage::storage_ping,
+            objectstorage::storage_test_connection,
+            objectstorage::storage_list_buckets,
+            objectstorage::storage_list_objects,
+            objectstorage::storage_get_object_bytes,
+            objectstorage::storage_put_object_bytes,
+            objectstorage::storage_delete_object,
+            objectstorage::storage_create_folder,
+            objectstorage::storage_create_bucket,
+            objectstorage::storage_delete_bucket,
+            objectstorage::storage_delete_prefix,
+            objectstorage::storage_head_object,
+            objectstorage::storage_copy_object,
+            objectstorage::storage_move_object,
+            objectstorage::storage_share_url,
+            objectstorage::storage_download,
+            objectstorage::storage_upload,
+            objectstorage::storage_cancel_transfer,
+            objectstorage::storage_pause_transfer,
+            objectstorage::storage_resume_transfer,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,
