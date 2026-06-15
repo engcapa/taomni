@@ -4,7 +4,20 @@ use std::path::Path;
 fn main() {
     enforce_asr_llm_isolation();
     compile_hbase_protos();
+    configure_macos_rpath();
     tauri_build::build();
+}
+
+/// On macOS, add an `@executable_path/../Frameworks` rpath so the krb5 dylibs
+/// bundled into `Taomni.app/Contents/Frameworks` resolve at runtime. The default
+/// `hbase-kerberos` feature links libgssapi against Homebrew's keg-only krb5,
+/// whose absolute path is otherwise baked into the binary; scripts/bundle-krb5-macos.sh
+/// rewrites those load commands to `@rpath/...`, and this rpath is where dyld
+/// finds them inside the bundle.
+fn configure_macos_rpath() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        println!("cargo:rustc-link-arg-bins=-Wl,-rpath,@executable_path/../Frameworks");
+    }
 }
 
 /// Compile the vendored HBase 2.6.x protobuf definitions into Rust types for
