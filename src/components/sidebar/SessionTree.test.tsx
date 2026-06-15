@@ -1,11 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { SessionConfig, SessionGroup } from "../../lib/ipc";
 import { SessionTree } from "./SessionTree";
 
 const ipcMocks = vi.hoisted(() => ({
-  deleteSession: vi.fn(async () => undefined),
+  deleteSession: vi.fn<(id: string) => Promise<void>>(async () => undefined),
   deleteSessionGroup: vi.fn(async () => undefined),
   importExternalBashSessions: vi.fn(async () => []),
   importPuttySessions: vi.fn(async () => []),
@@ -16,7 +16,7 @@ const ipcMocks = vi.hoisted(() => ({
   listSessions: vi.fn<() => Promise<SessionConfig[]>>(async () => []),
   markSessionConnected: vi.fn(async () => 0),
   readPlistSessionFile: vi.fn(async () => ({ text: "", path: "", relativePath: "" })),
-  saveSession: vi.fn(async () => undefined),
+  saveSession: vi.fn<(cfg: SessionConfig) => Promise<void>>(async () => undefined),
   saveSessionGroup: vi.fn(async () => undefined),
   scanLocalSessionFiles: vi.fn(async () => []),
   selectFilePath: vi.fn(async () => null),
@@ -134,5 +134,94 @@ describe("SessionTree multi-select connect", () => {
 
     expect(sessionRow("wsl-ubuntu")).toHaveAttribute("data-session-type", "WSL");
     expect(sessionRow("wsl-ubuntu")).toHaveTextContent("WSL");
+  });
+});
+
+describe("SessionTree multi-select batch operations", () => {
+  const sessions = [
+    makeSession("ipy-145", "145.216", "ipy"),
+    makeSession("ipy-152", "152.92", "ipy"),
+    makeSession("person-x", "x-host", "person"),
+  ];
+  const groups = [makeGroup("ipy"), makeGroup("person")];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ipcMocks.listSessions.mockResolvedValue(sessions);
+    ipcMocks.listSessionGroups.mockResolvedValue(groups);
+    useSessionStore.setState({
+      sessions,
+      groups,
+      loading: false,
+      selectedSessionId: null,
+      selectedSessionIds: [],
+      searchQuery: "",
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  function selectBothIpySessions() {
+    fireEvent.click(screen.getByText("ipy"));
+    fireEvent.click(sessionRow("ipy-145"), { ctrlKey: true });
+    fireEvent.click(sessionRow("ipy-152"), { ctrlKey: true });
+  }
+
+  it("deletes the whole selection after confirmation", async () => {
+    render(<SessionTree />);
+    selectBothIpySessions();
+
+    fireEvent.contextMenu(sessionRow("ipy-152"));
+    fireEvent.click(screen.getByTestId("context-menu-item-delete-selected-sessions-2"));
+
+    // Multi-delete is gated behind a confirmation dialog.
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => expect(ipcMocks.deleteSession).toHaveBeenCalledTimes(2));
+    expect(ipcMocks.deleteSession.mock.calls.map(([id]) => id).sort()).toEqual([
+      "ipy-145",
+      "ipy-152",
+    ]);
+  });
+
+  it("confirms before deleting a single session from the context menu", async () => {
+    render(<SessionTree />);
+    fireEvent.click(screen.getByText("ipy"));
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    fireEvent.click(screen.getByTestId("context-menu-item-delete"));
+
+    // A single delete is now gated behind the same confirmation dialog as
+    // the batch delete — nothing happens until the user confirms.
+    expect(ipcMocks.deleteSession).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => expect(ipcMocks.deleteSession).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.deleteSession).toHaveBeenCalledWith("ipy-145");
+  });
+
+  it("keeps the session when the single-delete confirmation is cancelled", async () => {
+    render(<SessionTree />);
+    fireEvent.click(screen.getByText("ipy"));
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    fireEvent.click(screen.getByTestId("context-menu-item-delete"));
+
+    fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
+    expect(ipcMocks.deleteSession).not.toHaveBeenCalled();
+  });
+
+  it("duplicates the whole selection from the context menu", async () => {
+    render(<SessionTree />);
+    selectBothIpySessions();
+
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    fireEvent.click(screen.getByTestId("context-menu-item-duplicate-selected-sessions-2"));
+
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
+    expect(ipcMocks.saveSession.mock.calls.map(([cfg]) => cfg.name)).toEqual([
+      "145.216 (copy)",
+      "152.92 (copy)",
+    ]);
   });
 });

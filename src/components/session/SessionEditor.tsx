@@ -62,7 +62,7 @@ import {
   normalizeGroupPath,
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
-import { promptAppDialog } from "../../lib/appDialogs";
+import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import {
   getSessionTerminalProfile,
@@ -2411,10 +2411,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   };
 
   const handleDelete = async () => {
-    if (session) {
-      await removeSession(session.id);
-      onClose();
-    }
+    if (!session) return;
+    const confirmed = await confirmAppDialog({
+      title: t("sessionEditor2.confirmDeleteTitle"),
+      message: t("sessionEditor2.confirmDeleteMessage", { name: session.name }),
+      confirmLabel: t("sessionEditor2.delete"),
+      danger: true,
+    });
+    if (!confirmed) return;
+    await removeSession(session.id);
+    onClose();
   };
 
   const handleTestConnection = async () => {

@@ -115,16 +115,18 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     sessions,
     groups,
     searchQuery,
-    selectedSessionId,
+    selectedSessionIds,
     loadSessions,
-    removeSession,
-    duplicateSession,
+    removeSessions,
+    duplicateSessions,
     moveSessionToGroup,
+    moveSessionsToGroup,
     createFolderPath,
     renameFolderPath,
     deleteFolderPath,
     importSessions,
     setSelectedSession,
+    toggleSessionSelection,
     loading,
   } = useSessionStore();
   const { setStatusMessage } = useAppStore();
@@ -154,7 +156,6 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     danger?: boolean;
     onConfirm: () => void;
   } | null>(null);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const ctx = useContextMenu();
 
   useEffect(() => {
@@ -173,18 +174,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     () => collectFolderPaths(sessions, groups),
     [sessions, groups],
   );
-  const effectiveSelectedSessionIds = useMemo(() => {
-    if (selectedSessionIds.size > 0) return selectedSessionIds;
-    return selectedSessionId ? new Set([selectedSessionId]) : new Set<string>();
-  }, [selectedSessionIds, selectedSessionId]);
-
-  useEffect(() => {
-    const knownSessionIds = new Set(sessions.map((session) => session.id));
-    setSelectedSessionIds((current) => {
-      const next = new Set([...current].filter((id) => knownSessionIds.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [sessions]);
+  const effectiveSelectedSessionIds = useMemo(
+    () => new Set(selectedSessionIds),
+    [selectedSessionIds],
+  );
 
   const toggle = (key: string) =>
     setExpanded((e) => ({ ...e, [key]: !e[key] }));
@@ -712,30 +705,14 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     setStatusMessage(t("sessionTree.sessionsStarted", { count: uniqueSessions.length, plural: uniqueSessions.length === 1 ? "" : "s", source: sourceLabel }));
   };
 
-  const toggleSessionSelection = (session: SessionConfig) => {
-    const base = selectedSessionIds.size > 0
-      ? selectedSessionIds
-      : selectedSessionId ? new Set([selectedSessionId]) : new Set<string>();
-    const next = new Set(base);
-    if (next.has(session.id)) {
-      next.delete(session.id);
-      setSelectedSession(next.values().next().value ?? null);
-    } else {
-      next.add(session.id);
-      setSelectedSession(session.id);
-    }
-    setSelectedSessionIds(next);
-  };
-
   const selectSingleSession = (session: SessionConfig) => {
     setSelectedSession(session.id);
-    setSelectedSessionIds(new Set([session.id]));
   };
 
   const handleSessionClick = (event: React.MouseEvent, session: SessionConfig) => {
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
-      toggleSessionSelection(session);
+      toggleSessionSelection(session.id);
       return;
     }
     selectSingleSession(session);
@@ -1171,19 +1148,20 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     const selectedContextSessions = effectiveSelectedSessionIds.has(session.id)
       ? sessions.filter((candidate) => effectiveSelectedSessionIds.has(candidate.id))
       : [session];
+    // Right-clicking an item outside the current selection narrows to just it.
+    // Right-clicking one already selected preserves the whole multi-selection.
     if (!effectiveSelectedSessionIds.has(session.id)) {
       selectSingleSession(session);
-    } else {
-      setSelectedSession(session.id);
     }
+    const targetIds = selectedContextSessions.map((candidate) => candidate.id);
     const hasMultiSelection = selectedContextSessions.length > 1;
     const moveChildren: MenuItem[] = [
-      { label: SESSION_ROOT_LABEL, icon: <FolderOpen className="w-3 h-3" />, onClick: () => void moveSessionToGroup(session.id, null) },
+      { label: SESSION_ROOT_LABEL, icon: <FolderOpen className="w-3 h-3" />, onClick: () => void moveSessionsToGroup(targetIds, null) },
       ...folderPaths.map((path) => ({
         label: folderOptionLabel(path),
         icon: <Folder className="w-3 h-3" />,
         onClick: () => {
-          void moveSessionToGroup(session.id, path);
+          void moveSessionsToGroup(targetIds, path);
           expandPath(path);
         },
       })),
@@ -1202,10 +1180,45 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       ] satisfies MenuItem[] : []),
       { label: t("sessionTree.contextConnect"), icon: <Play className="w-3 h-3" />, onClick: () => onConnectSession?.(session), disabled: !onConnectSession },
       { label: t("sessionTree.contextEdit"), icon: <Edit3 className="w-3 h-3" />, onClick: () => onEditSession?.(session), disabled: !onEditSession },
-      { label: t("sessionTree.contextDuplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => void duplicateSession(session.id) },
+      {
+        label: hasMultiSelection ? t("sessionTree.contextDuplicateCount", { count: targetIds.length }) : t("sessionTree.contextDuplicate"),
+        testId: hasMultiSelection ? `context-menu-item-duplicate-selected-sessions-${targetIds.length}` : undefined,
+        icon: <Copy className="w-3 h-3" />,
+        onClick: () => void duplicateSessions(targetIds),
+      },
       { label: t("sessionTree.contextMoveToFolder"), icon: <Folder className="w-3 h-3" />, children: moveChildren },
       { label: "", separator: true },
-      { label: t("sessionTree.contextDelete"), icon: <Trash2 className="w-3 h-3" />, danger: true, onClick: () => void removeSession(session.id) },
+      {
+        label: hasMultiSelection ? t("sessionTree.contextDeleteCount", { count: targetIds.length }) : t("sessionTree.contextDelete"),
+        testId: hasMultiSelection ? `context-menu-item-delete-selected-sessions-${targetIds.length}` : undefined,
+        icon: <Trash2 className="w-3 h-3" />,
+        danger: true,
+        onClick: () => {
+          if (hasMultiSelection) {
+            setConfirmPrompt({
+              title: t("sessionTree.confirmDeleteSelectedTitle"),
+              message: t("sessionTree.confirmDeleteSelected", { count: targetIds.length }),
+              confirmLabel: t("sessionTree.deleteAction"),
+              danger: true,
+              onConfirm: () => {
+                setConfirmPrompt(null);
+                void removeSessions(targetIds);
+              },
+            });
+          } else {
+            setConfirmPrompt({
+              title: t("sessionTree.confirmDeleteTitle"),
+              message: t("sessionTree.confirmDelete", { name: session.name }),
+              confirmLabel: t("sessionTree.deleteAction"),
+              danger: true,
+              onConfirm: () => {
+                setConfirmPrompt(null);
+                void removeSessions([session.id]);
+              },
+            });
+          }
+        },
+      },
     ];
     ctx.show(e, items);
   };
