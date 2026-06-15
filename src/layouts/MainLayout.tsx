@@ -38,6 +38,8 @@ import { SettingsPanel } from "../components/settings/SettingsPanel";
 import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
+import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
+import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
 import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
@@ -1209,6 +1211,23 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [addTab, markConnected]);
 
+  const openObjectStorageTab = useCallback((session: SessionConfig) => {
+    const id = `object-storage-${session.id}-${Date.now()}`;
+    const config = sessionToObjectStorageConfig(session);
+    const title = session.name || session.host || "Object Storage";
+    addTab({
+      id,
+      type: "object-storage",
+      title,
+      sessionId: session.id,
+      closable: true,
+      // The browser keys its live store by the tab session id (not the saved
+      // session id) so two tabs for the same saved session stay independent.
+      objectStorage: { sessionId: id, config },
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   // Open a local path or URL: URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
@@ -1424,6 +1443,15 @@ export function MainLayout() {
       }
     } else if (session.session_type === "Proxy") {
       openProxyTestTab(session);
+    } else if (session.session_type === "S3" || session.session_type === "AzureBlob") {
+      // Secrets are vault: refs in options_json; resolve happens server-side on
+      // attach. If any secret is vault-backed and the vault is locked, unlock
+      // first so the attach doesn't fail with a cryptic error.
+      if (objectStorageHasVaultSecret(session)) {
+        const vaultState = useVaultStore.getState().state;
+        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+      }
+      openObjectStorageTab(session);
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
@@ -1441,6 +1469,7 @@ export function MainLayout() {
     openDbTab,
     openHBaseShellTab,
     openProxyTestTab,
+    openObjectStorageTab,
     queueVaultUnlock,
   ]);
 
@@ -1805,6 +1834,7 @@ export function MainLayout() {
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
   const rdpTabs = tabs.filter((t) => t.type === "rdp" && t.rdp);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
+  const objectStorageTabs = tabs.filter((t) => t.type === "object-storage" && t.objectStorage);
   const dbTabs = tabs.filter((t) => t.type === "database" && t.db);
   const redisTabs = tabs.filter((t) => t.type === "redis" && t.db);
   const hbaseTabs = tabs.filter((t) => t.type === "hbase-shell" && t.hbase);
@@ -2470,6 +2500,26 @@ export function MainLayout() {
                       <LocalFileBrowserPanel
                         tabId={tab.id}
                         initialPath={tab.fileBrowser.initialPath}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* Object-storage (S3 / Azure Blob) browser tabs — always
+                    mounted so in-flight transfers survive tab switches. */}
+                {objectStorageTabs.map((tab) => {
+                  if (!tab.objectStorage) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <ObjectStorageBrowser
+                        sessionId={tab.objectStorage.sessionId}
+                        config={tab.objectStorage.config}
+                        title={tab.title}
                       />
                     </div>
                   );

@@ -3,7 +3,7 @@ import { Folder, File as FileIcon, Link as LinkIcon, HardDrive, ChevronDown, Hel
 import { PathBreadcrumb } from "./PathBreadcrumb";
 import { FileToolbar } from "./FileToolbar";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
-import { useSftpStore, WINDOWS_DRIVES_ROOT, type PaneSide } from "../../stores/sftpStore";
+import { useSftpStore, WINDOWS_DRIVES_ROOT, type PaneSide, type FilePanelStoreHook } from "../../stores/sftpStore";
 import {
   basename,
   formatBytes,
@@ -76,6 +76,13 @@ function clampCol(n: number): number {
 interface FilePanelProps {
   sessionId: string;
   side: PaneSide;
+  /**
+   * Optional store driving this panel. Defaults to the SFTP store. The
+   * object-storage browser passes its own store (same {@link FilePanelStore}
+   * surface) so the panel renders buckets/objects with no SFTP coupling. Must
+   * be stable across the component's lifetime (don't swap stores per render).
+   */
+  store?: FilePanelStoreHook;
   /** Optional subtitle (e.g. host) shown in muted text next to the LOCAL/REMOTE badge. */
   subtitle?: string;
   detachable?: boolean;
@@ -118,6 +125,7 @@ const SUPPORTED_PREVIEW_EXT = new Set([
 export function FilePanel({
   sessionId,
   side,
+  store,
   subtitle,
   detachable,
   onDetach,
@@ -144,14 +152,17 @@ export function FilePanel({
   const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const session = useSftpStore((s) => s.sessions[sessionId]);
-  const navigate = useSftpStore((s) => s.navigate);
-  const navigateBack = useSftpStore((s) => s.navigateBack);
-  const navigateForward = useSftpStore((s) => s.navigateForward);
-  const navigateUp = useSftpStore((s) => s.navigateUp);
-  const refresh = useSftpStore((s) => s.refreshPane);
-  const setSelection = useSftpStore((s) => s.setSelection);
-  const toggleHidden = useSftpStore((s) => s.toggleHidden);
+  // `store` is stable per mount (see prop docs), so the conditional default
+  // resolves to one consistent hook identity across renders.
+  const useStore = (store ?? useSftpStore) as FilePanelStoreHook;
+  const session = useStore((s) => s.sessions[sessionId]);
+  const navigate = useStore((s) => s.navigate);
+  const navigateBack = useStore((s) => s.navigateBack);
+  const navigateForward = useStore((s) => s.navigateForward);
+  const navigateUp = useStore((s) => s.navigateUp);
+  const refresh = useStore((s) => s.refreshPane);
+  const setSelection = useStore((s) => s.setSelection);
+  const toggleHidden = useStore((s) => s.toggleHidden);
   const ctx = useContextMenu();
 
   const [sortKey, setSortKey] = useState<"name" | "size" | "mtime" | "type">("name");
@@ -297,7 +308,7 @@ export function FilePanel({
       setDraggingOver(false);
       const payload = detail.data.payload as CrossPaneDragPayload | null;
       if (!payload) return;
-      const otherPane = useSftpStore.getState().sessions[payload.sessionId]?.[payload.side];
+      const otherPane = useStore.getState().sessions[payload.sessionId]?.[payload.side];
       if (!otherPane) return;
       const entries = otherPane.entries.filter((entry) => payload.paths.includes(entry.path));
       if (entries.length > 0) onCrossPaneDrop?.(entries);
