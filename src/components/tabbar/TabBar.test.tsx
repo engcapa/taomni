@@ -208,4 +208,10 @@ describe("TabBar overflow navigation", () => {
     // Active tab was outside the directory, so it jumps to the matching one.
     expect(useAppStore.getState().activeTabId).toBe("t-cap");
   });
+
+  it("shows the tab's full title as a tooltip", () => {
+    renderTabBar();
+    const tabItems = screen.getAllByTestId("tab-item");
+    expect(tabItems[0]).toHaveAttribute("title", "Terminal 0");
+  });
 });
