@@ -33,30 +33,27 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact
   } = useAppStore();
   const {
     sessions,
-    selectedSessionId,
+    selectedSessionIds,
     searchQuery,
     setSearchQuery,
     loadSessions,
-    removeSession,
-    duplicateSession,
-    updateSession,
+    removeSessions,
+    duplicateSessions,
+    moveSessionsToGroup,
   } = useSessionStore();
   const t = useT();
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId);
-  const [deleteConfirm, setDeleteConfirm] = useState<SessionConfig | null>(null);
+  const selectedSessions = sessions.filter((session) => selectedSessionIds.includes(session.id));
+  const selectionCount = selectedSessions.length;
+  const [deleteConfirm, setDeleteConfirm] = useState<SessionConfig[] | null>(null);
 
   const handleDelete = () => {
-    if (!selectedSession) return;
-    setDeleteConfirm(selectedSession);
+    if (selectionCount === 0) return;
+    setDeleteConfirm(selectedSessions);
   };
 
   const handleFavorite = () => {
-    if (!selectedSession) return;
-    void updateSession({
-      ...selectedSession,
-      group_path: "User sessions / Favorites",
-      updated_at: Math.floor(Date.now() / 1000),
-    });
+    if (selectionCount === 0) return;
+    void moveSessionsToGroup(selectedSessionIds, "User sessions / Favorites");
   };
 
   const handleSideTabClick = (tab: SideTab) => {
@@ -113,12 +110,12 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact
       <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}>
         <div className="h-7 flex items-center gap-1 px-1.5 border-b shrink-0" style={{ borderColor: "var(--taomni-divider)" }}>
           <IconBtn testId="session-new" title={t("sidebar.newSessionTitle")} icon={<Plus className="w-3.5 h-3.5" />} onClick={() => onNewSession?.()} />
-          <IconBtn testId="session-edit" title={t("sidebar.editTitle")} icon={<Edit3 className="w-3.5 h-3.5" />} onClick={() => selectedSession && onEditSession?.(selectedSession)} disabled={!selectedSession} />
-          <IconBtn testId="session-duplicate" title={t("sidebar.duplicateTitle")} icon={<Copy className="w-3.5 h-3.5" />} onClick={() => selectedSession && void duplicateSession(selectedSession.id)} disabled={!selectedSession} />
-          <IconBtn testId="session-delete" title={t("sidebar.deleteTitle")} icon={<Trash2 className="w-3.5 h-3.5" />} onClick={handleDelete} disabled={!selectedSession} />
+          <IconBtn testId="session-edit" title={t("sidebar.editTitle")} icon={<Edit3 className="w-3.5 h-3.5" />} onClick={() => selectionCount === 1 && onEditSession?.(selectedSessions[0])} disabled={selectionCount !== 1} />
+          <IconBtn testId="session-duplicate" title={t("sidebar.duplicateTitle")} icon={<Copy className="w-3.5 h-3.5" />} onClick={() => selectionCount > 0 && void duplicateSessions(selectedSessionIds)} disabled={selectionCount === 0} />
+          <IconBtn testId="session-delete" title={t("sidebar.deleteTitle")} icon={<Trash2 className="w-3.5 h-3.5" />} onClick={handleDelete} disabled={selectionCount === 0} />
           <span className="taomni-divider-v h-4 mx-1" />
           <IconBtn title={t("sidebar.refreshTitle")} icon={<RefreshCw className="w-3.5 h-3.5" />} onClick={() => void loadSessions()} />
-          <IconBtn title={t("sidebar.favoriteTitle")} icon={<Star className="w-3.5 h-3.5" />} onClick={handleFavorite} disabled={!selectedSession} />
+          <IconBtn title={t("sidebar.favoriteTitle")} icon={<Star className="w-3.5 h-3.5" />} onClick={handleFavorite} disabled={selectionCount === 0} />
           <div className="flex-1" />
           <div className="relative">
             <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -144,14 +141,18 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact
     {deleteConfirm && (
       <ConfirmDialog
         title={t("sidebar.confirmDeleteSessionTitle")}
-        message={t("sidebar.confirmDeleteSession", { name: deleteConfirm.name })}
+        message={
+          deleteConfirm.length === 1
+            ? t("sidebar.confirmDeleteSession", { name: deleteConfirm[0].name })
+            : t("sidebar.confirmDeleteSessions", { count: deleteConfirm.length })
+        }
         confirmLabel={t("common.delete")}
         danger
         onCancel={() => setDeleteConfirm(null)}
         onConfirm={() => {
-          const id = deleteConfirm.id;
+          const ids = deleteConfirm.map((session) => session.id);
           setDeleteConfirm(null);
-          void removeSession(id);
+          void removeSessions(ids);
         }}
       />
     )}
