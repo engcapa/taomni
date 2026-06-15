@@ -422,6 +422,10 @@ export function MainLayout() {
   }, []);
   // Maps tab.id → backend terminal session ID (set once the SSH/local session connects).
   const terminalSessionIds = useRef<Record<string, string>>({});
+  // Latest known cwd per tab, mirrored from terminalCwds so handleDuplicateTab
+  // can read it synchronously without taking terminalCwds as a dependency
+  // (which changes on every prompt once shell integration is active).
+  const terminalCwdsRef = useRef<Record<string, string>>({});
   // Pending one-shot resolvers waiting on the next cwd report for a tab. Used
   // by queryTerminalCwd to turn the fire-and-forget OSC 7 round trip into an
   // awaitable promise (e.g. when duplicating a terminal tab).
@@ -459,6 +463,7 @@ export function MainLayout() {
   }, [tabs]);
 
   const handleTerminalCwd = useCallback((tabId: string, cwd: string) => {
+    terminalCwdsRef.current[tabId] = cwd;
     setTerminalCwds((prev) => (prev[tabId] === cwd ? prev : { ...prev, [tabId]: cwd }));
     setTerminalCwdVersions((prev) => ({ ...prev, [tabId]: (prev[tabId] ?? 0) + 1 }));
     // Hand the freshly reported cwd to anyone awaiting it (e.g. a pending tab
@@ -504,18 +509,25 @@ export function MainLayout() {
     });
   }, []);
 
-  // Duplicate a tab. For local/SSH terminals, first resolve the source
-  // terminal's current directory so the copy can open there; other tab kinds
-  // duplicate immediately. The cwd probe injects a POSIX `printf` OSC 7 query,
-  // so it's skipped for Windows shells (PowerShell/cmd) that would error on it.
+  // Duplicate a tab. Terminal tabs try to open the copy in the source's current
+  // directory. Shell integration makes shells report their cwd via OSC 7 on
+  // every prompt, so we read the last-known cwd (terminalCwdsRef) with no
+  // injection — nothing to echo, and a half-typed line in the source is never
+  // touched. Only when no cwd was ever reported (integration absent, e.g.
+  // cmd/zsh/custom local shells) do we fall back to a one-shot probe, and only
+  // for local shells: the probe is skipped if a command is typed, and SSH never
+  // probes its source (a duplicate with no known cwd just opens in the remote
+  // default directory).
   const handleDuplicateTab = useCallback(
     async (tabId: string) => {
       const source = useAppStore.getState().tabs.find((t) => t.id === tabId);
       if (!source) return;
       let initialCwd: string | undefined;
       if (source.type === "terminal" && !source.adoptedTerminal) {
-        const canProbe = source.ssh ? true : localShellSupportsCwdProbe(source.localShell);
-        if (canProbe) {
+        const tracked = terminalCwdsRef.current[tabId];
+        if (tracked) {
+          initialCwd = tracked;
+        } else if (!source.ssh && localShellSupportsCwdProbe(source.localShell)) {
           const cwd = await queryTerminalCwd(tabId);
           initialCwd = cwd ?? undefined;
         }

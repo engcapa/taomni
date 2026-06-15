@@ -96,6 +96,7 @@ import {
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
+import { buildSshCwdIntegration } from "../../lib/terminalShellIntegration";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
@@ -799,6 +800,16 @@ export function TerminalPanel({
     if (!command) {
       // No way to read the cwd for this shell (e.g. cmd.exe).
       setStatusMessage("This shell can't report its working directory");
+      return;
+    }
+
+    // Never inject when a command is already typed but not yet run: the probe
+    // would be appended to it, corrupting both the probe and the user's input.
+    // captureBufferCommand reads the rendered current line, so this is
+    // shell-agnostic and covers PowerShell too (where pendingRef isn't tracked).
+    const term = termRef.current;
+    if (term && captureBufferCommand(term).length > 0) {
+      setStatusMessage("Can't read the working directory while a command is typed");
       return;
     }
 
@@ -2193,29 +2204,29 @@ export function TerminalPanel({
           window.setTimeout(focusTerminal, 0);
         } else {
           term.write(formatSshInfoBanner(ssh));
-          // Duplicated terminals carry the source's cwd. SSH can't set a start
-          // directory on the channel, so cd into it once the shell is up. We
-          // append the OSC 7 cwd probe so the blanking suppressor can hide the
-          // whole line (echo + cd) and leave a clean prompt in the new dir.
-          //
-          // The injection is delayed briefly so the server's MOTD / login
-          // banner and first prompt render first — otherwise the blanking
-          // suppressor (which drops output until the OSC 7 reply) would eat
-          // them. By the time it fires, only the cd's own echo is in flight.
-          if (initialCwd) {
-            const escaped = initialCwd.replace(/'/g, "'\\''");
-            const cdCommand = ` cd '${escaped}' &&${CWD_QUERY_COMMAND}`;
-            window.setTimeout(() => {
-              if (destroyed || sessionIdRef.current !== connectedSid) return;
-              injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
-              writeTerminal(connectedSid, encodeBase64(`${cdCommand}\r`)).catch(() => {
-                if (sessionIdRef.current === connectedSid) {
-                  injectedInputEchoSuppressorRef.current = null;
-                }
-              });
-            }, 500);
-          }
         }
+        // Install continuous OSC 7 cwd reporting on the remote shell so the tab
+        // always knows its working directory — used by SFTP "Sync" and, crucially,
+        // by tab duplication (which reads the last-known cwd instead of probing
+        // the source terminal, so there's no echo to hide and no half-typed input
+        // line to corrupt). When this tab is itself a duplicate carrying the
+        // source's cwd, the setup cd's there first (SSH can't set a start dir).
+        // Best-effort POSIX (bash/zsh); a non-POSIX remote just errors on the
+        // line, which the blanking suppressor hides up to its short TTL.
+        //
+        // Delayed so the server MOTD / first prompt render before the suppressor
+        // starts dropping output (it drops until the integration's own OSC 7
+        // reply arrives). By then only the injected line's echo is in flight.
+        const integrationCommand = buildSshCwdIntegration(initialCwd);
+        window.setTimeout(() => {
+          if (destroyed || sessionIdRef.current !== connectedSid) return;
+          injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
+          writeTerminal(connectedSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
+            if (sessionIdRef.current === connectedSid) {
+              injectedInputEchoSuppressorRef.current = null;
+            }
+          });
+        }, 500);
       }
 
       unlistenExit = await listenTerminalExit(connectedSid, () => markDisconnected(connectedSid));

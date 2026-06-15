@@ -552,13 +552,27 @@ pub fn create_pty(
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
     let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
+    let integration =
+        super::shell_integration::integration_for(&shell_launch.program, &shell_id, &shell_launch.args);
     let mut cmd = CommandBuilder::new(&shell_launch.program);
     for arg in &shell_launch.args {
+        cmd.arg(arg);
+    }
+    // Shell-integration args (e.g. PowerShell's `-NoExit -Command ". '<script>'"`)
+    // go after the shell's own args so OSC 7 cwd reporting is installed once the
+    // shell is interactive.
+    for arg in &integration.extra_args {
         cmd.arg(arg);
     }
 
     #[cfg(unix)]
     apply_terminal_environment(&mut cmd);
+
+    // Shell-integration env (e.g. bash's `PROMPT_COMMAND`). Set after the
+    // terminal environment so it can't be clobbered by it.
+    for (key, value) in &integration.env {
+        cmd.env(key, value);
+    }
 
     if let Some(dir) = cwd {
         cmd.cwd(dir);
