@@ -2212,21 +2212,41 @@ export function TerminalPanel({
         // line to corrupt). When this tab is itself a duplicate carrying the
         // source's cwd, the setup cd's there first (SSH can't set a start dir).
         // Best-effort POSIX (bash/zsh); a non-POSIX remote just errors on the
-        // line, which the blanking suppressor hides up to its short TTL.
+        // line, which the blanking suppressor hides up to its TTL.
         //
-        // Delayed so the server MOTD / first prompt render before the suppressor
-        // starts dropping output (it drops until the integration's own OSC 7
-        // reply arrives). By then only the injected line's echo is in flight.
+        // Only inject once the remote shows a real, idle prompt — never into a
+        // blank/initializing shell (a slow .bashrc / conda init), a streaming
+        // MOTD, or a half-typed line. Injecting early on a slow server is what
+        // leaked the raw command: the input got buffered, the echo came back
+        // after the suppressor's TTL, and the whole line printed. Poll for the
+        // prompt over several seconds, then give up quietly (no integration this
+        // session — safe, just no cwd-follow if it's later duplicated). The
+        // terminal is usable immediately; this only defers the background hook.
         const integrationCommand = buildSshCwdIntegration(initialCwd);
-        window.setTimeout(() => {
+        let integrationAttempts = 0;
+        const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
+        const installCwdIntegration = () => {
           if (destroyed || sessionIdRef.current !== connectedSid) return;
-          injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
+          const liveTerm = termRef.current;
+          if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) {
+            if (integrationAttempts >= MAX_INTEGRATION_ATTEMPTS) return;
+            integrationAttempts += 1;
+            window.setTimeout(installCwdIntegration, 500);
+            return;
+          }
+          // Generous TTL so a laggy link's echo round-trip still arrives while
+          // the suppressor is dropping (we only get here at a ready prompt, so
+          // it's just network latency, not shell startup). Bounded so a
+          // non-POSIX remote — which never emits the OSC 7 — isn't blacked out
+          // for too long before output resumes.
+          injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor(4000);
           writeTerminal(connectedSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
             if (sessionIdRef.current === connectedSid) {
               injectedInputEchoSuppressorRef.current = null;
             }
           });
-        }, 500);
+        };
+        window.setTimeout(installCwdIntegration, 500);
       }
 
       unlistenExit = await listenTerminalExit(connectedSid, () => markDisconnected(connectedSid));
@@ -3347,6 +3367,39 @@ function captureBufferCommand(term: Terminal): string {
 
   const command = best >= 0 ? trimmed.slice(best) : trimmed;
   return command.trim();
+}
+
+// Heuristic: does the terminal currently show an idle shell prompt waiting for
+// input? True only when the cursor line is non-empty AND ends in a common
+// prompt terminator with nothing typed after it. This deliberately returns
+// false for a blank screen (shell still starting up — e.g. a slow .bashrc /
+// conda init), a streaming MOTD, or a half-typed command, so callers that need
+// to inject a hidden setup line wait for a clean, ready prompt instead of
+// firing into a not-yet-ready shell (whose buffered echo would arrive late and
+// leak past the echo suppressor). Covers bash/zsh ("$ "/"# "/"% "), root,
+// PowerShell-over-SSH ("> "); fancy custom prompts won't match (callers then
+// skip integration, which is safe).
+function terminalAtIdlePrompt(term: Terminal): boolean {
+  const buffer = term.buffer.active;
+  if (buffer.type === "alternate") return false;
+
+  const cursorRow = buffer.baseY + buffer.cursorY;
+  let start = cursorRow;
+  while (start > 0 && buffer.getLine(start)?.isWrapped) start -= 1;
+
+  let text = "";
+  for (let row = start; row <= cursorRow; row += 1) {
+    const line = buffer.getLine(row);
+    if (!line) continue;
+    text +=
+      row === cursorRow
+        ? line.translateToString(false).slice(0, buffer.cursorX)
+        : line.translateToString(false);
+  }
+
+  if (text.replace(/\s+$/, "").length === 0) return false; // blank: not ready
+  // Ends in a prompt terminator, optionally followed by a single space.
+  return /[$#>%][ ]?$/.test(text);
 }
 
 function computeInlineGhost(
