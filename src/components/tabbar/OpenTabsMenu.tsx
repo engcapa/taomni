@@ -371,6 +371,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
                         type="button"
                         data-testid={`open-tabs-tab-${tab.id}`}
                         onClick={() => pickTab(tab)}
+                        title={tab.title}
                         className="flex-1 flex items-center gap-2 min-w-0 text-left"
                       >
                         <span className="w-4 flex-shrink-0 flex items-center justify-center">

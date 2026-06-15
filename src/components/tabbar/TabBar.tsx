@@ -751,6 +751,7 @@ function TabItem(props: TabItemProps) {
       data-drop-side={dropSide}
       className="taomni-tab relative"
       data-active={active}
+      title={editing ? undefined : tab.title}
       onClick={() => onActivate(tab)}
       onMouseDown={(e) => {
         if (editing) return;
