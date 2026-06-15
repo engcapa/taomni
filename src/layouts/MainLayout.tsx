@@ -142,6 +142,24 @@ function readRibbonVisible(): boolean {
   }
 }
 
+// Whether a local terminal's shell can answer an OSC 7 cwd probe when its tab
+// is duplicated. PowerShell and POSIX shells (bash/zsh/git-bash/WSL) can; cmd
+// can't emit OSC 7 cleanly, so it's skipped (the duplicate opens in the default
+// directory). SSH terminals always run a POSIX remote shell and are handled
+// separately. A LocalShellSelection identifies the shell by its executable
+// path (see TabBar's shellSelectionFor), so we match on the path/name text.
+function localShellSupportsCwdProbe(localShell?: LocalShellSelection): boolean {
+  const hint = `${localShell?.id ?? ""} ${localShell?.name ?? ""}`.toLowerCase();
+  if (
+    hint.includes("cmd.exe") ||
+    hint.includes("command prompt") ||
+    hint.includes("command-prompt")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function writeRibbonVisible(visible: boolean) {
   try {
     window.localStorage.setItem(RIBBON_VISIBLE_KEY, visible ? "true" : "false");
@@ -280,6 +298,7 @@ export function MainLayout() {
     refreshXServer,
     addTab,
     removeTab,
+    duplicateTab,
     setActiveTab,
     toggleSidebar,
     setSidebarCollapsed,
@@ -403,6 +422,14 @@ export function MainLayout() {
   }, []);
   // Maps tab.id → backend terminal session ID (set once the SSH/local session connects).
   const terminalSessionIds = useRef<Record<string, string>>({});
+  // Latest known cwd per tab, mirrored from terminalCwds so handleDuplicateTab
+  // can read it synchronously without taking terminalCwds as a dependency
+  // (which changes on every prompt once shell integration is active).
+  const terminalCwdsRef = useRef<Record<string, string>>({});
+  // Pending one-shot resolvers waiting on the next cwd report for a tab. Used
+  // by queryTerminalCwd to turn the fire-and-forget OSC 7 round trip into an
+  // awaitable promise (e.g. when duplicating a terminal tab).
+  const cwdQueryResolversRef = useRef<Record<string, Array<(cwd: string | null) => void>>>({});
 
   const toggleAttachedSidebar = useCallback((tabId: string) => {
     setAttachedSidebars((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
@@ -436,8 +463,16 @@ export function MainLayout() {
   }, [tabs]);
 
   const handleTerminalCwd = useCallback((tabId: string, cwd: string) => {
+    terminalCwdsRef.current[tabId] = cwd;
     setTerminalCwds((prev) => (prev[tabId] === cwd ? prev : { ...prev, [tabId]: cwd }));
     setTerminalCwdVersions((prev) => ({ ...prev, [tabId]: (prev[tabId] ?? 0) + 1 }));
+    // Hand the freshly reported cwd to anyone awaiting it (e.g. a pending tab
+    // duplication) before broadcasting to other windows.
+    const resolvers = cwdQueryResolversRef.current[tabId];
+    if (resolvers && resolvers.length > 0) {
+      cwdQueryResolversRef.current[tabId] = [];
+      for (const resolve of resolvers) resolve(cwd);
+    }
     // Mirror the new cwd to any same-origin window (e.g. a detached SFTP
     // popup) so it can offer the same last-known terminal cwd for explicit
     // sync even though only the main window hosts the terminal. We publish
@@ -450,6 +485,57 @@ export function MainLayout() {
       broadcastCwdHint(`attached-${tabId}`, cwd);
     });
   }, []);
+
+  // Ask a terminal tab for its current working directory and resolve once the
+  // shell reports back via OSC 7. Resolves null if the terminal isn't ready or
+  // the reply doesn't arrive in time (so callers can fall back gracefully).
+  const queryTerminalCwd = useCallback((tabId: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      if (!terminalSessionIds.current[tabId]) {
+        resolve(null);
+        return;
+      }
+      const list = cwdQueryResolversRef.current[tabId] ?? [];
+      list.push(resolve);
+      cwdQueryResolversRef.current[tabId] = list;
+      setTerminalCwdRequestTokens((prev) => ({ ...prev, [tabId]: (prev[tabId] ?? 0) + 1 }));
+      window.setTimeout(() => {
+        const pending = cwdQueryResolversRef.current[tabId];
+        if (pending && pending.includes(resolve)) {
+          cwdQueryResolversRef.current[tabId] = pending.filter((r) => r !== resolve);
+          resolve(null);
+        }
+      }, 1200);
+    });
+  }, []);
+
+  // Duplicate a tab. Terminal tabs try to open the copy in the source's current
+  // directory. Shell integration makes shells report their cwd via OSC 7 on
+  // every prompt, so we read the last-known cwd (terminalCwdsRef) with no
+  // injection — nothing to echo, and a half-typed line in the source is never
+  // touched. Only when no cwd was ever reported (integration absent, e.g.
+  // cmd/zsh/custom local shells) do we fall back to a one-shot probe, and only
+  // for local shells: the probe is skipped if a command is typed, and SSH never
+  // probes its source (a duplicate with no known cwd just opens in the remote
+  // default directory).
+  const handleDuplicateTab = useCallback(
+    async (tabId: string) => {
+      const source = useAppStore.getState().tabs.find((t) => t.id === tabId);
+      if (!source) return;
+      let initialCwd: string | undefined;
+      if (source.type === "terminal" && !source.adoptedTerminal) {
+        const tracked = terminalCwdsRef.current[tabId];
+        if (tracked) {
+          initialCwd = tracked;
+        } else if (!source.ssh && localShellSupportsCwdProbe(source.localShell)) {
+          const cwd = await queryTerminalCwd(tabId);
+          initialCwd = cwd ?? undefined;
+        }
+      }
+      duplicateTab(tabId, initialCwd ? { terminalInitialCwd: initialCwd } : undefined);
+    },
+    [duplicateTab, queryTerminalCwd],
+  );
 
   const requestTerminalCwd = useCallback((tabId: string): boolean => {
     if (!terminalSessionIds.current[tabId]) {
@@ -1894,6 +1980,7 @@ export function MainLayout() {
           }
           onConnectSession={handleConnectSession}
           onOpenSessionEditor={() => handleNewSession()}
+          onDuplicateTab={handleDuplicateTab}
           onCloseWindow={requestAppExit}
         />
       )}
@@ -1961,6 +2048,7 @@ export function MainLayout() {
                   }
                   onConnectSession={handleConnectSession}
                   onOpenSessionEditor={() => handleNewSession()}
+                  onDuplicateTab={handleDuplicateTab}
                 />
               )}              {multiExecActive && (
                 <MultiExecBar
@@ -2027,10 +2115,11 @@ export function MainLayout() {
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
                             adoptedTerminal={tab.adoptedTerminal}
+                            initialCwd={tab.terminalInitialCwd}
                             visible={terminalSplitVisible || isActive}
                             activeForShortcuts={isActive}
                             inputLocked={inputLocked}
-                            onCwdChange={tab.ssh ? (cwd) => handleTerminalCwd(tab.id, cwd) : undefined}
+                            onCwdChange={(cwd) => handleTerminalCwd(tab.id, cwd)}
                             cwdRequestToken={terminalCwdRequestTokens[tab.id] ?? 0}
                             onSessionReady={(sid) => { terminalSessionIds.current[tab.id] = sid; }}
                             onOutput={() => handleTerminalOutput(tab.id)}

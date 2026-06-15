@@ -30,6 +30,7 @@ interface CompactTitleBarProps {
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
   onConnectSession: (session: SessionConfig) => void;
   onOpenSessionEditor: () => void;
+  onDuplicateTab?: (id: string) => void;
   onCloseWindow?: () => void;
 }
 
@@ -40,6 +41,7 @@ export function CompactTitleBar({
   onStartLocalTerminal,
   onConnectSession,
   onOpenSessionEditor,
+  onDuplicateTab,
   onCloseWindow,
 }: CompactTitleBarProps) {
   const ctx = useContextMenu();
@@ -103,6 +105,7 @@ export function CompactTitleBar({
           onStartLocalTerminal={onStartLocalTerminal}
           onConnectSession={onConnectSession}
           onOpenSessionEditor={onOpenSessionEditor}
+          onDuplicateTab={onDuplicateTab}
         />
       </div>
       <div data-window-drag className="w-10 self-stretch shrink-0" />

@@ -62,7 +62,7 @@ import {
 } from "../floating-toolbar/floatingToolbarStyles";
 import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
 import {
-  createInputEchoSuppressor,
+  createOsc7BlankingSuppressor,
   type InputEchoSuppressor,
 } from "../../lib/terminalOutputFilter";
 import { makeHostKey, useCommandHistory } from "../../lib/history";
@@ -95,6 +95,8 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
+import { buildSshCwdIntegration } from "../../lib/terminalShellIntegration";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
@@ -169,6 +171,12 @@ interface TerminalPanelProps {
   };
   terminalProfile?: TerminalProfile;
   adoptedTerminal?: AdoptedTerminalSession;
+  /**
+   * One-shot working directory for the initial connect. Local terminals launch
+   * the shell here; SSH terminals `cd` here right after the shell opens. Used
+   * when a terminal tab is duplicated so the copy lands in the source's cwd.
+   */
+  initialCwd?: string;
   preserveSessionOnUnmount?: boolean;
   detachedWindowControls?: DetachedTerminalWindowControls;
   onDetachedStateChange?: (state: TerminalReattachState) => void;
@@ -217,6 +225,12 @@ interface TerminalPanelProps {
 const DEFAULT_FONT_SIZE = 14;
 const CWD_QUERY_COMMAND =
   " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
+// PowerShell equivalent of the OSC 7 cwd probe. `printf` doesn't exist in
+// PowerShell, so we emit the escape sequence via [Console]::Write. The echo is
+// hidden by the OSC-7 blanking suppressor (which keys off the real escape byte
+// this prints at runtime), so no marker bookkeeping is needed here.
+const PS_CWD_QUERY_COMMAND =
+  "[Console]::Write([char]27+']7;file://'+$env:COMPUTERNAME+'/'+($PWD.ProviderPath.Replace('\\','/'))+[char]27+'\\')";
 const OSC52_MAX_DECODED_BYTES = 1024 * 1024;
 
 interface SearchMatch {
@@ -256,6 +270,7 @@ export function TerminalPanel({
   localShell,
   terminalProfile,
   adoptedTerminal,
+  initialCwd,
   preserveSessionOnUnmount = false,
   detachedWindowControls,
   onDetachedStateChange,
@@ -394,6 +409,8 @@ export function TerminalPanel({
   const macroPlaybackRef = useRef(false);
   const eventIdRef = useRef(0);
   const imeGuardRef = useRef<TerminalImeInputGuard | null>(null);
+  const isComposingRef = useRef(false);
+  const compositionBufferRef = useRef<Uint8Array[]>([]);
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
   const suppressNativePasteUntilRef = useRef(0);
   const middleClickSelectionRef = useRef("");
@@ -465,11 +482,35 @@ export function TerminalPanel({
   const isLocalPowerShell = useMemo(
     () =>
       isLocal &&
-      (resolvedLocalShellId === "powershell" || resolvedLocalShellId === "windows-powershell"),
-    [isLocal, resolvedLocalShellId],
+      (resolvedLocalShellId
+        ? (resolvedLocalShellId === "powershell" || resolvedLocalShellId === "windows-powershell")
+        : (localShell?.id === "powershell" || localShell?.id === "windows-powershell")),
+    [isLocal, resolvedLocalShellId, localShell?.id],
   );
   const suggestionsActive = inlineSuggestionsEnabled && !isLocalPowerShell;
   const history = useCommandHistory(historyHostKey, inlineSuggestionsMax);
+
+  // Which command (if any) can probe this terminal's cwd via OSC 7. SSH and
+  // POSIX local shells use the `printf` form; PowerShell uses a [Console]::Write
+  // form; cmd.exe can't emit OSC 7 cleanly, so it has no probe. Resolved
+  // reactively because the backend reports the real local shell on connect.
+  const isLocalCmd = useMemo(
+    () =>
+      isLocal &&
+      (resolvedLocalShellId === "command-prompt" ||
+        /cmd\.exe|command[\s-]?prompt/i.test(`${localShell?.id ?? ""} ${localShell?.name ?? ""}`)),
+    [isLocal, resolvedLocalShellId, localShell?.id, localShell?.name],
+  );
+  const cwdProbeCommand = useMemo<string | null>(() => {
+    if (!isLocal) return CWD_QUERY_COMMAND; // SSH → remote POSIX shell.
+    if (isLocalCmd) return null;
+    if (isLocalPowerShell) return PS_CWD_QUERY_COMMAND;
+    return CWD_QUERY_COMMAND; // bash/zsh/git-bash/WSL/Unix default.
+  }, [isLocal, isLocalCmd, isLocalPowerShell]);
+  const cwdProbeCommandRef = useRef(cwdProbeCommand);
+  useEffect(() => {
+    cwdProbeCommandRef.current = cwdProbeCommand;
+  }, [cwdProbeCommand]);
 
   // Refs decouple the once-mounted xterm.onData callback from the live
   // history/enabled values. Without this, the initial writeXtermInput closure
@@ -755,8 +796,26 @@ export function TerminalPanel({
       return;
     }
 
-    injectedInputEchoSuppressorRef.current = createInputEchoSuppressor(CWD_QUERY_COMMAND, 5000);
-    writeTerminal(sid, encodeBase64(`${CWD_QUERY_COMMAND}\r`)).catch((err) => {
+    const command = cwdProbeCommandRef.current;
+    if (!command) {
+      // No way to read the cwd for this shell (e.g. cmd.exe).
+      setStatusMessage("This shell can't report its working directory");
+      return;
+    }
+
+    // Never inject when a command is already typed but not yet run: the probe
+    // would be appended to it, corrupting both the probe and the user's input.
+    // captureBufferCommand reads the rendered current line, so this is
+    // shell-agnostic and covers PowerShell too (where pendingRef isn't tracked).
+    const term = termRef.current;
+    if (term && captureBufferCommand(term).length > 0) {
+      setStatusMessage("Can't read the working directory while a command is typed");
+      return;
+    }
+
+    // Hide the probe's echo: drop everything until the OSC 7 reply it emits.
+    injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
+    writeTerminal(sid, encodeBase64(`${command}\r`)).catch((err) => {
       if (sessionIdRef.current === sid) injectedInputEchoSuppressorRef.current = null;
       setStatusMessage(err instanceof Error ? err.message : "Terminal cwd request failed");
     });
@@ -1739,6 +1798,7 @@ export function TerminalPanel({
     let unlistenForwardError: UnlistenFn | null = null;
     let unlistenAuthPrompt: UnlistenFn | null = null;
     let detachImeGuard: (() => void) | null = null;
+    let cleanupImePositionLock: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
 
     const primaryFont = getPrimaryFontName(fontFamily);
@@ -1776,6 +1836,59 @@ export function TerminalPanel({
       })
     );
     term.open(el);
+
+    // Lock helper-textarea position during CJK IME composition to prevent candidate box jumping
+    // when background text animations (e.g. Claude Code spinners) trigger cursor repositioning.
+    const textarea = term.textarea;
+    if (textarea) {
+      let isComposing = false;
+      let lockedLeft = "";
+      let lockedTop = "";
+
+      const onCompositionStart = () => {
+        isComposingRef.current = true;
+        isComposing = true;
+        lockedLeft = textarea.style.left;
+        lockedTop = textarea.style.top;
+      };
+
+      const onCompositionEnd = () => {
+        isComposingRef.current = false;
+        isComposing = false;
+        // Flush any PTY output buffered during composition
+        if (compositionBufferRef.current.length > 0) {
+          for (const chunk of compositionBufferRef.current) {
+            term.write(chunk);
+          }
+          compositionBufferRef.current = [];
+        }
+      };
+
+      textarea.addEventListener("compositionstart", onCompositionStart);
+      textarea.addEventListener("compositionend", onCompositionEnd);
+
+      const observer = new MutationObserver(() => {
+        if (isComposing) {
+          observer.disconnect();
+          if (textarea.style.left !== lockedLeft) {
+            textarea.style.left = lockedLeft;
+          }
+          if (textarea.style.top !== lockedTop) {
+            textarea.style.top = lockedTop;
+          }
+          observer.observe(textarea, { attributes: true, attributeFilter: ["style"] });
+        }
+      });
+
+      observer.observe(textarea, { attributes: true, attributeFilter: ["style"] });
+
+      cleanupImePositionLock = () => {
+        textarea.removeEventListener("compositionstart", onCompositionStart);
+        textarea.removeEventListener("compositionend", onCompositionEnd);
+        observer.disconnect();
+        compositionBufferRef.current = [];
+      };
+    }
 
     // OSC 7 — host writes its current working directory as `file://host/path`.
     // We listen for this so explicit SFTP "Sync" requests can learn the shell cwd.
@@ -1913,7 +2026,11 @@ export function TerminalPanel({
             outputLogRef.current += new TextDecoder().decode(filtered);
           }
           onOutputRef.current?.();
-          term.write(filtered);
+          if (isComposingRef.current) {
+            compositionBufferRef.current.push(filtered);
+          } else {
+            term.write(filtered);
+          }
         },
         onStateChange: (state, progress) => {
           setZmodemState(state);
@@ -2088,6 +2205,48 @@ export function TerminalPanel({
         } else {
           term.write(formatSshInfoBanner(ssh));
         }
+        // Install continuous OSC 7 cwd reporting on the remote shell so the tab
+        // always knows its working directory — used by SFTP "Sync" and, crucially,
+        // by tab duplication (which reads the last-known cwd instead of probing
+        // the source terminal, so there's no echo to hide and no half-typed input
+        // line to corrupt). When this tab is itself a duplicate carrying the
+        // source's cwd, the setup cd's there first (SSH can't set a start dir).
+        // Best-effort POSIX (bash/zsh); a non-POSIX remote just errors on the
+        // line, which the blanking suppressor hides up to its TTL.
+        //
+        // Only inject once the remote shows a real, idle prompt — never into a
+        // blank/initializing shell (a slow .bashrc / conda init), a streaming
+        // MOTD, or a half-typed line. Injecting early on a slow server is what
+        // leaked the raw command: the input got buffered, the echo came back
+        // after the suppressor's TTL, and the whole line printed. Poll for the
+        // prompt over several seconds, then give up quietly (no integration this
+        // session — safe, just no cwd-follow if it's later duplicated). The
+        // terminal is usable immediately; this only defers the background hook.
+        const integrationCommand = buildSshCwdIntegration(initialCwd);
+        let integrationAttempts = 0;
+        const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
+        const installCwdIntegration = () => {
+          if (destroyed || sessionIdRef.current !== connectedSid) return;
+          const liveTerm = termRef.current;
+          if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) {
+            if (integrationAttempts >= MAX_INTEGRATION_ATTEMPTS) return;
+            integrationAttempts += 1;
+            window.setTimeout(installCwdIntegration, 500);
+            return;
+          }
+          // Generous TTL so a laggy link's echo round-trip still arrives while
+          // the suppressor is dropping (we only get here at a ready prompt, so
+          // it's just network latency, not shell startup). Bounded so a
+          // non-POSIX remote — which never emits the OSC 7 — isn't blacked out
+          // for too long before output resumes.
+          injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor(4000);
+          writeTerminal(connectedSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
+            if (sessionIdRef.current === connectedSid) {
+              injectedInputEchoSuppressorRef.current = null;
+            }
+          });
+        };
+        window.setTimeout(installCwdIntegration, 500);
       }
 
       unlistenExit = await listenTerminalExit(connectedSid, () => markDisconnected(connectedSid));
@@ -2201,13 +2360,19 @@ export function TerminalPanel({
     } else {
       connectionStateRef.current = "connecting";
       appendEvent("connection", `Starting ${localShell?.name ?? "local terminal"}`);
+      // A duplicated terminal carries the source's cwd (from OSC 7). Translate
+      // it into a native start directory; skip it if it can't be mapped (e.g. a
+      // WSL/MSYS path with no Windows drive) so the shell still launches.
+      const startCwd = initialCwd
+        ? normalizeLocalStartCwd(initialCwd, getAppPlatform()) ?? undefined
+        : undefined;
       createLocalTerminal(
         sid,
         cols,
         rows,
         localShell?.id,
         localShell?.args,
-        undefined,
+        startCwd,
         handleRawOutput,
       )
         .then(({ sessionId, shellId }) => handleConnected({ sessionId, shellId }, "initial"))
@@ -2233,6 +2398,7 @@ export function TerminalPanel({
         pendingMfaRequestIdRef.current = null;
       }
       detachImeGuard?.();
+      cleanupImePositionLock?.();
       if (loggingActiveRef.current && outputLogRef.current) {
         flushRecordedOutput("Terminal closed; saved recorded output");
       }
@@ -3201,6 +3367,39 @@ function captureBufferCommand(term: Terminal): string {
 
   const command = best >= 0 ? trimmed.slice(best) : trimmed;
   return command.trim();
+}
+
+// Heuristic: does the terminal currently show an idle shell prompt waiting for
+// input? True only when the cursor line is non-empty AND ends in a common
+// prompt terminator with nothing typed after it. This deliberately returns
+// false for a blank screen (shell still starting up — e.g. a slow .bashrc /
+// conda init), a streaming MOTD, or a half-typed command, so callers that need
+// to inject a hidden setup line wait for a clean, ready prompt instead of
+// firing into a not-yet-ready shell (whose buffered echo would arrive late and
+// leak past the echo suppressor). Covers bash/zsh ("$ "/"# "/"% "), root,
+// PowerShell-over-SSH ("> "); fancy custom prompts won't match (callers then
+// skip integration, which is safe).
+function terminalAtIdlePrompt(term: Terminal): boolean {
+  const buffer = term.buffer.active;
+  if (buffer.type === "alternate") return false;
+
+  const cursorRow = buffer.baseY + buffer.cursorY;
+  let start = cursorRow;
+  while (start > 0 && buffer.getLine(start)?.isWrapped) start -= 1;
+
+  let text = "";
+  for (let row = start; row <= cursorRow; row += 1) {
+    const line = buffer.getLine(row);
+    if (!line) continue;
+    text +=
+      row === cursorRow
+        ? line.translateToString(false).slice(0, buffer.cursorX)
+        : line.translateToString(false);
+  }
+
+  if (text.replace(/\s+$/, "").length === 0) return false; // blank: not ready
+  // Ends in a prompt terminator, optionally followed by a single space.
+  return /[$#>%][ ]?$/.test(text);
 }
 
 function computeInlineGhost(

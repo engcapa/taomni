@@ -373,8 +373,7 @@ export function AppProxyPanel() {
               </button>
             </div>
           )}
-          {/* Test + result + updater note (shared by both modes) */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2 gap-y-1">
             <button
               type="button"
               className="taomni-btn h-7 px-2.5 text-[11px] inline-flex items-center gap-1"
@@ -382,10 +381,10 @@ export function AppProxyPanel() {
               disabled={testing}
             >
               {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-              {t("settings.appProxyTest")}
+              {testing ? t("sessionEditor2.proxyTestTesting") : t("settings.appProxyTest")}
             </button>
             {msg && (
-              <span className={`text-[11px] ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</span>
+              <span className={`text-[11px] break-all max-w-full ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</span>
             )}
           </div>
           <div className="text-[10px] text-[var(--taomni-text-muted)]">{t("settings.appProxyUpdaterNote")}</div>

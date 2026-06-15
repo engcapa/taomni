@@ -72,28 +72,42 @@ pub fn resolve_shell_with_id(
     if let Some(raw) = shell {
         let requested = raw.trim();
         if !requested.is_empty() {
-            if shell_args.is_none() {
-                if let Some(option) = list_local_shells()
-                    .into_iter()
-                    .find(|option| option.id == requested)
-                {
-                    let id = option.id;
-                    return (
-                        ShellLaunch {
-                            program: option.path,
-                            args: option.args,
-                        },
-                        id,
-                    );
-                }
+            // First, check if the requested string is one of our known shell IDs
+            if let Some(option) = list_local_shells()
+                .into_iter()
+                .find(|option| option.id == requested)
+            {
+                let id = option.id;
+                // If the user didn't override args, use option's default args, otherwise use user's args
+                let args = shell_args.unwrap_or(option.args);
+                return (
+                    ShellLaunch {
+                        program: option.path,
+                        args,
+                    },
+                    id,
+                );
             }
+
+            // Otherwise, it's a custom command. Let's inspect the program string to see if it looks like powershell.
+            let lower = requested.to_lowercase();
+            let is_ps = lower.contains("pwsh") || lower.contains("powershell");
+            let id = if is_ps {
+                if lower.contains("pwsh") || lower.contains("7") {
+                    "powershell".to_string()
+                } else {
+                    "windows-powershell".to_string()
+                }
+            } else {
+                "custom".to_string()
+            };
 
             return (
                 ShellLaunch {
                     program: requested.to_string(),
                     args: shell_args.unwrap_or_default(),
                 },
-                "custom".to_string(),
+                id,
             );
         }
     }
@@ -538,13 +552,27 @@ pub fn create_pty(
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
     let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
+    let integration =
+        super::shell_integration::integration_for(&shell_launch.program, &shell_id, &shell_launch.args);
     let mut cmd = CommandBuilder::new(&shell_launch.program);
     for arg in &shell_launch.args {
+        cmd.arg(arg);
+    }
+    // Shell-integration args (e.g. PowerShell's `-NoExit -Command ". '<script>'"`)
+    // go after the shell's own args so OSC 7 cwd reporting is installed once the
+    // shell is interactive.
+    for arg in &integration.extra_args {
         cmd.arg(arg);
     }
 
     #[cfg(unix)]
     apply_terminal_environment(&mut cmd);
+
+    // Shell-integration env (e.g. bash's `PROMPT_COMMAND`). Set after the
+    // terminal environment so it can't be clobbered by it.
+    for (key, value) in &integration.env {
+        cmd.env(key, value);
+    }
 
     if let Some(dir) = cwd {
         cmd.cwd(dir);

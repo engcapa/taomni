@@ -126,6 +126,14 @@ export interface Tab {
   fileBrowser?: FileBrowserTabInfo;
   proxyTest?: ProxyTestTabInfo;
   hasNewOutput?: boolean;
+  /**
+   * One-shot starting directory for a freshly opened local/SSH terminal tab.
+   * Set when a terminal tab is duplicated so the copy lands in the same
+   * working directory the source terminal was in (local terminals start the
+   * shell there; SSH terminals `cd` there right after connecting). Consumed on
+   * the initial connect and otherwise ignored.
+   */
+  terminalInitialCwd?: string;
 }
 
 /** A single local ↔ remote path mapping entry. */

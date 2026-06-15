@@ -1,6 +1,7 @@
 pub mod forwards;
 pub mod network;
 pub mod pty;
+pub mod shell_integration;
 pub mod ssh;
 pub mod x11;
 pub mod x11_forward;
