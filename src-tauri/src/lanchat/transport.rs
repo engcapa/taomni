@@ -312,6 +312,12 @@ async fn dispatch_inbound(
         frame::TEXT_ACK => {
             crate::lanchat::messaging::handle_text_ack(app, state, &env).await;
         }
+        frame::GROUP_ANNOUNCE => {
+            crate::lanchat::messaging::handle_group_announce(app, state, &env).await;
+        }
+        frame::GROUP_JOIN | frame::GROUP_LEAVE => {
+            crate::lanchat::messaging::handle_group_membership(app, state, &env).await;
+        }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");
         }

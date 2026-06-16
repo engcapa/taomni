@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::lanchat::protocol::PresenceStatus;
-use crate::lanchat::store::{decode_avatar_base64, Conversation, LanMessage, Profile};
+use crate::lanchat::store::{decode_avatar_base64, Conversation, Group, LanMessage, Profile};
 use crate::lanchat::messaging;
 use crate::state::AppState;
 
@@ -148,4 +148,65 @@ pub async fn lanchat_mark_read(
     conv_id: String,
 ) -> Result<(), String> {
     state.lanchat.store.reset_unread(&conv_id).map_err(|e| e.to_string())
+}
+
+/// Arguments for [`lanchat_create_group`].
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateGroupArgs {
+    pub name: String,
+    #[serde(default)]
+    pub members: Vec<String>,
+}
+
+/// Create a named group/channel and announce it to the given members.
+#[tauri::command]
+pub async fn lanchat_create_group(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    args: CreateGroupArgs,
+) -> Result<Group, String> {
+    if args.name.trim().is_empty() {
+        return Err("group name is empty".into());
+    }
+    messaging::create_group(&app, &state.lanchat, &args.name, args.members).await
+}
+
+/// Arguments for [`lanchat_send_group_text`].
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SendGroupTextArgs {
+    pub group_id: String,
+    pub text: String,
+    #[serde(default)]
+    pub mentions: Vec<String>,
+}
+
+/// Send a text message to all online members of a group.
+#[tauri::command]
+pub async fn lanchat_send_group_text(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    args: SendGroupTextArgs,
+) -> Result<LanMessage, String> {
+    if args.text.trim().is_empty() {
+        return Err("message text is empty".into());
+    }
+    messaging::send_group_text(&app, &state.lanchat, &args.group_id, args.text, args.mentions).await
+}
+
+/// List all known groups (with their members).
+#[tauri::command]
+pub async fn lanchat_list_groups(state: State<'_, AppState>) -> Result<Vec<Group>, String> {
+    state.lanchat.store.list_groups().map_err(|e| e.to_string())
+}
+
+/// Leave a group locally and notify its members.
+#[tauri::command]
+pub async fn lanchat_leave_group(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    group_id: String,
+) -> Result<(), String> {
+    messaging::leave_group(&app, &state.lanchat, &group_id).await
 }

@@ -12,7 +12,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter};
 
 use crate::lanchat::protocol::{frame, Envelope, PROTOCOL_VERSION};
-use crate::lanchat::store::{direct_conv_id, LanMessage};
+use crate::lanchat::store::{direct_conv_id, group_conv_id, LanMessage};
 use crate::lanchat::{events, transport, LanChatState};
 
 /// How long an unacked message waits before it is marked `failed`.
@@ -173,9 +173,30 @@ pub async fn handle_text_msg(
                 .collect()
         })
         .unwrap_or_default();
-    // Receiver keys the conversation by the sender.
-    let conv_id = direct_conv_id(from);
-    if let Err(e) = state.store.ensure_conversation(&conv_id, "direct", from) {
+
+    // Group message (payload carries groupId) vs direct (keyed by sender).
+    let group_id = env
+        .payload
+        .get("groupId")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let conv_id = match &group_id {
+        Some(g) => {
+            // Ensure the group exists locally even if the announce was missed;
+            // record the sender (and ourselves) as members.
+            let _ = state.store.upsert_group(g, g);
+            let _ = state.store.add_group_member(g, from);
+            let my_id = state.node_id().await;
+            let _ = state.store.add_group_member(g, &my_id);
+            group_conv_id(g)
+        }
+        None => direct_conv_id(from),
+    };
+    let (kind, poid) = match &group_id {
+        Some(g) => ("group", g.clone()),
+        None => ("direct", from.to_string()),
+    };
+    if let Err(e) = state.store.ensure_conversation(&conv_id, kind, &poid) {
         log::debug!("lanchat: ensure conversation failed: {e}");
         return;
     }
@@ -222,4 +243,194 @@ async fn send_ack(state: &Arc<LanChatState>, to: &str, msg_id: &str) {
     if let Some(handle) = state.connections.read().await.get(to) {
         let _ = handle.send(ack);
     }
+}
+
+/* ----------------------------- groups (phase 6) ----------------------------- */
+
+fn emit_group(app: &AppHandle, group: &crate::lanchat::store::Group) {
+    if let Err(e) = app.emit(events::GROUP, group) {
+        log::warn!("lanchat: emit group failed: {e}");
+    }
+}
+
+/// Broadcast an envelope to a set of peers (best-effort, skipping self).
+async fn broadcast(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    members: &[String],
+    my_id: &str,
+    make: impl Fn() -> Envelope,
+) {
+    for member in members {
+        if member == my_id {
+            continue;
+        }
+        let env = make();
+        if let Err(e) = transport::send_to_peer(app, state, member, env).await {
+            log::debug!("lanchat: broadcast to {member} failed: {e}");
+        }
+    }
+}
+
+/// Create a group locally, announce it to members, and return it.
+pub async fn create_group(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    name: &str,
+    members: Vec<String>,
+) -> Result<crate::lanchat::store::Group, String> {
+    let my_id = state.node_id().await;
+    let group_id = uuid::Uuid::new_v4().to_string();
+    state.store.upsert_group(&group_id, name).map_err(|e| e.to_string())?;
+    state.store.add_group_member(&group_id, &my_id).ok();
+    for m in &members {
+        state.store.add_group_member(&group_id, m).ok();
+    }
+    let conv_id = group_conv_id(&group_id);
+    state
+        .store
+        .ensure_conversation(&conv_id, "group", &group_id)
+        .map_err(|e| e.to_string())?;
+
+    let group = state
+        .store
+        .get_group(&group_id)
+        .map_err(|e| e.to_string())?
+        .ok_or("group missing after create")?;
+
+    // Announce to all members so they create the group locally.
+    let announce_members = group.members.clone();
+    let payload = json!({ "groupId": group_id, "name": name, "members": announce_members });
+    broadcast(app, state, &group.members, &my_id, || {
+        Envelope::new(frame::GROUP_ANNOUNCE, &my_id, None, payload.clone())
+    })
+    .await;
+
+    emit_group(app, &group);
+    emit_conversation(app, state, &conv_id).await;
+    Ok(group)
+}
+
+/// Send a group message to all online members (mesh fan-out from the sender).
+pub async fn send_group_text(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    group_id: &str,
+    text: String,
+    mentions: Vec<String>,
+) -> Result<LanMessage, String> {
+    let my_id = state.node_id().await;
+    let conv_id = group_conv_id(group_id);
+    state
+        .store
+        .ensure_conversation(&conv_id, "group", group_id)
+        .map_err(|e| e.to_string())?;
+
+    let msg_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().timestamp_millis();
+    let msg = LanMessage {
+        id: msg_id.clone(),
+        conv_id: conv_id.clone(),
+        sender_id: my_id.clone(),
+        body: text.clone(),
+        mentions: mentions.clone(),
+        created_at: now,
+        state: "sent".into(),
+    };
+    state.store.insert_message(&msg).map_err(|e| e.to_string())?;
+    let _ = state.store.touch_conversation(&conv_id, now, 0);
+    emit_message(app, &msg);
+    emit_conversation(app, state, &conv_id).await;
+
+    // Fan out the same message id to every member; receivers dedup by id.
+    let members = state
+        .store
+        .list_group_members(group_id)
+        .unwrap_or_default();
+    let payload = json!({ "groupId": group_id, "text": text, "mentions": mentions });
+    for member in members {
+        if member == my_id {
+            continue;
+        }
+        let env = Envelope {
+            v: PROTOCOL_VERSION,
+            frame_type: frame::TEXT_MSG.to_string(),
+            id: msg_id.clone(),
+            from: my_id.clone(),
+            to: Some(member.clone()),
+            ts: now,
+            payload: payload.clone(),
+        };
+        if let Err(e) = transport::send_to_peer(app, state, &member, env).await {
+            log::debug!("lanchat: group send to {member} failed: {e}");
+        }
+    }
+    Ok(msg)
+}
+
+/// Inbound `group-announce`: create/refresh the group + its membership locally.
+pub async fn handle_group_announce(app: &AppHandle, state: &Arc<LanChatState>, env: &Envelope) {
+    let Some(group_id) = env.payload.get("groupId").and_then(|v| v.as_str()) else {
+        return;
+    };
+    let name = env
+        .payload
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(group_id);
+    let _ = state.store.upsert_group(group_id, name);
+    if let Some(members) = env.payload.get("members").and_then(|v| v.as_array()) {
+        for m in members.iter().filter_map(|x| x.as_str()) {
+            let _ = state.store.add_group_member(group_id, m);
+        }
+    }
+    let my_id = state.node_id().await;
+    let _ = state.store.add_group_member(group_id, &my_id);
+    let conv_id = group_conv_id(group_id);
+    let _ = state.store.ensure_conversation(&conv_id, "group", group_id);
+    if let Ok(Some(group)) = state.store.get_group(group_id) {
+        emit_group(app, &group);
+    }
+    emit_conversation(app, state, &conv_id).await;
+}
+
+/// Inbound `group-join` / `group-leave`: update membership and notify the UI.
+pub async fn handle_group_membership(app: &AppHandle, state: &Arc<LanChatState>, env: &Envelope) {
+    let Some(group_id) = env.payload.get("groupId").and_then(|v| v.as_str()) else {
+        return;
+    };
+    let Some(node_id) = env.payload.get("nodeId").and_then(|v| v.as_str()) else {
+        return;
+    };
+    if env.frame_type == frame::GROUP_JOIN {
+        let _ = state.store.add_group_member(group_id, node_id);
+    } else {
+        let _ = state.store.remove_group_member(group_id, node_id);
+    }
+    if let Ok(Some(group)) = state.store.get_group(group_id) {
+        emit_group(app, &group);
+    }
+}
+
+/// Leave a group locally and notify members.
+pub async fn leave_group(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    group_id: &str,
+) -> Result<(), String> {
+    let my_id = state.node_id().await;
+    let members = state.store.list_group_members(group_id).unwrap_or_default();
+    state
+        .store
+        .remove_group_member(group_id, &my_id)
+        .map_err(|e| e.to_string())?;
+    let payload = json!({ "groupId": group_id, "nodeId": my_id });
+    broadcast(app, state, &members, &my_id, || {
+        Envelope::new(frame::GROUP_LEAVE, &my_id, None, payload.clone())
+    })
+    .await;
+    if let Ok(Some(group)) = state.store.get_group(group_id) {
+        emit_group(app, &group);
+    }
+    Ok(())
 }

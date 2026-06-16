@@ -39,6 +39,8 @@ pub mod events {
     pub const MESSAGE: &str = "lanchat://message";
     /// A conversation whose unread count / last activity changed.
     pub const CONVERSATION: &str = "lanchat://conversation";
+    /// A group whose membership/name changed (`Group`).
+    pub const GROUP: &str = "lanchat://group";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.

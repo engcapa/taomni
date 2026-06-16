@@ -367,6 +367,10 @@ pub fn run() {
             lanchat::commands::lanchat_list_conversations,
             lanchat::commands::lanchat_list_messages,
             lanchat::commands::lanchat_mark_read,
+            lanchat::commands::lanchat_create_group,
+            lanchat::commands::lanchat_send_group_text,
+            lanchat::commands::lanchat_list_groups,
+            lanchat::commands::lanchat_leave_group,
             exit_app,
         ])
         .run(tauri::generate_context!())

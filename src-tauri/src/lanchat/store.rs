@@ -77,6 +77,22 @@ pub fn direct_conv_id(peer_id: &str) -> String {
     format!("direct:{peer_id}")
 }
 
+/// Stable conversation id for a group/channel.
+pub fn group_conv_id(group_id: &str) -> String {
+    format!("group:{group_id}")
+}
+
+/// A named group / channel and its current member node ids.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Group {
+    pub id: String,
+    pub name: String,
+    pub created_at: i64,
+    #[serde(default)]
+    pub members: Vec<String>,
+}
+
 /// First 16 hex chars of the avatar's sha256 — the `avh` TXT fingerprint.
 pub fn avatar_fingerprint(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -436,6 +452,92 @@ impl LanChatStore {
         )?;
         Ok(())
     }
+
+    /// Create or rename a group.
+    pub fn upsert_group(&self, id: &str, name: &str) -> rusqlite::Result<()> {
+        let now = chrono::Utc::now().timestamp_millis();
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO groups (id, name, created_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET name = ?2",
+            params![id, name, now],
+        )?;
+        Ok(())
+    }
+
+    /// Add a member to a group (idempotent).
+    pub fn add_group_member(&self, group_id: &str, node_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO group_members (group_id, node_id) VALUES (?1, ?2)
+             ON CONFLICT(group_id, node_id) DO NOTHING",
+            params![group_id, node_id],
+        )?;
+        Ok(())
+    }
+
+    /// Remove a member from a group.
+    pub fn remove_group_member(&self, group_id: &str, node_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM group_members WHERE group_id = ?1 AND node_id = ?2",
+            params![group_id, node_id],
+        )?;
+        Ok(())
+    }
+
+    /// Member node ids of a group.
+    pub fn list_group_members(&self, group_id: &str) -> rusqlite::Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt =
+            conn.prepare("SELECT node_id FROM group_members WHERE group_id = ?1 ORDER BY node_id")?;
+        let rows = stmt.query_map(params![group_id], |r| r.get::<_, String>(0))?;
+        rows.collect()
+    }
+
+    /// Read a group (with its members).
+    pub fn get_group(&self, id: &str) -> rusqlite::Result<Option<Group>> {
+        let row = {
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT id, name, created_at FROM groups WHERE id = ?1",
+                params![id],
+                |r| {
+                    Ok(Group {
+                        id: r.get(0)?,
+                        name: r.get(1)?,
+                        created_at: r.get(2)?,
+                        members: vec![],
+                    })
+                },
+            )
+            .optional()?
+        };
+        match row {
+            Some(mut g) => {
+                g.members = self.list_group_members(id)?;
+                Ok(Some(g))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// All groups (with members), newest first.
+    pub fn list_groups(&self) -> rusqlite::Result<Vec<Group>> {
+        let ids: Vec<String> = {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt = conn.prepare("SELECT id FROM groups ORDER BY created_at DESC")?;
+            let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<Vec<String>>>()?
+        };
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(g) = self.get_group(&id)? {
+                out.push(g);
+            }
+        }
+        Ok(out)
+    }
 }
 
 fn row_to_message(r: &rusqlite::Row<'_>) -> rusqlite::Result<LanMessage> {
@@ -574,5 +676,23 @@ mod tests {
         store.insert_message(&msg("ms", &conv, "me", 1, "sending")).unwrap();
         store.set_message_state("ms", "delivered").unwrap();
         assert_eq!(store.get_message("ms").unwrap().unwrap().state, "delivered");
+    }
+
+    #[test]
+    fn group_membership_crud() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        store.upsert_group("g1", "研发大群").unwrap();
+        store.add_group_member("g1", "me").unwrap();
+        store.add_group_member("g1", "zhao").unwrap();
+        store.add_group_member("g1", "zhao").unwrap(); // idempotent
+        let g = store.get_group("g1").unwrap().unwrap();
+        assert_eq!(g.name, "研发大群");
+        assert_eq!(g.members.len(), 2);
+        store.remove_group_member("g1", "zhao").unwrap();
+        assert_eq!(store.get_group("g1").unwrap().unwrap().members, vec!["me"]);
+        // rename via upsert
+        store.upsert_group("g1", "前端小队").unwrap();
+        assert_eq!(store.get_group("g1").unwrap().unwrap().name, "前端小队");
+        assert_eq!(store.list_groups().unwrap().len(), 1);
     }
 }
