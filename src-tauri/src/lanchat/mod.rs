@@ -31,23 +31,38 @@ use protocol::PeerRecord;
 /// detached) are pure views that subscribe to `lanchat://*` events and call
 /// `lanchat_*` commands. Fields are populated as later phases land.
 pub struct LanChatState {
-    /// Path to the per-app `lanchat.sqlite` (schema created in phase 2).
+    /// Path to the per-app `lanchat.sqlite` (schema created on open).
     pub db_path: PathBuf,
-    /// This node's stable identity (generated/loaded in phase 2).
-    pub node_id: RwLock<Option<String>>,
+    /// SQLite-backed persistence (profile / peers / groups / messages).
+    pub store: store::LanChatStore,
+    /// This node's stable identity (loaded/generated on construction).
+    pub node_id: RwLock<String>,
     /// Peers discovered via mDNS, keyed by node id (populated in phase 3).
     pub peers: RwLock<HashMap<String, PeerRecord>>,
 }
 
 impl LanChatState {
-    /// Build empty state. `app_data_dir` is the resolved Tauri app-data dir;
-    /// the SQLite file lives alongside the main `taomni.db` but is separate.
+    /// Build state, opening `lanchat.sqlite` and bootstrapping this node's
+    /// stable identity. `app_data_dir` is the resolved Tauri app-data dir; the
+    /// SQLite file lives alongside the main `taomni.db` but is separate.
     pub fn new(app_data_dir: &Path) -> Self {
+        let db_path = app_data_dir.join("lanchat.sqlite");
+        let store = store::LanChatStore::open(&db_path).expect("failed to open lanchat.sqlite");
+        let node_id = store
+            .ensure_identity()
+            .expect("failed to initialize lanchat identity");
+        log::info!("lanchat: node identity {}", node_id);
         Self {
-            db_path: app_data_dir.join("lanchat.sqlite"),
-            node_id: RwLock::new(None),
+            db_path,
+            store,
+            node_id: RwLock::new(node_id),
             peers: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// This node's stable id.
+    pub async fn node_id(&self) -> String {
+        self.node_id.read().await.clone()
     }
 
     /// Number of peers currently in the live roster.
