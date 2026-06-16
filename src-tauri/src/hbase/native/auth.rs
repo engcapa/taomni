@@ -83,10 +83,14 @@ pub mod kerberos {
         // Negotiation loop.
         loop {
             match pending.step(&challenge).map_err(|e| format!("GSSAPI step failed: {e}"))? {
-                Step::Finished((_ctx, last)) => {
-                    if let Some(tok) = last {
-                        write_token(write, &tok).await?;
-                    }
+                Step::Finished((ctx, last)) => {
+                    // The GSSAPI security context is established, but HBase's
+                    // SaslServer follows the SASL/GSSAPI mechanism (RFC 4752),
+                    // which requires a security-layer negotiation *after* context
+                    // establishment. Skipping it makes the server reject the
+                    // subsequent plaintext ConnectionHeader ("Handshake expecting
+                    // no response data from server") and drop the connection.
+                    finish_sasl_security_layer(read, write, ctx, last.as_deref()).await?;
                     return Ok(true);
                 }
                 Step::Continue((next, tok)) => {
@@ -98,6 +102,56 @@ pub mod kerberos {
                 }
             }
         }
+    }
+
+    /// Perform the RFC 4752 SASL/GSSAPI security-layer negotiation that follows
+    /// context establishment, mirroring Java `GssKrb5Client`:
+    ///   1. client sends its final context token (empty for Kerberos);
+    ///   2. server replies with a `gss_wrap`-protected offer: 1 byte QOP bitmask
+    ///      + 3 bytes (big-endian) max server message size;
+    ///   3. client replies with a `gss_wrap`-protected choice: 1 byte selected
+    ///      QOP + 3 bytes max client message size + optional authzid.
+    ///
+    /// We support only `auth` (no integrity/privacy security layer), so we pick
+    /// QOP `0x01`, advertise a zero max buffer, and send an empty authzid — after
+    /// which the plaintext ConnectionHeader and RPCs flow unwrapped.
+    async fn finish_sasl_security_layer<R, W>(
+        read: &mut R,
+        write: &mut W,
+        mut ctx: ClientCtx,
+        last_token: Option<&[u8]>,
+    ) -> Result<(), String>
+    where
+        R: AsyncReadExt + Unpin,
+        W: AsyncWriteExt + Unpin,
+    {
+        // 1. Send the final context token (empty for Kerberos mutual auth).
+        write_token(write, last_token.unwrap_or(&[])).await?;
+
+        // 2. Read the server's wrapped QOP offer.
+        read_status(read).await?;
+        let len = read.read_i32().await.map_err(ioerr)?;
+        let wrapped_offer = read_n(read, len).await?;
+        let offer = ctx
+            .unwrap(&wrapped_offer)
+            .map_err(|e| format!("SASL unwrap of server QOP offer failed: {e}"))?;
+        let qop_mask = offer.first().copied().unwrap_or(0);
+
+        // SASL QOP bits: 0x01 = auth (no layer), 0x02 = integrity, 0x04 = privacy.
+        if qop_mask & 0x01 == 0 {
+            return Err(format!(
+                "server requires a SASL security layer (QOP offer 0x{qop_mask:02x}); \
+                 only authentication (no integrity/privacy) is supported"
+            ));
+        }
+
+        // 3. Reply: QOP=auth, zero max buffer (no security layer), empty authzid.
+        let reply = [0x01u8, 0x00, 0x00, 0x00];
+        let wrapped_reply = ctx
+            .wrap(false, &reply)
+            .map_err(|e| format!("SASL wrap of QOP choice failed: {e}"))?;
+        write_token(write, &wrapped_reply).await?;
+        Ok(())
     }
 
     async fn write_token<W: AsyncWriteExt + Unpin>(
