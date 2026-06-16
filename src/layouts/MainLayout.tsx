@@ -300,8 +300,6 @@ export function MainLayout() {
     toggleTerminalSplitInputLock,
     clearTerminalSplitInputLocks,
     setTabHasNewOutput,
-    tabMaximizedId,
-    toggleTabMaximized,
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -902,7 +900,7 @@ export function MainLayout() {
     if (!panel) return;
 
     const frame = requestAnimationFrame(() => {
-      if (sidebarCollapsed || tabMaximizedId) {
+      if (sidebarCollapsed) {
         panel.collapse();
       } else {
         panel.resize(`${lastSidebarSizeRef.current}%`);
@@ -910,7 +908,7 @@ export function MainLayout() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [sidebarCollapsed, tabMaximizedId]);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -1901,11 +1899,6 @@ export function MainLayout() {
     terminalSplitVisible,
   ]);
 
-  const isTabMaximized =
-    !!tabMaximizedId &&
-    tabMaximizedId === activeTabId &&
-    tabs.some((t) => t.id === tabMaximizedId);
-  const chromeHidden = isTabMaximized;
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
@@ -1913,7 +1906,6 @@ export function MainLayout() {
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
     <div
-      data-tab-maximized={isTabMaximized ? "true" : undefined}
       className="relative w-full h-full flex flex-col"
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
@@ -1934,7 +1926,7 @@ export function MainLayout() {
         onCloseWindow={requestAppExit}
         slotRef={setTabActionSlot}
       />
-      {quickConnectVisible && !chromeHidden && (
+      {quickConnectVisible && (
         <QuickConnect
           onConnectInput={handleQuickConnect}
           onConnectSession={handleConnectSession}
@@ -1943,7 +1935,7 @@ export function MainLayout() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        {!chromeHidden && sidebarCollapsed && (
+        {sidebarCollapsed && (
           <div data-testid="collapsed-sidebar-rail" className="h-full w-[26px] shrink-0 overflow-hidden">
             <Sidebar
               compact
@@ -1975,12 +1967,10 @@ export function MainLayout() {
               if (percentage > 2) {
                 lastSidebarSizeRef.current = percentage;
               }
-              if (!chromeHidden) {
-                setSidebarCollapsed(percentage <= 2);
-              }
+              setSidebarCollapsed(percentage <= 2);
             }}
           >
-            <div className="h-full overflow-hidden" style={sidebarCollapsed || chromeHidden ? { display: "none" } : undefined}>
+            <div className="h-full overflow-hidden" style={sidebarCollapsed ? { display: "none" } : undefined}>
               <Sidebar
                 onNewSession={handleNewSession}
                 onNewSftpSession={handleNewSftpSession}
@@ -1992,7 +1982,7 @@ export function MainLayout() {
 
           <PanelResizeHandle
             data-testid="main-sidebar-resize-handle"
-            className={sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
+            className={sidebarCollapsed ? "hidden" : "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
           />
 
           <Panel id="content">
@@ -2112,10 +2102,6 @@ export function MainLayout() {
                             } : undefined}
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
-                            } : undefined}
-                            maximizeToggle={!terminalSplitVisible ? {
-                              maximized: tabMaximizedId === tab.id,
-                              onToggle: () => toggleTabMaximized(tab.id),
                             } : undefined}
                           />
                         </div>
@@ -2363,8 +2349,6 @@ export function MainLayout() {
                           password={tab.vnc.password}
                           visible={isActive}
                           onDetach={() => openDetachedVnc(tab.id, tab.vnc!, tab.title)}
-                          onToggleMaximize={() => toggleTabMaximized(tab.id)}
-                          maximized={tabMaximizedId === tab.id}
                         />
                       </Suspense>
                     </div>
@@ -2392,8 +2376,6 @@ export function MainLayout() {
                           networkSettingsJson={tab.rdp.networkSettingsJson}
                           visible={isActive}
                           onDetach={() => openDetachedRdp(tab.id, tab.rdp!, tab.title)}
-                          onToggleMaximize={() => toggleTabMaximized(tab.id)}
-                          maximized={tabMaximizedId === tab.id}
                           chatToggle={!aiFullyDisabled ? {
                             open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
                             onToggle: () => void toggleTabChat(tab.id),
@@ -2459,8 +2441,6 @@ export function MainLayout() {
                           info={tab.db}
                           visible={isActive}
                           onDetach={() => openDetachedDatabase(tab.id, tab.db!, tab.title)}
-                          onToggleMaximize={() => toggleTabMaximized(tab.id)}
-                          maximized={tabMaximizedId === tab.id}
                           chatToggle={!aiFullyDisabled ? {
                             open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
                             onToggle: () => void toggleTabChat(tab.id),
@@ -2535,12 +2515,6 @@ export function MainLayout() {
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
-
-                {/* Maximized tabs no longer need a standalone restore button.
-                    Terminal, VNC and RDP panels each expose a maximize/restore
-                    toggle in their own floating toolbar (which can also be
-                    dragged to any screen edge when hidden), so the redundant
-                    top-right affordance has been removed for parity. */}
               </div>
             </div>
           </Panel>
@@ -2548,7 +2522,7 @@ export function MainLayout() {
         {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
       </div>
 
-      {!chromeHidden && <StatusBar />}
+      <StatusBar />
 
       {showSessionEditor && (
         <SessionEditor

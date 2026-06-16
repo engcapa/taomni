@@ -5,6 +5,7 @@ import {
   HelpCircle,
   Menu,
   Monitor,
+  MoreHorizontal,
   PanelLeft,
   Plus,
   Power,
@@ -18,14 +19,18 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TabBar } from "./TabBar";
+import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
+import { CaptureIndicators } from "../capture/CaptureIndicators";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
 import { getAppPlatform } from "../../lib/runtime";
+import { useUpdateStore } from "../../stores/updateStore";
 import { useT } from "../../lib/i18n";
 import type { LocalShellSelection } from "../../types";
 import type { SessionConfig } from "../../lib/ipc";
@@ -193,15 +198,73 @@ export function ControlBar({
           onDuplicateTab={onDuplicateTab}
         />
       </div>
+      {/* Update hint sits just left of the tab-action group (centre-right of the
+          bar). It only appears once a new version is staged. */}
+      <UpdateHint />
+      {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
       <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
+      <CaptureIndicators />
+      {/* Open-tabs `⋯` overflow — also hosts the Screenshot actions. Sits at the
+          right end of the tab-action group. */}
+      <TabMore />
       <div
-        className={IS_MAC ? "w-4 self-stretch shrink-0" : "w-10 self-stretch shrink-0"}
+        className={IS_MAC ? "w-3 self-stretch shrink-0" : "w-6 self-stretch shrink-0"}
         data-window-drag
         {...(IS_MAC ? { "data-tauri-drag-region": true } : {})}
       />
+      {/* Divider between the tab-related buttons and the main-window controls. */}
+      <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
       <TitleBarTrayControls />
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
+  );
+}
+
+/** The `⋯` open-tabs overflow button + its dropdown, relocated from the tab
+ *  strip to the right end of the tab-action group. The dropdown also lists the
+ *  active tab's Screenshot actions (see OpenTabsMenu). */
+function TabMore() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  return (
+    <div ref={wrapRef} className="relative shrink-0 pr-1">
+      <BarButton
+        testId="tab-more"
+        title={t("tabs.more")}
+        icon={<MoreHorizontal className="w-4 h-4" />}
+        onClick={() => setOpen((v) => !v)}
+      />
+      <OpenTabsMenu open={open} onClose={() => setOpen(false)} anchorRef={wrapRef} />
+    </div>
+  );
+}
+
+/** Non-intrusive update indicator: a small badge that appears only once a new
+ *  version is available/staged. Clicking it opens the update window. */
+function UpdateHint() {
+  const t = useT();
+  const status = useUpdateStore((s) => s.status);
+  const version = useUpdateStore((s) => s.availableVersion);
+  const openDialog = useUpdateStore((s) => s.openDialog);
+  if (status !== "available" && status !== "ready") return null;
+  const title = t("titlebar.updateAvailable", { version: version ?? "" });
+  return (
+    <BarButton
+      testId="titlebar-update-available"
+      title={title}
+      onClick={openDialog}
+      icon={
+        <span className="relative inline-flex">
+          <Download className="w-4 h-4" />
+          <span
+            aria-hidden="true"
+            className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full"
+            style={{ background: "#e5534b", boxShadow: "0 0 0 1.5px var(--taomni-chrome-bg)" }}
+          />
+        </span>
+      }
+    />
   );
 }
 

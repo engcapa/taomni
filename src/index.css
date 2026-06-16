@@ -391,11 +391,16 @@ body {
   color: #fff;
 }
 
-.taomni-titlebar-tray {
-  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 80%, transparent);
+/* Explicit divider between the tab-related buttons (tab-action slot + the `⋯`
+   overflow) and the main-window controls (tray + window buttons). Slightly
+   stronger than the in-tray group separators so the two clusters read apart. */
+.taomni-control-divider {
+  width: 1px;
+  margin: 5px 0;
+  background: var(--taomni-chrome-border);
 }
 
-/* Visually separate tray groups (voice / view / terminal layout / AI). The
+/* Visually separate tray groups (terminal layout / chat+voice / locale). The
    separator is a thin vertical hairline with breathing room so adjacent
    icons inside a group sit flush, while groups read as distinct clusters. */
 .taomni-titlebar-tray-group-sep {

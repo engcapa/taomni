@@ -105,10 +105,6 @@ vi.mock("../tabbar/TabActionSlot", () => ({
     active ? <div data-testid="tab-action-slot">{children}</div> : null,
 }));
 
-vi.mock("../capture/CaptureToolbar", () => ({
-  default: () => <div data-testid="capture-toolbar" />,
-}));
-
 vi.mock("../ContextMenu", () => ({
   useContextMenu: () => ({ show: vi.fn(), render: null }),
 }));

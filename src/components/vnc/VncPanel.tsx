@@ -16,7 +16,8 @@ import type { WsOutgoing } from "../../lib/vnc";
 import { useVncStore } from "../../stores/vncStore";
 import { useAppStore } from "../../stores/appStore";
 import { ExternalLink, Maximize, Maximize2, Minimize, Minimize2, RefreshCw } from "lucide-react";
-import CaptureToolbar from "../capture/CaptureToolbar";
+import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
 import {
   FT_BUTTON_STYLE,
@@ -40,8 +41,6 @@ export interface VncPanelProps {
   password?: string;
   visible: boolean;
   onDetach?: () => void;
-  onToggleMaximize?: () => void;
-  maximized?: boolean;
   detachedWindowControls?: {
     onReattach: () => void;
     onToggleOsFullscreen: () => void;
@@ -111,8 +110,6 @@ export default function VncPanel({
   password,
   visible,
   onDetach,
-  onToggleMaximize,
-  maximized,
   detachedWindowControls,
 }: VncPanelProps) {
   const t = useT();
@@ -840,6 +837,29 @@ export default function VncPanel({
   const showError =
     conn?.status === "disconnected" || conn?.status === "error";
 
+  // Publish this VNC canvas as the active capture source while connected and
+  // visible, so the screenshot actions (tab-strip `⋯` menu / detached capture
+  // button) target the framebuffer.
+  useEffect(() => {
+    if (!visible || !showCanvas) return;
+    const source: CaptureSource = {
+      filenamePrefix: `vnc-${host}`,
+      getVisible: async () => {
+        if (!canvasRef.current) throw new Error(t("vnc.notReady"));
+        return await captureCanvasPng(canvasRef.current);
+      },
+      getFull: async () => {
+        if (!canvasRef.current) throw new Error(t("vnc.notReady"));
+        return await captureCanvasPng(canvasRef.current);
+      },
+      getScrollFrame: async () => canvasRef.current ?? null,
+      getGifFrame: async () => canvasRef.current ?? null,
+      onStatus: (msg) => useAppStore.getState().setStatusMessage(msg),
+    };
+    useCaptureStore.getState().setSource(source);
+    return () => useCaptureStore.getState().clearSource(source);
+  }, [visible, showCanvas, host, t]);
+
   return (
     <div
       ref={containerRef}
@@ -853,29 +873,12 @@ export default function VncPanel({
         position: "relative",
       }}
     >
-      {/* Floating toolbar. Always rendered — when a VNC tab is maximized all
-          other chrome is hidden, so the maximize/restore toggle here is the
-          only way back. Keeping it mounted after a disconnect means a dropped
-          session can still be restored. The capture + scale controls need the
-          live canvas, so those are gated on the connection state. */}
+      {/* Tab-action toolbar. Always rendered so a dropped session can still be
+          restored; the scale control needs the live canvas, so it's gated on
+          the connection state. Screenshot actions live in the tab-strip `⋯`
+          menu (main window) or the detached capture button. */}
       <TabActions active={visible}>
         {showCanvas && (
-          <>
-            <CaptureToolbar
-            filenamePrefix={`vnc-${host}`}
-            getVisible={async () => {
-              if (!canvasRef.current) throw new Error(t("vnc.notReady"));
-              return await captureCanvasPng(canvasRef.current);
-            }}
-            getFull={async () => {
-              if (!canvasRef.current) throw new Error(t("vnc.notReady"));
-              return await captureCanvasPng(canvasRef.current);
-            }}
-            getScrollFrame={async () => canvasRef.current ?? null}
-            getGifFrame={async () => canvasRef.current ?? null}
-            onStatus={(msg) => useAppStore.getState().setStatusMessage(msg)}
-            compact
-          />
           <button
             data-testid="vnc-scale-toggle"
             onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
@@ -884,36 +887,25 @@ export default function VncPanel({
           >
             {scaleMode === "fit" ? <Maximize size={14} /> : <Minimize size={14} />}
           </button>
-          </>
         )}
-          {(onDetach || onToggleMaximize) && (
-            <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-          )}
           {onDetach && (
-            <button
-              data-testid="vnc-detach"
-              onClick={onDetach}
-              title={t("rdp.detach")}
-              aria-label={t("rdp.detach")}
-              style={FT_ICON_BUTTON_STYLE}
-            >
-              <ExternalLink size={14} />
-            </button>
-          )}
-          {onToggleMaximize && (
-            <button
-              data-testid="vnc-maximize"
-              onClick={onToggleMaximize}
-              title={maximized ? t("rdp.restore") : t("rdp.maximize")}
-              aria-label={maximized ? t("rdp.restore") : t("rdp.maximize")}
-              style={FT_ICON_BUTTON_STYLE}
-            >
-              {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            </button>
+            <>
+              <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+              <button
+                data-testid="vnc-detach"
+                onClick={onDetach}
+                title={t("rdp.detach")}
+                aria-label={t("rdp.detach")}
+                style={FT_ICON_BUTTON_STYLE}
+              >
+                <ExternalLink size={14} />
+              </button>
+            </>
           )}
           {detachedWindowControls && (
             <>
               <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+              <CaptureMenuButton />
               <button
                 data-testid="detached-reattach"
                 onClick={detachedWindowControls.onReattach}

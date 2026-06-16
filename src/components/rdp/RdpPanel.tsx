@@ -3,7 +3,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bot,
   Fullscreen,
-  Maximize2,
   Minimize2,
   PictureInPicture,
   PictureInPicture2,
@@ -48,7 +47,8 @@ import {
   FT_ICON_BUTTON_STYLE,
   FT_SEPARATOR_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import CaptureToolbar from "../capture/CaptureToolbar";
+import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { captureCanvasPng } from "../../lib/capture";
 import { useAppStore } from "../../stores/appStore";
 
@@ -65,11 +65,6 @@ export interface RdpPanelProps {
    *  is hidden — used by the detached window itself, which should show
    *  Reattach instead. */
   onDetach?: () => void;
-  /** When provided the toolbar shows a maximize/restore toggle that the
-   *  parent layout can use to hide the chrome around the panel. The RDP
-   *  canvas still fills its parent — no `position: fixed` shenanigans. */
-  onToggleMaximize?: () => void;
-  maximized?: boolean;
   /** When set, the toolbar shows an AI-chat toggle bound to this tab.
    *  Hidden in detached windows (no ChatDrawer lives there). */
   chatToggle?: {
@@ -84,9 +79,8 @@ export interface RdpPanelProps {
 }
 
 type ScaleMode = "fit" | "one";
-// Combined view state for the single "enlarge" cycle button:
-//   normal → maximized (in-window, app chrome hidden) → fullscreen (OS window).
-type ViewMode = "normal" | "maximized" | "fullscreen";
+// View state for the single "enlarge" button: normal <-> OS fullscreen.
+type ViewMode = "normal" | "fullscreen";
 
 export default function RdpPanel({
   tabId,
@@ -98,8 +92,6 @@ export default function RdpPanel({
   networkSettingsJson,
   visible,
   onDetach,
-  onToggleMaximize,
-  maximized,
   chatToggle,
   detachedWindowControls,
 }: RdpPanelProps) {
@@ -117,11 +109,6 @@ export default function RdpPanel({
   const suppressNextPasteKeyUpRef = useRef(false);
   const initRef = useRef({ host, port, username, password, options, networkSettingsJson });
   const [scaleMode, setScaleMode] = useState<ScaleMode>("fit");
-  // Local maximize fallback used only when the parent does NOT provide a
-  // controlled `maximized` prop. Stays scoped to the panel — never
-  // escapes the OS window.
-  const [localMaximized, setLocalMaximized] = useState(false);
-  const isMaximized = onToggleMaximize ? !!maximized : localMaximized;
   // Tracks whether the host OS window is fullscreen. Only meaningful for
   // attached tabs (detached windows manage their own fullscreen via
   // `detachedWindowControls`). Cosmetic — drives the toolbar icon.
@@ -401,14 +388,6 @@ export default function RdpPanel({
 
   /* ── View controls (local, never forwarded to the remote) ────────── */
 
-  const toggleMaximize = useCallback(() => {
-    if (onToggleMaximize) {
-      onToggleMaximize();
-    } else {
-      setLocalMaximized((m) => !m);
-    }
-  }, [onToggleMaximize]);
-
   // Toggle the host OS window between fullscreen and normal. Detached
   // windows already own a fullscreen toggle (passed via
   // `detachedWindowControls`); attached tabs flip the main app window
@@ -467,20 +446,10 @@ export default function RdpPanel({
       const code = e.nativeEvent.code;
 
       // Local view shortcuts intercepted before reaching the remote desktop:
-      //   F11               → toggle host-window OS fullscreen
-      //   Ctrl/⌘+Alt+Enter  → toggle in-window maximize/restore
+      //   F11 → toggle host-window OS fullscreen
       if (code === "F11") {
         e.preventDefault();
         if (down && !e.nativeEvent.repeat) toggleOsFullscreen();
-        return;
-      }
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        e.altKey &&
-        (code === "Enter" || code === "NumpadEnter")
-      ) {
-        e.preventDefault();
-        if (down && !e.nativeEvent.repeat) toggleMaximize();
         return;
       }
 
@@ -504,7 +473,6 @@ export default function RdpPanel({
       conn?.status,
       sendBinary,
       syncClipboardForRemotePaste,
-      toggleMaximize,
       toggleOsFullscreen,
       visible,
     ],
@@ -595,57 +563,50 @@ export default function RdpPanel({
     [scaleMode],
   );
 
-  /* ── View-size cycle (maximize + fullscreen merged) ──────────────────
-   * One button walks a single linear progression so the four scattered
-   * size controls collapse into a tidy group. Attached tabs cycle
-   *   normal → maximized (in-window) → fullscreen (OS) → normal
-   * Detached windows have no in-window maximize (the window *is* the
-   * panel), so their cycle is just normal ⇄ fullscreen.
-   *
-   * The current mode is DERIVED from the two underlying booleans rather
-   * than tracked separately, so it stays correct even when the user flips
-   * a state out-of-band via F11 / Ctrl+Alt+Enter. We reconcile toward a
-   * target by reusing the existing toggles only when a flip is needed. */
-  const hasInWindowMaximize = !detachedWindowControls;
+  /* ── View toggle: normal <-> OS fullscreen ───────────────────────────
+   * Derived from the underlying boolean so it stays correct even when the
+   * user flips it out-of-band via F11. */
   const currentFullscreen = detachedWindowControls
     ? detachedWindowControls.osFullscreen
     : osFullscreen;
-  const viewMode: ViewMode = currentFullscreen
-    ? "fullscreen"
-    : hasInWindowMaximize && isMaximized
-      ? "maximized"
-      : "normal";
+  const viewMode: ViewMode = currentFullscreen ? "fullscreen" : "normal";
 
-  const applyView = (targetMaximized: boolean, targetFullscreen: boolean) => {
-    if (hasInWindowMaximize && isMaximized !== targetMaximized) toggleMaximize();
-    if (currentFullscreen !== targetFullscreen) toggleOsFullscreen();
-  };
-
-  const cycleView = () => {
-    if (!hasInWindowMaximize) {
-      applyView(false, !currentFullscreen);
-      return;
-    }
-    if (viewMode === "normal") applyView(true, false);
-    else if (viewMode === "maximized") applyView(true, true);
-    else applyView(false, false);
-  };
+  const cycleView = () => toggleOsFullscreen();
 
   // Icon + tooltip describe what the NEXT click does, so the single button
   // still reads at a glance.
   const cycle =
     viewMode === "fullscreen"
       ? { icon: <Minimize2 size={14} />, label: t("rdp.restore"), hint: " (F11)" }
-      : viewMode === "maximized"
-        ? { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" }
-        : hasInWindowMaximize
-          ? { icon: <Maximize2 size={14} />, label: t("rdp.maximize"), hint: " (Ctrl+Alt+Enter)" }
-          : { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" };
+      : { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" };
+
+  // Publish this RDP canvas as the active capture source while connected and
+  // visible (screenshot actions live in the tab-strip `⋯` menu / detached
+  // capture button).
+  useEffect(() => {
+    if (!visible || status !== "connected") return;
+    const source: CaptureSource = {
+      filenamePrefix: `rdp-${host}`,
+      getVisible: async () => {
+        if (!canvasRef.current) throw new Error(t("rdp.notReady"));
+        return await captureCanvasPng(canvasRef.current);
+      },
+      getFull: async () => {
+        if (!canvasRef.current) throw new Error(t("rdp.notReady"));
+        return await captureCanvasPng(canvasRef.current);
+      },
+      getScrollFrame: () => canvasRef.current ?? null,
+      getGifFrame: () => canvasRef.current ?? null,
+      onStatus: (msg) => useAppStore.getState().setStatusMessage(msg),
+    };
+    useCaptureStore.getState().setSource(source);
+    return () => useCaptureStore.getState().clearSource(source);
+  }, [visible, status, host, t]);
 
   return (
     <div
       ref={containerRef}
-      className={`rdp-panel ${isMaximized ? "rdp-panel-maximized" : ""}`}
+      className="rdp-panel"
       data-testid="rdp-panel"
       tabIndex={0}
       onKeyDown={onKey(true)}
@@ -690,23 +651,6 @@ export default function RdpPanel({
         >
           <RefreshCw size={14} />
         </button>
-        {status === "connected" && (
-          <CaptureToolbar
-            filenamePrefix={`rdp-${host}`}
-            getVisible={async () => {
-              if (!canvasRef.current) throw new Error(t("rdp.notReady"));
-              return await captureCanvasPng(canvasRef.current);
-            }}
-            getFull={async () => {
-              if (!canvasRef.current) throw new Error(t("rdp.notReady"));
-              return await captureCanvasPng(canvasRef.current);
-            }}
-            getScrollFrame={() => canvasRef.current ?? null}
-            getGifFrame={() => canvasRef.current ?? null}
-            onStatus={(msg) => useAppStore.getState().setStatusMessage(msg)}
-            compact
-          />
-        )}
         {chatToggle && (
           <button
             type="button"
@@ -738,8 +682,7 @@ export default function RdpPanel({
         {/* View group — how the desktop is scaled and sized. The remote
             desktop auto-resizes to the viewport on its own (ResizeObserver
             below), so there is no manual resize button: scale toggle picks
-            fit-vs-1:1, the cycle button walks normal → maximized →
-            fullscreen. */}
+            fit-vs-1:1, the view button toggles OS fullscreen. */}
         <button
           type="button"
           data-testid="rdp-scale-toggle"
@@ -762,6 +705,7 @@ export default function RdpPanel({
         {detachedWindowControls && (
           <>
             <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
+            <CaptureMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"
