@@ -1,6 +1,15 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { DbConnectInfo, HBaseConnectInfo } from "../types";
+import type {
+  DbConnectInfo,
+  HBaseConnectInfo,
+  LanChatStatus,
+  LanConversation,
+  LanGroup,
+  LanMessage,
+  LanPeer,
+  LanProfile,
+} from "../types";
 
 export interface LocalShellOption {
   id: string;
@@ -1097,4 +1106,97 @@ export async function hbaseParseSiteXml(path: string): Promise<Record<string, st
 
 export async function hbaseParseKeytabPrincipal(path: string): Promise<string> {
   return invoke<string>("hbase_parse_keytab_principal", { path });
+}
+
+/* ----------------------------- LanChat (内网通讯) ----------------------------- */
+
+export async function lanchatStatus(): Promise<LanChatStatus> {
+  return invoke<LanChatStatus>("lanchat_status");
+}
+
+export async function lanchatGetProfile(): Promise<LanProfile> {
+  return invoke<LanProfile>("lanchat_get_profile");
+}
+
+export async function lanchatUpdateProfile(args: {
+  name: string;
+  avatarBase64?: string | null;
+  signature: string;
+  status: string;
+}): Promise<LanProfile> {
+  return invoke<LanProfile>("lanchat_update_profile", { args });
+}
+
+export async function lanchatSendText(args: {
+  peerId: string;
+  text: string;
+  mentions?: string[];
+}): Promise<LanMessage> {
+  return invoke<LanMessage>("lanchat_send_text", { args });
+}
+
+export async function lanchatResendMessage(msgId: string): Promise<LanMessage> {
+  return invoke<LanMessage>("lanchat_resend_message", { msgId });
+}
+
+export async function lanchatListConversations(): Promise<LanConversation[]> {
+  return invoke<LanConversation[]>("lanchat_list_conversations");
+}
+
+export async function lanchatListMessages(
+  convId: string,
+  limit?: number,
+): Promise<LanMessage[]> {
+  return invoke<LanMessage[]>("lanchat_list_messages", { convId, limit });
+}
+
+export async function lanchatMarkRead(convId: string): Promise<void> {
+  return invoke("lanchat_mark_read", { convId });
+}
+
+export async function lanchatCreateGroup(args: {
+  name: string;
+  members?: string[];
+}): Promise<LanGroup> {
+  return invoke<LanGroup>("lanchat_create_group", { args });
+}
+
+export async function lanchatSendGroupText(args: {
+  groupId: string;
+  text: string;
+  mentions?: string[];
+}): Promise<LanMessage> {
+  return invoke<LanMessage>("lanchat_send_group_text", { args });
+}
+
+export async function lanchatListGroups(): Promise<LanGroup[]> {
+  return invoke<LanGroup[]>("lanchat_list_groups");
+}
+
+export async function lanchatLeaveGroup(groupId: string): Promise<void> {
+  return invoke("lanchat_leave_group", { groupId });
+}
+
+export async function listenLanChatRoster(
+  cb: (peers: LanPeer[]) => void,
+): Promise<UnlistenFn> {
+  return listen<LanPeer[]>("lanchat://roster", (e) => cb(e.payload));
+}
+
+export async function listenLanChatMessage(
+  cb: (msg: LanMessage) => void,
+): Promise<UnlistenFn> {
+  return listen<LanMessage>("lanchat://message", (e) => cb(e.payload));
+}
+
+export async function listenLanChatConversation(
+  cb: (conv: LanConversation) => void,
+): Promise<UnlistenFn> {
+  return listen<LanConversation>("lanchat://conversation", (e) => cb(e.payload));
+}
+
+export async function listenLanChatGroup(
+  cb: (group: LanGroup) => void,
+): Promise<UnlistenFn> {
+  return listen<LanGroup>("lanchat://group", (e) => cb(e.payload));
 }

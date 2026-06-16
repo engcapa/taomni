@@ -33,7 +33,7 @@ import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
-import { TunnelManager } from "../components/tunnel/TunnelManager";
+import { LanChatPanel } from "../components/lanchat/LanChatPanel";import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
@@ -1580,6 +1580,20 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  const openLanChatTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "lan-chat",
+      type: "lan-chat",
+      title: t("tabs.lanChat"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
   const toggleQuickConnectVisible = useCallback(() => {
     const next = !quickConnectVisible;
     setQuickConnectVisible(next);
@@ -1652,6 +1666,9 @@ export function MainLayout() {
       case "settings":
         openSettingsTab();
         break;
+      case "lan-chat":
+        openLanChatTab();
+        break;
       case "macros":
         openPlaceholderTab(t("tabs.macros"), t("status.commandUnavailable"));
         break;
@@ -1669,6 +1686,7 @@ export function MainLayout() {
     openLocalTab,
     openPlaceholderTab,
     openSettingsTab,
+    openLanChatTab,
     removeTab,
     requestAppExit,
     setActiveTab,
@@ -2330,6 +2348,8 @@ export function MainLayout() {
 
                 {activeTab?.type === "settings" && <SettingsPanel />}
 
+                {activeTab?.type === "lan-chat" && <LanChatPanel />}
+
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
                   if (!tab.vnc) return null;
@@ -2512,6 +2532,7 @@ export function MainLayout() {
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "nettools" &&
+                  activeTab.type !== "lan-chat" &&
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}

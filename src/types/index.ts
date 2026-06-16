@@ -4,7 +4,71 @@ import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat";
+
+/** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
+export type LanPresence = "online" | "away" | "busy" | "offline";
+
+/** A peer discovered on the LAN via mDNS (mirrors Rust `PeerRecord`). */
+export interface LanPeer {
+  id: string;
+  name: string;
+  avatarHash?: string | null;
+  signature: string;
+  status: LanPresence;
+  lastSeen: number;
+  addr?: string | null;
+  port?: number | null;
+}
+
+/** This node's own profile (mirrors Rust `Profile`). */
+export interface LanProfile {
+  id: string;
+  name: string;
+  avatarBase64?: string | null;
+  avatarHash?: string | null;
+  signature: string;
+  status: LanPresence;
+  updatedAt: number;
+}
+
+/** A conversation thread — direct (`direct:<peer>`) or group (`group:<id>`). */
+export interface LanConversation {
+  id: string;
+  kind: "direct" | "group";
+  peerOrGroupId: string;
+  lastMsgAt: number;
+  unread: number;
+}
+
+/** Delivery state of an outgoing/incoming message. */
+export type LanMessageState = "sending" | "sent" | "delivered" | "failed";
+
+/** A chat message (mirrors Rust `LanMessage`). */
+export interface LanMessage {
+  id: string;
+  convId: string;
+  senderId: string;
+  body: string;
+  mentions: string[];
+  createdAt: number;
+  state: LanMessageState;
+}
+
+/** A named group / channel (mirrors Rust `Group`). */
+export interface LanGroup {
+  id: string;
+  name: string;
+  createdAt: number;
+  members: string[];
+}
+
+/** LanChat service status (mirrors Rust `LanChatStatus`). */
+export interface LanChatStatus {
+  running: boolean;
+  nodeId: string;
+  peerCount: number;
+}
 
 export interface VncConnectInfo {
   sessionId: string;
