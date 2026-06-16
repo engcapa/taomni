@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useUpdateStore } from "../stores/updateStore";
 import { useT, type TranslateFn } from "../lib/i18n";
 
@@ -30,11 +30,30 @@ export function UpdateDialog() {
   const installing = downloading && percent === 100;
   const canDownload =
     s.status === "available" && s.targetStatus !== "checking" && s.targetStatus !== "unavailable";
-  const dismissable = true;
+  // A download must run to completion without being dismissed by an accidental
+  // click-away or Escape — only the explicit Cancel button (which calls
+  // closeDialog directly) can hide it. Every other state is freely dismissable.
+  const dismissable = s.status !== "downloading";
 
   const close = () => {
     if (dismissable) s.closeDialog();
   };
+
+  // The dialog can be dragged by its title bar so it can be moved aside — it
+  // matters for the non-modal "checking"/"downloading" states, where the app
+  // stays usable underneath. The offset is relative to the centered resting
+  // position and is cleared whenever the dialog closes, so each open recenters.
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragStartRef = useRef<{
+    pointerX: number;
+    pointerY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!s.dialogOpen) setDragOffset({ x: 0, y: 0 });
+  }, [s.dialogOpen]);
 
   useEffect(() => {
     if (!s.dialogOpen) return;
@@ -53,6 +72,41 @@ export function UpdateDialog() {
 
   const showArch = s.candidates.length > 1;
 
+  // The "checking" and "downloading" phases render as non-modal floating
+  // dialogs: they must not dim or block the rest of the app, and a download
+  // must keep running to completion (losing focus must not dismiss it). The
+  // user can keep working — and drag the dialog aside by its title bar — while
+  // the background work runs. Result states stay modal.
+  const nonModal = s.status === "checking" || downloading;
+
+  const onTitlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragStartRef.current = {
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      originX: dragOffset.x,
+      originY: dragOffset.y,
+    };
+    const handleMove = (ev: PointerEvent) => {
+      const start = dragStartRef.current;
+      if (!start) return;
+      setDragOffset({
+        x: start.originX + (ev.clientX - start.pointerX),
+        y: start.originY + (ev.clientY - start.pointerY),
+      });
+    };
+    const stop = () => {
+      dragStartRef.current = null;
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+
   const title =
     s.status === "checking"
       ? t("update.checkButton")
@@ -66,9 +120,9 @@ export function UpdateDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={close}
+      className={`fixed inset-0 z-50 flex items-center justify-center${nonModal ? " pointer-events-none" : ""}`}
+      style={nonModal ? undefined : { background: "rgba(0,0,0,0.4)" }}
+      onClick={nonModal ? undefined : close}
       onKeyDown={(e) => {
         if (e.key === "Escape") close();
       }}
@@ -76,13 +130,23 @@ export function UpdateDialog() {
       <div
         role="dialog"
         aria-label={title}
-        aria-modal="true"
+        aria-modal={nonModal ? undefined : "true"}
         data-testid="update-dialog"
-        className="w-[440px] rounded shadow-lg p-5"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
+        className={`w-[440px] rounded shadow-lg p-5${nonModal ? " pointer-events-auto" : ""}`}
+        style={{
+          background: "var(--taomni-bg)",
+          border: "1px solid var(--taomni-card-border)",
+          transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-lg font-semibold mb-3">{title}</div>
+        <div
+          className="text-lg font-semibold mb-3 cursor-move select-none"
+          style={{ touchAction: "none" }}
+          onPointerDown={onTitlePointerDown}
+        >
+          {title}
+        </div>
 
         {s.status === "checking" && (
           <div className="text-[13px] mb-4 flex items-center gap-2" style={{ color: "var(--taomni-text-muted)" }}>
