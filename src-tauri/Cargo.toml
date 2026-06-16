@@ -36,7 +36,7 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 chrono = "0.4"
 russh = { version = "0.61", features = ["async-trait"] }
 russh-sftp = "2.3"
-tokio-util = { version = "0.7", features = ["compat", "io"] }
+tokio-util = { version = "0.7", features = ["compat", "io", "codec"] }
 futures = "0.3"
 async-trait = "0.1"
 async-stream = "0.3"

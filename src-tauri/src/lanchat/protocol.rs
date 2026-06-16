@@ -147,6 +147,17 @@ impl Envelope {
             payload,
         }
     }
+
+    /// Serialize the envelope body to JSON bytes (the length prefix is added
+    /// by the transport's `LengthDelimitedCodec`).
+    pub fn encode(&self) -> Result<bytes::Bytes, serde_json::Error> {
+        Ok(bytes::Bytes::from(serde_json::to_vec(self)?))
+    }
+
+    /// Decode an envelope from a received frame body.
+    pub fn decode(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice(bytes)
+    }
 }
 
 /// A peer learned from mDNS discovery (+ refreshed by control-channel
@@ -170,4 +181,35 @@ pub struct PeerRecord {
     /// Control-channel TCP port advertised in TXT.
     #[serde(default)]
     pub port: Option<u16>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn envelope_round_trips_through_codec() {
+        let env = Envelope::new(
+            frame::TEXT_MSG,
+            "node-a",
+            Some("node-b".into()),
+            serde_json::json!({ "convId": "c1", "text": "hi", "mentions": [] }),
+        );
+        let bytes = env.encode().unwrap();
+        let back = Envelope::decode(&bytes).unwrap();
+        assert_eq!(back.frame_type, frame::TEXT_MSG);
+        assert_eq!(back.from, "node-a");
+        assert_eq!(back.to.as_deref(), Some("node-b"));
+        assert_eq!(back.v, PROTOCOL_VERSION);
+        assert_eq!(back.payload["text"], "hi");
+    }
+
+    #[test]
+    fn presence_txt_round_trip() {
+        for s in ["online", "away", "busy", "offline"] {
+            assert_eq!(PresenceStatus::from_txt(s).as_txt(), s);
+        }
+        // Unknown falls back to online.
+        assert_eq!(PresenceStatus::from_txt("???"), PresenceStatus::Online);
+    }
 }

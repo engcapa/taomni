@@ -53,6 +53,8 @@ pub struct LanChatState {
     pub node_id: RwLock<String>,
     /// Peers discovered via mDNS, keyed by node id.
     pub peers: RwLock<HashMap<String, PeerRecord>>,
+    /// Live control-channel connections, keyed by remote node id.
+    pub connections: RwLock<HashMap<String, transport::ConnHandle>>,
     /// mDNS service daemon handle (set when discovery starts). Cloneable; kept
     /// so profile edits can re-announce the TXT record.
     pub daemon: StdMutex<Option<ServiceDaemon>>,
@@ -78,6 +80,7 @@ impl LanChatState {
             store,
             node_id: RwLock::new(node_id),
             peers: RwLock::new(HashMap::new()),
+            connections: RwLock::new(HashMap::new()),
             daemon: StdMutex::new(None),
             control_port: AtomicU16::new(0),
             control_listener: AsyncMutex::new(None),
@@ -97,8 +100,9 @@ impl LanChatState {
 
 /// Launch the LanChat background service.
 ///
-/// Reserves the TCP control port, then runs mDNS discovery (phase 3). The
-/// transport accept loop over the reserved listener is started in phase 4.
+/// Reserves the TCP control port, starts the transport accept loop over that
+/// listener, then runs mDNS discovery. Discovery + transport run concurrently
+/// for the lifetime of the app.
 pub async fn start(app: AppHandle) {
     use std::sync::atomic::Ordering;
     use tauri::Manager;
@@ -106,14 +110,23 @@ pub async fn start(app: AppHandle) {
     let lanchat = app.state::<crate::state::AppState>().lanchat.clone();
 
     // Reserve an ephemeral control port now so the mDNS TXT can advertise it;
-    // the transport phase takes over this listener to accept connections.
+    // the transport accept loop takes over this listener below.
     match TcpListener::bind(("0.0.0.0", 0)).await {
         Ok(listener) => {
             let port = listener.local_addr().map(|a| a.port()).unwrap_or(0);
             lanchat.control_port.store(port, Ordering::SeqCst);
             *lanchat.control_listener.lock().await = Some(listener);
             log::info!("lanchat: reserved control port {}", port);
-            discovery::run(app.clone(), lanchat, port).await;
+
+            // Transport accept loop (takes the reserved listener).
+            let app_t = app.clone();
+            let state_t = lanchat.clone();
+            tokio::spawn(async move {
+                transport::run_listener(app_t, state_t).await;
+            });
+
+            // mDNS discovery (runs for the app lifetime).
+            discovery::run(app, lanchat, port).await;
         }
         Err(e) => {
             log::error!("lanchat: failed to reserve control port: {e}");
