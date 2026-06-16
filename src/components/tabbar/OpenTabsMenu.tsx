@@ -6,13 +6,13 @@ import {
   ChevronDown,
   ChevronRight,
   Check,
-  PanelTopClose,
-  PanelTopOpen,
   Trash2,
+  Camera,
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useT } from "../../lib/i18n";
+import { useCaptureMenuItems } from "../capture/captureMenuItems";
 import type { Tab } from "../../types";
 import {
   filterVisibleTabs,
@@ -50,10 +50,11 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
   const tabFilter = useAppStore((s) => s.tabFilter);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setTabFilter = useAppStore((s) => s.setTabFilter);
-  const compactMode = useAppStore((s) => s.compactMode);
-  const toggleCompactMode = useAppStore((s) => s.toggleCompactMode);
   const removeTabs = useAppStore((s) => s.removeTabs);
   const sessions = useSessionStore((s) => s.sessions);
+  // Screenshot actions for the active tab fold into this menu (the standalone
+  // capture button was removed). Empty for non-capturable tabs.
+  const captureItems = useCaptureMenuItems(onClose);
 
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -256,15 +257,6 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
       }}
     >
       <div className="py-1">
-        <button type="button" className={rowClass} onClick={() => { toggleCompactMode(); onClose(); }}>
-          <span className="w-4 flex-shrink-0 flex items-center justify-center">
-            {compactMode ? <PanelTopOpen className="w-3 h-3" /> : <PanelTopClose className="w-3 h-3" />}
-          </span>
-          <span className="flex-1 truncate">
-            {compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact")}
-          </span>
-          <span className={`ml-6 flex-shrink-0 text-[11px] ${muted}`}>Ctrl+Shift+M</span>
-        </button>
         <button type="button" className={rowClass} onClick={closeAllTerminals}>
           <span className="w-4 flex-shrink-0 flex items-center justify-center">
             <Trash2 className="w-3 h-3" />
@@ -386,6 +378,31 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
           );
         })}
       </div>
+
+      {captureItems.length > 0 && (
+        <>
+          <div className="h-px mx-2" style={{ background: "var(--taomni-divider)" }} />
+          <div className="py-1" data-testid="open-tabs-screenshot">
+            <div className={`px-3 py-0.5 flex items-center gap-2 text-[11px] ${muted}`}>
+              <Camera className="w-3 h-3" />
+              <span>{t("capture.menuTitle")}</span>
+            </div>
+            {captureItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                data-testid={`capture-${item.key}`}
+                onClick={item.onClick}
+                className={rowClass}
+                style={item.active ? { color: "var(--taomni-accent)" } : undefined}
+              >
+                <span className="w-4 flex-shrink-0 flex items-center justify-center">{item.icon}</span>
+                <span className="flex-1 truncate">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>,
     document.body,
   );

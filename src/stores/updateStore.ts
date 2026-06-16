@@ -72,7 +72,19 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
 
   check: async (opts) => {
     const manual = opts?.manual ?? false;
-    set({ status: "checking", manual, error: null });
+    // A check is already in flight. Don't kick off a second, concurrent check
+    // — it would fire duplicate network requests and could race the first
+    // one's result. A manual re-trigger just re-surfaces the existing
+    // "checking…" dialog; an auto/periodic trigger quietly no-ops.
+    if (get().status === "checking") {
+      if (manual) set({ dialogOpen: true });
+      return;
+    }
+    // Manual checks (the About "Check for updates" button) open the window
+    // right away so the user immediately sees a non-modal "checking…" state
+    // instead of staring at nothing until the network round-trip finishes.
+    // Startup/periodic checks stay silent (dialogOpen left untouched).
+    set({ status: "checking", manual, error: null, dialogOpen: manual || get().dialogOpen });
     try {
       const platform = await getUpdaterPlatform();
       set({

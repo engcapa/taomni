@@ -123,6 +123,43 @@ describe("updateStore.check", () => {
     expect(get().error).toBe("nope");
     expect(get().dialogOpen).toBe(true);
   });
+
+  it("opens the dialog immediately while a manual check is in flight", async () => {
+    let resolvePlatform: (p: svc.UpdaterPlatform) => void = () => {};
+    mocked.getUpdaterPlatform.mockReturnValue(
+      new Promise<svc.UpdaterPlatform>((resolve) => {
+        resolvePlatform = resolve;
+      }),
+    );
+    mocked.checkForUpdate.mockResolvedValue(null);
+
+    const pending = get().check({ manual: true });
+    // Before the network round-trip resolves, the dialog is already showing
+    // the "checking" state so the user gets instant feedback.
+    expect(get().status).toBe("checking");
+    expect(get().dialogOpen).toBe(true);
+
+    resolvePlatform(platform({ os: "linux", nativeTarget: "linux-x86_64", recommendedTarget: "linux-x86_64", candidates: ["linux-x86_64"] }));
+    await pending;
+    expect(get().status).toBe("uptodate");
+  });
+
+  it("does not start a second check while one is already in flight", async () => {
+    useUpdateStore.setState({ status: "checking", dialogOpen: false });
+    await get().check({ manual: true });
+    // Re-triggering during a check just re-surfaces the dialog; no duplicate
+    // network calls are made.
+    expect(get().dialogOpen).toBe(true);
+    expect(mocked.getUpdaterPlatform).not.toHaveBeenCalled();
+    expect(mocked.checkForUpdate).not.toHaveBeenCalled();
+  });
+
+  it("an auto check no-ops while a check is already in flight", async () => {
+    useUpdateStore.setState({ status: "checking", dialogOpen: false });
+    await get().check();
+    expect(get().dialogOpen).toBe(false);
+    expect(mocked.getUpdaterPlatform).not.toHaveBeenCalled();
+  });
 });
 
 describe("updateStore.setSelectedTarget", () => {

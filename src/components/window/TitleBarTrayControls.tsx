@@ -1,10 +1,8 @@
-import { Monitor, Moon, Sun, PanelTopClose, PanelTopOpen, SplitSquareVertical, Users, Bot, Download } from "lucide-react";
+import { Monitor, Moon, Sun, SplitSquareVertical, Users, Bot } from "lucide-react";
 import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
-import { useUpdateStore } from "../../stores/updateStore";
-import { getAppPlatform } from "../../lib/runtime";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { PttButton } from "./PttButton";
@@ -18,8 +16,6 @@ const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
 
 export function TitleBarTrayControls() {
   const { mode, resolvedTheme, setMode } = useAppTheme();
-  const compactMode = useAppStore((s) => s.compactMode);
-  const toggleCompactMode = useAppStore((s) => s.toggleCompactMode);
   const terminalSplitActive = useAppStore((s) => s.terminalSplitActive);
   const multiExecActive = useAppStore((s) => s.multiExecActive);
   const toggleTerminalSplit = useAppStore((s) => s.toggleTerminalSplit);
@@ -28,94 +24,21 @@ export function TitleBarTrayControls() {
   const drawerScope = useChatStore((s) => s.drawerScope);
   const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
-  const updateStatus = useUpdateStore((s) => s.status);
-  const updateVersion = useUpdateStore((s) => s.availableVersion);
-  const openUpdateDialog = useUpdateStore((s) => s.openDialog);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
-
-  // Compact mode is removed on macOS — the global menu bar replaces the
-  // condensed in-app chrome there. The toggle stays on Windows/Linux.
-  const compactAvailable = getAppPlatform() !== "macos";
 
   const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
   const current = THEME_MODES[currentIndex] ?? THEME_MODES[0];
   const next = THEME_MODES[(currentIndex + 1) % THEME_MODES.length] ?? THEME_MODES[0];
 
-  const compactTitle = compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact");
   const splitTitle = terminalSplitActive ? t("titlebar.disableSplit") : t("titlebar.enableSplit");
   const multiExecTitle = multiExecActive ? t("titlebar.disableMultiExec") : t("titlebar.enableMultiExec");
   const chatOpenForGlobal = drawerOpen && drawerScope === "global";
   const chatTitle = chatOpenForGlobal ? t("titlebar.closeGlobalChat") : t("titlebar.openGlobalChat");
   const chatAria = chatOpenForGlobal ? t("titlebar.closeGlobalChatAria") : t("titlebar.openGlobalChatAria");
 
-  // Non-intrusive update hint: a small badge that appears only once a new
-  // version is available (or staged). Clicking it opens the update window —
-  // checks never pop it up on their own.
-  const updatePending = updateStatus === "available" || updateStatus === "ready";
-  const updateTitle = t("titlebar.updateAvailable", { version: updateVersion ?? "" });
-
   return (
     <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
-      {updatePending && (
-        <>
-          <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-            <TrayButton
-              testId="titlebar-update-available"
-              title={updateTitle}
-              ariaLabel={updateTitle}
-              onClick={openUpdateDialog}
-            >
-              <span className="relative inline-flex">
-                <Download className="w-[16px] h-[16px]" />
-                <span
-                  aria-hidden="true"
-                  className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full"
-                  style={{ background: "#e5534b", boxShadow: "0 0 0 1.5px var(--taomni-chrome-bg)" }}
-                />
-              </span>
-            </TrayButton>
-          </div>
-          <TrayGroupSeparator />
-        </>
-      )}
-
-      {/* Voice group */}
-      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-        <PttButton />
-      </div>
-
-      <TrayGroupSeparator />
-
-      {/* View group */}
-      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-        <TrayButton
-          testId="theme-cycle"
-          title={t("titlebar.cycleTheme", {
-            mode: themeLabel(mode),
-            resolved: resolvedTheme,
-            next: themeLabel(next.mode),
-          })}
-          ariaLabel={t("titlebar.cycleThemeAria")}
-          onClick={() => setMode(next.mode)}
-        >
-          {current.icon}
-        </TrayButton>
-        {compactAvailable && (
-          <TrayButton
-            testId="compact-toggle"
-            title={compactTitle}
-            ariaLabel={compactTitle}
-            active={compactMode}
-            onClick={toggleCompactMode}
-          >
-            {compactMode ? <PanelTopOpen className="w-[16px] h-[16px]" /> : <PanelTopClose className="w-[16px] h-[16px]" />}
-          </TrayButton>
-        )}
-      </div>
-
-      <TrayGroupSeparator />
-
       {/* Terminal layout group */}
       <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
@@ -138,31 +61,42 @@ export function TitleBarTrayControls() {
         </TrayButton>
       </div>
 
-      {!aiFullyDisabled && (
-        <>
-          <TrayGroupSeparator />
-          {/* AI chat group */}
-          <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-            <TrayButton
-              testId="ai-chat-drawer-toggle"
-              title={chatTitle}
-              ariaLabel={chatAria}
-              active={chatOpenForGlobal}
-              onClick={() => void toggleGlobalChat()}
-            >
-              <Bot className="w-[16px] h-[16px]" />
-            </TrayButton>
-          </div>
-        </>
-      )}
+      <TrayGroupSeparator />
+
+      {/* AI chat + voice group (voice sits to the right of global chat). */}
+      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
+        {!aiFullyDisabled && (
+          <TrayButton
+            testId="ai-chat-drawer-toggle"
+            title={chatTitle}
+            ariaLabel={chatAria}
+            active={chatOpenForGlobal}
+            onClick={() => void toggleGlobalChat()}
+          >
+            <Bot className="w-[16px] h-[16px]" />
+          </TrayButton>
+        )}
+        <PttButton />
+      </div>
 
       <TrayGroupSeparator />
 
-      {/* Language switcher — anchored to the rightmost tray slot so it always
-          sits at the top-right of the title bar, in both regular and compact
-          layouts. */}
+      {/* Locale + appearance group (theme sits to the right of the language
+          switcher), anchored to the rightmost tray slot. */}
       <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <LanguageSwitcher />
+        <TrayButton
+          testId="theme-cycle"
+          title={t("titlebar.cycleTheme", {
+            mode: themeLabel(mode),
+            resolved: resolvedTheme,
+            next: themeLabel(next.mode),
+          })}
+          ariaLabel={t("titlebar.cycleThemeAria")}
+          onClick={() => setMode(next.mode)}
+        >
+          {current.icon}
+        </TrayButton>
       </div>
     </div>
   );

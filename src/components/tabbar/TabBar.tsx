@@ -5,7 +5,6 @@ import {
   Folder,
   Monitor,
   Network as NetworkIcon,
-  MoreHorizontal,
   Search,
   Copy,
   Trash2,
@@ -39,7 +38,6 @@ import {
   type SessionConfig,
 } from "../../lib/ipc";
 import { getAppPlatform } from "../../lib/runtime";
-import { OpenTabsMenu } from "./OpenTabsMenu";
 import { filterVisibleTabs, getFilterChipText } from "../../lib/tabFilter";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
@@ -88,7 +86,6 @@ export function TabBar({
   const {
     tabs,
     activeTabId,
-    compactMode,
     setActiveTab,
     removeTab,
     removeTabs,
@@ -112,8 +109,6 @@ export function TabBar({
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [shellsLoaded, setShellsLoaded] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreWrapRef = useRef<HTMLDivElement>(null);
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const tabElementRefs = useRef(new Map<string, HTMLDivElement>());
   const [tabScrollState, setTabScrollState] = useState<TabScrollState>({
@@ -421,7 +416,6 @@ export function TabBar({
   return (
     <div
       data-testid="tab-bar"
-      data-compact={compactMode}
       className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0 overflow-hidden"
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
@@ -566,19 +560,9 @@ export function TabBar({
         </button>
       </div>
 
+      {/* Trailing draggable filler. The open-tabs `⋯` overflow now lives in the
+          ControlBar to the right of the tab-action slot (see ControlBar). */}
       <div className="flex-1 self-stretch" data-window-drag />
-      <div className="flex items-center gap-1 pr-1 pb-0.5">
-        <div ref={moreWrapRef} className="relative">
-          <IconBtn
-            testId="tab-more"
-            title={t("tabs.more")}
-            icon={<MoreHorizontal className="w-3.5 h-3.5" />}
-            active={moreOpen}
-            onClick={() => setMoreOpen((v) => !v)}
-          />
-          <OpenTabsMenu open={moreOpen} onClose={() => setMoreOpen(false)} anchorRef={moreWrapRef} />
-        </div>
-      </div>
     </div>
   );
 }

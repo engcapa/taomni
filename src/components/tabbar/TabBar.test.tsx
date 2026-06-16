@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TabBar } from "./TabBar";
+import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { Tab } from "../../types";
@@ -28,6 +30,32 @@ function renderTabBar() {
       onOpenSessionEditor={vi.fn()}
     />,
   );
+}
+
+// Mirrors the ControlBar's `TabMore`: the tab strip plus the `⋯` overflow
+// trigger and its OpenTabsMenu (which moved out of TabBar into the ControlBar).
+function TabBarWithMore() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <TabBar
+        onStartLocalTerminal={vi.fn()}
+        onConnectSession={vi.fn()}
+        onOpenSessionEditor={vi.fn()}
+      />
+      <div ref={ref}>
+        <button type="button" data-testid="tab-more" onClick={() => setOpen((v) => !v)}>
+          more
+        </button>
+        <OpenTabsMenu open={open} onClose={() => setOpen(false)} anchorRef={ref} />
+      </div>
+    </>
+  );
+}
+
+function renderTabBarWithMore() {
+  return render(<TabBarWithMore />);
 }
 
 function mockHorizontalOverflow(
@@ -69,7 +97,6 @@ describe("TabBar overflow navigation", () => {
     useAppStore.setState({
       tabs: Array.from({ length: 12 }, (_, index) => makeTab(index)),
       activeTabId: "tab-0",
-      compactMode: false,
       multiExecActive: false,
       multiExecSelectedTabIds: new Set(),
       tabFilter: null,
@@ -83,7 +110,6 @@ describe("TabBar overflow navigation", () => {
     useAppStore.setState({
       tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
       activeTabId: "welcome",
-      compactMode: false,
       multiExecActive: false,
       multiExecSelectedTabIds: new Set(),
       tabFilter: null,
@@ -122,7 +148,7 @@ describe("TabBar overflow navigation", () => {
   });
 
   it("lists all open tabs in the more menu and switches to the selected tab", () => {
-    renderTabBar();
+    renderTabBarWithMore();
 
     fireEvent.click(screen.getByTestId("tab-more"));
 
@@ -144,7 +170,7 @@ describe("TabBar overflow navigation", () => {
   });
 
   it("filters the strip by a fuzzy query and restores it via the chip", async () => {
-    renderTabBar();
+    renderTabBarWithMore();
     const scrollArea = screen.getByTestId("tab-scroll-area");
     expect(within(scrollArea).getAllByTestId("tab-item")).toHaveLength(12);
 
@@ -195,7 +221,7 @@ describe("TabBar overflow navigation", () => {
       activeTabId: "t-local",
       tabFilter: null,
     });
-    renderTabBar();
+    renderTabBarWithMore();
 
     fireEvent.click(screen.getByTestId("tab-more"));
     fireEvent.click(screen.getByTestId("open-tabs-group-proj-cap"));

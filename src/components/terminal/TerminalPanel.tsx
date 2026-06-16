@@ -52,8 +52,9 @@ import {
   renderXtermVisibleToCanvas,
   type XtermCaptureTheme,
 } from "../../lib/capture";
-import CaptureToolbar from "../capture/CaptureToolbar";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { CaptureMenuButton } from "../capture/CaptureMenuButton";
+import { TabActions } from "../tabbar/TabActionSlot";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
   FT_BUTTON_STYLE,
@@ -213,13 +214,6 @@ interface TerminalPanelProps {
   detachToggle?: {
     onDetach: () => void;
   };
-  /** When set, the floating toolbar exposes an "in-window maximize"
-   *  toggle. The terminal content always fills its parent — the parent
-   *  is responsible for hiding the chrome around it. */
-  maximizeToggle?: {
-    maximized: boolean;
-    onToggle: () => void;
-  };
 }
 
 const DEFAULT_FONT_SIZE = 14;
@@ -287,7 +281,6 @@ export function TerminalPanel({
   sftpToggle,
   chatToggle,
   detachToggle,
-  maximizeToggle,
 }: TerminalPanelProps) {
   const t = useT();
   const { confirm: confirmPaste, render: pasteConfirmDialog } = useConfirmDialog();
@@ -2609,6 +2602,10 @@ export function TerminalPanel({
     fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");
   const resolvedTheme = resolveTerminalTheme(themeName);
+  // Latest theme/font for capture, read lazily so the registration effect below
+  // doesn't churn on every render (resolvedTheme is a fresh object each time).
+  const captureThemeRef = useRef({ resolvedTheme, fontFamily, fontSize });
+  captureThemeRef.current = { resolvedTheme, fontFamily, fontSize };
 
   // Keep data-terminal-text in sync so WebDriver / automation can read
   // terminal content without depending on xterm's canvas rendering.
@@ -2651,6 +2648,53 @@ export function TerminalPanel({
     return unregister;
   }, [tabId, registeredSessionId, tabTitle]);
 
+  // Publish this terminal's capture source while it's the active tab, so the
+  // screenshot actions (folded into the tab-strip `⋯` menu in the main window,
+  // or the capture button in a detached window) target its rendered content.
+  useEffect(() => {
+    if (!activeForShortcuts) return;
+    const themeOf = (): XtermCaptureTheme => {
+      const { resolvedTheme: rt, fontFamily: ff, fontSize: fs } = captureThemeRef.current;
+      return {
+        background: rt.background ?? "#1d1f21",
+        foreground: rt.foreground ?? "#eaeaea",
+        fontFamily: ff,
+        fontSize: fs,
+        lineHeight: 1.2,
+      };
+    };
+    const source: CaptureSource = {
+      filenamePrefix: tabTitle,
+      getVisible: async () => {
+        const term = termRef.current;
+        const container = containerRef.current;
+        if (!term) throw new Error("Terminal not ready");
+        try {
+          return await captureXtermVisible(term, themeOf());
+        } catch (err) {
+          if (container) return await captureContainerCanvasesPng(container);
+          throw err;
+        }
+      },
+      getFull: async () => {
+        const term = termRef.current;
+        if (!term) throw new Error("Terminal not ready");
+        return await captureXtermFullBuffer(term, themeOf());
+      },
+      getScrollFrame: () => {
+        const term = termRef.current;
+        return term ? renderXtermVisibleToCanvas(term, themeOf()) : null;
+      },
+      getGifFrame: () => {
+        const term = termRef.current;
+        return term ? renderXtermVisibleToCanvas(term, themeOf()) : null;
+      },
+      onStatus: (msg) => setStatusMessage(msg),
+    };
+    useCaptureStore.getState().setSource(source);
+    return () => useCaptureStore.getState().clearSource(source);
+  }, [activeForShortcuts, tabTitle, setStatusMessage]);
+
   return (
     <div
       ref={panelRef}
@@ -2679,71 +2723,7 @@ export function TerminalPanel({
     >
       <div ref={containerRef} className="w-full h-full overflow-hidden" />
 
-      <FloatingToolbar
-        storageKey={`mob.terminal.toolbar.${ssh ? "ssh" : "local"}`}
-        defaultTop={4}
-        defaultRight={4}
-        testId="terminal-floating-toolbar"
-      >
-        <CaptureToolbar
-          filenamePrefix={`${safeFilePart(tabTitle)}`}
-          getVisible={async () => {
-            const term = termRef.current;
-            const container = containerRef.current;
-            if (!term) throw new Error("Terminal not ready");
-            const theme: XtermCaptureTheme = {
-              background: resolvedTheme.background ?? "#1d1f21",
-              foreground: resolvedTheme.foreground ?? "#eaeaea",
-              fontFamily,
-              fontSize,
-              lineHeight: 1.2,
-            };
-            try {
-              return await captureXtermVisible(term, theme);
-            } catch (err) {
-              if (container) return await captureContainerCanvasesPng(container);
-              throw err;
-            }
-          }}
-          getFull={async () => {
-            const term = termRef.current;
-            if (!term) throw new Error("Terminal not ready");
-            const theme: XtermCaptureTheme = {
-              background: resolvedTheme.background ?? "#1d1f21",
-              foreground: resolvedTheme.foreground ?? "#eaeaea",
-              fontFamily,
-              fontSize,
-              lineHeight: 1.2,
-            };
-            return await captureXtermFullBuffer(term, theme);
-          }}
-          getScrollFrame={() => {
-            const term = termRef.current;
-            if (!term) return null;
-            const theme: XtermCaptureTheme = {
-              background: resolvedTheme.background ?? "#1d1f21",
-              foreground: resolvedTheme.foreground ?? "#eaeaea",
-              fontFamily,
-              fontSize,
-              lineHeight: 1.2,
-            };
-            return renderXtermVisibleToCanvas(term, theme);
-          }}
-          getGifFrame={() => {
-            const term = termRef.current;
-            if (!term) return null;
-            const theme: XtermCaptureTheme = {
-              background: resolvedTheme.background ?? "#1d1f21",
-              foreground: resolvedTheme.foreground ?? "#eaeaea",
-              fontFamily,
-              fontSize,
-              lineHeight: 1.2,
-            };
-            return renderXtermVisibleToCanvas(term, theme);
-          }}
-          onStatus={(msg) => setStatusMessage(msg)}
-          compact
-        />
+      <TabActions active={activeForShortcuts}>
         {sftpToggle && (
           <button
             type="button"
@@ -2787,20 +2767,9 @@ export function TerminalPanel({
             <ExternalLink size={14} />
           </button>
         )}
-        {maximizeToggle && (
-          <button
-            type="button"
-            data-testid="terminal-maximize"
-            aria-label={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
-            title={maximizeToggle.maximized ? t("rdp.restore") : t("rdp.maximize")}
-            onClick={maximizeToggle.onToggle}
-            style={FT_ICON_BUTTON_STYLE}
-          >
-            {maximizeToggle.maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-        )}
         {detachedWindowControls && (
           <>
+            <CaptureMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"
@@ -2827,7 +2796,7 @@ export function TerminalPanel({
             </button>
           </>
         )}
-      </FloatingToolbar>
+      </TabActions>
 
       {isMultiExecTarget && (
         <div

@@ -48,6 +48,7 @@ import {
   type TerminalReattachState,
 } from "../terminal/TerminalPanel";
 import { useAppStore } from "../../stores/appStore";
+import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
 const VncPanel = lazy(() => import("../vnc/VncPanel"));
@@ -158,6 +159,7 @@ export default function DetachedSessionWindow({
   // native, falls back to the document.fullscreen API in browser dev
   // mode so the dev experience matches.
   const [osFullscreen, setOsFullscreen] = useState(false);
+  const [actionSlot, setActionSlot] = useState<HTMLDivElement | null>(null);
   const toggleOsFullscreen = useCallback(async () => {
     if (tauri) {
       try {
@@ -369,15 +371,23 @@ export default function DetachedSessionWindow({
   );
 
   return (
-    <div
-      data-testid="detached-session-window"
-      data-detached-kind={kind}
-      data-detached-id={id}
-      className="w-screen h-screen relative"
-      style={{ background: "#000", color: "var(--taomni-text)" }}
-    >
-      {inner}
-    </div>
+    <TabActionSlotProvider slot={actionSlot}>
+      <div
+        data-testid="detached-session-window"
+        data-detached-kind={kind}
+        data-detached-id={id}
+        className="w-screen h-screen relative flex flex-col"
+        style={{ background: "#000", color: "var(--taomni-text)" }}
+      >
+        <div
+          className="h-8 shrink-0 flex items-center justify-end px-1"
+          style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
+        >
+          <div ref={setActionSlot} data-testid="tab-action-slot" className="flex items-center gap-0.5" />
+        </div>
+        <div className="flex-1 relative min-h-0">{inner}</div>
+      </div>
+    </TabActionSlotProvider>
   );
 }
 

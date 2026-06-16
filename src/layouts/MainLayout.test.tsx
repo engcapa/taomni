@@ -78,16 +78,29 @@ vi.mock("react-resizable-panels", () => {
   };
 });
 
-vi.mock("../components/menubar/MenuBar", () => ({
-  MenuBar: () => <div data-testid="menu-bar" />,
-}));
-
-vi.mock("../components/menubar/Ribbon", () => ({
-  Ribbon: ({ onCommand }: { onCommand?: (command: string) => void }) => (
-    <div data-testid="ribbon">
-      <button type="button" data-testid="mock-ribbon-exit" onClick={() => onCommand?.("exit")}>
+vi.mock("../components/tabbar/ControlBar", () => ({
+  ControlBar: ({
+    onCommand,
+    onCloseWindow,
+    onToggleSidebar,
+    slotRef,
+  }: {
+    onCommand?: (command: string) => void;
+    onCloseWindow?: () => void;
+    onToggleSidebar?: () => void;
+    slotRef?: (el: HTMLDivElement | null) => void;
+  }) => (
+    <div data-testid="control-bar">
+      <button type="button" data-testid="window-close" onClick={() => onCloseWindow?.()}>
+        Close
+      </button>
+      <button type="button" data-testid="mock-menu-exit" onClick={() => onCommand?.("exit")}>
         Exit
       </button>
+      <button type="button" data-testid="mock-sidebar-toggle" onClick={() => onToggleSidebar?.()}>
+        Sidebar
+      </button>
+      <div ref={slotRef} data-testid="tab-action-slot" />
     </div>
   ),
 }));
@@ -320,7 +333,6 @@ describe("MainLayout attached SFTP sidebar", () => {
       ],
       activeTabId: "ssh-tab",
       sidebarCollapsed: false,
-      compactMode: false,
       terminalSplitActive: false,
       terminalSplitLayout: "horizontal",
       terminalSplitInputLockedTabIds: new Set(),
@@ -379,33 +391,13 @@ describe("MainLayout attached SFTP sidebar", () => {
     windowOpenSpy.mockRestore();
   });
 
-  it("hides outer chrome in compact mode without remounting the terminal", () => {
+  it("renders the unified control bar and status bar without remounting the terminal", () => {
     render(<MainLayout />);
 
-    expect(screen.getByTestId("menu-bar")).toBeInTheDocument();
-    expect(screen.queryByTestId("ribbon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("control-bar")).toBeInTheDocument();
     expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
     expect(screen.getByTestId("status-bar")).toBeInTheDocument();
-    expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole("button", { name: /enter compact mode/i }));
-
-    expect(screen.queryByTestId("menu-bar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ribbon")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("status-bar")).not.toBeInTheDocument();
-    expect(screen.getByTestId("compact-titlebar")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-bar")).toHaveAttribute("data-compact", "true");
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
-    expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
-    expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /exit compact mode/i }));
-
-    expect(screen.getByTestId("menu-bar")).toBeInTheDocument();
-    expect(screen.queryByTestId("ribbon")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("quick-connect")).not.toBeInTheDocument();
-    expect(screen.getByTestId("status-bar")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
   });
@@ -423,11 +415,10 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
-  it("routes ribbon exit through the app exit command", async () => {
-    window.localStorage.setItem("taomni.ribbonVisible", "true");
+  it("routes the app menu exit through the app exit command", async () => {
     render(<MainLayout />);
 
-    fireEvent.click(screen.getByTestId("mock-ribbon-exit"));
+    fireEvent.click(screen.getByTestId("mock-menu-exit"));
 
     expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
@@ -571,29 +562,24 @@ describe("MainLayout attached SFTP sidebar", () => {
     }
   });
 
-  it("opens compact main menu and sessions drawer from the titlebar", () => {
+  it("toggles the sidebar from the control bar", () => {
     render(<MainLayout />);
 
-    fireEvent.click(screen.getByRole("button", { name: /enter compact mode/i }));
+    expect(screen.getByTestId("control-bar")).toBeInTheDocument();
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: /main menu/i }));
-    expect(screen.getByTestId("context-menu-item-new-local-terminal")).toBeInTheDocument();
-    expect(screen.getByTestId("context-menu-item-sessions")).toBeInTheDocument();
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    fireEvent.click(screen.getByRole("button", { name: /show sessions drawer/i }));
-    expect(screen.getByTestId("compact-sidebar-drawer")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /close sessions drawer/i })[0]);
-    expect(screen.queryByTestId("compact-sidebar-drawer")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 
   it("collapses the main sidebar to a fixed rail without leaving the panel gap", () => {
     useAppStore.setState({
       sidebarCollapsed: true,
-      compactMode: false,
     });
 
     render(<MainLayout />);
@@ -825,7 +811,6 @@ describe("MainLayout attached SFTP sidebar", () => {
       ],
       activeTabId: "ssh-tab",
       sidebarCollapsed: false,
-      compactMode: false,
       statusMessage: "Ready",
     });
 

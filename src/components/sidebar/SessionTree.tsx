@@ -417,7 +417,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     const queries: KeychainQuery[] = [];
     const seen = new Set<string>();
     const addQuery = (service: string, account: string) => {
-      const key = `${service} ${account}`;
+      const key = `${service} ${account}`;
       if (seen.has(key)) return;
       seen.add(key);
       queries.push({ service, account });
