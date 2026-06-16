@@ -8,6 +8,7 @@ mod database;
 mod filebrowser;
 mod hbase;
 mod history;
+mod lanchat;
 pub mod llm;
 mod migrate;
 pub mod models;
@@ -77,7 +78,17 @@ pub fn run() {
             let ai_config = ai::config::AiConfig::load(&ai_config_path);
             let ai_ctx = ai::AppAiCtx::from_config(ai_config, vault_arc.clone());
 
-            app.manage(AppState::new(conn, vault_arc, ai_ctx));
+            // Decentralized LAN messenger state (separate lanchat.sqlite).
+            let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
+
+            app.manage(AppState::new(conn, vault_arc, ai_ctx, lanchat_state));
+
+            // Start the LanChat background service (mDNS discovery + TCP
+            // control channel are wired in later phases; phase 1 idles).
+            let app_for_lanchat = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                lanchat::start(app_for_lanchat).await;
+            });
 
             // Auto-start any tunnels with autostart=true.
             let app_for_autostart = app.handle().clone();
@@ -348,6 +359,7 @@ pub fn run() {
             proxy::get_app_proxy_config,
             proxy::save_app_proxy_config,
             proxy::get_app_proxy_url,
+            lanchat::commands::lanchat_status,
             exit_app,
         ])
         .run(tauri::generate_context!())

@@ -10,6 +10,7 @@ use crate::database::DbSession;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::hbase::HBaseSession;
+use crate::lanchat::LanChatState;
 use crate::objectstorage::ObjectStorageSession;
 use crate::rdp::ws::RdpSession;
 use crate::servers::ServerRegistry;
@@ -66,10 +67,19 @@ pub struct AppState {
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
+    /// Decentralized LAN messenger (LanChat) runtime state. Distinct from the
+    /// AI-assistant `chat`/`voice` modules. Holds node identity, peer roster,
+    /// and the lanchat.sqlite path; populated by the lanchat background service.
+    pub lanchat: Arc<LanChatState>,
 }
 
 impl AppState {
-    pub fn new(db: rusqlite::Connection, vault: Arc<Vault>, ai_ctx: AppAiCtx) -> Self {
+    pub fn new(
+        db: rusqlite::Connection,
+        vault: Arc<Vault>,
+        ai_ctx: AppAiCtx,
+        lanchat: Arc<LanChatState>,
+    ) -> Self {
         Self {
             terminals: Arc::new(RwLock::new(HashMap::new())),
             terminal_outputs: Arc::new(Mutex::new(HashMap::new())),
@@ -90,6 +100,7 @@ impl AppState {
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
+            lanchat,
         }
     }
 }
