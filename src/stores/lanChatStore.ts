@@ -17,6 +17,7 @@ import {
   listenLanChatRoster,
 } from "../lib/ipc";
 import { isTauriRuntime } from "../lib/runtime";
+import { notifyLanMessage } from "../lib/lanNotify";
 import type {
   LanConversation,
   LanGroup,
@@ -189,6 +190,18 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
     set((s) => {
       const existing = s.messagesByConv[msg.convId] ?? [];
       const next = upsertById(existing, msg).sort((a, b) => a.createdAt - b.createdAt);
+      const isNew = !existing.some((m) => m.id === msg.id);
+      const myId = s.profile?.id ?? "";
+      const fromMe = msg.senderId === myId;
+      const mentioned = msg.mentions.includes(myId);
+      // Notify on a genuinely new inbound message that is either a mention or
+      // belongs to a conversation that isn't currently open.
+      if (isNew && !fromMe && (mentioned || msg.convId !== s.activeConvId)) {
+        const senderName =
+          s.roster.find((p) => p.id === msg.senderId)?.name ?? msg.senderId.slice(0, 6);
+        const title = mentioned ? `${senderName} 提到了你` : senderName;
+        void notifyLanMessage(title, msg.body.slice(0, 120));
+      }
       return { messagesByConv: { ...s.messagesByConv, [msg.convId]: next } };
     }),
 

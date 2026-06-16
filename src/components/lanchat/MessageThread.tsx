@@ -88,6 +88,7 @@ export function MessageThread() {
         const showSep = day !== lastDay;
         lastDay = day;
         const senderName = nameById.get(msg.senderId) ?? msg.senderId.slice(0, 6);
+        const mentionsMe = !mine && msg.mentions.includes(myId);
         return (
           <Fragment key={msg.id}>
             {showSep ? (
@@ -119,8 +120,14 @@ export function MessageThread() {
                       ? "linear-gradient(135deg,var(--taomni-accent-soft),var(--taomni-accent))"
                       : "var(--taomni-card-bg)",
                     color: mine ? "#fff" : "var(--taomni-text)",
-                    border: mine ? "1px solid transparent" : "1px solid var(--taomni-card-border)",
-                    boxShadow: "var(--taomni-shadow-sm)",
+                    border: mine
+                      ? "1px solid transparent"
+                      : mentionsMe
+                        ? "1px solid var(--taomni-accent)"
+                        : "1px solid var(--taomni-card-border)",
+                    boxShadow: mentionsMe
+                      ? "0 0 0 2px color-mix(in srgb, var(--taomni-accent) 25%, transparent)"
+                      : "var(--taomni-shadow-sm)",
                   }}
                 >
                   {!mine ? (

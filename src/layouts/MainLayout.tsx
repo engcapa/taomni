@@ -91,6 +91,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
+import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
 import { setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
@@ -1593,6 +1594,20 @@ export function MainLayout() {
       closable: true,
     });
   }, [addTab, setActiveTab]);
+
+  // Initialize LanChat at app startup (not only when the tab opens) so roster,
+  // unread, and desktop notifications work even while the tab is closed.
+  useEffect(() => {
+    void useLanChatStore.getState().init();
+  }, []);
+
+  // Mirror total LanChat unread onto the lan-chat tab's new-output indicator
+  // (cleared while that tab is active).
+  const lanUnread = useLanChatStore((s) => totalUnread(s.conversations));
+  useEffect(() => {
+    const hasUnread = lanUnread > 0 && activeTabId !== "lan-chat";
+    setTabHasNewOutput("lan-chat", hasUnread);
+  }, [lanUnread, activeTabId, setTabHasNewOutput]);
 
   const toggleQuickConnectVisible = useCallback(() => {
     const next = !quickConnectVisible;

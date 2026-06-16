@@ -114,6 +114,7 @@ jiff = "0.2"
 hmac = "0.13.0"
 mdns-sd = "0.20.0"
 if-addrs = "0.15.0"
+tauri-plugin-notification = "2.3.3"
 
 [patch.crates-io]
 ironrdp-connector = { path = "vendor/ironrdp-connector" }

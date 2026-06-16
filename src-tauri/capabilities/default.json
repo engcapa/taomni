@@ -24,6 +24,7 @@
     "core:window:allow-is-fullscreen",
     "updater:default",
     "process:allow-restart",
+    "notification:default",
     {
       "identifier": "shell:allow-open",
       "allow": [
