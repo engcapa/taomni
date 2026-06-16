@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useLanChatStore } from "../../stores/lanChatStore";
+import { openDetachedWindow } from "../../lib/detachWindowing";
 import { Avatar } from "./Avatar";
 import { GroupCreateDialog } from "./GroupCreateDialog";
 import { MessageInput } from "./MessageInput";
@@ -141,7 +142,7 @@ export function LanChatPanel() {
           </div>
         ) : null}
         {header ? (
-          <ConversationHeader header={header} />
+          <ConversationHeader header={header} convId={activeConvId} isDesktop={isDesktop} />
         ) : (
           <div
             className="flex items-center px-3"
@@ -178,7 +179,20 @@ function SegBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   );
 }
 
-function ConversationHeader({ header }: { header: NonNullable<ReturnType<typeof useActiveHeader>> }) {
+function ConversationHeader({
+  header,
+  convId,
+  isDesktop,
+}: {
+  header: NonNullable<ReturnType<typeof useActiveHeader>>;
+  convId: string | null;
+  isDesktop: boolean;
+}) {
+  const detach = () => {
+    if (!convId) return;
+    const title = header.label ? `${header.label} ${header.name}` : header.name;
+    void openDetachedWindow({ kind: "lan-chat", sessionId: convId, title });
+  };
   return (
     <div
       className="flex items-center gap-2.5 px-3 py-2"
@@ -208,7 +222,7 @@ function ConversationHeader({ header }: { header: NonNullable<ReturnType<typeof 
           <Presentation className="h-4 w-4" />
         </HeaderBtn>
         <span style={{ width: 1, background: "var(--taomni-divider)", margin: "4px 4px" }} />
-        <HeaderBtn title="弹出为独立窗口（任务 01 阶段 9）" disabled>
+        <HeaderBtn title="弹出为独立窗口" disabled={!isDesktop} onClick={detach}>
           <ExternalLink className="h-4 w-4" />
         </HeaderBtn>
         <HeaderBtn title="停靠到屏幕边缘（后续任务）" disabled>

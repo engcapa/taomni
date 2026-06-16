@@ -33,6 +33,8 @@ interface LanChatStore {
   /** True only in the desktop (Tauri) runtime; browser preview is read-only. */
   isDesktop: boolean;
   initialized: boolean;
+  /** When true, this window does not raise desktop notifications (detached). */
+  suppressNotifications: boolean;
   profile: LanProfile | null;
   roster: LanPeer[];
   conversations: LanConversation[];
@@ -88,6 +90,7 @@ let unsubscribers: Array<() => void> = [];
 export const useLanChatStore = create<LanChatStore>((set, get) => ({
   isDesktop: isTauriRuntime(),
   initialized: false,
+  suppressNotifications: false,
   profile: null,
   roster: [],
   conversations: [],
@@ -197,10 +200,12 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
       // Notify on a genuinely new inbound message that is either a mention or
       // belongs to a conversation that isn't currently open.
       if (isNew && !fromMe && (mentioned || msg.convId !== s.activeConvId)) {
-        const senderName =
-          s.roster.find((p) => p.id === msg.senderId)?.name ?? msg.senderId.slice(0, 6);
-        const title = mentioned ? `${senderName} 提到了你` : senderName;
-        void notifyLanMessage(title, msg.body.slice(0, 120));
+        if (!s.suppressNotifications) {
+          const senderName =
+            s.roster.find((p) => p.id === msg.senderId)?.name ?? msg.senderId.slice(0, 6);
+          const title = mentioned ? `${senderName} 提到了你` : senderName;
+          void notifyLanMessage(title, msg.body.slice(0, 120));
+        }
       }
       return { messagesByConv: { ...s.messagesByConv, [msg.convId]: next } };
     }),
