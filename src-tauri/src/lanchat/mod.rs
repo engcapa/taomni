@@ -19,11 +19,25 @@ pub mod transport;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicU16;
+use std::sync::Mutex as StdMutex;
 
+use mdns_sd::ServiceDaemon;
 use tauri::AppHandle;
+use tokio::net::TcpListener;
+use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::RwLock;
 
 use protocol::PeerRecord;
+
+/// Tauri event channel names emitted to the frontend (all windows).
+pub mod events {
+    /// Full roster snapshot (`Vec<PeerRecord>`) after a debounced change.
+    pub const ROSTER: &str = "lanchat://roster";
+    /// A received/updated message (payload defined in phase 5).
+    #[allow(dead_code)]
+    pub const MESSAGE: &str = "lanchat://message";
+}
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.
 ///
@@ -37,8 +51,15 @@ pub struct LanChatState {
     pub store: store::LanChatStore,
     /// This node's stable identity (loaded/generated on construction).
     pub node_id: RwLock<String>,
-    /// Peers discovered via mDNS, keyed by node id (populated in phase 3).
+    /// Peers discovered via mDNS, keyed by node id.
     pub peers: RwLock<HashMap<String, PeerRecord>>,
+    /// mDNS service daemon handle (set when discovery starts). Cloneable; kept
+    /// so profile edits can re-announce the TXT record.
+    pub daemon: StdMutex<Option<ServiceDaemon>>,
+    /// TCP control-channel port (reserved at startup, advertised in mDNS TXT).
+    pub control_port: AtomicU16,
+    /// Reserved control listener, handed to the transport accept loop (phase 4).
+    pub control_listener: AsyncMutex<Option<TcpListener>>,
 }
 
 impl LanChatState {
@@ -57,6 +78,9 @@ impl LanChatState {
             store,
             node_id: RwLock::new(node_id),
             peers: RwLock::new(HashMap::new()),
+            daemon: StdMutex::new(None),
+            control_port: AtomicU16::new(0),
+            control_listener: AsyncMutex::new(None),
         }
     }
 
@@ -73,9 +97,26 @@ impl LanChatState {
 
 /// Launch the LanChat background service.
 ///
-/// Phase 1: skeleton that logs and idles — it establishes the startup hook
-/// and proves the spawn wiring without changing behavior. Later phases start
-/// mDNS discovery (phase 3) and the TCP control listener (phase 4) here.
-pub async fn start(_app: AppHandle) {
-    log::info!("lanchat: background service started (skeleton)");
+/// Reserves the TCP control port, then runs mDNS discovery (phase 3). The
+/// transport accept loop over the reserved listener is started in phase 4.
+pub async fn start(app: AppHandle) {
+    use std::sync::atomic::Ordering;
+    use tauri::Manager;
+
+    let lanchat = app.state::<crate::state::AppState>().lanchat.clone();
+
+    // Reserve an ephemeral control port now so the mDNS TXT can advertise it;
+    // the transport phase takes over this listener to accept connections.
+    match TcpListener::bind(("0.0.0.0", 0)).await {
+        Ok(listener) => {
+            let port = listener.local_addr().map(|a| a.port()).unwrap_or(0);
+            lanchat.control_port.store(port, Ordering::SeqCst);
+            *lanchat.control_listener.lock().await = Some(listener);
+            log::info!("lanchat: reserved control port {}", port);
+            discovery::run(app.clone(), lanchat, port).await;
+        }
+        Err(e) => {
+            log::error!("lanchat: failed to reserve control port: {e}");
+        }
+    }
 }

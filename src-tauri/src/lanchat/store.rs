@@ -18,7 +18,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::lanchat::protocol::PresenceStatus;
+use crate::lanchat::protocol::{PeerRecord, PresenceStatus};
 
 /// SQLite-backed LanChat store. Single connection guarded by a mutex.
 pub struct LanChatStore {
@@ -227,6 +227,36 @@ impl LanChatStore {
         Ok(self
             .get_profile()?
             .expect("profile row exists immediately after update"))
+    }
+
+    /// Upsert a discovered peer into the `peers` cache.
+    pub fn store_peer(&self, p: &PeerRecord) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO peers (id, name, avatar_hash, signature, last_seen, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(id) DO UPDATE SET
+               name=?2, avatar_hash=?3, signature=?4, last_seen=?5, status=?6",
+            params![
+                p.id,
+                p.name,
+                p.avatar_hash,
+                p.signature,
+                p.last_seen,
+                p.status.as_txt()
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Mark a cached peer offline (kept in the cache for last-seen history).
+    pub fn mark_peer_offline(&self, id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE peers SET status = 'offline' WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
     }
 }
 

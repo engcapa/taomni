@@ -71,9 +71,15 @@ pub async fn lanchat_update_profile(
         _ => None,
     };
     let status = PresenceStatus::from_txt(&args.status);
-    state
+    let profile = state
         .lanchat
         .store
         .update_profile(&args.name, avatar, &args.signature, status)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Re-announce the mDNS TXT so peers see the new name/avatar/status. The
+    // control-channel `profile-update` broadcast is added with messaging.
+    if let Err(e) = crate::lanchat::discovery::reregister(&state.lanchat) {
+        log::warn!("lanchat: re-register after profile update failed: {e}");
+    }
+    Ok(profile)
 }

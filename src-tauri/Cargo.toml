@@ -112,6 +112,8 @@ rusty-s3 = "0.9.1"
 quick-xml = { version = "0.40.1", features = ["serialize"] }
 jiff = "0.2"
 hmac = "0.13.0"
+mdns-sd = "0.20.0"
+if-addrs = "0.15.0"
 
 [patch.crates-io]
 ironrdp-connector = { path = "vendor/ironrdp-connector" }
