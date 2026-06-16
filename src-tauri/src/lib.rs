@@ -362,6 +362,11 @@ pub fn run() {
             lanchat::commands::lanchat_status,
             lanchat::commands::lanchat_get_profile,
             lanchat::commands::lanchat_update_profile,
+            lanchat::commands::lanchat_send_text,
+            lanchat::commands::lanchat_resend_message,
+            lanchat::commands::lanchat_list_conversations,
+            lanchat::commands::lanchat_list_messages,
+            lanchat::commands::lanchat_mark_read,
             exit_app,
         ])
         .run(tauri::generate_context!())

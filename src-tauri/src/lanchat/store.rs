@@ -43,6 +43,40 @@ pub struct Profile {
     pub updated_at: i64,
 }
 
+/// A conversation (direct with a peer, or a group). For direct chats the id is
+/// deterministic (`direct:<otherNodeId>`) so both peers map to a stable thread.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Conversation {
+    pub id: String,
+    /// "direct" | "group".
+    pub kind: String,
+    /// Peer node id (direct) or group id (group).
+    pub peer_or_group_id: String,
+    pub last_msg_at: i64,
+    pub unread: i64,
+}
+
+/// A chat message. `mentions` is a list of node ids; persisted as a JSON array.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanMessage {
+    pub id: String,
+    pub conv_id: String,
+    pub sender_id: String,
+    pub body: String,
+    #[serde(default)]
+    pub mentions: Vec<String>,
+    pub created_at: i64,
+    /// "sending" | "sent" | "delivered" | "failed".
+    pub state: String,
+}
+
+/// Stable conversation id for a direct chat with `peer_id`.
+pub fn direct_conv_id(peer_id: &str) -> String {
+    format!("direct:{peer_id}")
+}
+
 /// First 16 hex chars of the avatar's sha256 — the `avh` TXT fingerprint.
 pub fn avatar_fingerprint(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -258,6 +292,164 @@ impl LanChatStore {
         )?;
         Ok(())
     }
+
+    /// Ensure a conversation row exists, returning it. `kind` is "direct" or
+    /// "group"; `peer_or_group_id` is the peer node id or group id.
+    pub fn ensure_conversation(
+        &self,
+        id: &str,
+        kind: &str,
+        peer_or_group_id: &str,
+    ) -> rusqlite::Result<Conversation> {
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO conversations (id, kind, peer_or_group_id, last_msg_at, unread)
+                 VALUES (?1, ?2, ?3, 0, 0)
+                 ON CONFLICT(id) DO NOTHING",
+                params![id, kind, peer_or_group_id],
+            )?;
+        }
+        Ok(self
+            .get_conversation(id)?
+            .expect("conversation exists after ensure"))
+    }
+
+    /// Read a conversation by id.
+    pub fn get_conversation(&self, id: &str) -> rusqlite::Result<Option<Conversation>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, kind, peer_or_group_id, last_msg_at, unread
+             FROM conversations WHERE id = ?1",
+            params![id],
+            |r| {
+                Ok(Conversation {
+                    id: r.get(0)?,
+                    kind: r.get(1)?,
+                    peer_or_group_id: r.get(2)?,
+                    last_msg_at: r.get(3)?,
+                    unread: r.get(4)?,
+                })
+            },
+        )
+        .optional()
+    }
+
+    /// All conversations, most-recently-active first.
+    pub fn list_conversations(&self) -> rusqlite::Result<Vec<Conversation>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, kind, peer_or_group_id, last_msg_at, unread
+             FROM conversations ORDER BY last_msg_at DESC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(Conversation {
+                id: r.get(0)?,
+                kind: r.get(1)?,
+                peer_or_group_id: r.get(2)?,
+                last_msg_at: r.get(3)?,
+                unread: r.get(4)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// Insert a message (idempotent on id — duplicate deliveries are ignored).
+    /// Returns true if the row was newly inserted.
+    pub fn insert_message(&self, msg: &LanMessage) -> rusqlite::Result<bool> {
+        let mentions = serde_json::to_string(&msg.mentions).unwrap_or_else(|_| "[]".into());
+        let conn = self.conn.lock().unwrap();
+        let changed = conn.execute(
+            "INSERT INTO messages (id, conv_id, sender_id, body, mentions, created_at, state)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO NOTHING",
+            params![
+                msg.id,
+                msg.conv_id,
+                msg.sender_id,
+                msg.body,
+                mentions,
+                msg.created_at,
+                msg.state
+            ],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// Update a message's delivery state ("sending"/"sent"/"delivered"/"failed").
+    pub fn set_message_state(&self, id: &str, state: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE messages SET state = ?2 WHERE id = ?1",
+            params![id, state],
+        )?;
+        Ok(())
+    }
+
+    /// Read a single message by id.
+    pub fn get_message(&self, id: &str) -> rusqlite::Result<Option<LanMessage>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, conv_id, sender_id, body, mentions, created_at, state
+             FROM messages WHERE id = ?1",
+            params![id],
+            row_to_message,
+        )
+        .optional()
+    }
+
+    /// Recent messages for a conversation, oldest-first (last `limit`).
+    pub fn list_messages(&self, conv_id: &str, limit: i64) -> rusqlite::Result<Vec<LanMessage>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, conv_id, sender_id, body, mentions, created_at, state FROM (
+                 SELECT * FROM messages WHERE conv_id = ?1 ORDER BY created_at DESC LIMIT ?2
+             ) ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map(params![conv_id, limit], row_to_message)?;
+        rows.collect()
+    }
+
+    /// Bump a conversation's last-activity time and optionally its unread count.
+    pub fn touch_conversation(
+        &self,
+        conv_id: &str,
+        last_msg_at: i64,
+        unread_delta: i64,
+    ) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE conversations
+             SET last_msg_at = MAX(last_msg_at, ?2), unread = MAX(0, unread + ?3)
+             WHERE id = ?1",
+            params![conv_id, last_msg_at, unread_delta],
+        )?;
+        Ok(())
+    }
+
+    /// Clear a conversation's unread counter (message opened/read).
+    pub fn reset_unread(&self, conv_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE conversations SET unread = 0 WHERE id = ?1",
+            params![conv_id],
+        )?;
+        Ok(())
+    }
+}
+
+fn row_to_message(r: &rusqlite::Row<'_>) -> rusqlite::Result<LanMessage> {
+    let mentions_json: String = r.get(4)?;
+    let mentions = serde_json::from_str::<Vec<String>>(&mentions_json).unwrap_or_default();
+    Ok(LanMessage {
+        id: r.get(0)?,
+        conv_id: r.get(1)?,
+        sender_id: r.get(2)?,
+        body: r.get(3)?,
+        mentions,
+        created_at: r.get(5)?,
+        state: r.get(6)?,
+    })
 }
 
 #[cfg(test)]
@@ -318,5 +510,69 @@ mod tests {
         assert_eq!(h.len(), 16);
         assert_eq!(h, avatar_fingerprint(b"hello"));
         assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    fn msg(id: &str, conv: &str, sender: &str, ts: i64, state: &str) -> LanMessage {
+        LanMessage {
+            id: id.into(),
+            conv_id: conv.into(),
+            sender_id: sender.into(),
+            body: format!("body-{id}"),
+            mentions: vec![],
+            created_at: ts,
+            state: state.into(),
+        }
+    }
+
+    #[test]
+    fn insert_message_is_idempotent_on_id() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-x");
+        store.ensure_conversation(&conv, "direct", "peer-x").unwrap();
+        assert!(store.insert_message(&msg("m1", &conv, "peer-x", 100, "delivered")).unwrap());
+        // duplicate delivery -> not inserted again
+        assert!(!store.insert_message(&msg("m1", &conv, "peer-x", 100, "delivered")).unwrap());
+        assert_eq!(store.list_messages(&conv, 50).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn messages_listed_oldest_first_within_limit() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-y");
+        store.ensure_conversation(&conv, "direct", "peer-y").unwrap();
+        for (i, ts) in [(1, 300), (2, 100), (3, 200)] {
+            store
+                .insert_message(&msg(&format!("m{i}"), &conv, "me", ts, "sent"))
+                .unwrap();
+        }
+        let got = store.list_messages(&conv, 2).unwrap();
+        // last 2 by time (200, 300), returned oldest-first
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].created_at, 200);
+        assert_eq!(got[1].created_at, 300);
+    }
+
+    #[test]
+    fn conversation_unread_increments_and_resets() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-z");
+        store.ensure_conversation(&conv, "direct", "peer-z").unwrap();
+        store.touch_conversation(&conv, 500, 1).unwrap();
+        store.touch_conversation(&conv, 600, 1).unwrap();
+        let c = store.get_conversation(&conv).unwrap().unwrap();
+        assert_eq!(c.unread, 2);
+        assert_eq!(c.last_msg_at, 600);
+        store.reset_unread(&conv).unwrap();
+        assert_eq!(store.get_conversation(&conv).unwrap().unwrap().unread, 0);
+    }
+
+    #[test]
+    fn message_state_transitions() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-s");
+        store.ensure_conversation(&conv, "direct", "peer-s").unwrap();
+        store.insert_message(&msg("ms", &conv, "me", 1, "sending")).unwrap();
+        store.set_message_state("ms", "delivered").unwrap();
+        assert_eq!(store.get_message("ms").unwrap().unwrap().state, "delivered");
     }
 }

@@ -13,6 +13,7 @@
 
 pub mod commands;
 pub mod discovery;
+pub mod messaging;
 pub mod protocol;
 pub mod store;
 pub mod transport;
@@ -34,9 +35,10 @@ use protocol::PeerRecord;
 pub mod events {
     /// Full roster snapshot (`Vec<PeerRecord>`) after a debounced change.
     pub const ROSTER: &str = "lanchat://roster";
-    /// A received/updated message (payload defined in phase 5).
-    #[allow(dead_code)]
+    /// A new or updated message (`LanMessage`); the UI upserts by id.
     pub const MESSAGE: &str = "lanchat://message";
+    /// A conversation whose unread count / last activity changed.
+    pub const CONVERSATION: &str = "lanchat://conversation";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.

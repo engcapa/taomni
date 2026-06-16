@@ -79,8 +79,7 @@ pub async fn run_listener(app: AppHandle, state: Arc<LanChatState>) {
 
 /// Ensure a live connection to `peer_id`, dialing if necessary. Returns once
 /// the connection is registered (handshake complete), so callers may send
-/// immediately afterwards. (Used by messaging from phase 5.)
-#[allow(dead_code)]
+/// immediately afterwards.
 pub async fn ensure_connection(
     app: &AppHandle,
     state: &Arc<LanChatState>,
@@ -109,8 +108,6 @@ pub async fn ensure_connection(
 }
 
 /// Queue an envelope to a peer, dialing on demand if not yet connected.
-/// (Used by messaging from phase 5.)
-#[allow(dead_code)]
 pub async fn send_to_peer(
     app: &AppHandle,
     state: &Arc<LanChatState>,
@@ -283,10 +280,10 @@ async fn setup_connection(
     Ok(())
 }
 
-/// Route an inbound frame. Phase 4 handles keepalive; later phases extend this
-/// with text-msg/text-ack (phase 5), file-*, signal-*, wb-*.
+/// Route an inbound frame. Phase 4 handles keepalive; phase 5 adds text
+/// messaging; later phases extend with file-*, signal-*, wb-*.
 async fn dispatch_inbound(
-    _app: &AppHandle,
+    app: &AppHandle,
     state: &Arc<LanChatState>,
     peer_id: &str,
     my_id: &str,
@@ -308,6 +305,12 @@ async fn dispatch_inbound(
             if let Some(peer) = state.peers.write().await.get_mut(peer_id) {
                 peer.last_seen = chrono::Utc::now().timestamp_millis();
             }
+        }
+        frame::TEXT_MSG => {
+            crate::lanchat::messaging::handle_text_msg(app, state, peer_id, &env).await;
+        }
+        frame::TEXT_ACK => {
+            crate::lanchat::messaging::handle_text_ack(app, state, &env).await;
         }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");

@@ -5,10 +5,11 @@
 //! used by the status bar / web-preview banner.
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::lanchat::protocol::PresenceStatus;
-use crate::lanchat::store::{decode_avatar_base64, Profile};
+use crate::lanchat::store::{decode_avatar_base64, Conversation, LanMessage, Profile};
+use crate::lanchat::messaging;
 use crate::state::AppState;
 
 /// Snapshot of the LanChat service for the status bar.
@@ -82,4 +83,69 @@ pub async fn lanchat_update_profile(
         log::warn!("lanchat: re-register after profile update failed: {e}");
     }
     Ok(profile)
+}
+
+/// Arguments for [`lanchat_send_text`].
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SendTextArgs {
+    pub peer_id: String,
+    pub text: String,
+    #[serde(default)]
+    pub mentions: Vec<String>,
+}
+
+/// Send a one-to-one text message to a peer. Returns the locally persisted
+/// message (state transitions to delivered/failed via `lanchat://message`).
+#[tauri::command]
+pub async fn lanchat_send_text(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    args: SendTextArgs,
+) -> Result<LanMessage, String> {
+    if args.text.trim().is_empty() {
+        return Err("message text is empty".into());
+    }
+    messaging::send_text(&app, &state.lanchat, &args.peer_id, args.text, args.mentions).await
+}
+
+/// Re-send a failed/pending direct message (e.g. after the peer reconnects).
+#[tauri::command]
+pub async fn lanchat_resend_message(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    msg_id: String,
+) -> Result<LanMessage, String> {
+    messaging::resend(&app, &state.lanchat, &msg_id).await
+}
+
+/// List conversations, most-recently-active first.
+#[tauri::command]
+pub async fn lanchat_list_conversations(
+    state: State<'_, AppState>,
+) -> Result<Vec<Conversation>, String> {
+    state.lanchat.store.list_conversations().map_err(|e| e.to_string())
+}
+
+/// List recent messages for a conversation (oldest-first, last `limit`).
+#[tauri::command]
+pub async fn lanchat_list_messages(
+    state: State<'_, AppState>,
+    conv_id: String,
+    limit: Option<i64>,
+) -> Result<Vec<LanMessage>, String> {
+    state
+        .lanchat
+        .store
+        .list_messages(&conv_id, limit.unwrap_or(200))
+        .map_err(|e| e.to_string())
+}
+
+/// Clear a conversation's unread counter (opened/read).
+#[tauri::command]
+pub async fn lanchat_mark_read(
+    state: State<'_, AppState>,
+    conv_id: String,
+) -> Result<(), String> {
+    state.lanchat.store.reset_unread(&conv_id).map_err(|e| e.to_string())
 }
