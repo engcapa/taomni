@@ -71,6 +71,7 @@ import {
 import { parseSessionOptions, sessionTypeLabel } from "../../lib/terminalProfile";
 import { parseOpenSshConfig } from "../../lib/quickConnect";
 import { openBinaryFile, openTextFile, openTextFileWithName, downloadTextFile } from "../../lib/fileHelpers";
+import { pickImportText, pickImportBytes } from "../../lib/nativeImportPicker";
 import { serializeHtmlSessions } from "../../lib/sessionExportHtml";
 import {
   SESSION_ROOT_LABEL,
@@ -776,7 +777,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     parser: TextSessionParser,
     extraOptions?: () => Partial<SessionImportOptions>,
   ) => {
-    openTextFileWithName(accept).then((file) => {
+    pickImportText(accept).then((file) => {
       if (!file) return;
       const result = parser(file.text, {
         targetFolder: folderPath,
@@ -791,9 +792,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const importXshellFile = (folderPath: string | null) => {
-    openBinaryFile(".xsh,.xts,.zip,application/zip,application/x-zip-compressed,text/plain").then(async (bytes) => {
-      if (!bytes) return;
-      const result = await parseXshellFile(bytes, {
+    pickImportBytes(".xsh,.xts,.zip,application/zip,application/x-zip-compressed,text/plain").then(async (file) => {
+      if (!file) return;
+      const result = await parseXshellFile(file.bytes, {
         targetFolder: folderPath,
         existingSessions: sessions,
       });
@@ -804,9 +805,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const importXshellZip = (folderPath: string | null) => {
-    openBinaryFile(".zip,.xts,application/zip,application/x-zip-compressed").then(async (bytes) => {
-      if (!bytes) return;
-      const result = await parseXshellZipSessions(bytes, {
+    pickImportBytes(".zip,.xts,application/zip,application/x-zip-compressed").then(async (file) => {
+      if (!file) return;
+      const result = await parseXshellZipSessions(file.bytes, {
         targetFolder: folderPath,
         existingSessions: sessions,
       });
