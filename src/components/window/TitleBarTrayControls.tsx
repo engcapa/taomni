@@ -1,10 +1,9 @@
-import { Monitor, Moon, Sun, PanelTopClose, PanelTopOpen, SplitSquareVertical, Users, Bot, Download } from "lucide-react";
+import { Monitor, Moon, Sun, SplitSquareVertical, Users, Bot, Download } from "lucide-react";
 import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useUpdateStore } from "../../stores/updateStore";
-import { getAppPlatform } from "../../lib/runtime";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { PttButton } from "./PttButton";
@@ -18,8 +17,6 @@ const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
 
 export function TitleBarTrayControls() {
   const { mode, resolvedTheme, setMode } = useAppTheme();
-  const compactMode = useAppStore((s) => s.compactMode);
-  const toggleCompactMode = useAppStore((s) => s.toggleCompactMode);
   const terminalSplitActive = useAppStore((s) => s.terminalSplitActive);
   const multiExecActive = useAppStore((s) => s.multiExecActive);
   const toggleTerminalSplit = useAppStore((s) => s.toggleTerminalSplit);
@@ -34,15 +31,10 @@ export function TitleBarTrayControls() {
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
 
-  // Compact mode is removed on macOS — the global menu bar replaces the
-  // condensed in-app chrome there. The toggle stays on Windows/Linux.
-  const compactAvailable = getAppPlatform() !== "macos";
-
   const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
   const current = THEME_MODES[currentIndex] ?? THEME_MODES[0];
   const next = THEME_MODES[(currentIndex + 1) % THEME_MODES.length] ?? THEME_MODES[0];
 
-  const compactTitle = compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact");
   const splitTitle = terminalSplitActive ? t("titlebar.disableSplit") : t("titlebar.enableSplit");
   const multiExecTitle = multiExecActive ? t("titlebar.disableMultiExec") : t("titlebar.enableMultiExec");
   const chatOpenForGlobal = drawerOpen && drawerScope === "global";
@@ -101,17 +93,6 @@ export function TitleBarTrayControls() {
         >
           {current.icon}
         </TrayButton>
-        {compactAvailable && (
-          <TrayButton
-            testId="compact-toggle"
-            title={compactTitle}
-            ariaLabel={compactTitle}
-            active={compactMode}
-            onClick={toggleCompactMode}
-          >
-            {compactMode ? <PanelTopOpen className="w-[16px] h-[16px]" /> : <PanelTopClose className="w-[16px] h-[16px]" />}
-          </TrayButton>
-        )}
       </div>
 
       <TrayGroupSeparator />

@@ -1,9 +1,9 @@
-// Shared floating-toolbar button styles.
+// Shared tab-action toolbar button styles.
 //
-// Extracted from RdpPanel so every tab-overlay toolbar (RDP / terminal /
-// VNC) renders visually identical chrome: same icon-box size, background
-// opacity, border, and text colour. RdpPanel is the visual reference —
-// these values are its originals, kept verbatim.
+// These buttons render in the ControlBar's tab-action slot (and the detached
+// window's bar), so they blend into the app chrome rather than floating over
+// dark session content: transparent background, theme text colour, subtle
+// hover (see the `[data-tab-action] button:hover` rule in index.css).
 
 import type { CSSProperties } from "react";
 
@@ -13,10 +13,11 @@ export const FT_BUTTON_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 4,
-  padding: "3px 8px",
-  background: "rgba(0,0,0,0.45)",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.18)",
+  height: 24,
+  padding: "0 8px",
+  background: "transparent",
+  color: "var(--taomni-text)",
+  border: "1px solid transparent",
   borderRadius: 4,
   fontSize: 11,
   cursor: "pointer",
@@ -30,12 +31,12 @@ export const FT_ICON_BUTTON_STYLE: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 26,
+  width: 28,
   height: 24,
   padding: 0,
-  background: "rgba(0,0,0,0.45)",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.18)",
+  background: "transparent",
+  color: "var(--taomni-text)",
+  border: "1px solid transparent",
   borderRadius: 4,
   cursor: "pointer",
 };
@@ -43,14 +44,16 @@ export const FT_ICON_BUTTON_STYLE: CSSProperties = {
 // Thin vertical rule that visually groups related toolbar buttons.
 export const FT_SEPARATOR_STYLE: CSSProperties = {
   width: 1,
-  alignSelf: "stretch",
-  margin: "2px 2px",
-  background: "rgba(255,255,255,0.18)",
+  height: 16,
+  alignSelf: "center",
+  margin: "0 3px",
+  background: "var(--taomni-divider)",
 };
 
 /** Accent override merged onto FT_BUTTON_STYLE for active toggle buttons
  *  (e.g. terminal SFTP / chat toggles when open). */
 export const FT_BUTTON_ACTIVE_OVERRIDE: CSSProperties = {
-  background: "var(--taomni-accent)",
-  color: "#fff",
+  background: "var(--taomni-selected)",
+  color: "var(--taomni-text)",
+  borderColor: "var(--taomni-accent)",
 };

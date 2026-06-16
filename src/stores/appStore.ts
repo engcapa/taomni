@@ -7,7 +7,6 @@ import type { TabFilter } from "../lib/tabFilter";
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
-const COMPACT_MODE_KEY = "taomni.compactMode";
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
@@ -16,7 +15,6 @@ interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   sidebarCollapsed: boolean;
-  compactMode: boolean;
   activeSideTab: SideTab;
   /**
    * Whether a usable local X server is reachable (Xorg / XQuartz / VcXsrv /
@@ -75,8 +73,6 @@ interface AppState {
   moveTabToIndex: (id: string, toIndex: number) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  toggleCompactMode: () => void;
-  setCompactMode: (compact: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
   /** Re-probe the local X server and update {@link xServerStatus}. */
   refreshXServer: () => Promise<void>;
@@ -100,22 +96,6 @@ interface AppState {
   toggleTabMaximized: (tabId: string) => void;
   setTabFilter: (filter: TabFilter | null) => void;
   clearTabFilter: () => void;
-}
-
-function readCompactMode() {
-  try {
-    return window.localStorage.getItem(COMPACT_MODE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeCompactMode(compact: boolean) {
-  try {
-    window.localStorage.setItem(COMPACT_MODE_KEY, compact ? "true" : "false");
-  } catch {
-    // Ignore storage failures; compact mode still works for this run.
-  }
 }
 
 function readUiFontFamily(): string {
@@ -230,7 +210,6 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   activeTabId: "welcome",
   sidebarCollapsed: false,
-  compactMode: readCompactMode(),
   activeSideTab: "sessions",
   xServerEnabled: false,
   xServerStatus: null,
@@ -373,22 +352,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-  toggleCompactMode: () =>
-    set((s) => {
-      const compactMode = !s.compactMode;
-      writeCompactMode(compactMode);
-      return {
-        compactMode,
-        statusMessage: compactMode ? tr("status.compactEnabled") : tr("status.compactDisabled"),
-      };
-    }),
-  setCompactMode: (compactMode) => {
-    writeCompactMode(compactMode);
-    set({
-      compactMode,
-      statusMessage: compactMode ? tr("status.compactEnabled") : tr("status.compactDisabled"),
-    });
-  },
   setActiveSideTab: (tab) => set({ activeSideTab: tab, sidebarCollapsed: false }),
 
   refreshXServer: async () => {

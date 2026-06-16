@@ -100,11 +100,24 @@ pub fn run() {
             }
 
             if let Some(main_window_config) = app.config().app.windows.first().cloned() {
-                WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
+                #[allow(unused_mut)]
+                let mut builder = WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
                     // Required on Linux/Windows for navigator.clipboard.readText().
                     // Terminal right-click paste and Shift+Insert use that API.
-                    .enable_clipboard_access()
-                    .build()?;
+                    .enable_clipboard_access();
+                // On macOS use the native traffic-light controls with an overlay
+                // title bar so the window feels native (the frontend reserves a
+                // left inset and hides its custom min/max/close there). Windows
+                // and Linux keep the borderless custom chrome from tauri.conf.json
+                // (decorations = false).
+                #[cfg(target_os = "macos")]
+                {
+                    builder = builder
+                        .decorations(true)
+                        .title_bar_style(tauri::TitleBarStyle::Overlay)
+                        .hidden_title(true);
+                }
+                builder.build()?;
             }
             Ok(())
         })

@@ -88,7 +88,6 @@ export function TabBar({
   const {
     tabs,
     activeTabId,
-    compactMode,
     setActiveTab,
     removeTab,
     removeTabs,
@@ -421,7 +420,6 @@ export function TabBar({
   return (
     <div
       data-testid="tab-bar"
-      data-compact={compactMode}
       className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0 overflow-hidden"
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >

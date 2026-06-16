@@ -1,0 +1,231 @@
+import {
+  Download,
+  FileText,
+  FolderOpen,
+  HelpCircle,
+  Menu,
+  Monitor,
+  PanelLeft,
+  Plus,
+  Power,
+  RefreshCw,
+  Search,
+  Settings,
+  SplitSquareVertical,
+  Terminal as TerminalIcon,
+  Upload,
+  Users,
+  Wrench,
+  X,
+} from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { TabBar } from "./TabBar";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { WindowControls } from "../window/WindowControls";
+import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
+import { useSessionImportExport } from "../menubar/useSessionImportExport";
+import type { AppCommand } from "../menubar/commands";
+import { getAppPlatform } from "../../lib/runtime";
+import { useT } from "../../lib/i18n";
+import type { LocalShellSelection } from "../../types";
+import type { SessionConfig } from "../../lib/ipc";
+
+const IS_MAC = getAppPlatform() === "macos";
+// Width reserved on the left for the native macOS traffic-light controls when
+// the overlay title bar is active. Windows/Linux render their own controls on
+// the right instead, so no inset is needed there.
+const MAC_TRAFFIC_LIGHT_INSET = 76;
+
+interface ControlBarProps {
+  activeTabClosable: boolean;
+  /** macOS has a native global menu, so the in-bar app-menu button is hidden. */
+  nativeMenu: boolean;
+  xServerEnabled: boolean;
+  quickConnectVisible: boolean;
+  onCommand: (command: AppCommand) => void;
+  onToggleSidebar: () => void;
+  onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
+  onConnectSession: (session: SessionConfig) => void;
+  onOpenSessionEditor: () => void;
+  onDuplicateTab?: (id: string) => void;
+  onCloseWindow?: () => void;
+  /** Receives the DOM node that hosts the active tab's contextual actions. */
+  slotRef: (el: HTMLDivElement | null) => void;
+}
+export function ControlBar({
+  activeTabClosable,
+  nativeMenu,
+  xServerEnabled,
+  quickConnectVisible,
+  onCommand,
+  onToggleSidebar,
+  onStartLocalTerminal,
+  onConnectSession,
+  onOpenSessionEditor,
+  onDuplicateTab,
+  onCloseWindow,
+  slotRef,
+}: ControlBarProps) {
+  const ctx = useContextMenu();
+  const t = useT();
+  const {
+    hasSessions,
+    importJson,
+    importMoba,
+    importCsv,
+    importOpenSsh,
+    exportJson,
+    exportMoba,
+    exportCsv,
+    exportHtml,
+    previewNode,
+  } = useSessionImportExport();
+
+  // Windows/Linux move the borderless window by dragging marked regions; macOS
+  // uses the native overlay title bar (data-tauri-drag-region) instead.
+  const startDrag = (event: React.MouseEvent) => {
+    if (event.button !== 0) return;
+    if (!(event.target as HTMLElement).closest("[data-window-drag]")) return;
+    void getCurrentWindow().startDragging().catch(() => {});
+  };
+
+  const openMainMenu = (event: React.MouseEvent) => {
+    const importExportItems: MenuItem[] = [
+      {
+        label: t("menu.importSessions"),
+        testId: "menu-import-sessions",
+        icon: <Upload className="w-3 h-3" />,
+        children: [
+          { label: t("menu.importTaomni"), testId: "import-json", icon: <Upload className="w-3 h-3" />, onClick: importJson },
+          { label: t("menu.importMobaXterm"), testId: "import-mobaxterm", icon: <Upload className="w-3 h-3" />, onClick: importMoba },
+          { label: t("menu.importCsv"), testId: "import-csv", icon: <FileText className="w-3 h-3" />, onClick: importCsv },
+          { label: t("menu.importOpenSsh"), testId: "import-openssh", icon: <TerminalIcon className="w-3 h-3" />, onClick: importOpenSsh },
+        ],
+        onClick: () => {},
+      },
+      {
+        label: t("menu.exportSessions"),
+        testId: "menu-export-sessions",
+        icon: <Download className="w-3 h-3" />,
+        disabled: !hasSessions,
+        children: [
+          { label: t("menu.exportTaomni"), testId: "export-json", icon: <Download className="w-3 h-3" />, onClick: exportJson },
+          { label: t("menu.exportMobaXterm"), testId: "export-mobaxterm", icon: <Download className="w-3 h-3" />, onClick: exportMoba },
+          { label: t("menu.exportCsv"), testId: "export-csv", icon: <FileText className="w-3 h-3" />, onClick: exportCsv },
+          { label: t("menu.exportHtml"), testId: "export-html", icon: <FileText className="w-3 h-3" />, onClick: exportHtml },
+        ],
+        onClick: () => {},
+      },
+    ];
+    ctx.show(event, [
+      { label: t("menu.newLocalTerminal"), testId: "context-menu-item-new-local-terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
+      { label: t("menu.newRemoteSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+      { label: t("ribbon.newSftp"), icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
+      { label: t("menu.closeActiveTab"), icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
+      { label: "", separator: true, onClick: () => {} },
+      {
+        label: t("menu.sessions"),
+        testId: "context-menu-item-sessions",
+        icon: <FolderOpen className="w-3 h-3" />,
+        children: [
+          { label: t("menu.showSessions"), icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("sessions") },
+          { label: t("menu.newSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+          { label: t("menu.reloadSessions"), testId: "context-menu-item-reload-sessions", icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
+          { label: "", separator: true, onClick: () => {} },
+          ...importExportItems,
+        ],
+        onClick: () => {},
+      },
+      {
+        label: t("menu.view"),
+        icon: <PanelLeft className="w-3 h-3" />,
+        children: [
+          { label: t("sidebar.headerTitle"), icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
+          { label: t("menu.quickConnectToolbar"), testId: "context-menu-item-toggle-quick-connect", icon: <Search className="w-3 h-3" />, checked: quickConnectVisible, onClick: () => onCommand("toggle-quick-connect") },
+          { label: t("menu.splitTerminal"), icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },
+          { label: t("ribbon.multiExec"), icon: <Users className="w-3 h-3" />, onClick: () => onCommand("multiexec") },
+        ],
+        onClick: () => {},
+      },
+      {
+        label: t("menu.tools"),
+        testId: "context-menu-item-tools",
+        icon: <Wrench className="w-3 h-3" />,
+        children: [
+          { label: t("ribbon.tunneling"), icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
+          { label: t("tabs.networkTools"), onClick: () => onCommand("tools") },
+          { label: t("ribbon.packages"), onClick: () => onCommand("packages") },
+          { label: t("tabs.macros"), onClick: () => onCommand("macros") },
+        ],
+        onClick: () => {},
+      },
+      { label: t("menu.xserver"), testId: "context-menu-item-xserver", icon: <Monitor className="w-3 h-3" />, checked: xServerEnabled, onClick: () => onCommand("toggle-xserver") },
+      { label: t("menu.settings"), icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
+      { label: t("menu.help"), icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+      { label: "", separator: true, onClick: () => {} },
+      { label: t("ribbon.exit"), icon: <Power className="w-3 h-3" />, onClick: () => onCommand("exit"), danger: true },
+    ]);
+  };
+
+  return (
+    <div
+      data-testid="control-bar"
+      className="taomni-control-bar h-8 flex items-center min-w-0"
+      onMouseDown={IS_MAC ? undefined : startDrag}
+      {...(IS_MAC ? { "data-tauri-drag-region": true } : {})}
+    >
+      {ctx.render}
+      {previewNode}
+      {IS_MAC && (
+        <div className="shrink-0 self-stretch" style={{ width: MAC_TRAFFIC_LIGHT_INSET }} data-tauri-drag-region />
+      )}
+      <div className="flex items-center gap-1 px-1.5 shrink-0">
+        {!nativeMenu && (
+          <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
+        )}
+        <BarButton testId="sidebar-toggle" title={t("sidebar.headerTitle")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebar} />
+      </div>
+      <div className="min-w-0 flex-1 self-stretch">
+        <TabBar
+          onStartLocalTerminal={onStartLocalTerminal}
+          onConnectSession={onConnectSession}
+          onOpenSessionEditor={onOpenSessionEditor}
+          onDuplicateTab={onDuplicateTab}
+        />
+      </div>
+      <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
+      <div
+        className={IS_MAC ? "w-4 self-stretch shrink-0" : "w-10 self-stretch shrink-0"}
+        data-window-drag
+        {...(IS_MAC ? { "data-tauri-drag-region": true } : {})}
+      />
+      <TitleBarTrayControls />
+      {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
+    </div>
+  );
+}
+
+function BarButton({
+  icon,
+  title,
+  onClick,
+  testId,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  onClick?: (event: React.MouseEvent) => void;
+  testId?: string;
+}) {
+  return (
+    <button
+      data-testid={testId}
+      type="button"
+      title={title}
+      aria-label={title}
+      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+      onClick={onClick}
+    >
+      {icon}
+    </button>
+  );
+}

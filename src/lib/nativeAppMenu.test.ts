@@ -33,7 +33,6 @@ function actions(nodes: MenuNodeSpec[]): string[] {
 const baseParams = {
   activeTabClosable: true,
   hasSessions: true,
-  ribbonVisible: false,
   quickConnectVisible: false,
   t: idT,
 };
@@ -118,14 +117,11 @@ describe("buildAppMenuSpec", () => {
   it("reflects toolbar visibility as checkmarks in the View menu", () => {
     const spec = buildAppMenuSpec({
       ...baseParams,
-      ribbonVisible: true,
-      quickConnectVisible: false,
+      quickConnectVisible: true,
     });
     const view = submenu(spec, "view");
-    const ribbon = view.items.find((n) => n.type === "check" && n.id === "toggle-ribbon");
     const quick = view.items.find((n) => n.type === "check" && n.id === "toggle-quick-connect");
-    expect(ribbon && ribbon.type === "check" && ribbon.checked).toBe(true);
-    expect(quick && quick.type === "check" && quick.checked).toBe(false);
+    expect(quick && quick.type === "check" && quick.checked).toBe(true);
   });
 
   it("wires import/export actions for every format", () => {

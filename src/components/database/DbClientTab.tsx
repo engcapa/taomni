@@ -55,7 +55,7 @@ import {
 } from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
 import { useAppStore } from "../../stores/appStore";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { TabActions } from "../tabbar/TabActionSlot";
 import CaptureToolbar from "../capture/CaptureToolbar";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
@@ -1308,12 +1308,7 @@ export default function DbClientTab({
       style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       {queryTabMenu.render}
-      <FloatingToolbar
-        storageKey={`mob.db.toolbar.${info.engine}`}
-        defaultTop={4}
-        defaultRight={4}
-        testId="db-floating-toolbar"
-      >
+      <TabActions active={visible}>
         <CaptureToolbar
           filenamePrefix={safeFilePart(`db-${info.engine}-${info.host}`)}
           getVisible={async () => {
@@ -1393,7 +1388,7 @@ export default function DbClientTab({
             </button>
           </>
         )}
-      </FloatingToolbar>
+      </TabActions>
       {schemaCollapsed && (
         <button
           type="button"

@@ -6,8 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   Check,
-  PanelTopClose,
-  PanelTopOpen,
   Trash2,
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
@@ -50,8 +48,6 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
   const tabFilter = useAppStore((s) => s.tabFilter);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setTabFilter = useAppStore((s) => s.setTabFilter);
-  const compactMode = useAppStore((s) => s.compactMode);
-  const toggleCompactMode = useAppStore((s) => s.toggleCompactMode);
   const removeTabs = useAppStore((s) => s.removeTabs);
   const sessions = useSessionStore((s) => s.sessions);
 
@@ -256,15 +252,6 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
       }}
     >
       <div className="py-1">
-        <button type="button" className={rowClass} onClick={() => { toggleCompactMode(); onClose(); }}>
-          <span className="w-4 flex-shrink-0 flex items-center justify-center">
-            {compactMode ? <PanelTopOpen className="w-3 h-3" /> : <PanelTopClose className="w-3 h-3" />}
-          </span>
-          <span className="flex-1 truncate">
-            {compactMode ? t("titlebar.exitCompact") : t("titlebar.enterCompact")}
-          </span>
-          <span className={`ml-6 flex-shrink-0 text-[11px] ${muted}`}>Ctrl+Shift+M</span>
-        </button>
         <button type="button" className={rowClass} onClick={closeAllTerminals}>
           <span className="w-4 flex-shrink-0 flex items-center justify-center">
             <Trash2 className="w-3 h-3" />

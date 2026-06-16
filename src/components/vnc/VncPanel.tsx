@@ -17,7 +17,7 @@ import { useVncStore } from "../../stores/vncStore";
 import { useAppStore } from "../../stores/appStore";
 import { ExternalLink, Maximize, Maximize2, Minimize, Minimize2, RefreshCw } from "lucide-react";
 import CaptureToolbar from "../capture/CaptureToolbar";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { TabActions } from "../tabbar/TabActionSlot";
 import {
   FT_BUTTON_STYLE,
   FT_ICON_BUTTON_STYLE,
@@ -858,12 +858,7 @@ export default function VncPanel({
           only way back. Keeping it mounted after a disconnect means a dropped
           session can still be restored. The capture + scale controls need the
           live canvas, so those are gated on the connection state. */}
-      <FloatingToolbar
-        storageKey="mob.vnc.toolbar"
-        defaultTop={4}
-        defaultRight={4}
-        testId="vnc-floating-toolbar"
-      >
+      <TabActions active={visible}>
         {showCanvas && (
           <>
             <CaptureToolbar
@@ -940,7 +935,7 @@ export default function VncPanel({
               </button>
             </>
           )}
-        </FloatingToolbar>
+        </TabActions>
 
       {/* Status overlays */}
       {showConnecting && (

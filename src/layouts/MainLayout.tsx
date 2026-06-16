@@ -18,17 +18,15 @@ import {
   type PanelImperativeHandle,
   type PanelSize,
 } from "react-resizable-panels";
-import { MenuBar } from "../components/menubar/MenuBar";
-import { Ribbon, type RibbonCommand } from "../components/menubar/Ribbon";
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
+import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
-import { CompactTitleBar } from "../components/tabbar/CompactTitleBar";
-import { TabBar } from "../components/tabbar/TabBar";
+import { ControlBar } from "../components/tabbar/ControlBar";
+import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
 import { StatusBar } from "../components/statusbar/StatusBar";
-import { AppTitleBar } from "../components/window/AppTitleBar";
 import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
@@ -112,7 +110,6 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
-const RIBBON_VISIBLE_KEY = "taomni.ribbonVisible";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
 
 function macCommandDigitIndex(event: KeyboardEvent): number | null {
@@ -136,14 +133,6 @@ function macCommandDigitIndex(event: KeyboardEvent): number | null {
   return number === 9 ? -1 : number - 1;
 }
 
-function readRibbonVisible(): boolean {
-  try {
-    return typeof window !== "undefined" && window.localStorage.getItem(RIBBON_VISIBLE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
 // Whether a local terminal's shell can answer an OSC 7 cwd probe when its tab
 // is duplicated. PowerShell and POSIX shells (bash/zsh/git-bash/WSL) can; cmd
 // can't emit OSC 7 cleanly, so it's skipped (the duplicate opens in the default
@@ -160,14 +149,6 @@ function localShellSupportsCwdProbe(localShell?: LocalShellSelection): boolean {
     return false;
   }
   return true;
-}
-
-function writeRibbonVisible(visible: boolean) {
-  try {
-    window.localStorage.setItem(RIBBON_VISIBLE_KEY, visible ? "true" : "false");
-  } catch {
-    // Ignore storage failures; the in-memory visibility state still applies.
-  }
 }
 
 function readQuickConnectVisible(): boolean {
@@ -296,7 +277,6 @@ export function MainLayout() {
     tabs,
     activeTabId,
     sidebarCollapsed,
-    compactMode,
     xServerEnabled,
     refreshXServer,
     addTab,
@@ -305,8 +285,6 @@ export function MainLayout() {
     setActiveTab,
     toggleSidebar,
     setSidebarCollapsed,
-    toggleCompactMode,
-    setCompactMode,
     toggleXServer,
     setStatusMessage,
     multiExecActive,
@@ -345,12 +323,13 @@ export function MainLayout() {
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
   const [sftpDetachedTabs, setSftpDetachedTabs] = useState<Record<string, boolean>>({});
-  const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
-  const [ribbonVisible, setRibbonVisible] = useState(readRibbonVisible);
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
-  // On macOS we render a native global menu bar instead of the in-app
-  // <MenuBar>. The native menu lives at the top of the screen, matching
-  // standard macOS apps, and replaces compact mode entirely on that platform.
+  // The active tab's contextual action toolbar (Capture / Detach / Maximize …)
+  // portals into this slot, which lives inside the ControlBar.
+  const [tabActionSlot, setTabActionSlot] = useState<HTMLDivElement | null>(null);
+  // On macOS we render a native global menu bar instead of the in-app app menu.
+  // The native menu lives at the top of the screen, matching standard macOS
+  // apps; the in-bar menu button is hidden there.
   const nativeMenu = isTauriRuntime() && getAppPlatform() === "macos";
   const importExport = useSessionImportExport();
   const exitRequestInFlightRef = useRef(false);
@@ -923,7 +902,7 @@ export function MainLayout() {
     if (!panel) return;
 
     const frame = requestAnimationFrame(() => {
-      if (compactMode || sidebarCollapsed || tabMaximizedId) {
+      if (sidebarCollapsed || tabMaximizedId) {
         panel.collapse();
       } else {
         panel.resize(`${lastSidebarSizeRef.current}%`);
@@ -931,13 +910,7 @@ export function MainLayout() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [compactMode, sidebarCollapsed, tabMaximizedId]);
-
-  useEffect(() => {
-    if (!compactMode) {
-      setCompactSidebarOpen(false);
-    }
-  }, [compactMode]);
+  }, [sidebarCollapsed, tabMaximizedId]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -945,10 +918,6 @@ export function MainLayout() {
         event.preventDefault();
         useServersStore.getState().openDialog();
         return;
-      }
-      if (!nativeMenu && event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "m") {
-        event.preventDefault();
-        toggleCompactMode();
       }
       const primary = event.ctrlKey || event.metaKey;
       if (!primary || event.altKey || event.key.toLowerCase() !== "l") return;
@@ -972,7 +941,7 @@ export function MainLayout() {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [nativeMenu, toggleCompactMode, toggleGlobalChat, toggleTabChat]);
+  }, [toggleGlobalChat, toggleTabChat]);
 
   // Hydrate server configs + statuses once on mount so the servers dialog
   // opens with persisted settings and live run state.
@@ -1620,14 +1589,7 @@ export function MainLayout() {
     setStatusMessage(tr(next ? "status.quickConnectShown" : "status.quickConnectHidden"));
   }, [quickConnectVisible, setStatusMessage]);
 
-  const toggleRibbonVisible = useCallback(() => {
-    const next = !ribbonVisible;
-    setRibbonVisible(next);
-    writeRibbonVisible(next);
-    setStatusMessage(tr(next ? "status.ribbonShown" : "status.ribbonHidden"));
-  }, [ribbonVisible, setStatusMessage]);
-
-  const handleCommand = useCallback((command: RibbonCommand | "close-active" | "reload-sessions" | "toggle-quick-connect" | "toggle-ribbon") => {
+  const handleCommand = useCallback((command: AppCommand) => {
     switch (command) {
       case "new-session":
         handleNewSession();
@@ -1649,30 +1611,16 @@ export function MainLayout() {
         toggleXServer();
         break;
       case "view":
-        if (compactMode) {
-          setCompactSidebarOpen((open) => !open);
-        } else {
-          toggleSidebar();
-        }
-        break;
-      case "toggle-compact":
-        toggleCompactMode();
+        toggleSidebar();
         break;
       case "toggle-quick-connect":
         toggleQuickConnectVisible();
-        break;
-      case "toggle-ribbon":
-        toggleRibbonVisible();
         break;
       case "servers":
         useServersStore.getState().openDialog();
         break;
       case "sessions":
-        if (compactMode) {
-          setCompactSidebarOpen(true);
-        } else {
-          setSidebarCollapsed(false);
-        }
+        setSidebarCollapsed(false);
         break;
       case "split":
         toggleTerminalSplit();
@@ -1717,7 +1665,6 @@ export function MainLayout() {
     }
   }, [
     activeTab,
-    compactMode,
     handleNewSession,
     handleNewSftpSession,
     loadSessions,
@@ -1730,8 +1677,6 @@ export function MainLayout() {
     setStatusMessage,
     setSidebarCollapsed,
     toggleQuickConnectVisible,
-    toggleRibbonVisible,
-    toggleCompactMode,
     toggleTerminalSplit,
     toggleSidebar,
     toggleXServer,
@@ -1759,16 +1704,6 @@ export function MainLayout() {
     dispatchMenuActionRef.current = dispatchMenuAction;
   }, [dispatchMenuAction]);
 
-  // Compact mode does not exist on macOS — if a previous (cross-platform)
-  // run left it enabled in localStorage, clear it on mount so the native
-  // menu layout renders correctly.
-  useEffect(() => {
-    if (nativeMenu && compactMode) {
-      setCompactMode(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nativeMenu]);
-
   // Build + install the macOS global menu. Rebuilt whenever a piece of state
   // shown in the menu changes (checkmarks, enabled state) — all low-frequency,
   // so a full rebuild is simpler and cheaper than mutating individual items.
@@ -1778,7 +1713,6 @@ export function MainLayout() {
     const spec = buildAppMenuSpec({
       activeTabClosable: !!activeTab?.closable,
       hasSessions: importExport.hasSessions,
-      ribbonVisible,
       quickConnectVisible,
       t,
     });
@@ -1792,7 +1726,6 @@ export function MainLayout() {
     nativeMenu,
     activeTab?.closable,
     importExport.hasSessions,
-    ribbonVisible,
     quickConnectVisible,
     t,
   ]);
@@ -1973,59 +1906,44 @@ export function MainLayout() {
     tabMaximizedId === activeTabId &&
     tabs.some((t) => t.id === tabMaximizedId);
   const chromeHidden = isTabMaximized;
+  // macOS uses the native overlay title bar (traffic lights + native resize),
+  // so the custom resize handles are Windows/Linux only.
+  const isMac = getAppPlatform() === "macos";
 
   return (
+    <TabActionSlotProvider slot={tabActionSlot}>
     <div
-      data-compact-mode={compactMode}
       data-tab-maximized={isTabMaximized ? "true" : undefined}
-      className={`relative w-full h-full flex flex-col${compactMode ? " taomni-compact-root" : ""}`}
+      className="relative w-full h-full flex flex-col"
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
-      <WindowResizeHandles />
-      {!compactMode && !chromeHidden && <AppTitleBar onClose={requestAppExit} />}
-      {!compactMode && !chromeHidden && (
-        <>
-          {!nativeMenu && (
-            <MenuBar
-              activeTabClosable={!!activeTab?.closable}
-              ribbonVisible={ribbonVisible}
-              quickConnectVisible={quickConnectVisible}
-              onCommand={handleCommand}
-            />
-          )}
-          {ribbonVisible && (
-            <Ribbon
-              xServerEnabled={xServerEnabled}
-              splitActive={terminalSplitActive}
-              onCommand={handleCommand}
-            />
-          )}
-          {quickConnectVisible && (
-            <QuickConnect
-              onConnectInput={handleQuickConnect}
-              onConnectSession={handleConnectSession}
-              onHome={() => setActiveTab("welcome")}
-            />
-          )}
-        </>
-      )}
-      {compactMode && !chromeHidden && (
-        <CompactTitleBar
-          activeTabClosable={!!activeTab?.closable}
-          onCommand={handleCommand}
-          onToggleSidebarDrawer={() => setCompactSidebarOpen((open) => !open)}
-          onStartLocalTerminal={(localShell) =>
-            openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
-          }
+      {!isMac && <WindowResizeHandles />}
+      <ControlBar
+        activeTabClosable={!!activeTab?.closable}
+        nativeMenu={nativeMenu}
+        xServerEnabled={xServerEnabled}
+        quickConnectVisible={quickConnectVisible}
+        onCommand={handleCommand}
+        onToggleSidebar={toggleSidebar}
+        onStartLocalTerminal={(localShell) =>
+          openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+        }
+        onConnectSession={handleConnectSession}
+        onOpenSessionEditor={() => handleNewSession()}
+        onDuplicateTab={handleDuplicateTab}
+        onCloseWindow={requestAppExit}
+        slotRef={setTabActionSlot}
+      />
+      {quickConnectVisible && !chromeHidden && (
+        <QuickConnect
+          onConnectInput={handleQuickConnect}
           onConnectSession={handleConnectSession}
-          onOpenSessionEditor={() => handleNewSession()}
-          onDuplicateTab={handleDuplicateTab}
-          onCloseWindow={requestAppExit}
+          onHome={() => setActiveTab("welcome")}
         />
       )}
 
       <div className="flex-1 flex min-h-0">
-        {!compactMode && !chromeHidden && sidebarCollapsed && (
+        {!chromeHidden && sidebarCollapsed && (
           <div data-testid="collapsed-sidebar-rail" className="h-full w-[26px] shrink-0 overflow-hidden">
             <Sidebar
               compact
@@ -2057,14 +1975,13 @@ export function MainLayout() {
               if (percentage > 2) {
                 lastSidebarSizeRef.current = percentage;
               }
-              if (!compactMode && !chromeHidden) {
+              if (!chromeHidden) {
                 setSidebarCollapsed(percentage <= 2);
               }
             }}
           >
-            <div className="h-full overflow-hidden" style={compactMode || sidebarCollapsed || chromeHidden ? { display: "none" } : undefined}>
+            <div className="h-full overflow-hidden" style={sidebarCollapsed || chromeHidden ? { display: "none" } : undefined}>
               <Sidebar
-                compact={compactMode}
                 onNewSession={handleNewSession}
                 onNewSftpSession={handleNewSftpSession}
                 onEditSession={handleEditSession}
@@ -2075,21 +1992,12 @@ export function MainLayout() {
 
           <PanelResizeHandle
             data-testid="main-sidebar-resize-handle"
-            className={compactMode || sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
+            className={sidebarCollapsed || chromeHidden ? "hidden" : "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
           />
 
           <Panel id="content">
             <div className="h-full flex flex-col min-w-0">
-              {!compactMode && !chromeHidden && (
-                <TabBar
-                  onStartLocalTerminal={(localShell) =>
-                    openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
-                  }
-                  onConnectSession={handleConnectSession}
-                  onOpenSessionEditor={() => handleNewSession()}
-                  onDuplicateTab={handleDuplicateTab}
-                />
-              )}              {multiExecActive && (
+              {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}
@@ -2640,20 +2548,7 @@ export function MainLayout() {
         {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
       </div>
 
-      {!compactMode && !chromeHidden && <StatusBar />}
-
-      {compactMode && compactSidebarOpen && (
-        <CompactSidebarDrawer
-          onClose={() => setCompactSidebarOpen(false)}
-          onNewSession={handleNewSession}
-          onNewSftpSession={handleNewSftpSession}
-          onEditSession={handleEditSession}
-          onConnectSession={(session) => {
-            setCompactSidebarOpen(false);
-            handleConnectSession(session);
-          }}
-        />
-      )}
+      {!chromeHidden && <StatusBar />}
 
       {showSessionEditor && (
         <SessionEditor
@@ -2706,12 +2601,14 @@ export function MainLayout() {
       <UpdateDialog />
 
       {/* Session import preview — driven by the native macOS menu's
-          import actions (no-op elsewhere, where <MenuBar> hosts its own). */}
+          import actions (no-op elsewhere, where the ControlBar app menu hosts
+          its own). */}
       {nativeMenu && importExport.previewNode}
 
       <ServersDialog />
       {appExitConfirmDialog}
     </div>
+    </TabActionSlotProvider>
   );
 }
 
@@ -2821,72 +2718,6 @@ function TerminalSplitToolbar({
       >
         <X className="w-3.5 h-3.5" />
       </button>
-    </div>
-  );
-}
-
-function CompactSidebarDrawer({
-  onClose,
-  onNewSession,
-  onNewSftpSession,
-  onEditSession,
-  onConnectSession,
-}: {
-  onClose: () => void;
-  onNewSession: (groupPath?: string | null) => void;
-  onNewSftpSession: () => void;
-  onEditSession: (session: SessionConfig) => void;
-  onConnectSession: (session: SessionConfig) => void;
-}) {
-  const t = useT();
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  return (
-    <div data-testid="compact-sidebar-drawer" className="absolute inset-x-0 top-8 bottom-0 z-[1200] pointer-events-none">
-      <button
-        type="button"
-        aria-label={t("sidebar.closeDrawer")}
-        className="absolute inset-0 bg-black/10 pointer-events-auto"
-        onClick={onClose}
-      />
-      <div
-        className="absolute left-0 top-0 bottom-0 w-[min(380px,calc(100vw-44px))] pointer-events-auto shadow-xl"
-        style={{
-          background: "var(--taomni-sidebar-bg)",
-          borderRight: "1px solid var(--taomni-sidebar-border)",
-        }}
-      >
-        <div
-          className="h-7 flex items-center px-2 border-b text-[12px] font-semibold"
-          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
-        >
-          {t("sidebar.headerTitle")}
-          <button
-            type="button"
-            title={t("sidebar.closeDrawer")}
-            aria-label={t("sidebar.closeDrawer")}
-            className="ml-auto h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onClose}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="absolute left-0 right-0 top-7 bottom-0">
-          <Sidebar
-            compact={false}
-            onNewSession={onNewSession}
-            onNewSftpSession={onNewSftpSession}
-            onEditSession={onEditSession}
-            onConnectSession={onConnectSession}
-          />
-        </div>
-      </div>
     </div>
   );
 }

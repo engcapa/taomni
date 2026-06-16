@@ -41,7 +41,7 @@ import {
   writeFiles as writeClipboardFiles,
   writeText as writeClipboardText,
 } from "../../lib/clipboard";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { TabActions } from "../tabbar/TabActionSlot";
 import {
   FT_BUTTON_STYLE,
   FT_BUTTON_ACTIVE_OVERRIDE,
@@ -660,12 +660,7 @@ export default function RdpPanel({
         flexDirection: "column",
       }}
     >
-      <FloatingToolbar
-        storageKey="mob.rdp.toolbar"
-        defaultTop={4}
-        defaultRight={4}
-        testId="rdp-floating-toolbar"
-      >
+      <TabActions active={visible}>
         <span
           data-testid="rdp-status"
           style={{
@@ -780,7 +775,7 @@ export default function RdpPanel({
             </button>
           </>
         )}
-      </FloatingToolbar>
+      </TabActions>
 
       <div
         ref={viewportRef}

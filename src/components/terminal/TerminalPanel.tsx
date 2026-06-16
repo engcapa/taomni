@@ -53,7 +53,7 @@ import {
   type XtermCaptureTheme,
 } from "../../lib/capture";
 import CaptureToolbar from "../capture/CaptureToolbar";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
+import { TabActions } from "../tabbar/TabActionSlot";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
   FT_BUTTON_STYLE,
@@ -2679,12 +2679,7 @@ export function TerminalPanel({
     >
       <div ref={containerRef} className="w-full h-full overflow-hidden" />
 
-      <FloatingToolbar
-        storageKey={`mob.terminal.toolbar.${ssh ? "ssh" : "local"}`}
-        defaultTop={4}
-        defaultRight={4}
-        testId="terminal-floating-toolbar"
-      >
+      <TabActions active={activeForShortcuts}>
         <CaptureToolbar
           filenamePrefix={`${safeFilePart(tabTitle)}`}
           getVisible={async () => {
@@ -2827,7 +2822,7 @@ export function TerminalPanel({
             </button>
           </>
         )}
-      </FloatingToolbar>
+      </TabActions>
 
       {isMultiExecTarget && (
         <div

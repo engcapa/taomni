@@ -69,7 +69,6 @@ describe("TabBar overflow navigation", () => {
     useAppStore.setState({
       tabs: Array.from({ length: 12 }, (_, index) => makeTab(index)),
       activeTabId: "tab-0",
-      compactMode: false,
       multiExecActive: false,
       multiExecSelectedTabIds: new Set(),
       tabFilter: null,
@@ -83,7 +82,6 @@ describe("TabBar overflow navigation", () => {
     useAppStore.setState({
       tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
       activeTabId: "welcome",
-      compactMode: false,
       multiExecActive: false,
       multiExecSelectedTabIds: new Set(),
       tabFilter: null,
