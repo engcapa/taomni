@@ -561,9 +561,9 @@ describe("SessionEditor SSH settings tabs", () => {
     const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });
 
     await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
-    await user.type(screen.getByLabelText("Remote host"), "hbase-rest.example.com");
-    // Switch to REST mode so the REST-only fields render.
+    // Switch to REST mode first so the REST-only host/port fields render.
     await user.selectOptions(screen.getByTestId("hbase-connection-mode"), "rest");
+    await user.type(screen.getByLabelText("Remote host"), "hbase-rest.example.com");
     await user.type(screen.getByLabelText("HBase username"), "root");
     await user.type(screen.getByLabelText("HBase namespace"), "prod");
     await user.type(screen.getByLabelText("HBase REST path"), "/gateway/hbase");
@@ -593,8 +593,9 @@ describe("SessionEditor SSH settings tabs", () => {
     const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });
 
     await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
-    await user.type(screen.getByLabelText("Remote host"), "hbase.example.com");
-    // Native is the default mode; the ZK quorum field should be present.
+    // Native is the default mode; host/port are hidden and the ZK quorum field
+    // replaces them.
+    expect(screen.queryByLabelText("Remote host")).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("HBase ZooKeeper quorum"), "zk1:2181,zk2:2181");
     await user.type(screen.getByLabelText("HBase namespace"), "prod");
 
@@ -605,7 +606,7 @@ describe("SessionEditor SSH settings tabs", () => {
     const savedOptions = JSON.parse(savedConfig.options_json);
     expect(savedConfig).toMatchObject({
       session_type: "HBaseShell",
-      host: "hbase.example.com",
+      host: "",
     });
     expect(savedOptions).toMatchObject({
       hbaseConnectionMode: "native",
@@ -620,7 +621,9 @@ describe("SessionEditor SSH settings tabs", () => {
     const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });
 
     await waitFor(() => expect(screen.getByTestId("session-hbase-section")).toBeInTheDocument());
-    await user.type(screen.getByLabelText("Remote host"), "hbase.example.com");
+    // Native mode: no host/port fields; a ZK quorum (or hbase-site.xml) supplies
+    // the connection target, and auth is configured directly.
+    await user.type(screen.getByLabelText("HBase ZooKeeper quorum"), "zk1:2181,zk2:2181");
     await user.selectOptions(screen.getByTestId("hbase-auth-method"), "kerberos");
     await user.type(screen.getByLabelText("HBase service principal"), "hbase/_HOST@EMR.367593.COM");
     await user.type(screen.getByLabelText("HBase keytab file path"), "/path/to/keytab");
@@ -637,7 +640,7 @@ describe("SessionEditor SSH settings tabs", () => {
     const savedOptions = JSON.parse(savedConfig.options_json);
     expect(savedConfig).toMatchObject({
       session_type: "HBaseShell",
-      host: "hbase.example.com",
+      host: "",
     });
     expect(savedOptions).toMatchObject({
       hbaseConnectionMode: "native",

@@ -525,13 +525,20 @@ fn build_native_client(
     config: &HBaseConfig,
 ) -> Result<native::client::NativeClient, String> {
     let host = config.host.trim();
-    if host.is_empty() {
-        return Err("HBase host is required".into());
-    }
-    // ZK quorum: explicit field wins; otherwise treat host:port as the quorum.
+    // Native mode bootstraps via ZooKeeper, so the ZK quorum is what matters.
+    // The explicit quorum (or one parsed from hbase-site.xml) wins; host:port is
+    // only a single-node shorthand when no quorum is configured. host is
+    // therefore optional as long as a quorum is available.
     let zk_quorum = match config.zk_quorum.as_deref().map(str::trim) {
         Some(q) if !q.is_empty() => q.to_string(),
-        _ => format!("{host}:{}", config.port),
+        _ if !host.is_empty() => format!("{host}:{}", config.port),
+        _ => {
+            return Err(
+                "HBase native mode requires a ZooKeeper quorum (set the ZK quorum \
+                 field or provide an hbase-site.xml)"
+                    .into(),
+            )
+        }
     };
     let cfg = native::client::NativeConfig {
         zk_quorum,
