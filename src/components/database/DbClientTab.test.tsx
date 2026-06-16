@@ -100,12 +100,9 @@ vi.mock("./QueryResultGrid", () => ({
   QueryResultGrid: () => <div data-testid="query-result-grid" />,
 }));
 
-vi.mock("../floating-toolbar/FloatingToolbar", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <div data-testid="floating-toolbar">{children}</div>,
-}));
-
-vi.mock("../capture/CaptureToolbar", () => ({
-  default: () => <div data-testid="capture-toolbar" />,
+vi.mock("../tabbar/TabActionSlot", () => ({
+  TabActions: ({ active, children }: { active: boolean; children: React.ReactNode }) =>
+    active ? <div data-testid="tab-action-slot">{children}</div> : null,
 }));
 
 vi.mock("../ContextMenu", () => ({

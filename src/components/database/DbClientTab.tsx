@@ -55,8 +55,9 @@ import {
 } from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
 import { useAppStore } from "../../stores/appStore";
-import FloatingToolbar from "../floating-toolbar/FloatingToolbar";
-import CaptureToolbar from "../capture/CaptureToolbar";
+import { TabActions } from "../tabbar/TabActionSlot";
+import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
   FT_BUTTON_STYLE,
@@ -74,8 +75,6 @@ interface DbClientTabProps {
   info: DbConnectInfo;
   visible: boolean;
   onDetach?: () => void;
-  onToggleMaximize?: () => void;
-  maximized?: boolean;
   chatToggle?: {
     open: boolean;
     onToggle: () => void;
@@ -397,8 +396,6 @@ export default function DbClientTab({
   info,
   visible,
   onDetach,
-  onToggleMaximize,
-  maximized,
   chatToggle,
   detachedWindowControls,
 }: DbClientTabProps) {
@@ -837,6 +834,28 @@ export default function DbClientTab({
     if (!rootRef.current) return null;
     return await renderElementToCanvas(rootRef.current);
   }, []);
+
+  // Publish this DB view as the active capture source while visible, so the
+  // screenshot actions (tab-strip `⋯` menu / detached capture button) target it.
+  useEffect(() => {
+    if (!visible) return;
+    const source: CaptureSource = {
+      filenamePrefix: safeFilePart(`db-${info.engine}-${info.host}`),
+      getVisible: async () => {
+        if (!rootRef.current) throw new Error("Database view not ready");
+        return await captureElementPng(rootRef.current);
+      },
+      getFull: async () => {
+        if (!rootRef.current) throw new Error("Database view not ready");
+        return await captureElementPng(rootRef.current);
+      },
+      getScrollFrame: captureDbFrame,
+      getGifFrame: captureDbFrame,
+      onStatus: setStatusMessage,
+    };
+    useCaptureStore.getState().setSource(source);
+    return () => useCaptureStore.getState().clearSource(source);
+  }, [visible, info.engine, info.host, captureDbFrame, setStatusMessage]);
 
   const cancelQuery = useCallback((panelId?: string) => {
     setPanels((prev) =>
@@ -1308,27 +1327,7 @@ export default function DbClientTab({
       style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       {queryTabMenu.render}
-      <FloatingToolbar
-        storageKey={`mob.db.toolbar.${info.engine}`}
-        defaultTop={4}
-        defaultRight={4}
-        testId="db-floating-toolbar"
-      >
-        <CaptureToolbar
-          filenamePrefix={safeFilePart(`db-${info.engine}-${info.host}`)}
-          getVisible={async () => {
-            if (!rootRef.current) throw new Error("Database view not ready");
-            return await captureElementPng(rootRef.current);
-          }}
-          getFull={async () => {
-            if (!rootRef.current) throw new Error("Database view not ready");
-            return await captureElementPng(rootRef.current);
-          }}
-          getScrollFrame={captureDbFrame}
-          getGifFrame={captureDbFrame}
-          onStatus={setStatusMessage}
-          compact
-        />
+      <TabActions active={visible}>
         {chatToggle && (
           <button
             type="button"
@@ -1356,20 +1355,9 @@ export default function DbClientTab({
             <ExternalLink size={14} />
           </button>
         )}
-        {onToggleMaximize && (
-          <button
-            type="button"
-            data-testid="db-maximize"
-            onClick={onToggleMaximize}
-            title={maximized ? t("rdp.restore") : t("rdp.maximize")}
-            aria-label={maximized ? t("rdp.restore") : t("rdp.maximize")}
-            style={FT_ICON_BUTTON_STYLE}
-          >
-            {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-        )}
         {detachedWindowControls && (
           <>
+            <CaptureMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"
@@ -1393,7 +1381,7 @@ export default function DbClientTab({
             </button>
           </>
         )}
-      </FloatingToolbar>
+      </TabActions>
       {schemaCollapsed && (
         <button
           type="button"

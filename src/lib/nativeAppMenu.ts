@@ -1,4 +1,4 @@
-import type { RibbonCommand } from "../components/menubar/Ribbon";
+import type { AppCommand } from "../components/menubar/commands";
 import { t as translate } from "./i18n";
 
 /**
@@ -10,11 +10,7 @@ import { t as translate } from "./i18n";
  */
 
 export type MenuActionId =
-  | RibbonCommand
-  | "close-active"
-  | "reload-sessions"
-  | "toggle-quick-connect"
-  | "toggle-ribbon"
+  | AppCommand
   | "import-json"
   | "import-moba"
   | "import-csv"
@@ -77,8 +73,6 @@ export interface BuildAppMenuParams {
   activeTabClosable: boolean;
   /** Whether any saved sessions exist (controls Export enablement). */
   hasSessions: boolean;
-  /** Tool button bar (ribbon) visibility — shown as a checkmark. */
-  ribbonVisible: boolean;
   /** Quick-connect toolbar visibility — shown as a checkmark. */
   quickConnectVisible: boolean;
   /** Translation function (defaults to the module-level `t`). */
@@ -94,7 +88,6 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
   const {
     activeTabClosable,
     hasSessions,
-    ribbonVisible,
     quickConnectVisible,
     t = translate,
   } = params;
@@ -171,7 +164,6 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
   ];
 
   const viewMenu: MenuNodeSpec[] = [
-    { type: "check", id: "toggle-ribbon", label: t("menu.toolButtonBar"), action: "toggle-ribbon", checked: ribbonVisible },
     { type: "check", id: "toggle-quick-connect", label: t("menu.quickConnectToolbar"), action: "toggle-quick-connect", checked: quickConnectVisible },
     { type: "separator" },
     { type: "item", id: "toggle-sidebar", label: t("menu.toggleSidebar"), action: "view" },

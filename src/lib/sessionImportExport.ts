@@ -13,6 +13,11 @@ const TAOMNI_FORMAT = "taomni.sessions";
 const LEGACY_FORMAT = "newmob.sessions";
 const SCHEMA_VERSION = 1;
 const MAX_IMPORT_CHARS = 2_000_000;
+// ZeroOmega/SwitchyOmega backups embed full AutoSwitch rule lists and PAC
+// scripts, so a single options export routinely runs to several MB even though
+// only the tiny FixedProfile entries are imported. Allow a much larger cap for
+// that format while keeping the conservative default for everything else.
+const MAX_ZEROOMEGA_IMPORT_CHARS = 32_000_000;
 const MAX_IMPORT_ARCHIVE_BYTES = 50_000_000;
 const MAX_SESSIONS = 5_000;
 const MAX_NAME_LENGTH = 160;
@@ -780,7 +785,7 @@ export function parseSecureCrtSessions(text: string, options: SessionImportOptio
  * profiles (`SwitchProfile`, `RuleListProfile`) are skipped.
  */
 export function parseZeroOmegaProxies(text: string, options: SessionImportOptions = {}): SessionImportResult {
-  assertImportSize(text);
+  assertImportSize(text, MAX_ZEROOMEGA_IMPORT_CHARS);
 
   let parsed: unknown;
   try {
@@ -1856,7 +1861,7 @@ function decodeZipName(bytes: Uint8Array, flags: number): string {
   }
 }
 
-function decodeImportedText(bytes: Uint8Array): string {
+export function decodeImportedText(bytes: Uint8Array): string {
   if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return new TextDecoder("utf-8").decode(bytes.slice(3));
   }
@@ -2697,8 +2702,8 @@ function limitRows(rows: unknown[], warnings: string[]): { rows: unknown[]; skip
   return { rows: rows.slice(0, MAX_SESSIONS), skipped: rows.length - MAX_SESSIONS };
 }
 
-function assertImportSize(text: string) {
-  if (text.length > MAX_IMPORT_CHARS) {
+function assertImportSize(text: string, maxChars: number = MAX_IMPORT_CHARS) {
+  if (text.length > maxChars) {
     throw new Error("The selected file is too large to import safely.");
   }
 }

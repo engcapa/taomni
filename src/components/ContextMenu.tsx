@@ -1,4 +1,5 @@
 import { forwardRef, useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight } from "lucide-react";
 
 export interface MenuItem {
@@ -23,6 +24,8 @@ interface ContextMenuProps {
   onClose: () => void;
 }
 
+const MENU_MARGIN = 6;
+
 export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
@@ -31,20 +34,22 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
     const el = ref.current;
     if (!el) return;
 
-    const margin = 6;
     const rect = el.getBoundingClientRect();
-    const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
-    const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+    const maxLeft = Math.max(MENU_MARGIN, window.innerWidth - rect.width - MENU_MARGIN);
+    const maxTop = Math.max(MENU_MARGIN, window.innerHeight - rect.height - MENU_MARGIN);
 
     setPosition({
-      left: Math.min(Math.max(margin, x), maxLeft),
-      top: Math.min(Math.max(margin, y), maxTop),
+      left: Math.min(Math.max(MENU_MARGIN, x), maxLeft),
+      top: Math.min(Math.max(MENU_MARGIN, y), maxTop),
     });
   }, [x, y, items]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      // Submenus and custom panels render in a portal outside `ref`, so test
+      // against the shared marker attribute instead of DOM containment.
+      if (!target || !target.closest("[data-taomni-context-menu]")) {
         onClose();
       }
     };
@@ -64,13 +69,9 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
     left: position.left,
     top: position.top,
     zIndex: 9999,
-    maxHeight: "calc(100vh - 12px)",
-    overflow: "visible",
   };
 
-  return (
-    <MenuSurface ref={ref} items={items} onClose={onClose} style={style} />
-  );
+  return <MenuSurface ref={ref} items={items} onClose={onClose} style={style} />;
 }
 
 const MenuSurface = forwardRef<HTMLDivElement, {
@@ -78,19 +79,22 @@ const MenuSurface = forwardRef<HTMLDivElement, {
   onClose: () => void;
   style?: CSSProperties;
 }>(({ items, onClose, style }, ref) => {
-  const isLongMenu = items.length > 12 && !items.some(i => i.children?.length);
-  const scrollStyle: CSSProperties = isLongMenu ? { maxHeight: "300px", overflowY: "auto" } : {};
   return (
     <div
       ref={ref}
       data-testid="context-menu"
+      data-taomni-context-menu=""
       className="min-w-[220px] py-1 rounded shadow-lg border text-[12px]"
       style={{
         background: "var(--taomni-panel-bg)",
         borderColor: "var(--taomni-divider)",
         color: "var(--taomni-text)",
         ...style,
-        ...scrollStyle,
+        // The surface owns its own vertical overflow so long menus and long
+        // submenus stay within the viewport and scroll. Side flyouts are
+        // portaled out (below), so this scroll container never clips them.
+        maxHeight: "calc(100vh - 12px)",
+        overflowY: "auto",
       }}
     >
       {items.map((item, i) => (
@@ -102,32 +106,75 @@ const MenuSurface = forwardRef<HTMLDivElement, {
 
 MenuSurface.displayName = "MenuSurface";
 
-function SubMenuContainer({ children }: { children: ReactNode }) {
+function PortalFlyout({
+  triggerRef,
+  onMouseEnter,
+  onMouseLeave,
+  children,
+}: {
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const [openLeft, setOpenLeft] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
   useLayoutEffect(() => {
+    const trigger = triggerRef.current;
     const el = ref.current;
-    if (!el) return;
+    if (!trigger || !el) return;
+    const tRect = trigger.getBoundingClientRect();
     const rect = el.getBoundingClientRect();
-    if (rect.right > window.innerWidth - 6) {
-      setOpenLeft(true);
-    }
-  }, []);
 
-  return (
+    // Prefer opening to the right of the trigger; flip left if it overflows.
+    let left = tRect.right - 1;
+    if (left + rect.width > window.innerWidth - MENU_MARGIN) {
+      left = tRect.left - rect.width + 1;
+    }
+    left = Math.max(MENU_MARGIN, Math.min(left, window.innerWidth - rect.width - MENU_MARGIN));
+
+    // Align to the trigger top; shift up if it would overflow the bottom.
+    let top = tRect.top - 4;
+    if (top + rect.height > window.innerHeight - MENU_MARGIN) {
+      top = window.innerHeight - rect.height - MENU_MARGIN;
+    }
+    top = Math.max(MENU_MARGIN, top);
+
+    setPos({ left, top });
+  }, [triggerRef, children]);
+
+  return createPortal(
     <div
       ref={ref}
-      className={`absolute ${openLeft ? "right-full pr-1" : "left-full pl-1"} top-[-4px] z-10`}
+      data-taomni-context-menu=""
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      style={{
+        position: "fixed",
+        left: pos?.left ?? -9999,
+        top: pos?.top ?? -9999,
+        visibility: pos ? "visible" : "hidden",
+        zIndex: 9999,
+      }}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current != null) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   if (item.separator) {
     return <div className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
@@ -146,31 +193,45 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
   );
 
   if (hasChildren) {
-    const isVisible = item.openOnClick ? isOpen : isHovered;
+    const cancelClose = () => {
+      if (closeTimer.current != null) {
+        clearTimeout(closeTimer.current);
+        closeTimer.current = null;
+      }
+    };
+    // The flyout is portaled, so moving the cursor from the trigger to the
+    // submenu crosses a DOM gap. A short close delay bridges that gap: either
+    // side re-entering cancels the pending close.
+    const scheduleClose = () => {
+      cancelClose();
+      closeTimer.current = window.setTimeout(() => setOpen(false), 120);
+    };
+    const openNow = () => {
+      cancelClose();
+      setOpen(true);
+    };
+
     return (
       <div
         className="relative group/menu-row"
-        onMouseEnter={!item.openOnClick ? () => setIsHovered(true) : undefined}
-        onMouseLeave={item.openOnClick ? () => setIsOpen(false) : () => setIsHovered(false)}
+        onMouseEnter={item.openOnClick ? cancelClose : openNow}
+        onMouseLeave={scheduleClose}
       >
         <button
+          ref={triggerRef}
           data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
           className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] disabled:opacity-40"
           style={item.danger ? { color: "#b22222" } : undefined}
           disabled={item.disabled}
-          onClick={item.openOnClick ? () => setIsOpen(!isOpen) : undefined}
+          onClick={item.openOnClick ? () => setOpen((v) => !v) : undefined}
           type="button"
         >
           {content}
         </button>
-        {!item.disabled && isVisible && (
-          <SubMenuContainer>
-            {item.customPanel ? (
-              item.customPanel
-            ) : (
-              <MenuSurface items={item.children ?? []} onClose={onClose} />
-            )}
-          </SubMenuContainer>
+        {!item.disabled && open && (
+          <PortalFlyout triggerRef={triggerRef} onMouseEnter={cancelClose} onMouseLeave={scheduleClose}>
+            {item.customPanel ? item.customPanel : <MenuSurface items={item.children ?? []} onClose={onClose} />}
+          </PortalFlyout>
         )}
       </div>
     );

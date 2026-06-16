@@ -7,7 +7,6 @@ import type { TabFilter } from "../lib/tabFilter";
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
-const COMPACT_MODE_KEY = "taomni.compactMode";
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
@@ -16,7 +15,6 @@ interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   sidebarCollapsed: boolean;
-  compactMode: boolean;
   activeSideTab: SideTab;
   /**
    * Whether a usable local X server is reachable (Xorg / XQuartz / VcXsrv /
@@ -35,16 +33,6 @@ interface AppState {
   terminalSplitInputLockedTabIds: Set<string>;
   uiFontFamily: string;
   uiFontSize: number;
-  /**
-   * When non-null, the named tab is rendered alone in the OS window: the
-   * sidebar, menu bar, ribbon, quick-connect bar, and tab strip are all
-   * hidden so the tab content fills the available area. The OS window
-   * itself is unchanged — this is "in-window maximize", not a true
-   * Fullscreen API call. Cleared automatically if the maximized tab is
-   * removed or its kind changes.
-   */
-  tabMaximizedId: string | null;
-
   /**
    * Transient focus filter for the open-tab strip (issue #121). When set, the
    * strip only renders tabs matching the filter; the rest are hidden, not
@@ -75,8 +63,6 @@ interface AppState {
   moveTabToIndex: (id: string, toIndex: number) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  toggleCompactMode: () => void;
-  setCompactMode: (compact: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
   /** Re-probe the local X server and update {@link xServerStatus}. */
   refreshXServer: () => Promise<void>;
@@ -96,26 +82,8 @@ interface AppState {
   setTabHasNewOutput: (tabId: string, hasNewOutput: boolean) => void;
   setUiFontFamily: (font: string) => void;
   setUiFontSize: (size: number) => void;
-  setTabMaximized: (tabId: string | null) => void;
-  toggleTabMaximized: (tabId: string) => void;
   setTabFilter: (filter: TabFilter | null) => void;
   clearTabFilter: () => void;
-}
-
-function readCompactMode() {
-  try {
-    return window.localStorage.getItem(COMPACT_MODE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeCompactMode(compact: boolean) {
-  try {
-    window.localStorage.setItem(COMPACT_MODE_KEY, compact ? "true" : "false");
-  } catch {
-    // Ignore storage failures; compact mode still works for this run.
-  }
 }
 
 function readUiFontFamily(): string {
@@ -230,7 +198,6 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   activeTabId: "welcome",
   sidebarCollapsed: false,
-  compactMode: readCompactMode(),
   activeSideTab: "sessions",
   xServerEnabled: false,
   xServerStatus: null,
@@ -242,7 +209,6 @@ export const useAppStore = create<AppState>((set) => ({
   terminalSplitInputLockedTabIds: new Set(),
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
-  tabMaximizedId: null,
   tabFilter: null,
 
   addTab: (tab) =>
@@ -301,7 +267,6 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
-        tabMaximizedId: s.tabMaximizedId === id ? null : s.tabMaximizedId,
         statusMessage: tr("status.closedTab"),
       };
     }),
@@ -322,8 +287,6 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
-        tabMaximizedId:
-          s.tabMaximizedId && idSet.has(s.tabMaximizedId) ? null : s.tabMaximizedId,
         statusMessage: tr("status.closedTabs"),
       };
     }),
@@ -373,22 +336,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-  toggleCompactMode: () =>
-    set((s) => {
-      const compactMode = !s.compactMode;
-      writeCompactMode(compactMode);
-      return {
-        compactMode,
-        statusMessage: compactMode ? tr("status.compactEnabled") : tr("status.compactDisabled"),
-      };
-    }),
-  setCompactMode: (compactMode) => {
-    writeCompactMode(compactMode);
-    set({
-      compactMode,
-      statusMessage: compactMode ? tr("status.compactEnabled") : tr("status.compactDisabled"),
-    });
-  },
   setActiveSideTab: (tab) => set({ activeSideTab: tab, sidebarCollapsed: false }),
 
   refreshXServer: async () => {
@@ -546,20 +493,6 @@ export const useAppStore = create<AppState>((set) => ({
     set(() => {
       writeUiFontSize(size);
       return { uiFontSize: size };
-    }),
-
-  setTabMaximized: (tabId) =>
-    set((s) => {
-      if (tabId && !s.tabs.some((t) => t.id === tabId)) {
-        return s;
-      }
-      return { tabMaximizedId: tabId };
-    }),
-
-  toggleTabMaximized: (tabId) =>
-    set((s) => {
-      if (!s.tabs.some((t) => t.id === tabId)) return s;
-      return { tabMaximizedId: s.tabMaximizedId === tabId ? null : tabId };
     }),
 
   setTabFilter: (filter) => set({ tabFilter: filter }),

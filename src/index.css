@@ -196,33 +196,6 @@ body {
   font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
 }
 
-/* Ribbon toolbar */
-.taomni-ribbon {
-  background: linear-gradient(to bottom, var(--taomni-ribbon-from), var(--taomni-ribbon-to));
-  border-bottom: 1px solid var(--taomni-ribbon-border);
-}
-
-.taomni-ribbon-btn {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 8px 3px;
-  border-radius: 3px;
-  cursor: pointer;
-  user-select: none;
-  min-width: 56px;
-  font-size: calc(var(--taomni-ui-font-size) - 1px);
-  color: var(--taomni-text);
-  background: transparent;
-  border: none;
-  transition: var(--taomni-transition);
-}
-.taomni-ribbon-btn:hover {
-  background: var(--taomni-control-hover);
-  outline: 1px solid var(--taomni-tab-border);
-}
-
 /* Vertical side tabs */
 .taomni-side-tab {
   writing-mode: vertical-rl;
@@ -374,23 +347,11 @@ body {
   flex: 0 0 auto;
 }
 
-.taomni-app-titlebar {
-  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
-  border-bottom: 1px solid var(--taomni-chrome-border);
-  color: var(--taomni-text);
-  user-select: none;
-}
-
-.taomni-compact-root .taomni-tabbar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--taomni-divider);
-}
-
-.taomni-compact-titlebar {
+.taomni-control-bar {
   /* Pin to a fixed pixel height: the global :root font-size is 12px, so
      Tailwind's h-8 (2rem) collapses to 24px and the inner tabbar (32px)
-     would spill into the terminal area below. flex-shrink: 0 keeps the
-     parent flex column from compressing it further. */
+     would spill into the content area below. flex-shrink: 0 keeps the
+     parent flex column from compressing it. */
   height: 32px;
   flex-shrink: 0;
   background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
@@ -399,7 +360,7 @@ body {
   user-select: none;
 }
 
-.taomni-compact-titlebar .taomni-tabbar {
+.taomni-control-bar .taomni-tabbar {
   height: 32px;
   padding-top: 5px;
   background: transparent !important;
@@ -409,8 +370,16 @@ body {
   overflow: hidden;
 }
 
-.taomni-compact-titlebar .taomni-tab {
+.taomni-control-bar .taomni-tab {
   height: 25px;
+  max-width: min(220px, 28vw);
+}
+
+/* Tab-action slot buttons (the ex-floating toolbar, now docked in the control
+   bar / detached window bar) blend into the chrome; add the hover affordance
+   their inline styles can't express. */
+[data-testid="tab-action-slot"] button:hover {
+  background: var(--taomni-hover) !important;
 }
 
 .taomni-window-controls {
@@ -422,11 +391,16 @@ body {
   color: #fff;
 }
 
-.taomni-titlebar-tray {
-  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 80%, transparent);
+/* Explicit divider between the tab-related buttons (tab-action slot + the `⋯`
+   overflow) and the main-window controls (tray + window buttons). Slightly
+   stronger than the in-tray group separators so the two clusters read apart. */
+.taomni-control-divider {
+  width: 1px;
+  margin: 5px 0;
+  background: var(--taomni-chrome-border);
 }
 
-/* Visually separate tray groups (voice / view / terminal layout / AI). The
+/* Visually separate tray groups (terminal layout / chat+voice / locale). The
    separator is a thin vertical hairline with breathing room so adjacent
    icons inside a group sit flush, while groups read as distinct clusters. */
 .taomni-titlebar-tray-group-sep {
@@ -438,10 +412,6 @@ body {
 .taomni-titlebar-tray-btn[data-active="true"] {
   background: color-mix(in srgb, var(--taomni-accent) 15%, transparent);
   color: var(--taomni-accent);
-}
-
-.taomni-compact-root .taomni-tab {
-  max-width: min(220px, 28vw);
 }
 
 .taomni-tree-row {
