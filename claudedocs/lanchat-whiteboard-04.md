@@ -39,6 +39,17 @@
 
 ---
 
+## 组件依赖选型与主要技术方案
+- **渲染:`react-konva`(Konva,新增)** — 图元模型、命中测试、分层与拖拽;自由画笔用 **`perfect-freehand`(新增)** 生成自然笔迹路径。
+- **协同一致性:Yjs(`yjs` + `y-protocols`,新增)** — 作为 CRDT 文档与冲突合并,替代手写 Lamport/LWW,更健壮、社区成熟;多人光标用 y-protocols 的 awareness。
+- **同步传输:自建 Yjs Provider** — 把 Yjs 的二进制更新(document update / awareness)经核心的 length-delimited 二进制帧在 P2P 通道广播;后端只透传不解析。
+- **新成员同步:复用 Yjs 的 state vector + diff** — 天然支持快照/增量,免去自定义 snapshot 协议细节(上文手写快照协议在采用 Yjs 后由其内置机制承担)。
+- **后端:仅透传白板二进制帧,无新增 crate**。
+- **备选(更轻量):** 若不引入 Yjs,可保留"Lamport + LWW + 墓碑"手写模型,但需自行处理并发合并与重连对账,工作量与风险更高。
+- **理由:** Yjs 是去中心化协同的事实标准,可直接复用我们的 P2P 通道做传输,显著降低一致性实现风险;Konva + perfect-freehand 兼顾绘制能力与可控性。
+
+---
+
 ## Steps(细化)
 
 ### 阶段 1 — 白板画布与绘图工具

@@ -36,6 +36,17 @@
 
 ---
 
+## 组件依赖选型与主要技术方案
+- **传输通道:复用核心的 `tokio` + `LengthDelimitedCodec` 二进制帧**,不新增网络库;分块 IO 用 `tokio::fs`。
+- **取消/暂停:复用 `std::sync::atomic` + `tokio::sync::Notify`**(与 `filebrowser/transfer.rs` 同范式)。
+- **截图采集:`xcap`(新增)** — 跨平台屏幕/窗口截图(Win/macOS/Linux),`screenshots` crate 的继任者,纯 Rust 接口。
+- **剪贴板图片:复用已有 `arboard`** — 已在依赖中,支持读写图片,用于粘贴/复制发送,避免重复引入剪贴板库。
+- **保存/打开对话框:`@tauri-apps/plugin-dialog`(新增)** — 选择保存路径;打开本地文件复用现有 shell/open 能力。
+- **前端:复用 `transferStore.ts` 范式 + `lucide-react`**;图片内联用 object URL,无需额外库。
+- **理由:** 仅新增 `xcap`(截图)与 `plugin-dialog`,其余全部复用。
+
+---
+
 ## Steps(细化)
 
 ### 阶段 1 — 后端传输引擎

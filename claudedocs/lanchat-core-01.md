@@ -76,11 +76,32 @@
 
 ---
 
+## 组件依赖选型与主要技术方案
+
+### 后端(Rust / Tauri)
+- **mDNS/DNS-SD:`mdns-sd`(新增)** — 纯 Rust、无系统依赖,register + browse 一体,跨平台,契合桌面发布管线。备选 `libmdns`(仅广播)+ `mdns`(仅浏览)因需双向、维护性差,不采用。
+- **本机网卡枚举:`if-addrs`(新增)** — 轻量,列出接口与 IP,多网卡场景下选择正确的广播/绑定地址。
+- **TCP 帧编解码:复用 `tokio` + `tokio-util` 的 `LengthDelimitedCodec`** — 需为 `tokio-util` 增加 `codec` feature;配合 `serde_json` 编解码 JSON 信封,二进制大块(后续文件/媒体/白板)共用同一 length-delimited 帧。
+- **身份/哈希/时间:复用 `uuid`(v4)、`sha2`(头像指纹)、`chrono`(时间戳)**,均已是依赖。
+- **持久化:复用 `rusqlite 0.40`(bundled)**,无需新增。
+- **错误/日志:复用 `thiserror`/`anyhow` 与 `tracing`**。
+- **理由:** 仅新增 `mdns-sd` 与 `if-addrs`,全为纯 Rust、无新增系统库,保证三端构建一致、不污染现有管线。
+
+### 前端(React / TS)
+- **状态:复用 `zustand`**(新建 `lanChatStore`)。
+- **图标/样式:复用 `lucide-react` + Tailwind 4**。
+- **桌面通知:`@tauri-apps/plugin-notification`(新增)** — 需在 Rust 端注册插件并在 capabilities 授权。
+- **消息富文本:复用现有 `marked` + `dompurify`**(渲染并消毒,防 XSS)。
+- **表情:首期内置静态 emoji 面板(零依赖)**;如需全量可后续引入 `emoji-mart`。
+- **理由:** 前端新增面仅一个官方 Tauri 插件,其余全部复用。
+
+---
+
 ## Steps(细化)
 
 ### 阶段 1 — 后端模块脚手架与依赖
 - 1.1 新建 `src-tauri/src/lanchat/`(`mod.rs` + 子模块 `discovery.rs`、`transport.rs`、`protocol.rs`、`store.rs`、`commands.rs`)。
-- 1.2 在 `src-tauri/Cargo.toml` 加入:mDNS 库(`mdns-sd`)、`uuid`、`local-ip-address`(枚举本机网卡 IP);`tokio`/`serde`/`rusqlite` 已有。
+- 1.2 在 `src-tauri/Cargo.toml` 加入:`mdns-sd`(发现)、`if-addrs`(网卡枚举),并为 `tokio-util` 开启 `codec` feature;`uuid`/`tokio`/`serde`/`rusqlite`/`sha2`/`chrono` 已有。
 - 1.3 在 `src-tauri/src/state.rs` 的 `AppState` 增加 `lanchat: Arc<LanChatState>`(持有节点身份、peer 注册表、连接表、sqlite 句柄)。
 - 1.4 在 `src-tauri/src/lib.rs` 注册 lanchat 的 Tauri 命令与启动钩子(应用启动时拉起发现/监听任务)。
 - **验收:** 桌面版可编译启动,后台启动一个空的 lanchat 服务任务,不影响现有功能。
