@@ -71,7 +71,6 @@ import {
 import { parseSessionOptions, sessionTypeLabel } from "../../lib/terminalProfile";
 import { parseOpenSshConfig } from "../../lib/quickConnect";
 import { openBinaryFile, openTextFile, openTextFileWithName, downloadTextFile } from "../../lib/fileHelpers";
-import { pickImportText, pickImportBytes } from "../../lib/nativeImportPicker";
 import { serializeHtmlSessions } from "../../lib/sessionExportHtml";
 import {
   SESSION_ROOT_LABEL,
@@ -418,7 +417,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     const queries: KeychainQuery[] = [];
     const seen = new Set<string>();
     const addQuery = (service: string, account: string) => {
-      const key = `${service} ${account}`;
+      const key = `${service} ${account}`;
       if (seen.has(key)) return;
       seen.add(key);
       queries.push({ service, account });
@@ -777,7 +776,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     parser: TextSessionParser,
     extraOptions?: () => Partial<SessionImportOptions>,
   ) => {
-    pickImportText(accept).then((file) => {
+    openTextFileWithName(accept).then((file) => {
       if (!file) return;
       const result = parser(file.text, {
         targetFolder: folderPath,
@@ -792,9 +791,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const importXshellFile = (folderPath: string | null) => {
-    pickImportBytes(".xsh,.xts,.zip,application/zip,application/x-zip-compressed,text/plain").then(async (file) => {
-      if (!file) return;
-      const result = await parseXshellFile(file.bytes, {
+    openBinaryFile(".xsh,.xts,.zip,application/zip,application/x-zip-compressed,text/plain").then(async (bytes) => {
+      if (!bytes) return;
+      const result = await parseXshellFile(bytes, {
         targetFolder: folderPath,
         existingSessions: sessions,
       });
@@ -805,9 +804,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const importXshellZip = (folderPath: string | null) => {
-    pickImportBytes(".zip,.xts,application/zip,application/x-zip-compressed").then(async (file) => {
-      if (!file) return;
-      const result = await parseXshellZipSessions(file.bytes, {
+    openBinaryFile(".zip,.xts,application/zip,application/x-zip-compressed").then(async (bytes) => {
+      if (!bytes) return;
+      const result = await parseXshellZipSessions(bytes, {
         targetFolder: folderPath,
         existingSessions: sessions,
       });
