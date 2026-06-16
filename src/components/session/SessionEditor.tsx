@@ -1397,24 +1397,30 @@ function HBaseSettings({
         </span>
       </Field>
 
-      <Field label="Remote host">
-        <input
-          className="taomni-input w-64"
-          value={host}
-          aria-label="Remote host"
-          placeholder="e.g. localhost or EMR header IP"
-          onChange={(e) => setHost(e.target.value)}
-        />
-      </Field>
-      <Field label="Port">
-        <input
-          className="taomni-input w-32"
-          value={port}
-          aria-label={isNative ? "HBase port" : "HBase REST port"}
-          placeholder={isNative ? "2181" : "8080"}
-          onChange={(e) => setPort(e.target.value)}
-        />
-      </Field>
+      {/* host/port are the REST endpoint. Native mode bootstraps via the ZK
+          quorum (or hbase-site.xml), so these are hidden there. */}
+      {!isNative && (
+        <>
+          <Field label="Remote host">
+            <input
+              className="taomni-input w-64"
+              value={host}
+              aria-label="Remote host"
+              placeholder="e.g. hbase-rest.example.com"
+              onChange={(e) => setHost(e.target.value)}
+            />
+          </Field>
+          <Field label="Port">
+            <input
+              className="taomni-input w-32"
+              value={port}
+              aria-label="HBase REST port"
+              placeholder="8080"
+              onChange={(e) => setPort(e.target.value)}
+            />
+          </Field>
+        </>
+      )}
 
       {isNative && (
         <>
@@ -2526,8 +2532,22 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   };
 
   const handleTestHBaseConnection = async () => {
-    if (!host) {
-      setTestResult({ ok: false, msg: t("sessionEditor2.errHostRequired") });
+    // Mirror the save-path validation: REST needs a host; native needs a ZK
+    // quorum, an hbase-site.xml, or a host (host/port are hidden in native mode).
+    if (hbaseConnectionMode === "rest" && !host.trim()) {
+      setTestResult({ ok: false, msg: "HBase REST host is required." });
+      return;
+    }
+    if (
+      hbaseConnectionMode !== "rest" &&
+      !hbaseSitePath.trim() &&
+      !hbaseZkQuorum.trim() &&
+      !host.trim()
+    ) {
+      setTestResult({
+        ok: false,
+        msg: "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.",
+      });
       return;
     }
     setTesting(true);

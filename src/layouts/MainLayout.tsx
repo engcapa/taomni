@@ -286,6 +286,7 @@ function sessionToHBaseConnectInfo(session: SessionConfig, password?: string): H
     principal: str("hbasePrincipal") || null,
     keytabPath: str("hbaseKeytabPath") || null,
     krb5ConfPath: str("hbaseKrb5ConfPath") || null,
+    hbaseSitePath: str("hbaseSitePath") || null,
   };
 }
 
@@ -1175,7 +1176,15 @@ export function MainLayout() {
   const openHBaseShellTab = useCallback((session: SessionConfig, password?: string) => {
     const id = `hbase-shell-${session.id}-${Date.now()}`;
     const info = sessionToHBaseConnectInfo(session, password);
-    const title = `HBase ${session.host}:${session.port}${info.namespace ? `/${info.namespace}` : ""}`;
+    // Native mode may have no host/port (it bootstraps via ZK quorum or
+    // hbase-site.xml), so build a sensible endpoint label per mode.
+    const endpointLabel =
+      info.connectionMode === "native"
+        ? info.zkQuorum?.split(",")[0]?.trim() ||
+          (session.host ? `${session.host}:${session.port}` : "") ||
+          (info.hbaseSitePath ? "hbase-site.xml" : "ZooKeeper")
+        : `${session.host}:${session.port}`;
+    const title = `HBase ${endpointLabel}${info.namespace ? `/${info.namespace}` : ""}`;
     addTab({
       id,
       type: "hbase-shell",
