@@ -10,7 +10,7 @@ import {
   Video,
 } from "lucide-react";
 
-import { useLanChatStore } from "../../stores/lanChatStore";
+import { useLanChatStore, mergedMemberPeers } from "../../stores/lanChatStore";
 import { useLanCallStore } from "../../stores/lanCallStore";
 import { useLanWbStore } from "../../stores/lanWbStore";
 import { openDetachedWindow } from "../../lib/detachWindowing";
@@ -64,12 +64,17 @@ export function LanChatPanel() {
   const setSegment = useLanChatStore((s) => s.setSegment);
   const roster = useLanChatStore((s) => s.roster);
   const groups = useLanChatStore((s) => s.groups);
+  const conversations = useLanChatStore((s) => s.conversations);
   const activeConvId = useLanChatStore((s) => s.activeConvId);
 
   const [search, setSearch] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const header = useActiveHeader();
+  const memberCount = useMemo(
+    () => mergedMemberPeers(roster, conversations).length,
+    [roster, conversations],
+  );
 
   useEffect(() => {
     void init();
@@ -133,7 +138,7 @@ export function LanChatPanel() {
         {/* segmented control */}
         <div className="m-2 flex rounded-lg p-0.5" style={{ background: "var(--taomni-tab-inactive)" }}>
           <SegBtn active={segment === "members"} onClick={() => setSegment("members")}>
-            成员 {roster.length}
+            成员 {memberCount}
           </SegBtn>
           <SegBtn active={segment === "groups"} onClick={() => setSegment("groups")}>
             群组 {groups.length}

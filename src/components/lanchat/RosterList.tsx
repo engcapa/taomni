@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useLanChatStore, directConvId } from "../../stores/lanChatStore";
+import { useLanChatStore, directConvId, mergedMemberPeers } from "../../stores/lanChatStore";
 import type { LanConversation } from "../../types";
 import { Avatar } from "./Avatar";
 import { presenceLabel, shortTime } from "./util";
@@ -29,8 +29,13 @@ export function RosterList({ search }: RosterListProps) {
 
   const q = search.trim().toLowerCase();
 
+  const memberPeers = useMemo(
+    () => mergedMemberPeers(roster, conversations),
+    [roster, conversations],
+  );
+
   if (segment === "members") {
-    const peers = roster.filter((p) => !q || p.name.toLowerCase().includes(q));
+    const peers = memberPeers.filter((p) => !q || p.name.toLowerCase().includes(q));
     return (
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
         <div className="px-1.5 pt-2 pb-1 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>

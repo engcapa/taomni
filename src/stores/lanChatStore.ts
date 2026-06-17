@@ -124,6 +124,33 @@ export function directConvId(peerId: string): string {
   return `direct:${peerId}`;
 }
 
+/** Members shown in the roster column: mDNS-discovered peers plus any peer we
+ *  have a direct conversation with but never resolved over mDNS (cross-segment
+ *  / multicast-pruned Wi-Fi). Without this, an inbound chat from an
+ *  undiscovered peer is stored but has no row to open or reply from. */
+export function mergedMemberPeers(
+  roster: LanPeer[],
+  conversations: LanConversation[],
+): LanPeer[] {
+  const byId = new Map<string, LanPeer>();
+  for (const p of roster) byId.set(p.id, p);
+  for (const c of conversations) {
+    if (c.kind !== "direct" || byId.has(c.peerOrGroupId)) continue;
+    byId.set(c.peerOrGroupId, {
+      id: c.peerOrGroupId,
+      name: c.peerOrGroupId.slice(0, 8),
+      signature: "",
+      status: "offline",
+      lastSeen: c.lastMsgAt,
+      addr: null,
+      port: null,
+    });
+  }
+  return Array.from(byId.values()).sort((a, b) =>
+    a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+  );
+}
+
 /** Total unread across all conversations (for the global badge). */
 export function totalUnread(convs: LanConversation[]): number {
   return convs.reduce((sum, c) => sum + (c.unread > 0 ? c.unread : 0), 0);
