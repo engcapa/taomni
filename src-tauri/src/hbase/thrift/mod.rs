@@ -119,10 +119,23 @@ impl ThriftSession {
         let ctx = self.clone();
         run(move || {
             let mut c = ctx.connect();
-            // Cheapest call that proves both reachability and auth.
-            c.get_table_names_by_pattern(".*".to_string(), true)
-                .map_err(thrift_err)?;
-            Ok("HBase Thrift2 connection OK".to_string())
+            // Cheapest call that proves both reachability and auth. There is no
+            // permission-free probe, so an access-denied response here still
+            // means we authenticated successfully — the account just lacks
+            // GLOBAL list permission. Treat that as a (limited) connection
+            // rather than failing, so ACL-restricted users can still operate on
+            // the tables they do have access to.
+            match c.get_table_names_by_pattern(".*".to_string(), true) {
+                Ok(_) => Ok("HBase Thrift2 connection OK".to_string()),
+                Err(e) => {
+                    let msg = thrift_err(e);
+                    if msg.contains("AccessDenied") || msg.contains("Access denied") {
+                        Ok("HBase Thrift2 connection OK (authenticated; limited ACL permissions)".to_string())
+                    } else {
+                        Err(msg)
+                    }
+                }
+            }
         })
         .await
     }
