@@ -176,6 +176,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
 
   const toolsMenu: MenuNodeSpec[] = [
     { type: "item", id: "tunneling", label: t("menu.tunneling"), action: "tunneling" },
+    { type: "item", id: "lan-chat", label: t("tabs.lanChat"), action: "lan-chat" },
     { type: "item", id: "network-tools", label: t("menu.networkTools"), action: "tools" },
     { type: "item", id: "packages", label: t("menu.packages"), action: "packages" },
     { type: "item", id: "macros", label: t("menu.macros"), action: "macros" },

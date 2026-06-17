@@ -562,6 +562,7 @@ const dict = {
     detach: "Detach",
     welcome: "Welcome",
     settings: "Settings",
+    lanChat: "LAN Chat",
     sshTunnels: "SSH tunnels",
     networkTools: "Network tools",
     packages: "Packages",

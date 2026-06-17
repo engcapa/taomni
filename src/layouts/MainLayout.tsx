@@ -33,7 +33,10 @@ import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
-import { TunnelManager } from "../components/tunnel/TunnelManager";
+import { LanChatPanel } from "../components/lanchat/LanChatPanel";
+import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
+import { CallOverlay } from "../components/lanchat/CallOverlay";
+import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
@@ -91,6 +94,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
+import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
 import { setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
@@ -1580,6 +1584,34 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  const openLanChatTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "lan-chat",
+      type: "lan-chat",
+      title: t("tabs.lanChat"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
+  // Initialize LanChat at app startup (not only when the tab opens) so roster,
+  // unread, and desktop notifications work even while the tab is closed.
+  useEffect(() => {
+    void useLanChatStore.getState().init();
+  }, []);
+
+  // Mirror total LanChat unread onto the lan-chat tab's new-output indicator
+  // (cleared while that tab is active).
+  const lanUnread = useLanChatStore((s) => totalUnread(s.conversations));
+  useEffect(() => {
+    const hasUnread = lanUnread > 0 && activeTabId !== "lan-chat";
+    setTabHasNewOutput("lan-chat", hasUnread);
+  }, [lanUnread, activeTabId, setTabHasNewOutput]);
+
   const toggleQuickConnectVisible = useCallback(() => {
     const next = !quickConnectVisible;
     setQuickConnectVisible(next);
@@ -1652,6 +1684,9 @@ export function MainLayout() {
       case "settings":
         openSettingsTab();
         break;
+      case "lan-chat":
+        openLanChatTab();
+        break;
       case "macros":
         openPlaceholderTab(t("tabs.macros"), t("status.commandUnavailable"));
         break;
@@ -1669,6 +1704,7 @@ export function MainLayout() {
     openLocalTab,
     openPlaceholderTab,
     openSettingsTab,
+    openLanChatTab,
     removeTab,
     requestAppExit,
     setActiveTab,
@@ -2330,6 +2366,8 @@ export function MainLayout() {
 
                 {activeTab?.type === "settings" && <SettingsPanel />}
 
+                {activeTab?.type === "lan-chat" && <LanChatPanel />}
+
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
                   if (!tab.vnc) return null;
@@ -2512,6 +2550,7 @@ export function MainLayout() {
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "nettools" &&
+                  activeTab.type !== "lan-chat" &&
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
@@ -2581,6 +2620,9 @@ export function MainLayout() {
 
       <ServersDialog />
       {appExitConfirmDialog}
+      <CallOverlay />
+      <WhiteboardOverlay />
+      <EdgeDrawer />
     </div>
     </TabActionSlotProvider>
   );

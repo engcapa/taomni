@@ -25,7 +25,7 @@
  * sitting in localStorage indefinitely.
  */
 
-export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal" | "database";
+export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat";
 
 const STORAGE_PREFIX = "taomni.detached.";
 const REATTACH_PREFIX = "taomni.reattach.";
@@ -204,7 +204,8 @@ function isDetachedKind(value: string): value is DetachedKind {
     value === "rdp" ||
     value === "vnc" ||
     value === "terminal" ||
-    value === "database"
+    value === "database" ||
+    value === "lan-chat"
   );
 }
 

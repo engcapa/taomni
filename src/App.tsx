@@ -5,6 +5,7 @@ import {
   detectDetachedSftpRoute,
 } from "./components/filebrowser/SftpDetachedWindow";
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
+import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { detectDetachedRoute } from "./lib/detachedSession";
 import { useAppTheme } from "./lib/appTheme";
 import { attachSftpSync } from "./lib/sftpSync";
@@ -97,9 +98,14 @@ function App() {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;
   } else {
     const detachedRoute = detectDetachedRoute();
-    content = detachedRoute && detachedRoute.kind !== "sftp"
-      ? <DetachedSessionWindow kind={detachedRoute.kind} id={detachedRoute.id} />
-      : <MainLayout />;
+    if (detachedRoute?.kind === "lan-chat") {
+      content = <LanChatDetachedWindow id={detachedRoute.id} />;
+    } else {
+      content =
+        detachedRoute && detachedRoute.kind !== "sftp"
+          ? <DetachedSessionWindow kind={detachedRoute.kind} id={detachedRoute.id} />
+          : <MainLayout />;
+    }
   }
 
   return (

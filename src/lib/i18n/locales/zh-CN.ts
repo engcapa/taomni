@@ -561,6 +561,7 @@ export const zhCN: DeepPartial<typeof en> = {
     detach: "分离窗口",
     welcome: "欢迎",
     settings: "设置",
+    lanChat: "内网通讯",
     sshTunnels: "SSH 隧道",
     networkTools: "网络工具",
     packages: "软件包",

@@ -8,6 +8,7 @@ mod database;
 mod filebrowser;
 mod hbase;
 mod history;
+mod lanchat;
 pub mod llm;
 mod migrate;
 pub mod models;
@@ -48,6 +49,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data = app
                 .path()
@@ -77,7 +80,17 @@ pub fn run() {
             let ai_config = ai::config::AiConfig::load(&ai_config_path);
             let ai_ctx = ai::AppAiCtx::from_config(ai_config, vault_arc.clone());
 
-            app.manage(AppState::new(conn, vault_arc, ai_ctx));
+            // Decentralized LAN messenger state (separate lanchat.sqlite).
+            let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
+
+            app.manage(AppState::new(conn, vault_arc, ai_ctx, lanchat_state));
+
+            // Start the LanChat background service (mDNS discovery + TCP
+            // control channel are wired in later phases; phase 1 idles).
+            let app_for_lanchat = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                lanchat::start(app_for_lanchat).await;
+            });
 
             // Auto-start any tunnels with autostart=true.
             let app_for_autostart = app.handle().clone();
@@ -351,6 +364,30 @@ pub fn run() {
             proxy::get_app_proxy_config,
             proxy::save_app_proxy_config,
             proxy::get_app_proxy_url,
+            lanchat::commands::lanchat_status,
+            lanchat::commands::lanchat_list_peers,
+            lanchat::commands::lanchat_get_profile,
+            lanchat::commands::lanchat_update_profile,
+            lanchat::commands::lanchat_send_text,
+            lanchat::commands::lanchat_resend_message,
+            lanchat::commands::lanchat_list_conversations,
+            lanchat::commands::lanchat_list_messages,
+            lanchat::commands::lanchat_mark_read,
+            lanchat::commands::lanchat_create_group,
+            lanchat::commands::lanchat_send_group_text,
+            lanchat::commands::lanchat_list_groups,
+            lanchat::commands::lanchat_leave_group,
+            lanchat::commands::lanchat_send_file,
+            lanchat::commands::lanchat_send_dir,
+            lanchat::commands::lanchat_accept_file,
+            lanchat::commands::lanchat_open_path,
+            lanchat::commands::lanchat_reject_file,
+            lanchat::commands::lanchat_transfer_control,
+            lanchat::commands::lanchat_send_screenshot,
+            lanchat::commands::lanchat_send_clipboard_image,
+            lanchat::commands::lanchat_send_image_bytes,
+            lanchat::commands::lanchat_send_signal,
+            lanchat::commands::lanchat_signal_group,
             exit_app,
         ])
         .run(tauri::generate_context!())
