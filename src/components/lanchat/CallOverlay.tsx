@@ -114,6 +114,22 @@ export function CallOverlay() {
     void init();
   }, [init]);
 
+  // Release camera/mic if the window/app is closed mid-call (avoid a device
+  // indicator staying lit). Best-effort track stop on unload.
+  useEffect(() => {
+    const release = () => {
+      const s = useLanCallStore.getState();
+      s.localStream?.getTracks().forEach((t) => t.stop());
+      s.screenStream?.getTracks().forEach((t) => t.stop());
+    };
+    window.addEventListener("beforeunload", release);
+    window.addEventListener("pagehide", release);
+    return () => {
+      window.removeEventListener("beforeunload", release);
+      window.removeEventListener("pagehide", release);
+    };
+  }, []);
+
   return (
     <>
       {incoming ? (
@@ -160,7 +176,7 @@ export function CallOverlay() {
               · {status === "calling" ? "呼叫中…" : status === "active" ? "进行中" : status}
             </span>
             <span className="ml-auto text-[11px] font-normal" style={{ color: "var(--taomni-text-muted)" }}>
-              P2P · 无 STUN/TURN
+              {Object.keys(remotes).length >= 8 ? "人数较多，mesh 建议 ≤ 8 人 · " : ""}P2P · 无 STUN/TURN
             </span>
           </div>
           <div
