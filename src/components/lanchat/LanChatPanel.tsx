@@ -25,7 +25,7 @@ import { TransferPanel } from "./TransferPanel";
 import { presenceLabel } from "./util";
 
 /** Header info for the currently selected conversation. */
-function useActiveHeader() {
+export function useActiveHeader() {
   const activeConvId = useLanChatStore((s) => s.activeConvId);
   const roster = useLanChatStore((s) => s.roster);
   const groups = useLanChatStore((s) => s.groups);
@@ -223,9 +223,11 @@ function ConversationHeader({
 }) {
   const sendFilePath = useLanChatStore((s) => s.sendFilePath);
   const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
+  const openEdgeDock = useLanChatStore((s) => s.openEdgeDock);
   const startCall = useLanCallStore((s) => s.startCall);
   const startMeeting = useLanCallStore((s) => s.startMeeting);
   const startBoard = useLanWbStore((s) => s.startBoard);
+  const [dockMenu, setDockMenu] = useState(false);
   const canMedia = isDesktop && header.kind === "direct";
   const canMeet = isDesktop && header.kind === "group";
   const peerId = convId && convId.startsWith("direct:") ? convId.slice("direct:".length) : null;
@@ -284,9 +286,47 @@ function ConversationHeader({
         <HeaderBtn title="弹出为独立窗口" disabled={!isDesktop} onClick={detach}>
           <ExternalLink className="h-4 w-4" />
         </HeaderBtn>
-        <HeaderBtn title="停靠到屏幕边缘（后续任务）" disabled>
-          <PanelRight className="h-4 w-4" />
-        </HeaderBtn>
+        <div className="relative">
+          <HeaderBtn title="停靠到窗口边缘（抽屉）" disabled={!convId} onClick={() => setDockMenu((v) => !v)}>
+            <PanelRight className="h-4 w-4" />
+          </HeaderBtn>
+          {dockMenu ? (
+            <>
+              <div className="fixed inset-0 z-[150]" onClick={() => setDockMenu(false)} />
+              <div
+                className="absolute right-0 z-[151] mt-1 w-36 rounded-lg p-1.5 text-[12px]"
+                style={{ background: "var(--taomni-card-bg)", border: "1px solid var(--taomni-card-border)", boxShadow: "var(--taomni-shadow-lg)" }}
+              >
+                <div className="px-2 py-1" style={{ color: "var(--taomni-text-muted)" }}>
+                  停靠到窗口边缘
+                </div>
+                {(
+                  [
+                    ["top", "⬆ 顶部抽屉"],
+                    ["bottom", "⬇ 底部抽屉"],
+                    ["left", "⬅ 左侧抽屉"],
+                    ["right", "➡ 右侧抽屉"],
+                  ] as const
+                ).map(([sideKey, label]) => (
+                  <button
+                    key={sideKey}
+                    type="button"
+                    onClick={() => {
+                      openEdgeDock(sideKey);
+                      setDockMenu(false);
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--taomni-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    className="flex w-full items-center rounded-md px-2.5 py-1.5 text-left"
+                    style={{ color: "var(--taomni-text)" }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
   );

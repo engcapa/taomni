@@ -42,6 +42,9 @@ import type {
 /** Which left-panel segment is shown. */
 export type LanSegment = "members" | "groups";
 
+/** Screen edge the in-app drawer docks to. */
+export type LanEdgeSide = "top" | "bottom" | "left" | "right";
+
 interface LanChatStore {
   /** True only in the desktop (Tauri) runtime; browser preview is read-only. */
   isDesktop: boolean;
@@ -56,6 +59,10 @@ interface LanChatStore {
   messagesByConv: Record<string, LanMessage[]>;
   segment: LanSegment;
   activeConvId: string | null;
+  /** Edge the active conversation is docked to as an in-app drawer (null = not docked). */
+  edgeDock: LanEdgeSide | null;
+  /** Whether the docked drawer is expanded (false = collapsed to the peek tab). */
+  edgeOpen: boolean;
   /** Active/recent transfers keyed by transfer id. */
   transfers: Record<string, LanTransferProgress>;
   /** Pending inbound file offers awaiting accept/reject. */
@@ -66,6 +73,12 @@ interface LanChatStore {
   /** Load profile + roster + conversations + groups and subscribe to events. */
   init: () => Promise<void>;
   setSegment: (seg: LanSegment) => void;
+  /** Dock the active conversation to a window edge as an in-app drawer. */
+  openEdgeDock: (side: LanEdgeSide) => void;
+  /** Expand / collapse (to the peek tab) the docked drawer. */
+  setEdgeOpen: (open: boolean) => void;
+  /** Undock the drawer entirely. */
+  closeEdgeDock: () => void;
   openConversation: (convId: string) => Promise<void>;
   /** Open (or create) a direct conversation with a peer and select it. */
   openDirect: (peerId: string) => Promise<void>;
@@ -129,6 +142,8 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   messagesByConv: {},
   segment: "members",
   activeConvId: null,
+  edgeDock: null,
+  edgeOpen: true,
   transfers: {},
   offers: [],
   transferPaths: {},
@@ -164,6 +179,10 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   },
 
   setSegment: (segment) => set({ segment }),
+
+  openEdgeDock: (side) => set({ edgeDock: side, edgeOpen: true }),
+  setEdgeOpen: (open) => set({ edgeOpen: open }),
+  closeEdgeDock: () => set({ edgeDock: null, edgeOpen: true }),
 
   openConversation: async (convId) => {
     set({ activeConvId: convId });
