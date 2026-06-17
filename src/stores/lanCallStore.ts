@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { lanchatSendSignal, listenLanChatSignal } from "../lib/ipc";
+import { lanchatSendSignal, lanchatSignalGroup, listenLanChatSignal } from "../lib/ipc";
 import { LanRtcSession } from "../lib/lanRtc";
 import { isTauriRuntime } from "../lib/runtime";
 import type { LanCallKind, LanSignal } from "../types";
@@ -13,6 +13,8 @@ interface IncomingCall {
   from: string;
   fromName: string;
   kind: LanCallKind;
+  /** Set when this is a group meeting invite. */
+  groupId?: string;
 }
 
 interface RemotePeer {
@@ -40,6 +42,7 @@ interface CallStore {
 
   init: () => Promise<void>;
   startCall: (peerId: string, kind: LanCallKind) => Promise<void>;
+  startMeeting: (groupId: string, kind: LanCallKind) => Promise<void>;
   acceptIncoming: () => Promise<void>;
   rejectIncoming: () => void;
   hangup: () => void;
@@ -123,6 +126,33 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     await lanchatSendSignal(peerId, "call-invite", { callId, kind });
   },
 
+  startMeeting: async (groupId, kind) => {
+    if (get().callId) return;
+    const meetingId = crypto.randomUUID();
+    let local: MediaStream;
+    try {
+      local = await getMedia(kind);
+    } catch {
+      return;
+    }
+    session = new LanRtcSession(meetingId, myNodeId(), rtcCallbacks());
+    session.setLocalStream(local);
+    set({
+      callId: meetingId,
+      kind,
+      groupId,
+      status: "active",
+      micOn: true,
+      camOn: kind === "video",
+      screenOn: false,
+      localStream: local,
+      screenStream: null,
+      remotes: {},
+    });
+    // Announce to group members; those who accept connect into the mesh.
+    await lanchatSignalGroup(groupId, "meeting-join", { meetingId, groupId, kind });
+  },
+
   acceptIncoming: async () => {
     const inc = get().incoming;
     if (!inc) return;
@@ -138,17 +168,24 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     set({
       callId: inc.callId,
       kind: inc.kind,
-      groupId: null,
+      groupId: inc.groupId ?? null,
       status: "active",
       micOn: true,
       camOn: inc.kind === "video",
       screenOn: false,
       localStream: local,
-      remotes: { [inc.from]: { stream: null, mic: true, cam: inc.kind === "video", screen: false } },
+      screenStream: null,
+      remotes: inc.groupId ? {} : { [inc.from]: { stream: null, mic: true, cam: inc.kind === "video", screen: false } },
       incoming: null,
     });
-    await lanchatSendSignal(inc.from, "call-accept", { callId: inc.callId });
-    // Callee waits for the caller's offer (lanRtc auto-answers).
+    if (inc.groupId) {
+      // Meeting: connect to the inviter and announce so existing members connect.
+      session.connect(inc.from);
+      await lanchatSignalGroup(inc.groupId, "meeting-join", { meetingId: inc.callId, groupId: inc.groupId, kind: inc.kind });
+    } else {
+      await lanchatSendSignal(inc.from, "call-accept", { callId: inc.callId });
+      // 1:1 callee waits for the caller's offer (lanRtc auto-answers).
+    }
   },
 
   rejectIncoming: () => {
@@ -160,8 +197,12 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   hangup: () => {
     const s = get();
     if (s.callId) {
-      for (const peerId of Object.keys(s.remotes)) {
-        void lanchatSendSignal(peerId, "call-end", { callId: s.callId });
+      if (s.groupId) {
+        void lanchatSignalGroup(s.groupId, "meeting-leave", { meetingId: s.callId, groupId: s.groupId });
+      } else {
+        for (const peerId of Object.keys(s.remotes)) {
+          void lanchatSendSignal(peerId, "call-end", { callId: s.callId });
+        }
       }
     }
     session?.close();
@@ -296,6 +337,30 @@ async function handleSignal(sig: LanSignal) {
           },
         };
       });
+      break;
+    }
+    case "meeting-join": {
+      const meetingId = payload.meetingId as string;
+      if (store.callId === meetingId) {
+        // Already in this meeting: connect to the (new) member.
+        session?.connect(from);
+      } else if (!store.callId && !store.incoming) {
+        useLanCallStore.setState({
+          incoming: {
+            callId: meetingId,
+            from,
+            fromName: peerName(from),
+            kind: (payload.kind as LanCallKind) ?? "video",
+            groupId: payload.groupId as string,
+          },
+        });
+      }
+      break;
+    }
+    case "meeting-leave": {
+      if (store.callId === (payload.meetingId as string)) {
+        session?.closePeer(from);
+      }
       break;
     }
     case "signal-sdp":

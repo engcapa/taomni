@@ -1,8 +1,42 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
 import { avatarGradient, avatarInitial } from "./util";
+
+/** Returns true while the stream's audio is above a speaking threshold. */
+function useSpeaking(stream: MediaStream | null): boolean {
+  const [speaking, setSpeaking] = useState(false);
+  useEffect(() => {
+    if (!stream || stream.getAudioTracks().length === 0) {
+      setSpeaking(false);
+      return;
+    }
+    let raf = 0;
+    let ctx: AudioContext | null = null;
+    try {
+      ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        setSpeaking(avg > 18);
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch {
+      return;
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      ctx?.close().catch(() => undefined);
+    };
+  }, [stream]);
+  return speaking;
+}
 
 function VideoTile({
   stream,
@@ -16,13 +50,19 @@ function VideoTile({
   camOff: boolean;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
+  const speaking = useSpeaking(stream);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
   return (
     <div
       className="relative grid place-items-center overflow-hidden rounded-xl"
-      style={{ background: "#111827", border: "2px solid transparent", minHeight: 160 }}
+      style={{
+        background: "#111827",
+        border: `2px solid ${speaking ? "#22c55e" : "transparent"}`,
+        boxShadow: speaking ? "0 0 0 3px rgba(34,197,94,.25)" : "none",
+        minHeight: 160,
+      }}
     >
       <video
         ref={ref}
@@ -82,8 +122,8 @@ export function CallOverlay() {
           style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-chrome-border)", boxShadow: "var(--taomni-shadow-lg)" }}
         >
           <div className="mb-2 text-[13px]">
-            <span className="font-semibold">{incoming.fromName}</span> 邀请你
-            {incoming.kind === "video" ? "视频" : "语音"}通话
+            <span className="font-semibold">{incoming.fromName}</span>{" "}
+            {incoming.groupId ? "发起了群会议" : `邀请你${incoming.kind === "video" ? "视频" : "语音"}通话`}
           </div>
           <div className="flex gap-2">
             <button

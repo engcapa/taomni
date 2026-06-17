@@ -223,8 +223,11 @@ function ConversationHeader({
   const sendFilePath = useLanChatStore((s) => s.sendFilePath);
   const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
   const startCall = useLanCallStore((s) => s.startCall);
+  const startMeeting = useLanCallStore((s) => s.startMeeting);
   const canMedia = isDesktop && header.kind === "direct";
+  const canMeet = isDesktop && header.kind === "group";
   const peerId = convId && convId.startsWith("direct:") ? convId.slice("direct:".length) : null;
+  const groupId = convId && convId.startsWith("group:") ? convId.slice("group:".length) : null;
   const detach = () => {
     if (!convId) return;
     const title = header.label ? `${header.label} ${header.name}` : header.name;
@@ -258,7 +261,14 @@ function ConversationHeader({
         <HeaderBtn title={canMedia ? "语音通话" : "语音通话仅支持单聊"} disabled={!canMedia} onClick={() => peerId && void startCall(peerId, "audio")}>
           <Phone className="h-4 w-4" />
         </HeaderBtn>
-        <HeaderBtn title={canMedia ? "视频通话" : "视频通话仅支持单聊"} disabled={!canMedia} onClick={() => peerId && void startCall(peerId, "video")}>
+        <HeaderBtn
+          title={canMeet ? "发起群会议" : canMedia ? "视频通话" : "视频通话/会议"}
+          disabled={!canMedia && !canMeet}
+          onClick={() => {
+            if (canMeet && groupId) void startMeeting(groupId, "video");
+            else if (peerId) void startCall(peerId, "video");
+          }}
+        >
           <Video className="h-4 w-4" />
         </HeaderBtn>
         <HeaderBtn title="协作白板（任务 04）" disabled>
