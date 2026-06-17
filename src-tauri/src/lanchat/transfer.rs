@@ -448,6 +448,15 @@ pub fn save_rgba_png(width: u32, height: u32, rgba: &[u8]) -> Result<PathBuf, St
     Ok(path)
 }
 
+/// Write a pre-encoded PNG blob (e.g. a webview getDisplayMedia capture) to a
+/// temp file and return its path. Used by the screenshot fallback when native
+/// capture (the `screen-capture` build feature) is unavailable.
+pub fn save_png_bytes(bytes: &[u8]) -> Result<PathBuf, String> {
+    let path = temp_image_path("shot");
+    std::fs::write(&path, bytes).map_err(|e| format!("save image: {e}"))?;
+    Ok(path)
+}
+
 /// Sender: peer accepted — spawn the chunked send loop (file or folder).
 pub async fn handle_file_accept(app: &AppHandle, state: &Arc<LanChatState>, _from: &str, env: &Envelope) {
     let Some(transfer_id) = env.payload.get("transferId").and_then(|v| v.as_str()) else {

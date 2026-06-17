@@ -382,6 +382,7 @@ pub fn run() {
             lanchat::commands::lanchat_transfer_control,
             lanchat::commands::lanchat_send_screenshot,
             lanchat::commands::lanchat_send_clipboard_image,
+            lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,
             lanchat::commands::lanchat_signal_group,
             exit_app,

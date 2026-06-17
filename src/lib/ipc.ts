@@ -1245,6 +1245,10 @@ export async function lanchatSendClipboardImage(peerId: string): Promise<string>
   return invoke<string>("lanchat_send_clipboard_image", { peerId });
 }
 
+export async function lanchatSendImageBytes(peerId: string, dataB64: string): Promise<string> {
+  return invoke<string>("lanchat_send_image_bytes", { peerId, data: dataB64 });
+}
+
 export async function listenLanChatTransfer(
   cb: (p: LanTransferProgress) => void,
 ): Promise<UnlistenFn> {

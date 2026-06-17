@@ -15,6 +15,7 @@ import {
   lanchatSendClipboardImage,
   lanchatSendFile,
   lanchatSendGroupText,
+  lanchatSendImageBytes,
   lanchatSendScreenshot,
   lanchatSendText,
   lanchatTransferControl,
@@ -215,7 +216,15 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   sendScreenshot: async () => {
     const peerId = get().activePeerId();
     if (!peerId) throw new Error("截图仅支持发送给单个成员");
-    await lanchatSendScreenshot(peerId);
+    try {
+      await lanchatSendScreenshot(peerId);
+    } catch {
+      // Native capture unavailable (screen-capture feature off, macOS, or an
+      // xcap runtime error) — fall back to a webview getDisplayMedia frame.
+      const { captureScreenPng } = await import("../lib/lanScreenCapture");
+      const b64 = await captureScreenPng();
+      await lanchatSendImageBytes(peerId, b64);
+    }
   },
 
   sendClipboardImage: async () => {

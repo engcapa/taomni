@@ -339,7 +339,24 @@ pub async fn lanchat_send_screenshot(
     transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
 }
 
-/// Send the current clipboard image (if any) to a peer as a PNG.
+/// Send a pre-encoded PNG (base64) to a peer as a file. Used as the webview
+/// screenshot fallback when native screen capture (the `screen-capture` build
+/// feature) is unavailable — e.g. macOS, or any default build.
+#[tauri::command]
+pub async fn lanchat_send_image_bytes(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    peer_id: String,
+    data: String,
+) -> Result<String, String> {
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+    let bytes = BASE64
+        .decode(data.as_bytes())
+        .map_err(|e| format!("decode image: {e}"))?;
+    let path = transfer::save_png_bytes(&bytes)?;
+    let conv = direct_conv_id(&peer_id);
+    transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+}
 #[tauri::command]
 pub async fn lanchat_send_clipboard_image(
     app: AppHandle,
