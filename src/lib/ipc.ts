@@ -1217,8 +1217,12 @@ export async function lanchatSendDir(peerId: string, path: string): Promise<stri
   return invoke<string>("lanchat_send_dir", { peerId, path });
 }
 
-export async function lanchatAcceptFile(transferId: string, savePath: string): Promise<void> {
-  return invoke("lanchat_accept_file", { transferId, savePath });
+export async function lanchatAcceptFile(transferId: string, savePath: string): Promise<string> {
+  return invoke<string>("lanchat_accept_file", { transferId, savePath });
+}
+
+export async function lanchatOpenPath(path: string): Promise<void> {
+  return invoke("lanchat_open_path", { path });
 }
 
 export async function lanchatRejectFile(transferId: string): Promise<void> {

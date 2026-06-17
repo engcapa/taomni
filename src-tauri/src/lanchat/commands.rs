@@ -237,15 +237,22 @@ pub async fn lanchat_send_file(
     transfer::send_file(&app, &state.lanchat, &peer_id, std::path::PathBuf::from(path), conv).await
 }
 
-/// Accept an inbound file offer, saving to `save_path`.
+/// Accept an inbound file offer. Pass an empty `save_path` to use the default
+/// downloads location. Returns the resolved save path.
 #[tauri::command]
 pub async fn lanchat_accept_file(
     app: AppHandle,
     state: State<'_, AppState>,
     transfer_id: String,
     save_path: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     transfer::accept_offer(&app, &state.lanchat, &transfer_id, std::path::PathBuf::from(save_path)).await
+}
+
+/// Open a received file (or its folder) with the OS default handler.
+#[tauri::command]
+pub async fn lanchat_open_path(path: String) -> Result<(), String> {
+    transfer::open_path(&path)
 }
 
 /// Reject an inbound file offer.

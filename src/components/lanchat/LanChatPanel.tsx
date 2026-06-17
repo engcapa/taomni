@@ -18,6 +18,7 @@ import { MessageInput } from "./MessageInput";
 import { MessageThread } from "./MessageThread";
 import { ProfileEditor } from "./ProfileEditor";
 import { RosterList } from "./RosterList";
+import { TransferPanel } from "./TransferPanel";
 import { presenceLabel } from "./util";
 
 /** Header info for the currently selected conversation. */
@@ -152,6 +153,7 @@ export function LanChatPanel() {
           </div>
         )}
         <MessageThread />
+        <TransferPanel />
         <MessageInput disabled={!activeConvId} />
       </div>
 

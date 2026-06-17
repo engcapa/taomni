@@ -274,12 +274,14 @@ pub async fn handle_file_offer(app: &AppHandle, state: &Arc<LanChatState>, from:
 }
 
 /// Accept an inbound offer, opening a temp file and signalling the sender.
+/// If `save_path` is empty, defaults to the OS downloads dir + the offer name.
+/// Returns the resolved save path so the UI can later open the file.
 pub async fn accept_offer(
     app: &AppHandle,
     state: &Arc<LanChatState>,
     transfer_id: &str,
     save_path: PathBuf,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let offer = state
         .offers
         .write()
@@ -287,11 +289,20 @@ pub async fn accept_offer(
         .remove(transfer_id)
         .ok_or("offer not found or already handled")?;
 
+    let save_path = if save_path.as_os_str().is_empty() {
+        let base = dirs::download_dir()
+            .or_else(dirs::home_dir)
+            .unwrap_or_else(|| std::env::temp_dir());
+        base.join(&offer.name)
+    } else {
+        save_path
+    };
+
     // Folder offer: record the chosen base dir; per-file offers auto-accept.
     if offer.kind == "dir" {
-        let base = save_path.join(&offer.name);
+        let base = save_path.clone();
         let _ = tokio::fs::create_dir_all(&base).await;
-        state.accepted_folders.write().await.insert(transfer_id.to_string(), base);
+        state.accepted_folders.write().await.insert(transfer_id.to_string(), base.clone());
         let my_id = state.node_id().await;
         let accept = Envelope::new(frame::FILE_ACCEPT, &my_id, Some(offer.from.clone()), json!({ "transferId": transfer_id }));
         transport::send_to_peer(app, state, &offer.from, accept).await?;
@@ -306,9 +317,12 @@ pub async fn accept_offer(
             state: "active".into(),
             conv_id: offer.conv_id,
         });
-        return Ok(());
+        return Ok(base.to_string_lossy().to_string());
     }
 
+    if let Some(parent) = save_path.parent() {
+        let _ = tokio::fs::create_dir_all(parent).await;
+    }
     let temp_path = save_path.with_extension(format!(
         "{}.part",
         save_path.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default()
@@ -316,6 +330,7 @@ pub async fn accept_offer(
     let file = tokio::fs::File::create(&temp_path)
         .await
         .map_err(|e| format!("create {}: {e}", temp_path.display()))?;
+    let saved = save_path.to_string_lossy().to_string();
     state
         .transfers
         .write()
@@ -357,7 +372,7 @@ pub async fn accept_offer(
             conv_id: offer.conv_id,
         },
     );
-    Ok(())
+    Ok(saved)
 }
 
 /// Reject an inbound offer.
@@ -391,6 +406,17 @@ fn mime_guess_simple(name: &str) -> String {
 
 fn temp_image_path(prefix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("taomni-lanchat-{prefix}-{}.png", uuid::Uuid::new_v4()))
+}
+
+/// Open a path with the platform's default handler (file or folder).
+pub fn open_path(path: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("explorer").arg(path).spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(path).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(path).spawn();
+    result.map(|_| ()).map_err(|e| format!("open {path}: {e}"))
 }
 
 /// Capture the primary monitor to a temp PNG and return its path. Blocking —

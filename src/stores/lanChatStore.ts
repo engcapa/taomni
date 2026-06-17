@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import {
+  lanchatAcceptFile,
   lanchatCreateGroup,
   lanchatGetProfile,
   lanchatListConversations,
@@ -8,25 +9,33 @@ import {
   lanchatListMessages,
   lanchatListPeers,
   lanchatMarkRead,
+  lanchatOpenPath,
+  lanchatRejectFile,
   lanchatResendMessage,
   lanchatSendClipboardImage,
+  lanchatSendFile,
   lanchatSendGroupText,
   lanchatSendScreenshot,
   lanchatSendText,
+  lanchatTransferControl,
   lanchatUpdateProfile,
   listenLanChatConversation,
+  listenLanChatFileOffer,
   listenLanChatGroup,
   listenLanChatMessage,
   listenLanChatRoster,
+  listenLanChatTransfer,
 } from "../lib/ipc";
 import { isTauriRuntime } from "../lib/runtime";
 import { notifyLanMessage } from "../lib/lanNotify";
 import type {
   LanConversation,
+  LanFileOffer,
   LanGroup,
   LanMessage,
   LanPeer,
   LanProfile,
+  LanTransferProgress,
 } from "../types";
 
 /** Which left-panel segment is shown. */
@@ -46,6 +55,12 @@ interface LanChatStore {
   messagesByConv: Record<string, LanMessage[]>;
   segment: LanSegment;
   activeConvId: string | null;
+  /** Active/recent transfers keyed by transfer id. */
+  transfers: Record<string, LanTransferProgress>;
+  /** Pending inbound file offers awaiting accept/reject. */
+  offers: LanFileOffer[];
+  /** Local file path for each transfer (source for send, save for recv). */
+  transferPaths: Record<string, string>;
 
   /** Load profile + roster + conversations + groups and subscribe to events. */
   init: () => Promise<void>;
@@ -59,6 +74,12 @@ interface LanChatStore {
   activePeerId: () => string | null;
   sendScreenshot: () => Promise<void>;
   sendClipboardImage: () => Promise<void>;
+  /** Send a local file (by absolute path) to the active conversation's peer. */
+  sendFilePath: (path: string) => Promise<void>;
+  acceptOffer: (transferId: string) => Promise<void>;
+  rejectOffer: (transferId: string) => Promise<void>;
+  transferControl: (transferId: string, action: "pause" | "resume" | "cancel") => Promise<void>;
+  openTransfer: (transferId: string) => Promise<void>;
   saveProfile: (args: {
     name: string;
     avatarBase64?: string | null;
@@ -72,6 +93,8 @@ interface LanChatStore {
   applyMessage: (msg: LanMessage) => void;
   applyConversation: (conv: LanConversation) => void;
   applyGroup: (group: LanGroup) => void;
+  applyTransfer: (p: LanTransferProgress) => void;
+  applyOffer: (offer: LanFileOffer) => void;
 }
 
 function upsertById<T extends { id: string }>(list: T[], item: T): T[] {
@@ -105,6 +128,9 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   messagesByConv: {},
   segment: "members",
   activeConvId: null,
+  transfers: {},
+  offers: [],
+  transferPaths: {},
 
   init: async () => {
     if (get().initialized) return;
@@ -129,6 +155,8 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
         await listenLanChatConversation((conv) => get().applyConversation(conv)),
       );
       unsubscribers.push(await listenLanChatGroup((group) => get().applyGroup(group)));
+      unsubscribers.push(await listenLanChatTransfer((p) => get().applyTransfer(p)));
+      unsubscribers.push(await listenLanChatFileOffer((o) => get().applyOffer(o)));
     } catch (e) {
       console.debug("lanchat listen:", e);
     }
@@ -196,6 +224,53 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
     await lanchatSendClipboardImage(peerId);
   },
 
+  sendFilePath: async (path) => {
+    const peerId = get().activePeerId();
+    if (!peerId) throw new Error("发送文件仅支持单个成员");
+    const transferId = await lanchatSendFile(peerId, path);
+    set((s) => ({ transferPaths: { ...s.transferPaths, [transferId]: path } }));
+  },
+
+  acceptOffer: async (transferId) => {
+    try {
+      const savedPath = await lanchatAcceptFile(transferId, "");
+      set((s) => ({
+        offers: s.offers.filter((o) => o.transferId !== transferId),
+        transferPaths: { ...s.transferPaths, [transferId]: savedPath },
+      }));
+    } catch (e) {
+      console.debug("lanchat acceptOffer:", e);
+    }
+  },
+
+  rejectOffer: async (transferId) => {
+    try {
+      await lanchatRejectFile(transferId);
+    } catch {
+      /* ignore */
+    }
+    set((s) => ({ offers: s.offers.filter((o) => o.transferId !== transferId) }));
+  },
+
+  transferControl: async (transferId, action) => {
+    try {
+      await lanchatTransferControl(transferId, action);
+    } catch (e) {
+      console.debug("lanchat transferControl:", e);
+    }
+  },
+
+  openTransfer: async (transferId) => {
+    const path = get().transferPaths[transferId];
+    if (path) {
+      try {
+        await lanchatOpenPath(path);
+      } catch (e) {
+        console.debug("lanchat openTransfer:", e);
+      }
+    }
+  },
+
   saveProfile: async (args) => {
     const profile = await lanchatUpdateProfile(args);
     set({ profile });
@@ -246,6 +321,14 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
     }),
 
   applyGroup: (group) => set((s) => ({ groups: upsertById(s.groups, group) })),
+
+  applyTransfer: (p) =>
+    set((s) => ({ transfers: { ...s.transfers, [p.transferId]: p } })),
+
+  applyOffer: (offer) =>
+    set((s) => ({
+      offers: [...s.offers.filter((o) => o.transferId !== offer.transferId), offer],
+    })),
 }));
 
 /** Tear down event listeners (used when a window unmounts the module). */
