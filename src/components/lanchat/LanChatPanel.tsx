@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useLanChatStore } from "../../stores/lanChatStore";
+import { useLanCallStore } from "../../stores/lanCallStore";
 import { openDetachedWindow } from "../../lib/detachWindowing";
 import { pickFile } from "../../lib/lanFilePicker";
 import { Avatar } from "./Avatar";
@@ -221,7 +222,9 @@ function ConversationHeader({
 }) {
   const sendFilePath = useLanChatStore((s) => s.sendFilePath);
   const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
+  const startCall = useLanCallStore((s) => s.startCall);
   const canMedia = isDesktop && header.kind === "direct";
+  const peerId = convId && convId.startsWith("direct:") ? convId.slice("direct:".length) : null;
   const detach = () => {
     if (!convId) return;
     const title = header.label ? `${header.label} ${header.name}` : header.name;
@@ -252,10 +255,10 @@ function ConversationHeader({
         <HeaderBtn title={canMedia ? "截图发送" : "截图发送仅支持单聊"} disabled={!canMedia} onClick={() => void sendScreenshot().catch(() => undefined)}>
           <Camera className="h-4 w-4" />
         </HeaderBtn>
-        <HeaderBtn title="语音通话（任务 03）" disabled>
+        <HeaderBtn title={canMedia ? "语音通话" : "语音通话仅支持单聊"} disabled={!canMedia} onClick={() => peerId && void startCall(peerId, "audio")}>
           <Phone className="h-4 w-4" />
         </HeaderBtn>
-        <HeaderBtn title="视频通话（任务 03）" disabled>
+        <HeaderBtn title={canMedia ? "视频通话" : "视频通话仅支持单聊"} disabled={!canMedia} onClick={() => peerId && void startCall(peerId, "video")}>
           <Video className="h-4 w-4" />
         </HeaderBtn>
         <HeaderBtn title="协作白板（任务 04）" disabled>
