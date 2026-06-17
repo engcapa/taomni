@@ -79,6 +79,10 @@ pub struct LanChatState {
     pub offers: RwLock<HashMap<String, transfer::OfferInfo>>,
     /// In-progress inbound writes, keyed by transfer id.
     pub incoming: AsyncMutex<HashMap<String, transfer::IncomingState>>,
+    /// Receiver: accepted folder transfers → chosen base dir, keyed by folder id.
+    pub accepted_folders: RwLock<HashMap<String, std::path::PathBuf>>,
+    /// Sender: folder transfers awaiting accept, keyed by folder id.
+    pub outgoing_dirs: RwLock<HashMap<String, transfer::DirMeta>>,
 }
 
 impl LanChatState {
@@ -105,6 +109,8 @@ impl LanChatState {
             outgoing: RwLock::new(HashMap::new()),
             offers: RwLock::new(HashMap::new()),
             incoming: AsyncMutex::new(HashMap::new()),
+            accepted_folders: RwLock::new(HashMap::new()),
+            outgoing_dirs: RwLock::new(HashMap::new()),
         }
     }
 

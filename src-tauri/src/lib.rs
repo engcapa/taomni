@@ -374,6 +374,7 @@ pub fn run() {
             lanchat::commands::lanchat_list_groups,
             lanchat::commands::lanchat_leave_group,
             lanchat::commands::lanchat_send_file,
+            lanchat::commands::lanchat_send_dir,
             lanchat::commands::lanchat_accept_file,
             lanchat::commands::lanchat_reject_file,
             lanchat::commands::lanchat_transfer_control,

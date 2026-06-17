@@ -258,6 +258,18 @@ pub async fn lanchat_reject_file(
     transfer::reject_offer(&app, &state.lanchat, &transfer_id).await
 }
 
+/// Offer a whole folder to a peer (recursive). Returns the folder transfer id.
+#[tauri::command]
+pub async fn lanchat_send_dir(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    peer_id: String,
+    path: String,
+) -> Result<String, String> {
+    let conv = direct_conv_id(&peer_id);
+    transfer::send_dir(&app, &state.lanchat, &peer_id, std::path::PathBuf::from(path), conv).await
+}
+
 /// Pause / resume / cancel a transfer (`action`: "pause" | "resume" | "cancel").
 #[tauri::command]
 pub async fn lanchat_transfer_control(

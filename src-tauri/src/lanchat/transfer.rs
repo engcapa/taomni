@@ -79,6 +79,20 @@ pub struct OfferInfo {
     pub size: u64,
     pub mime: String,
     pub conv_id: String,
+    /// "file" | "dir".
+    pub kind: String,
+}
+
+/// Sender-side folder metadata held until the peer accepts the folder offer.
+#[derive(Clone)]
+pub struct DirMeta {
+    pub peer_id: String,
+    pub root: PathBuf,
+    pub name: String,
+    pub conv_id: String,
+    /// (absolute path, relative path) of each regular file under the folder.
+    pub files: Vec<(PathBuf, String)>,
+    pub total: u64,
 }
 
 /// Receiver-side in-progress write.
@@ -196,6 +210,8 @@ pub async fn send_file(
 }
 
 /// Inbound `file-offer`: stash it and surface it to the UI for accept/reject.
+/// Files that belong to an already-accepted folder are auto-accepted under the
+/// chosen base directory (no per-file prompt).
 pub async fn handle_file_offer(app: &AppHandle, state: &Arc<LanChatState>, from: &str, env: &Envelope) {
     let p = &env.payload;
     let Some(transfer_id) = p.get("transferId").and_then(|v| v.as_str()) else {
@@ -204,18 +220,56 @@ pub async fn handle_file_offer(app: &AppHandle, state: &Arc<LanChatState>, from:
     let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("file").to_string();
     let size = p.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
     let mime = p.get("mime").and_then(|v| v.as_str()).unwrap_or("application/octet-stream").to_string();
+    let kind = p.get("kind").and_then(|v| v.as_str()).unwrap_or("file").to_string();
     let conv_id = p
         .get("convId")
         .and_then(|v| v.as_str())
         .map(String::from)
         .unwrap_or_else(|| crate::lanchat::store::direct_conv_id(from));
+
+    // A file belonging to an accepted folder: auto-accept under the base dir.
+    if let Some(folder_id) = p.get("folderId").and_then(|v| v.as_str()) {
+        let base = state.accepted_folders.read().await.get(folder_id).cloned();
+        if let Some(base) = base {
+            let save_path = base.join(&name); // name is the relative path
+            if let Some(parent) = save_path.parent() {
+                let _ = tokio::fs::create_dir_all(parent).await;
+            }
+            if let Ok(file) = tokio::fs::File::create(save_path.with_extension("part")).await {
+                state
+                    .transfers
+                    .write()
+                    .await
+                    .insert(transfer_id.to_string(), Arc::new(LanTransferHandle::new()));
+                state.incoming.lock().await.insert(
+                    transfer_id.to_string(),
+                    IncomingState {
+                        file,
+                        temp_path: save_path.with_extension("part"),
+                        save_path,
+                        name: name.clone(),
+                        size,
+                        received: 0,
+                        from: from.to_string(),
+                        conv_id: conv_id.clone(),
+                        started: Instant::now(),
+                    },
+                );
+                let my_id = state.node_id().await;
+                let accept = Envelope::new(frame::FILE_ACCEPT, &my_id, Some(from.to_string()), json!({ "transferId": transfer_id }));
+                transport::try_send(state, from, accept).await;
+            }
+            return;
+        }
+    }
+
     state.offers.write().await.insert(
         transfer_id.to_string(),
-        OfferInfo { from: from.to_string(), name: name.clone(), size, mime: mime.clone(), conv_id: conv_id.clone() },
+        OfferInfo { from: from.to_string(), name: name.clone(), size, mime: mime.clone(), conv_id: conv_id.clone(), kind: kind.clone() },
     );
     let _ = app.emit(
         events::FILE_OFFER,
-        &json!({ "transferId": transfer_id, "from": from, "name": name, "size": size, "mime": mime, "convId": conv_id }),
+        &json!({ "transferId": transfer_id, "from": from, "name": name, "size": size, "mime": mime, "kind": kind, "convId": conv_id }),
     );
 }
 
@@ -232,6 +286,29 @@ pub async fn accept_offer(
         .await
         .remove(transfer_id)
         .ok_or("offer not found or already handled")?;
+
+    // Folder offer: record the chosen base dir; per-file offers auto-accept.
+    if offer.kind == "dir" {
+        let base = save_path.join(&offer.name);
+        let _ = tokio::fs::create_dir_all(&base).await;
+        state.accepted_folders.write().await.insert(transfer_id.to_string(), base);
+        let my_id = state.node_id().await;
+        let accept = Envelope::new(frame::FILE_ACCEPT, &my_id, Some(offer.from.clone()), json!({ "transferId": transfer_id }));
+        transport::send_to_peer(app, state, &offer.from, accept).await?;
+        emit_progress(app, &TransferProgress {
+            transfer_id: transfer_id.to_string(),
+            direction: "recv".into(),
+            name: offer.name,
+            size: offer.size,
+            transferred: 0,
+            rate: 0.0,
+            eta: 0.0,
+            state: "active".into(),
+            conv_id: offer.conv_id,
+        });
+        return Ok(());
+    }
+
     let temp_path = save_path.with_extension(format!(
         "{}.part",
         save_path.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default()
@@ -310,11 +387,21 @@ fn mime_guess_simple(name: &str) -> String {
     .to_string()
 }
 
-/// Sender: peer accepted — spawn the chunked send loop.
+/// Sender: peer accepted — spawn the chunked send loop (file or folder).
 pub async fn handle_file_accept(app: &AppHandle, state: &Arc<LanChatState>, _from: &str, env: &Envelope) {
     let Some(transfer_id) = env.payload.get("transferId").and_then(|v| v.as_str()) else {
         return;
     };
+    // Folder accept?
+    if let Some(dir) = state.outgoing_dirs.write().await.remove(transfer_id) {
+        let app = app.clone();
+        let state = state.clone();
+        let transfer_id = transfer_id.to_string();
+        tokio::spawn(async move {
+            run_dir_send(&app, &state, &transfer_id, dir).await;
+        });
+        return;
+    }
     let Some(meta) = state.outgoing.read().await.get(transfer_id).cloned() else {
         return;
     };
@@ -559,6 +646,128 @@ pub async fn control(app: &AppHandle, state: &Arc<LanChatState>, transfer_id: &s
     Ok(())
 }
 
+/// Recursively collect regular files under `root` (skipping symlinks/specials),
+/// returning (absolute path, forward-slash relative path) pairs + total bytes.
+fn walk_dir(root: &std::path::Path) -> (Vec<(PathBuf, String)>, u64) {
+    let mut files = Vec::new();
+    let mut total = 0u64;
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(meta) = entry.metadata() else { continue };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            if meta.is_dir() {
+                stack.push(path);
+            } else if meta.is_file() {
+                if let Ok(rel) = path.strip_prefix(root) {
+                    let rel = rel.to_string_lossy().replace('\\', "/");
+                    total += meta.len();
+                    files.push((path.clone(), rel));
+                }
+            }
+        }
+    }
+    (files, total)
+}
+
+/// Offer a whole folder. The receiver accepts once (choosing a base dir); each
+/// file is then streamed and auto-accepted under that base, preserving the
+/// relative tree.
+pub async fn send_dir(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    peer_id: &str,
+    root: PathBuf,
+    conv_id: String,
+) -> Result<String, String> {
+    let meta = tokio::fs::metadata(&root).await.map_err(|e| format!("stat {}: {e}", root.display()))?;
+    if !meta.is_dir() {
+        return Err("not a directory".into());
+    }
+    let name = root.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "folder".into());
+    let (files, total) = {
+        let root = root.clone();
+        tokio::task::spawn_blocking(move || walk_dir(&root)).await.map_err(|e| e.to_string())?
+    };
+    let folder_id = uuid::Uuid::new_v4().to_string();
+    state.outgoing_dirs.write().await.insert(
+        folder_id.clone(),
+        DirMeta { peer_id: peer_id.to_string(), root, name: name.clone(), conv_id: conv_id.clone(), files, total },
+    );
+    let my_id = state.node_id().await;
+    let offer = Envelope::new(
+        frame::FILE_OFFER,
+        &my_id,
+        Some(peer_id.to_string()),
+        json!({ "transferId": folder_id, "name": name, "size": total, "mime": "inode/directory", "kind": "dir", "convId": conv_id }),
+    );
+    transport::send_to_peer(app, state, peer_id, offer).await?;
+    emit_progress(app, &TransferProgress {
+        transfer_id: folder_id.clone(),
+        direction: "send".into(),
+        name,
+        size: total,
+        transferred: 0,
+        rate: 0.0,
+        eta: 0.0,
+        state: "offering".into(),
+        conv_id,
+    });
+    Ok(folder_id)
+}
+
+/// Sender: stream every file of an accepted folder, tagging each offer with the
+/// folder id so the receiver auto-accepts under its chosen base dir.
+async fn run_dir_send(app: &AppHandle, state: &Arc<LanChatState>, folder_id: &str, dir: DirMeta) {
+    let my_id = state.node_id().await;
+    let started = Instant::now();
+    let mut sent_total: u64 = 0;
+    for (abs, rel) in &dir.files {
+        let size = tokio::fs::metadata(abs).await.map(|m| m.len()).unwrap_or(0);
+        let file_id = uuid::Uuid::new_v4().to_string();
+        let offer = Envelope::new(
+            frame::FILE_OFFER,
+            &my_id,
+            Some(dir.peer_id.clone()),
+            json!({ "transferId": file_id, "folderId": folder_id, "name": rel, "size": size, "mime": "application/octet-stream", "kind": "file", "convId": dir.conv_id }),
+        );
+        if !transport::try_send(state, &dir.peer_id, offer).await {
+            break;
+        }
+        let meta = OutgoingMeta { peer_id: dir.peer_id.clone(), path: abs.clone(), name: rel.clone(), size, conv_id: dir.conv_id.clone() };
+        let handle = Arc::new(LanTransferHandle::new());
+        state.transfers.write().await.insert(file_id.clone(), handle.clone());
+        run_send_loop(app, state, &file_id, meta, handle).await;
+        sent_total += size;
+        emit_progress(app, &TransferProgress {
+            transfer_id: folder_id.to_string(),
+            direction: "send".into(),
+            name: dir.name.clone(),
+            size: dir.total,
+            transferred: sent_total,
+            rate: rate_eta(sent_total, dir.total, started).0,
+            eta: rate_eta(sent_total, dir.total, started).1,
+            state: "active".into(),
+            conv_id: dir.conv_id.clone(),
+        });
+    }
+    emit_progress(app, &TransferProgress {
+        transfer_id: folder_id.to_string(),
+        direction: "send".into(),
+        name: dir.name.clone(),
+        size: dir.total,
+        transferred: sent_total,
+        rate: 0.0,
+        eta: 0.0,
+        state: "done".into(),
+        conv_id: dir.conv_id,
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,5 +807,20 @@ mod tests {
         let (rate, eta) = rate_eta(1000, 5000, started);
         assert!(rate > 0.0);
         assert!(eta >= 0.0);
+    }
+
+    #[test]
+    fn walk_dir_collects_files_recursively_skipping_symlinks() {
+        let base = std::env::temp_dir().join(format!("lanchat-walk-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(base.join("sub")).unwrap();
+        std::fs::write(base.join("a.txt"), b"hello").unwrap();
+        std::fs::write(base.join("sub/b.txt"), b"world!!").unwrap();
+        let (files, total) = walk_dir(&base);
+        assert_eq!(files.len(), 2);
+        assert_eq!(total, 5 + 7);
+        let rels: Vec<&str> = files.iter().map(|(_, r)| r.as_str()).collect();
+        assert!(rels.contains(&"a.txt"));
+        assert!(rels.iter().any(|r| *r == "sub/b.txt"));
+        std::fs::remove_dir_all(&base).ok();
     }
 }
