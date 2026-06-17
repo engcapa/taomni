@@ -62,6 +62,23 @@ function renderElement(el: WbElement) {
 
 const COLORS = ["#1e40af", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#0f172a", "#ec4899"];
 
+/** Cap how often an in-progress shape is written to the shared Yjs doc. A fast
+ *  pointermove fires ~60×/s; throttling to this interval emits ~10 wb-ops/s to
+ *  peers (with a guaranteed final write on pointer-up) instead of one per move. */
+const WB_WRITE_MS = 90;
+
+/** The geometry fields that change while a shape is being drawn. */
+function geomPatch(el: WbElement): Partial<WbElement> {
+  switch (el.type) {
+    case "pen":
+      return { points: el.points };
+    case "arrow":
+      return { x2: el.x2, y2: el.y2 };
+    default:
+      return { w: el.w, h: el.h };
+  }
+}
+
 /** The collaborative canvas. Reads elements from the Yjs-backed store; drawing
  *  mutates the store (which broadcasts via the provider once a board is live). */
 export function Whiteboard() {
@@ -83,8 +100,15 @@ export function Whiteboard() {
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
-  const drawingId = useRef<string | null>(null);
   const cursorThrottle = useRef(0);
+
+  // In-progress drawing: `live` is the source of truth (refreshed every move);
+  // `preview` mirrors it for smooth local rendering. Writes to the shared Yjs
+  // doc are throttled (WB_WRITE_MS) so peers get ~10 ops/s, not one per move.
+  const live = useRef<WbElement | null>(null);
+  const [preview, setPreview] = useState<WbElement | null>(null);
+  const lastWrite = useRef(0);
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -95,30 +119,52 @@ export function Whiteboard() {
     return () => ro.disconnect();
   }, []);
 
+  // Drop any pending throttled write if the canvas unmounts mid-stroke.
+  useEffect(() => () => {
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+  }, []);
+
   const pos = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = e.target.getStage()?.getPointerPosition();
     return { x: p?.x ?? 0, y: p?.y ?? 0 };
+  };
+
+  /** Flush the live element's current geometry to the shared doc. */
+  const writeLive = () => {
+    const el = live.current;
+    if (!el) return;
+    lastWrite.current = Date.now();
+    if (flushTimer.current) {
+      clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+    }
+    updateElement(el.id, geomPatch(el));
   };
 
   const onDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const { x, y } = pos(e);
     const id = crypto.randomUUID();
     const base = { id, seq: nextSeq(), color, strokeWidth };
+    let el: WbElement | null = null;
     if (tool === "pen") {
-      addElement({ ...base, type: "pen", points: [x, y] });
-      drawingId.current = id;
+      el = { ...base, type: "pen", points: [x, y] };
     } else if (tool === "rect" || tool === "ellipse") {
-      addElement({ ...base, type: tool, x, y, w: 0, h: 0 });
-      drawingId.current = id;
+      el = { ...base, type: tool, x, y, w: 0, h: 0 };
     } else if (tool === "arrow") {
-      addElement({ ...base, type: "arrow", x, y, x2: x, y2: y });
-      drawingId.current = id;
+      el = { ...base, type: "arrow", x, y, x2: x, y2: y };
     } else if (tool === "text") {
       const text = window.prompt("文字内容：", "");
       if (text) addElement({ ...base, type: "text", x, y, text });
+      return;
     } else if (tool === "note") {
       addElement({ ...base, type: "note", x, y, w: 160, h: 90, text: "便签…" });
+      return;
     }
+    if (!el) return;
+    addElement(el); // element exists in the doc from the first point
+    live.current = el;
+    setPreview(el);
+    lastWrite.current = Date.now();
   };
 
   const onMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -128,21 +174,29 @@ export function Whiteboard() {
       cursorThrottle.current = now;
       provider.sendCursor(x, y, myName, color);
     }
-    const id = drawingId.current;
-    if (!id) return;
-    const cur = elements.find((el) => el.id === id);
+    const cur = live.current;
     if (!cur) return;
+    let next: WbElement;
     if (cur.type === "pen") {
-      updateElement(id, { points: [...(cur.points ?? []), x, y] });
+      next = { ...cur, points: [...(cur.points ?? []), x, y] };
     } else if (cur.type === "arrow") {
-      updateElement(id, { x2: x, y2: y });
+      next = { ...cur, x2: x, y2: y };
     } else {
-      updateElement(id, { w: x - (cur.x ?? 0), h: y - (cur.y ?? 0) });
+      next = { ...cur, w: x - (cur.x ?? 0), h: y - (cur.y ?? 0) };
+    }
+    live.current = next;
+    setPreview(next); // smooth local render every move
+    if (now - lastWrite.current >= WB_WRITE_MS) {
+      writeLive();
+    } else if (!flushTimer.current) {
+      flushTimer.current = setTimeout(writeLive, WB_WRITE_MS - (now - lastWrite.current));
     }
   };
 
   const onUp = () => {
-    drawingId.current = null;
+    if (live.current) writeLive(); // final authoritative write
+    live.current = null;
+    setPreview(null);
   };
 
   return (
@@ -197,7 +251,7 @@ export function Whiteboard() {
         >
           <Layer>
             {elements.map((el) =>
-              tool === "eraser" ? (
+              el.id === preview?.id ? null : tool === "eraser" ? (
                 <Group key={el.id} onClick={() => deleteElement(el.id)} onTap={() => deleteElement(el.id)}>
                   {renderElement(el)}
                 </Group>
@@ -205,6 +259,9 @@ export function Whiteboard() {
                 renderElement(el)
               ),
             )}
+            {/* In-progress stroke: rendered locally every move; the committed
+                copy (throttled) is hidden above to avoid a double draw. */}
+            {preview ? renderElement(preview) : null}
           </Layer>
         </Stage>
         {Object.entries(cursors).map(([id, c]) => (
