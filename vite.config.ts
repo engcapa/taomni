@@ -23,6 +23,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["zmodem.js"],
+    // In browser preview the Tauri plugins are aliased to stubs; keep the dep
+    // optimizer from pre-bundling the real packages (whose imports reference
+    // core exports the stub intentionally omits).
+    exclude: isTauriBuild ? [] : ["@tauri-apps/plugin-notification", "@tauri-apps/plugin-shell"],
   },
   // Tauri 2 targets modern WebView2 / WebKitGTK / WKWebView, all of which
   // support ES2022. Keep the production transform target explicit so xterm's
@@ -38,6 +42,7 @@ export default defineConfig({
           "@tauri-apps/api/core": resolve(__dirname, "src/stubs/tauri-core.ts"),
           "@tauri-apps/api/event": resolve(__dirname, "src/stubs/tauri-event.ts"),
           "@tauri-apps/plugin-shell": resolve(__dirname, "src/stubs/tauri-shell.ts"),
+          "@tauri-apps/plugin-notification": resolve(__dirname, "src/stubs/tauri-notification.ts"),
         },
   },
   server: {

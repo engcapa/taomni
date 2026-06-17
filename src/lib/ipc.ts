@@ -1114,6 +1114,10 @@ export async function lanchatStatus(): Promise<LanChatStatus> {
   return invoke<LanChatStatus>("lanchat_status");
 }
 
+export async function lanchatListPeers(): Promise<LanPeer[]> {
+  return invoke<LanPeer[]>("lanchat_list_peers");
+}
+
 export async function lanchatGetProfile(): Promise<LanProfile> {
   return invoke<LanProfile>("lanchat_get_profile");
 }

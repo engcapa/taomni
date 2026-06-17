@@ -6,6 +6,7 @@ import {
   lanchatListConversations,
   lanchatListGroups,
   lanchatListMessages,
+  lanchatListPeers,
   lanchatMarkRead,
   lanchatResendMessage,
   lanchatSendGroupText,
@@ -103,12 +104,13 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
     if (get().initialized) return;
     set({ initialized: true });
     try {
-      const [profile, conversations, groups] = await Promise.all([
+      const [profile, conversations, groups, peers] = await Promise.all([
         lanchatGetProfile(),
         lanchatListConversations(),
         lanchatListGroups(),
+        lanchatListPeers(),
       ]);
-      set({ profile, conversations, groups });
+      set({ profile, conversations, groups, roster: peers });
     } catch (e) {
       // Browser preview / backend not ready: leave defaults, stub fills mocks.
       console.debug("lanchat init:", e);

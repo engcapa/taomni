@@ -10,6 +10,7 @@ use tauri::{AppHandle, State};
 use crate::lanchat::protocol::PresenceStatus;
 use crate::lanchat::store::{decode_avatar_base64, Conversation, Group, LanMessage, Profile};
 use crate::lanchat::messaging;
+use crate::lanchat::protocol::PeerRecord;
 use crate::state::AppState;
 
 /// Snapshot of the LanChat service for the status bar.
@@ -32,6 +33,14 @@ pub async fn lanchat_status(state: State<'_, AppState>) -> Result<LanChatStatus,
         node_id: state.lanchat.node_id().await,
         peer_count: state.lanchat.peer_count().await,
     })
+}
+
+/// Current discovered peers (live roster snapshot). Lets a freshly-opened or
+/// detached window populate immediately instead of waiting for the next
+/// debounced roster event.
+#[tauri::command]
+pub async fn lanchat_list_peers(state: State<'_, AppState>) -> Result<Vec<PeerRecord>, String> {
+    Ok(state.lanchat.peers.read().await.values().cloned().collect())
 }
 
 /// Read this node's local profile.

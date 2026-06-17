@@ -361,6 +361,7 @@ pub fn run() {
             proxy::save_app_proxy_config,
             proxy::get_app_proxy_url,
             lanchat::commands::lanchat_status,
+            lanchat::commands::lanchat_list_peers,
             lanchat::commands::lanchat_get_profile,
             lanchat::commands::lanchat_update_profile,
             lanchat::commands::lanchat_send_text,
