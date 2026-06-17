@@ -11,8 +11,8 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, IndexInfo,
-    QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
+    IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -644,7 +644,6 @@ pub async fn execute_stream(
     state.finish(on_event, start.elapsed().as_millis() as u64)
 }
 
-#[cfg(test)]
 fn quote_presto_ident(ident: &str) -> String {
     format!("\"{}\"", ident.replace('"', "\"\""))
 }
@@ -875,6 +874,68 @@ pub async fn list_indexes(
     _table: &str,
 ) -> Result<Vec<IndexInfo>, String> {
     Ok(Vec::new())
+}
+
+/// Presto/Trino catalogs expose only tables and views (surfaced via
+/// `list_tables`); there are no routine-style schema objects to list.
+pub async fn list_objects(
+    _client: &PrestoClient,
+    _schema: Option<&str>,
+    _kind: &str,
+) -> Result<Vec<DbObject>, String> {
+    Ok(Vec::new())
+}
+
+/// Resolve the effective catalog + schema and build a quoted qualified name.
+async fn presto_qualified(
+    client: &PrestoClient,
+    schema: Option<&str>,
+    name: &str,
+) -> Result<String, String> {
+    let catalog = current_catalog(client).await?;
+    let schema = match schema.filter(|value| !value.is_empty()) {
+        Some(schema) => schema.to_string(),
+        None => client
+            .schema
+            .lock()
+            .await
+            .clone()
+            .ok_or_else(|| "Presto schema is required. Select a schema first.".to_string())?,
+    };
+    Ok(format!(
+        "{}.{}.{}",
+        quote_presto_ident(&catalog),
+        quote_presto_ident(&schema),
+        quote_presto_ident(name)
+    ))
+}
+
+pub async fn object_ddl(
+    client: &PrestoClient,
+    schema: Option<&str>,
+    kind: &str,
+    name: &str,
+) -> Result<String, String> {
+    let qualified = presto_qualified(client, schema, name).await?;
+    let verb = if kind == "view" { "VIEW" } else { "TABLE" };
+    let sql = format!("SHOW CREATE {verb} {qualified}");
+    let token = CancellationToken::new();
+    let res = run_statement(client, &sql, None, &token, false).await?.result;
+    res.rows
+        .first()
+        .and_then(|r| r.first().cloned().flatten())
+        .ok_or_else(|| format!("No DDL returned for {name}"))
+}
+
+pub async fn table_stats(
+    client: &PrestoClient,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<QueryResult, String> {
+    let qualified = presto_qualified(client, schema, table).await?;
+    let sql = format!("SHOW STATS FOR {qualified}");
+    let token = CancellationToken::new();
+    Ok(run_statement(client, &sql, None, &token, false).await?.result)
 }
 
 #[cfg(test)]
