@@ -387,6 +387,41 @@ fn mime_guess_simple(name: &str) -> String {
     .to_string()
 }
 
+/* ------------------------- screenshot & clipboard (task 02 phase 3) ------------------------- */
+
+fn temp_image_path(prefix: &str) -> PathBuf {
+    std::env::temp_dir().join(format!("taomni-lanchat-{prefix}-{}.png", uuid::Uuid::new_v4()))
+}
+
+/// Capture the primary monitor to a temp PNG and return its path. Blocking —
+/// call via `spawn_blocking`. Requires the `screen-capture` feature (xcap +
+/// platform screen-capture libraries, e.g. PipeWire on Linux/Wayland).
+#[cfg(feature = "screen-capture")]
+pub fn capture_screenshot() -> Result<PathBuf, String> {
+    let monitors = xcap::Monitor::all().map_err(|e| format!("enumerate monitors: {e}"))?;
+    let monitor = monitors.into_iter().next().ok_or("no monitor found")?;
+    let image = monitor.capture_image().map_err(|e| format!("capture: {e}"))?;
+    let path = temp_image_path("shot");
+    image.save(&path).map_err(|e| format!("save screenshot: {e}"))?;
+    Ok(path)
+}
+
+/// Stub when built without the `screen-capture` feature.
+#[cfg(not(feature = "screen-capture"))]
+pub fn capture_screenshot() -> Result<PathBuf, String> {
+    Err("此版本未启用屏幕截图（需 screen-capture 构建特性）".into())
+}
+
+/// Save raw RGBA8 pixels (e.g. from the clipboard) to a temp PNG; return path.
+/// Uses the pure-Rust `image` crate (no system dependencies).
+pub fn save_rgba_png(width: u32, height: u32, rgba: &[u8]) -> Result<PathBuf, String> {
+    let buf = image::RgbaImage::from_raw(width, height, rgba.to_vec())
+        .ok_or("invalid image buffer")?;
+    let path = temp_image_path("clip");
+    buf.save(&path).map_err(|e| format!("save clipboard image: {e}"))?;
+    Ok(path)
+}
+
 /// Sender: peer accepted — spawn the chunked send loop (file or folder).
 pub async fn handle_file_accept(app: &AppHandle, state: &Arc<LanChatState>, _from: &str, env: &Envelope) {
     let Some(transfer_id) = env.payload.get("transferId").and_then(|v| v.as_str()) else {

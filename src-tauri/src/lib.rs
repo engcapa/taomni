@@ -378,6 +378,8 @@ pub fn run() {
             lanchat::commands::lanchat_accept_file,
             lanchat::commands::lanchat_reject_file,
             lanchat::commands::lanchat_transfer_control,
+            lanchat::commands::lanchat_send_screenshot,
+            lanchat::commands::lanchat_send_clipboard_image,
             exit_app,
         ])
         .run(tauri::generate_context!())

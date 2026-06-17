@@ -5,10 +5,12 @@ import type {
   HBaseConnectInfo,
   LanChatStatus,
   LanConversation,
+  LanFileOffer,
   LanGroup,
   LanMessage,
   LanPeer,
   LanProfile,
+  LanTransferProgress,
 } from "../types";
 
 export interface LocalShellOption {
@@ -1203,4 +1205,49 @@ export async function listenLanChatGroup(
   cb: (group: LanGroup) => void,
 ): Promise<UnlistenFn> {
   return listen<LanGroup>("lanchat://group", (e) => cb(e.payload));
+}
+
+/* ----------------------------- LanChat transfers ----------------------------- */
+
+export async function lanchatSendFile(peerId: string, path: string): Promise<string> {
+  return invoke<string>("lanchat_send_file", { peerId, path });
+}
+
+export async function lanchatSendDir(peerId: string, path: string): Promise<string> {
+  return invoke<string>("lanchat_send_dir", { peerId, path });
+}
+
+export async function lanchatAcceptFile(transferId: string, savePath: string): Promise<void> {
+  return invoke("lanchat_accept_file", { transferId, savePath });
+}
+
+export async function lanchatRejectFile(transferId: string): Promise<void> {
+  return invoke("lanchat_reject_file", { transferId });
+}
+
+export async function lanchatTransferControl(
+  transferId: string,
+  action: "pause" | "resume" | "cancel",
+): Promise<void> {
+  return invoke("lanchat_transfer_control", { transferId, action });
+}
+
+export async function lanchatSendScreenshot(peerId: string): Promise<string> {
+  return invoke<string>("lanchat_send_screenshot", { peerId });
+}
+
+export async function lanchatSendClipboardImage(peerId: string): Promise<string> {
+  return invoke<string>("lanchat_send_clipboard_image", { peerId });
+}
+
+export async function listenLanChatTransfer(
+  cb: (p: LanTransferProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<LanTransferProgress>("lanchat://transfer", (e) => cb(e.payload));
+}
+
+export async function listenLanChatFileOffer(
+  cb: (offer: LanFileOffer) => void,
+): Promise<UnlistenFn> {
+  return listen<LanFileOffer>("lanchat://file-offer", (e) => cb(e.payload));
 }

@@ -984,7 +984,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lanchat_resend_message":
     case "lanchat_update_profile":
     case "lanchat_create_group":
-    case "lanchat_leave_group": {
+    case "lanchat_leave_group":
+    case "lanchat_send_file":
+    case "lanchat_send_dir":
+    case "lanchat_accept_file":
+    case "lanchat_reject_file":
+    case "lanchat_transfer_control":
+    case "lanchat_send_screenshot":
+    case "lanchat_send_clipboard_image": {
       throw new Error("内网通讯仅桌面版可用：浏览器预览不支持真实发现与直连。");
     }
     default:

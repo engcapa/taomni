@@ -9,7 +9,9 @@ import {
   lanchatListPeers,
   lanchatMarkRead,
   lanchatResendMessage,
+  lanchatSendClipboardImage,
   lanchatSendGroupText,
+  lanchatSendScreenshot,
   lanchatSendText,
   lanchatUpdateProfile,
   listenLanChatConversation,
@@ -53,6 +55,10 @@ interface LanChatStore {
   openDirect: (peerId: string) => Promise<void>;
   sendCurrent: (text: string, mentions?: string[]) => Promise<void>;
   resend: (msgId: string) => Promise<void>;
+  /** Peer id of the active conversation if it is a direct chat, else null. */
+  activePeerId: () => string | null;
+  sendScreenshot: () => Promise<void>;
+  sendClipboardImage: () => Promise<void>;
   saveProfile: (args: {
     name: string;
     avatarBase64?: string | null;
@@ -171,6 +177,23 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
     } catch (e) {
       console.debug("lanchat resend:", e);
     }
+  },
+
+  activePeerId: () => {
+    const conv = get().activeConvId;
+    return conv && conv.startsWith("direct:") ? conv.slice("direct:".length) : null;
+  },
+
+  sendScreenshot: async () => {
+    const peerId = get().activePeerId();
+    if (!peerId) throw new Error("截图仅支持发送给单个成员");
+    await lanchatSendScreenshot(peerId);
+  },
+
+  sendClipboardImage: async () => {
+    const peerId = get().activePeerId();
+    if (!peerId) throw new Error("发送剪贴板图片仅支持单个成员");
+    await lanchatSendClipboardImage(peerId);
   },
 
   saveProfile: async (args) => {

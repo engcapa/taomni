@@ -70,6 +70,30 @@ export interface LanChatStatus {
   peerCount: number;
 }
 
+/** A file transfer progress / state update (mirrors Rust `TransferProgress`). */
+export interface LanTransferProgress {
+  transferId: string;
+  direction: "send" | "recv";
+  name: string;
+  size: number;
+  transferred: number;
+  rate: number;
+  eta: number;
+  state: "offering" | "active" | "paused" | "done" | "failed" | "cancelled" | "rejected";
+  convId: string;
+}
+
+/** An inbound file offer awaiting accept/reject. */
+export interface LanFileOffer {
+  transferId: string;
+  from: string;
+  name: string;
+  size: number;
+  mime: string;
+  kind: "file" | "dir";
+  convId: string;
+}
+
 export interface VncConnectInfo {
   sessionId: string;
   host: string;

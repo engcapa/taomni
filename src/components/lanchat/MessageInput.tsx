@@ -26,6 +26,11 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
 
   const roster = useLanChatStore((s) => s.roster);
   const sendCurrent = useLanChatStore((s) => s.sendCurrent);
+  const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
+  const sendClipboardImage = useLanChatStore((s) => s.sendClipboardImage);
+  const activePeerId = useLanChatStore((s) => s.activePeerId);
+  const isDesktop = useLanChatStore((s) => s.isDesktop);
+  const canMedia = isDesktop && !!activePeerId();
 
   const candidates = useMemo(() => {
     if (!mention) return [];
@@ -161,7 +166,13 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
         <ToolButton title="发送文件（任务 02）" disabled>
           <Paperclip className="h-4 w-4" />
         </ToolButton>
-        <ToolButton title="截图（任务 02）" disabled>
+        <ToolButton
+          title={canMedia ? "截图并发送" : "截图发送仅支持桌面版的单聊"}
+          disabled={!canMedia}
+          onClick={() => {
+            void sendScreenshot().catch(() => undefined);
+          }}
+        >
           <Camera className="h-4 w-4" />
         </ToolButton>
       </div>
@@ -173,6 +184,13 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
           onChange={onChange}
           onKeyDown={onKeyDown}
           onClick={(e) => detectMention(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
+          onPaste={(e) => {
+            const hasImage = Array.from(e.clipboardData.items).some((it) => it.type.startsWith("image/"));
+            if (hasImage && canMedia) {
+              e.preventDefault();
+              void sendClipboardImage().catch(() => undefined);
+            }
+          }}
           placeholder={disabled ? "选择会话后输入消息…" : "输入消息，@ 提及成员，回车发送…"}
           className="h-9 flex-1 resize-none rounded-lg px-2.5 py-2 text-[12px] outline-none"
           style={{ border: "1px solid var(--taomni-input-border)", background: "var(--taomni-input-bg)", color: "var(--taomni-text)" }}

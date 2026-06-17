@@ -280,3 +280,37 @@ pub async fn lanchat_transfer_control(
 ) -> Result<(), String> {
     transfer::control(&app, &state.lanchat, &transfer_id, &action).await
 }
+
+/// Capture the primary screen and send it to a peer as a PNG.
+#[tauri::command]
+pub async fn lanchat_send_screenshot(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    peer_id: String,
+) -> Result<String, String> {
+    let path = tokio::task::spawn_blocking(transfer::capture_screenshot)
+        .await
+        .map_err(|e| e.to_string())??;
+    let conv = direct_conv_id(&peer_id);
+    transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+}
+
+/// Send the current clipboard image (if any) to a peer as a PNG.
+#[tauri::command]
+pub async fn lanchat_send_clipboard_image(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    peer_id: String,
+) -> Result<String, String> {
+    let path = {
+        let mut guard = state.clipboard.lock().map_err(|_| "clipboard lock".to_string())?;
+        if guard.is_none() {
+            *guard = Some(arboard::Clipboard::new().map_err(|e| e.to_string())?);
+        }
+        let cb = guard.as_mut().unwrap();
+        let img = cb.get_image().map_err(|_| "剪贴板中没有图片".to_string())?;
+        transfer::save_rgba_png(img.width as u32, img.height as u32, &img.bytes)?
+    };
+    let conv = direct_conv_id(&peer_id);
+    transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+}

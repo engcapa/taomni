@@ -115,6 +115,8 @@ hmac = "0.13.0"
 mdns-sd = "0.20.0"
 if-addrs = "0.15.0"
 tauri-plugin-notification = "2.3.3"
+xcap = { version = "0.9.6", optional = true }
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [patch.crates-io]
 ironrdp-connector = { path = "vendor/ironrdp-connector" }
@@ -127,6 +129,7 @@ winscard = { path = "vendor/winscard" }
 [features]
 default = ["hbase-kerberos"]
 voice-capture = ["dep:cpal"]
+screen-capture = ["dep:xcap"]
 asr-sherpa-onnx = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
