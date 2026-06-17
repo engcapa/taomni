@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { AtSign, Camera, Paperclip, Send, Smile } from "lucide-react";
 
 import { useLanChatStore } from "../../stores/lanChatStore";
+import { pickFile } from "../../lib/lanFilePicker";
 import type { LanPeer } from "../../types";
 import { Avatar } from "./Avatar";
 
@@ -28,6 +29,7 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
   const sendCurrent = useLanChatStore((s) => s.sendCurrent);
   const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
   const sendClipboardImage = useLanChatStore((s) => s.sendClipboardImage);
+  const sendFilePath = useLanChatStore((s) => s.sendFilePath);
   const activePeerId = useLanChatStore((s) => s.activePeerId);
   const isDesktop = useLanChatStore((s) => s.isDesktop);
   const canMedia = isDesktop && !!activePeerId();
@@ -163,7 +165,16 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
         >
           <AtSign className="h-4 w-4" />
         </ToolButton>
-        <ToolButton title="发送文件（任务 02）" disabled>
+        <ToolButton
+          title={canMedia ? "发送文件" : "发送文件仅支持桌面版的单聊"}
+          disabled={!canMedia}
+          onClick={() => {
+            void (async () => {
+              const path = await pickFile();
+              if (path) await sendFilePath(path).catch(() => undefined);
+            })();
+          }}
+        >
           <Paperclip className="h-4 w-4" />
         </ToolButton>
         <ToolButton

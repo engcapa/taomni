@@ -12,6 +12,7 @@ import {
 
 import { useLanChatStore } from "../../stores/lanChatStore";
 import { openDetachedWindow } from "../../lib/detachWindowing";
+import { pickFile } from "../../lib/lanFilePicker";
 import { Avatar } from "./Avatar";
 import { GroupCreateDialog } from "./GroupCreateDialog";
 import { MessageInput } from "./MessageInput";
@@ -71,6 +72,34 @@ export function LanChatPanel() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Desktop drag-and-drop: dropping files while a direct chat is open sends them.
+  useEffect(() => {
+    if (!isDesktop) return;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    void (async () => {
+      try {
+        const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+        const un = await getCurrentWebview().onDragDropEvent((event) => {
+          if (event.payload.type !== "drop") return;
+          const store = useLanChatStore.getState();
+          if (!store.activePeerId()) return;
+          for (const path of event.payload.paths) {
+            void store.sendFilePath(path).catch(() => undefined);
+          }
+        });
+        if (disposed) un();
+        else unlisten = un;
+      } catch {
+        /* drag-drop unavailable */
+      }
+    })();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [isDesktop]);
 
   return (
     <div className="flex h-full min-w-0" style={{ background: "var(--taomni-bg)" }}>
@@ -190,10 +219,19 @@ function ConversationHeader({
   convId: string | null;
   isDesktop: boolean;
 }) {
+  const sendFilePath = useLanChatStore((s) => s.sendFilePath);
+  const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
+  const canMedia = isDesktop && header.kind === "direct";
   const detach = () => {
     if (!convId) return;
     const title = header.label ? `${header.label} ${header.name}` : header.name;
     void openDetachedWindow({ kind: "lan-chat", sessionId: convId, title });
+  };
+  const sendFile = () => {
+    void (async () => {
+      const path = await pickFile();
+      if (path) await sendFilePath(path).catch(() => undefined);
+    })();
   };
   return (
     <div
@@ -208,10 +246,10 @@ function ConversationHeader({
         </div>
       </div>
       <div className="ml-auto flex gap-0.5">
-        <HeaderBtn title="发送文件（任务 02）" disabled>
+        <HeaderBtn title={canMedia ? "发送文件" : "发送文件仅支持单聊"} disabled={!canMedia} onClick={sendFile}>
           <Paperclip className="h-4 w-4" />
         </HeaderBtn>
-        <HeaderBtn title="截图发送（任务 02）" disabled>
+        <HeaderBtn title={canMedia ? "截图发送" : "截图发送仅支持单聊"} disabled={!canMedia} onClick={() => void sendScreenshot().catch(() => undefined)}>
           <Camera className="h-4 w-4" />
         </HeaderBtn>
         <HeaderBtn title="语音通话（任务 03）" disabled>

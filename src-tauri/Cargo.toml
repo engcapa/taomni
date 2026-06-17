@@ -117,6 +117,7 @@ if-addrs = "0.15.0"
 tauri-plugin-notification = "2.3.3"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
+tauri-plugin-dialog = "2.7.1"
 
 [patch.crates-io]
 ironrdp-connector = { path = "vendor/ironrdp-connector" }

@@ -979,6 +979,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lanchat_mark_read": {
       return undefined as T;
     }
+    case "lanchat_open_path": {
+      return undefined as T;
+    }
     case "lanchat_send_text":
     case "lanchat_send_group_text":
     case "lanchat_resend_message":

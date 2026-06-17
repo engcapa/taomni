@@ -25,6 +25,7 @@
     "updater:default",
     "process:allow-restart",
     "notification:default",
+    "dialog:default",
     {
       "identifier": "shell:allow-open",
       "allow": [

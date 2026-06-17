@@ -26,7 +26,7 @@ export default defineConfig({
     // In browser preview the Tauri plugins are aliased to stubs; keep the dep
     // optimizer from pre-bundling the real packages (whose imports reference
     // core exports the stub intentionally omits).
-    exclude: isTauriBuild ? [] : ["@tauri-apps/plugin-notification", "@tauri-apps/plugin-shell"],
+    exclude: isTauriBuild ? [] : ["@tauri-apps/plugin-notification", "@tauri-apps/plugin-shell", "@tauri-apps/plugin-dialog"],
   },
   // Tauri 2 targets modern WebView2 / WebKitGTK / WKWebView, all of which
   // support ES2022. Keep the production transform target explicit so xterm's
@@ -43,6 +43,7 @@ export default defineConfig({
           "@tauri-apps/api/event": resolve(__dirname, "src/stubs/tauri-event.ts"),
           "@tauri-apps/plugin-shell": resolve(__dirname, "src/stubs/tauri-shell.ts"),
           "@tauri-apps/plugin-notification": resolve(__dirname, "src/stubs/tauri-notification.ts"),
+          "@tauri-apps/plugin-dialog": resolve(__dirname, "src/stubs/tauri-dialog.ts"),
         },
   },
   server: {
