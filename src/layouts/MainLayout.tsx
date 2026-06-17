@@ -34,7 +34,8 @@ import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
 import { LanChatPanel } from "../components/lanchat/LanChatPanel";
-import { CallOverlay } from "../components/lanchat/CallOverlay";import { TunnelManager } from "../components/tunnel/TunnelManager";
+import { CallOverlay } from "../components/lanchat/CallOverlay";
+import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
@@ -2619,6 +2620,7 @@ export function MainLayout() {
       <ServersDialog />
       {appExitConfirmDialog}
       <CallOverlay />
+      <WhiteboardOverlay />
     </div>
     </TabActionSlotProvider>
   );

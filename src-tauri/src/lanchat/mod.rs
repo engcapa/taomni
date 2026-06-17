@@ -48,6 +48,8 @@ pub mod events {
     pub const TRANSFER: &str = "lanchat://transfer";
     /// A WebRTC signaling frame from a peer (`{from,type,payload}`).
     pub const SIGNAL: &str = "lanchat://signal";
+    /// A whiteboard frame from a peer (`{from,type,payload}`).
+    pub const WB: &str = "lanchat://wb";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.

@@ -363,6 +363,20 @@ async fn dispatch_inbound(
                 &json!({ "from": peer_id, "type": env.frame_type, "payload": env.payload }),
             );
         }
+        frame::WB_OPEN
+        | frame::WB_INVITE
+        | frame::WB_JOIN
+        | frame::WB_LEAVE
+        | frame::WB_OP
+        | frame::WB_CURSOR
+        | frame::WB_SNAPSHOT_REQ
+        | frame::WB_SNAPSHOT => {
+            // Relay whiteboard frames to the frontend (Yjs provider handles them).
+            let _ = app.emit(
+                crate::lanchat::events::WB,
+                &json!({ "from": peer_id, "type": env.frame_type, "payload": env.payload }),
+            );
+        }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");
         }

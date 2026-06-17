@@ -1280,3 +1280,9 @@ export async function listenLanChatSignal(
 ): Promise<UnlistenFn> {
   return listen<LanSignal>("lanchat://signal", (e) => cb(e.payload));
 }
+
+export async function listenLanChatWb(
+  cb: (s: LanSignal) => void,
+): Promise<UnlistenFn> {
+  return listen<LanSignal>("lanchat://wb", (e) => cb(e.payload));
+}

@@ -12,6 +12,7 @@ import {
 
 import { useLanChatStore } from "../../stores/lanChatStore";
 import { useLanCallStore } from "../../stores/lanCallStore";
+import { useLanWbStore } from "../../stores/lanWbStore";
 import { openDetachedWindow } from "../../lib/detachWindowing";
 import { pickFile } from "../../lib/lanFilePicker";
 import { Avatar } from "./Avatar";
@@ -224,6 +225,7 @@ function ConversationHeader({
   const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
   const startCall = useLanCallStore((s) => s.startCall);
   const startMeeting = useLanCallStore((s) => s.startMeeting);
+  const startBoard = useLanWbStore((s) => s.startBoard);
   const canMedia = isDesktop && header.kind === "direct";
   const canMeet = isDesktop && header.kind === "group";
   const peerId = convId && convId.startsWith("direct:") ? convId.slice("direct:".length) : null;
@@ -271,7 +273,11 @@ function ConversationHeader({
         >
           <Video className="h-4 w-4" />
         </HeaderBtn>
-        <HeaderBtn title="协作白板（任务 04）" disabled>
+        <HeaderBtn
+          title="协作白板"
+          disabled={!convId}
+          onClick={() => convId && startBoard(convId, `${header.name} 的白板`)}
+        >
           <Presentation className="h-4 w-4" />
         </HeaderBtn>
         <span style={{ width: 1, background: "var(--taomni-divider)", margin: "4px 4px" }} />
