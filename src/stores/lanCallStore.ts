@@ -33,6 +33,8 @@ interface CallStore {
   camOn: boolean;
   screenOn: boolean;
   localStream: MediaStream | null;
+  /** Local screen-share preview stream (when screenOn). */
+  screenStream: MediaStream | null;
   remotes: Record<string, RemotePeer>;
   incoming: IncomingCall | null;
 
@@ -43,10 +45,15 @@ interface CallStore {
   hangup: () => void;
   toggleMic: () => void;
   toggleCam: () => void;
+  toggleScreen: () => Promise<void>;
 }
 
 let session: LanRtcSession | null = null;
 let signalUnsub: (() => void) | null = null;
+
+function myNodeId(): string {
+  return useLanChatStore.getState().profile?.id ?? "";
+}
 
 function peerName(id: string): string {
   const roster = useLanChatStore.getState().roster;
@@ -78,6 +85,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   camOn: true,
   screenOn: false,
   localStream: null,
+  screenStream: null,
   remotes: {},
   incoming: null,
 
@@ -99,7 +107,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     } catch {
       return; // permission denied / no device
     }
-    session = new LanRtcSession(callId, rtcCallbacks());
+    session = new LanRtcSession(callId, myNodeId(), rtcCallbacks());
     session.setLocalStream(local);
     set({
       callId,
@@ -125,7 +133,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       get().rejectIncoming();
       return;
     }
-    session = new LanRtcSession(inc.callId, rtcCallbacks());
+    session = new LanRtcSession(inc.callId, myNodeId(), rtcCallbacks());
     session.setLocalStream(local);
     set({
       callId: inc.callId,
@@ -158,7 +166,9 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     }
     session?.close();
     session = null;
-    set({ callId: null, status: "ended", localStream: null, remotes: {}, groupId: null });
+    const s2 = get();
+    s2.screenStream?.getTracks().forEach((t) => t.stop());
+    set({ callId: null, status: "ended", localStream: null, screenStream: null, screenOn: false, remotes: {}, groupId: null });
   },
 
   toggleMic: () => {
@@ -175,6 +185,37 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     s.localStream?.getVideoTracks().forEach((t) => (t.enabled = next));
     set({ camOn: next });
     broadcastMediaState();
+  },
+
+  // NOTE: getDisplayMedia works on Windows (WebView2) and Linux (WebKitGTK w/
+  // PipeWire portal). macOS WKWebView support is limited; the documented
+  // fallback is an xcap-captured frame stream via canvas.captureStream — left
+  // as a follow-up since it can't be exercised in this environment.
+  toggleScreen: async () => {
+    const s = get();
+    if (!s.callId || !session) return;
+    if (!s.screenOn) {
+      let display: MediaStream;
+      try {
+        display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      } catch {
+        return;
+      }
+      const track = display.getVideoTracks()[0];
+      if (!track) return;
+      await session.setVideoTrack(track);
+      track.onended = () => {
+        void get().toggleScreen();
+      };
+      set({ screenOn: true, screenStream: display });
+      broadcastMediaState();
+    } else {
+      s.screenStream?.getTracks().forEach((t) => t.stop());
+      const camTrack = s.localStream?.getVideoTracks()[0] ?? null;
+      await session.setVideoTrack(camTrack);
+      set({ screenOn: false, screenStream: null });
+      broadcastMediaState();
+    }
   },
 }));
 
@@ -193,7 +234,8 @@ function rtcCallbacks() {
         if (!s.groupId && Object.keys(remotes).length === 0 && s.callId) {
           session?.close();
           session = null;
-          return { remotes, callId: null, status: "ended" as CallStatus, localStream: null };
+          s.screenStream?.getTracks().forEach((t) => t.stop());
+          return { remotes, callId: null, status: "ended" as CallStatus, localStream: null, screenStream: null, screenOn: false };
         }
         return { remotes };
       });
@@ -225,7 +267,7 @@ async function handleSignal(sig: LanSignal) {
       // Caller side: peer accepted — start offering.
       if (store.callId === payload.callId) {
         useLanCallStore.setState({ status: "active" });
-        await session?.connect(from, true);
+        session?.connect(from);
       }
       break;
     }
@@ -238,7 +280,8 @@ async function handleSignal(sig: LanSignal) {
       if (store.callId === payload.callId) {
         session?.close();
         session = null;
-        useLanCallStore.setState({ callId: null, status: "ended", localStream: null, remotes: {} });
+        store.screenStream?.getTracks().forEach((t) => t.stop());
+        useLanCallStore.setState({ callId: null, status: "ended", localStream: null, screenStream: null, screenOn: false, remotes: {} });
       }
       break;
     }

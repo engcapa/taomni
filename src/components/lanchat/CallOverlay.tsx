@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
 import { avatarGradient, avatarInitial } from "./util";
@@ -59,13 +59,16 @@ export function CallOverlay() {
   const status = useLanCallStore((s) => s.status);
   const micOn = useLanCallStore((s) => s.micOn);
   const camOn = useLanCallStore((s) => s.camOn);
+  const screenOn = useLanCallStore((s) => s.screenOn);
   const localStream = useLanCallStore((s) => s.localStream);
+  const screenStream = useLanCallStore((s) => s.screenStream);
   const remotes = useLanCallStore((s) => s.remotes);
   const acceptIncoming = useLanCallStore((s) => s.acceptIncoming);
   const rejectIncoming = useLanCallStore((s) => s.rejectIncoming);
   const hangup = useLanCallStore((s) => s.hangup);
   const toggleMic = useLanCallStore((s) => s.toggleMic);
   const toggleCam = useLanCallStore((s) => s.toggleCam);
+  const toggleScreen = useLanCallStore((s) => s.toggleScreen);
 
   useEffect(() => {
     void init();
@@ -124,7 +127,7 @@ export function CallOverlay() {
             className="grid flex-1 gap-2 p-3"
             style={{ gridTemplateColumns: `repeat(${Math.min(3, 1 + Object.keys(remotes).length)},1fr)`, background: "#070b14" }}
           >
-            <VideoTile stream={localStream} muted label="我" camOff={!camOn || kind === "audio"} />
+            <VideoTile stream={screenOn ? screenStream : localStream} muted label={screenOn ? "我（共享屏幕）" : "我"} camOff={!screenOn && (!camOn || kind === "audio")} />
             {Object.entries(remotes).map(([peerId, r]) => (
               <VideoTile key={peerId} stream={r.stream} muted={false} label={peerId.slice(0, 6)} camOff={!r.cam} />
             ))}
@@ -134,6 +137,19 @@ export function CallOverlay() {
             {kind === "video" ? (
               <CtlButton on={camOn} onClick={toggleCam} onIcon={<Video className="h-5 w-5" />} offIcon={<VideoOff className="h-5 w-5" />} />
             ) : null}
+            <button
+              type="button"
+              onClick={() => void toggleScreen()}
+              title={screenOn ? "停止共享" : "共享屏幕"}
+              className="grid h-12 w-12 place-items-center rounded-full"
+              style={{
+                background: screenOn ? "var(--taomni-accent)" : "var(--taomni-card-bg)",
+                color: screenOn ? "#fff" : "var(--taomni-text)",
+                border: "1px solid var(--taomni-card-border)",
+              }}
+            >
+              <MonitorUp className="h-5 w-5" />
+            </button>
             <button
               type="button"
               onClick={hangup}
