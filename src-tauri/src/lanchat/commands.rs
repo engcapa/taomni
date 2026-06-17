@@ -255,6 +255,43 @@ pub async fn lanchat_open_path(path: String) -> Result<(), String> {
     transfer::open_path(&path)
 }
 
+/* ----------------------------- A/V signaling (task 03) ----------------------------- */
+
+/// Send a WebRTC signaling frame to a single peer (call-*/signal-*/media-state).
+#[tauri::command]
+pub async fn lanchat_send_signal(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    peer_id: String,
+    frame_type: String,
+    payload: serde_json::Value,
+) -> Result<(), String> {
+    let my_id = state.lanchat.node_id().await;
+    let env = crate::lanchat::protocol::Envelope::new(&frame_type, &my_id, Some(peer_id.clone()), payload);
+    crate::lanchat::transport::send_to_peer(&app, &state.lanchat, &peer_id, env).await
+}
+
+/// Broadcast a signaling frame to all members of a group (meeting fan-out).
+#[tauri::command]
+pub async fn lanchat_signal_group(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    group_id: String,
+    frame_type: String,
+    payload: serde_json::Value,
+) -> Result<(), String> {
+    let my_id = state.lanchat.node_id().await;
+    let members = state.lanchat.store.list_group_members(&group_id).map_err(|e| e.to_string())?;
+    for member in members {
+        if member == my_id {
+            continue;
+        }
+        let env = crate::lanchat::protocol::Envelope::new(&frame_type, &my_id, Some(member.clone()), payload.clone());
+        let _ = crate::lanchat::transport::send_to_peer(&app, &state.lanchat, &member, env).await;
+    }
+    Ok(())
+}
+
 /// Reject an inbound file offer.
 #[tauri::command]
 pub async fn lanchat_reject_file(

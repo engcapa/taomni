@@ -46,6 +46,8 @@ pub mod events {
     pub const FILE_OFFER: &str = "lanchat://file-offer";
     /// A transfer progress / state update (`TransferProgress`).
     pub const TRANSFER: &str = "lanchat://transfer";
+    /// A WebRTC signaling frame from a peer (`{from,type,payload}`).
+    pub const SIGNAL: &str = "lanchat://signal";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.

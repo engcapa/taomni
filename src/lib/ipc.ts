@@ -10,6 +10,7 @@ import type {
   LanMessage,
   LanPeer,
   LanProfile,
+  LanSignal,
   LanTransferProgress,
 } from "../types";
 
@@ -1254,4 +1255,28 @@ export async function listenLanChatFileOffer(
   cb: (offer: LanFileOffer) => void,
 ): Promise<UnlistenFn> {
   return listen<LanFileOffer>("lanchat://file-offer", (e) => cb(e.payload));
+}
+
+/* ----------------------------- LanChat A/V signaling ----------------------------- */
+
+export async function lanchatSendSignal(
+  peerId: string,
+  frameType: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  return invoke("lanchat_send_signal", { peerId, frameType, payload });
+}
+
+export async function lanchatSignalGroup(
+  groupId: string,
+  frameType: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  return invoke("lanchat_signal_group", { groupId, frameType, payload });
+}
+
+export async function listenLanChatSignal(
+  cb: (s: LanSignal) => void,
+): Promise<UnlistenFn> {
+  return listen<LanSignal>("lanchat://signal", (e) => cb(e.payload));
 }

@@ -94,6 +94,16 @@ export interface LanFileOffer {
   convId: string;
 }
 
+/** A WebRTC signaling frame relayed from a peer. */
+export interface LanSignal {
+  from: string;
+  type: string;
+  payload: Record<string, unknown>;
+}
+
+/** Call kind. */
+export type LanCallKind = "audio" | "video";
+
 export interface VncConnectInfo {
   sessionId: string;
   host: string;

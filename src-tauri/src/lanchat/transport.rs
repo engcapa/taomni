@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use futures::{SinkExt, StreamExt};
 use serde_json::json;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -346,6 +346,22 @@ async fn dispatch_inbound(
         }
         frame::FILE_PAUSE | frame::FILE_RESUME | frame::FILE_CANCEL => {
             crate::lanchat::transfer::handle_file_control(app, state, &env).await;
+        }
+        frame::CALL_INVITE
+        | frame::CALL_ACCEPT
+        | frame::CALL_REJECT
+        | frame::CALL_CANCEL
+        | frame::CALL_END
+        | frame::SIGNAL_SDP
+        | frame::SIGNAL_ICE
+        | frame::MEETING_JOIN
+        | frame::MEETING_LEAVE
+        | frame::MEDIA_STATE => {
+            // Relay WebRTC signaling to the frontend (lanRtc handles it).
+            let _ = app.emit(
+                crate::lanchat::events::SIGNAL,
+                &json!({ "from": peer_id, "type": env.frame_type, "payload": env.payload }),
+            );
         }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");
