@@ -1320,7 +1320,11 @@ function HBaseSettings({
   krb5ConfPath: string; setKrb5ConfPath: (v: string) => void;
   hbaseSitePath: string; setHBaseSitePath: (v: string) => void;
 }) {
-  const isNative = connectionMode !== "rest";
+  const isThrift = connectionMode === "thrift";
+  const isRest = connectionMode === "rest";
+  const isNative = !isThrift && !isRest;
+  // REST and Thrift both connect to an explicit host:port endpoint.
+  const showHostPort = !isNative;
 
   const handleBrowseSiteXml = async () => {
     try {
@@ -1386,27 +1390,40 @@ function HBaseSettings({
           className="taomni-input w-64"
           data-testid="hbase-connection-mode"
           aria-label="HBase connection mode"
-          value={isNative ? "native" : "rest"}
-          onChange={(e) => setConnectionMode(e.target.value)}
+          value={isThrift ? "thrift" : isRest ? "rest" : "native"}
+          onChange={(e) => {
+            const next = e.target.value;
+            setConnectionMode(next);
+            // Suggest the Lindorm Thrift default port when entering thrift mode
+            // from an unset/REST default port.
+            if (next === "thrift" && (!port.trim() || port.trim() === "8080")) {
+              setPort("9190");
+            }
+          }}
         >
           <option value="native">Native RPC (ZooKeeper + RegionServer)</option>
           <option value="rest">REST / Stargate gateway</option>
+          <option value="thrift">Thrift2 (Lindorm / HBase 增强版, 9190)</option>
         </select>
         <span className="ml-2 text-[var(--taomni-text-muted)]">
-          {isNative ? "No gateway needed; talks the native protocol." : "Requires an HBase REST server."}
+          {isNative
+            ? "No gateway needed; talks the native protocol."
+            : isThrift
+              ? "Aliyun Lindorm Thrift2-over-HTTP; uses AccessKey/Signature."
+              : "Requires an HBase REST server."}
         </span>
       </Field>
 
-      {/* host/port are the REST endpoint. Native mode bootstraps via the ZK
-          quorum (or hbase-site.xml), so these are hidden there. */}
-      {!isNative && (
+      {/* host/port are the REST/Thrift endpoint. Native mode bootstraps via the
+          ZK quorum (or hbase-site.xml), so these are hidden there. */}
+      {showHostPort && (
         <>
           <Field label="Remote host">
             <input
               className="taomni-input w-64"
               value={host}
               aria-label="Remote host"
-              placeholder="e.g. hbase-rest.example.com"
+              placeholder={isThrift ? "e.g. ld-xxxx-proxy-lindorm.lindorm.aliyuncs.com" : "e.g. hbase-rest.example.com"}
               onChange={(e) => setHost(e.target.value)}
             />
           </Field>
@@ -1414,8 +1431,8 @@ function HBaseSettings({
             <input
               className="taomni-input w-32"
               value={port}
-              aria-label="HBase REST port"
-              placeholder="8080"
+              aria-label="HBase endpoint port"
+              placeholder={isThrift ? "9190" : "8080"}
               onChange={(e) => setPort(e.target.value)}
             />
           </Field>
@@ -1573,17 +1590,17 @@ function HBaseSettings({
         </>
       )}
 
-      <Field label="Username">
+      <Field label={isThrift ? "AccessKeyId" : "Username"}>
         <input
           className="taomni-input w-64"
           value={username}
           aria-label="HBase username"
-          placeholder="(optional) REST basic auth user"
+          placeholder={isThrift ? "(optional) ACL AccessKeyId" : "(optional) REST basic auth user"}
           onChange={(e) => setUsername(e.target.value)}
         />
       </Field>
 
-      <Field label="Password">
+      <Field label={isThrift ? "AccessKeySignature" : "Password"}>
           <input
             className="taomni-input w-64"
             type="password"
@@ -1623,7 +1640,7 @@ function HBaseSettings({
         />
       </Field>
 
-      {!isNative && (
+      {isRest && (
         <Field label="REST path">
           <input
             className="taomni-input w-64"
@@ -2068,8 +2085,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
     if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
     if (proto === "HBaseShell") {
-      if (hbaseConnectionMode === "rest" && !host.trim()) {
-        return "HBase REST host is required.";
+      if ((hbaseConnectionMode === "rest" || hbaseConnectionMode === "thrift") && !host.trim()) {
+        return hbaseConnectionMode === "thrift"
+          ? "HBase Thrift host is required."
+          : "HBase REST host is required.";
       }
       if (hbaseConnectionMode === "native" && !hbaseSitePath.trim() && !hbaseZkQuorum.trim() && !host.trim()) {
         return "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.";
@@ -2498,7 +2517,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     timeoutSecs: parseInt(dbTimeout) || null,
     restPath: hbaseRestPath || null,
     namespace: hbaseNamespace || null,
-    connectionMode: hbaseConnectionMode === "rest" ? "rest" : "native",
+    connectionMode:
+      hbaseConnectionMode === "rest"
+        ? "rest"
+        : hbaseConnectionMode === "thrift"
+          ? "thrift"
+          : "native",
     zkQuorum: hbaseZkQuorum || null,
     zkRoot: hbaseZkRoot || null,
     effectiveUser: hbaseEffectiveUser || null,
@@ -2532,14 +2556,19 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   };
 
   const handleTestHBaseConnection = async () => {
-    // Mirror the save-path validation: REST needs a host; native needs a ZK
-    // quorum, an hbase-site.xml, or a host (host/port are hidden in native mode).
-    if (hbaseConnectionMode === "rest" && !host.trim()) {
-      setTestResult({ ok: false, msg: "HBase REST host is required." });
+    // Mirror the save-path validation: REST/Thrift need a host; native needs a
+    // ZK quorum, an hbase-site.xml, or a host (host/port hidden in native mode).
+    if ((hbaseConnectionMode === "rest" || hbaseConnectionMode === "thrift") && !host.trim()) {
+      setTestResult({
+        ok: false,
+        msg: hbaseConnectionMode === "thrift"
+          ? "HBase Thrift host is required."
+          : "HBase REST host is required.",
+      });
       return;
     }
     if (
-      hbaseConnectionMode !== "rest" &&
+      hbaseConnectionMode === "native" &&
       !hbaseSitePath.trim() &&
       !hbaseZkQuorum.trim() &&
       !host.trim()

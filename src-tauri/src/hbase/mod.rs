@@ -10,6 +10,7 @@
 //! ZooKeeper), for clusters that do not expose a REST gateway.
 
 pub mod native;
+pub mod thrift;
 
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
@@ -78,14 +79,26 @@ pub struct HBaseConfig {
     pub hbase_site_path: Option<String>,
 }
 
+/// Selected HBase transport backend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HBaseMode {
+    /// RegionServer/Master RPC via ZooKeeper (default).
+    Native,
+    /// HBase REST/Stargate gateway.
+    Rest,
+    /// Thrift2-over-HTTP (Aliyun Lindorm / HBase 增强版, port 9190).
+    Thrift,
+}
+
 impl HBaseConfig {
-    /// True when the native RPC transport should be used. Native is the
-    /// default; only an explicit `"rest"` selects the REST backend.
-    fn is_native(&self) -> bool {
-        !matches!(
-            self.connection_mode.as_deref().map(str::trim),
-            Some("rest") | Some("REST")
-        )
+    /// Classify the configured transport. Native is the default; only an
+    /// explicit `"rest"` or `"thrift"` selects another backend.
+    fn mode(&self) -> HBaseMode {
+        match self.connection_mode.as_deref().map(str::trim) {
+            Some("rest") | Some("REST") => HBaseMode::Rest,
+            Some("thrift") | Some("Thrift") | Some("THRIFT") => HBaseMode::Thrift,
+            _ => HBaseMode::Native,
+        }
     }
 }
 
@@ -107,6 +120,7 @@ pub struct HBaseSession {
 pub enum HBaseSessionInner {
     Native(native::client::NativeClient),
     Rest(RestSession),
+    Thrift(thrift::ThriftSession),
 }
 
 #[derive(Debug, Serialize)]
@@ -360,6 +374,7 @@ pub async fn hbase_list_tables(
         match &session.inner {
             HBaseSessionInner::Rest(rest) => list_tables(rest).await,
             HBaseSessionInner::Native(client) => native_list_tables(client).await,
+            HBaseSessionInner::Thrift(t) => thrift_list_tables(t).await,
         }
     };
     run_cancellable(&session.cancel, fut).await
@@ -376,6 +391,7 @@ pub async fn hbase_describe_table(
         match &session.inner {
             HBaseSessionInner::Rest(rest) => describe_table(rest, &table).await,
             HBaseSessionInner::Native(client) => native_describe_table(client, &table).await,
+            HBaseSessionInner::Thrift(t) => thrift_describe_table(t, &table).await,
         }
     };
     run_cancellable(&session.cancel, fut).await
@@ -395,6 +411,7 @@ pub async fn hbase_execute(
         let mut result = match &session.inner {
             HBaseSessionInner::Rest(rest) => execute_command(rest, parsed, raw).await?,
             HBaseSessionInner::Native(client) => native_execute(client, parsed, raw).await?,
+            HBaseSessionInner::Thrift(t) => thrift_execute(t, parsed, raw).await?,
         };
         result.duration_ms = started.elapsed().as_millis() as u64;
         Ok(result)
@@ -484,15 +501,20 @@ async fn build_session(
         }
     }
 
-    if resolved_config.is_native() {
-        // If keytab + principal are configured, run kinit to refresh the
-        // ticket cache before establishing the GSSAPI connection.
-        if resolved_config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
-            try_keytab_kinit(&resolved_config)?;
+    match resolved_config.mode() {
+        HBaseMode::Native => {
+            // If keytab + principal are configured, run kinit to refresh the
+            // ticket cache before establishing the GSSAPI connection.
+            if resolved_config.auth_method.as_deref().map(str::trim) == Some("kerberos") {
+                try_keytab_kinit(&resolved_config)?;
+            }
+            Ok(HBaseSessionInner::Native(build_native_client(&resolved_config)?))
         }
-        Ok(HBaseSessionInner::Native(build_native_client(&resolved_config)?))
-    } else {
-        Ok(HBaseSessionInner::Rest(RestSession::new(&resolved_config, password)?))
+        HBaseMode::Rest => Ok(HBaseSessionInner::Rest(RestSession::new(&resolved_config, password)?)),
+        HBaseMode::Thrift => Ok(HBaseSessionInner::Thrift(thrift::ThriftSession::new(
+            &resolved_config,
+            password,
+        )?)),
     }
 }
 
@@ -589,6 +611,7 @@ async fn ping_backend(session: &HBaseSessionInner) -> Result<String, String> {
     match session {
         HBaseSessionInner::Rest(rest) => ping_session(rest).await,
         HBaseSessionInner::Native(client) => client.ping().await.map_err(|e| e.to_string()),
+        HBaseSessionInner::Thrift(t) => t.ping().await,
     }
 }
 
@@ -1683,6 +1706,133 @@ async fn native_execute(
     }
 }
 
+// ---- thrift backend dispatch ------------------------------------------------
+
+async fn thrift_list_tables(
+    client: &thrift::ThriftSession,
+) -> Result<Vec<HBaseTableInfo>, String> {
+    client
+        .list_tables()
+        .await
+        .map(|names| names.into_iter().map(|name| HBaseTableInfo { name }).collect())
+}
+
+async fn thrift_describe_table(
+    client: &thrift::ThriftSession,
+    table: &str,
+) -> Result<HBaseTableSchema, String> {
+    let (name, families) = client.describe_table(table).await?;
+    Ok(HBaseTableSchema {
+        name,
+        column_families: families
+            .into_iter()
+            .map(|(name, attributes)| HBaseColumnFamily { name, attributes })
+            .collect(),
+    })
+}
+
+/// Execute a parsed shell command against the Thrift2 backend.
+async fn thrift_execute(
+    client: &thrift::ThriftSession,
+    command: ShellCommand,
+    raw: String,
+) -> Result<HBaseShellResult, String> {
+    match command {
+        ShellCommand::Help => Ok(help_result(raw)),
+        ShellCommand::List => {
+            let tables = client.list_tables().await?;
+            Ok(table_result(
+                raw,
+                format!("{} table(s)", tables.len()),
+                vec!["TABLE"],
+                tables.into_iter().map(|name| vec![name]).collect(),
+            ))
+        }
+        // The Thrift2 API has no cluster status/version call.
+        ShellCommand::Status | ShellCommand::Version => Ok(message_result(
+            raw,
+            "status/version are not exposed by the HBase Thrift2 API".into(),
+        )),
+        ShellCommand::Describe { table } => {
+            let schema = thrift_describe_table(client, &table).await?;
+            let rows = schema
+                .column_families
+                .into_iter()
+                .map(|family| {
+                    vec![
+                        family.name,
+                        family
+                            .attributes
+                            .into_iter()
+                            .map(|(k, v)| format!("{k}={v}"))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            Ok(table_result(
+                raw,
+                format!("Schema for {}", schema.name),
+                vec!["COLUMN FAMILY", "ATTRIBUTES"],
+                rows,
+            ))
+        }
+        ShellCommand::Create { table, families } => {
+            let specs: Vec<(String, BTreeMap<String, String>)> =
+                families.into_iter().map(|f| (f.name, f.attributes)).collect();
+            client.create_table(&table, &specs).await?;
+            Ok(message_result(raw, format!("Created table {table}")))
+        }
+        ShellCommand::Drop { table } => {
+            client.drop_table(&table).await?;
+            Ok(message_result(raw, format!("Dropped table {table}")))
+        }
+        ShellCommand::Get { table, row, column } => {
+            let rows = client
+                .get(&table, row.as_bytes(), column.as_deref())
+                .await?;
+            Ok(rows_to_cell_table(raw, rows))
+        }
+        ShellCommand::Scan {
+            table,
+            limit,
+            start_row,
+            stop_row,
+            columns,
+        } => {
+            let rows = client
+                .scan(
+                    &table,
+                    limit,
+                    start_row.as_deref().map(str::as_bytes),
+                    stop_row.as_deref().map(str::as_bytes),
+                    &columns,
+                )
+                .await?;
+            Ok(rows_to_cell_table(raw, rows))
+        }
+        ShellCommand::Put {
+            table,
+            row,
+            column,
+            value,
+        } => {
+            client
+                .put(&table, row.as_bytes(), &column, value.as_bytes())
+                .await?;
+            Ok(message_result(raw, "1 cell written".into()))
+        }
+        ShellCommand::Delete { table, row, column } => {
+            client.delete(&table, row.as_bytes(), &column).await?;
+            Ok(message_result(raw, "Cell deleted".into()))
+        }
+        ShellCommand::DeleteAll { table, row } => {
+            client.delete_all(&table, row.as_bytes()).await?;
+            Ok(message_result(raw, "Row deleted".into()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1889,6 +2039,7 @@ mod kerberos_live_tests {
         let result = match &session {
             HBaseSessionInner::Native(c) => native_execute(c, parsed, "list".into()).await,
             HBaseSessionInner::Rest(r) => execute_command(r, parsed, "list".into()).await,
+            HBaseSessionInner::Thrift(t) => thrift_execute(t, parsed, "list".into()).await,
         }
         .expect("list failed");
         eprintln!("LIST: {} -> {:?}", result.message, result.rows);

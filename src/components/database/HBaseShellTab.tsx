@@ -327,6 +327,9 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
       return `ZK: ${q} (${r})${info.namespace ? ` [${info.namespace}]` : ""}`;
     }
     const scheme = info.ssl ? "https" : "http";
+    if (info.connectionMode === "thrift") {
+      return `Thrift ${scheme}://${info.host}:${info.port}${info.namespace ? ` [${info.namespace}]` : ""}`;
+    }
     const path = info.restPath ? `/${info.restPath.replace(/^\/+|\/+$/g, "")}` : "";
     return `${scheme}://${info.host}:${info.port}${path}${info.namespace ? ` [${info.namespace}]` : ""}`;
   }, [info.connectionMode, info.host, info.namespace, info.port, info.restPath, info.ssl, info.zkQuorum, info.zkRoot, info.hbaseSitePath]);
