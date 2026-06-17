@@ -21,8 +21,8 @@ use sqlx_postgres::{PgConnectOptions, PgPoolOptions, PgRow, PgSslMode, Postgres}
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, IndexInfo,
-    QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
+    IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -1047,6 +1047,269 @@ fn group_indexes(rows: impl Iterator<Item = (String, String, bool)>) -> Vec<Inde
         }
     }
     out
+}
+
+/// List routine-style objects (procedures, functions, triggers, events) for
+/// MySQL. Returns an empty vec for kinds MySQL does not have.
+pub async fn list_objects_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    kind: &str,
+) -> Result<Vec<DbObject>, String> {
+    let (sql, owner_col) = match kind {
+        "procedure" | "function" => (
+            "SELECT routine_name FROM information_schema.routines \
+             WHERE routine_schema = COALESCE(?, DATABASE()) AND routine_type = ? \
+             ORDER BY routine_name",
+            false,
+        ),
+        "trigger" => (
+            "SELECT trigger_name, event_object_table FROM information_schema.triggers \
+             WHERE trigger_schema = COALESCE(?, DATABASE()) ORDER BY trigger_name",
+            true,
+        ),
+        "event" => (
+            "SELECT event_name FROM information_schema.events \
+             WHERE event_schema = COALESCE(?, DATABASE()) ORDER BY event_name",
+            false,
+        ),
+        _ => return Ok(Vec::new()),
+    };
+    let mut q = query(sql).bind(schema);
+    if kind == "procedure" || kind == "function" {
+        q = q.bind(kind.to_uppercase());
+    }
+    let rows = q
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("list {kind} failed: {e}"))?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            let name = mysql_value_to_string(r, 0)?;
+            let owner = if owner_col { mysql_value_to_string(r, 1) } else { None };
+            Some(DbObject {
+                name,
+                kind: kind.to_string(),
+                owner,
+            })
+        })
+        .collect())
+}
+
+/// List functions, sequences, and (defensively) other objects for PostgreSQL.
+/// Materialized views are surfaced through `list_tables_postgres`.
+pub async fn list_objects_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    kind: &str,
+) -> Result<Vec<DbObject>, String> {
+    let schema = schema.unwrap_or("public");
+    let sql = match kind {
+        "function" => {
+            "SELECT DISTINCT p.proname FROM pg_catalog.pg_proc p \
+             JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace \
+             WHERE n.nspname = $1 ORDER BY p.proname"
+        }
+        "sequence" => {
+            "SELECT sequence_name FROM information_schema.sequences \
+             WHERE sequence_schema = $1 ORDER BY sequence_name"
+        }
+        _ => return Ok(Vec::new()),
+    };
+    let rows = query(sql)
+        .bind(schema)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("list {kind} failed: {e}"))?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            let name: String = r.try_get(0).ok()?;
+            Some(DbObject {
+                name,
+                kind: kind.to_string(),
+                owner: None,
+            })
+        })
+        .collect())
+}
+
+/// Backtick-quote and qualify a MySQL identifier.
+fn mysql_qualified(schema: Option<&str>, name: &str) -> String {
+    let esc = |s: &str| s.replace('`', "``");
+    match schema {
+        Some(s) if !s.is_empty() => format!("`{}`.`{}`", esc(s), esc(name)),
+        _ => format!("`{}`", esc(name)),
+    }
+}
+
+/// `SHOW CREATE …` for a MySQL object; returns the DDL column verbatim.
+pub async fn object_ddl_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    kind: &str,
+    name: &str,
+) -> Result<String, String> {
+    let verb = match kind {
+        "view" => "VIEW",
+        "procedure" => "PROCEDURE",
+        "function" => "FUNCTION",
+        "trigger" => "TRIGGER",
+        "event" => "EVENT",
+        _ => "TABLE",
+    };
+    let sql = format!("SHOW CREATE {verb} {}", mysql_qualified(schema, name));
+    let token = CancellationToken::new();
+    let res = execute_mysql(pool, &sql, &token).await?;
+    // The DDL lives in the column whose name starts with "Create".
+    let idx = res
+        .columns
+        .iter()
+        .position(|c| c.name.to_ascii_lowercase().starts_with("create"))
+        .unwrap_or(res.columns.len().saturating_sub(1));
+    res.rows
+        .first()
+        .and_then(|r| r.get(idx).cloned().flatten())
+        .ok_or_else(|| format!("No DDL returned for {name}"))
+}
+
+/// Reconstruct DDL / fetch definitions for PostgreSQL objects.
+pub async fn object_ddl_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    kind: &str,
+    name: &str,
+) -> Result<String, String> {
+    let schema = schema.unwrap_or("public");
+    match kind {
+        "view" | "materialized_view" => {
+            let row = query(
+                "SELECT pg_get_viewdef(c.oid, true) FROM pg_class c \
+                 JOIN pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE n.nspname = $1 AND c.relname = $2",
+            )
+            .bind(schema)
+            .bind(name)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| format!("view definition failed: {e}"))?;
+            let def: String = row
+                .and_then(|r| r.try_get::<String, _>(0).ok())
+                .ok_or_else(|| format!("View {name} not found"))?;
+            let kw = if kind == "materialized_view" { "MATERIALIZED VIEW" } else { "VIEW" };
+            Ok(format!(
+                "CREATE OR REPLACE {kw} \"{schema}\".\"{name}\" AS\n{def}"
+            ))
+        }
+        "function" => {
+            let row = query(
+                "SELECT pg_get_functiondef(p.oid) FROM pg_proc p \
+                 JOIN pg_namespace n ON n.oid = p.pronamespace \
+                 WHERE n.nspname = $1 AND p.proname = $2 LIMIT 1",
+            )
+            .bind(schema)
+            .bind(name)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| format!("function definition failed: {e}"))?;
+            row.and_then(|r| r.try_get::<String, _>(0).ok())
+                .ok_or_else(|| format!("Function {name} not found"))
+        }
+        "sequence" => Ok(format!("CREATE SEQUENCE \"{schema}\".\"{name}\";")),
+        _ => {
+            // Tables: reconstruct a best-effort CREATE TABLE from the columns.
+            let cols = describe_table_postgres(pool, Some(schema), name).await?;
+            if cols.is_empty() {
+                return Err(format!("Table {name} not found"));
+            }
+            let mut lines: Vec<String> = cols
+                .iter()
+                .map(|c| {
+                    let null = if c.nullable { "" } else { " NOT NULL" };
+                    let default = c
+                        .default
+                        .as_ref()
+                        .map(|d| format!(" DEFAULT {d}"))
+                        .unwrap_or_default();
+                    format!("  \"{}\" {}{}{}", c.name, c.type_name, null, default)
+                })
+                .collect();
+            let pks: Vec<String> = cols
+                .iter()
+                .filter(|c| c.primary_key)
+                .map(|c| format!("\"{}\"", c.name))
+                .collect();
+            if !pks.is_empty() {
+                lines.push(format!("  PRIMARY KEY ({})", pks.join(", ")));
+            }
+            Ok(format!(
+                "CREATE TABLE \"{schema}\".\"{name}\" (\n{}\n);",
+                lines.join(",\n")
+            ))
+        }
+    }
+}
+
+/// Table size / row estimates for MySQL.
+pub async fn table_stats_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<QueryResult, String> {
+    let rows = query(
+        "SELECT engine, table_rows, data_length, index_length, data_free, \
+                table_collation, create_time, update_time \
+         FROM information_schema.tables \
+         WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("table stats failed: {e}"))?
+    .ok_or_else(|| format!("Table {table} not found"))?;
+    let pairs = vec![
+        ("Engine", mysql_value_to_string(&rows, 0)),
+        ("Estimated rows", mysql_value_to_string(&rows, 1)),
+        ("Data length (bytes)", mysql_value_to_string(&rows, 2)),
+        ("Index length (bytes)", mysql_value_to_string(&rows, 3)),
+        ("Data free (bytes)", mysql_value_to_string(&rows, 4)),
+        ("Collation", mysql_value_to_string(&rows, 5)),
+        ("Created", mysql_value_to_string(&rows, 6)),
+        ("Updated", mysql_value_to_string(&rows, 7)),
+    ];
+    Ok(super::metric_result(pairs))
+}
+
+/// Table size / row estimates for PostgreSQL.
+pub async fn table_stats_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<QueryResult, String> {
+    let schema = schema.unwrap_or("public");
+    let row = query(
+        "SELECT pg_total_relation_size(c.oid), pg_relation_size(c.oid), \
+                pg_indexes_size(c.oid), s.n_live_tup \
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace \
+         LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid \
+         WHERE n.nspname = $1 AND c.relname = $2",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("table stats failed: {e}"))?
+    .ok_or_else(|| format!("Table {table} not found"))?;
+    let num = |idx: usize| row.try_get::<Option<i64>, _>(idx).ok().flatten().map(|v| v.to_string());
+    let pairs = vec![
+        ("Total size (bytes)", num(0)),
+        ("Table size (bytes)", num(1)),
+        ("Indexes size (bytes)", num(2)),
+        ("Live rows (estimate)", num(3)),
+    ];
+    Ok(super::metric_result(pairs))
 }
 
 #[cfg(test)]

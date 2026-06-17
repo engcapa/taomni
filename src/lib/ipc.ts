@@ -832,6 +832,15 @@ export interface DbIndex {
   unique: boolean;
 }
 
+/** A non-table schema object (routine, trigger, event, sequence, dictionary). */
+export interface DbObject {
+  name: string;
+  /** "procedure" | "function" | "trigger" | "event" | "sequence" | "dictionary". */
+  kind: string;
+  /** Owning table for triggers (used to DROP/DISABLE on PostgreSQL). */
+  owner?: string;
+}
+
 export interface DbColumn {
   name: string;
   type: string;
@@ -879,6 +888,44 @@ export async function dbListIndexes(
   table: string,
 ): Promise<DbIndex[]> {
   return invoke<DbIndex[]>("db_list_indexes", {
+    sessionId,
+    schema: schema ?? null,
+    table,
+  });
+}
+
+export async function dbListObjects(
+  sessionId: string,
+  schema: string | null,
+  kind: string,
+): Promise<DbObject[]> {
+  return invoke<DbObject[]>("db_list_objects", {
+    sessionId,
+    schema: schema ?? null,
+    kind,
+  });
+}
+
+export async function dbObjectDdl(
+  sessionId: string,
+  schema: string | null,
+  kind: string,
+  name: string,
+): Promise<string> {
+  return invoke<string>("db_object_ddl", {
+    sessionId,
+    schema: schema ?? null,
+    kind,
+    name,
+  });
+}
+
+export async function dbTableStats(
+  sessionId: string,
+  schema: string | null,
+  table: string,
+): Promise<DbQueryResult> {
+  return invoke<DbQueryResult>("db_table_stats", {
     sessionId,
     schema: schema ?? null,
     table,

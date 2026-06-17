@@ -69,6 +69,13 @@ import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { sqlStatementsForExecution } from "../../lib/sqlStatements";
+import {
+  asSqlEngine,
+  quoteIdent as dialectQuoteIdent,
+  qualifiedName as dialectQualifiedName,
+  sqlLiteral as dialectSqlLiteral,
+  setDefaultSchemaSql,
+} from "../../lib/sqlDialect";
 
 interface DbClientTabProps {
   tabId: string;
@@ -279,27 +286,15 @@ async function writeTextFile(path: string, text: string): Promise<void> {
 }
 
 function quoteIdent(engine: string, ident: string): string {
-  if (engine === "PostgreSQL" || engine === "Presto") return `"${ident.replace(/"/g, "\"\"")}"`;
-  return `\`${ident.replace(/`/g, "``")}\``;
+  return dialectQuoteIdent(asSqlEngine(engine), ident);
 }
 
 function qualifiedName(engine: string, schema: string | null, table: string, catalog?: string | null): string {
-  if (engine === "Presto" && catalog && schema) {
-    return `${quoteIdent(engine, catalog)}.${quoteIdent(engine, schema)}.${quoteIdent(engine, table)}`;
-  }
-  return schema
-    ? `${quoteIdent(engine, schema)}.${quoteIdent(engine, table)}`
-    : quoteIdent(engine, table);
+  return dialectQualifiedName(asSqlEngine(engine), { catalog, schema, name: table });
 }
 
 function schemaSwitchSql(engine: string, schema: string, catalog?: string | null): string {
-  if (engine === "PostgreSQL") {
-    return `SET search_path TO ${quoteIdent(engine, schema)}`;
-  }
-  if (engine === "Presto" && catalog) {
-    return `USE ${quoteIdent(engine, catalog)}.${quoteIdent(engine, schema)}`;
-  }
-  return `USE ${quoteIdent(engine, schema)}`;
+  return setDefaultSchemaSql(asSqlEngine(engine), schema, catalog);
 }
 
 function unquoteIdent(value: string): string {
@@ -332,8 +327,7 @@ function parseEditableSelectTarget(sql: string): { schema: string | null; table:
 }
 
 function sqlLiteral(value: string | null): string {
-  if (value === null) return "NULL";
-  return `'${value.replace(/'/g, "''")}'`;
+  return dialectSqlLiteral(value);
 }
 
 function whereForColumns(engine: string, columns: string[], allColumns: string[], values: (string | null)[]): string {
@@ -1449,9 +1443,14 @@ export default function DbClientTab({
                   <SchemaTree
                     sessionId={connectionSessionId}
                     engine={info.engine}
+                    catalog={info.catalog}
                     onInsertTable={insertIntoActive}
                     onQuickSelect={quickSelect}
                     quickSelectLimit={rowLimit}
+                    onInsertSql={(sql) => insertQueryFromOutside(sql, { destination: "new" })}
+                    onNewQuery={addPanel}
+                    onSetDefaultSchema={(schema) => void switchSchema(schema)}
+                    onStatus={setStatusMessage}
                     onSchemasLoaded={onSchemasLoaded}
                     onSchemaLoaded={onSchemaLoaded}
                   />

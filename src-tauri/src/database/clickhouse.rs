@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     emit_query_result_stream, send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig,
-    DbHandle, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    DbHandle, DbObject, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -450,6 +450,81 @@ pub async fn list_tables(
             })
         })
         .collect())
+}
+
+/// List ClickHouse dictionaries. Views / materialized views are surfaced via
+/// `list_tables`; other object kinds do not exist in ClickHouse.
+pub async fn list_objects(
+    client: &ClickHouseClient,
+    schema: Option<&str>,
+    kind: &str,
+) -> Result<Vec<DbObject>, String> {
+    if kind != "dictionary" {
+        return Ok(Vec::new());
+    }
+    let db = schema.unwrap_or(&client.database);
+    let sql = format!(
+        "SELECT name FROM system.dictionaries WHERE database = '{}' ORDER BY name",
+        db.replace('\'', "''")
+    );
+    let token = CancellationToken::new();
+    let res = execute(client, &sql, &token).await?;
+    Ok(res
+        .rows
+        .into_iter()
+        .filter_map(|r| r.into_iter().next().flatten())
+        .map(|name| DbObject {
+            name,
+            kind: "dictionary".to_string(),
+            owner: None,
+        })
+        .collect())
+}
+
+/// `SHOW CREATE TABLE|DICTIONARY` for a ClickHouse object.
+pub async fn object_ddl(
+    client: &ClickHouseClient,
+    schema: Option<&str>,
+    kind: &str,
+    name: &str,
+) -> Result<String, String> {
+    let db = schema.unwrap_or(&client.database);
+    let verb = if kind == "dictionary" { "DICTIONARY" } else { "TABLE" };
+    let sql = format!(
+        "SHOW CREATE {verb} `{}`.`{}`",
+        db.replace('`', "``"),
+        name.replace('`', "``"),
+    );
+    let token = CancellationToken::new();
+    let res = execute(client, &sql, &token).await?;
+    res.rows
+        .first()
+        .and_then(|r| r.first().cloned().flatten())
+        .ok_or_else(|| format!("No DDL returned for {name}"))
+}
+
+/// Row / byte totals for a ClickHouse table from `system.parts`.
+pub async fn table_stats(
+    client: &ClickHouseClient,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<QueryResult, String> {
+    let db = schema.unwrap_or(&client.database);
+    let sql = format!(
+        "SELECT sum(rows), sum(bytes_on_disk), count() FROM system.parts \
+         WHERE database = '{}' AND table = '{}' AND active",
+        db.replace('\'', "''"),
+        table.replace('\'', "''"),
+    );
+    let token = CancellationToken::new();
+    let res = execute(client, &sql, &token).await?;
+    let r0 = res.rows.first();
+    let get = |i: usize| r0.and_then(|r| r.get(i).cloned().flatten());
+    Ok(super::metric_result(vec![
+        ("Rows", get(0)),
+        ("Bytes on disk", get(1)),
+        ("Active parts", get(2)),
+    ]))
 }
 
 pub async fn describe_table(

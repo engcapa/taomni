@@ -198,6 +198,19 @@ pub struct IndexInfo {
     pub unique: bool,
 }
 
+/// A non-table schema object (routine, trigger, event, sequence, dictionary).
+#[derive(Debug, Clone, Serialize)]
+pub struct DbObject {
+    pub name: String,
+    /// Canonical kind: "procedure" | "function" | "trigger" | "event" |
+    /// "sequence" | "dictionary".
+    pub kind: String,
+    /// Owning table for triggers (needed to DROP/DISABLE on PostgreSQL); None
+    /// for objects that stand on their own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+}
+
 /// The live, engine-specific connection handle. Held behind an `Arc` in
 /// `AppState::db_connections`; SQL pools are internally `Send + Sync` so they
 /// need no extra lock, while the Redis multiplexed connection is cloneable.
@@ -554,6 +567,96 @@ pub async fn db_list_indexes(
         DbHandle::ClickHouse(_) => Ok(Vec::new()),
         DbHandle::Presto(client) => presto::list_indexes(client, schema.as_deref(), &table).await,
         DbHandle::Redis(_) => Err("Redis has no indexes".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn db_list_objects(
+    state: State<'_, AppState>,
+    session_id: String,
+    schema: Option<String>,
+    kind: String,
+) -> Result<Vec<DbObject>, String> {
+    let session = get_session(&state, &session_id).await?;
+    match &session.handle {
+        DbHandle::MySql(pool) => sql::list_objects_mysql(pool, schema.as_deref(), &kind).await,
+        DbHandle::Postgres(pool) => {
+            sql::list_objects_postgres(pool, schema.as_deref(), &kind).await
+        }
+        DbHandle::ClickHouse(client) => {
+            clickhouse::list_objects(client, schema.as_deref(), &kind).await
+        }
+        DbHandle::Presto(client) => presto::list_objects(client, schema.as_deref(), &kind).await,
+        DbHandle::Redis(_) => Err("Redis has no SQL objects".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn db_object_ddl(
+    state: State<'_, AppState>,
+    session_id: String,
+    schema: Option<String>,
+    kind: String,
+    name: String,
+) -> Result<String, String> {
+    let session = get_session(&state, &session_id).await?;
+    match &session.handle {
+        DbHandle::MySql(pool) => sql::object_ddl_mysql(pool, schema.as_deref(), &kind, &name).await,
+        DbHandle::Postgres(pool) => {
+            sql::object_ddl_postgres(pool, schema.as_deref(), &kind, &name).await
+        }
+        DbHandle::ClickHouse(client) => {
+            clickhouse::object_ddl(client, schema.as_deref(), &kind, &name).await
+        }
+        DbHandle::Presto(client) => {
+            presto::object_ddl(client, schema.as_deref(), &kind, &name).await
+        }
+        DbHandle::Redis(_) => Err("Redis has no SQL objects".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn db_table_stats(
+    state: State<'_, AppState>,
+    session_id: String,
+    schema: Option<String>,
+    table: String,
+) -> Result<QueryResult, String> {
+    let session = get_session(&state, &session_id).await?;
+    match &session.handle {
+        DbHandle::MySql(pool) => sql::table_stats_mysql(pool, schema.as_deref(), &table).await,
+        DbHandle::Postgres(pool) => {
+            sql::table_stats_postgres(pool, schema.as_deref(), &table).await
+        }
+        DbHandle::ClickHouse(client) => {
+            clickhouse::table_stats(client, schema.as_deref(), &table).await
+        }
+        DbHandle::Presto(client) => presto::table_stats(client, schema.as_deref(), &table).await,
+        DbHandle::Redis(_) => Err("Redis has no tables".into()),
+    }
+}
+
+/// Build a two-column ("Metric"/"Value") result from label/value pairs, used by
+/// the per-engine `table_stats_*` helpers.
+pub(crate) fn metric_result(pairs: Vec<(&str, Option<String>)>) -> QueryResult {
+    QueryResult {
+        columns: vec![
+            ColumnInfo {
+                name: "Metric".into(),
+                type_name: "text".into(),
+            },
+            ColumnInfo {
+                name: "Value".into(),
+                type_name: "text".into(),
+            },
+        ],
+        rows: pairs
+            .into_iter()
+            .map(|(label, value)| vec![Some(label.to_string()), value])
+            .collect(),
+        rows_affected: 0,
+        duration_ms: 0,
+        warnings: Vec::new(),
     }
 }
 
