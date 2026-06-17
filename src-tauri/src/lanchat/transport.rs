@@ -107,6 +107,17 @@ pub async fn ensure_connection(
     Ok(())
 }
 
+/// Send to a peer over an already-established connection, without dialing.
+/// Returns false if there is no live connection. Used by tight loops (file
+/// transfer) that run after a connection is known to exist, avoiding the
+/// dial machinery (which would create a non-Send type cycle with dispatch).
+pub async fn try_send(state: &Arc<LanChatState>, peer_id: &str, env: Envelope) -> bool {
+    match state.connections.read().await.get(peer_id) {
+        Some(handle) => handle.send(env).is_ok(),
+        None => false,
+    }
+}
+
 /// Queue an envelope to a peer, dialing on demand if not yet connected.
 pub async fn send_to_peer(
     app: &AppHandle,
@@ -317,6 +328,24 @@ async fn dispatch_inbound(
         }
         frame::GROUP_JOIN | frame::GROUP_LEAVE => {
             crate::lanchat::messaging::handle_group_membership(app, state, &env).await;
+        }
+        frame::FILE_OFFER => {
+            crate::lanchat::transfer::handle_file_offer(app, state, peer_id, &env).await;
+        }
+        frame::FILE_ACCEPT => {
+            crate::lanchat::transfer::handle_file_accept(app, state, peer_id, &env).await;
+        }
+        frame::FILE_REJECT => {
+            crate::lanchat::transfer::handle_file_reject(app, state, peer_id, &env).await;
+        }
+        frame::FILE_CHUNK => {
+            crate::lanchat::transfer::handle_file_chunk(app, state, peer_id, &env).await;
+        }
+        frame::FILE_COMPLETE => {
+            crate::lanchat::transfer::handle_file_complete(app, state, peer_id, &env).await;
+        }
+        frame::FILE_PAUSE | frame::FILE_RESUME | frame::FILE_CANCEL => {
+            crate::lanchat::transfer::handle_file_control(app, state, &env).await;
         }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");

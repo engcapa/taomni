@@ -11,6 +11,8 @@ use crate::lanchat::protocol::PresenceStatus;
 use crate::lanchat::store::{decode_avatar_base64, Conversation, Group, LanMessage, Profile};
 use crate::lanchat::messaging;
 use crate::lanchat::protocol::PeerRecord;
+use crate::lanchat::store::direct_conv_id;
+use crate::lanchat::transfer;
 use crate::state::AppState;
 
 /// Snapshot of the LanChat service for the status bar.
@@ -218,4 +220,51 @@ pub async fn lanchat_leave_group(
     group_id: String,
 ) -> Result<(), String> {
     messaging::leave_group(&app, &state.lanchat, &group_id).await
+}
+
+/* ----------------------------- transfers (task 02) ----------------------------- */
+
+/// Offer a file to a peer. Returns the transfer id (progress via
+/// `lanchat://transfer`).
+#[tauri::command]
+pub async fn lanchat_send_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    peer_id: String,
+    path: String,
+) -> Result<String, String> {
+    let conv = direct_conv_id(&peer_id);
+    transfer::send_file(&app, &state.lanchat, &peer_id, std::path::PathBuf::from(path), conv).await
+}
+
+/// Accept an inbound file offer, saving to `save_path`.
+#[tauri::command]
+pub async fn lanchat_accept_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    transfer_id: String,
+    save_path: String,
+) -> Result<(), String> {
+    transfer::accept_offer(&app, &state.lanchat, &transfer_id, std::path::PathBuf::from(save_path)).await
+}
+
+/// Reject an inbound file offer.
+#[tauri::command]
+pub async fn lanchat_reject_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    transfer_id: String,
+) -> Result<(), String> {
+    transfer::reject_offer(&app, &state.lanchat, &transfer_id).await
+}
+
+/// Pause / resume / cancel a transfer (`action`: "pause" | "resume" | "cancel").
+#[tauri::command]
+pub async fn lanchat_transfer_control(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    transfer_id: String,
+    action: String,
+) -> Result<(), String> {
+    transfer::control(&app, &state.lanchat, &transfer_id, &action).await
 }

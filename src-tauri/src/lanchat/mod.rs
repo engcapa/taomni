@@ -16,6 +16,7 @@ pub mod discovery;
 pub mod messaging;
 pub mod protocol;
 pub mod store;
+pub mod transfer;
 pub mod transport;
 
 use std::collections::HashMap;
@@ -41,6 +42,10 @@ pub mod events {
     pub const CONVERSATION: &str = "lanchat://conversation";
     /// A group whose membership/name changed (`Group`).
     pub const GROUP: &str = "lanchat://group";
+    /// An inbound file offer awaiting accept/reject.
+    pub const FILE_OFFER: &str = "lanchat://file-offer";
+    /// A transfer progress / state update (`TransferProgress`).
+    pub const TRANSFER: &str = "lanchat://transfer";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.
@@ -66,6 +71,14 @@ pub struct LanChatState {
     pub control_port: AtomicU16,
     /// Reserved control listener, handed to the transport accept loop (phase 4).
     pub control_listener: AsyncMutex<Option<TcpListener>>,
+    /// Active file transfers, keyed by transfer id (cancel/pause handles).
+    pub transfers: RwLock<HashMap<String, std::sync::Arc<transfer::LanTransferHandle>>>,
+    /// Outgoing transfers awaiting the peer's accept, keyed by transfer id.
+    pub outgoing: RwLock<HashMap<String, transfer::OutgoingMeta>>,
+    /// Inbound offers awaiting the local user's accept/reject, by transfer id.
+    pub offers: RwLock<HashMap<String, transfer::OfferInfo>>,
+    /// In-progress inbound writes, keyed by transfer id.
+    pub incoming: AsyncMutex<HashMap<String, transfer::IncomingState>>,
 }
 
 impl LanChatState {
@@ -88,6 +101,10 @@ impl LanChatState {
             daemon: StdMutex::new(None),
             control_port: AtomicU16::new(0),
             control_listener: AsyncMutex::new(None),
+            transfers: RwLock::new(HashMap::new()),
+            outgoing: RwLock::new(HashMap::new()),
+            offers: RwLock::new(HashMap::new()),
+            incoming: AsyncMutex::new(HashMap::new()),
         }
     }
 
