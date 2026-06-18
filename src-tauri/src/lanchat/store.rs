@@ -175,6 +175,26 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
     )
 }
 
+/// Run forward-compatible schema migrations. Each ALTER TABLE ADD COLUMN
+/// is individually executed and "duplicate column" errors are silently ignored
+/// so the migration is safe to re-run on already-migrated databases.
+fn migrate_schema(conn: &Connection) {
+    // v2: persist peer connection info for startup reconnection.
+    for ddl in [
+        "ALTER TABLE peers ADD COLUMN addr TEXT",
+        "ALTER TABLE peers ADD COLUMN port INTEGER",
+    ] {
+        if let Err(e) = conn.execute(ddl, []) {
+            let msg = e.to_string();
+            // "duplicate column name" is expected on re-runs; anything else is
+            // worth logging but not fatal.
+            if !msg.contains("duplicate column") {
+                log::warn!("lanchat migrate: {ddl}: {e}");
+            }
+        }
+    }
+}
+
 impl LanChatStore {
     /// Open (creating if needed) the `lanchat.sqlite` file and ensure schema.
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
@@ -182,6 +202,7 @@ impl LanChatStore {
         // WAL keeps reads non-blocking during the frequent message writes.
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
         init_schema(&conn)?;
+        migrate_schema(&conn);
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -191,6 +212,7 @@ impl LanChatStore {
     fn open_in_memory() -> rusqlite::Result<Self> {
         let conn = Connection::open_in_memory()?;
         init_schema(&conn)?;
+        migrate_schema(&conn);
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -283,17 +305,20 @@ impl LanChatStore {
     pub fn store_peer(&self, p: &PeerRecord) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO peers (id, name, avatar_hash, signature, last_seen, status)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "INSERT INTO peers (id, name, avatar_hash, signature, last_seen, status, addr, port)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT(id) DO UPDATE SET
-               name=?2, avatar_hash=?3, signature=?4, last_seen=?5, status=?6",
+               name=?2, avatar_hash=?3, signature=?4, last_seen=?5, status=?6,
+               addr=COALESCE(?7, addr), port=COALESCE(?8, port)",
             params![
                 p.id,
                 p.name,
                 p.avatar_hash,
                 p.signature,
                 p.last_seen,
-                p.status.as_txt()
+                p.status.as_txt(),
+                p.addr,
+                p.port.map(|v| v as i64)
             ],
         )?;
         Ok(())
@@ -307,6 +332,38 @@ impl LanChatStore {
             params![id],
         )?;
         Ok(())
+    }
+
+    /// Load peers seen within `since_ms` milliseconds, with known addr+port.
+    /// Used at startup to attempt reconnection to previously known peers.
+    pub fn list_recent_peers(&self, since_ms: i64) -> Vec<PeerRecord> {
+        let conn = self.conn.lock().unwrap();
+        let cutoff = chrono::Utc::now().timestamp_millis() - since_ms;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, avatar_hash, signature, last_seen, status, addr, port
+                 FROM peers
+                 WHERE last_seen > ?1 AND addr IS NOT NULL AND port IS NOT NULL
+                 ORDER BY last_seen DESC",
+            )
+            .unwrap();
+        stmt.query_map(params![cutoff], |r| {
+            let status_str: String = r.get(5)?;
+            let port_val: Option<i64> = r.get(7)?;
+            Ok(PeerRecord {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                avatar_hash: r.get(2)?,
+                signature: r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                last_seen: r.get(4)?,
+                status: PresenceStatus::from_txt(&status_str),
+                addr: r.get(6)?,
+                port: port_val.and_then(|v| u16::try_from(v).ok()),
+            })
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect()
     }
 
     /// Ensure a conversation row exists, returning it. `kind` is "direct" or
@@ -694,5 +751,42 @@ mod tests {
         store.upsert_group("g1", "前端小队").unwrap();
         assert_eq!(store.get_group("g1").unwrap().unwrap().name, "前端小队");
         assert_eq!(store.list_groups().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn list_recent_peers_returns_peers_with_addr_port() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        // Peer with addr+port (recent)
+        store
+            .store_peer(&PeerRecord {
+                id: "p1".into(),
+                name: "Alice".into(),
+                avatar_hash: None,
+                signature: String::new(),
+                status: PresenceStatus::Online,
+                last_seen: now,
+                addr: Some("192.168.1.10".into()),
+                port: Some(4711),
+            })
+            .unwrap();
+        // Peer without addr (should be excluded)
+        store
+            .store_peer(&PeerRecord {
+                id: "p2".into(),
+                name: "Bob".into(),
+                avatar_hash: None,
+                signature: String::new(),
+                status: PresenceStatus::Online,
+                last_seen: now,
+                addr: None,
+                port: None,
+            })
+            .unwrap();
+        let recent = store.list_recent_peers(60_000); // last minute
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].id, "p1");
+        assert_eq!(recent[0].addr.as_deref(), Some("192.168.1.10"));
+        assert_eq!(recent[0].port, Some(4711));
     }
 }

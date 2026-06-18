@@ -11,6 +11,7 @@
 //! handshake + keepalive set and logs the rest.
 
 use std::net::SocketAddr;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,7 +23,7 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
-use crate::lanchat::protocol::{frame, Envelope};
+use crate::lanchat::protocol::{frame, Envelope, PeerRecord, PresenceStatus};
 use crate::lanchat::LanChatState;
 
 /// How often to send a keepalive ping on an idle connection.
@@ -80,7 +81,21 @@ pub async fn run_listener(app: AppHandle, state: Arc<LanChatState>) {
 /// Ensure a live connection to `peer_id`, dialing if necessary. Returns once
 /// the connection is registered (handshake complete), so callers may send
 /// immediately afterwards.
-pub async fn ensure_connection(
+///
+/// The `BoxFuture` return type is intentional: it breaks the opaque-type cycle
+/// that arises because `setup_connection` (via `dispatch_inbound` →
+/// `handle_peer_exchange`) spawns tasks that call back into this function.
+/// Without the explicit `Box`, rustc cannot resolve the `Send` auto-trait for
+/// the spawned futures and emits E0391.
+pub fn ensure_connection<'a>(
+    app: &'a AppHandle,
+    state: &'a Arc<LanChatState>,
+    peer_id: &'a str,
+) -> futures::future::BoxFuture<'a, Result<(), String>> {
+    Box::pin(ensure_connection_inner(app, state, peer_id))
+}
+
+async fn ensure_connection_inner(
     app: &AppHandle,
     state: &Arc<LanChatState>,
     peer_id: &str,
@@ -146,15 +161,48 @@ async fn recv_frame(framed: &mut LanFramed) -> Result<Envelope, String> {
     }
 }
 
-/// Exchange hello/hello-ack and learn the remote node id. `expected` is `Some`
-/// when we dialed (so we send first), `None` when accepting.
+/// Identity learned from a peer's `hello` / `hello-ack` frame. Carries enough
+/// to synthesize a roster entry for a peer we never resolved over mDNS (e.g. a
+/// multicast-segmented Wi-Fi client that can still reach us by unicast).
+struct PeerHello {
+    id: String,
+    name: String,
+    /// The peer's advertised control-channel listen port (so we can dial back),
+    /// if its `hello` carried one. Older peers omit it.
+    port: Option<u16>,
+}
+
+fn parse_hello(env: &Envelope) -> PeerHello {
+    PeerHello {
+        id: env.from.clone(),
+        name: env
+            .payload
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        port: env
+            .payload
+            .get("port")
+            .and_then(|v| v.as_u64())
+            .and_then(|n| u16::try_from(n).ok())
+            .filter(|p| *p != 0),
+    }
+}
+
+/// Exchange hello/hello-ack and learn the remote identity. `expected` is `Some`
+/// when we dialed (so we send first), `None` when accepting. `my_port` is our
+/// control-channel listen port, advertised so the peer can dial us back even
+/// when it never discovered us over mDNS.
 async fn handshake(
     framed: &mut LanFramed,
     my_id: &str,
     my_name: &str,
+    my_port: u16,
     expected: Option<String>,
-) -> Result<String, String> {
-    let hello_payload = json!({ "name": my_name, "pv": crate::lanchat::protocol::PROTOCOL_VERSION });
+) -> Result<PeerHello, String> {
+    let hello_payload =
+        json!({ "name": my_name, "pv": crate::lanchat::protocol::PROTOCOL_VERSION, "port": my_port });
     match expected {
         Some(target) => {
             send_frame(
@@ -166,20 +214,125 @@ async fn handshake(
             if ack.frame_type != frame::HELLO_ACK {
                 return Err(format!("expected hello-ack, got {}", ack.frame_type));
             }
-            Ok(ack.from)
+            Ok(parse_hello(&ack))
         }
         None => {
             let hello = recv_frame(framed).await?;
             if hello.frame_type != frame::HELLO {
                 return Err(format!("expected hello, got {}", hello.frame_type));
             }
-            let peer_id = hello.from.clone();
+            let peer = parse_hello(&hello);
             send_frame(
                 framed,
-                &Envelope::new(frame::HELLO_ACK, my_id, Some(peer_id.clone()), hello_payload),
+                &Envelope::new(frame::HELLO_ACK, my_id, Some(peer.id.clone()), hello_payload),
             )
             .await?;
-            Ok(peer_id)
+            Ok(peer)
+        }
+    }
+}
+
+/// Learn / refresh a peer from a freshly established connection. Peers that
+/// mDNS never resolved (cross-segment Wi-Fi, multicast-pruned networks) are
+/// synthesized from the connection's source IP + the `hello` identity so they
+/// show up in the roster and can be replied to. Returns true if a *new* peer
+/// was added (caller should re-emit the roster).
+async fn learn_peer_from_conn(
+    state: &Arc<LanChatState>,
+    peer_id: &str,
+    hello: &PeerHello,
+    addr: SocketAddr,
+) -> bool {
+    let ip = addr.ip().to_string();
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut peers = state.peers.write().await;
+    match peers.get_mut(peer_id) {
+        Some(existing) => {
+            // Already known (typically from mDNS). Keep it fresh and backfill
+            // any missing reach info without forcing a roster churn.
+            existing.last_seen = now;
+            if existing.addr.is_none() {
+                existing.addr = Some(ip);
+            }
+            if existing.port.is_none() {
+                existing.port = hello.port;
+            }
+            false
+        }
+        None => {
+            let name = if hello.name.trim().is_empty() {
+                peer_id.chars().take(8).collect()
+            } else {
+                hello.name.clone()
+            };
+            let rec = PeerRecord {
+                id: peer_id.to_string(),
+                name,
+                avatar_hash: None,
+                signature: String::new(),
+                status: PresenceStatus::Online,
+                last_seen: now,
+                addr: Some(ip),
+                port: hello.port,
+            };
+            let _ = state.store.store_peer(&rec);
+            peers.insert(peer_id.to_string(), rec);
+            true
+        }
+    }
+}
+
+/// Handle an inbound `peer-exchange`: learn about peers the sender knows that
+/// we haven't discovered yet (e.g. because mDNS multicast was suppressed on
+/// our WiFi segment). For each unknown peer with a reachable addr+port, add it
+/// to our roster and attempt a TCP connection.
+async fn handle_peer_exchange(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    _from: &str,
+    env: &Envelope,
+) {
+    let Some(peers_arr) = env.payload.get("peers").and_then(|v| v.as_array()) else {
+        return;
+    };
+    let my_id = state.node_id().await;
+    let mut new_peers = Vec::new();
+    for entry in peers_arr {
+        let Some(id) = entry.get("id").and_then(|v| v.as_str()) else { continue };
+        if id == my_id { continue; }
+        // Skip peers we already know or are already connected to.
+        if state.peers.read().await.contains_key(id) { continue; }
+        if state.connections.read().await.contains_key(id) { continue; }
+        let name = entry.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let addr = entry.get("addr").and_then(|v| v.as_str()).map(String::from);
+        let port = entry.get("port").and_then(|v| v.as_u64()).and_then(|n| u16::try_from(n).ok());
+        if let (Some(addr_val), Some(port_val)) = (&addr, port) {
+            let rec = PeerRecord {
+                id: id.to_string(),
+                name: if name.is_empty() { id.chars().take(8).collect() } else { name },
+                avatar_hash: None,
+                signature: String::new(),
+                status: PresenceStatus::Online,
+                last_seen: chrono::Utc::now().timestamp_millis(),
+                addr: Some(addr_val.clone()),
+                port: Some(port_val),
+            };
+            let _ = state.store.store_peer(&rec);
+            state.peers.write().await.insert(id.to_string(), rec);
+            new_peers.push(id.to_string());
+        }
+    }
+    if !new_peers.is_empty() {
+        crate::lanchat::discovery::emit_roster(app, state).await;
+        // Attempt connections to newly learned peers in the background.
+        for peer_id in new_peers {
+            let app = (*app).clone();
+            let state = (*state).clone();
+            tokio::spawn(async move {
+                if let Err(e) = ensure_connection(&app, &state, &peer_id).await {
+                    log::debug!("lanchat: peer-exchange connect to {peer_id} failed: {e}");
+                }
+            });
         }
     }
 }
@@ -203,13 +356,15 @@ async fn setup_connection(
         .flatten()
         .map(|p| p.name)
         .unwrap_or_default();
+    let my_port = state.control_port.load(Ordering::SeqCst);
 
-    let peer_id = timeout(
+    let hello = timeout(
         HANDSHAKE_TIMEOUT,
-        handshake(&mut framed, &my_id, &my_name, expected.clone()),
+        handshake(&mut framed, &my_id, &my_name, my_port, expected.clone()),
     )
     .await
     .map_err(|_| "handshake timed out".to_string())??;
+    let peer_id = hello.id.clone();
 
     if let Some(exp) = &expected {
         if exp != &peer_id {
@@ -221,6 +376,13 @@ async fn setup_connection(
     if state.connections.read().await.contains_key(&peer_id) {
         log::debug!("lanchat: duplicate connection to {peer_id} dropped");
         return Ok(());
+    }
+
+    // Learn this peer from the connection itself — covers peers mDNS never
+    // resolved (cross-segment / multicast-pruned Wi-Fi). Re-emit the roster so
+    // the UI gains a row to open/reply, even with no prior discovery.
+    if learn_peer_from_conn(&state, &peer_id, &hello, addr).await {
+        crate::lanchat::discovery::emit_roster(&app, &state).await;
     }
 
     let (mut sink, mut read) = framed.split();
@@ -235,6 +397,32 @@ async fn setup_connection(
         },
     );
     log::info!("lanchat: connected to {peer_id} ({addr})");
+
+    // Gossip: share our known peers so the new connection can discover nodes
+    // that mDNS failed to resolve (e.g. WiFi multicast suppression).
+    {
+        let mut peers_snapshot = Vec::new();
+        {
+            let guard = state.peers.read().await;
+            for p in guard.values() {
+                if p.id != peer_id && p.addr.is_some() && p.port.is_some() {
+                    peers_snapshot.push(serde_json::json!({
+                        "id": p.id,
+                        "name": p.name,
+                        "addr": p.addr,
+                        "port": p.port,
+                    }));
+                }
+            }
+        }
+        if !peers_snapshot.is_empty() {
+            let env = Envelope::new(
+                frame::PEER_EXCHANGE, &my_id, Some(peer_id.clone()),
+                serde_json::json!({ "peers": peers_snapshot }),
+            );
+            let _ = tx.send(env);
+        }
+    }
 
     // Write task: drain the outbound queue into the framed sink.
     let write_task = tokio::spawn(async move {
@@ -278,7 +466,7 @@ async fn setup_connection(
                 }
             };
             match Envelope::decode(&buf) {
-                Ok(env) => dispatch_inbound(&app, &state, &peer_id, &my_id, env).await,
+                Ok(env) => Box::pin(dispatch_inbound(&app, &state, &peer_id, &my_id, env)).await,
                 Err(e) => log::debug!("lanchat: bad frame from {peer_id}: {e}"),
             }
         }
@@ -377,6 +565,9 @@ async fn dispatch_inbound(
                 &json!({ "from": peer_id, "type": env.frame_type, "payload": env.payload }),
             );
         }
+        frame::PEER_EXCHANGE => {
+            handle_peer_exchange(app, state, peer_id, &env).await;
+        }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");
         }
@@ -389,8 +580,8 @@ mod tests {
     use tokio::net::TcpListener;
 
     // Real TCP handshake over loopback: both sides learn each other's node id
-    // through length-delimited JSON frames. Exercises the codec + handshake
-    // without needing mDNS or a Tauri app handle.
+    // (plus name + advertised control port) through length-delimited JSON
+    // frames. Exercises the codec + handshake without mDNS or a Tauri handle.
     #[tokio::test]
     async fn handshake_exchanges_node_ids_over_tcp() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -399,7 +590,7 @@ mod tests {
         let acceptor = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
             let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
-            handshake(&mut framed, "node-acceptor", "Acceptor", None).await
+            handshake(&mut framed, "node-acceptor", "Acceptor", 5001, None).await
         });
 
         let stream = TcpStream::connect(addr).await.unwrap();
@@ -408,16 +599,20 @@ mod tests {
             &mut framed,
             "node-dialer",
             "Dialer",
+            5002,
             Some("node-acceptor".to_string()),
         )
-        .await;
+        .await
+        .unwrap();
 
-        assert_eq!(dialer.unwrap(), "node-acceptor", "dialer learns acceptor id");
-        assert_eq!(
-            acceptor.await.unwrap().unwrap(),
-            "node-dialer",
-            "acceptor learns dialer id"
-        );
+        assert_eq!(dialer.id, "node-acceptor", "dialer learns acceptor id");
+        assert_eq!(dialer.name, "Acceptor", "dialer learns acceptor name");
+        assert_eq!(dialer.port, Some(5001), "dialer learns acceptor port");
+
+        let accepted = acceptor.await.unwrap().unwrap();
+        assert_eq!(accepted.id, "node-dialer", "acceptor learns dialer id");
+        assert_eq!(accepted.name, "Dialer", "acceptor learns dialer name");
+        assert_eq!(accepted.port, Some(5002), "acceptor learns dialer port");
     }
 
     // A dialer expecting a specific peer id must reject a mismatched ack.
@@ -429,7 +624,7 @@ mod tests {
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
             let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
-            let _ = handshake(&mut framed, "node-other", "Other", None).await;
+            let _ = handshake(&mut framed, "node-other", "Other", 5003, None).await;
         });
 
         let stream = TcpStream::connect(addr).await.unwrap();
@@ -441,11 +636,12 @@ mod tests {
             &mut framed,
             "node-dialer",
             "Dialer",
+            5004,
             Some("node-expected".to_string()),
         )
         .await
         .unwrap();
-        assert_eq!(learned, "node-other");
-        assert_ne!(learned, "node-expected");
+        assert_eq!(learned.id, "node-other");
+        assert_ne!(learned.id, "node-expected");
     }
 }

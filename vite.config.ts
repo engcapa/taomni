@@ -9,7 +9,7 @@ import { rdpProxyPlugin } from "./vite-plugins/rdpProxy";
 
 const isTauriBuild = !!process.env.TAURI_ENV_PLATFORM;
 
-const devPort = isTauriBuild ? 1420 : 5000;
+const devPort = isTauriBuild ? 1980 : 5000;
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")) as {
   version: string;

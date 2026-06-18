@@ -143,8 +143,10 @@ fn peer_from_resolved(resolved: &mdns_sd::ResolvedService, my_id: &str) -> Optio
     })
 }
 
-/// Emit the current roster snapshot to all frontend windows.
-async fn emit_roster(app: &AppHandle, state: &LanChatState) {
+/// Emit the current roster snapshot to all frontend windows. Public so the
+/// transport can re-emit when it learns a peer from a connection (rather than
+/// from mDNS).
+pub async fn emit_roster(app: &AppHandle, state: &LanChatState) {
     let mut roster: Vec<PeerRecord> = state.peers.read().await.values().cloned().collect();
     roster.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     if let Err(e) = app.emit(events::ROSTER, &roster) {
