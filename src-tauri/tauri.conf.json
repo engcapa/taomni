@@ -5,7 +5,7 @@
   "identifier": "com.taomni.app",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:1980",
     "beforeDevCommand": "bash scripts/bundle-krb5-macos.sh stage && pnpm dev",
     "beforeBuildCommand": "pnpm build && bash scripts/bundle-krb5-macos.sh stage",
     "beforeBundleCommand": "bash scripts/bundle-krb5-macos.sh fixbin"

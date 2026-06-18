@@ -81,7 +81,21 @@ pub async fn run_listener(app: AppHandle, state: Arc<LanChatState>) {
 /// Ensure a live connection to `peer_id`, dialing if necessary. Returns once
 /// the connection is registered (handshake complete), so callers may send
 /// immediately afterwards.
-pub async fn ensure_connection(
+///
+/// The `BoxFuture` return type is intentional: it breaks the opaque-type cycle
+/// that arises because `setup_connection` (via `dispatch_inbound` →
+/// `handle_peer_exchange`) spawns tasks that call back into this function.
+/// Without the explicit `Box`, rustc cannot resolve the `Send` auto-trait for
+/// the spawned futures and emits E0391.
+pub fn ensure_connection<'a>(
+    app: &'a AppHandle,
+    state: &'a Arc<LanChatState>,
+    peer_id: &'a str,
+) -> futures::future::BoxFuture<'a, Result<(), String>> {
+    Box::pin(ensure_connection_inner(app, state, peer_id))
+}
+
+async fn ensure_connection_inner(
     app: &AppHandle,
     state: &Arc<LanChatState>,
     peer_id: &str,
@@ -315,7 +329,7 @@ async fn handle_peer_exchange(
             let app = (*app).clone();
             let state = (*state).clone();
             tokio::spawn(async move {
-                if let Err(e) = Box::pin(ensure_connection(&app, &state, &peer_id)).await {
+                if let Err(e) = ensure_connection(&app, &state, &peer_id).await {
                     log::debug!("lanchat: peer-exchange connect to {peer_id} failed: {e}");
                 }
             });
