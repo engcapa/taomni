@@ -9873,6 +9873,7 @@ dependencies = [
  "sha1 0.11.0",
  "sha2 0.11.0",
  "shellexpand",
+ "socket2",
  "sqlx-core",
  "sqlx-mysql",
  "sqlx-postgres",

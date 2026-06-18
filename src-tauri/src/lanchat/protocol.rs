@@ -42,6 +42,8 @@ pub mod frame {
     pub const GROUP_ANNOUNCE: &str = "group-announce";
     pub const GROUP_JOIN: &str = "group-join";
     pub const GROUP_LEAVE: &str = "group-leave";
+    // --- peer-exchange: gossip roster over TCP to work around mDNS failures ---
+    pub const PEER_EXCHANGE: &str = "peer-exchange";
     // --- task 02 (reserved): file & screenshot transfer ---
     pub const FILE_OFFER: &str = "file-offer";
     pub const FILE_ACCEPT: &str = "file-accept";

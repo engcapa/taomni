@@ -11,6 +11,7 @@
 //!
 //! Build-out is phased; each submodule's doc notes which phase fills it in.
 
+pub mod beacon;
 pub mod commands;
 pub mod discovery;
 pub mod messaging;
@@ -154,6 +155,33 @@ pub async fn start(app: AppHandle) {
             let state_t = lanchat.clone();
             tokio::spawn(async move {
                 transport::run_listener(app_t, state_t).await;
+            });
+
+            // UDP broadcast beacon discovery (fallback for WiFi multicast suppression).
+            let app_b = app.clone();
+            let state_b = lanchat.clone();
+            tokio::spawn(async move {
+                beacon::run(app_b, state_b, port).await;
+            });
+
+            // Historic peer reconnection (in background, delayed slightly).
+            let app_r = app.clone();
+            let state_r = lanchat.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                // 7 days in ms
+                let recent = state_r.store.list_recent_peers(7 * 24 * 3600 * 1000);
+                for peer in recent {
+                    if state_r.connections.read().await.contains_key(&peer.id) {
+                        continue;
+                    }
+                    if let (Some(addr), Some(p)) = (&peer.addr, peer.port) {
+                        log::info!("lanchat: reconnecting to historic peer {} ({}:{})", peer.name, addr, p);
+                        if let Err(e) = transport::ensure_connection(&app_r, &state_r, &peer.id).await {
+                            log::debug!("lanchat: historic reconnect to {} failed: {}", peer.id, e);
+                        }
+                    }
+                }
             });
 
             // mDNS discovery (runs for the app lifetime).

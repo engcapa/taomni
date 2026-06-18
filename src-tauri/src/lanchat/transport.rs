@@ -268,6 +268,61 @@ async fn learn_peer_from_conn(
     }
 }
 
+/// Handle an inbound `peer-exchange`: learn about peers the sender knows that
+/// we haven't discovered yet (e.g. because mDNS multicast was suppressed on
+/// our WiFi segment). For each unknown peer with a reachable addr+port, add it
+/// to our roster and attempt a TCP connection.
+async fn handle_peer_exchange(
+    app: &AppHandle,
+    state: &Arc<LanChatState>,
+    _from: &str,
+    env: &Envelope,
+) {
+    let Some(peers_arr) = env.payload.get("peers").and_then(|v| v.as_array()) else {
+        return;
+    };
+    let my_id = state.node_id().await;
+    let mut new_peers = Vec::new();
+    for entry in peers_arr {
+        let Some(id) = entry.get("id").and_then(|v| v.as_str()) else { continue };
+        if id == my_id { continue; }
+        // Skip peers we already know or are already connected to.
+        if state.peers.read().await.contains_key(id) { continue; }
+        if state.connections.read().await.contains_key(id) { continue; }
+        let name = entry.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let addr = entry.get("addr").and_then(|v| v.as_str()).map(String::from);
+        let port = entry.get("port").and_then(|v| v.as_u64()).and_then(|n| u16::try_from(n).ok());
+        if let (Some(addr_val), Some(port_val)) = (&addr, port) {
+            let rec = PeerRecord {
+                id: id.to_string(),
+                name: if name.is_empty() { id.chars().take(8).collect() } else { name },
+                avatar_hash: None,
+                signature: String::new(),
+                status: PresenceStatus::Online,
+                last_seen: chrono::Utc::now().timestamp_millis(),
+                addr: Some(addr_val.clone()),
+                port: Some(port_val),
+            };
+            let _ = state.store.store_peer(&rec);
+            state.peers.write().await.insert(id.to_string(), rec);
+            new_peers.push(id.to_string());
+        }
+    }
+    if !new_peers.is_empty() {
+        crate::lanchat::discovery::emit_roster(app, state).await;
+        // Attempt connections to newly learned peers in the background.
+        for peer_id in new_peers {
+            let app = (*app).clone();
+            let state = (*state).clone();
+            tokio::spawn(async move {
+                if let Err(e) = Box::pin(ensure_connection(&app, &state, &peer_id)).await {
+                    log::debug!("lanchat: peer-exchange connect to {peer_id} failed: {e}");
+                }
+            });
+        }
+    }
+}
+
 /// Establish a connection (handshake + register + spawn read/write/ping
 /// tasks). Returns once registered so callers can send immediately.
 async fn setup_connection(
@@ -329,6 +384,32 @@ async fn setup_connection(
     );
     log::info!("lanchat: connected to {peer_id} ({addr})");
 
+    // Gossip: share our known peers so the new connection can discover nodes
+    // that mDNS failed to resolve (e.g. WiFi multicast suppression).
+    {
+        let mut peers_snapshot = Vec::new();
+        {
+            let guard = state.peers.read().await;
+            for p in guard.values() {
+                if p.id != peer_id && p.addr.is_some() && p.port.is_some() {
+                    peers_snapshot.push(serde_json::json!({
+                        "id": p.id,
+                        "name": p.name,
+                        "addr": p.addr,
+                        "port": p.port,
+                    }));
+                }
+            }
+        }
+        if !peers_snapshot.is_empty() {
+            let env = Envelope::new(
+                frame::PEER_EXCHANGE, &my_id, Some(peer_id.clone()),
+                serde_json::json!({ "peers": peers_snapshot }),
+            );
+            let _ = tx.send(env);
+        }
+    }
+
     // Write task: drain the outbound queue into the framed sink.
     let write_task = tokio::spawn(async move {
         while let Some(env) = rx.recv().await {
@@ -371,7 +452,7 @@ async fn setup_connection(
                 }
             };
             match Envelope::decode(&buf) {
-                Ok(env) => dispatch_inbound(&app, &state, &peer_id, &my_id, env).await,
+                Ok(env) => Box::pin(dispatch_inbound(&app, &state, &peer_id, &my_id, env)).await,
                 Err(e) => log::debug!("lanchat: bad frame from {peer_id}: {e}"),
             }
         }
@@ -469,6 +550,9 @@ async fn dispatch_inbound(
                 crate::lanchat::events::WB,
                 &json!({ "from": peer_id, "type": env.frame_type, "payload": env.payload }),
             );
+        }
+        frame::PEER_EXCHANGE => {
+            handle_peer_exchange(app, state, peer_id, &env).await;
         }
         other => {
             log::debug!("lanchat: unhandled frame '{other}' from {peer_id}");
