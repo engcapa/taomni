@@ -24,7 +24,12 @@ import {
   StandardSQL,
   type SQLDialect,
 } from "@codemirror/lang-sql";
-import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  type CompletionSource,
+} from "@codemirror/autocomplete";
 import { bracketMatching, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 
 interface SqlEditorPanelProps {
@@ -33,10 +38,27 @@ interface SqlEditorPanelProps {
   initialDoc?: string;
   /** Table/column names for schema-aware autocomplete. */
   schema?: Record<string, string[]>;
+  /**
+   * When provided, these sources fully replace the language's built-in
+   * keyword/schema completion. Used by the HBase shell editor to suggest HBase
+   * shell commands instead of SQL keywords.
+   */
+  completionSources?: readonly CompletionSource[];
   onDocChange?: (doc: string) => void;
   /** Run callback receives selection if any text is selected, else full doc. */
   onRun?: (sql: string) => void;
   onFocus?: () => void;
+}
+
+/**
+ * Build the autocompletion extension. When `completionSources` are given they
+ * override the language-data sources (so lang-sql's SQL keyword completion is
+ * suppressed); otherwise the default language-driven completion is used.
+ */
+function autocompleteFor(sources?: readonly CompletionSource[]) {
+  return sources && sources.length > 0
+    ? autocompletion({ override: [...sources] })
+    : autocompletion();
 }
 
 function dialectFor(engine: string): SQLDialect {
@@ -67,6 +89,7 @@ export function SqlEditorPanel({
   engine,
   initialDoc = "",
   schema,
+  completionSources,
   onDocChange,
   onRun,
   onFocus,
@@ -75,6 +98,7 @@ export function SqlEditorPanel({
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langCompartment = useRef(new Compartment());
+  const autocompleteCompartment = useRef(new Compartment());
   const onRunRef = useRef(onRun);
   const onDocChangeRef = useRef(onDocChange);
   const onFocusRef = useRef(onFocus);
@@ -114,7 +138,7 @@ export function SqlEditorPanel({
         history(),
         bracketMatching(),
         closeBrackets(),
-        autocompletion(),
+        autocompleteCompartment.current.of(autocompleteFor(completionSources)),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         langCompartment.current.of(
           sql({ dialect: dialectFor(engine), upperCaseKeywords: true }),
@@ -228,6 +252,16 @@ export function SqlEditorPanel({
       ),
     });
   }, [engine, schema]);
+
+  // Reconfigure completion sources when an override is supplied or changes
+  // (e.g. HBase command/table suggestions as the object tree loads).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: autocompleteCompartment.current.reconfigure(autocompleteFor(completionSources)),
+    });
+  }, [completionSources]);
 
   return <div ref={hostRef} className="h-full w-full overflow-hidden" data-testid="sql-editor" />;
 }

@@ -30,6 +30,7 @@ import {
   type HBaseCommandCategory,
   type HBaseTransport,
 } from "../../lib/hbaseCommands";
+import { hbaseCompletionSource } from "../../lib/hbaseCompletions";
 import {
   hbaseConnect,
   hbaseDisconnect,
@@ -637,6 +638,12 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
   // RENDER_MAIN_PLACEHOLDER
   const [rowLimit, setRowLimit] = useState(DEFAULT_ROW_LIMIT);
 
+  // HBase shell command/table autocomplete (replaces lang-sql's SQL keywords).
+  const completionSources = useMemo(
+    () => [hbaseCompletionSource({ transport, schema: schemaMap })],
+    [transport, schemaMap],
+  );
+
   const initialLayout = useMemo(
     () => loadResizableLayout(`hbase-shell-${info.sessionId}`, ["sidebar", "workspace"]),
     [info.sessionId],
@@ -802,7 +809,7 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
                   <SqlEditorPanel
                     engine="HBase"
                     initialDoc={activePanel.doc}
-                    schema={schemaMap}
+                    completionSources={completionSources}
                     handleRef={(h) => { editorHandles.current[activePanel.id] = h; }}
                     onDocChange={(doc) => patchPanel(activePanel.id, { doc })}
                     onFocus={() => setActivePanelId(activePanel.id)}
