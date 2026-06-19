@@ -212,7 +212,13 @@ export function CallOverlay() {
           >
             <VideoTile stream={screenOn ? screenStream : localStream} muted label={screenOn ? "我（共享屏幕）" : "我"} camOff={!screenOn && (!camOn || kind === "audio")} />
             {Object.entries(remotes).map(([peerId, r]) => (
-              <VideoTile key={peerId} stream={r.stream} muted={false} label={peerId.slice(0, 6)} camOff={!r.cam} />
+              <VideoTile
+                key={peerId}
+                stream={r.stream}
+                muted={false}
+                label={`${peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
+                camOff={!r.cam && !r.screen}
+              />
             ))}
           </div>
           <div className="flex items-center justify-center gap-3 py-3" style={{ borderTop: "1px solid var(--taomni-divider)" }}>
