@@ -1415,6 +1415,13 @@ const dict = {
     terminalAppearanceTitle: "Terminal Appearance",
     terminalAppearanceSubtitle: "Font and theme defaults",
     reset: "Reset",
+    lanChatSection: "LAN Messenger (LanChat)",
+    lanChatSubtitle: "Decentralized LAN messaging · listen & broadcast",
+    lanChatAutostart: "Start on app launch",
+    lanChatAutostartDesc:
+      "When on, the app starts listening and broadcasting on the LAN at launch so peers can discover each other and exchange messages. When off, it stays dark at launch; you can enable it manually when opening the chat (once started it runs until the app exits).",
+    lanChatRunning: "Running",
+    lanChatIdle: "Off",
     aiSection: "AI Settings",
     aiSubtitle: "Speech recognition (ASR) · LLM Provider · Privacy mode",
     aiMaster: "Master AI switch",

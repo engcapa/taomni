@@ -1411,6 +1411,13 @@ export const zhCN: DeepPartial<typeof en> = {
     terminalAppearanceTitle: "终端外观",
     terminalAppearanceSubtitle: "字体与主题默认设置",
     reset: "重置",
+    lanChatSection: "局域网通讯 (LanChat)",
+    lanChatSubtitle: "去中心化内网通讯 · 监听与广播",
+    lanChatAutostart: "随程序启动时开启",
+    lanChatAutostartDesc:
+      "开启后,程序启动即在局域网内监听并广播本机,以便互相发现并收发消息。关闭则启动时保持隐身,可在打开聊天时再手动开启(开启后本次运行不可关闭)。",
+    lanChatRunning: "运行中",
+    lanChatIdle: "未开启",
     aiSection: "AI 设置",
     aiSubtitle: "语音识别（ASR）· LLM 服务 · 隐私模式",
     aiMaster: "AI 主开关",
