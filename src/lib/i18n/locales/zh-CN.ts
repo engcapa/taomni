@@ -157,6 +157,10 @@ export const zhCN: DeepPartial<typeof en> = {
     confirmRun: "执行",
     writeWarning: "该操作会修改集群数据。",
     destructiveWarning: "这是破坏性操作，无法撤销。",
+    help: "帮助",
+    helpTitle: "HBase 命令参考",
+    helpRestNote: "REST 传输不支持 —— 请使用 Native 或 Thrift 连接。",
+    helpClose: "关闭",
   },
   titlebar: {
     cycleTheme: "主题：{mode}（{resolved}）。点击切换到 {next}。",

@@ -137,4 +137,15 @@ describe("HBaseShellTab workspace", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(ipcMock.hbaseExecute).not.toHaveBeenCalled();
   });
+
+  it("opens a command-reference help dialog and gates admin commands on REST", async () => {
+    render(<HBaseShellTab tabId="t1" info={info} visible />);
+    await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
+    fireEvent.click(await screen.findByText("Help"));
+    const dialog = await screen.findByTestId("hbase-help-dialog");
+    expect(dialog).toHaveTextContent("count");
+    expect(dialog).toHaveTextContent("enable");
+    // REST transport => admin verbs carry the unsupported note.
+    expect(dialog).toHaveTextContent("Not available on the REST transport");
+  });
 });

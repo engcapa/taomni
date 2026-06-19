@@ -158,6 +158,10 @@ const dict = {
     confirmRun: "Run",
     writeWarning: "This modifies cluster data.",
     destructiveWarning: "This is a destructive operation and cannot be undone.",
+    help: "Help",
+    helpTitle: "HBase command reference",
+    helpRestNote: "Not available on the REST transport — use a Native or Thrift connection.",
+    helpClose: "Close",
   },
   titlebar: {
     cycleTheme: "Theme: {mode} ({resolved}). Click for {next}.",

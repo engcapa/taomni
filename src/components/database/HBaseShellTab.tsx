@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  HelpCircle,
   Loader2,
   Play,
   Plus,
@@ -304,7 +305,55 @@ function HistoryDropdown({ history, onPick, onClose }: { history: string[]; onPi
   );
 }
 
-// PLACEHOLDER_MAIN
+function HelpDialog({ transport, onClose }: { transport: HBaseTransport; onClose: () => void }) {
+  const t = useT();
+  return (
+    <div className="fixed inset-0 z-[950] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.4)" }} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label={t("hbaseObjects.helpTitle")}
+        aria-modal="true"
+        data-testid="hbase-help-dialog"
+        className="w-[640px] max-h-[80vh] overflow-auto taomni-scroll-y rounded shadow-lg p-4"
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center mb-3">
+          <div className="text-sm font-semibold flex-1">{t("hbaseObjects.helpTitle")}</div>
+          <button type="button" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("hbaseObjects.helpClose")}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {CATEGORY_ORDER.map((cat) => {
+          const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
+          return (
+            <div key={cat} className="mb-3">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
+              <table className="w-full text-[12px] border-collapse">
+                <tbody>
+                  {cmds.map((c) => {
+                    const supported = commandSupported(c.verb, transport);
+                    return (
+                      <tr key={c.verb} className="border-b" style={{ borderColor: "var(--taomni-divider)", opacity: supported ? 1 : 0.55 }}>
+                        <td className="py-1 pr-2 align-top taomni-mono font-semibold whitespace-nowrap">{c.verb}</td>
+                        <td className="py-1 pr-2 align-top taomni-mono text-[11px] text-[var(--taomni-text-muted)]">{c.syntax}</td>
+                        <td className="py-1 align-top text-[11px]">
+                          {c.description}
+                          {!supported && <div className="text-[10px]" style={{ color: "#d9534f" }}>{t("hbaseObjects.helpRestNote")}</div>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabProps) {
   const t = useT();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
@@ -340,6 +389,7 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [showCommands, setShowCommands] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
   const historyRef = useRef<Record<string, string[]>>({});
@@ -727,6 +777,9 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
                 <button type="button" className={btn} title="Command history" onClick={() => { setShowHistory((v) => !v); setShowCommands(false); }}>
                   <Clock className="w-3.5 h-3.5" /> History
                 </button>
+                <button type="button" className={btn} title={t("hbaseObjects.helpTitle")} onClick={() => setShowHelp(true)}>
+                  <HelpCircle className="w-3.5 h-3.5" /> {t("hbaseObjects.help")}
+                </button>
                 <div className="flex-1" />
                 <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
                   Rows
@@ -775,6 +828,7 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
         </Panel>
 
       </PanelGroup>
+      {showHelp && <HelpDialog transport={transport} onClose={() => setShowHelp(false)} />}
       {confirmDialog.render}
     </div>
   );
