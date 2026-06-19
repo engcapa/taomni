@@ -42,6 +42,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
+      "entitlements": "Entitlements.plist",
       "frameworks": [
         "frameworks/libgssapi_krb5.2.2.dylib",
         "frameworks/libkrb5.3.3.dylib",

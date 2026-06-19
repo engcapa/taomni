@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Hardened-runtime resource-access entitlements. The notarized/signed build
+	  runs under the hardened runtime, which blocks camera and microphone access
+	  unless the app is explicitly entitled to them. These two keys let macOS
+	  show the TCC prompt (backed by the Info.plist usage strings) instead of
+	  silently denying getUserMedia for LanChat calls (issue #153).
+
+	  Intentionally NOT enabling com.apple.security.app-sandbox: the app is not
+	  sandboxed (it bundles krb5 dylibs, opens LAN sockets, and accesses the
+	  filesystem), and turning the sandbox on here would break those.
+	-->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.device.camera</key>
+	<true/>
+</dict>
+</plist>
