@@ -114,6 +114,22 @@ impl LanChatState {
         let db_path = app_data_dir.join("lanchat.sqlite");
         let store = store::LanChatStore::open(&db_path).expect("failed to open lanchat.sqlite");
         let keystore = keystore::KeyStore::new(app_data_dir);
+        // At-rest message encryption: load (or create) the machine key, attach it
+        // to the store, and encrypt any legacy plaintext rows. If the key is
+        // unavailable, messages stay plaintext rather than failing to start.
+        match keystore.load_or_create_random("message-key-v1", 32) {
+            Ok(key) => {
+                store.set_message_key(&key);
+                match store.migrate_message_encryption() {
+                    Ok(n) if n > 0 => log::info!("lanchat: encrypted {n} legacy message(s) at rest"),
+                    Ok(_) => {}
+                    Err(e) => log::warn!("lanchat: message encryption migration failed: {e}"),
+                }
+            }
+            Err(e) => {
+                log::error!("lanchat: message key unavailable ({e}); messages stored in plaintext")
+            }
+        }
         // Bootstrap the self-certifying identity (generates a key pair + cert on
         // first launch, migrates from a legacy UUID identity if present).
         let identity = identity::ensure(&store, &keystore)

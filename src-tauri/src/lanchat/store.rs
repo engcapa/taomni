@@ -10,19 +10,25 @@
 //! peers/groups/conversations/messages helpers on the same `LanChatStore`.
 
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 use crate::lanchat::protocol::{PeerRecord, PresenceStatus};
+use crate::vault::crypto;
 
 /// SQLite-backed LanChat store. Single connection guarded by a mutex.
 pub struct LanChatStore {
     conn: Mutex<Connection>,
+    /// AES-256-GCM key for at-rest message-body encryption, loaded from the OS
+    /// keychain (phase 3). When unset (e.g. store unit tests), bodies are stored
+    /// in plaintext (`enc_ver = 0`) for backward compatibility.
+    msg_key: OnceLock<Zeroizing<[u8; crypto::KEY_LEN]>>,
 }
 
 /// This node's own profile (single row in `profile`). Avatar bytes are carried
@@ -187,10 +193,13 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
 fn migrate_schema(conn: &Connection) {
     // v2: persist peer connection info for startup reconnection.
     // v3: persist this node's self-signed identity certificate (phase 1).
+    // v4: at-rest message-body encryption (phase 3).
     for ddl in [
         "ALTER TABLE peers ADD COLUMN addr TEXT",
         "ALTER TABLE peers ADD COLUMN port INTEGER",
         "ALTER TABLE profile ADD COLUMN cert_der BLOB",
+        "ALTER TABLE messages ADD COLUMN body_cipher BLOB",
+        "ALTER TABLE messages ADD COLUMN enc_ver INTEGER NOT NULL DEFAULT 0",
     ] {
         if let Err(e) = conn.execute(ddl, []) {
             let msg = e.to_string();
@@ -213,6 +222,7 @@ impl LanChatStore {
         migrate_schema(&conn);
         Ok(Self {
             conn: Mutex::new(conn),
+            msg_key: OnceLock::new(),
         })
     }
 
@@ -223,6 +233,7 @@ impl LanChatStore {
         migrate_schema(&conn);
         Ok(Self {
             conn: Mutex::new(conn),
+            msg_key: OnceLock::new(),
         })
     }
 
@@ -552,26 +563,128 @@ impl LanChatStore {
         rows.collect()
     }
 
+    /// Attach the at-rest message-encryption key (idempotent; first set wins).
+    pub fn set_message_key(&self, key: &[u8]) {
+        if key.len() != crypto::KEY_LEN {
+            log::error!("lanchat: message key has wrong length {}", key.len());
+            return;
+        }
+        let mut arr = [0u8; crypto::KEY_LEN];
+        arr.copy_from_slice(key);
+        let _ = self.msg_key.set(Zeroizing::new(arr));
+    }
+
+    /// Encrypt a body to `nonce || ciphertext`, or `None` when no key is attached
+    /// (callers then store plaintext with `enc_ver = 0`).
+    fn encrypt_body(&self, plaintext: &str) -> Option<Vec<u8>> {
+        let key = self.msg_key.get()?;
+        let nonce = crypto::random_nonce();
+        let ct = crypto::aead_encrypt(key, &nonce, plaintext.as_bytes()).ok()?;
+        let mut out = Vec::with_capacity(crypto::NONCE_LEN + ct.len());
+        out.extend_from_slice(&nonce);
+        out.extend_from_slice(&ct);
+        Some(out)
+    }
+
+    /// Decrypt a `nonce || ciphertext` body blob; empty string on any failure
+    /// (missing key, truncated blob, wrong key).
+    fn decrypt_body(&self, blob: &[u8]) -> String {
+        let Some(key) = self.msg_key.get() else {
+            return String::new();
+        };
+        if blob.len() < crypto::NONCE_LEN {
+            return String::new();
+        }
+        let (nonce, ct) = blob.split_at(crypto::NONCE_LEN);
+        let Ok(nonce) = <[u8; crypto::NONCE_LEN]>::try_from(nonce) else {
+            return String::new();
+        };
+        match crypto::aead_decrypt(key, &nonce, ct) {
+            Ok(pt) => String::from_utf8_lossy(&pt).to_string(),
+            Err(_) => String::new(),
+        }
+    }
+
+    /// Map a message row to [`LanMessage`], decrypting the body when it was stored
+    /// encrypted (`enc_ver >= 1`). Expects columns: id, conv_id, sender_id, body,
+    /// mentions, created_at, state, body_cipher, enc_ver.
+    fn row_to_message(&self, r: &rusqlite::Row<'_>) -> rusqlite::Result<LanMessage> {
+        let mentions_json: String = r.get(4)?;
+        let mentions = serde_json::from_str::<Vec<String>>(&mentions_json).unwrap_or_default();
+        let enc_ver: i64 = r.get(8)?;
+        let body = if enc_ver >= 1 {
+            let cipher: Option<Vec<u8>> = r.get(7)?;
+            cipher.map(|c| self.decrypt_body(&c)).unwrap_or_default()
+        } else {
+            r.get::<_, String>(3)?
+        };
+        Ok(LanMessage {
+            id: r.get(0)?,
+            conv_id: r.get(1)?,
+            sender_id: r.get(2)?,
+            body,
+            mentions,
+            created_at: r.get(5)?,
+            state: r.get(6)?,
+        })
+    }
+
     /// Insert a message (idempotent on id — duplicate deliveries are ignored).
     /// Returns true if the row was newly inserted.
     pub fn insert_message(&self, msg: &LanMessage) -> rusqlite::Result<bool> {
         let mentions = serde_json::to_string(&msg.mentions).unwrap_or_else(|_| "[]".into());
+        // Encrypt the body when a key is attached; otherwise persist plaintext.
+        let (body_plain, body_cipher, enc_ver): (String, Option<Vec<u8>>, i64) =
+            match self.encrypt_body(&msg.body) {
+                Some(ct) => (String::new(), Some(ct), 1),
+                None => (msg.body.clone(), None, 0),
+            };
         let conn = self.conn.lock().unwrap();
         let changed = conn.execute(
-            "INSERT INTO messages (id, conv_id, sender_id, body, mentions, created_at, state)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO messages (id, conv_id, sender_id, body, mentions, created_at, state, body_cipher, enc_ver)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(id) DO NOTHING",
             params![
                 msg.id,
                 msg.conv_id,
                 msg.sender_id,
-                msg.body,
+                body_plain,
                 mentions,
                 msg.created_at,
-                msg.state
+                msg.state,
+                body_cipher,
+                enc_ver
             ],
         )?;
         Ok(changed > 0)
+    }
+
+    /// Encrypt any legacy plaintext message rows in place (run once after the key
+    /// is attached). Returns the number of rows migrated.
+    pub fn migrate_message_encryption(&self) -> rusqlite::Result<usize> {
+        if self.msg_key.get().is_none() {
+            return Ok(0);
+        }
+        let pending: Vec<(String, String)> = {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt =
+                conn.prepare("SELECT id, body FROM messages WHERE enc_ver = 0 AND body <> ''")?;
+            let rows =
+                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let mut migrated = 0;
+        for (id, body) in pending {
+            if let Some(ct) = self.encrypt_body(&body) {
+                let conn = self.conn.lock().unwrap();
+                conn.execute(
+                    "UPDATE messages SET body_cipher = ?2, enc_ver = 1, body = '' WHERE id = ?1",
+                    params![id, ct],
+                )?;
+                migrated += 1;
+            }
+        }
+        Ok(migrated)
     }
 
     /// Update a message's delivery state ("sending"/"sent"/"delivered"/"failed").
@@ -588,10 +701,10 @@ impl LanChatStore {
     pub fn get_message(&self, id: &str) -> rusqlite::Result<Option<LanMessage>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT id, conv_id, sender_id, body, mentions, created_at, state
+            "SELECT id, conv_id, sender_id, body, mentions, created_at, state, body_cipher, enc_ver
              FROM messages WHERE id = ?1",
             params![id],
-            row_to_message,
+            |r| self.row_to_message(r),
         )
         .optional()
     }
@@ -600,11 +713,11 @@ impl LanChatStore {
     pub fn list_messages(&self, conv_id: &str, limit: i64) -> rusqlite::Result<Vec<LanMessage>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, conv_id, sender_id, body, mentions, created_at, state FROM (
+            "SELECT id, conv_id, sender_id, body, mentions, created_at, state, body_cipher, enc_ver FROM (
                  SELECT * FROM messages WHERE conv_id = ?1 ORDER BY created_at DESC LIMIT ?2
              ) ORDER BY created_at ASC",
         )?;
-        let rows = stmt.query_map(params![conv_id, limit], row_to_message)?;
+        let rows = stmt.query_map(params![conv_id, limit], |r| self.row_to_message(r))?;
         rows.collect()
     }
 
@@ -720,20 +833,6 @@ impl LanChatStore {
         }
         Ok(out)
     }
-}
-
-fn row_to_message(r: &rusqlite::Row<'_>) -> rusqlite::Result<LanMessage> {
-    let mentions_json: String = r.get(4)?;
-    let mentions = serde_json::from_str::<Vec<String>>(&mentions_json).unwrap_or_default();
-    Ok(LanMessage {
-        id: r.get(0)?,
-        conv_id: r.get(1)?,
-        sender_id: r.get(2)?,
-        body: r.get(3)?,
-        mentions,
-        created_at: r.get(5)?,
-        state: r.get(6)?,
-    })
 }
 
 #[cfg(test)]
@@ -858,6 +957,57 @@ mod tests {
         store.insert_message(&msg("ms", &conv, "me", 1, "sending")).unwrap();
         store.set_message_state("ms", "delivered").unwrap();
         assert_eq!(store.get_message("ms").unwrap().unwrap().state, "delivered");
+    }
+
+    #[test]
+    fn message_body_encrypted_at_rest_when_key_set() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        store.set_message_key(&[7u8; 32]);
+        let conv = direct_conv_id("peer-e");
+        store.ensure_conversation(&conv, "direct", "peer-e").unwrap();
+        let mut m = msg("me1", &conv, "me", 10, "sent");
+        m.body = "secret text".into();
+        store.insert_message(&m).unwrap();
+
+        // Round-trips through the decrypting read path.
+        assert_eq!(store.get_message("me1").unwrap().unwrap().body, "secret text");
+        assert_eq!(store.list_messages(&conv, 10).unwrap()[0].body, "secret text");
+
+        // At rest the plaintext column is empty and the ciphertext is present.
+        let conn = store.conn.lock().unwrap();
+        let (plain, cipher, ev): (String, Option<Vec<u8>>, i64) = conn
+            .query_row(
+                "SELECT body, body_cipher, enc_ver FROM messages WHERE id = 'me1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(plain, "", "plaintext body not stored");
+        assert!(cipher.is_some_and(|c| !c.is_empty()), "ciphertext stored");
+        assert_eq!(ev, 1);
+    }
+
+    #[test]
+    fn migrate_message_encryption_encrypts_legacy_rows() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-m");
+        store.ensure_conversation(&conv, "direct", "peer-m").unwrap();
+        // Insert without a key -> stored plaintext (enc_ver 0).
+        let mut m = msg("ml1", &conv, "me", 5, "delivered");
+        m.body = "legacy plaintext".into();
+        store.insert_message(&m).unwrap();
+
+        store.set_message_key(&[3u8; 32]);
+        assert_eq!(store.migrate_message_encryption().unwrap(), 1);
+        assert_eq!(store.get_message("ml1").unwrap().unwrap().body, "legacy plaintext");
+        let conn = store.conn.lock().unwrap();
+        let (plain, ev): (String, i64) = conn
+            .query_row("SELECT body, enc_ver FROM messages WHERE id='ml1'", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(plain, "");
+        assert_eq!(ev, 1);
     }
 
     #[test]
