@@ -105,6 +105,23 @@ export function isDestructiveCommand(statement: string): boolean {
   return DESTRUCTIVE_VERBS.has(commandVerb(statement));
 }
 
+/**
+ * Build the forced-confirmation message for a write statement, or null when the
+ * statement is not a write (and so needs no confirmation). The caller supplies
+ * the localized warning lines so this stays i18n-agnostic.
+ */
+export function writeConfirmMessage(
+  statement: string,
+  warnings: { write: string; destructive: string },
+): { message: string; danger: boolean } | null {
+  const { isWrite, destructive } = classifyStatement(statement);
+  if (!isWrite) return null;
+  return {
+    message: `${statement.trim()}\n\n${destructive ? warnings.destructive : warnings.write}`,
+    danger: destructive,
+  };
+}
+
 /** Whether a verb can run on the given transport. Unknown verbs are allowed. */
 export function commandSupported(verb: string, transport: HBaseTransport): boolean {
   const spec = SPEC_BY_VERB.get(verb.toLowerCase());

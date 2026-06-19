@@ -4,6 +4,7 @@ import {
   classifyStatement,
   isWriteCommand,
   isDestructiveCommand,
+  writeConfirmMessage,
   commandVerb,
   commandSupported,
   shellQuote,
@@ -127,6 +128,29 @@ describe("HBASE_COMMANDS catalogue", () => {
       if (spec.destructive) expect(spec.isWrite).toBe(true);
       if (spec.category === "meta" || spec.category === "read") expect(spec.isWrite).toBe(false);
     }
+  });
+});
+
+describe("writeConfirmMessage", () => {
+  const warnings = { write: "WRITE-WARN", destructive: "DESTRUCTIVE-WARN" };
+
+  it("returns null for read/meta statements", () => {
+    expect(writeConfirmMessage("scan 'tbl'", warnings)).toBeNull();
+    expect(writeConfirmMessage("list", warnings)).toBeNull();
+  });
+
+  it("includes the statement and a non-danger warning for writes", () => {
+    const built = writeConfirmMessage("put 'tbl', 'r', 'cf:q', 'v'", warnings);
+    expect(built).not.toBeNull();
+    expect(built!.danger).toBe(false);
+    expect(built!.message).toContain("put 'tbl', 'r', 'cf:q', 'v'");
+    expect(built!.message).toContain("WRITE-WARN");
+  });
+
+  it("flags destructive writes as danger", () => {
+    const built = writeConfirmMessage("drop 'tbl'", warnings);
+    expect(built!.danger).toBe(true);
+    expect(built!.message).toContain("DESTRUCTIVE-WARN");
   });
 });
 

@@ -23,9 +23,9 @@ import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLay
 import { splitHBaseStatements } from "../../lib/hbaseStatements";
 import {
   HBASE_COMMANDS,
-  classifyStatement,
   commandSupported,
   hbaseResultToGrid,
+  writeConfirmMessage,
   type HBaseCommandCategory,
   type HBaseTransport,
 } from "../../lib/hbaseCommands";
@@ -407,13 +407,16 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
   // Forced confirmation before any write command (editor- or tree-initiated).
   const confirmWrite = useCallback(
     async (statement: string): Promise<boolean> => {
-      const { isWrite, destructive } = classifyStatement(statement);
-      if (!isWrite) return true;
+      const built = writeConfirmMessage(statement, {
+        write: t("hbaseObjects.writeWarning"),
+        destructive: t("hbaseObjects.destructiveWarning"),
+      });
+      if (!built) return true;
       return confirmDialog.confirm({
         title: t("hbaseObjects.confirmWriteTitle"),
-        message: `${statement.trim()}\n\n${destructive ? t("hbaseObjects.destructiveWarning") : t("hbaseObjects.writeWarning")}`,
+        message: built.message,
         confirmLabel: t("hbaseObjects.confirmRun"),
-        danger: destructive,
+        danger: built.danger,
       });
     },
     [confirmDialog, t],

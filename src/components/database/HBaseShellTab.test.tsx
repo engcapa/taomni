@@ -112,4 +112,29 @@ describe("HBaseShellTab workspace", () => {
     await waitFor(() => expect(ipcMock.hbaseExecute).toHaveBeenCalledWith(expect.any(String), "list"));
     expect(await screen.findByTestId("query-result-grid")).toHaveTextContent("1 rows");
   });
+
+  it("forces a confirmation popup before a write command and runs it on confirm", async () => {
+    editorState.value = "drop 'users'";
+    render(<HBaseShellTab tabId="t1" info={info} visible />);
+    await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
+    fireEvent.click(await screen.findByTestId("mock-editor"));
+    // The forced confirmation dialog must appear before any execution.
+    const dialog = await screen.findByTestId("confirm-dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByTestId("confirm-dialog-message")).toHaveTextContent("drop 'users'");
+    expect(ipcMock.hbaseExecute).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(ipcMock.hbaseExecute).toHaveBeenCalledWith(expect.any(String), "drop 'users'"));
+  });
+
+  it("does not run a write command when the confirmation is cancelled", async () => {
+    editorState.value = "deleteall 'users', 'r1'";
+    render(<HBaseShellTab tabId="t1" info={info} visible />);
+    await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
+    fireEvent.click(await screen.findByTestId("mock-editor"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
+    // Give any pending microtasks a chance, then assert nothing ran.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ipcMock.hbaseExecute).not.toHaveBeenCalled();
+  });
 });
