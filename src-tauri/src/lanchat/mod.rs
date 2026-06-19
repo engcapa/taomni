@@ -19,6 +19,7 @@ pub mod keystore;
 pub mod messaging;
 pub mod protocol;
 pub mod store;
+pub mod swarm;
 pub mod tls;
 pub mod transfer;
 pub mod transport;
@@ -101,18 +102,10 @@ pub struct LanChatState {
     pub control_port: AtomicU16,
     /// Reserved control listener, handed to the transport accept loop (phase 4).
     pub control_listener: AsyncMutex<Option<TcpListener>>,
-    /// Active file transfers, keyed by transfer id (cancel/pause handles).
-    pub transfers: RwLock<HashMap<String, std::sync::Arc<transfer::LanTransferHandle>>>,
-    /// Outgoing transfers awaiting the peer's accept, keyed by transfer id.
-    pub outgoing: RwLock<HashMap<String, transfer::OutgoingMeta>>,
-    /// Inbound offers awaiting the local user's accept/reject, by transfer id.
-    pub offers: RwLock<HashMap<String, transfer::OfferInfo>>,
-    /// In-progress inbound writes, keyed by transfer id.
-    pub incoming: AsyncMutex<HashMap<String, transfer::IncomingState>>,
-    /// Receiver: accepted folder transfers → chosen base dir, keyed by folder id.
-    pub accepted_folders: RwLock<HashMap<String, std::path::PathBuf>>,
-    /// Sender: folder transfers awaiting accept, keyed by folder id.
-    pub outgoing_dirs: RwLock<HashMap<String, transfer::DirMeta>>,
+    /// Active swarm transfers (origin seeds + leeches), keyed by content file id.
+    pub swarms: RwLock<HashMap<String, std::sync::Arc<swarm::SwarmFile>>>,
+    /// Inbound offers awaiting the local user's accept/reject, by file id.
+    pub swarm_offers: RwLock<HashMap<String, swarm::OfferInfo>>,
 }
 
 impl LanChatState {
@@ -161,12 +154,8 @@ impl LanChatState {
             daemon: StdMutex::new(None),
             control_port: AtomicU16::new(0),
             control_listener: AsyncMutex::new(None),
-            transfers: RwLock::new(HashMap::new()),
-            outgoing: RwLock::new(HashMap::new()),
-            offers: RwLock::new(HashMap::new()),
-            incoming: AsyncMutex::new(HashMap::new()),
-            accepted_folders: RwLock::new(HashMap::new()),
-            outgoing_dirs: RwLock::new(HashMap::new()),
+            swarms: RwLock::new(HashMap::new()),
+            swarm_offers: RwLock::new(HashMap::new()),
         }
     }
 

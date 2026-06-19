@@ -1,4 +1,4 @@
-import { Check, Download, FolderOpen, Pause, Play, X } from "lucide-react";
+import { FolderOpen, Pause, Play, X } from "lucide-react";
 
 import { useLanChatStore } from "../../stores/lanChatStore";
 import type { LanTransferProgress } from "../../types";
@@ -32,65 +32,27 @@ function stateText(t: LanTransferProgress): string {
   }
 }
 
-/** Transfers + pending offers for the active conversation, shown above the
- *  composer (the prototype's transfer queue / file cards). */
+/** Active transfers for the current conversation, shown above the composer.
+ *  Inbound offers are surfaced globally by `IncomingOfferModal`. */
 export function TransferPanel() {
   const activeConvId = useLanChatStore((s) => s.activeConvId);
   const transfers = useLanChatStore((s) => s.transfers);
-  const offers = useLanChatStore((s) => s.offers);
-  const acceptOffer = useLanChatStore((s) => s.acceptOffer);
-  const rejectOffer = useLanChatStore((s) => s.rejectOffer);
   const transferControl = useLanChatStore((s) => s.transferControl);
   const openTransfer = useLanChatStore((s) => s.openTransfer);
 
   if (!activeConvId) return null;
 
-  const convOffers = offers.filter((o) => o.convId === activeConvId);
   const convTransfers = Object.values(transfers)
     .filter((t) => t.convId === activeConvId && t.state !== "rejected")
     .sort((a, b) => a.transferId.localeCompare(b.transferId));
 
-  if (convOffers.length === 0 && convTransfers.length === 0) return null;
+  if (convTransfers.length === 0) return null;
 
   return (
     <div
       className="max-h-44 overflow-y-auto px-2.5 py-2"
       style={{ borderTop: "1px solid var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
     >
-      {convOffers.map((o) => (
-        <div
-          key={o.transferId}
-          className="mb-1.5 flex items-center gap-2 rounded-lg p-2"
-          style={{ background: "var(--taomni-card-bg)", border: "1px solid var(--taomni-card-border)" }}
-        >
-          <Download className="h-4 w-4" style={{ color: "var(--taomni-accent)" }} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold">{o.name}</div>
-            <div className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
-              {o.kind === "dir" ? "文件夹" : "文件"} · {fmtBytes(o.size)} · 来件
-            </div>
-          </div>
-          <button
-            type="button"
-            title="接收"
-            onClick={() => void acceptOffer(o.transferId)}
-            className="grid h-7 w-7 place-items-center rounded-md text-white"
-            style={{ background: "var(--taomni-accent)" }}
-          >
-            <Check className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            title="拒绝"
-            onClick={() => void rejectOffer(o.transferId)}
-            className="grid h-7 w-7 place-items-center rounded-md"
-            style={{ border: "1px solid var(--taomni-input-border)", color: "var(--taomni-text-muted)" }}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      ))}
-
       {convTransfers.map((t) => {
         const pct = t.size > 0 ? Math.min(100, Math.floor((t.transferred / t.size) * 100)) : 0;
         const active = t.state === "active" || t.state === "offering";

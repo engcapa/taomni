@@ -22,10 +22,18 @@ pub const SERVICE_TYPE: &str = "_taomni-lan._tcp.local.";
 /// node's self-signed TLS certificate — and the control channel is mutual-TLS.
 /// This is a hard cutover: v2 nodes do not interoperate with v1 (plaintext,
 /// random-UUID) nodes.
-pub const PROTOCOL_VERSION: u32 = 2;
+///
+/// v3 (swarm file transfer): every length-delimited frame body now begins with a
+/// one-byte kind tag (see [`wire`]) so bulk file pieces can travel as raw binary
+/// (`0x01`) alongside JSON control envelopes (`0x00`), avoiding base64. File
+/// transfer moves to a request/response swarm with per-piece SHA-256. Another
+/// hard cutover: v3 nodes do not interoperate with v2 (the tag byte would be
+/// mis-parsed as JSON).
+pub const PROTOCOL_VERSION: u32 = 3;
 
-/// Default chunk size for binary (file/media) frames — 64 KiB.
-pub const BINARY_CHUNK_SIZE: usize = 64 * 1024;
+/// Default file piece size for the swarm transfer engine — 256 KiB raw (no
+/// base64). Bounds per-in-flight-piece memory and the swarm request window.
+pub const PIECE_SIZE: usize = 256 * 1024;
 
 /// Frame `type` discriminators carried in [`Envelope::frame_type`].
 ///
@@ -49,16 +57,23 @@ pub mod frame {
     pub const GROUP_LEAVE: &str = "group-leave";
     // --- peer-exchange: gossip roster over TCP to work around mDNS failures ---
     pub const PEER_EXCHANGE: &str = "peer-exchange";
-    // --- task 02 (reserved): file & screenshot transfer ---
-    pub const FILE_OFFER: &str = "file-offer";
-    pub const FILE_ACCEPT: &str = "file-accept";
-    pub const FILE_REJECT: &str = "file-reject";
-    pub const FILE_CHUNK: &str = "file-chunk";
-    pub const FILE_PROGRESS: &str = "file-progress";
-    pub const FILE_PAUSE: &str = "file-pause";
-    pub const FILE_RESUME: &str = "file-resume";
-    pub const FILE_CANCEL: &str = "file-cancel";
-    pub const FILE_COMPLETE: &str = "file-complete";
+    // --- task 02: swarm file & folder transfer (v3) ---
+    // Bulk piece data travels as raw binary frames (see `wire`); these JSON
+    // control frames drive the request/response swarm.
+    /// Announce a file/folder manifest to one peer or a whole group.
+    pub const SWARM_OFFER: &str = "swarm-offer";
+    /// Receiver agreed to leech — sender records it as a swarm member.
+    pub const SWARM_ACCEPT: &str = "swarm-accept";
+    /// Receiver declined the offer.
+    pub const SWARM_REJECT: &str = "swarm-reject";
+    /// Ask a peer for a specific piece: `{fileId, piece}`.
+    pub const SWARM_REQUEST: &str = "swarm-request";
+    /// Advertise that we now hold a piece: `{fileId, piece}`.
+    pub const SWARM_HAVE: &str = "swarm-have";
+    /// Full bitfield of held pieces on join: `{fileId, bits(base64)}`.
+    pub const SWARM_BITFIELD: &str = "swarm-bitfield";
+    /// Abort a whole transfer for this peer: `{fileId}`.
+    pub const SWARM_CANCEL: &str = "swarm-cancel";
     // --- task 03 (reserved): A/V meeting signaling ---
     pub const CALL_INVITE: &str = "call-invite";
     pub const CALL_ACCEPT: &str = "call-accept";
@@ -167,6 +182,68 @@ impl Envelope {
     }
 }
 
+/// Frame tagging for the v3 wire format. Each length-delimited frame body starts
+/// with a one-byte kind tag so bulk file pieces ride as raw binary next to JSON
+/// control envelopes without base64. The tag lives at the transport boundary
+/// only; [`Envelope`] stays pure JSON.
+pub mod wire {
+    use bytes::{BufMut, Bytes, BytesMut};
+
+    /// JSON control envelope follows.
+    pub const TAG_CONTROL: u8 = 0x00;
+    /// Raw binary file piece follows.
+    pub const TAG_PIECE: u8 = 0x01;
+
+    /// A decoded inbound frame: either a control envelope (still JSON-encoded
+    /// bytes) or a binary piece.
+    pub enum Frame {
+        Control(super::Envelope),
+        /// (file_id, piece_index, data)
+        Piece(String, u32, Bytes),
+    }
+
+    /// Prepend the control tag to already-JSON-encoded envelope bytes.
+    pub fn frame_control(json: &[u8]) -> Bytes {
+        let mut b = BytesMut::with_capacity(1 + json.len());
+        b.put_u8(TAG_CONTROL);
+        b.extend_from_slice(json);
+        b.freeze()
+    }
+
+    /// Encode a binary piece frame body:
+    /// `[TAG_PIECE][u8 fileId_len][fileId][u32 BE pieceIndex][data]`.
+    /// `file_id` is a hex SHA-256 (64 bytes) so its length fits a u8.
+    pub fn frame_piece(file_id: &str, piece: u32, data: &[u8]) -> Bytes {
+        let id = file_id.as_bytes();
+        let mut b = BytesMut::with_capacity(1 + 1 + id.len() + 4 + data.len());
+        b.put_u8(TAG_PIECE);
+        b.put_u8(id.len() as u8);
+        b.extend_from_slice(id);
+        b.put_u32(piece);
+        b.extend_from_slice(data);
+        b.freeze()
+    }
+
+    /// Parse a received frame body by its leading tag. Returns `None` if the
+    /// frame is empty, malformed, or carries an unknown tag.
+    pub fn decode_frame(buf: &[u8]) -> Option<Frame> {
+        match buf.first()? {
+            &TAG_CONTROL => super::Envelope::decode(&buf[1..]).ok().map(Frame::Control),
+            &TAG_PIECE => {
+                let id_len = *buf.get(1)? as usize;
+                let id_end = 2 + id_len;
+                let id = std::str::from_utf8(buf.get(2..id_end)?).ok()?.to_string();
+                let idx_end = id_end + 4;
+                let idx_bytes: [u8; 4] = buf.get(id_end..idx_end)?.try_into().ok()?;
+                let piece = u32::from_be_bytes(idx_bytes);
+                let data = Bytes::copy_from_slice(buf.get(idx_end..)?);
+                Some(Frame::Piece(id, piece, data))
+            }
+            _ => None,
+        }
+    }
+}
+
 /// A peer learned from mDNS discovery (+ refreshed by control-channel
 /// traffic). Cached in `peers` SQLite table and held live in `LanChatState`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,5 +295,38 @@ mod tests {
         }
         // Unknown falls back to online.
         assert_eq!(PresenceStatus::from_txt("???"), PresenceStatus::Online);
+    }
+
+    #[test]
+    fn wire_control_frame_round_trips() {
+        let env = Envelope::new(frame::PING, "node-a", Some("node-b".into()), serde_json::json!({}));
+        let framed = wire::frame_control(&env.encode().unwrap());
+        assert_eq!(framed[0], wire::TAG_CONTROL);
+        match wire::decode_frame(&framed) {
+            Some(wire::Frame::Control(e)) => assert_eq!(e.frame_type, frame::PING),
+            _ => panic!("expected control frame"),
+        }
+    }
+
+    #[test]
+    fn wire_piece_frame_round_trips() {
+        let file_id = "a".repeat(64);
+        let data = vec![7u8, 8, 9, 10, 11];
+        let framed = wire::frame_piece(&file_id, 42, &data);
+        assert_eq!(framed[0], wire::TAG_PIECE);
+        match wire::decode_frame(&framed) {
+            Some(wire::Frame::Piece(id, idx, bytes)) => {
+                assert_eq!(id, file_id);
+                assert_eq!(idx, 42);
+                assert_eq!(&bytes[..], &data[..]);
+            }
+            _ => panic!("expected piece frame"),
+        }
+    }
+
+    #[test]
+    fn wire_rejects_empty_and_unknown_tags() {
+        assert!(wire::decode_frame(&[]).is_none());
+        assert!(wire::decode_frame(&[0x7f, 1, 2, 3]).is_none());
     }
 }

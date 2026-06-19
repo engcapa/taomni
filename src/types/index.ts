@@ -92,6 +92,8 @@ export interface LanFileOffer {
   mime: string;
   kind: "file" | "dir";
   convId: string;
+  /** Set when the offer targets a group (vs a 1:1 chat). */
+  groupId?: string | null;
 }
 
 /** A WebRTC signaling frame relayed from a peer. */

@@ -989,6 +989,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lanchat_create_group":
     case "lanchat_leave_group":
     case "lanchat_send_file":
+    case "lanchat_send_group_file":
     case "lanchat_send_dir":
     case "lanchat_accept_file":
     case "lanchat_reject_file":

@@ -25,7 +25,7 @@ use tokio::time::timeout;
 use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
-use crate::lanchat::protocol::{frame, Envelope, PeerRecord, PresenceStatus};
+use crate::lanchat::protocol::{frame, wire, Envelope, PeerRecord, PresenceStatus};
 use crate::lanchat::{identity, tls, LanChatState};
 
 /// How often to send a keepalive ping on an idle connection.
@@ -34,8 +34,13 @@ const PING_INTERVAL: Duration = Duration::from_secs(15);
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Hard cap on a single control frame (hardening: bounds a malicious peer's
 /// length prefix so it can't force a huge allocation). Well above any legitimate
-/// frame — file chunks are 64 KiB (~88 KiB base64-framed).
+/// frame — file pieces are 256 KiB raw (no base64) + a tiny header.
 const MAX_FRAME_LEN: usize = 4 * 1024 * 1024;
+/// Bounded capacity of a connection's binary-data (file-piece) queue. This is
+/// the backpressure point: a seeder's `send_data` awaits a free slot, so a fast
+/// disk can never pile the whole file into memory. Control frames use a
+/// separate, prioritized queue so pings/text never wait behind piece data.
+const DATA_QUEUE_CAP: usize = 8;
 
 /// A length-delimited codec with our explicit frame-length cap.
 fn new_codec() -> LengthDelimitedCodec {
@@ -44,18 +49,21 @@ fn new_codec() -> LengthDelimitedCodec {
     codec
 }
 
-/// A live connection to a peer: its id/address plus an outbound frame sender
-/// drained by the connection's write task.
+/// A live connection to a peer: its id/address plus two outbound queues drained
+/// by the connection's write task — a small unbounded control queue (JSON
+/// envelopes) and a bounded binary-data queue (file pieces, the backpressure
+/// point). The write task prioritizes control.
 pub struct ConnHandle {
     pub peer_id: String,
     pub addr: SocketAddr,
-    tx: mpsc::UnboundedSender<Envelope>,
+    control_tx: mpsc::UnboundedSender<Envelope>,
+    data_tx: mpsc::Sender<bytes::Bytes>,
 }
 
 impl ConnHandle {
-    /// Queue an envelope for delivery to this peer.
+    /// Queue a control envelope for delivery to this peer.
     pub fn send(&self, env: Envelope) -> Result<(), String> {
-        self.tx.send(env).map_err(|_| "connection closed".to_string())
+        self.control_tx.send(env).map_err(|_| "connection closed".to_string())
     }
 }
 
@@ -146,6 +154,18 @@ pub async fn try_send(state: &Arc<LanChatState>, peer_id: &str, env: Envelope) -
     }
 }
 
+/// Send a binary data frame (a file piece) to a peer over the bounded data
+/// queue, awaiting a free slot if it is full. This `.await` is the swarm's
+/// backpressure: a seeder cannot read faster than the network drains. Returns
+/// false if there is no live connection.
+pub async fn send_data(state: &Arc<LanChatState>, peer_id: &str, bytes: bytes::Bytes) -> bool {
+    let sender = match state.connections.read().await.get(peer_id) {
+        Some(handle) => handle.data_tx.clone(),
+        None => return false,
+    };
+    sender.send(bytes).await.is_ok()
+}
+
 /// Queue an envelope to a peer, dialing on demand if not yet connected.
 pub async fn send_to_peer(
     app: &AppHandle,
@@ -165,13 +185,17 @@ async fn send_frame<T: AsyncWrite + Unpin>(
     framed: &mut LanFramed<T>,
     env: &Envelope,
 ) -> Result<(), String> {
-    let bytes = env.encode().map_err(|e| e.to_string())?;
-    framed.send(bytes).await.map_err(|e| e.to_string())
+    let json = env.encode().map_err(|e| e.to_string())?;
+    framed.send(wire::frame_control(&json)).await.map_err(|e| e.to_string())
 }
 
 async fn recv_frame<T: AsyncRead + Unpin>(framed: &mut LanFramed<T>) -> Result<Envelope, String> {
     match framed.next().await {
-        Some(Ok(buf)) => Envelope::decode(&buf).map_err(|e| e.to_string()),
+        Some(Ok(buf)) => match wire::decode_frame(&buf) {
+            Some(wire::Frame::Control(env)) => Ok(env),
+            Some(wire::Frame::Piece(..)) => Err("unexpected binary frame during handshake".into()),
+            None => Err("undecodable frame".into()),
+        },
         Some(Err(e)) => Err(e.to_string()),
         None => Err("connection closed during handshake".into()),
     }
@@ -491,13 +515,15 @@ async fn setup_connection(
 
     let (mut sink, mut read) = framed.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Envelope>();
+    let (data_tx, mut data_rx) = mpsc::channel::<bytes::Bytes>(DATA_QUEUE_CAP);
 
     state.connections.write().await.insert(
         peer_id.clone(),
         ConnHandle {
             peer_id: peer_id.clone(),
             addr,
-            tx: tx.clone(),
+            control_tx: tx.clone(),
+            data_tx,
         },
     );
     log::info!("lanchat: connected to {peer_id} ({addr})");
@@ -528,16 +554,29 @@ async fn setup_connection(
         }
     }
 
-    // Write task: drain the outbound queue into the framed sink.
+    // Write task: drain both queues into the framed sink, prioritizing control
+    // frames (biased select) so pings/text never wait behind a piece backlog.
+    // Control frames are tagged here; data frames are pre-tagged piece bytes.
     let write_task = tokio::spawn(async move {
-        while let Some(env) = rx.recv().await {
-            match env.encode() {
-                Ok(bytes) => {
+        loop {
+            tokio::select! {
+                biased;
+                ctrl = rx.recv() => match ctrl {
+                    Some(env) => match env.encode() {
+                        Ok(json) => {
+                            if sink.send(wire::frame_control(&json)).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(e) => log::debug!("lanchat: encode frame failed: {e}"),
+                    },
+                    None => break, // control senders dropped → connection gone
+                },
+                data = data_rx.recv() => if let Some(bytes) = data {
                     if sink.send(bytes).await.is_err() {
                         break;
                     }
-                }
-                Err(e) => log::debug!("lanchat: encode frame failed: {e}"),
+                },
             }
         }
     });
@@ -569,9 +608,14 @@ async fn setup_connection(
                     break;
                 }
             };
-            match Envelope::decode(&buf) {
-                Ok(env) => Box::pin(dispatch_inbound(&app, &state, &peer_id, &my_id, env)).await,
-                Err(e) => log::debug!("lanchat: bad frame from {peer_id}: {e}"),
+            match wire::decode_frame(&buf) {
+                Some(wire::Frame::Control(env)) => {
+                    Box::pin(dispatch_inbound(&app, &state, &peer_id, &my_id, env)).await
+                }
+                Some(wire::Frame::Piece(file_id, idx, data)) => {
+                    crate::lanchat::swarm::handle_piece(&app, &state, &peer_id, &file_id, idx, data).await
+                }
+                None => log::debug!("lanchat: bad/unknown frame from {peer_id}"),
             }
         }
         state.connections.write().await.remove(&peer_id);
@@ -621,23 +665,26 @@ async fn dispatch_inbound(
         frame::GROUP_JOIN | frame::GROUP_LEAVE => {
             crate::lanchat::messaging::handle_group_membership(app, state, &env).await;
         }
-        frame::FILE_OFFER => {
-            crate::lanchat::transfer::handle_file_offer(app, state, peer_id, &env).await;
+        frame::SWARM_OFFER => {
+            crate::lanchat::swarm::handle_offer(app, state, peer_id, &env).await;
         }
-        frame::FILE_ACCEPT => {
-            crate::lanchat::transfer::handle_file_accept(app, state, peer_id, &env).await;
+        frame::SWARM_ACCEPT => {
+            crate::lanchat::swarm::handle_accept(app, state, peer_id, &env).await;
         }
-        frame::FILE_REJECT => {
-            crate::lanchat::transfer::handle_file_reject(app, state, peer_id, &env).await;
+        frame::SWARM_REJECT => {
+            crate::lanchat::swarm::handle_reject(app, state, peer_id, &env).await;
         }
-        frame::FILE_CHUNK => {
-            crate::lanchat::transfer::handle_file_chunk(app, state, peer_id, &env).await;
+        frame::SWARM_REQUEST => {
+            crate::lanchat::swarm::handle_request(state, peer_id, &env).await;
         }
-        frame::FILE_COMPLETE => {
-            crate::lanchat::transfer::handle_file_complete(app, state, peer_id, &env).await;
+        frame::SWARM_HAVE => {
+            crate::lanchat::swarm::handle_have(app, state, peer_id, &env).await;
         }
-        frame::FILE_PAUSE | frame::FILE_RESUME | frame::FILE_CANCEL => {
-            crate::lanchat::transfer::handle_file_control(app, state, &env).await;
+        frame::SWARM_BITFIELD => {
+            crate::lanchat::swarm::handle_bitfield(app, state, peer_id, &env).await;
+        }
+        frame::SWARM_CANCEL => {
+            crate::lanchat::swarm::handle_cancel(app, state, peer_id, &env).await;
         }
         frame::CALL_INVITE
         | frame::CALL_ACCEPT
@@ -785,5 +832,56 @@ mod tests {
         let seen_client_fp = srv.await.unwrap();
         assert_eq!(seen_client_fp.as_deref(), Some(client_fp.as_str()), "server sees client fp");
         assert_eq!(seen_server_fp.as_deref(), Some(server_fp.as_str()), "client sees server fp");
+    }
+
+    // v3 wire over the *real* mutual-TLS + length-delimited transport: a large
+    // (256 KiB) binary piece frame interleaved with a JSON control frame must
+    // survive the TLS record layer and the codec, and demux correctly by tag.
+    #[tokio::test]
+    async fn v3_piece_and_control_frames_survive_tls_transport() {
+        use crate::lanchat::identity::Identity;
+
+        let server_id = Identity::generate().unwrap();
+        let client_id = Identity::generate().unwrap();
+        let server_cfg = tls::server_config(&server_id).unwrap();
+        let client_cfg = tls::client_config(&client_id).unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let file_id = "c".repeat(64);
+        let fid = file_id.clone();
+        // Server side: receive two frames, demux, and report what it saw.
+        let srv = tokio::spawn(async move {
+            let (tcp, _) = listener.accept().await.unwrap();
+            let tls = TlsStream::from(TlsAcceptor::from(server_cfg).accept(tcp).await.unwrap());
+            let mut framed = Framed::new(tls, new_codec());
+            let mut ctrl_type = None;
+            let mut piece = None;
+            for _ in 0..2 {
+                let buf = framed.next().await.unwrap().unwrap();
+                match wire::decode_frame(&buf) {
+                    Some(wire::Frame::Control(env)) => ctrl_type = Some(env.frame_type),
+                    Some(wire::Frame::Piece(id, idx, data)) => piece = Some((id, idx, data.len())),
+                    None => panic!("undecodable frame"),
+                }
+            }
+            (ctrl_type, piece)
+        });
+
+        let tcp = TcpStream::connect(addr).await.unwrap();
+        let sni = rustls::pki_types::ServerName::try_from(tls::SNI).unwrap();
+        let tls = TlsStream::from(TlsConnector::from(client_cfg).connect(sni, tcp).await.unwrap());
+        let mut framed = Framed::new(tls, new_codec());
+
+        let ctrl = Envelope::new(frame::SWARM_REQUEST, "a", Some("b".into()), json!({ "fileId": fid, "piece": 7 }));
+        framed.send(wire::frame_control(&ctrl.encode().unwrap())).await.unwrap();
+        let data = vec![0xA5u8; 256 * 1024];
+        framed.send(wire::frame_piece(&fid, 7, &data)).await.unwrap();
+        framed.flush().await.unwrap();
+
+        let (ctrl_type, piece) = srv.await.unwrap();
+        assert_eq!(ctrl_type.as_deref(), Some(frame::SWARM_REQUEST));
+        assert_eq!(piece, Some((file_id, 7, 256 * 1024)));
     }
 }
