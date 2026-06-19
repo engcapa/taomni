@@ -18,6 +18,24 @@ use crate::lanchat::{events, transport, LanChatState};
 /// How long an unacked message waits before it is marked `failed`.
 const DELIVERY_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// App-level cap on a chat message length (characters). Outbound is rejected,
+/// inbound is truncated — a sanity bound on top of the transport frame cap.
+const MAX_TEXT_CHARS: usize = 8192;
+
+/// True if `text` is within the message-length cap.
+fn within_limit(text: &str) -> bool {
+    text.chars().take(MAX_TEXT_CHARS + 1).count() <= MAX_TEXT_CHARS
+}
+
+/// Truncate inbound text to the cap at a char boundary.
+fn cap_text(text: String) -> String {
+    if within_limit(&text) {
+        text
+    } else {
+        text.chars().take(MAX_TEXT_CHARS).collect()
+    }
+}
+
 fn emit_message(app: &AppHandle, msg: &LanMessage) {
     if let Err(e) = app.emit(events::MESSAGE, msg) {
         log::warn!("lanchat: emit message failed: {e}");
@@ -42,6 +60,9 @@ pub async fn send_text(
 ) -> Result<LanMessage, String> {
     let my_id = state.node_id().await;
     let conv_id = direct_conv_id(peer_id);
+    if !within_limit(&text) {
+        return Err("message too long".into());
+    }
     state
         .store
         .ensure_conversation(&conv_id, "direct", peer_id)
@@ -163,6 +184,7 @@ pub async fn handle_text_msg(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
+    let text = cap_text(text);
     let mentions: Vec<String> = env
         .payload
         .get("mentions")
@@ -321,6 +343,9 @@ pub async fn send_group_text(
 ) -> Result<LanMessage, String> {
     let my_id = state.node_id().await;
     let conv_id = group_conv_id(group_id);
+    if !within_limit(&text) {
+        return Err("message too long".into());
+    }
     state
         .store
         .ensure_conversation(&conv_id, "group", group_id)
@@ -433,4 +458,25 @@ pub async fn leave_group(
         emit_group(app, &group);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn within_limit_bounds_message_length() {
+        assert!(within_limit("hello"));
+        assert!(within_limit(&"x".repeat(MAX_TEXT_CHARS)));
+        assert!(!within_limit(&"x".repeat(MAX_TEXT_CHARS + 1)));
+    }
+
+    #[test]
+    fn cap_text_truncates_overlong_inbound() {
+        let long = "у".repeat(MAX_TEXT_CHARS + 500); // multi-byte chars
+        let capped = cap_text(long);
+        assert_eq!(capped.chars().count(), MAX_TEXT_CHARS);
+        // Short text is returned unchanged.
+        assert_eq!(cap_text("hi".into()), "hi");
+    }
 }

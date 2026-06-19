@@ -32,6 +32,17 @@ use crate::lanchat::{identity, tls, LanChatState};
 const PING_INTERVAL: Duration = Duration::from_secs(15);
 /// How long the handshake may take before the connection is abandoned.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Hard cap on a single control frame (hardening: bounds a malicious peer's
+/// length prefix so it can't force a huge allocation). Well above any legitimate
+/// frame — file chunks are 64 KiB (~88 KiB base64-framed).
+const MAX_FRAME_LEN: usize = 4 * 1024 * 1024;
+
+/// A length-delimited codec with our explicit frame-length cap.
+fn new_codec() -> LengthDelimitedCodec {
+    let mut codec = LengthDelimitedCodec::new();
+    codec.set_max_frame_length(MAX_FRAME_LEN);
+    codec
+}
 
 /// A live connection to a peer: its id/address plus an outbound frame sender
 /// drained by the connection's write task.
@@ -404,7 +415,7 @@ async fn setup_connection(
     };
     let peer_fp = identity::fingerprint(&peer_cert);
 
-    let mut framed = Framed::new(tls, LengthDelimitedCodec::new());
+    let mut framed = Framed::new(tls, new_codec());
     let my_id = state.node_id().await;
     let my_name = state
         .store
