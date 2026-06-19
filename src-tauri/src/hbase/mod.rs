@@ -202,6 +202,22 @@ enum ShellCommand {
         table: String,
         row: String,
     },
+    Count {
+        table: String,
+    },
+    Exists {
+        table: String,
+    },
+    Enable {
+        table: String,
+    },
+    Disable {
+        table: String,
+    },
+    Alter {
+        table: String,
+        families: Vec<FamilySpec>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -1001,7 +1017,112 @@ async fn execute_command(
             send_json(session, Method::DELETE, &path, None).await?;
             Ok(message_result(raw, "Row deleted".into()))
         }
+        ShellCommand::Count { table } => {
+            let display = session.table_name(&table);
+            let count = count_table(session, &table).await?;
+            Ok(table_result(
+                raw,
+                format!("{count} row(s)"),
+                vec!["TABLE", "ROWS"],
+                vec![vec![display, count.to_string()]],
+            ))
+        }
+        ShellCommand::Exists { table } => {
+            let display = session.table_name(&table);
+            let exists = match describe_table(session, &table).await {
+                Ok(_) => true,
+                Err(e) if looks_like_missing(&e) => false,
+                Err(e) => return Err(e),
+            };
+            Ok(table_result(
+                raw,
+                format!("Table {display} {}", if exists { "exists" } else { "does not exist" }),
+                vec!["TABLE", "EXISTS"],
+                vec![vec![display, exists.to_string()]],
+            ))
+        }
+        ShellCommand::Enable { .. }
+        | ShellCommand::Disable { .. }
+        | ShellCommand::Alter { .. } => Err(rest_admin_unsupported(&raw)),
     }
+}
+
+/// `enable`/`disable`/`alter` require the HBase Admin API, which the REST
+/// (Stargate) gateway does not expose. Surface a clear, actionable message.
+fn rest_admin_unsupported(raw: &str) -> String {
+    let verb = raw.split_whitespace().next().unwrap_or("This command");
+    format!(
+        "`{verb}` is not supported by the HBase REST (Stargate) transport. \
+         Use a Native (ZooKeeper/RPC) or Thrift connection to run admin commands."
+    )
+}
+
+/// True when an error message indicates a table is missing (used by `exists`).
+fn looks_like_missing(msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    m.contains("not found")
+        || m.contains("404")
+        || m.contains("tablenotfound")
+        || m.contains("does not exist")
+        || m.contains("not exist")
+}
+
+/// Count rows in a table over the REST scanner.
+///
+/// Uses a `FirstKeyOnlyFilter` so the server returns at most one cell per row
+/// (minimal payload), then pages the scanner counting distinct row keys. Falls
+/// back to an unfiltered scan if the gateway rejects the filter. Capped to keep
+/// a runaway scan bounded.
+async fn count_table(session: &RestSession, table: &str) -> Result<usize, String> {
+    const PAGE_CAP: usize = 1_000_000;
+    let table = session.table_name(table);
+    let batch = 1000;
+
+    let make_spec = |with_filter: bool| -> Value {
+        let mut spec = Map::new();
+        spec.insert("batch".into(), json!(batch));
+        spec.insert("caching".into(), json!(batch));
+        if with_filter {
+            spec.insert("filter".into(), json!("{\"type\": \"FirstKeyOnlyFilter\"}"));
+        }
+        Value::Object(spec)
+    };
+
+    let path = format!("/{}/scanner", enc(&table));
+    let location = match create_scanner(session, &path, make_spec(true)).await {
+        Ok(loc) => loc,
+        Err(_) => create_scanner(session, &path, make_spec(false)).await?,
+    };
+
+    let mut count = 0usize;
+    let mut last_row: Option<String> = None;
+    for _ in 0..PAGE_CAP {
+        let resp = session
+            .request(Method::GET, location.clone())
+            .send()
+            .await
+            .map_err(|e| describe_request_error("HBase scanner read failed", &e))?;
+        if resp.status() == StatusCode::NO_CONTENT {
+            break;
+        }
+        let value = response_json(resp).await?;
+        let rows = cellset_rows(&value);
+        if rows.is_empty() {
+            break;
+        }
+        for r in &rows {
+            let rk = r.first().cloned().unwrap_or_default();
+            if last_row.as_deref() != Some(rk.as_str()) {
+                count += 1;
+                last_row = Some(rk);
+            }
+        }
+        if count >= PAGE_CAP {
+            break;
+        }
+    }
+    let _ = session.request(Method::DELETE, location).send().await;
+    Ok(count)
 }
 
 async fn scan_table(
@@ -1213,9 +1334,30 @@ fn parse_shell_command(input: &str) -> Result<ShellCommand, String> {
             table: required_arg(&args, 0, "deleteall table")?,
             row: required_arg(&args, 1, "deleteall row")?,
         }),
-        "enable" | "disable" | "alter" | "count" => Err(format!(
-            "{name} is not implemented by the HBase REST shell client yet"
-        )),
+        "count" => Ok(ShellCommand::Count {
+            table: required_arg(&args, 0, "count table")?,
+        }),
+        "exists" => Ok(ShellCommand::Exists {
+            table: required_arg(&args, 0, "exists table")?,
+        }),
+        "enable" => Ok(ShellCommand::Enable {
+            table: required_arg(&args, 0, "enable table")?,
+        }),
+        "disable" => Ok(ShellCommand::Disable {
+            table: required_arg(&args, 0, "disable table")?,
+        }),
+        "alter" => {
+            let table = required_arg(&args, 0, "alter table")?;
+            let families = args
+                .iter()
+                .skip(1)
+                .map(|arg| parse_family_spec(arg))
+                .collect::<Result<Vec<_>, _>>()?;
+            if families.is_empty() {
+                return Err("alter requires at least one column family specification".into());
+            }
+            Ok(ShellCommand::Alter { table, families })
+        }
         other => Err(format!("Unsupported HBase shell command: {other}")),
     }
 }
@@ -1460,11 +1602,13 @@ fn value_result(command: String, message: String, value: &Value) -> HBaseShellRe
 fn help_result(command: String) -> HBaseShellResult {
     table_result(
         command,
-        "Supported HBase REST shell commands".into(),
+        "Supported HBase shell commands (enable/disable/alter require a Native or Thrift connection)".into(),
         vec!["COMMAND", "EXAMPLE"],
         vec![
             vec!["list".into(), "list".into()],
             vec!["describe".into(), "describe 'table'".into()],
+            vec!["exists".into(), "exists 'table'".into()],
+            vec!["count".into(), "count 'table'".into()],
             vec![
                 "scan".into(),
                 "scan 'table', {LIMIT=>50, STARTROW=>'r1', COLUMNS=>['cf:q']}".into(),
@@ -1474,6 +1618,9 @@ fn help_result(command: String) -> HBaseShellResult {
             vec!["delete".into(), "delete 'table', 'row', 'cf:q'".into()],
             vec!["deleteall".into(), "deleteall 'table', 'row'".into()],
             vec!["create".into(), "create 'table', 'cf'".into()],
+            vec!["alter".into(), "alter 'table', {NAME=>'cf', VERSIONS=>5}".into()],
+            vec!["enable".into(), "enable 'table'".into()],
+            vec!["disable".into(), "disable 'table'".into()],
             vec!["drop".into(), "drop 'table'".into()],
             vec!["status".into(), "status".into()],
             vec!["version".into(), "version".into()],
@@ -1580,6 +1727,23 @@ fn rows_to_cell_table(raw: String, rows: Vec<ResultRow>) -> HBaseShellResult {
         vec!["ROW", "COLUMN", "TIMESTAMP", "VALUE"],
         body,
     )
+}
+
+/// Upper bound on cells scanned when emulating `count` over the native/Thrift
+/// scan path (those clients do not expose a server-side row counter).
+const COUNT_SCAN_CAP: usize = 1_000_000;
+
+/// Count distinct row keys in a set of scanned cells (cells are row-ordered).
+fn count_distinct_rows(rows: &[ResultRow]) -> usize {
+    let mut count = 0usize;
+    let mut last: Option<&[u8]> = None;
+    for r in rows {
+        if last != Some(r.row.as_slice()) {
+            count += 1;
+            last = Some(r.row.as_slice());
+        }
+    }
+    count
 }
 
 /// Execute a parsed shell command against the native client.
@@ -1702,6 +1866,54 @@ async fn native_execute(
                 .await
                 .map_err(|e| e.to_string())?;
             Ok(message_result(raw, "Row deleted".into()))
+        }
+        ShellCommand::Count { table } => {
+            let display = client.qualify(&table);
+            let rows = client
+                .scan(&table, COUNT_SCAN_CAP, None, None, &[])
+                .await
+                .map_err(|e| e.to_string())?;
+            let count = count_distinct_rows(&rows);
+            Ok(table_result(
+                raw,
+                format!("{count} row(s)"),
+                vec!["TABLE", "ROWS"],
+                vec![vec![display, count.to_string()]],
+            ))
+        }
+        ShellCommand::Exists { table } => {
+            let display = client.qualify(&table);
+            let exists = match native_describe_table(client, &table).await {
+                Ok(_) => true,
+                Err(e) if looks_like_missing(&e) => false,
+                Err(e) => return Err(e),
+            };
+            Ok(table_result(
+                raw,
+                format!("Table {display} {}", if exists { "exists" } else { "does not exist" }),
+                vec!["TABLE", "EXISTS"],
+                vec![vec![display, exists.to_string()]],
+            ))
+        }
+        ShellCommand::Enable { table } => {
+            client.enable_table(&table).await.map_err(|e| e.to_string())?;
+            Ok(message_result(raw, format!("Enabled table {table}")))
+        }
+        ShellCommand::Disable { table } => {
+            client.disable_table(&table).await.map_err(|e| e.to_string())?;
+            Ok(message_result(raw, format!("Disabled table {table}")))
+        }
+        ShellCommand::Alter { table, families } => {
+            let specs: Vec<(String, BTreeMap<String, String>)> =
+                families.into_iter().map(|f| (f.name, f.attributes)).collect();
+            let changed = client
+                .alter_table(&table, &specs)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(message_result(
+                raw,
+                format!("Altered table {table} ({changed} column family change(s))"),
+            ))
         }
     }
 }
@@ -1830,6 +2042,42 @@ async fn thrift_execute(
             client.delete_all(&table, row.as_bytes()).await?;
             Ok(message_result(raw, "Row deleted".into()))
         }
+        ShellCommand::Count { table } => {
+            let rows = client.scan(&table, COUNT_SCAN_CAP, None, None, &[]).await?;
+            let count = count_distinct_rows(&rows);
+            Ok(table_result(
+                raw,
+                format!("{count} row(s)"),
+                vec!["TABLE", "ROWS"],
+                vec![vec![table, count.to_string()]],
+            ))
+        }
+        ShellCommand::Exists { table } => {
+            let exists = client.table_exists(&table).await?;
+            Ok(table_result(
+                raw,
+                format!("Table {table} {}", if exists { "exists" } else { "does not exist" }),
+                vec!["TABLE", "EXISTS"],
+                vec![vec![table, exists.to_string()]],
+            ))
+        }
+        ShellCommand::Enable { table } => {
+            client.enable_table(&table).await?;
+            Ok(message_result(raw, format!("Enabled table {table}")))
+        }
+        ShellCommand::Disable { table } => {
+            client.disable_table(&table).await?;
+            Ok(message_result(raw, format!("Disabled table {table}")))
+        }
+        ShellCommand::Alter { table, families } => {
+            let specs: Vec<(String, BTreeMap<String, String>)> =
+                families.into_iter().map(|f| (f.name, f.attributes)).collect();
+            let changed = client.alter_table(&table, &specs).await?;
+            Ok(message_result(
+                raw,
+                format!("Altered table {table} ({changed} column family change(s))"),
+            ))
+        }
     }
 }
 
@@ -1906,6 +2154,77 @@ mod tests {
             }
             other => panic!("unexpected command: {other:?}"),
         }
+    }
+
+    #[test]
+    fn parses_count_and_exists() {
+        match parse_shell_command("count 't1'").unwrap() {
+            ShellCommand::Count { table } => assert_eq!(table, "t1"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+        match parse_shell_command("exists 't1'").unwrap() {
+            ShellCommand::Exists { table } => assert_eq!(table, "t1"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_enable_disable() {
+        match parse_shell_command("enable 't1'").unwrap() {
+            ShellCommand::Enable { table } => assert_eq!(table, "t1"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+        match parse_shell_command("disable 't1'").unwrap() {
+            ShellCommand::Disable { table } => assert_eq!(table, "t1"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_alter_family_map() {
+        match parse_shell_command("alter 't1', {NAME=>'cf', VERSIONS=>5}").unwrap() {
+            ShellCommand::Alter { table, families } => {
+                assert_eq!(table, "t1");
+                assert_eq!(families[0].name, "cf");
+                assert_eq!(
+                    families[0].attributes.get("VERSIONS").map(String::as_str),
+                    Some("5")
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn alter_requires_family_spec() {
+        assert!(parse_shell_command("alter 't1'").is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_command() {
+        assert!(parse_shell_command("whoami").is_err());
+        assert!(parse_shell_command("show_filters").is_err());
+    }
+
+    #[test]
+    fn count_distinct_rows_counts_unique_keys() {
+        let row = |k: &str| ResultRow {
+            row: k.as_bytes().to_vec(),
+            column: b"cf:q".to_vec(),
+            timestamp: 0,
+            value: b"v".to_vec(),
+        };
+        // Cells are row-ordered; two cells for r1 then one for r2 => 2 rows.
+        let rows = vec![row("r1"), row("r1"), row("r2")];
+        assert_eq!(count_distinct_rows(&rows), 2);
+        assert_eq!(count_distinct_rows(&[]), 0);
+    }
+
+    #[test]
+    fn looks_like_missing_detects_not_found() {
+        assert!(looks_like_missing("HBase REST error (404 Not Found): ..."));
+        assert!(looks_like_missing("table not found: t1"));
+        assert!(!looks_like_missing("connection refused"));
     }
 
     #[test]

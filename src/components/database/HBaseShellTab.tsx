@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Ban,
   ChevronDown,
   ChevronRight,
-  Database,
+  Clock,
+  HelpCircle,
   Loader2,
   Play,
-  RefreshCw,
-  Table2,
-  Trash2,
-  Ban,
+  Plus,
+  SquareDashedMousePointer,
+  X,
 } from "lucide-react";
 import {
   Group as PanelGroup,
@@ -22,15 +23,31 @@ import type { HBaseConnectInfo } from "../../types";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { splitHBaseStatements } from "../../lib/hbaseStatements";
 import {
+  HBASE_COMMANDS,
+  commandSupported,
+  hbaseResultToGrid,
+  writeConfirmMessage,
+  type HBaseCommandCategory,
+  type HBaseTransport,
+} from "../../lib/hbaseCommands";
+import { hbaseCompletionSource } from "../../lib/hbaseCompletions";
+import {
   hbaseConnect,
   hbaseDisconnect,
   hbaseExecute,
-  hbaseListTables,
   hbaseCancel,
-  type HBaseShellResult,
-  type HBaseTableInfo,
+  type DbQueryResult,
 } from "../../lib/ipc";
 import { useAppStore } from "../../stores/appStore";
+import { useT } from "../../lib/i18n";
+import { useConfirmDialog } from "../sidebar/ConfirmDialog";
+import {
+  QueryResultGrid,
+  type QueryRefreshMode,
+} from "./QueryResultGrid";
+import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
+import { HBaseSchemaTree } from "./HBaseSchemaTree";
+import { useDbSessionFontSize } from "./useDbSessionFontSize";
 
 interface HBaseShellTabProps {
   tabId: string;
@@ -38,157 +55,365 @@ interface HBaseShellTabProps {
   visible: boolean;
 }
 
-const COMMON_COMMANDS = [
-  { label: "help", cmd: "help", exec: true },
-  { label: "list", cmd: "list", exec: true },
-  { label: "status", cmd: "status", exec: true },
-  { label: "version", cmd: "version", exec: true },
-  { label: "whoami", cmd: "whoami", exec: true },
-  { label: "show_filters", cmd: "show_filters", exec: true },
-  { label: "describe", cmd: "describe 'table_name'", exec: false },
-  { label: "scan", cmd: "scan 'table_name', {LIMIT => 10}", exec: false },
-  { label: "get", cmd: "get 'table_name', 'row_id'", exec: false },
-  { label: "count", cmd: "count 'table_name'", exec: false },
-  { label: "exists", cmd: "exists 'table_name'", exec: false },
-];
+const MAX_PANELS = 4;
+const MAX_HISTORY = 200;
+const MAX_RESULT_SHEETS = 50;
+const DEFAULT_ROW_LIMIT = 50;
+
+type ResultSubTab = "results" | "messages";
+
+interface ResultSheet {
+  id: string;
+  title: string;
+  command: string;
+  result: DbQueryResult | null;
+  error: string | null;
+  warnings: string[];
+  running: boolean;
+  cancelling: boolean;
+  elapsedMs: number;
+  resultTab: ResultSubTab;
+  createdAt: number;
+}
+
+interface PanelState {
+  id: string;
+  doc: string;
+  sheets: ResultSheet[];
+  activeSheetId: string | null;
+}
+
+function uid(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function createRuntimeHBaseSessionId(baseSessionId: string): string {
-  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `${baseSessionId}::${suffix}`;
+  return `${baseSessionId}::${uid()}`;
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+function newSheet(command: string, ordinal: number): ResultSheet {
+  return {
+    id: uid(),
+    title: `Result ${ordinal}`,
+    command,
+    result: null,
+    error: null,
+    warnings: [],
+    running: true,
+    cancelling: false,
+    elapsedMs: 0,
+    resultTab: "results",
+    createdAt: Date.now(),
+  };
 }
 
-function defaultCommand(info: HBaseConnectInfo): string {
-  return info.namespace ? `list` : "list";
+function newPanel(doc = "list"): PanelState {
+  return { id: uid(), doc, sheets: [], activeSheetId: null };
 }
 
-function ResultTable({ result }: { result: HBaseShellResult | null }) {
-  if (!result) {
-    return (
-      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-        Run an HBase shell command to see results.
-      </div>
-    );
-  }
+function activeSheet(panel: PanelState): ResultSheet | null {
+  return panel.sheets.find((s) => s.id === panel.activeSheetId) ?? null;
+}
 
-  if (result.columns.length === 0) {
-    return (
-      <div className="p-3 text-[12px]">
-        <div className="font-semibold mb-1">{result.message}</div>
-        <div className="text-[var(--taomni-text-muted)]">{result.durationMs} ms</div>
-      </div>
-    );
-  }
-
+// PLACEHOLDER_REST
+function ResultArea({
+  panel,
+  onSheetSelect,
+  onSheetClose,
+  onTabChange,
+  onRefreshSheet,
+  onCancel,
+  onStatus,
+}: {
+  panel: PanelState;
+  onSheetSelect: (sheetId: string) => void;
+  onSheetClose: (sheetId: string) => void;
+  onTabChange: (sheetId: string, tab: ResultSubTab) => void;
+  onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
+  onCancel: () => void;
+  onStatus: (message: string) => void;
+}) {
+  const sheet = activeSheet(panel);
+  const tab = "h-6 px-3 text-[11px] inline-flex items-center";
   return (
-    <div className="h-full overflow-auto taomni-scroll-y">
-      <table className="min-w-full text-[12px] border-collapse">
-        <thead>
-          <tr style={{ background: "var(--taomni-quick-bg)" }}>
-            {result.columns.map((column) => (
-              <th
-                key={column}
-                className="sticky top-0 z-10 text-left px-2 py-1 border-b font-semibold"
-                style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+    <div className="h-full flex flex-col min-h-0" style={{ background: "var(--taomni-bg)", fontSize: "var(--taomni-db-font-size, 12px)" }}>
+      <div className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden" style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
+        {panel.sheets.length === 0 ? (
+          <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
+        ) : (
+          panel.sheets.map((rs) => {
+            const active = rs.id === sheet?.id;
+            return (
+              <button
+                key={rs.id}
+                type="button"
+                className="h-6 max-w-[170px] px-2 inline-flex items-center gap-1 text-[11px]"
+                style={{
+                  background: active ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
+                  color: active ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
+                  border: "1px solid var(--taomni-tab-border)",
+                  borderBottom: active ? "1px solid var(--taomni-tab-active)" : "1px solid var(--taomni-divider)",
+                  borderTopLeftRadius: 4,
+                  borderTopRightRadius: 4,
+                }}
+                onClick={() => onSheetSelect(rs.id)}
+                title={rs.command}
               >
-                {column}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {result.rows.map((row, rowIndex) => (
-            <tr key={`${rowIndex}-${row.join("\u0001")}`} className="hover:bg-[var(--taomni-hover)]">
-              {result.columns.map((column, columnIndex) => (
-                <td
-                  key={`${column}-${columnIndex}`}
-                  className="px-2 py-1 border-b align-top taomni-mono max-w-[520px] break-words"
-                  style={{ borderColor: "var(--taomni-divider)" }}
-                >
-                  {row[columnIndex] ?? ""}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <span className="truncate">{rs.title}</span>
+                {rs.running && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
+                {(rs.error || rs.warnings.length > 0) && <span className="text-[10px] shrink-0">●</span>}
+                <X className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]" onClick={(e) => { e.stopPropagation(); onSheetClose(rs.id); }} />
+              </button>
+            );
+          })
+        )}
+      </div>
+      {sheet && (
+        <div className="h-7 shrink-0 flex items-center gap-1 px-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
+          <button type="button" className={tab} style={{ color: sheet.resultTab === "results" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }} onClick={() => onTabChange(sheet.id, "results")}>Results</button>
+          <button type="button" className={tab} style={{ color: sheet.resultTab === "messages" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }} onClick={() => onTabChange(sheet.id, "messages")}>
+            Messages{(sheet.error || sheet.warnings.length > 0) ? " ●" : ""}
+          </button>
+          <span className="ml-auto truncate px-2 text-[10px] text-[var(--taomni-text-muted)] font-mono" title={sheet.command}>{sheet.command.replace(/\s+/g, " ")}</span>
+        </div>
+      )}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {!sheet ? (
+          <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">Run a command to create a result sheet.</div>
+        ) : sheet.resultTab === "results" ? (
+          sheet.result ? (
+            <div className={`flex-1 min-h-0 flex flex-col ${sheet.cancelling ? "opacity-50 pointer-events-none" : ""}`}>
+              <QueryResultGrid
+                result={sheet.result}
+                sourceSql={sheet.command}
+                running={sheet.running}
+                cancelling={sheet.cancelling}
+                onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
+                onCancel={onCancel}
+                onStatus={onStatus}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">{sheet.running ? "Running…" : sheet.error ? "See Messages." : "No result."}</div>
+          )
+        ) : (
+          <div className="flex-1 overflow-auto taomni-scroll-y p-2 text-[12px] font-mono" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
+            {sheet.error && <div style={{ color: "#d9534f" }}>{sheet.error}</div>}
+            {sheet.warnings.map((w, i) => (<div key={i} style={{ color: "#e6a817" }}>{w}</div>))}
+            {!sheet.error && sheet.warnings.length === 0 && <div className="text-[var(--taomni-text-muted)]">{sheet.result?.rowsAffected != null ? sheet.command : "No messages."}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatusBar({ panel }: { panel: PanelState }) {
+  const sheet = activeSheet(panel);
+  const r = sheet?.result ?? null;
+  return (
+    <div className="h-6 shrink-0 flex items-center gap-3 px-2 text-[11px] text-[var(--taomni-text-muted)]" style={{ background: "var(--taomni-quick-bg)", borderTop: "1px solid var(--taomni-divider)" }}>
+      {sheet?.running ? (
+        <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {sheet.cancelling ? "Cancelling" : "Running"} {(sheet.elapsedMs / 1000).toFixed(1)}s</span>
+      ) : r ? (
+        <>
+          {r.columns.length > 0 && <span>{r.rows.length} rows</span>}
+          {r.columns.length > 0 && <span>{r.columns.length} cols</span>}
+          <span>{r.durationMs} ms</span>
+        </>
+      ) : (
+        <span>{panel.sheets.length} result sheet(s)</span>
+      )}
+    </div>
+  );
+}
+
+// PLACEHOLDER_MENU
+const CATEGORY_ORDER: HBaseCommandCategory[] = ["meta", "read", "ddl", "dml"];
+const CATEGORY_LABEL: Record<HBaseCommandCategory, string> = {
+  meta: "Meta",
+  read: "Read",
+  ddl: "DDL (tables)",
+  dml: "DML (cells)",
+};
+
+function CommandsMenu({
+  transport,
+  onPick,
+  onClose,
+}: {
+  transport: HBaseTransport;
+  onPick: (example: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="absolute left-2 top-9 z-50 w-[360px] max-h-[420px] overflow-auto taomni-scroll-y rounded shadow-lg py-1 text-[12px]"
+        style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
+      >
+        {CATEGORY_ORDER.map((cat) => {
+          const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
+          if (cmds.length === 0) return null;
+          return (
+            <div key={cat}>
+              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)]">{CATEGORY_LABEL[cat]}</div>
+              {cmds.map((c) => {
+                const supported = commandSupported(c.verb, transport);
+                return (
+                  <button
+                    key={c.verb}
+                    type="button"
+                    disabled={!supported}
+                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--taomni-hover)] disabled:opacity-40 flex flex-col gap-0.5"
+                    title={supported ? c.description : `${c.description} (not available on the ${transport} transport)`}
+                    onClick={() => { onPick(c.example); onClose(); }}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="taomni-mono font-semibold">{c.verb}</span>
+                      {c.isWrite && <span className="text-[9px] rounded px-1" style={{ background: "var(--taomni-divider)", color: c.destructive ? "#d9534f" : "var(--taomni-text-muted)" }}>{c.destructive ? "destructive" : "write"}</span>}
+                      {!supported && <span className="text-[9px] text-[var(--taomni-text-muted)]">unsupported</span>}
+                    </span>
+                    <span className="taomni-mono text-[10px] text-[var(--taomni-text-muted)] truncate">{c.example}</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function HistoryDropdown({ history, onPick, onClose }: { history: string[]; onPick: (cmd: string) => void; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute right-2 top-9 z-50 w-[420px] max-h-[300px] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
+        {history.length === 0 ? (
+          <div className="px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]">No command history yet.</div>
+        ) : (
+          history.map((cmd, i) => (
+            <button key={i} type="button" className="text-left px-3 py-2 text-[11px] truncate font-mono hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)] last:border-0" onClick={() => onPick(cmd)} title={cmd}>
+              {cmd.replace(/\s+/g, " ")}
+            </button>
+          ))
+        )}
+      </div>
+    </>
+  );
+}
+
+function HelpDialog({ transport, onClose }: { transport: HBaseTransport; onClose: () => void }) {
+  const t = useT();
+  return (
+    <div className="fixed inset-0 z-[950] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.4)" }} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label={t("hbaseObjects.helpTitle")}
+        aria-modal="true"
+        data-testid="hbase-help-dialog"
+        className="w-[640px] max-h-[80vh] overflow-auto taomni-scroll-y rounded shadow-lg p-4"
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center mb-3">
+          <div className="text-sm font-semibold flex-1">{t("hbaseObjects.helpTitle")}</div>
+          <button type="button" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("hbaseObjects.helpClose")}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {CATEGORY_ORDER.map((cat) => {
+          const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
+          return (
+            <div key={cat} className="mb-3">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
+              <table className="w-full text-[12px] border-collapse">
+                <tbody>
+                  {cmds.map((c) => {
+                    const supported = commandSupported(c.verb, transport);
+                    return (
+                      <tr key={c.verb} className="border-b" style={{ borderColor: "var(--taomni-divider)", opacity: supported ? 1 : 0.55 }}>
+                        <td className="py-1 pr-2 align-top taomni-mono font-semibold whitespace-nowrap">{c.verb}</td>
+                        <td className="py-1 pr-2 align-top taomni-mono text-[11px] text-[var(--taomni-text-muted)]">{c.syntax}</td>
+                        <td className="py-1 align-top text-[11px]">
+                          {c.description}
+                          {!supported && <div className="text-[10px]" style={{ color: "#d9534f" }}>{t("hbaseObjects.helpRestNote")}</div>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabProps) {
+  const t = useT();
+  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
+  const confirmDialog = useConfirmDialog();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useDbSessionFontSize(visible, rootRef);
+
+  const transport: HBaseTransport = (info.connectionMode as HBaseTransport) ?? "rest";
+
   const [connectionSessionId, setConnectionSessionId] = useState<string | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
-  const [allTables, setAllTables] = useState<HBaseTableInfo[]>([]);
-  const [visibleCount, setVisibleCount] = useState(10);
-  const [tablesLoading, setTablesLoading] = useState(false);
-  const [loadTimeoutTriggered, setLoadTimeoutTriggered] = useState(false);
-  const [command, setCommand] = useState(() => defaultCommand(info));
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<HBaseShellResult | null>(null);
-  const [history, setHistory] = useState<HBaseShellResult[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [showMenu, setShowMenu] = useState(false);
   const [hasBeenVisible, setHasBeenVisible] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setHasBeenVisible(true);
+  // --- workspace state (restored from localStorage) ---
+  const workspaceKey = `taomni.hbase.workspace.v1.${info.sessionId}`;
+  const [panels, setPanels] = useState<PanelState[]>(() => {
+    try {
+      const raw = localStorage.getItem(workspaceKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { docs?: string[] };
+        if (Array.isArray(parsed.docs) && parsed.docs.length > 0) {
+          return parsed.docs.slice(0, MAX_PANELS).map((doc) => newPanel(doc));
+        }
+      }
+    } catch {
+      /* ignore */
     }
-  }, [visible]);
-
-  const initialLayout = useMemo(() => {
-    return loadResizableLayout(`hbase-shell-${info.sessionId}`, ["sidebar", "workspace"]);
-  }, [info.sessionId]);
-
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (initialLayout && typeof initialLayout.sidebar === "number") {
-      return initialLayout.sidebar === 0;
-    }
-    return false;
+    return [newPanel("list")];
   });
+  const [activePanelId, setActivePanelId] = useState<string>(() => panels[0]?.id ?? "");
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
+  const [showCommands, setShowCommands] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
-  const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
+  const historyRef = useRef<Record<string, string[]>>({});
 
-  const lastVisibleSidebarWidthRef = useRef<number>(
-    initialLayout && typeof initialLayout.sidebar === "number" && initialLayout.sidebar > 0
-      ? initialLayout.sidebar
-      : 20
+  const activePanel = useMemo(
+    () => panels.find((p) => p.id === activePanelId) ?? panels[0],
+    [panels, activePanelId],
   );
 
-  const expandSidebarPanel = () => {
-    const nextSize = Math.min(40, Math.max(15, lastVisibleSidebarWidthRef.current));
-    sidebarPanelRef.current?.resize(`${nextSize}%`);
-    setSidebarCollapsed(false);
-  };
-
-  const handleSidebarResize = (size: PanelSize) => {
-    const percentage = size.asPercentage;
-    if (percentage > 0) {
-      lastVisibleSidebarWidthRef.current = percentage;
+  // Persist panel docs + active panel for restore-on-mount.
+  useEffect(() => {
+    try {
+      localStorage.setItem(workspaceKey, JSON.stringify({ docs: panels.map((p) => p.doc) }));
+    } catch {
+      /* ignore quota */
     }
-    setSidebarCollapsed(percentage === 0);
-  };
+  }, [panels, workspaceKey]);
 
-  const cancelLoadTables = useCallback(async () => {
-    if (connectionSessionId) {
-      await hbaseCancel(connectionSessionId);
-    }
-  }, [connectionSessionId]);
+  useEffect(() => {
+    if (visible) setHasBeenVisible(true);
+  }, [visible]);
 
-  const handleCancelQuery = useCallback(async () => {
-    if (connectionSessionId) {
-      await hbaseCancel(connectionSessionId);
-    }
-  }, [connectionSessionId]);
-  
-  const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
-  const commandRef = useRef<HTMLTextAreaElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
+  // --- connection lifecycle ---
   useEffect(() => {
     let cancelled = false;
     const runtimeSessionId = createRuntimeHBaseSessionId(info.sessionId);
@@ -212,117 +437,193 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info.sessionId]);
 
+  const anyRunning = panels.some((p) => p.sheets.some((s) => s.running));
   useEffect(() => {
-    setTabHasNewOutput(tabId, running && !visible);
-  }, [running, tabId, visible, setTabHasNewOutput]);
+    setTabHasNewOutput(tabId, anyRunning && !visible);
+  }, [anyRunning, tabId, visible, setTabHasNewOutput]);
 
-  const loadTables = useCallback(async () => {
-    if (!connectionSessionId) return;
-    setTablesLoading(true);
-    setLoadTimeoutTriggered(false);
-    setError(null);
+  // --- state patch helpers ---
+  const patchPanel = useCallback((id: string, patch: Partial<PanelState>) => {
+    setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+  const patchSheet = useCallback((panelId: string, sheetId: string, patch: Partial<ResultSheet>) => {
+    setPanels((prev) =>
+      prev.map((p) =>
+        p.id !== panelId ? p : { ...p, sheets: p.sheets.map((s) => (s.id === sheetId ? { ...s, ...patch } : s)) },
+      ),
+    );
+  }, []);
 
-    let timeoutId: number | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = window.setTimeout(() => {
-        reject(new Error("TIMEOUT"));
-      }, 60000);
-    });
+  // EXEC_PLACEHOLDER
+  // Forced confirmation before any write command (editor- or tree-initiated).
+  const confirmWrite = useCallback(
+    async (statement: string): Promise<boolean> => {
+      const built = writeConfirmMessage(statement, {
+        write: t("hbaseObjects.writeWarning"),
+        destructive: t("hbaseObjects.destructiveWarning"),
+      });
+      if (!built) return true;
+      return confirmDialog.confirm({
+        title: t("hbaseObjects.confirmWriteTitle"),
+        message: built.message,
+        confirmLabel: t("hbaseObjects.confirmRun"),
+        danger: built.danger,
+      });
+    },
+    [confirmDialog, t],
+  );
 
-    try {
-      const fetchPromise = hbaseListTables(connectionSessionId);
-      const res = await Promise.race([fetchPromise, timeoutPromise]);
-      if (timeoutId) window.clearTimeout(timeoutId);
-      setAllTables(res);
-      setVisibleCount(10);
-    } catch (err) {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      const errStr = String(err);
-      if (err instanceof Error && err.message === "TIMEOUT") {
-        setLoadTimeoutTriggered(true);
-        setAllTables([]);
-      } else if (errStr.includes("cancelled") || errStr.includes("Cancel")) {
-        setError("Load cancelled by user");
-      } else {
-        setError(errStr);
+  const executeIntoSheet = useCallback(
+    async (panelId: string, sheetId: string, command: string): Promise<boolean> => {
+      if (!connectionSessionId) return false;
+      patchSheet(panelId, sheetId, { running: true, cancelling: false, error: null, elapsedMs: 0 });
+      const started = Date.now();
+      const timer = window.setInterval(() => patchSheet(panelId, sheetId, { elapsedMs: Date.now() - started }), 100);
+      try {
+        const res = await hbaseExecute(connectionSessionId, command);
+        patchSheet(panelId, sheetId, {
+          result: hbaseResultToGrid(res),
+          warnings: res.warnings ?? [],
+          running: false,
+          error: null,
+          command: res.command || command,
+          elapsedMs: Date.now() - started,
+        });
+        return true;
+      } catch (err) {
+        patchSheet(panelId, sheetId, {
+          error: String(err),
+          running: false,
+          resultTab: "messages",
+          elapsedMs: Date.now() - started,
+        });
+        return false;
+      } finally {
+        window.clearInterval(timer);
       }
-    } finally {
-      setTablesLoading(false);
-    }
-  }, [connectionSessionId]);
+    },
+    [connectionSessionId, patchSheet],
+  );
 
-  useEffect(() => {
-    if (connectionSessionId) void loadTables();
-  }, [connectionSessionId, loadTables]);
-
-  useEffect(() => {
-    if (!showMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMenu]);
-
-  const run = useCallback(
-    async (nextCommand = command) => {
-      const trimmed = nextCommand.trim();
-      if (!trimmed || !connectionSessionId || running) return;
+  const runStatements = useCallback(
+    async (panelId: string, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || !connectionSessionId) return;
+      const panel = panels.find((p) => p.id === panelId);
+      if (panel?.sheets.some((s) => s.running)) return;
       const statements = splitHBaseStatements(trimmed);
       if (statements.length === 0) return;
-      setRunning(true);
-      setError(null);
-      let mutatedTables = false;
-      try {
-        // The backend executes one statement per call, so run a multi-command
-        // block sequentially. Each statement gets its own history entry; on the
-        // first failure we surface the error and stop (later statements may
-        // depend on earlier ones).
-        for (const statement of statements) {
-          try {
-            const nextResult = await hbaseExecute(connectionSessionId, statement);
-            setResult(nextResult);
-            setHistory((items) => [nextResult, ...items].slice(0, 40));
-            if (/^(create|drop)\b/i.test(statement)) mutatedTables = true;
-          } catch (err) {
-            const detail = String(err);
-            setError(
-              statements.length > 1 ? `${statement}\n${detail}` : detail,
-            );
-            break;
-          }
-        }
-      } finally {
-        if (mutatedTables) void loadTables();
-        setRunning(false);
+      const h = historyRef.current[panelId] ?? [];
+      if (h[0] !== trimmed) historyRef.current[panelId] = [trimmed, ...h].slice(0, MAX_HISTORY);
+
+      let mutated = false;
+      let ordinal = panel?.sheets.length ?? 0;
+      for (const statement of statements) {
+        const ok = await confirmWrite(statement);
+        if (!ok) break;
+        ordinal += 1;
+        const sheet = newSheet(statement, ordinal);
+        setPanels((prev) =>
+          prev.map((p) =>
+            p.id !== panelId ? p : { ...p, sheets: [...p.sheets, sheet].slice(-MAX_RESULT_SHEETS), activeSheetId: sheet.id },
+          ),
+        );
+        const success = await executeIntoSheet(panelId, sheet.id, statement);
+        if (/^(create|drop|enable|disable|alter)\b/i.test(statement)) mutated = true;
+        if (!success) break;
+      }
+      if (mutated) setRefreshSignal((s) => s + 1);
+    },
+    [connectionSessionId, panels, confirmWrite, executeIntoSheet],
+  );
+
+  const cancelQuery = useCallback(
+    (panelId: string) => {
+      setPanels((prev) =>
+        prev.map((p) =>
+          p.id !== panelId ? p : { ...p, sheets: p.sheets.map((s) => (s.running ? { ...s, cancelling: true } : s)) },
+        ),
+      );
+      if (connectionSessionId) void hbaseCancel(connectionSessionId);
+    },
+    [connectionSessionId],
+  );
+
+  const refreshSheet = useCallback(
+    (panelId: string, sheetId: string, _mode: QueryRefreshMode) => {
+      const panel = panels.find((p) => p.id === panelId);
+      const sheet = panel?.sheets.find((s) => s.id === sheetId);
+      if (sheet) void executeIntoSheet(panelId, sheetId, sheet.command);
+    },
+    [panels, executeIntoSheet],
+  );
+
+  const closeResultSheet = useCallback((panelId: string, sheetId: string) => {
+    setPanels((prev) =>
+      prev.map((p) => {
+        if (p.id !== panelId) return p;
+        const sheets = p.sheets.filter((s) => s.id !== sheetId);
+        const activeSheetId = p.activeSheetId === sheetId ? (sheets[sheets.length - 1]?.id ?? null) : p.activeSheetId;
+        return { ...p, sheets, activeSheetId };
+      }),
+    );
+  }, []);
+
+  const addPanel = useCallback(
+    (doc = "") => {
+      if (panels.length >= MAX_PANELS) return;
+      const panel = newPanel(doc);
+      setPanels((prev) => [...prev, panel]);
+      setActivePanelId(panel.id);
+    },
+    [panels.length],
+  );
+
+  const closePanel = useCallback(
+    (panelId: string) => {
+      setPanels((prev) => {
+        if (prev.length <= 1) return prev;
+        const next = prev.filter((p) => p.id !== panelId);
+        if (panelId === activePanelId) setActivePanelId(next[next.length - 1].id);
+        return next;
+      });
+    },
+    [activePanelId],
+  );
+
+  // --- tree → workspace bridge ---
+  const onRunCommand = useCallback((stmt: string) => void runStatements(activePanelId, stmt), [runStatements, activePanelId]);
+  const onInsert = useCallback(
+    (stmt: string, target: "cursor" | "newPanel" = "cursor") => {
+      if (target === "newPanel" && panels.length < MAX_PANELS) {
+        addPanel(stmt);
+        return;
+      }
+      const editor = editorHandles.current[activePanelId];
+      if (editor) {
+        editor.insertText(`${stmt}\n`);
+        editor.focus();
+      } else {
+        patchPanel(activePanelId, { doc: `${activePanel?.doc ?? ""}${activePanel?.doc ? "\n" : ""}${stmt}` });
       }
     },
-    [command, connectionSessionId, loadTables, running],
+    [panels.length, addPanel, activePanelId, activePanel, patchPanel],
   );
 
-  const quickCommand = useCallback(
-    (next: string) => {
-      setCommand(next);
-      commandRef.current?.focus();
-    },
-    [],
-  );
-
-  const onCommandKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-      event.preventDefault();
-      void run();
-    }
-  };
+  const onTablesLoaded = useCallback((tables: string[]) => {
+    setSchemaMap((prev) => {
+      const next: Record<string, string[]> = {};
+      for (const tbl of tables) next[tbl] = prev[tbl] ?? [];
+      return next;
+    });
+  }, []);
+  const onFamiliesLoaded = useCallback((table: string, families: string[]) => {
+    setSchemaMap((prev) => ({ ...prev, [table]: families }));
+  }, []);
 
   const endpoint = useMemo(() => {
     if (info.connectionMode === "native") {
-      const q =
-        info.zkQuorum ||
-        (info.host ? `${info.host}:${info.port}` : "") ||
-        (info.hbaseSitePath ? "hbase-site.xml" : "ZooKeeper");
+      const q = info.zkQuorum || (info.host ? `${info.host}:${info.port}` : "") || (info.hbaseSitePath ? "hbase-site.xml" : "ZooKeeper");
       const r = info.zkRoot || "/hbase";
       return `ZK: ${q} (${r})${info.namespace ? ` [${info.namespace}]` : ""}`;
     }
@@ -333,6 +634,37 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
     const path = info.restPath ? `/${info.restPath.replace(/^\/+|\/+$/g, "")}` : "";
     return `${scheme}://${info.host}:${info.port}${path}${info.namespace ? ` [${info.namespace}]` : ""}`;
   }, [info.connectionMode, info.host, info.namespace, info.port, info.restPath, info.ssl, info.zkQuorum, info.zkRoot, info.hbaseSitePath]);
+
+  // RENDER_MAIN_PLACEHOLDER
+  const [rowLimit, setRowLimit] = useState(DEFAULT_ROW_LIMIT);
+
+  // HBase shell command/table autocomplete (replaces lang-sql's SQL keywords).
+  const completionSources = useMemo(
+    () => [hbaseCompletionSource({ transport, schema: schemaMap })],
+    [transport, schemaMap],
+  );
+
+  const initialLayout = useMemo(
+    () => loadResizableLayout(`hbase-shell-${info.sessionId}`, ["sidebar", "workspace"]),
+    [info.sessionId],
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    initialLayout && typeof initialLayout.sidebar === "number" ? initialLayout.sidebar === 0 : false,
+  );
+  const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const lastVisibleSidebarWidthRef = useRef<number>(
+    initialLayout && typeof initialLayout.sidebar === "number" && initialLayout.sidebar > 0 ? initialLayout.sidebar : 20,
+  );
+  const expandSidebarPanel = () => {
+    const nextSize = Math.min(40, Math.max(15, lastVisibleSidebarWidthRef.current));
+    sidebarPanelRef.current?.resize(`${nextSize}%`);
+    setSidebarCollapsed(false);
+  };
+  const handleSidebarResize = (size: PanelSize) => {
+    const percentage = size.asPercentage;
+    if (percentage > 0) lastVisibleSidebarWidthRef.current = percentage;
+    setSidebarCollapsed(percentage === 0);
+  };
 
   if (connError) {
     return (
@@ -345,7 +677,6 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
       </div>
     );
   }
-
   if (!hasBeenVisible) {
     return (
       <div className="h-full w-full flex items-center justify-center" style={{ background: "var(--taomni-bg)" }}>
@@ -354,304 +685,163 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
     );
   }
 
-  const visibleTables = allTables.slice(0, visibleCount);
+  const panelRunning = activePanel.sheets.some((s) => s.running);
+  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
 
   return (
-    <div className="h-full w-full flex flex-col relative" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
+    <div ref={rootRef} className="h-full w-full flex flex-col relative" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
       {sidebarCollapsed && (
         <button
           type="button"
           data-testid="hbase-sidebar-drawer-handle"
           className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
-          style={{
-            background: "var(--taomni-panel-bg)",
-            borderColor: "var(--taomni-divider)",
-            color: "var(--taomni-text-muted)",
-          }}
+          style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
           title="Show database objects"
           aria-label="Show database objects"
           onClick={expandSidebarPanel}
         >
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>
-            Objects
-          </span>
+          <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>Objects</span>
         </button>
       )}
       <PanelGroup
         orientation="horizontal"
         id={`hbase-shell-${info.sessionId}`}
-        defaultLayout={loadResizableLayout(`hbase-shell-${info.sessionId}`, ["sidebar", "workspace"])}
+        defaultLayout={initialLayout}
         onLayoutChanged={saveResizableLayout(`hbase-shell-${info.sessionId}`)}
         className="flex-1 min-h-0"
       >
-        <Panel
-          panelRef={sidebarPanelRef}
-          id="sidebar"
-          defaultSize="20%"
-          minSize="15%"
-          maxSize="40%"
-          collapsible
-          collapsedSize={0}
-          onResize={handleSidebarResize}
-        >
-          <aside className="h-full flex flex-col border-r" style={{ borderColor: "var(--taomni-divider)" }}>
-            <div
-              className="h-8 flex items-center gap-1.5 px-2 border-b text-[12px] font-semibold shrink-0"
-              style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
-            >
-              <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-              <span className="truncate flex-1">HBase</span>
-              <button
-                type="button"
-                className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] shrink-0"
-                title="Refresh tables"
-                onClick={() => void loadTables()}
-                disabled={!connectionSessionId || tablesLoading}
-              >
-                {tablesLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-              </button>
-            </div>
-            <div
-              className="px-2 py-1.5 text-[11px] text-[var(--taomni-text-muted)] border-b truncate shrink-0"
-              style={{ borderColor: "var(--taomni-divider)" }}
-              title={endpoint}
-            >
-              {endpoint}
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1">
-              {!connectionSessionId && (
-                <div className="px-2 py-2 text-[12px] text-[var(--taomni-text-muted)] flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Connecting...</span>
-                </div>
-              )}
-              {tablesLoading && (
-                <div className="px-2 py-2 text-[12px] text-[var(--taomni-text-muted)] flex items-center justify-between border-b" style={{ borderColor: "var(--taomni-divider)" }}>
-                  <div className="flex items-center gap-1.5">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Loading tables...</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="taomni-btn px-1.5 py-0.5 text-[10px] flex items-center gap-0.5 hover:bg-[var(--taomni-hover)]"
-                    onClick={cancelLoadTables}
-                    title="Cancel table load"
-                  >
-                    <Ban className="w-3 h-3" style={{ color: "#d9534f" }} />
-                    Cancel
-                  </button>
-                </div>
-              )}
-              {loadTimeoutTriggered && (
-                <div className="px-2 py-2 text-[11px] text-[var(--taomni-text-muted)] flex flex-col gap-1.5 border-b" style={{ borderColor: "var(--taomni-divider)" }}>
-                  <span className="text-amber-500 font-medium">Load timed out (&gt;60s)</span>
-                  <button
-                    type="button"
-                    className="taomni-btn self-start px-2 py-1 text-[10px]"
-                    onClick={() => void loadTables()}
-                  >
-                    Retry Load
-                  </button>
-                </div>
-              )}
-              {connectionSessionId && allTables.length === 0 && !tablesLoading && !loadTimeoutTriggered && (
-                <div className="px-2 py-1 text-[12px] text-[var(--taomni-text-muted)]">No tables loaded.</div>
-              )}
-              {!tablesLoading && visibleTables.map((table) => (
-                <div key={table.name} className="group">
-                  <button
-                    type="button"
-                    className="taomni-tree-row w-full text-left"
-                    title={table.name}
-                    onClick={() => quickCommand(`describe ${shellQuote(table.name)}`)}
-                  >
-                    <Table2 className="w-3.5 h-3.5" style={{ color: "#3b7ac2" }} />
-                    <span className="flex-1 truncate">{table.name}</span>
-                  </button>
-                  <div className="hidden group-hover:flex gap-1 px-7 pb-1">
-                    <button
-                      className="taomni-btn h-5 px-1 text-[10px]"
-                      type="button"
-                      onClick={() => quickCommand(`scan ${shellQuote(table.name)}, {LIMIT=>50}`)}
-                    >
-                      scan
-                    </button>
-                    <button
-                      className="taomni-btn h-5 px-1 text-[10px]"
-                      type="button"
-                      onClick={() => quickCommand(`get ${shellQuote(table.name)}, 'row-key'`)}
-                    >
-                      get
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {!tablesLoading && allTables.length > visibleCount && (
-                <div className="px-2 py-1.5 flex justify-center border-t mt-1" style={{ borderColor: "var(--taomni-divider)" }}>
-                  <button
-                    type="button"
-                    className="taomni-btn w-full py-1 text-[11px] font-semibold flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)]"
-                    onClick={() => setVisibleCount((c) => c + 10)}
-                  >
-                    More... ({allTables.length - visibleCount} remaining)
-                  </button>
-                </div>
-              )}
-            </div>
-          </aside>
+        <Panel panelRef={sidebarPanelRef} id="sidebar" defaultSize="20%" minSize="15%" maxSize="40%" collapsible collapsedSize={0} onResize={handleSidebarResize}>
+          <div className="h-full border-r" style={{ borderColor: "var(--taomni-divider)" }}>
+            <HBaseSchemaTree
+              sessionId={connectionSessionId}
+              transport={transport}
+              namespace={info.namespace}
+              endpoint={endpoint}
+              refreshSignal={refreshSignal}
+              scanLimit={rowLimit}
+              onRunCommand={onRunCommand}
+              onInsert={onInsert}
+              onNewQuery={() => addPanel("")}
+              onStatus={setStatusMessage}
+              onTablesLoaded={onTablesLoaded}
+              onFamiliesLoaded={onFamiliesLoaded}
+            />
+          </div>
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel id="workspace">
-          <main className="h-full flex flex-col min-w-0">
-            <div className="h-8 flex items-center gap-1.5 px-2 border-b shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
-              <button
-                className="h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40"
-                type="button"
-                onClick={() => void run()}
-                disabled={!connectionSessionId || running || !command.trim()}
-                title="Run (Ctrl+Enter)"
-              >
-                {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} />}
-                Run
-              </button>
-
-              <button
-                className="h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40"
-                type="button"
-                onClick={handleCancelQuery}
-                disabled={!running}
-                title="Cancel query"
-              >
-                <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} />
-                Cancel
-              </button>
-
-              <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
-
-              <div className="relative" ref={menuRef}>
-                <button
-                  className="h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40"
-                  type="button"
-                  onClick={() => setShowMenu((prev) => !prev)}
-                  disabled={!connectionSessionId || running}
-                >
-                  Commands <ChevronDown className="w-3 h-3" />
-                </button>
-                {showMenu && (
-                  <div
-                    className="absolute left-0 mt-1 w-52 rounded border shadow-lg z-50 py-1 text-[12px]"
+          <div className="h-full flex flex-col min-w-0">
+            {/* query-panel tab strip */}
+            <div className="h-7 shrink-0 flex items-center gap-1 px-1 overflow-hidden" style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
+              {panels.map((p, i) => {
+                const running = p.sheets.some((s) => s.running);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="px-2 h-5 max-w-[190px] rounded inline-flex items-center gap-1"
                     style={{
-                      background: "var(--taomni-panel-bg)",
-                      borderColor: "var(--taomni-divider)",
-                      color: "var(--taomni-text)",
+                      background: p.id === activePanelId ? "var(--taomni-selected)" : "transparent",
+                      color: p.id === activePanelId ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
                     }}
+                    onClick={() => setActivePanelId(p.id)}
+                    title={`Query ${i + 1}`}
                   >
-                    {COMMON_COMMANDS.map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        className="w-full text-left px-3 py-1.5 hover:bg-[var(--taomni-hover)] flex items-center justify-between"
-                        onClick={() => {
-                          quickCommand(item.cmd);
-                          setShowMenu(false);
-                        }}
-                      >
-                        <span className="taomni-mono">{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                className="h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40"
-                type="button"
-                onClick={() => setHistory([])}
-                disabled={history.length === 0}
-                title="Clear query history"
-              >
-                <Trash2 className="w-3 h-3" /> Clear
-              </button>
-              <div className="ml-auto text-[11px] text-[var(--taomni-text-muted)]">
-                {result ? `${result.rows.length} row(s) / ${result.durationMs} ms` : ""}
-              </div>
+                    <span className="truncate">Query {i + 1}</span>
+                    {running && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
+                    {panels.length > 1 && (
+                      <X className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]" onClick={(e) => { e.stopPropagation(); closePanel(p.id); }} />
+                    )}
+                  </button>
+                );
+              })}
+              {panels.length < MAX_PANELS && (
+                <button type="button" title="New query panel" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => addPanel("")}>
+                  <Plus className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
-            <PanelGroup
-              orientation="vertical"
-              id={`hbase-workspace-${info.sessionId}`}
-              defaultLayout={loadResizableLayout(`hbase-workspace-${info.sessionId}`, ["editor", "results"])}
-              onLayoutChanged={saveResizableLayout(`hbase-workspace-${info.sessionId}`)}
-              className="flex-1 min-h-0"
-            >
-              <Panel id="editor" defaultSize="30%" minSize="15%">
-                <div className="h-full flex flex-col relative">
-                  {sidebarCollapsed && (
-                    <div
-                      className="absolute left-[24px] top-0 bottom-0 w-px z-10"
-                      style={{ background: "var(--taomni-divider)" }}
-                    />
-                  )}
-                  <textarea
-                    ref={commandRef}
-                    className="flex-1 resize-none taomni-mono bg-[var(--taomni-bg)] text-[var(--taomni-text)] outline-none border-none"
-                    style={{
-                      minHeight: 0,
-                      padding: 12,
-                      paddingLeft: sidebarCollapsed ? 36 : 12,
-                    }}
-                    value={command}
-                    onChange={(event) => setCommand(event.target.value)}
-                    onKeyDown={onCommandKeyDown}
-                    spellCheck={false}
-                    aria-label="HBase shell command"
+            <div key={activePanel.id} className="flex-1 min-h-0 h-full flex flex-col min-w-0 relative">
+              {/* editor toolbar */}
+              <div className="h-8 shrink-0 flex items-center gap-1 px-2 relative" style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
+                <button type="button" className={btn} disabled={!connectionSessionId || panelRunning} title="Run (Ctrl+Enter)"
+                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc)}>
+                  <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
+                </button>
+                <button type="button" className={btn} disabled={!connectionSessionId || panelRunning} title="Run selection"
+                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getSelectionOrAll() ?? activePanel.doc)}>
+                  <SquareDashedMousePointer className="w-3.5 h-3.5" /> Selection
+                </button>
+                <button type="button" className={btn} disabled={!panelRunning} title="Cancel query" onClick={() => cancelQuery(activePanel.id)}>
+                  <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
+                </button>
+                <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
+                <button type="button" className={btn} title="Commands" onClick={() => { setShowCommands((v) => !v); setShowHistory(false); }}>
+                  Commands <ChevronDown className="w-3 h-3" />
+                </button>
+                <button type="button" className={btn} title="Command history" onClick={() => { setShowHistory((v) => !v); setShowCommands(false); }}>
+                  <Clock className="w-3.5 h-3.5" /> History
+                </button>
+                <button type="button" className={btn} title={t("hbaseObjects.helpTitle")} onClick={() => setShowHelp(true)}>
+                  <HelpCircle className="w-3.5 h-3.5" /> {t("hbaseObjects.help")}
+                </button>
+                <div className="flex-1" />
+                <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+                  Rows
+                  <input className="taomni-input h-6 w-[68px] text-[11px]" type="number" min={1} max={10000} value={rowLimit}
+                    title="Default scan row limit" onChange={(e) => setRowLimit(Math.max(1, Math.min(10000, Number(e.target.value) || DEFAULT_ROW_LIMIT)))} />
+                </label>
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">HBase ({transport})</span>
+                {showCommands && <CommandsMenu transport={transport} onPick={(ex) => onInsert(ex, "cursor")} onClose={() => setShowCommands(false)} />}
+                {showHistory && <HistoryDropdown history={historyRef.current[activePanel.id] ?? []} onPick={(cmd) => { editorHandles.current[activePanel.id]?.setValue(cmd); setShowHistory(false); }} onClose={() => setShowHistory(false)} />}
+              </div>
+
+              <PanelGroup
+                orientation="vertical"
+                id={`hbase-workspace-${info.sessionId}`}
+                defaultLayout={loadResizableLayout(`hbase-workspace-${info.sessionId}`, ["editor", "results"])}
+                onLayoutChanged={saveResizableLayout(`hbase-workspace-${info.sessionId}`)}
+                className="flex-1 min-h-0"
+              >
+                <Panel id="editor" defaultSize="35%" minSize="15%">
+                  <SqlEditorPanel
+                    engine="HBase"
+                    initialDoc={activePanel.doc}
+                    completionSources={completionSources}
+                    handleRef={(h) => { editorHandles.current[activePanel.id] = h; }}
+                    onDocChange={(doc) => patchPanel(activePanel.id, { doc })}
+                    onFocus={() => setActivePanelId(activePanel.id)}
+                    onRun={(sql) => void runStatements(activePanel.id, sql)}
                   />
-                  {(error || (result && result.warnings && result.warnings.length > 0)) && (
-                    <div
-                      className="py-1.5 text-[11px] border-t shrink-0"
-                      style={{
-                        borderColor: "var(--taomni-divider)",
-                        color: error ? "#b22222" : "var(--taomni-text-muted)",
-                        paddingLeft: sidebarCollapsed ? 36 : 12,
-                        paddingRight: 12,
-                      }}
-                    >
-                      {error ?? result?.warnings.join("; ")}
-                    </div>
-                  )}
-                </div>
-              </Panel>
-              <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
-              <Panel id="results" minSize="20%">
-                <div className="h-full flex flex-col min-h-0">
-                  <div className="flex-1 min-h-0">
-                    <ResultTable result={result} />
-                  </div>
-                  {history.length > 0 && (
-                    <div className="h-[104px] border-t overflow-auto taomni-scroll-y shrink-0" style={{ borderColor: "var(--taomni-divider)" }}>
-                      {history.map((entry) => (
-                        <button
-                          key={`${entry.durationMs}-${entry.command}-${entry.message}`}
-                          type="button"
-                          className="w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-hover)] flex gap-2"
-                          onClick={() => {
-                            setCommand(entry.command);
-                            setResult(entry);
-                          }}
-                        >
-                          <span className="taomni-mono truncate flex-1">{entry.command}</span>
-                          <span className="text-[var(--taomni-text-muted)]">{entry.rows.length} row(s)</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </Panel>
-            </PanelGroup>
-          </main>
+                </Panel>
+                <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
+                <Panel id="results" minSize="15%">
+                  <ResultArea
+                    panel={activePanel}
+                    onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}
+                    onSheetClose={(sheetId) => closeResultSheet(activePanel.id, sheetId)}
+                    onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
+                    onRefreshSheet={(sheetId, mode) => refreshSheet(activePanel.id, sheetId, mode)}
+                    onCancel={() => cancelQuery(activePanel.id)}
+                    onStatus={setStatusMessage}
+                  />
+                </Panel>
+              </PanelGroup>
+              <StatusBar panel={activePanel} />
+            </div>
+          </div>
         </Panel>
+
       </PanelGroup>
+      {showHelp && <HelpDialog transport={transport} onClose={() => setShowHelp(false)} />}
+      {confirmDialog.render}
     </div>
   );
 }
+
+
+
+
+
