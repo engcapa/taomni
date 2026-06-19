@@ -14,6 +14,7 @@
 pub mod beacon;
 pub mod commands;
 pub mod discovery;
+pub mod identity;
 pub mod keystore;
 pub mod messaging;
 pub mod protocol;
@@ -64,6 +65,12 @@ pub struct LanChatState {
     pub db_path: PathBuf,
     /// SQLite-backed persistence (profile / peers / groups / messages).
     pub store: store::LanChatStore,
+    /// Machine-bound secret store (OS keychain + file fallback) for the identity
+    /// key and the at-rest message-encryption key.
+    pub keystore: keystore::KeyStore,
+    /// This node's self-certifying identity (cert + private key DER); the TLS
+    /// transport (phase 2) builds its rustls config from this.
+    pub identity: identity::Identity,
     /// This node's stable identity (loaded/generated on construction).
     pub node_id: RwLock<String>,
     /// Peers discovered via mDNS, keyed by node id.
@@ -98,13 +105,18 @@ impl LanChatState {
     pub fn new(app_data_dir: &Path) -> Self {
         let db_path = app_data_dir.join("lanchat.sqlite");
         let store = store::LanChatStore::open(&db_path).expect("failed to open lanchat.sqlite");
-        let node_id = store
-            .ensure_identity()
+        let keystore = keystore::KeyStore::new(app_data_dir);
+        // Bootstrap the self-certifying identity (generates a key pair + cert on
+        // first launch, migrates from a legacy UUID identity if present).
+        let identity = identity::ensure(&store, &keystore)
             .expect("failed to initialize lanchat identity");
+        let node_id = identity.node_id.clone();
         log::info!("lanchat: node identity {}", node_id);
         Self {
             db_path,
             store,
+            keystore,
+            identity,
             node_id: RwLock::new(node_id),
             peers: RwLock::new(HashMap::new()),
             connections: RwLock::new(HashMap::new()),

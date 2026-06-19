@@ -40,6 +40,10 @@ pub fn ensure_crypto_provider() {
 fn ensure_keyring_store() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
+        // Never touch the real OS keychain from the test harness — tests run
+        // against the temp-dir file fallback so they stay isolated and don't
+        // pollute the developer's keychain.
+        #[cfg(not(test))]
         if let Err(e) = keyring::use_native_store(true) {
             log::warn!("lanchat keystore: OS keychain unavailable ({e}); will use file fallback");
         }

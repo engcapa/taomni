@@ -180,9 +180,11 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
 /// so the migration is safe to re-run on already-migrated databases.
 fn migrate_schema(conn: &Connection) {
     // v2: persist peer connection info for startup reconnection.
+    // v3: persist this node's self-signed identity certificate (phase 1).
     for ddl in [
         "ALTER TABLE peers ADD COLUMN addr TEXT",
         "ALTER TABLE peers ADD COLUMN port INTEGER",
+        "ALTER TABLE profile ADD COLUMN cert_der BLOB",
     ] {
         if let Err(e) = conn.execute(ddl, []) {
             let msg = e.to_string();
@@ -236,6 +238,80 @@ impl LanChatStore {
             params![id, default_display_name(), PresenceStatus::Online.as_txt(), now],
         )?;
         Ok(id)
+    }
+
+    /// Read the persisted node id and (optional) self-signed cert DER, if the
+    /// identity row exists. Used by identity bootstrap (phase 1) to decide
+    /// whether to reuse the stored identity or generate a fresh one.
+    pub fn get_profile_id_and_cert(&self) -> rusqlite::Result<Option<(String, Option<Vec<u8>>)>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, cert_der FROM profile LIMIT 1",
+            [],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<Vec<u8>>>(1)?)),
+        )
+        .optional()
+    }
+
+    /// Persist this node's self-certifying identity (node id + cert DER). When a
+    /// row already exists under `old_id` it is migrated in place (the PRIMARY KEY
+    /// is updated), preserving name/avatar/signature/status; otherwise a fresh
+    /// default profile row is created.
+    pub fn set_identity(
+        &self,
+        new_id: &str,
+        cert_der: &[u8],
+        old_id: Option<&str>,
+    ) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        match old_id {
+            Some(old) if old != new_id => {
+                conn.execute(
+                    "UPDATE profile SET id = ?1, cert_der = ?2 WHERE id = ?3",
+                    params![new_id, cert_der, old],
+                )?;
+            }
+            Some(_) => {
+                conn.execute(
+                    "UPDATE profile SET cert_der = ?2 WHERE id = ?1",
+                    params![new_id, cert_der],
+                )?;
+            }
+            None => {
+                let now = chrono::Utc::now().timestamp_millis();
+                conn.execute(
+                    "INSERT INTO profile (id, name, avatar, avatar_hash, signature, status, updated_at, cert_der)
+                     VALUES (?1, ?2, NULL, NULL, '', ?3, ?4, ?5)",
+                    params![
+                        new_id,
+                        default_display_name(),
+                        PresenceStatus::Online.as_txt(),
+                        now,
+                        cert_der
+                    ],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Rewrite our own outbound messages' sender id when the node id changes
+    /// (legacy UUID -> self-certifying id), so "sent by me" detection survives.
+    pub fn migrate_sender_id(&self, old_id: &str, new_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE messages SET sender_id = ?2 WHERE sender_id = ?1",
+            params![old_id, new_id],
+        )?;
+        Ok(())
+    }
+
+    /// Drop the cached peer roster (used on identity migration: every peer's id
+    /// changes network-wide under the hard cutover, so the cache is stale).
+    pub fn clear_peers(&self) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM peers", [])?;
+        Ok(())
     }
 
     /// Read this node's profile, if the identity row exists.
