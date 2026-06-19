@@ -108,7 +108,6 @@ export default function LanChatDetachedWindow({ id }: { id: string }) {
         {headerName}
       </div>
       <VaultGate
-        reason="查看局域网聊天需要主密码解锁(与密码保险库共用)。"
         lockedTitle="局域网聊天已锁定"
         lockedHint="需要主密码解锁。该密码与应用的密码保险库共用。"
       >

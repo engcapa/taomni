@@ -30,7 +30,6 @@ export function LanChatGate() {
 
   return (
     <VaultGate
-      reason="首次打开局域网聊天需要主密码解锁(与密码保险库共用)。"
       lockedTitle="局域网聊天已锁定"
       lockedHint="首次打开需要主密码解锁。该密码与应用的密码保险库共用。"
     >
