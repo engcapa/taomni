@@ -36,6 +36,8 @@ describe("SettingsPanel", () => {
     ipcMocks.listSessions.mockResolvedValue([]);
     window.localStorage.clear();
     setAppThemeMode("system");
+    // jsdom has no layout engine; search scroll-to-match calls this.
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   afterEach(() => {
@@ -101,5 +103,37 @@ describe("SettingsPanel", () => {
     await user.click(resetButton);
     expect(window.localStorage.getItem("taomni.uiFontFamily")).toContain("Inter");
     expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("12");
+  });
+
+  it("highlights settings matching the search query", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SettingsPanel />);
+
+    const search = screen.getByTestId("settings-search-input");
+    await user.type(search, "proxy");
+
+    const proxy = container.querySelector('[data-search-id="app-proxy"]');
+    const language = container.querySelector('[data-search-id="language"]');
+    expect(proxy).toHaveAttribute("data-search-match", "true");
+    expect(language).toHaveAttribute("data-search-match", "false");
+
+    // Match counter reflects the single hit.
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
+
+    // Clearing the search drops the active state entirely.
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(search).toHaveValue("");
+    expect(
+      container.querySelector('[data-search-id="app-proxy"]'),
+    ).not.toHaveAttribute("data-search-match");
+  });
+
+  it("shows an empty state when no setting matches", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    await user.type(screen.getByTestId("settings-search-input"), "zzzznomatch");
+    expect(screen.getByTestId("settings-search-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-search-count")).not.toBeInTheDocument();
   });
 });

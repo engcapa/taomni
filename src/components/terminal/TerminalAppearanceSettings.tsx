@@ -245,16 +245,19 @@ export function TerminalAppearanceSettings({
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.themeHeading")}</div>
-        <div data-testid="terminal-theme-gallery" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-          {TERMINAL_THEME_DEFINITIONS.map((definition) => (
-            <ThemeCard
-              key={definition.id}
-              definition={definition}
-              selected={definition.id === selectedThemeId}
-              onSelect={() => updateProfile({ theme: definition.id })}
-              t={t}
-            />
-          ))}
+        <div className="max-h-[300px] overflow-auto rounded-md pr-0.5">
+          <ul data-testid="terminal-theme-gallery" className="flex flex-col gap-1.5">
+            {TERMINAL_THEME_DEFINITIONS.map((definition) => (
+              <li key={definition.id}>
+                <ThemeCard
+                  definition={definition}
+                  selected={definition.id === selectedThemeId}
+                  onSelect={() => updateProfile({ theme: definition.id })}
+                  t={t}
+                />
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -621,21 +624,30 @@ function ThemeCard({
       type="button"
       aria-label={t("terminalAppearance.themeUseLabel", { name: definition.name })}
       data-selected={selected}
-      className="h-[74px] rounded-md border bg-[var(--taomni-card-bg)] text-left p-2 flex items-center gap-2 hover:bg-[var(--taomni-hover)]"
+      className="w-full rounded-md border bg-[var(--taomni-card-bg)] text-left px-2.5 py-1.5 flex items-center gap-3 hover:bg-[var(--taomni-hover)]"
       style={{ borderColor }}
       onClick={onSelect}
     >
       <ThemeSwatch definition={definition} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-[12px] font-semibold truncate">{definition.name}</span>
-        <span className="mt-1 flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.green ?? "#62d36f" }} />
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.blue ?? "#83a7d8" }} />
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.yellow ?? "#e3a85e" }} />
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.red ?? "#ff6b6b" }} />
+      <span className="min-w-0 flex-1 flex items-center gap-2">
+        <span className="text-[12px] font-semibold truncate">{definition.name}</span>
+        <span className="flex-shrink-0 rounded-sm border border-[var(--taomni-divider)] px-1 py-px text-[10px] leading-none text-[var(--taomni-text-muted)]">
+          {definition.variant === "light"
+            ? t("terminalAppearance.themeVariantLight")
+            : t("terminalAppearance.themeVariantDark")}
         </span>
       </span>
-      {selected && <Check className="w-4 h-4 text-[var(--taomni-accent)] flex-shrink-0" />}
+      <span className="flex flex-shrink-0 items-center gap-1.5">
+        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.green ?? "#62d36f" }} />
+        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.blue ?? "#83a7d8" }} />
+        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.yellow ?? "#e3a85e" }} />
+        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: theme.red ?? "#ff6b6b" }} />
+      </span>
+      {selected ? (
+        <Check className="w-4 h-4 text-[var(--taomni-accent)] flex-shrink-0" />
+      ) : (
+        <span className="w-4 flex-shrink-0" aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -654,7 +666,7 @@ function ThemeSwatch({ definition }: { definition: TerminalThemeDefinition }) {
 
   return (
     <span
-      className="w-[68px] h-[46px] rounded border p-1 flex-shrink-0"
+      className="w-[58px] h-[40px] rounded border p-1 flex-shrink-0"
       style={{
         background: theme.background ?? "#1d1f21",
         color: theme.foreground ?? "#eaeaea",
