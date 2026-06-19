@@ -171,6 +171,12 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             ON messages (conv_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_conversations_last_msg
             ON conversations (last_msg_at);
+        CREATE TABLE IF NOT EXISTS pinned_keys (
+            node_id    TEXT PRIMARY KEY,
+            cert_der   BLOB NOT NULL,
+            first_seen INTEGER NOT NULL,
+            last_seen  INTEGER NOT NULL
+        );
         ",
     )
 }
@@ -312,6 +318,49 @@ impl LanChatStore {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM peers", [])?;
         Ok(())
+    }
+
+    /// The pinned certificate DER for a peer id (trust-on-first-use record), if
+    /// one has been recorded.
+    pub fn get_pin(&self, node_id: &str) -> rusqlite::Result<Option<Vec<u8>>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT cert_der FROM pinned_keys WHERE node_id = ?1",
+            params![node_id],
+            |r| r.get::<_, Vec<u8>>(0),
+        )
+        .optional()
+    }
+
+    /// Record a peer's certificate on first sight (TOFU). No-op if already pinned.
+    pub fn set_pin(&self, node_id: &str, cert_der: &[u8], now: i64) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO pinned_keys (node_id, cert_der, first_seen, last_seen)
+             VALUES (?1, ?2, ?3, ?3)
+             ON CONFLICT(node_id) DO UPDATE SET last_seen = ?3",
+            params![node_id, cert_der, now],
+        )?;
+        Ok(())
+    }
+
+    /// Forget a pinned peer (so the next connection re-pins via TOFU). Used by the
+    /// "re-trust" command after a peer legitimately reinstalled.
+    pub fn clear_pin(&self, node_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM pinned_keys WHERE node_id = ?1", params![node_id])?;
+        Ok(())
+    }
+
+    /// All pinned peers as `(node_id, first_seen, last_seen)`, newest first. For
+    /// the security/identity view in the UI.
+    pub fn list_pins(&self) -> rusqlite::Result<Vec<(String, i64, i64)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT node_id, first_seen, last_seen FROM pinned_keys ORDER BY last_seen DESC",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        rows.collect()
     }
 
     /// Read this node's profile, if the identity row exists.

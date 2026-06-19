@@ -19,6 +19,7 @@ pub mod keystore;
 pub mod messaging;
 pub mod protocol;
 pub mod store;
+pub mod tls;
 pub mod transfer;
 pub mod transport;
 
@@ -53,6 +54,9 @@ pub mod events {
     pub const SIGNAL: &str = "lanchat://signal";
     /// A whiteboard frame from a peer (`{from,type,payload}`).
     pub const WB: &str = "lanchat://wb";
+    /// A security event: a peer's presented identity was rejected (spoofed id or
+    /// a changed pinned key). Payload `{ peerId, addr, kind }`.
+    pub const SECURITY: &str = "lanchat://security";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.
@@ -71,6 +75,10 @@ pub struct LanChatState {
     /// This node's self-certifying identity (cert + private key DER); the TLS
     /// transport (phase 2) builds its rustls config from this.
     pub identity: identity::Identity,
+    /// Shared mutual-TLS configs for the control channel (built once from the
+    /// identity): server side accepts inbound, client side dials out.
+    pub tls_server: std::sync::Arc<rustls::ServerConfig>,
+    pub tls_client: std::sync::Arc<rustls::ClientConfig>,
     /// This node's stable identity (loaded/generated on construction).
     pub node_id: RwLock<String>,
     /// Peers discovered via mDNS, keyed by node id.
@@ -112,11 +120,15 @@ impl LanChatState {
             .expect("failed to initialize lanchat identity");
         let node_id = identity.node_id.clone();
         log::info!("lanchat: node identity {}", node_id);
+        let tls_server = tls::server_config(&identity).expect("build lanchat server TLS config");
+        let tls_client = tls::client_config(&identity).expect("build lanchat client TLS config");
         Self {
             db_path,
             store,
             keystore,
             identity,
+            tls_server,
+            tls_client,
             node_id: RwLock::new(node_id),
             peers: RwLock::new(HashMap::new()),
             connections: RwLock::new(HashMap::new()),
