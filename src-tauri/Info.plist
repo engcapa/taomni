@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Merged into the generated macOS Info.plist by tauri-build / tauri-bundler
+	  (both `tauri dev` and `tauri build`). Without these usage-description
+	  strings macOS TCC denies camera/microphone access the moment LanChat calls
+	  navigator.mediaDevices.getUserMedia(), so calls can't be started and an
+	  answered call disconnects immediately (issue #153). The string is shown in
+	  the system permission prompt.
+	-->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Taomni 需要使用麦克风以进行局域网语音 / 视频通话。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Taomni 需要使用摄像头以进行局域网视频通话。</string>
+</dict>
+</plist>

@@ -20,6 +20,7 @@ import {
   lanchatRetrustPeer,
   lanchatSendClipboardImage,
   lanchatSendFile,
+  lanchatSendGroupFile,
   lanchatSendGroupText,
   lanchatSendImageBytes,
   lanchatSendScreenshot,
@@ -341,9 +342,11 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   },
 
   sendFilePath: async (path) => {
-    const peerId = get().activePeerId();
-    if (!peerId) throw new Error("发送文件仅支持单个成员");
-    const transferId = await lanchatSendFile(peerId, path);
+    const convId = get().activeConvId;
+    if (!convId) throw new Error("请先选择会话");
+    const transferId = convId.startsWith("group:")
+      ? await lanchatSendGroupFile(convId.slice("group:".length), path)
+      : await lanchatSendFile(convId.slice("direct:".length), path);
     set((s) => ({ transferPaths: { ...s.transferPaths, [transferId]: path } }));
   },
 
@@ -529,7 +532,15 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   applyGroup: (group) => set((s) => ({ groups: upsertById(s.groups, group) })),
 
   applyTransfer: (p) =>
-    set((s) => ({ transfers: { ...s.transfers, [p.transferId]: p } })),
+    set((s) => {
+      // A terminal update for a still-pending offer means it was rescinded /
+      // resolved elsewhere — drop the inbound prompt so its toast clears.
+      const terminal = p.state === "cancelled" || p.state === "rejected" || p.state === "failed" || p.state === "done";
+      return {
+        transfers: { ...s.transfers, [p.transferId]: p },
+        offers: terminal ? s.offers.filter((o) => o.transferId !== p.transferId) : s.offers,
+      };
+    }),
 
   applyOffer: (offer) =>
     set((s) => ({

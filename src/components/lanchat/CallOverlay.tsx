@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Maximize2, Mic, MicOff, Minus, MonitorUp, Phone, PhoneOff, Video, VideoOff, X } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
 import { avatarGradient, avatarInitial } from "./util";
@@ -109,10 +109,19 @@ export function CallOverlay() {
   const toggleMic = useLanCallStore((s) => s.toggleMic);
   const toggleCam = useLanCallStore((s) => s.toggleCam);
   const toggleScreen = useLanCallStore((s) => s.toggleScreen);
+  const callError = useLanCallStore((s) => s.callError);
+  const clearCallError = useLanCallStore((s) => s.clearCallError);
 
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Auto-dismiss a surfaced media/permission error after a few seconds.
+  useEffect(() => {
+    if (!callError) return;
+    const t = setTimeout(() => clearCallError(), 6000);
+    return () => clearTimeout(t);
+  }, [callError, clearCallError]);
 
   // Release camera/mic if the window/app is closed mid-call (avoid a device
   // indicator staying lit). Best-effort track stop on unload.
@@ -130,8 +139,56 @@ export function CallOverlay() {
     };
   }, []);
 
+  // Draggable + minimizable call window. `pos` is an offset from the centered
+  // position; the title bar (or the pill's grip) drags it. A new call resets to
+  // centered + expanded.
+  const [minimized, setMinimized] = useState(false);
+  const [pos, setPos] = useState({ dx: 0, dy: 0 });
+  const dragRef = useRef<{ px: number; py: number; bx: number; by: number } | null>(null);
+  useEffect(() => {
+    if (!callId) {
+      setMinimized(false);
+      setPos({ dx: 0, dy: 0 });
+    }
+  }, [callId]);
+  const onDragStart = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    dragRef.current = { px: e.clientX, py: e.clientY, bx: pos.dx, by: pos.dy };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    setPos({ dx: d.bx + (e.clientX - d.px), dy: d.by + (e.clientY - d.py) });
+  };
+  const onDragEnd = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+  };
+  const transform = `translate(calc(-50% + ${pos.dx}px), calc(-50% + ${pos.dy}px))`;
+  const statusText = status === "calling" ? "呼叫中…" : status === "active" ? "进行中" : status;
+
   return (
     <>
+      {callError ? (
+        <div
+          className="fixed left-1/2 top-4 z-[210] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-white"
+          style={{ background: "#c42b1c", boxShadow: "var(--taomni-shadow-lg)" }}
+          role="alert"
+        >
+          <span>{callError}</span>
+          <button
+            type="button"
+            onClick={clearCallError}
+            className="ml-1 opacity-80 hover:opacity-100"
+            aria-label="关闭"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
+
       {incoming ? (
         <div
           className="fixed right-4 top-4 z-[200] w-72 rounded-xl p-3"
@@ -162,22 +219,36 @@ export function CallOverlay() {
         </div>
       ) : null}
 
-      {callId ? (
+      {callId && !minimized ? (
         <div
-          className="fixed left-1/2 top-1/2 z-[190] flex w-[680px] max-w-[94vw] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl"
-          style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-chrome-border)", boxShadow: "var(--taomni-shadow-lg)" }}
+          className="fixed left-1/2 top-1/2 z-[190] flex w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-2xl"
+          style={{ transform, background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-chrome-border)", boxShadow: "var(--taomni-shadow-lg)" }}
         >
           <div
             className="flex items-center gap-2 px-4 py-2 text-[13px] font-semibold"
-            style={{ background: "linear-gradient(to bottom,var(--taomni-titlebar-from),var(--taomni-titlebar-to))", borderBottom: "1px solid var(--taomni-chrome-border)" }}
+            style={{ background: "linear-gradient(to bottom,var(--taomni-titlebar-from),var(--taomni-titlebar-to))", borderBottom: "1px solid var(--taomni-chrome-border)", cursor: "move", touchAction: "none" }}
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
           >
             内网{kind === "video" ? "视频" : "语音"}通话
             <span className="font-normal" style={{ color: "var(--taomni-text-muted)" }}>
-              · {status === "calling" ? "呼叫中…" : status === "active" ? "进行中" : status}
+              · {statusText}
             </span>
             <span className="ml-auto text-[11px] font-normal" style={{ color: "var(--taomni-text-muted)" }}>
               {Object.keys(remotes).length >= 8 ? "人数较多，mesh 建议 ≤ 8 人 · " : ""}P2P · 无 STUN/TURN
             </span>
+            <button
+              type="button"
+              onClick={() => setMinimized(true)}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="最小化"
+              aria-label="最小化"
+              className="ml-1 grid h-6 w-6 place-items-center rounded-md"
+              style={{ color: "var(--taomni-text-muted)" }}
+            >
+              <Minus className="h-4 w-4" />
+            </button>
           </div>
           <div
             className="grid flex-1 gap-2 p-3"
@@ -185,7 +256,13 @@ export function CallOverlay() {
           >
             <VideoTile stream={screenOn ? screenStream : localStream} muted label={screenOn ? "我（共享屏幕）" : "我"} camOff={!screenOn && (!camOn || kind === "audio")} />
             {Object.entries(remotes).map(([peerId, r]) => (
-              <VideoTile key={peerId} stream={r.stream} muted={false} label={peerId.slice(0, 6)} camOff={!r.cam} />
+              <VideoTile
+                key={peerId}
+                stream={r.stream}
+                muted={false}
+                label={`${peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
+                camOff={!r.cam && !r.screen}
+              />
             ))}
           </div>
           <div className="flex items-center justify-center gap-3 py-3" style={{ borderTop: "1px solid var(--taomni-divider)" }}>
@@ -218,7 +295,73 @@ export function CallOverlay() {
           </div>
         </div>
       ) : null}
+
+      {callId && minimized ? (
+        <div
+          className="fixed left-1/2 top-1/2 z-[190] flex items-center gap-1.5 rounded-full py-1.5 pl-3 pr-2"
+          style={{ transform, background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-chrome-border)", boxShadow: "var(--taomni-shadow-lg)" }}
+        >
+          <span
+            className="cursor-move select-none pr-1 text-[12px] font-semibold"
+            style={{ touchAction: "none" }}
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            title="拖动"
+          >
+            内网{kind === "video" ? "视频" : "语音"}通话 · {statusText}
+          </span>
+          <RoundBtn
+            onClick={toggleMic}
+            title={micOn ? "静音" : "取消静音"}
+            bg={micOn ? "var(--taomni-card-bg)" : "#374151"}
+            color={micOn ? "var(--taomni-text)" : "#9ca3af"}
+          >
+            {micOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          </RoundBtn>
+          <RoundBtn
+            onClick={() => void toggleScreen()}
+            title={screenOn ? "停止共享" : "共享屏幕"}
+            bg={screenOn ? "var(--taomni-accent)" : "var(--taomni-card-bg)"}
+            color={screenOn ? "#fff" : "var(--taomni-text)"}
+          >
+            <MonitorUp className="h-4 w-4" />
+          </RoundBtn>
+          <RoundBtn onClick={() => setMinimized(false)} title="展开" bg="var(--taomni-card-bg)" color="var(--taomni-text)">
+            <Maximize2 className="h-4 w-4" />
+          </RoundBtn>
+          <RoundBtn onClick={hangup} title="挂断" bg="#c42b1c" color="#fff">
+            <PhoneOff className="h-4 w-4" />
+          </RoundBtn>
+        </div>
+      ) : null}
     </>
+  );
+}
+
+function RoundBtn({
+  onClick,
+  title,
+  bg,
+  color,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  bg: string;
+  color: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="grid h-8 w-8 place-items-center rounded-full"
+      style={{ background: bg, color, border: "1px solid var(--taomni-card-border)" }}
+    >
+      {children}
+    </button>
   );
 }
 

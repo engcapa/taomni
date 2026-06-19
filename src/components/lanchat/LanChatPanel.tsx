@@ -19,6 +19,7 @@ import { openDetachedWindow } from "../../lib/detachWindowing";
 import { pickFile } from "../../lib/lanFilePicker";
 import { Avatar } from "./Avatar";
 import { GroupCreateDialog } from "./GroupCreateDialog";
+import { IncomingOfferModal } from "./IncomingOfferModal";
 import { MessageInput } from "./MessageInput";
 import { MessageThread } from "./MessageThread";
 import { PrivacySettings } from "./PrivacySettings";
@@ -238,6 +239,7 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
       {showProfile ? <ProfileEditor onClose={() => setShowProfile(false)} /> : null}
       {showPrivacy ? <PrivacySettings onClose={() => setShowPrivacy(false)} /> : null}
       {showGroupCreate ? <GroupCreateDialog onClose={() => setShowGroupCreate(false)} /> : null}
+      <IncomingOfferModal />
     </div>
   );
 }

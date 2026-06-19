@@ -1265,6 +1265,10 @@ export async function lanchatSendFile(peerId: string, path: string): Promise<str
   return invoke<string>("lanchat_send_file", { peerId, path });
 }
 
+export async function lanchatSendGroupFile(groupId: string, path: string): Promise<string> {
+  return invoke<string>("lanchat_send_group_file", { groupId, path });
+}
+
 export async function lanchatSendDir(peerId: string, path: string): Promise<string> {
   return invoke<string>("lanchat_send_dir", { peerId, path });
 }

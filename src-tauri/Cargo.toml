@@ -156,6 +156,15 @@ winreg = "0.55"
 # The `damage` feature transitively enables `xfixes`, which provides the
 # `xfixes::Region` type that `damage_subtract` takes.
 x11rb = { version = "0.13", features = ["shm", "damage"] }
+# Linux WebView (webkit2gtk) media stack. The default webkit2gtk settings ship
+# with media-stream / WebRTC disabled, so navigator.mediaDevices.getUserMedia
+# and getDisplayMedia reject — breaking LanChat voice/video calls and screen
+# share on Linux (Windows/WebView2 has them on by default). We flip the settings
+# and allow UserMedia permission requests in lib.rs via window.with_webview.
+# Pinned to the exact version wry resolves so PlatformWebview::inner()'s
+# `webkit2gtk::WebView` type matches; `v2_38` exposes set_enable_webrtc (and
+# transitively v2_4's set_enable_media_stream / set_enable_mediasource).
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 
 [dev-dependencies]
 tempfile = "3"

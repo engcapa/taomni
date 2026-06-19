@@ -31,7 +31,10 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
   const sendClipboardImage = useLanChatStore((s) => s.sendClipboardImage);
   const sendFilePath = useLanChatStore((s) => s.sendFilePath);
   const activePeerId = useLanChatStore((s) => s.activePeerId);
+  const activeConvId = useLanChatStore((s) => s.activeConvId);
   const isDesktop = useLanChatStore((s) => s.isDesktop);
+  // Files send to a 1:1 peer or a whole group; screenshot/clipboard are 1:1 only.
+  const canFile = isDesktop && !!activeConvId;
   const canMedia = isDesktop && !!activePeerId();
 
   const candidates = useMemo(() => {
@@ -166,8 +169,8 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
           <AtSign className="h-4 w-4" />
         </ToolButton>
         <ToolButton
-          title={canMedia ? "发送文件" : "发送文件仅支持桌面版的单聊"}
-          disabled={!canMedia}
+          title={canFile ? "发送文件" : "发送文件仅支持桌面版"}
+          disabled={!canFile}
           onClick={() => {
             void (async () => {
               const path = await pickFile();

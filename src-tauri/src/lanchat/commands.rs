@@ -12,6 +12,7 @@ use crate::lanchat::store::{decode_avatar_base64, Conversation, Group, LanMessag
 use crate::lanchat::messaging;
 use crate::lanchat::protocol::PeerRecord;
 use crate::lanchat::store::direct_conv_id;
+use crate::lanchat::swarm;
 use crate::lanchat::transfer;
 use crate::state::AppState;
 
@@ -227,8 +228,8 @@ pub async fn lanchat_leave_group(
 
 /* ----------------------------- transfers (task 02) ----------------------------- */
 
-/// Offer a file to a peer. Returns the transfer id (progress via
-/// `lanchat://transfer`).
+/// Offer a file to a single peer (a swarm of one). Returns the content file id
+/// (the transfer id); progress arrives on `lanchat://transfer`.
 #[tauri::command]
 pub async fn lanchat_send_file(
     app: AppHandle,
@@ -237,7 +238,28 @@ pub async fn lanchat_send_file(
     path: String,
 ) -> Result<String, String> {
     let conv = direct_conv_id(&peer_id);
-    transfer::send_file(&app, &state.lanchat, &peer_id, std::path::PathBuf::from(path), conv).await
+    swarm::send(
+        &app,
+        &state.lanchat,
+        vec![peer_id.clone()],
+        vec![peer_id],
+        std::path::PathBuf::from(path),
+        conv,
+        None,
+    )
+    .await
+}
+
+/// Offer a file to every member of a group (swarm fan-out; members also trade
+/// pieces with each other). Returns the content file id.
+#[tauri::command]
+pub async fn lanchat_send_group_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    group_id: String,
+    path: String,
+) -> Result<String, String> {
+    swarm::send_to_group(&app, &state.lanchat, &group_id, std::path::PathBuf::from(path)).await
 }
 
 /// Accept an inbound file offer. Pass an empty `save_path` to use the default
@@ -249,7 +271,7 @@ pub async fn lanchat_accept_file(
     transfer_id: String,
     save_path: String,
 ) -> Result<String, String> {
-    transfer::accept_offer(&app, &state.lanchat, &transfer_id, std::path::PathBuf::from(save_path)).await
+    swarm::accept_offer(&app, &state.lanchat, &transfer_id, std::path::PathBuf::from(save_path)).await
 }
 
 /// Open a received file (or its folder) with the OS default handler.
@@ -302,7 +324,7 @@ pub async fn lanchat_reject_file(
     state: State<'_, AppState>,
     transfer_id: String,
 ) -> Result<(), String> {
-    transfer::reject_offer(&app, &state.lanchat, &transfer_id).await
+    swarm::reject_offer(&app, &state.lanchat, &transfer_id).await
 }
 
 /// Offer a whole folder to a peer (recursive). Returns the folder transfer id.
@@ -314,7 +336,7 @@ pub async fn lanchat_send_dir(
     path: String,
 ) -> Result<String, String> {
     let conv = direct_conv_id(&peer_id);
-    transfer::send_dir(&app, &state.lanchat, &peer_id, std::path::PathBuf::from(path), conv).await
+    swarm::send_dir(&app, &state.lanchat, vec![peer_id], std::path::PathBuf::from(path), conv, None).await
 }
 
 /// Pause / resume / cancel a transfer (`action`: "pause" | "resume" | "cancel").
@@ -325,7 +347,7 @@ pub async fn lanchat_transfer_control(
     transfer_id: String,
     action: String,
 ) -> Result<(), String> {
-    transfer::control(&app, &state.lanchat, &transfer_id, &action).await
+    swarm::control(&app, &state.lanchat, &transfer_id, &action).await
 }
 
 /// Capture the primary screen and send it to a peer as a PNG.
@@ -339,7 +361,7 @@ pub async fn lanchat_send_screenshot(
         .await
         .map_err(|e| e.to_string())??;
     let conv = direct_conv_id(&peer_id);
-    transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+    swarm::send(&app, &state.lanchat, vec![peer_id.clone()], vec![peer_id], path, conv, None).await
 }
 
 /// Send a pre-encoded PNG (base64) to a peer as a file. Used as the webview
@@ -358,7 +380,7 @@ pub async fn lanchat_send_image_bytes(
         .map_err(|e| format!("decode image: {e}"))?;
     let path = transfer::save_png_bytes(&bytes)?;
     let conv = direct_conv_id(&peer_id);
-    transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+    swarm::send(&app, &state.lanchat, vec![peer_id.clone()], vec![peer_id], path, conv, None).await
 }
 #[tauri::command]
 pub async fn lanchat_send_clipboard_image(
@@ -376,7 +398,7 @@ pub async fn lanchat_send_clipboard_image(
         transfer::save_rgba_png(img.width as u32, img.height as u32, &img.bytes)?
     };
     let conv = direct_conv_id(&peer_id);
-    transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+    swarm::send(&app, &state.lanchat, vec![peer_id.clone()], vec![peer_id], path, conv, None).await
 }
 
 /* ----------------------------- retention & security (phase 4) ----------------------------- */

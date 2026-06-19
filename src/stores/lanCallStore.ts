@@ -39,6 +39,8 @@ interface CallStore {
   screenStream: MediaStream | null;
   remotes: Record<string, RemotePeer>;
   incoming: IncomingCall | null;
+  /** Last media/permission failure to surface to the user; null when clear. */
+  callError: string | null;
 
   init: () => Promise<void>;
   startCall: (peerId: string, kind: LanCallKind) => Promise<void>;
@@ -49,6 +51,7 @@ interface CallStore {
   toggleMic: () => void;
   toggleCam: () => void;
   toggleScreen: () => Promise<void>;
+  clearCallError: () => void;
 }
 
 let session: LanRtcSession | null = null;
@@ -68,6 +71,15 @@ async function getMedia(kind: LanCallKind): Promise<MediaStream> {
     audio: true,
     video: kind === "video" ? { width: 1280, height: 720 } : false,
   });
+}
+
+/** Turn a getUserMedia/getDisplayMedia rejection into a user-facing message.
+ *  On Linux a disabled webkit media stack surfaces as a TypeError (mediaDevices
+ *  undefined) or NotAllowedError — both land here so the failure is visible
+ *  instead of the call silently ending. */
+function mediaErrorMessage(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  return `无法访问麦克风/摄像头/屏幕：${msg || "设备不可用或权限被拒绝"}`;
 }
 
 function broadcastMediaState() {
@@ -91,6 +103,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   screenStream: null,
   remotes: {},
   incoming: null,
+  callError: null,
 
   init: async () => {
     if (signalUnsub || !isTauriRuntime()) return;
@@ -107,7 +120,8 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     let local: MediaStream;
     try {
       local = await getMedia(kind);
-    } catch {
+    } catch (e) {
+      set({ callError: mediaErrorMessage(e) });
       return; // permission denied / no device
     }
     session = new LanRtcSession(callId, myNodeId(), rtcCallbacks());
@@ -132,7 +146,8 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     let local: MediaStream;
     try {
       local = await getMedia(kind);
-    } catch {
+    } catch (e) {
+      set({ callError: mediaErrorMessage(e) });
       return;
     }
     session = new LanRtcSession(meetingId, myNodeId(), rtcCallbacks());
@@ -159,7 +174,8 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     let local: MediaStream;
     try {
       local = await getMedia(inc.kind);
-    } catch {
+    } catch (e) {
+      set({ callError: mediaErrorMessage(e) });
       get().rejectIncoming();
       return;
     }
@@ -239,7 +255,8 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       let display: MediaStream;
       try {
         display = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      } catch {
+      } catch (e) {
+        set({ callError: mediaErrorMessage(e) });
         return;
       }
       const track = display.getVideoTracks()[0];
@@ -258,6 +275,8 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       broadcastMediaState();
     }
   },
+
+  clearCallError: () => set({ callError: null }),
 }));
 
 function rtcCallbacks() {
