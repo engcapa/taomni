@@ -60,7 +60,7 @@ export function useActiveHeader() {
   }, [activeConvId, roster, groups]);
 }
 
-export function LanChatPanel() {
+export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) {
   const init = useLanChatStore((s) => s.init);
   const isDesktop = useLanChatStore((s) => s.isDesktop);
   const profile = useLanChatStore((s) => s.profile);
@@ -71,6 +71,7 @@ export function LanChatPanel() {
   const conversations = useLanChatStore((s) => s.conversations);
   const activeConvId = useLanChatStore((s) => s.activeConvId);
   const serviceRunning = useLanChatStore((s) => s.serviceRunning);
+  const enableService = useLanChatStore((s) => s.enableService);
 
   const [search, setSearch] = useState("");
   const [showProfile, setShowProfile] = useState(false);
@@ -211,9 +212,27 @@ export function LanChatPanel() {
             内网通讯
           </div>
         )}
+        {readOnly && !serviceRunning ? (
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 text-[11px]"
+            style={{ background: "color-mix(in srgb, var(--taomni-accent) 14%, transparent)", borderBottom: "1px solid var(--taomni-accent)" }}
+          >
+            <span style={{ color: "var(--taomni-text-muted)" }}>
+              局域网聊天未开启,仅可查看历史记录。
+            </span>
+            <button
+              type="button"
+              onClick={() => void enableService()}
+              className="ml-auto rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
+              style={{ background: "var(--taomni-accent)" }}
+            >
+              开启聊天
+            </button>
+          </div>
+        ) : null}
         <MessageThread />
         <TransferPanel />
-        <MessageInput disabled={!activeConvId} />
+        <MessageInput disabled={!activeConvId || (readOnly && !serviceRunning)} />
       </div>
 
       {showProfile ? <ProfileEditor onClose={() => setShowProfile(false)} /> : null}

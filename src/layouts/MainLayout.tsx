@@ -33,7 +33,7 @@ import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
-import { LanChatPanel } from "../components/lanchat/LanChatPanel";
+import { LanChatGate } from "../components/lanchat/LanChatGate";
 import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
 import { CallOverlay } from "../components/lanchat/CallOverlay";
 import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";import { TunnelManager } from "../components/tunnel/TunnelManager";
@@ -2371,7 +2371,7 @@ export function MainLayout() {
 
                 {activeTab?.type === "settings" && <SettingsPanel />}
 
-                {activeTab?.type === "lan-chat" && <LanChatPanel />}
+                {activeTab?.type === "lan-chat" && <LanChatGate />}
 
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
