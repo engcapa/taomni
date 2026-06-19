@@ -388,6 +388,13 @@ pub fn run() {
             lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,
             lanchat::commands::lanchat_signal_group,
+            lanchat::commands::lanchat_get_retention,
+            lanchat::commands::lanchat_set_retention,
+            lanchat::commands::lanchat_delete_message,
+            lanchat::commands::lanchat_clear_conversation,
+            lanchat::commands::lanchat_clear_all_history,
+            lanchat::commands::lanchat_list_pinned,
+            lanchat::commands::lanchat_retrust_peer,
             exit_app,
         ])
         .run(tauri::generate_context!())

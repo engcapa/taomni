@@ -99,6 +99,16 @@ pub struct Group {
     pub members: Vec<String>,
 }
 
+/// Message retention policy (single `settings` row). `retention_days` / `max_per_conv`
+/// of 0 disable that cap; `cleanup_enabled` gates the periodic sweep entirely.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetentionSettings {
+    pub retention_days: i64,
+    pub max_per_conv: i64,
+    pub cleanup_enabled: bool,
+}
+
 /// First 16 hex chars of the avatar's sha256 — the `avh` TXT fingerprint.
 pub fn avatar_fingerprint(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -183,6 +193,13 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             first_seen INTEGER NOT NULL,
             last_seen  INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS settings (
+            id              INTEGER PRIMARY KEY CHECK (id = 1),
+            retention_days  INTEGER NOT NULL DEFAULT 90,
+            max_per_conv    INTEGER NOT NULL DEFAULT 5000,
+            cleanup_enabled INTEGER NOT NULL DEFAULT 1
+        );
+        INSERT OR IGNORE INTO settings (id) VALUES (1);
         ",
     )
 }
@@ -748,6 +765,105 @@ impl LanChatStore {
         Ok(())
     }
 
+    /// Read the message-retention policy.
+    pub fn get_retention(&self) -> rusqlite::Result<RetentionSettings> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT retention_days, max_per_conv, cleanup_enabled FROM settings WHERE id = 1",
+            [],
+            |r| {
+                Ok(RetentionSettings {
+                    retention_days: r.get(0)?,
+                    max_per_conv: r.get(1)?,
+                    cleanup_enabled: r.get::<_, i64>(2)? != 0,
+                })
+            },
+        )
+    }
+
+    /// Update the message-retention policy.
+    pub fn set_retention(&self, s: &RetentionSettings) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO settings (id, retention_days, max_per_conv, cleanup_enabled)
+             VALUES (1, ?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET
+               retention_days = ?1, max_per_conv = ?2, cleanup_enabled = ?3",
+            params![
+                s.retention_days,
+                s.max_per_conv,
+                if s.cleanup_enabled { 1 } else { 0 }
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Apply the retention policy: delete messages older than `retention_days`
+    /// and trim each conversation to its newest `max_per_conv`. A cap of 0
+    /// disables that dimension. Returns the number of rows deleted.
+    pub fn apply_retention(&self) -> rusqlite::Result<usize> {
+        let s = self.get_retention()?;
+        if !s.cleanup_enabled {
+            return Ok(0);
+        }
+        let conn = self.conn.lock().unwrap();
+        let mut deleted = 0usize;
+        if s.retention_days > 0 {
+            let cutoff =
+                chrono::Utc::now().timestamp_millis() - s.retention_days * 86_400_000;
+            deleted += conn.execute(
+                "DELETE FROM messages WHERE created_at < ?1",
+                params![cutoff],
+            )?;
+        }
+        if s.max_per_conv > 0 {
+            deleted += conn.execute(
+                "DELETE FROM messages WHERE id IN (
+                     SELECT id FROM (
+                         SELECT id, ROW_NUMBER() OVER (
+                             PARTITION BY conv_id ORDER BY created_at DESC
+                         ) AS rn FROM messages
+                     ) WHERE rn > ?1
+                 )",
+                params![s.max_per_conv],
+            )?;
+        }
+        Ok(deleted)
+    }
+
+    /// Delete a single message by id.
+    pub fn delete_message(&self, id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM messages WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    /// Delete all messages in a conversation and reset its counters.
+    pub fn clear_conversation(&self, conv_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM messages WHERE conv_id = ?1", params![conv_id])?;
+        conn.execute(
+            "UPDATE conversations SET unread = 0, last_msg_at = 0 WHERE id = ?1",
+            params![conv_id],
+        )?;
+        Ok(())
+    }
+
+    /// Delete all message history across every conversation.
+    pub fn clear_all_history(&self) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM messages", [])?;
+        conn.execute("UPDATE conversations SET unread = 0, last_msg_at = 0", [])?;
+        Ok(())
+    }
+
+    /// Reclaim disk space after large deletions.
+    pub fn vacuum(&self) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("VACUUM", [])?;
+        Ok(())
+    }
+
     /// Create or rename a group.
     pub fn upsert_group(&self, id: &str, name: &str) -> rusqlite::Result<()> {
         let now = chrono::Utc::now().timestamp_millis();
@@ -1008,6 +1124,49 @@ mod tests {
             .unwrap();
         assert_eq!(plain, "");
         assert_eq!(ev, 1);
+    }
+
+    #[test]
+    fn retention_trims_by_age_and_count() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-r");
+        store.ensure_conversation(&conv, "direct", "peer-r").unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        let old = now - 100 * 86_400_000; // 100 days ago
+        store.insert_message(&msg("old1", &conv, "me", old, "delivered")).unwrap();
+        for i in 0..5 {
+            store
+                .insert_message(&msg(&format!("r{i}"), &conv, "me", now - i, "delivered"))
+                .unwrap();
+        }
+        store
+            .set_retention(&RetentionSettings {
+                retention_days: 90,
+                max_per_conv: 3,
+                cleanup_enabled: true,
+            })
+            .unwrap();
+        let deleted = store.apply_retention().unwrap();
+        assert!(deleted >= 1, "old + overflow rows deleted");
+        let remaining = store.list_messages(&conv, 100).unwrap();
+        assert!(remaining.len() <= 3, "trimmed to max_per_conv");
+        assert!(!remaining.iter().any(|m| m.id == "old1"), "aged-out row gone");
+    }
+
+    #[test]
+    fn clear_conversation_and_all_history() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let c1 = direct_conv_id("a");
+        let c2 = direct_conv_id("b");
+        store.ensure_conversation(&c1, "direct", "a").unwrap();
+        store.ensure_conversation(&c2, "direct", "b").unwrap();
+        store.insert_message(&msg("x1", &c1, "me", 1, "sent")).unwrap();
+        store.insert_message(&msg("y1", &c2, "me", 1, "sent")).unwrap();
+        store.clear_conversation(&c1).unwrap();
+        assert_eq!(store.list_messages(&c1, 10).unwrap().len(), 0);
+        assert_eq!(store.list_messages(&c2, 10).unwrap().len(), 1);
+        store.clear_all_history().unwrap();
+        assert_eq!(store.list_messages(&c2, 10).unwrap().len(), 0);
     }
 
     #[test]

@@ -9,7 +9,10 @@ import type {
   LanGroup,
   LanMessage,
   LanPeer,
+  LanPinnedPeer,
   LanProfile,
+  LanRetention,
+  LanSecurityEvent,
   LanSignal,
   LanTransferProgress,
 } from "../types";
@@ -1336,4 +1339,40 @@ export async function listenLanChatWb(
   cb: (s: LanSignal) => void,
 ): Promise<UnlistenFn> {
   return listen<LanSignal>("lanchat://wb", (e) => cb(e.payload));
+}
+
+/* ----------------------------- retention & security (phase 4) ----------------------------- */
+
+export async function lanchatGetRetention(): Promise<LanRetention> {
+  return invoke<LanRetention>("lanchat_get_retention");
+}
+
+export async function lanchatSetRetention(settings: LanRetention): Promise<void> {
+  return invoke("lanchat_set_retention", { settings });
+}
+
+export async function lanchatDeleteMessage(msgId: string): Promise<void> {
+  return invoke("lanchat_delete_message", { msgId });
+}
+
+export async function lanchatClearConversation(convId: string): Promise<void> {
+  return invoke("lanchat_clear_conversation", { convId });
+}
+
+export async function lanchatClearAllHistory(): Promise<void> {
+  return invoke("lanchat_clear_all_history");
+}
+
+export async function lanchatListPinned(): Promise<LanPinnedPeer[]> {
+  return invoke<LanPinnedPeer[]>("lanchat_list_pinned");
+}
+
+export async function lanchatRetrustPeer(nodeId: string): Promise<void> {
+  return invoke("lanchat_retrust_peer", { nodeId });
+}
+
+export async function listenLanChatSecurity(
+  cb: (e: LanSecurityEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<LanSecurityEvent>("lanchat://security", (e) => cb(e.payload));
 }

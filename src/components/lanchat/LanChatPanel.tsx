@@ -7,6 +7,8 @@ import {
   Phone,
   Plus,
   Presentation,
+  Shield,
+  Trash2,
   Video,
 } from "lucide-react";
 
@@ -19,8 +21,10 @@ import { Avatar } from "./Avatar";
 import { GroupCreateDialog } from "./GroupCreateDialog";
 import { MessageInput } from "./MessageInput";
 import { MessageThread } from "./MessageThread";
+import { PrivacySettings } from "./PrivacySettings";
 import { ProfileEditor } from "./ProfileEditor";
 import { RosterList } from "./RosterList";
+import { SecurityAlertBanner } from "./SecurityAlertBanner";
 import { TransferPanel } from "./TransferPanel";
 import { presenceLabel } from "./util";
 
@@ -69,6 +73,7 @@ export function LanChatPanel() {
 
   const [search, setSearch] = useState("");
   const [showProfile, setShowProfile] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const header = useActiveHeader();
   const memberCount = useMemo(
@@ -163,6 +168,15 @@ export function LanChatPanel() {
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
+          <button
+            type="button"
+            title="隐私与安全"
+            onClick={() => setShowPrivacy(true)}
+            className="grid h-6.5 w-6.5 place-items-center rounded-md"
+            style={{ border: "1px solid var(--taomni-input-border)", background: "var(--taomni-card-bg)", color: "var(--taomni-text-muted)", height: 26, width: 26 }}
+          >
+            <Shield className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         <RosterList search={search} />
@@ -170,6 +184,7 @@ export function LanChatPanel() {
 
       {/* conversation column */}
       <div className="flex min-w-0 flex-1 flex-col" style={{ background: "var(--taomni-bg)" }}>
+        <SecurityAlertBanner />
         {!isDesktop ? (
           <div
             className="flex items-center gap-2 px-3 py-1.5 text-[11px]"
@@ -194,6 +209,7 @@ export function LanChatPanel() {
       </div>
 
       {showProfile ? <ProfileEditor onClose={() => setShowProfile(false)} /> : null}
+      {showPrivacy ? <PrivacySettings onClose={() => setShowPrivacy(false)} /> : null}
       {showGroupCreate ? <GroupCreateDialog onClose={() => setShowGroupCreate(false)} /> : null}
     </div>
   );
@@ -229,6 +245,7 @@ function ConversationHeader({
   const sendFilePath = useLanChatStore((s) => s.sendFilePath);
   const sendScreenshot = useLanChatStore((s) => s.sendScreenshot);
   const openEdgeDock = useLanChatStore((s) => s.openEdgeDock);
+  const clearConversation = useLanChatStore((s) => s.clearConversation);
   const startCall = useLanCallStore((s) => s.startCall);
   const startMeeting = useLanCallStore((s) => s.startMeeting);
   const startBoard = useLanWbStore((s) => s.startBoard);
@@ -286,6 +303,17 @@ function ConversationHeader({
           onClick={() => convId && startBoard(convId, `${header.name} 的白板`)}
         >
           <Presentation className="h-4 w-4" />
+        </HeaderBtn>
+        <HeaderBtn
+          title="清空会话记录"
+          disabled={!convId}
+          onClick={() => {
+            if (convId && window.confirm("确定清空该会话的全部消息？此操作不可撤销。")) {
+              void clearConversation(convId);
+            }
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
         </HeaderBtn>
         <span style={{ width: 1, background: "var(--taomni-divider)", margin: "4px 4px" }} />
         <HeaderBtn title="弹出为独立窗口" disabled={!isDesktop} onClick={detach}>

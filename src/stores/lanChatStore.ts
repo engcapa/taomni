@@ -2,8 +2,12 @@ import { create } from "zustand";
 
 import {
   lanchatAcceptFile,
+  lanchatClearAllHistory,
+  lanchatClearConversation,
   lanchatCreateGroup,
+  lanchatDeleteMessage,
   lanchatGetProfile,
+  lanchatGetRetention,
   lanchatListConversations,
   lanchatListGroups,
   lanchatListMessages,
@@ -12,12 +16,14 @@ import {
   lanchatOpenPath,
   lanchatRejectFile,
   lanchatResendMessage,
+  lanchatRetrustPeer,
   lanchatSendClipboardImage,
   lanchatSendFile,
   lanchatSendGroupText,
   lanchatSendImageBytes,
   lanchatSendScreenshot,
   lanchatSendText,
+  lanchatSetRetention,
   lanchatTransferControl,
   lanchatUpdateProfile,
   listenLanChatConversation,
@@ -25,6 +31,7 @@ import {
   listenLanChatGroup,
   listenLanChatMessage,
   listenLanChatRoster,
+  listenLanChatSecurity,
   listenLanChatTransfer,
 } from "../lib/ipc";
 import { isTauriRuntime } from "../lib/runtime";
@@ -36,6 +43,8 @@ import type {
   LanMessage,
   LanPeer,
   LanProfile,
+  LanRetention,
+  LanSecurityEvent,
   LanTransferProgress,
 } from "../types";
 
@@ -69,6 +78,10 @@ interface LanChatStore {
   offers: LanFileOffer[];
   /** Local file path for each transfer (source for send, save for recv). */
   transferPaths: Record<string, string>;
+  /** Message-retention policy (loaded on init; null until then). */
+  retention: LanRetention | null;
+  /** Recent unacknowledged security alerts (rejected peer identities). */
+  securityAlerts: LanSecurityEvent[];
 
   /** Load profile + roster + conversations + groups and subscribe to events. */
   init: () => Promise<void>;
@@ -101,6 +114,17 @@ interface LanChatStore {
     status: string;
   }) => Promise<void>;
   createGroup: (name: string, members: string[]) => Promise<LanGroup | null>;
+
+  // retention & history management
+  loadRetention: () => Promise<void>;
+  saveRetention: (settings: LanRetention) => Promise<void>;
+  deleteMessage: (convId: string, msgId: string) => Promise<void>;
+  clearConversation: (convId: string) => Promise<void>;
+  clearAllHistory: () => Promise<void>;
+  // security
+  retrustPeer: (nodeId: string) => Promise<void>;
+  dismissSecurityAlert: (peerId: string) => void;
+  applySecurityEvent: (e: LanSecurityEvent) => void;
 
   // event-driven mutators
   applyRoster: (peers: LanPeer[]) => void;
@@ -174,6 +198,8 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   transfers: {},
   offers: [],
   transferPaths: {},
+  retention: null,
+  securityAlerts: [],
 
   init: async () => {
     if (get().initialized) return;
@@ -186,6 +212,12 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
         lanchatListPeers(),
       ]);
       set({ profile, conversations, groups, roster: peers });
+      // Retention policy is best-effort; ignore if unavailable.
+      try {
+        set({ retention: await lanchatGetRetention() });
+      } catch (e) {
+        console.debug("lanchat retention:", e);
+      }
     } catch (e) {
       // Browser preview / backend not ready: leave defaults, stub fills mocks.
       console.debug("lanchat init:", e);
@@ -200,6 +232,7 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
       unsubscribers.push(await listenLanChatGroup((group) => get().applyGroup(group)));
       unsubscribers.push(await listenLanChatTransfer((p) => get().applyTransfer(p)));
       unsubscribers.push(await listenLanChatFileOffer((o) => get().applyOffer(o)));
+      unsubscribers.push(await listenLanChatSecurity((e) => get().applySecurityEvent(e)));
     } catch (e) {
       console.debug("lanchat listen:", e);
     }
@@ -341,6 +374,68 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
       return null;
     }
   },
+
+  loadRetention: async () => {
+    try {
+      set({ retention: await lanchatGetRetention() });
+    } catch (e) {
+      console.debug("lanchat loadRetention:", e);
+    }
+  },
+
+  saveRetention: async (settings) => {
+    await lanchatSetRetention(settings);
+    set({ retention: settings });
+  },
+
+  deleteMessage: async (convId, msgId) => {
+    try {
+      await lanchatDeleteMessage(msgId);
+      set((s) => ({
+        messagesByConv: {
+          ...s.messagesByConv,
+          [convId]: (s.messagesByConv[convId] ?? []).filter((m) => m.id !== msgId),
+        },
+      }));
+    } catch (e) {
+      console.debug("lanchat deleteMessage:", e);
+    }
+  },
+
+  clearConversation: async (convId) => {
+    try {
+      await lanchatClearConversation(convId);
+      set((s) => ({ messagesByConv: { ...s.messagesByConv, [convId]: [] } }));
+    } catch (e) {
+      console.debug("lanchat clearConversation:", e);
+    }
+  },
+
+  clearAllHistory: async () => {
+    try {
+      await lanchatClearAllHistory();
+      set({ messagesByConv: {} });
+    } catch (e) {
+      console.debug("lanchat clearAllHistory:", e);
+    }
+  },
+
+  retrustPeer: async (nodeId) => {
+    try {
+      await lanchatRetrustPeer(nodeId);
+    } catch (e) {
+      console.debug("lanchat retrustPeer:", e);
+    }
+    get().dismissSecurityAlert(nodeId);
+  },
+
+  dismissSecurityAlert: (peerId) =>
+    set((s) => ({ securityAlerts: s.securityAlerts.filter((a) => a.peerId !== peerId) })),
+
+  applySecurityEvent: (e) =>
+    set((s) => ({
+      securityAlerts: [...s.securityAlerts.filter((a) => a.peerId !== e.peerId), e],
+    })),
 
   applyRoster: (peers) => set({ roster: peers }),
 

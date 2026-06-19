@@ -225,6 +225,24 @@ pub async fn start(app: AppHandle) {
                 }
             });
 
+            // Periodic retention cleanup: sweep on startup and every 6 hours.
+            let state_c = lanchat.clone();
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_secs(6 * 3600));
+                loop {
+                    interval.tick().await; // fires immediately on the first iteration
+                    match state_c.store.apply_retention() {
+                        Ok(n) if n > 0 => {
+                            log::info!("lanchat: retention removed {n} message(s)");
+                            let _ = state_c.store.vacuum();
+                        }
+                        Ok(_) => {}
+                        Err(e) => log::warn!("lanchat: retention sweep failed: {e}"),
+                    }
+                }
+            });
+
             // mDNS discovery (runs for the app lifetime).
             discovery::run(app, lanchat, port).await;
         }

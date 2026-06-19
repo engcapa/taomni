@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef } from "react";
+import { Trash2 } from "lucide-react";
 
 import { useLanChatStore } from "../../stores/lanChatStore";
 import type { LanMessage } from "../../types";
@@ -55,6 +56,7 @@ export function MessageThread() {
   const profile = useLanChatStore((s) => s.profile);
   const roster = useLanChatStore((s) => s.roster);
   const resend = useLanChatStore((s) => s.resend);
+  const deleteMessage = useLanChatStore((s) => s.deleteMessage);
 
   const messages = activeConvId ? messagesByConv[activeConvId] ?? [] : [];
   const myId = profile?.id ?? "";
@@ -100,7 +102,7 @@ export function MessageThread() {
               </div>
             ) : null}
             <div
-              className="flex max-w-[78%] gap-2.5"
+              className="group flex max-w-[78%] items-center gap-2.5"
               style={mine ? { alignSelf: "flex-end", flexDirection: "row-reverse" } : undefined}
             >
               <Avatar
@@ -156,6 +158,15 @@ export function MessageThread() {
                   </div>
                 ) : null}
               </div>
+              <button
+                type="button"
+                title="删除此消息"
+                onClick={() => activeConvId && void deleteMessage(activeConvId, msg.id)}
+                className="opacity-0 transition-opacity group-hover:opacity-100"
+                style={{ color: "var(--taomni-text-muted)" }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           </Fragment>
         );
