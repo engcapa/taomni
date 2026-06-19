@@ -13,6 +13,7 @@ import type {
   LanProfile,
   LanRetention,
   LanSecurityEvent,
+  LanServiceState,
   LanSignal,
   LanTransferProgress,
 } from "../types";
@@ -1375,4 +1376,29 @@ export async function listenLanChatSecurity(
   cb: (e: LanSecurityEvent) => void,
 ): Promise<UnlistenFn> {
   return listen<LanSecurityEvent>("lanchat://security", (e) => cb(e.payload));
+}
+
+/* ----------------------------- service enable / start-on-launch ----------------------------- */
+
+export async function lanchatGetServiceState(): Promise<LanServiceState> {
+  return invoke<LanServiceState>("lanchat_get_service_state");
+}
+
+/** Manually start the background service (one-way; runs until app exit). */
+export async function lanchatStartService(): Promise<void> {
+  return invoke("lanchat_start_service");
+}
+
+/** Set the "start LanChat on app launch" policy (affects next launch only). */
+export async function lanchatSetStartOnLaunch(enabled: boolean): Promise<void> {
+  return invoke("lanchat_set_start_on_launch", { enabled });
+}
+
+/** Service lifecycle change: fires with `{ running }` when the service starts. */
+export async function listenLanChatService(
+  cb: (running: boolean) => void,
+): Promise<UnlistenFn> {
+  return listen<{ running: boolean }>("lanchat://service", (e) =>
+    cb(e.payload.running),
+  );
 }

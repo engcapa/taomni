@@ -19,6 +19,10 @@ export function PrivacySettings({ onClose }: { onClose: () => void }) {
   const saveRetention = useLanChatStore((s) => s.saveRetention);
   const clearAllHistory = useLanChatStore((s) => s.clearAllHistory);
   const isDesktop = useLanChatStore((s) => s.isDesktop);
+  const serviceRunning = useLanChatStore((s) => s.serviceRunning);
+  const startOnLaunch = useLanChatStore((s) => s.startOnLaunch);
+  const setStartOnLaunch = useLanChatStore((s) => s.setStartOnLaunch);
+  const loadServiceState = useLanChatStore((s) => s.loadServiceState);
 
   const [form, setForm] = useState<LanRetention>(retention ?? DEFAULT_RETENTION);
   const [busy, setBusy] = useState(false);
@@ -26,7 +30,8 @@ export function PrivacySettings({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     void loadRetention();
-  }, [loadRetention]);
+    void loadServiceState();
+  }, [loadRetention, loadServiceState]);
   useEffect(() => {
     if (retention) setForm(retention);
   }, [retention]);
@@ -78,6 +83,31 @@ export function PrivacySettings({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="flex flex-col gap-3 p-4">
+          <div
+            className="flex flex-col gap-2 rounded-lg p-3"
+            style={{ background: "var(--taomni-card-bg)", border: "1px solid var(--taomni-divider)" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium">局域网监听 / 广播</span>
+              <span
+                className="text-[11px] font-medium"
+                style={{ color: serviceRunning ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+              >
+                {serviceRunning ? "● 运行中" : "○ 未开启"}
+              </span>
+            </div>
+            <label className="flex items-center justify-between">
+              <span className="text-[12px]">随程序启动时开启</span>
+              <input
+                type="checkbox"
+                checked={startOnLaunch}
+                onChange={(e) => void setStartOnLaunch(e.target.checked)}
+              />
+            </label>
+            <div className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+              开启后本次运行将持续监听并广播,关闭程序前无法停止。
+            </div>
+          </div>
           <label className="flex items-center justify-between">
             <span className="text-[12px]">自动清理历史消息</span>
             <input

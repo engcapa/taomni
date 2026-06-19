@@ -70,6 +70,7 @@ export function LanChatPanel() {
   const groups = useLanChatStore((s) => s.groups);
   const conversations = useLanChatStore((s) => s.conversations);
   const activeConvId = useLanChatStore((s) => s.activeConvId);
+  const serviceRunning = useLanChatStore((s) => s.serviceRunning);
 
   const [search, setSearch] = useState("");
   const [showProfile, setShowProfile] = useState(false);
@@ -133,6 +134,13 @@ export function LanChatPanel() {
             <div className="text-[13px] font-semibold">
               {profile?.name ?? "我"}
               <span style={{ color: "var(--taomni-text-muted)", fontWeight: 400 }}> · 本机</span>
+              <span
+                className="ml-1.5 text-[11px] font-normal"
+                style={{ color: serviceRunning ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+                title={serviceRunning ? "正在局域网监听 / 广播" : "未开启监听 / 广播"}
+              >
+                {serviceRunning ? "● 在线" : "○ 未开启"}
+              </span>
             </div>
             <div className="truncate text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
               {profile?.signature || "设置状态签名…"}

@@ -108,6 +108,14 @@ export interface LanRetention {
   cleanupEnabled: boolean;
 }
 
+/** Service enablement state (mirrors Rust `LanChatServiceState`). */
+export interface LanServiceState {
+  /** Whether the background service (discovery + transport + beacon) is live. */
+  running: boolean;
+  /** Whether the service is configured to start on app launch. */
+  startOnLaunch: boolean;
+}
+
 /** A pinned peer identity record (mirrors Rust `PinnedPeer`). */
 export interface LanPinnedPeer {
   nodeId: string;

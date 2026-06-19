@@ -8,6 +8,7 @@ import {
   lanchatDeleteMessage,
   lanchatGetProfile,
   lanchatGetRetention,
+  lanchatGetServiceState,
   lanchatListConversations,
   lanchatListGroups,
   lanchatListMessages,
@@ -24,6 +25,8 @@ import {
   lanchatSendScreenshot,
   lanchatSendText,
   lanchatSetRetention,
+  lanchatSetStartOnLaunch,
+  lanchatStartService,
   lanchatTransferControl,
   lanchatUpdateProfile,
   listenLanChatConversation,
@@ -32,6 +35,7 @@ import {
   listenLanChatMessage,
   listenLanChatRoster,
   listenLanChatSecurity,
+  listenLanChatService,
   listenLanChatTransfer,
 } from "../lib/ipc";
 import { isTauriRuntime } from "../lib/runtime";
@@ -82,6 +86,10 @@ interface LanChatStore {
   retention: LanRetention | null;
   /** Recent unacknowledged security alerts (rejected peer identities). */
   securityAlerts: LanSecurityEvent[];
+  /** Whether the background service (discovery/transport/beacon) is running. */
+  serviceRunning: boolean;
+  /** Whether the service is configured to start on app launch. */
+  startOnLaunch: boolean;
 
   /** Load profile + roster + conversations + groups and subscribe to events. */
   init: () => Promise<void>;
@@ -125,6 +133,14 @@ interface LanChatStore {
   retrustPeer: (nodeId: string) => Promise<void>;
   dismissSecurityAlert: (peerId: string) => void;
   applySecurityEvent: (e: LanSecurityEvent) => void;
+
+  // service enablement
+  /** Refresh `serviceRunning` + `startOnLaunch` from the backend. */
+  loadServiceState: () => Promise<void>;
+  /** Manually start the service (one-way; runs until app exit). */
+  enableService: () => Promise<void>;
+  /** Persist the start-on-launch policy (affects next launch only). */
+  setStartOnLaunch: (enabled: boolean) => Promise<void>;
 
   // event-driven mutators
   applyRoster: (peers: LanPeer[]) => void;
@@ -200,6 +216,8 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
   transferPaths: {},
   retention: null,
   securityAlerts: [],
+  serviceRunning: false,
+  startOnLaunch: false,
 
   init: async () => {
     if (get().initialized) return;
@@ -218,6 +236,13 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
       } catch (e) {
         console.debug("lanchat retention:", e);
       }
+      // Service enablement state (running + start-on-launch). Best-effort.
+      try {
+        const svc = await lanchatGetServiceState();
+        set({ serviceRunning: svc.running, startOnLaunch: svc.startOnLaunch });
+      } catch (e) {
+        console.debug("lanchat service state:", e);
+      }
     } catch (e) {
       // Browser preview / backend not ready: leave defaults, stub fills mocks.
       console.debug("lanchat init:", e);
@@ -233,6 +258,9 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
       unsubscribers.push(await listenLanChatTransfer((p) => get().applyTransfer(p)));
       unsubscribers.push(await listenLanChatFileOffer((o) => get().applyOffer(o)));
       unsubscribers.push(await listenLanChatSecurity((e) => get().applySecurityEvent(e)));
+      unsubscribers.push(
+        await listenLanChatService((running) => set({ serviceRunning: running })),
+      );
     } catch (e) {
       console.debug("lanchat listen:", e);
     }
@@ -436,6 +464,34 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
     set((s) => ({
       securityAlerts: [...s.securityAlerts.filter((a) => a.peerId !== e.peerId), e],
     })),
+
+  loadServiceState: async () => {
+    try {
+      const svc = await lanchatGetServiceState();
+      set({ serviceRunning: svc.running, startOnLaunch: svc.startOnLaunch });
+    } catch (e) {
+      console.debug("lanchat loadServiceState:", e);
+    }
+  },
+
+  enableService: async () => {
+    try {
+      await lanchatStartService();
+      // Optimistic; the lanchat://service event confirms when actually live.
+      set({ serviceRunning: true });
+    } catch (e) {
+      console.debug("lanchat enableService:", e);
+    }
+  },
+
+  setStartOnLaunch: async (enabled) => {
+    try {
+      await lanchatSetStartOnLaunch(enabled);
+      set({ startOnLaunch: enabled });
+    } catch (e) {
+      console.debug("lanchat setStartOnLaunch:", e);
+    }
+  },
 
   applyRoster: (peers) => set({ roster: peers }),
 
