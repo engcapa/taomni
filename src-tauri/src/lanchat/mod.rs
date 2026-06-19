@@ -14,6 +14,7 @@
 pub mod beacon;
 pub mod commands;
 pub mod discovery;
+pub mod keystore;
 pub mod messaging;
 pub mod protocol;
 pub mod store;

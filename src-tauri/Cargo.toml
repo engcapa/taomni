@@ -61,6 +61,9 @@ ironrdp-tokio = { version = "0.9.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 # RDP server (servers/rdp.rs): self-signed TLS cert + cross-platform input injection.
 rcgen = "0.14"
+# LanChat (lanchat/tls.rs): async rustls adapter to upgrade the P2P TCP control
+# channel to mutual TLS over tokio streams.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 # Input injection for the RDP server. Use the pure-Rust `x11rb` backend (not the
 # default `xdo`, which needs the libxdo C library) and the `wayland` backend so
 # Wayland sessions work without extra system deps. Both features are Linux-only
