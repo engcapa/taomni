@@ -198,6 +198,64 @@ impl ThriftSession {
         .await
     }
 
+    pub async fn enable_table(&self, table: &str) -> Result<(), String> {
+        let ctx = self.clone();
+        let tn = self.table_name(table);
+        run(move || {
+            let mut c = ctx.connect();
+            c.enable_table(tn).map_err(thrift_err)
+        })
+        .await
+    }
+
+    pub async fn disable_table(&self, table: &str) -> Result<(), String> {
+        let ctx = self.clone();
+        let tn = self.table_name(table);
+        run(move || {
+            let mut c = ctx.connect();
+            c.disable_table(tn).map_err(thrift_err)
+        })
+        .await
+    }
+
+    pub async fn table_exists(&self, table: &str) -> Result<bool, String> {
+        let ctx = self.clone();
+        let tn = self.table_name(table);
+        run(move || {
+            let mut c = ctx.connect();
+            c.table_exists(tn).map_err(thrift_err)
+        })
+        .await
+    }
+
+    /// Add or modify column families (`alter`). Returns the number changed.
+    pub async fn alter_table(
+        &self,
+        table: &str,
+        families: &[(String, BTreeMap<String, String>)],
+    ) -> Result<usize, String> {
+        let ctx = self.clone();
+        let tn = self.table_name(table);
+        let names: Vec<String> = families.iter().map(|(n, _)| n.clone()).collect();
+        let specs: Vec<TColumnFamilyDescriptor> =
+            families.iter().map(|(name, attrs)| tcfd(name, attrs)).collect();
+        run(move || {
+            let mut c = ctx.connect();
+            let desc = c.get_table_descriptor(tn.clone()).map_err(thrift_err)?;
+            let existing: Vec<String> =
+                families_of(&desc).into_iter().map(|(n, _)| n).collect();
+            for (i, cf) in specs.into_iter().enumerate() {
+                if existing.iter().any(|n| n == &names[i]) {
+                    c.modify_column_family(tn.clone(), cf).map_err(thrift_err)?;
+                } else {
+                    c.add_column_family(tn.clone(), cf).map_err(thrift_err)?;
+                }
+            }
+            Ok(names.len())
+        })
+        .await
+    }
+
     pub async fn get(
         &self,
         table: &str,
