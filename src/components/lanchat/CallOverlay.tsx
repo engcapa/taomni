@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff, X } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
 import { avatarGradient, avatarInitial } from "./util";
@@ -109,10 +109,19 @@ export function CallOverlay() {
   const toggleMic = useLanCallStore((s) => s.toggleMic);
   const toggleCam = useLanCallStore((s) => s.toggleCam);
   const toggleScreen = useLanCallStore((s) => s.toggleScreen);
+  const callError = useLanCallStore((s) => s.callError);
+  const clearCallError = useLanCallStore((s) => s.clearCallError);
 
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Auto-dismiss a surfaced media/permission error after a few seconds.
+  useEffect(() => {
+    if (!callError) return;
+    const t = setTimeout(() => clearCallError(), 6000);
+    return () => clearTimeout(t);
+  }, [callError, clearCallError]);
 
   // Release camera/mic if the window/app is closed mid-call (avoid a device
   // indicator staying lit). Best-effort track stop on unload.
@@ -132,6 +141,24 @@ export function CallOverlay() {
 
   return (
     <>
+      {callError ? (
+        <div
+          className="fixed left-1/2 top-4 z-[210] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-white"
+          style={{ background: "#c42b1c", boxShadow: "var(--taomni-shadow-lg)" }}
+          role="alert"
+        >
+          <span>{callError}</span>
+          <button
+            type="button"
+            onClick={clearCallError}
+            className="ml-1 opacity-80 hover:opacity-100"
+            aria-label="关闭"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
+
       {incoming ? (
         <div
           className="fixed right-4 top-4 z-[200] w-72 rounded-xl p-3"

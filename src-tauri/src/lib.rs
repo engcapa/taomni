@@ -146,6 +146,39 @@ pub fn run() {
                         .hidden_title(true);
                 }
                 builder.build()?;
+
+                // On Linux the webview is webkit2gtk, which ships with the
+                // media-stream / WebRTC settings OFF — so getUserMedia and
+                // getDisplayMedia reject and LanChat calls can't be answered or
+                // screen-shared (Windows/WebView2 has them on by default). Flip
+                // the settings and auto-allow UserMedia permission requests for
+                // the main window (where the call overlay is mounted).
+                #[cfg(target_os = "linux")]
+                if let Some(main_window) = app.get_webview_window("main") {
+                    let _ = main_window.with_webview(|webview| {
+                        use webkit2gtk::glib::object::Cast;
+                        use webkit2gtk::{
+                            PermissionRequestExt, SettingsExt, UserMediaPermissionRequest,
+                            WebViewExt,
+                        };
+                        let wv = webview.inner();
+                        if let Some(settings) = WebViewExt::settings(&wv) {
+                            settings.set_enable_media_stream(true);
+                            settings.set_enable_mediasource(true);
+                            settings.set_enable_webrtc(true);
+                        }
+                        // LAN-local app: grant mic/camera/screen capture. Other
+                        // permission kinds fall through to the default handler.
+                        wv.connect_permission_request(|_, req| {
+                            if req.downcast_ref::<UserMediaPermissionRequest>().is_some() {
+                                req.allow();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                    });
+                }
             }
             Ok(())
         })
