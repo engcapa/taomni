@@ -192,7 +192,8 @@ export function SettingsPanel() {
                   ref={searchInputRef}
                   data-testid="settings-search-input"
                   type="search"
-                  className="taomni-input h-8 w-full pl-8 pr-8"
+                  className="taomni-input h-8 w-full"
+                  style={{ paddingLeft: "2rem", paddingRight: "2rem" }}
                   placeholder={t("settings.searchPlaceholder")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
