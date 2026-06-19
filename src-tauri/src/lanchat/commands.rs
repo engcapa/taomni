@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::lanchat::protocol::PresenceStatus;
-use crate::lanchat::store::{decode_avatar_base64, Conversation, Group, LanMessage, Profile};
+use crate::lanchat::store::{decode_avatar_base64, Conversation, Group, LanMessage, Profile, RetentionSettings};
 use crate::lanchat::messaging;
 use crate::lanchat::protocol::PeerRecord;
 use crate::lanchat::store::direct_conv_id;
@@ -31,7 +31,10 @@ pub struct LanChatStatus {
 #[tauri::command]
 pub async fn lanchat_status(state: State<'_, AppState>) -> Result<LanChatStatus, String> {
     Ok(LanChatStatus {
-        running: true,
+        running: state
+            .lanchat
+            .running
+            .load(std::sync::atomic::Ordering::SeqCst),
         node_id: state.lanchat.node_id().await,
         peer_count: state.lanchat.peer_count().await,
     })
@@ -374,4 +377,151 @@ pub async fn lanchat_send_clipboard_image(
     };
     let conv = direct_conv_id(&peer_id);
     transfer::send_file(&app, &state.lanchat, &peer_id, path, conv).await
+}
+
+/* ----------------------------- retention & security (phase 4) ----------------------------- */
+
+/// Read the message-retention policy.
+#[tauri::command]
+pub async fn lanchat_get_retention(
+    state: State<'_, AppState>,
+) -> Result<RetentionSettings, String> {
+    state.lanchat.store.get_retention().map_err(|e| e.to_string())
+}
+
+/// Update the message-retention policy and apply it immediately.
+#[tauri::command]
+pub async fn lanchat_set_retention(
+    state: State<'_, AppState>,
+    settings: RetentionSettings,
+) -> Result<(), String> {
+    state
+        .lanchat
+        .store
+        .set_retention(&settings)
+        .map_err(|e| e.to_string())?;
+    let _ = state.lanchat.store.apply_retention();
+    Ok(())
+}
+
+/// Service enablement state for the UI: whether the background service is
+/// currently running, and whether it is configured to start on app launch.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanChatServiceState {
+    pub running: bool,
+    pub start_on_launch: bool,
+}
+
+/// Read whether the service is running + the start-on-launch policy.
+#[tauri::command]
+pub async fn lanchat_get_service_state(
+    state: State<'_, AppState>,
+) -> Result<LanChatServiceState, String> {
+    Ok(LanChatServiceState {
+        running: state
+            .lanchat
+            .running
+            .load(std::sync::atomic::Ordering::SeqCst),
+        start_on_launch: state
+            .lanchat
+            .store
+            .get_start_on_launch()
+            .map_err(|e| e.to_string())?,
+    })
+}
+
+/// Start the background service on demand (manual enable from the chat UI).
+/// Idempotent and one-way: once started it runs until the app exits. The work
+/// is spawned so the command returns immediately rather than blocking on the
+/// discovery loop; the `lanchat://service` event reports when it is live.
+#[tauri::command]
+pub async fn lanchat_start_service(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    if state
+        .lanchat
+        .running
+        .load(std::sync::atomic::Ordering::SeqCst)
+    {
+        return Ok(());
+    }
+    tauri::async_runtime::spawn(async move {
+        crate::lanchat::start_service(app).await;
+    });
+    Ok(())
+}
+
+/// Set the "start LanChat on app launch" policy. Does not start/stop the
+/// running service — only affects the next launch.
+#[tauri::command]
+pub async fn lanchat_set_start_on_launch(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    state
+        .lanchat
+        .store
+        .set_start_on_launch(enabled)
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a single message from local history.
+#[tauri::command]
+pub async fn lanchat_delete_message(
+    state: State<'_, AppState>,
+    msg_id: String,
+) -> Result<(), String> {
+    state.lanchat.store.delete_message(&msg_id).map_err(|e| e.to_string())
+}
+
+/// Clear all messages in a conversation.
+#[tauri::command]
+pub async fn lanchat_clear_conversation(
+    state: State<'_, AppState>,
+    conv_id: String,
+) -> Result<(), String> {
+    state.lanchat.store.clear_conversation(&conv_id).map_err(|e| e.to_string())
+}
+
+/// Delete all local chat history and reclaim disk space.
+#[tauri::command]
+pub async fn lanchat_clear_all_history(state: State<'_, AppState>) -> Result<(), String> {
+    state.lanchat.store.clear_all_history().map_err(|e| e.to_string())?;
+    let _ = state.lanchat.store.vacuum();
+    Ok(())
+}
+
+/// A pinned peer identity record (trust-on-first-use).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PinnedPeer {
+    pub node_id: String,
+    pub first_seen: i64,
+    pub last_seen: i64,
+}
+
+/// List pinned peer identities (the verified-on-first-use record).
+#[tauri::command]
+pub async fn lanchat_list_pinned(state: State<'_, AppState>) -> Result<Vec<PinnedPeer>, String> {
+    Ok(state
+        .lanchat
+        .store
+        .list_pins()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|(node_id, first_seen, last_seen)| PinnedPeer {
+            node_id,
+            first_seen,
+            last_seen,
+        })
+        .collect())
+}
+
+/// Forget a peer's pinned identity so the next connection re-pins it (use after a
+/// peer legitimately reinstalled and now presents a new identity).
+#[tauri::command]
+pub async fn lanchat_retrust_peer(
+    state: State<'_, AppState>,
+    node_id: String,
+) -> Result<(), String> {
+    state.lanchat.store.clear_pin(&node_id).map_err(|e| e.to_string())
 }

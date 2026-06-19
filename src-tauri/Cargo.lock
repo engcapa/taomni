@@ -9889,6 +9889,7 @@ dependencies = [
  "thiserror 2.0.18",
  "thrift",
  "tokio",
+ "tokio-rustls",
  "tokio-tungstenite",
  "tokio-util",
  "tracing",

@@ -10,19 +10,25 @@
 //! peers/groups/conversations/messages helpers on the same `LanChatStore`.
 
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 use crate::lanchat::protocol::{PeerRecord, PresenceStatus};
+use crate::vault::crypto;
 
 /// SQLite-backed LanChat store. Single connection guarded by a mutex.
 pub struct LanChatStore {
     conn: Mutex<Connection>,
+    /// AES-256-GCM key for at-rest message-body encryption, loaded from the OS
+    /// keychain (phase 3). When unset (e.g. store unit tests), bodies are stored
+    /// in plaintext (`enc_ver = 0`) for backward compatibility.
+    msg_key: OnceLock<Zeroizing<[u8; crypto::KEY_LEN]>>,
 }
 
 /// This node's own profile (single row in `profile`). Avatar bytes are carried
@@ -91,6 +97,16 @@ pub struct Group {
     pub created_at: i64,
     #[serde(default)]
     pub members: Vec<String>,
+}
+
+/// Message retention policy (single `settings` row). `retention_days` / `max_per_conv`
+/// of 0 disable that cap; `cleanup_enabled` gates the periodic sweep entirely.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetentionSettings {
+    pub retention_days: i64,
+    pub max_per_conv: i64,
+    pub cleanup_enabled: bool,
 }
 
 /// First 16 hex chars of the avatar's sha256 — the `avh` TXT fingerprint.
@@ -171,6 +187,19 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             ON messages (conv_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_conversations_last_msg
             ON conversations (last_msg_at);
+        CREATE TABLE IF NOT EXISTS pinned_keys (
+            node_id    TEXT PRIMARY KEY,
+            cert_der   BLOB NOT NULL,
+            first_seen INTEGER NOT NULL,
+            last_seen  INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+            id              INTEGER PRIMARY KEY CHECK (id = 1),
+            retention_days  INTEGER NOT NULL DEFAULT 90,
+            max_per_conv    INTEGER NOT NULL DEFAULT 5000,
+            cleanup_enabled INTEGER NOT NULL DEFAULT 1
+        );
+        INSERT OR IGNORE INTO settings (id) VALUES (1);
         ",
     )
 }
@@ -180,9 +209,16 @@ fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
 /// so the migration is safe to re-run on already-migrated databases.
 fn migrate_schema(conn: &Connection) {
     // v2: persist peer connection info for startup reconnection.
+    // v3: persist this node's self-signed identity certificate (phase 1).
+    // v4: at-rest message-body encryption (phase 3).
+    // v5: "start LanChat on app launch" policy (single settings row).
     for ddl in [
         "ALTER TABLE peers ADD COLUMN addr TEXT",
         "ALTER TABLE peers ADD COLUMN port INTEGER",
+        "ALTER TABLE profile ADD COLUMN cert_der BLOB",
+        "ALTER TABLE messages ADD COLUMN body_cipher BLOB",
+        "ALTER TABLE messages ADD COLUMN enc_ver INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE settings ADD COLUMN start_on_launch INTEGER NOT NULL DEFAULT 0",
     ] {
         if let Err(e) = conn.execute(ddl, []) {
             let msg = e.to_string();
@@ -205,6 +241,7 @@ impl LanChatStore {
         migrate_schema(&conn);
         Ok(Self {
             conn: Mutex::new(conn),
+            msg_key: OnceLock::new(),
         })
     }
 
@@ -215,6 +252,7 @@ impl LanChatStore {
         migrate_schema(&conn);
         Ok(Self {
             conn: Mutex::new(conn),
+            msg_key: OnceLock::new(),
         })
     }
 
@@ -236,6 +274,123 @@ impl LanChatStore {
             params![id, default_display_name(), PresenceStatus::Online.as_txt(), now],
         )?;
         Ok(id)
+    }
+
+    /// Read the persisted node id and (optional) self-signed cert DER, if the
+    /// identity row exists. Used by identity bootstrap (phase 1) to decide
+    /// whether to reuse the stored identity or generate a fresh one.
+    pub fn get_profile_id_and_cert(&self) -> rusqlite::Result<Option<(String, Option<Vec<u8>>)>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, cert_der FROM profile LIMIT 1",
+            [],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<Vec<u8>>>(1)?)),
+        )
+        .optional()
+    }
+
+    /// Persist this node's self-certifying identity (node id + cert DER). When a
+    /// row already exists under `old_id` it is migrated in place (the PRIMARY KEY
+    /// is updated), preserving name/avatar/signature/status; otherwise a fresh
+    /// default profile row is created.
+    pub fn set_identity(
+        &self,
+        new_id: &str,
+        cert_der: &[u8],
+        old_id: Option<&str>,
+    ) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        match old_id {
+            Some(old) if old != new_id => {
+                conn.execute(
+                    "UPDATE profile SET id = ?1, cert_der = ?2 WHERE id = ?3",
+                    params![new_id, cert_der, old],
+                )?;
+            }
+            Some(_) => {
+                conn.execute(
+                    "UPDATE profile SET cert_der = ?2 WHERE id = ?1",
+                    params![new_id, cert_der],
+                )?;
+            }
+            None => {
+                let now = chrono::Utc::now().timestamp_millis();
+                conn.execute(
+                    "INSERT INTO profile (id, name, avatar, avatar_hash, signature, status, updated_at, cert_der)
+                     VALUES (?1, ?2, NULL, NULL, '', ?3, ?4, ?5)",
+                    params![
+                        new_id,
+                        default_display_name(),
+                        PresenceStatus::Online.as_txt(),
+                        now,
+                        cert_der
+                    ],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Rewrite our own outbound messages' sender id when the node id changes
+    /// (legacy UUID -> self-certifying id), so "sent by me" detection survives.
+    pub fn migrate_sender_id(&self, old_id: &str, new_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE messages SET sender_id = ?2 WHERE sender_id = ?1",
+            params![old_id, new_id],
+        )?;
+        Ok(())
+    }
+
+    /// Drop the cached peer roster (used on identity migration: every peer's id
+    /// changes network-wide under the hard cutover, so the cache is stale).
+    pub fn clear_peers(&self) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM peers", [])?;
+        Ok(())
+    }
+
+    /// The pinned certificate DER for a peer id (trust-on-first-use record), if
+    /// one has been recorded.
+    pub fn get_pin(&self, node_id: &str) -> rusqlite::Result<Option<Vec<u8>>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT cert_der FROM pinned_keys WHERE node_id = ?1",
+            params![node_id],
+            |r| r.get::<_, Vec<u8>>(0),
+        )
+        .optional()
+    }
+
+    /// Record a peer's certificate on first sight (TOFU). No-op if already pinned.
+    pub fn set_pin(&self, node_id: &str, cert_der: &[u8], now: i64) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO pinned_keys (node_id, cert_der, first_seen, last_seen)
+             VALUES (?1, ?2, ?3, ?3)
+             ON CONFLICT(node_id) DO UPDATE SET last_seen = ?3",
+            params![node_id, cert_der, now],
+        )?;
+        Ok(())
+    }
+
+    /// Forget a pinned peer (so the next connection re-pins via TOFU). Used by the
+    /// "re-trust" command after a peer legitimately reinstalled.
+    pub fn clear_pin(&self, node_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM pinned_keys WHERE node_id = ?1", params![node_id])?;
+        Ok(())
+    }
+
+    /// All pinned peers as `(node_id, first_seen, last_seen)`, newest first. For
+    /// the security/identity view in the UI.
+    pub fn list_pins(&self) -> rusqlite::Result<Vec<(String, i64, i64)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT node_id, first_seen, last_seen FROM pinned_keys ORDER BY last_seen DESC",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        rows.collect()
     }
 
     /// Read this node's profile, if the identity row exists.
@@ -427,26 +582,128 @@ impl LanChatStore {
         rows.collect()
     }
 
+    /// Attach the at-rest message-encryption key (idempotent; first set wins).
+    pub fn set_message_key(&self, key: &[u8]) {
+        if key.len() != crypto::KEY_LEN {
+            log::error!("lanchat: message key has wrong length {}", key.len());
+            return;
+        }
+        let mut arr = [0u8; crypto::KEY_LEN];
+        arr.copy_from_slice(key);
+        let _ = self.msg_key.set(Zeroizing::new(arr));
+    }
+
+    /// Encrypt a body to `nonce || ciphertext`, or `None` when no key is attached
+    /// (callers then store plaintext with `enc_ver = 0`).
+    fn encrypt_body(&self, plaintext: &str) -> Option<Vec<u8>> {
+        let key = self.msg_key.get()?;
+        let nonce = crypto::random_nonce();
+        let ct = crypto::aead_encrypt(key, &nonce, plaintext.as_bytes()).ok()?;
+        let mut out = Vec::with_capacity(crypto::NONCE_LEN + ct.len());
+        out.extend_from_slice(&nonce);
+        out.extend_from_slice(&ct);
+        Some(out)
+    }
+
+    /// Decrypt a `nonce || ciphertext` body blob; empty string on any failure
+    /// (missing key, truncated blob, wrong key).
+    fn decrypt_body(&self, blob: &[u8]) -> String {
+        let Some(key) = self.msg_key.get() else {
+            return String::new();
+        };
+        if blob.len() < crypto::NONCE_LEN {
+            return String::new();
+        }
+        let (nonce, ct) = blob.split_at(crypto::NONCE_LEN);
+        let Ok(nonce) = <[u8; crypto::NONCE_LEN]>::try_from(nonce) else {
+            return String::new();
+        };
+        match crypto::aead_decrypt(key, &nonce, ct) {
+            Ok(pt) => String::from_utf8_lossy(&pt).to_string(),
+            Err(_) => String::new(),
+        }
+    }
+
+    /// Map a message row to [`LanMessage`], decrypting the body when it was stored
+    /// encrypted (`enc_ver >= 1`). Expects columns: id, conv_id, sender_id, body,
+    /// mentions, created_at, state, body_cipher, enc_ver.
+    fn row_to_message(&self, r: &rusqlite::Row<'_>) -> rusqlite::Result<LanMessage> {
+        let mentions_json: String = r.get(4)?;
+        let mentions = serde_json::from_str::<Vec<String>>(&mentions_json).unwrap_or_default();
+        let enc_ver: i64 = r.get(8)?;
+        let body = if enc_ver >= 1 {
+            let cipher: Option<Vec<u8>> = r.get(7)?;
+            cipher.map(|c| self.decrypt_body(&c)).unwrap_or_default()
+        } else {
+            r.get::<_, String>(3)?
+        };
+        Ok(LanMessage {
+            id: r.get(0)?,
+            conv_id: r.get(1)?,
+            sender_id: r.get(2)?,
+            body,
+            mentions,
+            created_at: r.get(5)?,
+            state: r.get(6)?,
+        })
+    }
+
     /// Insert a message (idempotent on id — duplicate deliveries are ignored).
     /// Returns true if the row was newly inserted.
     pub fn insert_message(&self, msg: &LanMessage) -> rusqlite::Result<bool> {
         let mentions = serde_json::to_string(&msg.mentions).unwrap_or_else(|_| "[]".into());
+        // Encrypt the body when a key is attached; otherwise persist plaintext.
+        let (body_plain, body_cipher, enc_ver): (String, Option<Vec<u8>>, i64) =
+            match self.encrypt_body(&msg.body) {
+                Some(ct) => (String::new(), Some(ct), 1),
+                None => (msg.body.clone(), None, 0),
+            };
         let conn = self.conn.lock().unwrap();
         let changed = conn.execute(
-            "INSERT INTO messages (id, conv_id, sender_id, body, mentions, created_at, state)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO messages (id, conv_id, sender_id, body, mentions, created_at, state, body_cipher, enc_ver)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(id) DO NOTHING",
             params![
                 msg.id,
                 msg.conv_id,
                 msg.sender_id,
-                msg.body,
+                body_plain,
                 mentions,
                 msg.created_at,
-                msg.state
+                msg.state,
+                body_cipher,
+                enc_ver
             ],
         )?;
         Ok(changed > 0)
+    }
+
+    /// Encrypt any legacy plaintext message rows in place (run once after the key
+    /// is attached). Returns the number of rows migrated.
+    pub fn migrate_message_encryption(&self) -> rusqlite::Result<usize> {
+        if self.msg_key.get().is_none() {
+            return Ok(0);
+        }
+        let pending: Vec<(String, String)> = {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt =
+                conn.prepare("SELECT id, body FROM messages WHERE enc_ver = 0 AND body <> ''")?;
+            let rows =
+                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let mut migrated = 0;
+        for (id, body) in pending {
+            if let Some(ct) = self.encrypt_body(&body) {
+                let conn = self.conn.lock().unwrap();
+                conn.execute(
+                    "UPDATE messages SET body_cipher = ?2, enc_ver = 1, body = '' WHERE id = ?1",
+                    params![id, ct],
+                )?;
+                migrated += 1;
+            }
+        }
+        Ok(migrated)
     }
 
     /// Update a message's delivery state ("sending"/"sent"/"delivered"/"failed").
@@ -463,10 +720,10 @@ impl LanChatStore {
     pub fn get_message(&self, id: &str) -> rusqlite::Result<Option<LanMessage>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT id, conv_id, sender_id, body, mentions, created_at, state
+            "SELECT id, conv_id, sender_id, body, mentions, created_at, state, body_cipher, enc_ver
              FROM messages WHERE id = ?1",
             params![id],
-            row_to_message,
+            |r| self.row_to_message(r),
         )
         .optional()
     }
@@ -475,11 +732,11 @@ impl LanChatStore {
     pub fn list_messages(&self, conv_id: &str, limit: i64) -> rusqlite::Result<Vec<LanMessage>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, conv_id, sender_id, body, mentions, created_at, state FROM (
+            "SELECT id, conv_id, sender_id, body, mentions, created_at, state, body_cipher, enc_ver FROM (
                  SELECT * FROM messages WHERE conv_id = ?1 ORDER BY created_at DESC LIMIT ?2
              ) ORDER BY created_at ASC",
         )?;
-        let rows = stmt.query_map(params![conv_id, limit], row_to_message)?;
+        let rows = stmt.query_map(params![conv_id, limit], |r| self.row_to_message(r))?;
         rows.collect()
     }
 
@@ -507,6 +764,126 @@ impl LanChatStore {
             "UPDATE conversations SET unread = 0 WHERE id = ?1",
             params![conv_id],
         )?;
+        Ok(())
+    }
+
+    /// Read the message-retention policy.
+    pub fn get_retention(&self) -> rusqlite::Result<RetentionSettings> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT retention_days, max_per_conv, cleanup_enabled FROM settings WHERE id = 1",
+            [],
+            |r| {
+                Ok(RetentionSettings {
+                    retention_days: r.get(0)?,
+                    max_per_conv: r.get(1)?,
+                    cleanup_enabled: r.get::<_, i64>(2)? != 0,
+                })
+            },
+        )
+    }
+
+    /// Update the message-retention policy.
+    pub fn set_retention(&self, s: &RetentionSettings) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO settings (id, retention_days, max_per_conv, cleanup_enabled)
+             VALUES (1, ?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET
+               retention_days = ?1, max_per_conv = ?2, cleanup_enabled = ?3",
+            params![
+                s.retention_days,
+                s.max_per_conv,
+                if s.cleanup_enabled { 1 } else { 0 }
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Read the "start LanChat service on app launch" policy.
+    pub fn get_start_on_launch(&self) -> rusqlite::Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT start_on_launch FROM settings WHERE id = 1",
+            [],
+            |r| Ok(r.get::<_, i64>(0)? != 0),
+        )
+    }
+
+    /// Update the "start LanChat service on app launch" policy.
+    pub fn set_start_on_launch(&self, enabled: bool) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO settings (id, start_on_launch) VALUES (1, ?1)
+             ON CONFLICT(id) DO UPDATE SET start_on_launch = ?1",
+            params![if enabled { 1 } else { 0 }],
+        )?;
+        Ok(())
+    }
+
+    /// Apply the retention policy: delete messages older than `retention_days`
+    /// and trim each conversation to its newest `max_per_conv`. A cap of 0
+    /// disables that dimension. Returns the number of rows deleted.
+    pub fn apply_retention(&self) -> rusqlite::Result<usize> {
+        let s = self.get_retention()?;
+        if !s.cleanup_enabled {
+            return Ok(0);
+        }
+        let conn = self.conn.lock().unwrap();
+        let mut deleted = 0usize;
+        if s.retention_days > 0 {
+            let cutoff =
+                chrono::Utc::now().timestamp_millis() - s.retention_days * 86_400_000;
+            deleted += conn.execute(
+                "DELETE FROM messages WHERE created_at < ?1",
+                params![cutoff],
+            )?;
+        }
+        if s.max_per_conv > 0 {
+            deleted += conn.execute(
+                "DELETE FROM messages WHERE id IN (
+                     SELECT id FROM (
+                         SELECT id, ROW_NUMBER() OVER (
+                             PARTITION BY conv_id ORDER BY created_at DESC
+                         ) AS rn FROM messages
+                     ) WHERE rn > ?1
+                 )",
+                params![s.max_per_conv],
+            )?;
+        }
+        Ok(deleted)
+    }
+
+    /// Delete a single message by id.
+    pub fn delete_message(&self, id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM messages WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    /// Delete all messages in a conversation and reset its counters.
+    pub fn clear_conversation(&self, conv_id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM messages WHERE conv_id = ?1", params![conv_id])?;
+        conn.execute(
+            "UPDATE conversations SET unread = 0, last_msg_at = 0 WHERE id = ?1",
+            params![conv_id],
+        )?;
+        Ok(())
+    }
+
+    /// Delete all message history across every conversation.
+    pub fn clear_all_history(&self) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM messages", [])?;
+        conn.execute("UPDATE conversations SET unread = 0, last_msg_at = 0", [])?;
+        Ok(())
+    }
+
+    /// Reclaim disk space after large deletions.
+    pub fn vacuum(&self) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("VACUUM", [])?;
         Ok(())
     }
 
@@ -595,20 +972,6 @@ impl LanChatStore {
         }
         Ok(out)
     }
-}
-
-fn row_to_message(r: &rusqlite::Row<'_>) -> rusqlite::Result<LanMessage> {
-    let mentions_json: String = r.get(4)?;
-    let mentions = serde_json::from_str::<Vec<String>>(&mentions_json).unwrap_or_default();
-    Ok(LanMessage {
-        id: r.get(0)?,
-        conv_id: r.get(1)?,
-        sender_id: r.get(2)?,
-        body: r.get(3)?,
-        mentions,
-        created_at: r.get(5)?,
-        state: r.get(6)?,
-    })
 }
 
 #[cfg(test)]
@@ -733,6 +1096,111 @@ mod tests {
         store.insert_message(&msg("ms", &conv, "me", 1, "sending")).unwrap();
         store.set_message_state("ms", "delivered").unwrap();
         assert_eq!(store.get_message("ms").unwrap().unwrap().state, "delivered");
+    }
+
+    #[test]
+    fn message_body_encrypted_at_rest_when_key_set() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        store.set_message_key(&[7u8; 32]);
+        let conv = direct_conv_id("peer-e");
+        store.ensure_conversation(&conv, "direct", "peer-e").unwrap();
+        let mut m = msg("me1", &conv, "me", 10, "sent");
+        m.body = "secret text".into();
+        store.insert_message(&m).unwrap();
+
+        // Round-trips through the decrypting read path.
+        assert_eq!(store.get_message("me1").unwrap().unwrap().body, "secret text");
+        assert_eq!(store.list_messages(&conv, 10).unwrap()[0].body, "secret text");
+
+        // At rest the plaintext column is empty and the ciphertext is present.
+        let conn = store.conn.lock().unwrap();
+        let (plain, cipher, ev): (String, Option<Vec<u8>>, i64) = conn
+            .query_row(
+                "SELECT body, body_cipher, enc_ver FROM messages WHERE id = 'me1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(plain, "", "plaintext body not stored");
+        assert!(cipher.is_some_and(|c| !c.is_empty()), "ciphertext stored");
+        assert_eq!(ev, 1);
+    }
+
+    #[test]
+    fn migrate_message_encryption_encrypts_legacy_rows() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-m");
+        store.ensure_conversation(&conv, "direct", "peer-m").unwrap();
+        // Insert without a key -> stored plaintext (enc_ver 0).
+        let mut m = msg("ml1", &conv, "me", 5, "delivered");
+        m.body = "legacy plaintext".into();
+        store.insert_message(&m).unwrap();
+
+        store.set_message_key(&[3u8; 32]);
+        assert_eq!(store.migrate_message_encryption().unwrap(), 1);
+        assert_eq!(store.get_message("ml1").unwrap().unwrap().body, "legacy plaintext");
+        let conn = store.conn.lock().unwrap();
+        let (plain, ev): (String, i64) = conn
+            .query_row("SELECT body, enc_ver FROM messages WHERE id='ml1'", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(plain, "");
+        assert_eq!(ev, 1);
+    }
+
+    #[test]
+    fn start_on_launch_defaults_off_and_persists() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        // Fresh DB: opt-in policy is off by default.
+        assert!(!store.get_start_on_launch().unwrap());
+        store.set_start_on_launch(true).unwrap();
+        assert!(store.get_start_on_launch().unwrap());
+        store.set_start_on_launch(false).unwrap();
+        assert!(!store.get_start_on_launch().unwrap());
+    }
+
+    #[test]
+    fn retention_trims_by_age_and_count() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let conv = direct_conv_id("peer-r");
+        store.ensure_conversation(&conv, "direct", "peer-r").unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        let old = now - 100 * 86_400_000; // 100 days ago
+        store.insert_message(&msg("old1", &conv, "me", old, "delivered")).unwrap();
+        for i in 0..5 {
+            store
+                .insert_message(&msg(&format!("r{i}"), &conv, "me", now - i, "delivered"))
+                .unwrap();
+        }
+        store
+            .set_retention(&RetentionSettings {
+                retention_days: 90,
+                max_per_conv: 3,
+                cleanup_enabled: true,
+            })
+            .unwrap();
+        let deleted = store.apply_retention().unwrap();
+        assert!(deleted >= 1, "old + overflow rows deleted");
+        let remaining = store.list_messages(&conv, 100).unwrap();
+        assert!(remaining.len() <= 3, "trimmed to max_per_conv");
+        assert!(!remaining.iter().any(|m| m.id == "old1"), "aged-out row gone");
+    }
+
+    #[test]
+    fn clear_conversation_and_all_history() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let c1 = direct_conv_id("a");
+        let c2 = direct_conv_id("b");
+        store.ensure_conversation(&c1, "direct", "a").unwrap();
+        store.ensure_conversation(&c2, "direct", "b").unwrap();
+        store.insert_message(&msg("x1", &c1, "me", 1, "sent")).unwrap();
+        store.insert_message(&msg("y1", &c2, "me", 1, "sent")).unwrap();
+        store.clear_conversation(&c1).unwrap();
+        assert_eq!(store.list_messages(&c1, 10).unwrap().len(), 0);
+        assert_eq!(store.list_messages(&c2, 10).unwrap().len(), 1);
+        store.clear_all_history().unwrap();
+        assert_eq!(store.list_messages(&c2, 10).unwrap().len(), 0);
     }
 
     #[test]

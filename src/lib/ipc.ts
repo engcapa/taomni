@@ -9,7 +9,11 @@ import type {
   LanGroup,
   LanMessage,
   LanPeer,
+  LanPinnedPeer,
   LanProfile,
+  LanRetention,
+  LanSecurityEvent,
+  LanServiceState,
   LanSignal,
   LanTransferProgress,
 } from "../types";
@@ -1336,4 +1340,65 @@ export async function listenLanChatWb(
   cb: (s: LanSignal) => void,
 ): Promise<UnlistenFn> {
   return listen<LanSignal>("lanchat://wb", (e) => cb(e.payload));
+}
+
+/* ----------------------------- retention & security (phase 4) ----------------------------- */
+
+export async function lanchatGetRetention(): Promise<LanRetention> {
+  return invoke<LanRetention>("lanchat_get_retention");
+}
+
+export async function lanchatSetRetention(settings: LanRetention): Promise<void> {
+  return invoke("lanchat_set_retention", { settings });
+}
+
+export async function lanchatDeleteMessage(msgId: string): Promise<void> {
+  return invoke("lanchat_delete_message", { msgId });
+}
+
+export async function lanchatClearConversation(convId: string): Promise<void> {
+  return invoke("lanchat_clear_conversation", { convId });
+}
+
+export async function lanchatClearAllHistory(): Promise<void> {
+  return invoke("lanchat_clear_all_history");
+}
+
+export async function lanchatListPinned(): Promise<LanPinnedPeer[]> {
+  return invoke<LanPinnedPeer[]>("lanchat_list_pinned");
+}
+
+export async function lanchatRetrustPeer(nodeId: string): Promise<void> {
+  return invoke("lanchat_retrust_peer", { nodeId });
+}
+
+export async function listenLanChatSecurity(
+  cb: (e: LanSecurityEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<LanSecurityEvent>("lanchat://security", (e) => cb(e.payload));
+}
+
+/* ----------------------------- service enable / start-on-launch ----------------------------- */
+
+export async function lanchatGetServiceState(): Promise<LanServiceState> {
+  return invoke<LanServiceState>("lanchat_get_service_state");
+}
+
+/** Manually start the background service (one-way; runs until app exit). */
+export async function lanchatStartService(): Promise<void> {
+  return invoke("lanchat_start_service");
+}
+
+/** Set the "start LanChat on app launch" policy (affects next launch only). */
+export async function lanchatSetStartOnLaunch(enabled: boolean): Promise<void> {
+  return invoke("lanchat_set_start_on_launch", { enabled });
+}
+
+/** Service lifecycle change: fires with `{ running }` when the service starts. */
+export async function listenLanChatService(
+  cb: (running: boolean) => void,
+): Promise<UnlistenFn> {
+  return listen<{ running: boolean }>("lanchat://service", (e) =>
+    cb(e.payload.running),
+  );
 }

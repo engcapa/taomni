@@ -18,18 +18,31 @@ use std::time::Duration;
 use futures::{SinkExt, StreamExt};
 use serde_json::json;
 use tauri::{AppHandle, Emitter};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
+use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 use crate::lanchat::protocol::{frame, Envelope, PeerRecord, PresenceStatus};
-use crate::lanchat::LanChatState;
+use crate::lanchat::{identity, tls, LanChatState};
 
 /// How often to send a keepalive ping on an idle connection.
 const PING_INTERVAL: Duration = Duration::from_secs(15);
 /// How long the handshake may take before the connection is abandoned.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Hard cap on a single control frame (hardening: bounds a malicious peer's
+/// length prefix so it can't force a huge allocation). Well above any legitimate
+/// frame — file chunks are 64 KiB (~88 KiB base64-framed).
+const MAX_FRAME_LEN: usize = 4 * 1024 * 1024;
+
+/// A length-delimited codec with our explicit frame-length cap.
+fn new_codec() -> LengthDelimitedCodec {
+    let mut codec = LengthDelimitedCodec::new();
+    codec.set_max_frame_length(MAX_FRAME_LEN);
+    codec
+}
 
 /// A live connection to a peer: its id/address plus an outbound frame sender
 /// drained by the connection's write task.
@@ -46,7 +59,7 @@ impl ConnHandle {
     }
 }
 
-type LanFramed = Framed<TcpStream, LengthDelimitedCodec>;
+type LanFramed<T> = Framed<T, LengthDelimitedCodec>;
 
 /// Accept loop over the reserved control listener. Spawns a task per inbound
 /// connection. Runs until the listener errors irrecoverably.
@@ -148,17 +161,31 @@ pub async fn send_to_peer(
     handle.send(env)
 }
 
-async fn send_frame(framed: &mut LanFramed, env: &Envelope) -> Result<(), String> {
+async fn send_frame<T: AsyncWrite + Unpin>(
+    framed: &mut LanFramed<T>,
+    env: &Envelope,
+) -> Result<(), String> {
     let bytes = env.encode().map_err(|e| e.to_string())?;
     framed.send(bytes).await.map_err(|e| e.to_string())
 }
 
-async fn recv_frame(framed: &mut LanFramed) -> Result<Envelope, String> {
+async fn recv_frame<T: AsyncRead + Unpin>(framed: &mut LanFramed<T>) -> Result<Envelope, String> {
     match framed.next().await {
         Some(Ok(buf)) => Envelope::decode(&buf).map_err(|e| e.to_string()),
         Some(Err(e)) => Err(e.to_string()),
         None => Err("connection closed during handshake".into()),
     }
+}
+
+/// Emit a security event to the frontend (and log it) when a peer's presented
+/// identity is rejected. `kind` is `"spoof"` (claimed id != cert fingerprint) or
+/// `"keyChanged"` (a pinned cert changed).
+fn emit_security(app: &AppHandle, peer_id: &str, addr: SocketAddr, kind: &str) {
+    log::warn!("lanchat: security: {kind} from {peer_id} ({addr})");
+    let _ = app.emit(
+        crate::lanchat::events::SECURITY,
+        &json!({ "peerId": peer_id, "addr": addr.to_string(), "kind": kind }),
+    );
 }
 
 /// Identity learned from a peer's `hello` / `hello-ack` frame. Carries enough
@@ -170,6 +197,8 @@ struct PeerHello {
     /// The peer's advertised control-channel listen port (so we can dial back),
     /// if its `hello` carried one. Older peers omit it.
     port: Option<u16>,
+    /// The peer's protocol version (0 if absent).
+    pv: u32,
 }
 
 fn parse_hello(env: &Envelope) -> PeerHello {
@@ -187,6 +216,12 @@ fn parse_hello(env: &Envelope) -> PeerHello {
             .and_then(|v| v.as_u64())
             .and_then(|n| u16::try_from(n).ok())
             .filter(|p| *p != 0),
+        pv: env
+            .payload
+            .get("pv")
+            .and_then(|v| v.as_u64())
+            .map(|n| n as u32)
+            .unwrap_or(0),
     }
 }
 
@@ -194,8 +229,8 @@ fn parse_hello(env: &Envelope) -> PeerHello {
 /// when we dialed (so we send first), `None` when accepting. `my_port` is our
 /// control-channel listen port, advertised so the peer can dial us back even
 /// when it never discovered us over mDNS.
-async fn handshake(
-    framed: &mut LanFramed,
+async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
+    framed: &mut LanFramed<T>,
     my_id: &str,
     my_name: &str,
     my_port: u16,
@@ -347,7 +382,40 @@ async fn setup_connection(
     expected: Option<String>,
 ) -> Result<(), String> {
     let _ = stream.set_nodelay(true);
-    let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
+
+    // Upgrade the raw TCP stream to mutual TLS before any application data: the
+    // dialer takes the client role, the acceptor the server role. Both present
+    // and require the self-signed identity certificate.
+    let tls: TlsStream<TcpStream> = match &expected {
+        Some(_) => {
+            let connector = TlsConnector::from(state.tls_client.clone());
+            let sni = rustls::pki_types::ServerName::try_from(tls::SNI)
+                .map_err(|e| format!("bad sni: {e}"))?;
+            let s = timeout(HANDSHAKE_TIMEOUT, connector.connect(sni, stream))
+                .await
+                .map_err(|_| "tls connect timed out".to_string())?
+                .map_err(|e| format!("tls connect: {e}"))?;
+            TlsStream::from(s)
+        }
+        None => {
+            let acceptor = TlsAcceptor::from(state.tls_server.clone());
+            let s = timeout(HANDSHAKE_TIMEOUT, acceptor.accept(stream))
+                .await
+                .map_err(|_| "tls accept timed out".to_string())?
+                .map_err(|e| format!("tls accept: {e}"))?;
+            TlsStream::from(s)
+        }
+    };
+
+    // Capture the peer's certificate fingerprint; the claimed identity is bound
+    // to it after the application handshake below.
+    let peer_cert = {
+        let (_, conn) = tls.get_ref();
+        tls::peer_cert_der(conn).ok_or("peer presented no TLS certificate")?
+    };
+    let peer_fp = identity::fingerprint(&peer_cert);
+
+    let mut framed = Framed::new(tls, new_codec());
     let my_id = state.node_id().await;
     let my_name = state
         .store
@@ -366,6 +434,26 @@ async fn setup_connection(
     .map_err(|_| "handshake timed out".to_string())??;
     let peer_id = hello.id.clone();
 
+    // Reject pre-v2 peers (defense in depth; v1 plaintext peers already fail the
+    // TLS handshake above and never reach here).
+    if hello.pv < crate::lanchat::protocol::PROTOCOL_VERSION {
+        return Err(format!(
+            "unsupported protocol version {} from {peer_id}",
+            hello.pv
+        ));
+    }
+
+    // Anti-spoofing: the claimed node id must equal the presented certificate's
+    // fingerprint. Because the id *is* the fingerprint, a peer cannot claim an id
+    // without holding its private key (proven by the TLS handshake signature).
+    // This is the core identity guarantee.
+    if peer_id != peer_fp {
+        emit_security(&app, &peer_id, addr, "spoof");
+        return Err(format!(
+            "identity mismatch: claimed {peer_id} but certificate fingerprint is {peer_fp}"
+        ));
+    }
+
     if let Some(exp) = &expected {
         if exp != &peer_id {
             return Err(format!("peer id mismatch: expected {exp}, got {peer_id}"));
@@ -376,6 +464,22 @@ async fn setup_connection(
     if state.connections.read().await.contains_key(&peer_id) {
         log::debug!("lanchat: duplicate connection to {peer_id} dropped");
         return Ok(());
+    }
+
+    // Trust-on-first-use pin (audit + defense in depth): record the cert on first
+    // sight, block if a previously pinned cert ever changes. The latter is
+    // structurally unreachable while the id==fingerprint check above holds, so a
+    // mismatch means that invariant was somehow broken.
+    let now = chrono::Utc::now().timestamp_millis();
+    match state.store.get_pin(&peer_id) {
+        Ok(Some(pinned)) if pinned != peer_cert => {
+            emit_security(&app, &peer_id, addr, "keyChanged");
+            return Err(format!("pinned identity key changed for {peer_id}"));
+        }
+        Ok(_) => {
+            let _ = state.store.set_pin(&peer_id, &peer_cert, now);
+        }
+        Err(e) => log::debug!("lanchat: pin lookup for {peer_id} failed: {e}"),
     }
 
     // Learn this peer from the connection itself — covers peers mDNS never
@@ -643,5 +747,43 @@ mod tests {
         .unwrap();
         assert_eq!(learned.id, "node-other");
         assert_ne!(learned.id, "node-expected");
+    }
+
+    // Real loopback mutual-TLS handshake between two self-signed identities:
+    // each side must observe the other's certificate fingerprint, which is the
+    // peer's node id. This is the binding the anti-spoofing check relies on.
+    #[tokio::test]
+    async fn mutual_tls_binds_peer_cert_fingerprint() {
+        use crate::lanchat::identity::{fingerprint, Identity};
+
+        let server_id = Identity::generate().unwrap();
+        let client_id = Identity::generate().unwrap();
+        let (server_fp, client_fp) = (server_id.node_id.clone(), client_id.node_id.clone());
+        let server_cfg = tls::server_config(&server_id).unwrap();
+        let client_cfg = tls::client_config(&client_id).unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let srv = tokio::spawn(async move {
+            let (tcp, _) = listener.accept().await.unwrap();
+            let tls = TlsStream::from(TlsAcceptor::from(server_cfg).accept(tcp).await.unwrap());
+            let (_, conn) = tls.get_ref();
+            tls::peer_cert_der(conn).map(|c| fingerprint(&c))
+        });
+
+        let tcp = TcpStream::connect(addr).await.unwrap();
+        let sni = rustls::pki_types::ServerName::try_from(tls::SNI).unwrap();
+        let tls = TlsStream::from(
+            TlsConnector::from(client_cfg).connect(sni, tcp).await.unwrap(),
+        );
+        let seen_server_fp = {
+            let (_, conn) = tls.get_ref();
+            tls::peer_cert_der(conn).map(|c| fingerprint(&c))
+        };
+
+        let seen_client_fp = srv.await.unwrap();
+        assert_eq!(seen_client_fp.as_deref(), Some(client_fp.as_str()), "server sees client fp");
+        assert_eq!(seen_server_fp.as_deref(), Some(server_fp.as_str()), "client sees server fp");
     }
 }

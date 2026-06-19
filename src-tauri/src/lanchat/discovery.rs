@@ -255,7 +255,10 @@ mod tests {
         assert_eq!(info.get_property_val_str("name"), Some("赵敏"));
         assert_eq!(info.get_property_val_str("st"), Some("busy"));
         assert_eq!(info.get_property_val_str("port"), Some("4711"));
-        assert_eq!(info.get_property_val_str("pv"), Some("1"));
+        assert_eq!(
+            info.get_property_val_str("pv").map(str::to_string),
+            Some(protocol::PROTOCOL_VERSION.to_string())
+        );
         assert_eq!(info.get_property_val_str("caps"), Some("text"));
         assert!(info.get_property_val_str("id").is_some_and(|v| !v.is_empty()));
         assert!(info.get_fullname().ends_with("._taomni-lan._tcp.local."));

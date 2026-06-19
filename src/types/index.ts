@@ -101,6 +101,36 @@ export interface LanSignal {
   payload: Record<string, unknown>;
 }
 
+/** Message-retention policy (mirrors Rust `RetentionSettings`). */
+export interface LanRetention {
+  retentionDays: number;
+  maxPerConv: number;
+  cleanupEnabled: boolean;
+}
+
+/** Service enablement state (mirrors Rust `LanChatServiceState`). */
+export interface LanServiceState {
+  /** Whether the background service (discovery + transport + beacon) is live. */
+  running: boolean;
+  /** Whether the service is configured to start on app launch. */
+  startOnLaunch: boolean;
+}
+
+/** A pinned peer identity record (mirrors Rust `PinnedPeer`). */
+export interface LanPinnedPeer {
+  nodeId: string;
+  firstSeen: number;
+  lastSeen: number;
+}
+
+/** A security event: a peer's presented identity was rejected. */
+export interface LanSecurityEvent {
+  peerId: string;
+  addr: string;
+  /** "spoof" = claimed id != cert fingerprint; "keyChanged" = pinned cert changed. */
+  kind: "spoof" | "keyChanged";
+}
+
 /** Call kind. */
 export type LanCallKind = "audio" | "video";
 

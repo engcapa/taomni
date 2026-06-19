@@ -17,7 +17,12 @@ use serde::{Deserialize, Serialize};
 pub const SERVICE_TYPE: &str = "_taomni-lan._tcp.local.";
 
 /// Control-channel protocol version (bumped on breaking frame changes).
-pub const PROTOCOL_VERSION: u32 = 1;
+///
+/// v2 (phase 1+): node ids are self-certifying — the SHA-256 fingerprint of the
+/// node's self-signed TLS certificate — and the control channel is mutual-TLS.
+/// This is a hard cutover: v2 nodes do not interoperate with v1 (plaintext,
+/// random-UUID) nodes.
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Default chunk size for binary (file/media) frames — 64 KiB.
 pub const BINARY_CHUNK_SIZE: usize = 64 * 1024;

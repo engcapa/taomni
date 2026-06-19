@@ -14,15 +14,18 @@
 pub mod beacon;
 pub mod commands;
 pub mod discovery;
+pub mod identity;
+pub mod keystore;
 pub mod messaging;
 pub mod protocol;
 pub mod store;
+pub mod tls;
 pub mod transfer;
 pub mod transport;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicU16;
+use std::sync::atomic::{AtomicBool, AtomicU16};
 use std::sync::Mutex as StdMutex;
 
 use mdns_sd::ServiceDaemon;
@@ -51,6 +54,13 @@ pub mod events {
     pub const SIGNAL: &str = "lanchat://signal";
     /// A whiteboard frame from a peer (`{from,type,payload}`).
     pub const WB: &str = "lanchat://wb";
+    /// A security event: a peer's presented identity was rejected (spoofed id or
+    /// a changed pinned key). Payload `{ peerId, addr, kind }`.
+    pub const SECURITY: &str = "lanchat://security";
+    /// Service lifecycle change. Payload `{ running: bool }`. Emitted when the
+    /// background service starts (boot autostart or manual enable) so every
+    /// window can switch the panel from "not enabled" to live.
+    pub const SERVICE: &str = "lanchat://service";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.
@@ -63,8 +73,23 @@ pub struct LanChatState {
     pub db_path: PathBuf,
     /// SQLite-backed persistence (profile / peers / groups / messages).
     pub store: store::LanChatStore,
+    /// Machine-bound secret store (OS keychain + file fallback) for the identity
+    /// key and the at-rest message-encryption key.
+    pub keystore: keystore::KeyStore,
+    /// This node's self-certifying identity (cert + private key DER); the TLS
+    /// transport (phase 2) builds its rustls config from this.
+    pub identity: identity::Identity,
+    /// Shared mutual-TLS configs for the control channel (built once from the
+    /// identity): server side accepts inbound, client side dials out.
+    pub tls_server: std::sync::Arc<rustls::ServerConfig>,
+    pub tls_client: std::sync::Arc<rustls::ClientConfig>,
     /// This node's stable identity (loaded/generated on construction).
     pub node_id: RwLock<String>,
+    /// Whether the background service (discovery + transport + beacon) has been
+    /// started. A one-way latch: set true on first `start_service`, never
+    /// cleared while the app runs (there is no runtime "stop"). Guards against
+    /// double-start when both boot-autostart and a manual enable race.
+    pub running: AtomicBool,
     /// Peers discovered via mDNS, keyed by node id.
     pub peers: RwLock<HashMap<String, PeerRecord>>,
     /// Live control-channel connections, keyed by remote node id.
@@ -97,14 +122,40 @@ impl LanChatState {
     pub fn new(app_data_dir: &Path) -> Self {
         let db_path = app_data_dir.join("lanchat.sqlite");
         let store = store::LanChatStore::open(&db_path).expect("failed to open lanchat.sqlite");
-        let node_id = store
-            .ensure_identity()
+        let keystore = keystore::KeyStore::new(app_data_dir);
+        // At-rest message encryption: load (or create) the machine key, attach it
+        // to the store, and encrypt any legacy plaintext rows. If the key is
+        // unavailable, messages stay plaintext rather than failing to start.
+        match keystore.load_or_create_random("message-key-v1", 32) {
+            Ok(key) => {
+                store.set_message_key(&key);
+                match store.migrate_message_encryption() {
+                    Ok(n) if n > 0 => log::info!("lanchat: encrypted {n} legacy message(s) at rest"),
+                    Ok(_) => {}
+                    Err(e) => log::warn!("lanchat: message encryption migration failed: {e}"),
+                }
+            }
+            Err(e) => {
+                log::error!("lanchat: message key unavailable ({e}); messages stored in plaintext")
+            }
+        }
+        // Bootstrap the self-certifying identity (generates a key pair + cert on
+        // first launch, migrates from a legacy UUID identity if present).
+        let identity = identity::ensure(&store, &keystore)
             .expect("failed to initialize lanchat identity");
+        let node_id = identity.node_id.clone();
         log::info!("lanchat: node identity {}", node_id);
+        let tls_server = tls::server_config(&identity).expect("build lanchat server TLS config");
+        let tls_client = tls::client_config(&identity).expect("build lanchat client TLS config");
         Self {
             db_path,
             store,
+            keystore,
+            identity,
+            tls_server,
+            tls_client,
             node_id: RwLock::new(node_id),
+            running: AtomicBool::new(false),
             peers: RwLock::new(HashMap::new()),
             connections: RwLock::new(HashMap::new()),
             daemon: StdMutex::new(None),
@@ -130,16 +181,26 @@ impl LanChatState {
     }
 }
 
-/// Launch the LanChat background service.
+/// Launch the LanChat background service (idempotent, one-way).
 ///
 /// Reserves the TCP control port, starts the transport accept loop over that
 /// listener, then runs mDNS discovery. Discovery + transport run concurrently
-/// for the lifetime of the app.
-pub async fn start(app: AppHandle) {
+/// for the lifetime of the app — there is no runtime "stop"; the only way to
+/// go dark is to not start (see the `start_on_launch` policy) or quit the app.
+///
+/// Safe to call more than once: the first call latches `running` and proceeds;
+/// later calls return immediately. This lets boot-autostart and a manual
+/// `lanchat_start_service` from the UI race without double-binding the port.
+pub async fn start_service(app: AppHandle) {
     use std::sync::atomic::Ordering;
-    use tauri::Manager;
+    use tauri::{Emitter, Manager};
 
     let lanchat = app.state::<crate::state::AppState>().lanchat.clone();
+
+    // One-way latch: if already started, do nothing.
+    if lanchat.running.swap(true, Ordering::SeqCst) {
+        return;
+    }
 
     // Reserve an ephemeral control port now so the mDNS TXT can advertise it;
     // the transport accept loop takes over this listener below.
@@ -149,6 +210,9 @@ pub async fn start(app: AppHandle) {
             lanchat.control_port.store(port, Ordering::SeqCst);
             *lanchat.control_listener.lock().await = Some(listener);
             log::info!("lanchat: reserved control port {}", port);
+
+            // Announce the service is now live to every window.
+            let _ = app.emit(events::SERVICE, serde_json::json!({ "running": true }));
 
             // Transport accept loop (takes the reserved listener).
             let app_t = app.clone();
@@ -184,11 +248,32 @@ pub async fn start(app: AppHandle) {
                 }
             });
 
+            // Periodic retention cleanup: sweep on startup and every 6 hours.
+            let state_c = lanchat.clone();
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_secs(6 * 3600));
+                loop {
+                    interval.tick().await; // fires immediately on the first iteration
+                    match state_c.store.apply_retention() {
+                        Ok(n) if n > 0 => {
+                            log::info!("lanchat: retention removed {n} message(s)");
+                            let _ = state_c.store.vacuum();
+                        }
+                        Ok(_) => {}
+                        Err(e) => log::warn!("lanchat: retention sweep failed: {e}"),
+                    }
+                }
+            });
+
             // mDNS discovery (runs for the app lifetime).
             discovery::run(app, lanchat, port).await;
         }
         Err(e) => {
             log::error!("lanchat: failed to reserve control port: {e}");
+            // Roll back the latch so a later manual enable can retry.
+            lanchat.running.store(false, Ordering::SeqCst);
+            let _ = app.emit(events::SERVICE, serde_json::json!({ "running": false }));
         }
     }
 }
