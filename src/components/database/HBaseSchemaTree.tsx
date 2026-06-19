@@ -46,6 +46,8 @@ export interface HBaseSchemaTreeProps {
   namespace?: string | null;
   /** Endpoint summary shown under the header. */
   endpoint?: string;
+  /** Default LIMIT used by Browse / scan helpers. */
+  scanLimit?: number;
   /** Bumped by the parent to force a table-list reload (e.g. after a mutation). */
   refreshSignal?: number;
   /** Run a (read or confirmed-write) command and show its result in the grid. */
@@ -101,8 +103,6 @@ function synthesizeCreateDdl(table: string, families: HBaseColumnFamily[]): stri
   return `create '${table}',\n  ${specs.join(",\n  ")}`;
 }
 
-const SCAN_PREVIEW_LIMIT = 50;
-
 interface FamilyState {
   expanded: boolean;
   families?: HBaseColumnFamily[];
@@ -114,6 +114,7 @@ export function HBaseSchemaTree({
   transport,
   namespace,
   endpoint,
+  scanLimit = 50,
   refreshSignal = 0,
   onRunCommand,
   onInsert,
@@ -266,7 +267,7 @@ export function HBaseSchemaTree({
 
   const tableMenu = (full: string): MenuItem[] => {
     const items: MenuItem[] = [
-      { label: t("hbaseObjects.browse"), onClick: () => onRunCommand?.(scanStatement(full, { limit: SCAN_PREVIEW_LIMIT })) },
+      { label: t("hbaseObjects.browse"), onClick: () => onRunCommand?.(scanStatement(full, { limit: scanLimit })) },
       { label: t("hbaseObjects.scanWithOptions"), onClick: () => void promptScanLimit(full) },
       { label: t("hbaseObjects.getRow"), onClick: () => void promptGetRow(full) },
       { label: t("hbaseObjects.count"), onClick: () => onRunCommand?.(countStatement(full)) },
@@ -277,7 +278,7 @@ export function HBaseSchemaTree({
       {
         label: t("hbaseObjects.insertTo"),
         children: [
-          { label: t("hbaseObjects.insertScan"), onClick: () => onInsert?.(scanStatement(full, { limit: SCAN_PREVIEW_LIMIT }), "cursor") },
+          { label: t("hbaseObjects.insertScan"), onClick: () => onInsert?.(scanStatement(full, { limit: scanLimit }), "cursor") },
           { label: t("hbaseObjects.insertGet"), onClick: () => onInsert?.(getStatement(full, "row-key"), "cursor") },
           { label: t("hbaseObjects.insertPut"), onClick: () => onInsert?.(putStatement(full, "row-key", "cf:q", "value"), "cursor") },
           { label: t("hbaseObjects.insertDelete"), onClick: () => onInsert?.(deleteStatement(full, "row-key", "cf:q"), "cursor") },
@@ -296,8 +297,8 @@ export function HBaseSchemaTree({
   };
 
   const familyMenu = (table: string, family: string): MenuItem[] => [
-    { label: t("hbaseObjects.scanFamily"), onClick: () => onRunCommand?.(scanStatement(table, { limit: SCAN_PREVIEW_LIMIT, columns: [family] })) },
-    { label: t("hbaseObjects.insertScanFamily"), onClick: () => onInsert?.(scanStatement(table, { limit: SCAN_PREVIEW_LIMIT, columns: [family] }), "cursor") },
+    { label: t("hbaseObjects.scanFamily"), onClick: () => onRunCommand?.(scanStatement(table, { limit: scanLimit, columns: [family] })) },
+    { label: t("hbaseObjects.insertScanFamily"), onClick: () => onInsert?.(scanStatement(table, { limit: scanLimit, columns: [family] }), "cursor") },
     sep,
     { label: t("hbaseObjects.copyFamily"), onClick: () => void copyName(family) },
     { label: t("hbaseObjects.alterFamily"), disabled: !adminEnabled("alter"), onClick: () => onInsert?.(alterTemplate(table, family), "cursor") },
@@ -316,7 +317,7 @@ export function HBaseSchemaTree({
           style={{ paddingLeft: indent }}
           title={full}
           onClick={() => void toggleTable(full)}
-          onDoubleClick={() => onRunCommand?.(scanStatement(full, { limit: SCAN_PREVIEW_LIMIT }))}
+          onDoubleClick={() => onRunCommand?.(scanStatement(full, { limit: scanLimit }))}
           onContextMenu={(e) => openMenu(e, tableMenu(full))}
         >
           {st?.expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
@@ -341,7 +342,7 @@ export function HBaseSchemaTree({
                 style={{ paddingLeft: indent + 16 }}
                 title={Object.entries(fam.attributes ?? {}).map(([k, v]) => `${k}=${v}`).join(", ") || fam.name}
                 onContextMenu={(e) => openMenu(e, familyMenu(full, fam.name))}
-                onDoubleClick={() => onInsert?.(scanStatement(full, { limit: SCAN_PREVIEW_LIMIT, columns: [fam.name] }), "cursor")}
+                onDoubleClick={() => onInsert?.(scanStatement(full, { limit: scanLimit, columns: [fam.name] }), "cursor")}
               >
                 <Columns3 className="w-3 h-3 text-[var(--taomni-text-muted)]" />
                 <span className="flex-1 truncate">{fam.name}</span>

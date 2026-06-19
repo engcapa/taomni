@@ -1,0 +1,115 @@
+import { forwardRef, useEffect, useImperativeHandle } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import HBaseShellTab from "./HBaseShellTab";
+import type { HBaseConnectInfo } from "../../types";
+
+const editorState = vi.hoisted(() => ({ value: "list" }));
+
+const ipcMock = vi.hoisted(() => ({
+  hbaseConnect: vi.fn(async () => ({ ok: true })),
+  hbaseDisconnect: vi.fn(async () => undefined),
+  hbaseCancel: vi.fn(async () => undefined),
+  hbaseExecute: vi.fn(async (_s: string, command: string) => ({
+    command,
+    message: "1 row(s)",
+    columns: ["ROW", "VALUE"],
+    rows: [["r1", "v1"]],
+    warnings: [],
+    durationMs: 5,
+  })),
+}));
+
+vi.mock("react-resizable-panels", () => {
+  const Group = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={className}>{children}</div>
+  );
+  const Panel = forwardRef<unknown, { children: React.ReactNode; panelRef?: React.Ref<unknown> }>(
+    ({ children, panelRef }, ref) => {
+      const handle = { resize: vi.fn() };
+      useImperativeHandle(ref, () => handle);
+      useImperativeHandle(panelRef, () => handle);
+      return <div>{children}</div>;
+    },
+  );
+  const Separator = () => <div />;
+  return { Group, Panel, Separator, PanelGroup: Group, PanelResizeHandle: Separator };
+});
+
+vi.mock("../../lib/ipc", () => ({
+  hbaseConnect: ipcMock.hbaseConnect,
+  hbaseDisconnect: ipcMock.hbaseDisconnect,
+  hbaseCancel: ipcMock.hbaseCancel,
+  hbaseExecute: ipcMock.hbaseExecute,
+}));
+
+vi.mock("./HBaseSchemaTree", () => ({
+  HBaseSchemaTree: ({ sessionId }: { sessionId: string | null }) => (
+    <div data-testid="hbase-schema-tree" data-session-id={sessionId ?? ""} />
+  ),
+}));
+
+vi.mock("./SqlEditorPanel", () => ({
+  SqlEditorPanel: ({
+    handleRef,
+    onRun,
+  }: {
+    handleRef: (handle: unknown | null) => void;
+    onRun: (sql: string) => void;
+  }) => {
+    useEffect(() => {
+      handleRef({
+        getValue: () => editorState.value,
+        getSelectionOrAll: () => editorState.value,
+        insertText: vi.fn(),
+        setValue: vi.fn(),
+        focus: vi.fn(),
+      });
+      return () => handleRef(null);
+    }, [handleRef]);
+    return (
+      <button type="button" data-testid="mock-editor" onClick={() => onRun(editorState.value)}>
+        editor
+      </button>
+    );
+  },
+}));
+
+vi.mock("./QueryResultGrid", () => ({
+  QueryResultGrid: ({ result }: { result: { rows: unknown[] } }) => (
+    <div data-testid="query-result-grid">{result.rows.length} rows</div>
+  ),
+}));
+
+const info: HBaseConnectInfo = {
+  sessionId: "hb1",
+  host: "localhost",
+  port: 8080,
+  connectionMode: "rest",
+};
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  editorState.value = "list";
+  localStorage.clear();
+});
+
+describe("HBaseShellTab workspace", () => {
+  it("connects and renders the editor toolbar", async () => {
+    render(<HBaseShellTab tabId="t1" info={info} visible />);
+    await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
+    expect(await screen.findByText("Run")).toBeInTheDocument();
+    expect(screen.getByTestId("hbase-schema-tree")).toBeInTheDocument();
+  });
+
+  it("runs a read command and shows a result sheet", async () => {
+    editorState.value = "list";
+    render(<HBaseShellTab tabId="t1" info={info} visible />);
+    await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
+    // Wait for the connection session to settle, enabling the editor's run.
+    fireEvent.click(await screen.findByTestId("mock-editor"));
+    await waitFor(() => expect(ipcMock.hbaseExecute).toHaveBeenCalledWith(expect.any(String), "list"));
+    expect(await screen.findByTestId("query-result-grid")).toHaveTextContent("1 rows");
+  });
+});
