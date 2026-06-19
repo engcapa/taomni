@@ -85,11 +85,26 @@ pub fn run() {
 
             app.manage(AppState::new(conn, vault_arc, ai_ctx, lanchat_state));
 
-            // Start the LanChat background service (mDNS discovery + TCP
-            // control channel are wired in later phases; phase 1 idles).
+            // Start the LanChat background service only if the user opted into
+            // "start on launch". Otherwise it stays dark (no mDNS/beacon/listen)
+            // until the user opens the chat and confirms enabling it. The state
+            // (DB/identity/TLS) is always constructed above so the service can
+            // be started on demand later.
             let app_for_lanchat = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                lanchat::start(app_for_lanchat).await;
+                let lanchat = app_for_lanchat
+                    .state::<AppState>()
+                    .lanchat
+                    .clone();
+                let start_on_launch = lanchat
+                    .store
+                    .get_start_on_launch()
+                    .unwrap_or(false);
+                if start_on_launch {
+                    lanchat::start_service(app_for_lanchat).await;
+                } else {
+                    log::info!("lanchat: start_on_launch disabled; service idle until enabled");
+                }
             });
 
             // Auto-start any tunnels with autostart=true.
@@ -390,6 +405,9 @@ pub fn run() {
             lanchat::commands::lanchat_signal_group,
             lanchat::commands::lanchat_get_retention,
             lanchat::commands::lanchat_set_retention,
+            lanchat::commands::lanchat_get_service_state,
+            lanchat::commands::lanchat_start_service,
+            lanchat::commands::lanchat_set_start_on_launch,
             lanchat::commands::lanchat_delete_message,
             lanchat::commands::lanchat_clear_conversation,
             lanchat::commands::lanchat_clear_all_history,

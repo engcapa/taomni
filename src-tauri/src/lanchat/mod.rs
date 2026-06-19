@@ -25,7 +25,7 @@ pub mod transport;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicU16;
+use std::sync::atomic::{AtomicBool, AtomicU16};
 use std::sync::Mutex as StdMutex;
 
 use mdns_sd::ServiceDaemon;
@@ -57,6 +57,10 @@ pub mod events {
     /// A security event: a peer's presented identity was rejected (spoofed id or
     /// a changed pinned key). Payload `{ peerId, addr, kind }`.
     pub const SECURITY: &str = "lanchat://security";
+    /// Service lifecycle change. Payload `{ running: bool }`. Emitted when the
+    /// background service starts (boot autostart or manual enable) so every
+    /// window can switch the panel from "not enabled" to live.
+    pub const SERVICE: &str = "lanchat://service";
 }
 
 /// Shared LanChat runtime state, held by `AppState.lanchat`.
@@ -81,6 +85,11 @@ pub struct LanChatState {
     pub tls_client: std::sync::Arc<rustls::ClientConfig>,
     /// This node's stable identity (loaded/generated on construction).
     pub node_id: RwLock<String>,
+    /// Whether the background service (discovery + transport + beacon) has been
+    /// started. A one-way latch: set true on first `start_service`, never
+    /// cleared while the app runs (there is no runtime "stop"). Guards against
+    /// double-start when both boot-autostart and a manual enable race.
+    pub running: AtomicBool,
     /// Peers discovered via mDNS, keyed by node id.
     pub peers: RwLock<HashMap<String, PeerRecord>>,
     /// Live control-channel connections, keyed by remote node id.
@@ -146,6 +155,7 @@ impl LanChatState {
             tls_server,
             tls_client,
             node_id: RwLock::new(node_id),
+            running: AtomicBool::new(false),
             peers: RwLock::new(HashMap::new()),
             connections: RwLock::new(HashMap::new()),
             daemon: StdMutex::new(None),
@@ -171,16 +181,26 @@ impl LanChatState {
     }
 }
 
-/// Launch the LanChat background service.
+/// Launch the LanChat background service (idempotent, one-way).
 ///
 /// Reserves the TCP control port, starts the transport accept loop over that
 /// listener, then runs mDNS discovery. Discovery + transport run concurrently
-/// for the lifetime of the app.
-pub async fn start(app: AppHandle) {
+/// for the lifetime of the app — there is no runtime "stop"; the only way to
+/// go dark is to not start (see the `start_on_launch` policy) or quit the app.
+///
+/// Safe to call more than once: the first call latches `running` and proceeds;
+/// later calls return immediately. This lets boot-autostart and a manual
+/// `lanchat_start_service` from the UI race without double-binding the port.
+pub async fn start_service(app: AppHandle) {
     use std::sync::atomic::Ordering;
-    use tauri::Manager;
+    use tauri::{Emitter, Manager};
 
     let lanchat = app.state::<crate::state::AppState>().lanchat.clone();
+
+    // One-way latch: if already started, do nothing.
+    if lanchat.running.swap(true, Ordering::SeqCst) {
+        return;
+    }
 
     // Reserve an ephemeral control port now so the mDNS TXT can advertise it;
     // the transport accept loop takes over this listener below.
@@ -190,6 +210,9 @@ pub async fn start(app: AppHandle) {
             lanchat.control_port.store(port, Ordering::SeqCst);
             *lanchat.control_listener.lock().await = Some(listener);
             log::info!("lanchat: reserved control port {}", port);
+
+            // Announce the service is now live to every window.
+            let _ = app.emit(events::SERVICE, serde_json::json!({ "running": true }));
 
             // Transport accept loop (takes the reserved listener).
             let app_t = app.clone();
@@ -248,6 +271,9 @@ pub async fn start(app: AppHandle) {
         }
         Err(e) => {
             log::error!("lanchat: failed to reserve control port: {e}");
+            // Roll back the latch so a later manual enable can retry.
+            lanchat.running.store(false, Ordering::SeqCst);
+            let _ = app.emit(events::SERVICE, serde_json::json!({ "running": false }));
         }
     }
 }

@@ -211,12 +211,14 @@ fn migrate_schema(conn: &Connection) {
     // v2: persist peer connection info for startup reconnection.
     // v3: persist this node's self-signed identity certificate (phase 1).
     // v4: at-rest message-body encryption (phase 3).
+    // v5: "start LanChat on app launch" policy (single settings row).
     for ddl in [
         "ALTER TABLE peers ADD COLUMN addr TEXT",
         "ALTER TABLE peers ADD COLUMN port INTEGER",
         "ALTER TABLE profile ADD COLUMN cert_der BLOB",
         "ALTER TABLE messages ADD COLUMN body_cipher BLOB",
         "ALTER TABLE messages ADD COLUMN enc_ver INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE settings ADD COLUMN start_on_launch INTEGER NOT NULL DEFAULT 0",
     ] {
         if let Err(e) = conn.execute(ddl, []) {
             let msg = e.to_string();
@@ -798,6 +800,27 @@ impl LanChatStore {
         Ok(())
     }
 
+    /// Read the "start LanChat service on app launch" policy.
+    pub fn get_start_on_launch(&self) -> rusqlite::Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT start_on_launch FROM settings WHERE id = 1",
+            [],
+            |r| Ok(r.get::<_, i64>(0)? != 0),
+        )
+    }
+
+    /// Update the "start LanChat service on app launch" policy.
+    pub fn set_start_on_launch(&self, enabled: bool) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO settings (id, start_on_launch) VALUES (1, ?1)
+             ON CONFLICT(id) DO UPDATE SET start_on_launch = ?1",
+            params![if enabled { 1 } else { 0 }],
+        )?;
+        Ok(())
+    }
+
     /// Apply the retention policy: delete messages older than `retention_days`
     /// and trim each conversation to its newest `max_per_conv`. A cap of 0
     /// disables that dimension. Returns the number of rows deleted.
@@ -1124,6 +1147,17 @@ mod tests {
             .unwrap();
         assert_eq!(plain, "");
         assert_eq!(ev, 1);
+    }
+
+    #[test]
+    fn start_on_launch_defaults_off_and_persists() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        // Fresh DB: opt-in policy is off by default.
+        assert!(!store.get_start_on_launch().unwrap());
+        store.set_start_on_launch(true).unwrap();
+        assert!(store.get_start_on_launch().unwrap());
+        store.set_start_on_launch(false).unwrap();
+        assert!(!store.get_start_on_launch().unwrap());
     }
 
     #[test]
