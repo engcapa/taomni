@@ -16,6 +16,7 @@ pub mod commands;
 pub mod discovery;
 pub mod identity;
 pub mod keystore;
+pub mod media;
 pub mod messaging;
 pub mod protocol;
 pub mod store;
@@ -106,6 +107,9 @@ pub struct LanChatState {
     pub swarms: RwLock<HashMap<String, std::sync::Arc<swarm::SwarmFile>>>,
     /// Inbound offers awaiting the local user's accept/reject, by file id.
     pub swarm_offers: RwLock<HashMap<String, swarm::OfferInfo>>,
+    /// Active native A/V media sessions (Linux / no-WebRTC stack), keyed by call
+    /// id. Empty on the WebRTC stack (Win/mac route media through the webview).
+    pub media_sessions: RwLock<HashMap<String, std::sync::Arc<media::NativeMediaSession>>>,
 }
 
 impl LanChatState {
@@ -156,6 +160,7 @@ impl LanChatState {
             control_listener: AsyncMutex::new(None),
             swarms: RwLock::new(HashMap::new()),
             swarm_offers: RwLock::new(HashMap::new()),
+            media_sessions: RwLock::new(HashMap::new()),
         }
     }
 
