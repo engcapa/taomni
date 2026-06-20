@@ -1,5 +1,9 @@
 // lanRtc.ts — lightweight WebRTC mesh for LanChat (task 03).
 //
+// The `WebRtcSession` is the `MediaSession` implementation for webviews that
+// expose `RTCPeerConnection` (Windows / macOS). Linux uses `NativeSession`
+// instead (see mediaSession.ts).
+//
 // All media is peer-to-peer on the LAN, so RTCPeerConnection uses an empty ICE
 // server list (host candidates only — no STUN/TURN). Signaling (SDP/ICE) is
 // carried over the LanChat control channel via lanchat_send_signal +
@@ -11,12 +15,7 @@
 // comparing node ids.
 
 import { lanchatSendSignal } from "./ipc";
-
-export interface LanRtcCallbacks {
-  onRemoteStream: (peerId: string, stream: MediaStream) => void;
-  onPeerClosed: (peerId: string) => void;
-  onPeerState?: (peerId: string, state: RTCPeerConnectionState) => void;
-}
+import type { MediaSession, MediaSessionCallbacks } from "./mediaSession";
 
 interface PeerEntry {
   pc: RTCPeerConnection;
@@ -26,14 +25,15 @@ interface PeerEntry {
   polite: boolean;
 }
 
-export class LanRtcSession {
+export class WebRtcSession implements MediaSession {
   readonly callId: string;
+  readonly isNative = false;
   private myId: string;
   private peers = new Map<string, PeerEntry>();
   private localStream: MediaStream | null = null;
-  private cb: LanRtcCallbacks;
+  private cb: MediaSessionCallbacks;
 
-  constructor(callId: string, myId: string, cb: LanRtcCallbacks) {
+  constructor(callId: string, myId: string, cb: MediaSessionCallbacks) {
     this.callId = callId;
     this.myId = myId;
     this.cb = cb;

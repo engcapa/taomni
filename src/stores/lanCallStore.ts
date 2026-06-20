@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { lanchatSendSignal, lanchatSignalGroup, listenLanChatSignal } from "../lib/ipc";
-import { LanRtcSession } from "../lib/lanRtc";
+import { createMediaSession, type MediaSession } from "../lib/mediaSession";
 import { isTauriRuntime } from "../lib/runtime";
 import type { LanCallKind, LanSignal } from "../types";
 import { useLanChatStore } from "./lanChatStore";
@@ -54,7 +54,7 @@ interface CallStore {
   clearCallError: () => void;
 }
 
-let session: LanRtcSession | null = null;
+let session: MediaSession | null = null;
 let signalUnsub: (() => void) | null = null;
 
 function myNodeId(): string {
@@ -124,7 +124,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       set({ callError: mediaErrorMessage(e) });
       return; // permission denied / no device
     }
-    session = new LanRtcSession(callId, myNodeId(), rtcCallbacks());
+    session = await createMediaSession(callId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
     set({
       callId,
@@ -150,7 +150,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       set({ callError: mediaErrorMessage(e) });
       return;
     }
-    session = new LanRtcSession(meetingId, myNodeId(), rtcCallbacks());
+    session = await createMediaSession(meetingId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
     set({
       callId: meetingId,
@@ -179,7 +179,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       get().rejectIncoming();
       return;
     }
-    session = new LanRtcSession(inc.callId, myNodeId(), rtcCallbacks());
+    session = await createMediaSession(inc.callId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
     set({
       callId: inc.callId,
@@ -279,7 +279,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   clearCallError: () => set({ callError: null }),
 }));
 
-function rtcCallbacks() {
+function mediaCallbacks() {
   return {
     onRemoteStream: (peerId: string, stream: MediaStream) => {
       useLanCallStore.setState((s) => ({
