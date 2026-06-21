@@ -3,6 +3,7 @@
 
 pub mod commands;
 pub mod config;
+pub mod mcp_http;
 pub mod permissions_mcp;
 pub mod process;
 pub mod protocol;

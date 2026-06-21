@@ -40,6 +40,14 @@ tokio-util = { version = "0.7", features = ["compat", "io", "codec"] }
 futures = "0.3"
 async-trait = "0.1"
 async-stream = "0.3"
+# Claude Code agent bridge (agent/cc_bridge/mcp_http.rs): the official Rust MCP
+# SDK. We run an in-app Streamable-HTTP MCP server that CC connects to via its
+# `.mcp.json` `type:"http"` entry. axum hosts the rmcp tower service + a Bearer
+# auth layer; schemars derives the tool input/output JSON schemas. Versions are
+# already in the tree (tower 0.5 / http 1 / hyper 1 / schemars 1) — additive.
+rmcp = { version = "1", features = ["server", "transport-streamable-http-server", "macros"] }
+axum = "0.8"
+schemars = "1"
 thiserror = "2"
 reqwest = { version = "0.13", features = ["rustls", "json", "stream", "query", "socks", "blocking"], default-features = false }
 heck = "0.5"

@@ -226,6 +226,52 @@ pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> R
     Ok(())
 }
 
+/// Resolve a pending CC side-effect tool call. The frontend calls this after it
+/// has performed the effect dispatched by an `agent-cc-tool` event; the value
+/// unblocks the in-app MCP server's tool handler so CC receives the result.
+#[tauri::command]
+pub async fn cc_resolve_tool_call(
+    call_id: String,
+    ok: bool,
+    output: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let sender = state
+        .cc_pending_tool_calls
+        .lock()
+        .map_err(|e| e.to_string())?
+        .remove(&call_id);
+    match sender {
+        Some(tx) => {
+            let _ = tx.send(crate::state::CcToolOutcome { ok, output });
+            Ok(())
+        }
+        None => Err(format!("no pending CC tool call '{call_id}'")),
+    }
+}
+
+/// Resolve a pending CC permission prompt with the human's decision (from the
+/// ActionCard). Unblocks the in-app MCP server's `permission_prompt` handler.
+#[tauri::command]
+pub async fn cc_resolve_permission(
+    call_id: String,
+    decision: crate::state::CcPermissionDecision,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let sender = state
+        .cc_pending_permissions
+        .lock()
+        .map_err(|e| e.to_string())?
+        .remove(&call_id);
+    match sender {
+        Some(tx) => {
+            let _ = tx.send(decision);
+            Ok(())
+        }
+        None => Err(format!("no pending CC permission prompt '{call_id}'")),
+    }
+}
+
 /// Streaming variant of `cc_send_message`. Emits `cc-stream:{thread_id}`
 /// events for every CcEvent the CLI produces (assistant_message, tool_use,
 /// partial, etc.). Resolves once the stream finishes.
