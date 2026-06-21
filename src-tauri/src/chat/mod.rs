@@ -349,6 +349,25 @@ pub enum StreamEventOut {
     Error { id: String, message: String },
 }
 
+/// Render a CC tool-use event as a compact, human-readable transcript line.
+///
+/// This is *not* a `[TOOL_CALL]` marker — it carries no machine-parseable JSON,
+/// so MessageBubble never turns it into an ActionCard or re-executes it. It
+/// exists purely so the chat keeps a record of what Claude Code did (the real
+/// confirmation happens live via the in-app MCP server's permission prompt).
+fn format_cc_tool_use(name: &str, input: &serde_json::Value) -> String {
+    let summary = input
+        .get("command")
+        .and_then(|v| v.as_str())
+        .or_else(|| input.get("file_path").and_then(|v| v.as_str()))
+        .or_else(|| input.get("notebook_path").and_then(|v| v.as_str()))
+        .or_else(|| input.get("path").and_then(|v| v.as_str()));
+    match summary {
+        Some(s) => format!("\n> 🔧 `{}` — {}\n", name, s),
+        None => format!("\n> 🔧 `{}`\n", name),
+    }
+}
+
 /// Streaming variant of `chat_send`. Emits events on
 /// `chat-stream:{thread_id}` and resolves once the stream finishes (or errors).
 #[tauri::command]
@@ -559,10 +578,16 @@ pub async fn chat_stream(
                     });
                 }
                 // CC tool calls now run through the in-app MCP server with HITL
-                // confirmation (agent-cc-permission / agent-cc-tool). We no
-                // longer inject decorative [TOOL_CALL] markers into the stream —
-                // doing so triggered a second, native execution of the same
-                // tool via agent_execute_tool in MessageBubble (double-exec).
+                // confirmation (agent-cc-permission / agent-cc-tool). We emit a
+                // plain-text transcript line for visibility, but no longer
+                // inject [TOOL_CALL] markers — those triggered a second, native
+                // execution of the same tool via agent_execute_tool (double-exec).
+                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
+                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
+                        id: assistant_id_clone.clone(),
+                        content: format_cc_tool_use(name, input),
+                    });
+                }
                 _ => {}
             }
         }).await;
@@ -585,7 +610,10 @@ pub async fn chat_stream(
                 crate::agent::cc_bridge::protocol::CcEvent::AssistantMessage { content } => {
                     final_content.push_str(content);
                 }
-                // No [TOOL_CALL] markers — see the streaming callback above.
+                // Plain-text tool record — see the streaming callback above.
+                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
+                    final_content.push_str(&format_cc_tool_use(name, input));
+                }
                 _ => {}
             }
         }
@@ -768,4 +796,29 @@ pub async fn chat_stream(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod cc_tool_use_tests {
+    use super::format_cc_tool_use;
+    use serde_json::json;
+
+    #[test]
+    fn renders_command_without_tool_call_marker() {
+        let line = format_cc_tool_use("run_in_terminal", &json!({ "command": "ls -la" }));
+        assert!(line.contains("run_in_terminal"));
+        assert!(line.contains("ls -la"));
+        // Must NOT be a parseable marker (would trigger native re-execution).
+        assert!(!line.contains("[TOOL_CALL]"));
+    }
+
+    #[test]
+    fn renders_file_path_and_bare_tool() {
+        let edit = format_cc_tool_use("Edit", &json!({ "file_path": "/tmp/x.rs" }));
+        assert!(edit.contains("/tmp/x.rs"));
+        assert!(!edit.contains("[TOOL_CALL]"));
+        let bare = format_cc_tool_use("list_sessions", &json!({}));
+        assert!(bare.contains("list_sessions"));
+        assert!(!bare.contains("[TOOL_CALL]"));
+    }
 }
