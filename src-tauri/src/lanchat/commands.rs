@@ -338,7 +338,7 @@ pub async fn nmedia_start(state: State<'_, AppState>, call_id: String) -> Result
     if let Some(existing) = lan.media_sessions.read().await.get(&call_id) {
         return Ok(existing.ws_port());
     }
-    let session = crate::lanchat::media::NativeMediaSession::start(call_id.clone()).await?;
+    let session = crate::lanchat::media::NativeMediaSession::start(lan.clone(), call_id.clone()).await?;
     let port = session.ws_port();
     lan.media_sessions.write().await.insert(call_id, session);
     Ok(port)
@@ -409,6 +409,20 @@ pub async fn nmedia_peer_state(
 ) -> Result<(), String> {
     if let Some(s) = state.lanchat.media_sessions.read().await.get(&call_id).cloned() {
         s.peer_state(&peer_id, mic, cam, screen);
+    }
+    Ok(())
+}
+
+/// Toggle the local microphone for a native media session (mutes the outgoing
+/// Opus stream without stopping capture).
+#[tauri::command]
+pub async fn nmedia_toggle_mic(
+    state: State<'_, AppState>,
+    call_id: String,
+    on: bool,
+) -> Result<(), String> {
+    if let Some(s) = state.lanchat.media_sessions.read().await.get(&call_id).cloned() {
+        s.set_mic(on);
     }
     Ok(())
 }

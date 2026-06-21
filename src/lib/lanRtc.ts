@@ -48,6 +48,11 @@ export class WebRtcSession implements MediaSession {
     return this.localStream;
   }
 
+  /** Mute/unmute the local mic by toggling the audio track(s). */
+  setMic(on: boolean): void {
+    this.localStream?.getAudioTracks().forEach((t) => (t.enabled = on));
+  }
+
   private syncLocalTracks(pc: RTCPeerConnection) {
     if (!this.localStream) return;
     const senders = pc.getSenders();

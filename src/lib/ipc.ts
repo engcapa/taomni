@@ -1374,6 +1374,10 @@ export async function nmediaPeerState(
   return invoke("nmedia_peer_state", { callId, peerId, mic, cam, screen });
 }
 
+export async function nmediaToggleMic(callId: string, on: boolean): Promise<void> {
+  return invoke("nmedia_toggle_mic", { callId, on });
+}
+
 export async function listenLanChatWb(
   cb: (s: LanSignal) => void,
 ): Promise<UnlistenFn> {

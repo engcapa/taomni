@@ -22,8 +22,15 @@ import {
   nmediaRemovePeer,
   nmediaStart,
   nmediaStop,
+  nmediaToggleMic,
 } from "./ipc";
 import type { MediaSession, MediaSessionCallbacks } from "./mediaSession";
+
+/** Binary outbound frame kinds from the relay (mirror media/relay.rs). */
+const WS_BIN_AUDIO = 0;
+const WS_BIN_VIDEO = 1;
+/** Decoded audio is mono f32 at this rate (mirror media/audio.rs SAMPLE_RATE). */
+const AUDIO_SAMPLE_RATE = 48_000;
 
 export class NativeSession implements MediaSession {
   readonly callId: string;
@@ -35,6 +42,10 @@ export class NativeSession implements MediaSession {
   private ws: WebSocket | null = null;
   private startPromise: Promise<void>;
   private closed = false;
+  /** Shared output context + per-peer scheduling cursor (RDP playback pattern:
+   *  schedule decoded PCM buffers slightly ahead for a small jitter cushion). */
+  private audioCtx: AudioContext | null = null;
+  private audioCursors = new Map<string, number>();
   /** Our intended local capture state, sent in offers/answers. */
   private localState = { mic: true, cam: false, screen: false };
 
@@ -43,13 +54,6 @@ export class NativeSession implements MediaSession {
     this.myId = myId;
     this.cb = cb;
     this.startPromise = this.start();
-  }
-
-  // PLACEHOLDER_METHODS
-
-  /** Set the local mic/cam/screen intent advertised to peers in offers. */
-  setLocalState(mic: boolean, cam: boolean, screen: boolean): void {
-    this.localState = { mic, cam, screen };
   }
 
   private async start(): Promise<void> {
@@ -103,8 +107,49 @@ export class NativeSession implements MediaSession {
       }
       return;
     }
-    // Binary media frame: [kind][peerIdLen][peerId][payload]. Decoded-media
-    // rendering (audio → AudioWorklet, video → canvas) lands in Phase 2+.
+    // Binary media frame: [kind][peerIdLen][peerId][payload].
+    const data = ev.data as ArrayBuffer;
+    if (data.byteLength < 2) return;
+    const head = new Uint8Array(data, 0, 2);
+    const kind = head[0];
+    const idLen = head[1];
+    if (data.byteLength < 2 + idLen) return;
+    const peerId = new TextDecoder().decode(new Uint8Array(data, 2, idLen));
+    const payload = data.slice(2 + idLen); // copy → aligned for typed-array views
+    if (kind === WS_BIN_AUDIO) {
+      this.playAudio(peerId, new Float32Array(payload));
+    } else if (kind === WS_BIN_VIDEO) {
+      // Video render (→ canvas) lands in Phase 3/4.
+    }
+  }
+
+  private ensureAudioCtx(): AudioContext | null {
+    if (this.audioCtx && this.audioCtx.state !== "closed") return this.audioCtx;
+    const Ctor =
+      typeof AudioContext !== "undefined"
+        ? AudioContext
+        : (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return null;
+    this.audioCtx = new Ctor({ sampleRate: AUDIO_SAMPLE_RATE });
+    return this.audioCtx;
+  }
+
+  /** Schedule one decoded mono PCM frame for a peer, just ahead of the playback
+   *  clock so brief network jitter doesn't cause gaps (a ~40 ms cushion). */
+  private playAudio(peerId: string, pcm: Float32Array): void {
+    if (pcm.length === 0) return;
+    const ctx = this.ensureAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+    const buffer = ctx.createBuffer(1, pcm.length, AUDIO_SAMPLE_RATE);
+    buffer.getChannelData(0).set(pcm);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    const cushion = ctx.currentTime + 0.04;
+    const startAt = Math.max(this.audioCursors.get(peerId) ?? 0, cushion);
+    src.start(startAt);
+    this.audioCursors.set(peerId, startAt + buffer.duration);
   }
 
   private onPeerAdd(peerId: string): void {
@@ -185,8 +230,15 @@ export class NativeSession implements MediaSession {
   closePeer(peerId: string): void {
     if (!this.peers.delete(peerId)) return;
     this.canvases.delete(peerId);
+    this.audioCursors.delete(peerId);
     void nmediaRemovePeer(this.callId, peerId).catch(() => undefined);
     this.cb.onPeerClosed(peerId);
+  }
+
+  /** Mute/unmute the local mic (drives the Rust Opus encoder). */
+  setMic(on: boolean): void {
+    this.localState.mic = on;
+    void nmediaToggleMic(this.callId, on).catch(() => undefined);
   }
 
   close(): void {
@@ -196,6 +248,11 @@ export class NativeSession implements MediaSession {
       this.peers.delete(id);
     }
     this.canvases.clear();
+    this.audioCursors.clear();
+    if (this.audioCtx) {
+      void this.audioCtx.close().catch(() => undefined);
+      this.audioCtx = null;
+    }
     if (this.ws) {
       try {
         this.ws.close();

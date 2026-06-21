@@ -239,7 +239,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   toggleMic: () => {
     const s = get();
     const next = !s.micOn;
-    s.localStream?.getAudioTracks().forEach((t) => (t.enabled = next));
+    session?.setMic(next);
     set({ micOn: next });
     broadcastMediaState();
   },

@@ -18,9 +18,12 @@
 //! as phases start using them.
 #![allow(dead_code)]
 
+#[cfg(feature = "native-av")]
+pub mod audio;
 pub mod relay;
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tauri::AppHandle;
@@ -47,21 +50,50 @@ pub struct NativeMediaSession {
     inbound_tx: mpsc::UnboundedSender<InboundMedia>,
     /// The loopback WS relay for this call.
     relay: relay::RelayHandle,
-    /// Peers we are currently exchanging media with.
-    peers: RwLock<HashSet<String>>,
+    /// Peers we are currently exchanging media with (shared with the audio
+    /// encode task so it fans frames to the live set).
+    peers: Arc<RwLock<HashSet<String>>>,
+    /// Local mic on/off (read by the audio encode task).
+    mic_on: Arc<AtomicBool>,
+    /// Audio send path (cpal capture + Opus encode); `None` if it failed to
+    /// start. Only present with the `native-av` feature.
+    #[cfg(feature = "native-av")]
+    audio: std::sync::Mutex<Option<audio::AudioSender>>,
 }
 
 impl NativeMediaSession {
-    /// Start a session: spawn the loopback WS relay and wire the inbound pump
-    /// into it. Returns the session ready to register in `media_sessions`.
-    pub async fn start(call_id: String) -> Result<Arc<Self>, String> {
+    /// Start a session: spawn the loopback WS relay, the audio send path, and
+    /// wire the inbound pump into the relay. `state` drives outbound media frames.
+    pub async fn start(state: Arc<LanChatState>, call_id: String) -> Result<Arc<Self>, String> {
         let (inbound_tx, inbound_rx) = mpsc::unbounded_channel();
         let relay = relay::spawn_relay(inbound_rx).await?;
+        let peers = Arc::new(RwLock::new(HashSet::new()));
+        let mic_on = Arc::new(AtomicBool::new(true));
+
+        #[cfg(feature = "native-av")]
+        let audio = match audio::start_audio_sender(
+            state.clone(),
+            call_id.clone(),
+            peers.clone(),
+            mic_on.clone(),
+        ) {
+            Ok(s) => std::sync::Mutex::new(Some(s)),
+            Err(e) => {
+                log::warn!("lanchat: native audio sender failed to start: {e}");
+                std::sync::Mutex::new(None)
+            }
+        };
+        #[cfg(not(feature = "native-av"))]
+        let _ = &state; // state is only needed to drive the audio sender
+
         Ok(Arc::new(Self {
             call_id,
             inbound_tx,
             relay,
-            peers: RwLock::new(HashSet::new()),
+            peers,
+            mic_on,
+            #[cfg(feature = "native-av")]
+            audio,
         }))
     }
 
@@ -76,8 +108,8 @@ impl NativeMediaSession {
         let _ = self.inbound_tx.send(InboundMedia { peer_id: peer_id.to_string(), frame });
     }
 
-    /// Register a peer we now exchange media with (capture/encode toward it is
-    /// started by the audio/video phases).
+    /// Register a peer we now exchange media with (the audio task starts fanning
+    /// encoded frames to it immediately).
     pub async fn add_peer(&self, peer_id: &str) {
         self.peers.write().await.insert(peer_id.to_string());
     }
@@ -87,6 +119,11 @@ impl NativeMediaSession {
         if self.peers.write().await.remove(peer_id) {
             let _ = self.relay.control_tx.send(relay::RelayControl::PeerRemoved(peer_id.to_string()));
         }
+    }
+
+    /// Toggle the local microphone (mutes the outgoing Opus stream).
+    pub fn set_mic(&self, on: bool) {
+        self.mic_on.store(on, Ordering::Relaxed);
     }
 
     /// Forward a peer's mic/cam/screen state to the webview.
@@ -99,8 +136,12 @@ impl NativeMediaSession {
         });
     }
 
-    /// Tear the session down: cancel the relay (which releases the WS + tasks).
+    /// Tear the session down: stop capture/encoding and cancel the relay.
     pub fn stop(&self) {
+        #[cfg(feature = "native-av")]
+        if let Some(sender) = self.audio.lock().unwrap().take() {
+            sender.stop();
+        }
         self.relay.cancel.cancel();
     }
 }

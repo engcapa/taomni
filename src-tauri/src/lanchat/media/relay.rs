@@ -17,6 +17,8 @@
 //! runs (announcing peers from inbound traffic) but forwards no media payload.
 
 use std::collections::HashSet;
+#[cfg(feature = "native-av")]
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -217,24 +219,36 @@ fn bin(kind: u8, peer_id: &str, payload: &[u8]) -> Message {
     Message::Binary(out.into())
 }
 
-/// Per-peer inbound decode state, owned by the relay loop. Currently tracks
-/// which peers we've announced to the webview; the per-peer Opus/H.264 decoders
-/// attach here when the audio (Phase 2) and video (Phase 3/4) paths land.
+/// Per-peer inbound decode state, owned by the relay loop. Tracks which peers
+/// we've announced to the webview and (with `native-av`) their Opus decoders.
 struct PeerDecoders {
     announced: HashSet<String>,
+    /// peer → (Opus decoder, frames since last level report).
+    #[cfg(feature = "native-av")]
+    audio: HashMap<String, (super::audio::OpusStreamDecoder, u32)>,
 }
 
 impl PeerDecoders {
     fn new() -> Self {
-        Self { announced: HashSet::new() }
+        Self {
+            announced: HashSet::new(),
+            #[cfg(feature = "native-av")]
+            audio: HashMap::new(),
+        }
     }
     fn remove(&mut self, peer_id: &str) {
         self.announced.remove(peer_id);
+        #[cfg(feature = "native-av")]
+        self.audio.remove(peer_id);
     }
 }
 
+/// How many decoded audio frames between RMS level reports (~100 ms @ 20 ms).
+#[cfg(feature = "native-av")]
+const LEVEL_REPORT_EVERY: u32 = 5;
+
 /// Handle one inbound media frame: announce the peer to the webview on first
-/// sight, then (once the decoders are wired) decode and forward the payload.
+/// sight, then decode + forward the payload (audio now; video in Phase 3/4).
 fn handle_inbound(peers: &mut PeerDecoders, out_tx: &UnboundedSender<Message>, inbound: InboundMedia) {
     let InboundMedia { peer_id, frame } = inbound;
     if peers.announced.insert(peer_id.clone()) {
@@ -243,13 +257,58 @@ fn handle_inbound(peers: &mut PeerDecoders, out_tx: &UnboundedSender<Message>, i
             has_video: frame.kind == wire::MEDIA_VIDEO,
         }));
     }
-    // Decode + forward (binary PCM / RGBA via `bin`, plus a `level` text message)
-    // lands with the audio path (Phase 2) and video path (Phase 3/4). Until then
-    // the relay only maintains peer presence; encoded payloads are dropped.
-    let _ = &frame.data;
+    #[cfg(feature = "native-av")]
+    {
+        if frame.kind == wire::MEDIA_AUDIO {
+            decode_audio(peers, out_tx, &peer_id, &frame.data);
+        }
+        // Video decode (H.264 → RGBA → WS_BIN_VIDEO) lands in Phase 3/4.
+    }
+    #[cfg(not(feature = "native-av"))]
+    {
+        let _ = &frame.data; // no decoders compiled in
+    }
 }
 
-#[allow(dead_code)] // bin()/kinds are exercised by the decode path (Phase 2+)
+/// Decode one Opus packet from `peer_id` and forward PCM (+ periodic level).
+#[cfg(feature = "native-av")]
+fn decode_audio(
+    peers: &mut PeerDecoders,
+    out_tx: &UnboundedSender<Message>,
+    peer_id: &str,
+    data: &[u8],
+) {
+    if !peers.audio.contains_key(peer_id) {
+        match super::audio::OpusStreamDecoder::new() {
+            Ok(d) => {
+                peers.audio.insert(peer_id.to_string(), (d, 0));
+            }
+            Err(e) => {
+                log::warn!("lanchat: opus decoder init for {peer_id} failed: {e}");
+                return;
+            }
+        }
+    }
+    let (dec, since) = peers.audio.get_mut(peer_id).unwrap();
+    let pcm = dec.decode(data);
+    if pcm.is_empty() {
+        return;
+    }
+    let mut buf = Vec::with_capacity(pcm.len() * 4);
+    for s in &pcm {
+        buf.extend_from_slice(&s.to_le_bytes());
+    }
+    let _ = out_tx.send(bin(WS_BIN_AUDIO, peer_id, &buf));
+
+    *since += 1;
+    if *since >= LEVEL_REPORT_EVERY {
+        *since = 0;
+        let rms = (pcm.iter().map(|s| s * s).sum::<f32>() / pcm.len() as f32).sqrt();
+        let _ = out_tx.send(text(&WsText::Level { peer_id: peer_id.to_string(), level: rms.min(1.0) }));
+    }
+}
+
+#[allow(dead_code)] // bin()/kinds are exercised by the decode path (native-av)
 fn _relay_decode_seam() {
     let _ = (WS_BIN_AUDIO, WS_BIN_VIDEO, bin as fn(u8, &str, &[u8]) -> Message);
 }

@@ -46,6 +46,9 @@ export interface MediaSession {
   /** Provide the local capture stream (WebRTC); native ignores it and drives
    *  capture in Rust. */
   setLocalStream(stream: MediaStream | null): void;
+  /** Mute/unmute the local microphone. WebRTC toggles the audio track; native
+   *  drives the Rust Opus encoder over IPC. */
+  setMic(on: boolean): void;
   /** Swap the outgoing video track (camera ↔ screen); native ignores it. */
   setVideoTrack(track: MediaStreamTrack | null): Promise<void>;
   /** Start (or fetch) a connection to a peer; negotiation is automatic. */
