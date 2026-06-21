@@ -87,12 +87,22 @@ export function ControlBar({
     previewNode,
   } = useSessionImportExport();
 
-  // Windows/Linux move the borderless window by dragging marked regions; macOS
-  // uses the native overlay title bar (data-tauri-drag-region) instead.
+  // Borderless window: we move it ourselves via startDragging() on every
+  // platform, triggered by a left-button press on any [data-window-drag]
+  // region. macOS previously relied on the native overlay title bar's
+  // data-tauri-drag-region, but that IPC is unreliable there (e.g. macOS 14
+  // Intel) and Tauri only honours the exact mousedown target — so the large
+  // tab-strip filler never dragged. A double-click toggles maximize to keep
+  // the native title-bar gesture on all platforms.
   const startDrag = (event: React.MouseEvent) => {
     if (event.button !== 0) return;
     if (!(event.target as HTMLElement).closest("[data-window-drag]")) return;
-    void getCurrentWindow().startDragging().catch(() => {});
+    const win = getCurrentWindow();
+    if (event.detail === 2) {
+      void win.toggleMaximize().catch(() => {});
+    } else {
+      void win.startDragging().catch(() => {});
+    }
   };
 
   const openMainMenu = (event: React.MouseEvent) => {
@@ -178,13 +188,12 @@ export function ControlBar({
     <div
       data-testid="control-bar"
       className="taomni-control-bar h-8 flex items-center min-w-0"
-      onMouseDown={IS_MAC ? undefined : startDrag}
-      {...(IS_MAC ? { "data-tauri-drag-region": true } : {})}
+      onMouseDown={startDrag}
     >
       {ctx.render}
       {previewNode}
       {IS_MAC && (
-        <div className="shrink-0 self-stretch" style={{ width: MAC_TRAFFIC_LIGHT_INSET }} data-tauri-drag-region />
+        <div className="shrink-0 self-stretch" style={{ width: MAC_TRAFFIC_LIGHT_INSET }} data-window-drag />
       )}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
         {!nativeMenu && (
@@ -212,7 +221,6 @@ export function ControlBar({
       <div
         className={IS_MAC ? "w-3 self-stretch shrink-0" : "w-6 self-stretch shrink-0"}
         data-window-drag
-        {...(IS_MAC ? { "data-tauri-drag-region": true } : {})}
       />
       {/* Divider between the tab-related buttons and the main-window controls. */}
       <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />

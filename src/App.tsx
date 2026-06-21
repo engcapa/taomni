@@ -35,6 +35,27 @@ function App() {
     root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
   }, [uiFontFamily, uiFontSize]);
 
+  // In production builds (the shipped binary, not `pnpm dev` / `tauri dev`),
+  // suppress the WebView's native right-click menu. On WebView2/WKWebView that
+  // menu exposes "Reload", which reloads the whole webview and tears down every
+  // live terminal / SFTP / AI session — there is no real navigation in this SPA,
+  // so a reload is always destructive. Editable fields keep their native
+  // Cut/Copy/Paste menu (which never contains Reload), and the app's own custom
+  // context menus call preventDefault themselves, so capture-phase here leaves
+  // them intact (preventDefault does not stop propagation to React handlers).
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    const suppressNativeMenu = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) {
+        return;
+      }
+      event.preventDefault();
+    };
+    window.addEventListener("contextmenu", suppressNativeMenu, { capture: true });
+    return () => window.removeEventListener("contextmenu", suppressNativeMenu, { capture: true });
+  }, []);
+
   // Mirror the transfer queue across same-origin windows so a user can see
   // the same uploads/downloads from both the main app and a detached SFTP
   // window. The cleanup tears the channel down on hot-reload too.
