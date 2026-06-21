@@ -69,6 +69,14 @@ function peerName(id: string): string {
   return roster.find((p) => p.id === id)?.name ?? id.slice(0, 6);
 }
 
+/** On the native stack a video call captures the camera in Rust; kick it off so
+ *  a "video" call actually sends video (WebRTC gets it from getUserMedia). */
+function autoStartNativeCam(kind: LanCallKind) {
+  if (session?.isNative && kind === "video") {
+    void (session as NativeSession).setCam(true).catch(() => undefined);
+  }
+}
+
 async function getMedia(kind: LanCallKind): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({
     audio: true,
@@ -131,6 +139,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     }
     session = await createMediaSession(callId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
+    autoStartNativeCam(kind);
     set({
       callId,
       kind,
@@ -159,6 +168,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     }
     session = await createMediaSession(meetingId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
+    autoStartNativeCam(kind);
     set({
       callId: meetingId,
       kind,
@@ -190,6 +200,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     }
     session = await createMediaSession(inc.callId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
+    autoStartNativeCam(inc.kind);
     set({
       callId: inc.callId,
       kind: inc.kind,
@@ -248,7 +259,11 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   toggleCam: () => {
     const s = get();
     const next = !s.camOn;
-    s.localStream?.getVideoTracks().forEach((t) => (t.enabled = next));
+    if (session?.isNative) {
+      void (session as NativeSession).setCam(next).catch((e) => set({ callError: mediaErrorMessage(e) }));
+    } else {
+      s.localStream?.getVideoTracks().forEach((t) => (t.enabled = next));
+    }
     set({ camOn: next });
     broadcastMediaState();
   },

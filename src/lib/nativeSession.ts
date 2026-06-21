@@ -22,6 +22,7 @@ import {
   nmediaRemovePeer,
   nmediaStart,
   nmediaStop,
+  nmediaToggleCam,
   nmediaToggleMic,
   nmediaToggleScreen,
 } from "./ipc";
@@ -266,6 +267,12 @@ export class NativeSession implements MediaSession {
   async setScreen(on: boolean): Promise<void> {
     await nmediaToggleScreen(this.callId, on);
     this.localState.screen = on;
+  }
+
+  /** Start/stop the local camera (drives the Rust nokhwa capturer + H.264). */
+  async setCam(on: boolean): Promise<void> {
+    await nmediaToggleCam(this.callId, on);
+    this.localState.cam = on;
   }
 
   close(): void {

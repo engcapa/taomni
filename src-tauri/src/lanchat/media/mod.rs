@@ -64,6 +64,9 @@ pub struct NativeMediaSession {
     /// Screen-share send path (X11 capture + H.264); `None` when not sharing.
     #[cfg(feature = "native-av")]
     screen: std::sync::Mutex<Option<video::VideoSender>>,
+    /// Camera send path (nokhwa + H.264); `None` when the camera is off.
+    #[cfg(feature = "native-av")]
+    cam: std::sync::Mutex<Option<video::VideoSender>>,
 }
 
 impl NativeMediaSession {
@@ -101,6 +104,8 @@ impl NativeMediaSession {
             audio,
             #[cfg(feature = "native-av")]
             screen: std::sync::Mutex::new(None),
+            #[cfg(feature = "native-av")]
+            cam: std::sync::Mutex::new(None),
         }))
     }
 
@@ -121,8 +126,13 @@ impl NativeMediaSession {
     pub async fn add_peer(&self, peer_id: &str) {
         self.peers.write().await.insert(peer_id.to_string());
         #[cfg(feature = "native-av")]
-        if let Some(s) = self.screen.lock().unwrap().as_ref() {
-            s.request_keyframe();
+        {
+            if let Some(s) = self.screen.lock().unwrap().as_ref() {
+                s.request_keyframe();
+            }
+            if let Some(c) = self.cam.lock().unwrap().as_ref() {
+                c.request_keyframe();
+            }
         }
     }
 
@@ -182,6 +192,37 @@ impl NativeMediaSession {
         }
     }
 
+    /// Start or stop the camera (nokhwa capture + H.264 to peers).
+    #[cfg(feature = "native-av")]
+    pub async fn set_cam(&self, state: Arc<LanChatState>, on: bool) -> Result<(), String> {
+        if on {
+            if self.cam.lock().unwrap().is_some() {
+                return Ok(());
+            }
+            let sender = video::start_camera_sender(state, self.call_id.clone(), self.peers.clone())
+                .await?;
+            let mut g = self.cam.lock().unwrap();
+            if g.is_some() {
+                sender.stop();
+            } else {
+                *g = Some(sender);
+            }
+        } else if let Some(c) = self.cam.lock().unwrap().take() {
+            c.stop();
+        }
+        Ok(())
+    }
+
+    /// Without the codec feature, the native camera is unavailable.
+    #[cfg(not(feature = "native-av"))]
+    pub async fn set_cam(&self, _state: Arc<LanChatState>, on: bool) -> Result<(), String> {
+        if on {
+            Err("native camera not built in (enable the native-av feature)".into())
+        } else {
+            Ok(())
+        }
+    }
+
     /// Forward a peer's mic/cam/screen state to the webview.
     pub fn peer_state(&self, peer_id: &str, mic: bool, cam: bool, screen: bool) {
         let _ = self.relay.control_tx.send(relay::RelayControl::PeerState {
@@ -201,6 +242,9 @@ impl NativeMediaSession {
             }
             if let Some(screen) = self.screen.lock().unwrap().take() {
                 screen.stop();
+            }
+            if let Some(cam) = self.cam.lock().unwrap().take() {
+                cam.stop();
             }
         }
         self.relay.cancel.cancel();

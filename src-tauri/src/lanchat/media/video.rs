@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use openh264::encoder::{BitRate, Encoder, EncoderConfig, FrameRate};
-use openh264::formats::{BgraSliceU8, YUVBuffer, YUVSource};
+use openh264::formats::{BgraSliceU8, RgbSliceU8, YUVBuffer, YUVSource};
 use openh264::OpenH264API;
 use tauri::AppHandle;
 use tokio::sync::{mpsc, RwLock};
@@ -217,6 +217,121 @@ fn screen_capture_thread(
         }
     }
     log::info!("lanchat: screen capture stopped");
+}
+
+/// Start camera capture+encode (nokhwa v4l2). Resolves once the camera opens.
+pub async fn start_camera_sender(
+    state: Arc<LanChatState>,
+    call_id: String,
+    peers: Arc<RwLock<HashSet<String>>>,
+) -> Result<VideoSender, String> {
+    let (frame_tx, frame_rx) = mpsc::unbounded_channel::<(Vec<u8>, i64)>();
+    let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
+    let (init_tx, init_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+    let want_keyframe = Arc::new(AtomicBool::new(false));
+    let want_kf_thread = want_keyframe.clone();
+
+    std::thread::Builder::new()
+        .name("lanchat-camera".into())
+        .spawn(move || camera_capture_thread(frame_tx, stop_rx, want_kf_thread, init_tx))
+        .map_err(|e| e.to_string())?;
+
+    match init_rx.await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => return Err(e),
+        Err(_) => return Err("camera thread exited before init".into()),
+    }
+
+    let task = tokio::spawn(send_loop(state, call_id, "cam", peers, frame_rx));
+    Ok(VideoSender { stop_tx, abort: task.abort_handle(), want_keyframe })
+}
+
+/// Camera capture+encode loop (own thread; nokhwa `Camera` is `!Send`).
+fn camera_capture_thread(
+    frame_tx: mpsc::UnboundedSender<(Vec<u8>, i64)>,
+    stop_rx: std::sync::mpsc::Receiver<()>,
+    want_keyframe: Arc<AtomicBool>,
+    init_tx: tokio::sync::oneshot::Sender<Result<(), String>>,
+) {
+    use nokhwa::pixel_format::RgbFormat;
+    use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
+
+    let format = RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestFrameRate);
+    let mut camera = match nokhwa::Camera::new(CameraIndex::Index(0), format) {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = init_tx.send(Err(format!("camera open failed: {e}")));
+            return;
+        }
+    };
+    if let Err(e) = camera.open_stream() {
+        let _ = init_tx.send(Err(format!("camera stream failed: {e}")));
+        return;
+    }
+    let _ = init_tx.send(Ok(()));
+
+    let mut encoder: Option<Encoder> = None;
+    let mut enc_dims = (0usize, 0usize);
+    let mut last_kf = Instant::now() - KEYFRAME_INTERVAL;
+    let mut tight: Vec<u8> = Vec::new();
+
+    loop {
+        if !matches!(stop_rx.try_recv(), Err(std::sync::mpsc::TryRecvError::Empty)) {
+            break;
+        }
+        let img = match camera.frame().and_then(|b| b.decode_image::<RgbFormat>()) {
+            Ok(i) => i,
+            Err(e) => {
+                log::debug!("lanchat: camera frame error: {e}");
+                std::thread::sleep(Duration::from_millis(10));
+                continue;
+            }
+        };
+        let (ow, oh) = (img.width() as usize, img.height() as usize);
+        let w = ow & !1;
+        let h = oh & !1;
+        if w == 0 || h == 0 {
+            continue;
+        }
+        if encoder.is_none() || enc_dims != (w, h) {
+            match make_encoder(w as u32, h as u32) {
+                Ok(e) => {
+                    encoder = Some(e);
+                    enc_dims = (w, h);
+                    last_kf = Instant::now() - KEYFRAME_INTERVAL;
+                }
+                Err(e) => {
+                    log::warn!("lanchat: h264 encoder init failed: {e}");
+                    break;
+                }
+            }
+        }
+        // Tight RGB for the even-cropped region (source row stride is ow*3).
+        let raw = img.as_raw();
+        let (row, orow) = (w * 3, ow * 3);
+        tight.resize(row * h, 0);
+        for r in 0..h {
+            tight[r * row..(r + 1) * row].copy_from_slice(&raw[r * orow..r * orow + row]);
+        }
+        let enc = encoder.as_mut().unwrap();
+        if want_keyframe.swap(false, Ordering::Relaxed) || last_kf.elapsed() >= KEYFRAME_INTERVAL {
+            enc.force_intra_frame();
+            last_kf = Instant::now();
+        }
+        let yuv = YUVBuffer::from_rgb_source(RgbSliceU8::new(&tight, (w, h)));
+        let ts = chrono::Utc::now().timestamp_millis();
+        match enc.encode(&yuv) {
+            Ok(bitstream) => {
+                let nal = bitstream.to_vec();
+                if !nal.is_empty() {
+                    let _ = frame_tx.send((nal, ts));
+                }
+            }
+            Err(e) => log::debug!("lanchat: h264 encode failed: {e}"),
+        }
+    }
+    let _ = camera.stop_stream();
+    log::info!("lanchat: camera capture stopped");
 }
 
 /// Fan encoded video access units to the call's peers as TAG_MEDIA video frames.

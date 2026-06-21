@@ -441,6 +441,20 @@ pub async fn nmedia_toggle_screen(
         None => Err(format!("no native media session for {call_id}")),
     }
 }
+
+/// Start/stop the native camera for a call (nokhwa capture + H.264 to peers).
+#[tauri::command]
+pub async fn nmedia_toggle_cam(
+    state: State<'_, AppState>,
+    call_id: String,
+    on: bool,
+) -> Result<(), String> {
+    let session = state.lanchat.media_sessions.read().await.get(&call_id).cloned();
+    match session {
+        Some(s) => s.set_cam(state.lanchat.clone(), on).await,
+        None => Err(format!("no native media session for {call_id}")),
+    }
+}
 #[tauri::command]
 pub async fn lanchat_send_dir(
     app: AppHandle,
