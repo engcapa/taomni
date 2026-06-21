@@ -1,13 +1,41 @@
 # CC → Agent 编排中心:演进计划
 
-**状态**: 草案 v2(决策已锁定,待批准实现)
-**日期**: 2026-06-21
+**状态**: 实现中 — Phase 0 ✅ / Phase 1+2 ✅(端到端打通)/ Phase 3–5 ☐ 待办
+**日期**: 2026-06-21(进度更新同日)
 **目标**: 把当前"沙箱聊天 provider"式的 Claude Code(CC)集成,演进为 Taomni 的 agent 中心调度编排中心。终态为多 agent 调度中心(C),本轮交付 A 全量 + B 最小版。
 
 **关联代码**:
 - `src-tauri/src/agent/cc_bridge/`(process.rs / commands.rs / config.rs / tools_mcp.rs / permissions_mcp.rs)
 - `src-tauri/src/agent/mcp_server.rs`、`src-tauri/src/agent/safety.rs`
 - `src-tauri/src/chat/mod.rs`、`src/stores/chatStore.ts`、`src/components/chat/MessageBubble.tsx`、`src/components/agent/ActionCard.tsx`
+
+---
+
+## 〇、进度总览(截至 2026-06-21)
+
+| 阶段 | 状态 | 交付 / 位置 |
+|---|---|---|
+| **Phase 0** 止血 + 地基 | ✅ 已完成(在 main) | `safety.rs` 工具名映射、`process.rs` 空闲超时 + kill/respawn、CC 分支接 `terminal_context` |
+| **Phase 1+2** 有状态工具 + HITL | ✅ 已完成,**端到端打通** | rmcp in-app MCP 服务器 `cc_bridge/mcp_http.rs`(8 个有状态工具)+ `permission_prompt` HITL + 挂起 oneshot 回填 + per-thread token/会话作用域。基础提交 `44f7169`/`ed51c67`(已并入 main);本轮 `5305df2`/`1c78791` 修好 HITL 全链路(见下方「本轮修复」) |
+| **Phase 3** cwd + 模型 + 渲染保真 | ☐ 待办 | `--add-dir`、per-thread 模型/思考预算、结构化工具卡 |
+| **Phase 4** 编排者 B 最小版 | ☐ 待办 | `dispatch_subtask` |
+| **Phase 5** 调度中心 C | ☐ 待办(仅设计文档) | — |
+
+**本轮修复(`5305df2` + `1c78791`,使 HITL 真正可用):**
+- `permission_prompt` 读 CC 的 `input` 字段(原只认 `tool_input` → 退化成 `null`,卡片崩溃 + 回 CC `updatedInput:null`)。
+- 工具名 `mcp__taomni__<tool>` 归一化后再评级,写动作才会弹卡。
+- emit 用 camelCase `callId/threadId`(tauri emit 不转大小写)。
+- 从 token scope 回填 `session_id`;`run_in_terminal` 经终端 registry 命中正确后端会话;接通 `read_terminal_tail` 让 CC 读真实远端回显。
+- 监听器异步注册加 `disposed` 守卫(修命令双发);ActionCard 改不透明底(修与聊天文本重叠)。
+
+**实现与原计划的偏差(已确认,影响后续):**
+- rmcp 服务器落在**新文件** `cc_bridge/mcp_http.rs`,而非重写 `agent/mcp_server.rs`。旧的自定义 JSON-RPC `mcp_server.rs` 与 stdio `--mcp-server` 分支已于本轮全部删除(见下「清理债」✅),活动路径只剩 `mcp_http.rs`。
+- 实际暴露 **8** 个有状态工具(`list_sessions`/`search_history`/`read_terminal_tail`/`run_in_terminal`/`switch_tab`/`open_session_editor`/`sftp_upload`/`save_as_runbook`),非原文「11 个」。
+
+**讨论结论(2026-06-21,影响 Phase 3 取舍,尚未落地):**
+- CC 不喂环境信息也基本能给对命令或靠「跑→`read_terminal_tail` 读回显→调整」闭环自纠 → **「环境事实卡」降级为可选优化,不做**。
+- 闭环修不掉的两点才值得做:① **执行目标消歧**(CC 偶尔误用本地 Bash 而非远端 `run_in_terminal`,信号不报错、闭环收敛不了);② **只读命令确认降噪**(每条 `run_in_terminal` 都弹卡,调整循环里点击摩擦大)。
+- `--add-dir` 只对**本地工作区线程**有意义;远端 SSH 线程文件操作走 `run_in_terminal`/`sftp`,`--add-dir` 基本 N/A。CC 子进程当前未设 `current_dir`(继承 Taomni 工作目录,无意义)。
 
 ---
 
@@ -47,7 +75,7 @@
 
 ## 三、分阶段计划(每阶段一个 review gate)
 
-### Phase 0 — 止血 + 地基(低风险,独立于 rmcp,先发)
+### Phase 0 — 止血 + 地基(低风险,独立于 rmcp,先发) — ✅ 已完成(在 main)
 
 **0.1 `agent/safety.rs` — 补 CC 工具名映射**
 - `check_tool_call` 增分支:`Bash` → 取 `command` 跑 `shell_safety::check_blacklist`;`Read/Edit/Write/NotebookEdit` → 取路径对 `sensitive_deny_dirs()` 校验(挡命令绕过)。保留现有 `run_in_terminal`/`read_terminal_tail`。
@@ -61,9 +89,9 @@
 **0.3 `chat/mod.rs` — CC 分支接 `terminal_context`**
 - 把 redact 后的 `req.terminal_context` 拼入发给 CC 的首条消息(对齐非 CC 路径 611 行)。
 
-→ ✅ **Review gate 0**:`cargo test` 通过 + 冒烟。
+→ ✅ **Review gate 0**(已通过,在 main):`cargo test` 通过 + 冒烟。
 
-### Phase 1 + 2(捆绑)— 有状态工具 + HITL 分级
+### Phase 1 + 2(捆绑)— 有状态工具 + HITL 分级 — ✅ 已完成,端到端打通
 
 > 捆绑原因:Phase 1 让 CC 能碰真实 SSH,不带 Phase 2 的确认就是"无确认在生产机跑任意命令"的危险中间态。
 
@@ -94,24 +122,47 @@
 - `chat/mod.rs` CC spawn 前确保 in-app 服务器在跑、取 addr+token 注入 config;加 `--strict-mcp-config`(防用户 `~/.claude` MCP 绕过 permission_prompt;review 确认是否影响 skills/CLAUDE.md 加载)。
 - `lib.rs` 注册 `cc_resolve_tool_call`/`cc_resolve_permission`;`main.rs` 的 stdio `--mcp-server` 分支可废弃。
 
-→ ✅ **Review gate 1+2**:CC 在绑定会话真实跑命令、危险动作停下等人点、跨会话被拒。
+→ ✅ **Review gate 1+2**(已通过):CC 在绑定会话真实跑命令、危险动作停下等人点、跨会话被拒。**全链路已在 GUI 验证**(绑定 SSH 会话执行 `uname -a`,确认卡 → 允许 → 远端执行 → `read_terminal_tail` 读回真实输出)。
 
-### Phase 3 — 真实 cwd + 模型 / 渲染保真
-- live `chat_stream` 接 `--add-dir`(搬 `commands.rs` 逻辑),cwd 由前端 OSC-7 传入(扩 `chat_stream` 请求字段)。
-- per-thread 模型(opus/sonnet/haiku)+ thinking 预算,在 provider 切换处暴露。
-- CC 的 `tool_use/tool_result` 渲染为结构化卡片;从 result 事件捞 token/cost/usage。
+### Phase 3 — 真实 cwd + 模型 / 渲染保真 — ☐ 待办
+- ☐ live `chat_stream` 接 `--add-dir`(搬 `commands.rs` 逻辑),cwd 由前端 OSC-7 传入(扩 `chat_stream` 请求字段)。**注**:仅对本地工作区线程有意义;远端 SSH 线程 N/A。还需先给 CC 子进程显式设 `current_dir`(现继承 Taomni 工作目录,无意义)。
+- ☐ per-thread 模型(opus/sonnet/haiku)+ thinking 预算,在 provider 切换处暴露。
+- ☐ CC 的 `tool_use/tool_result` 渲染为结构化卡片;从 result 事件捞 token/cost/usage。
+- ☐(新增候选,讨论结论)**执行目标消歧**:让 CC 在绑定会话时优先 `run_in_terminal`(远端)而非内置 Bash(本地)——system-prompt 一句消歧,或 Strict 线程 deny 本地 Bash。小而高价值。
+- ☐(新增候选,讨论结论)**只读命令确认降噪**:区分只读/改动命令,只读免逐条弹卡(或引导 allow-session),降低「跑→读→调整」循环的点击摩擦。
+- ❌(讨论结论)**环境事实卡** —— 不做:`read_terminal_tail` 反馈闭环已覆盖,纯优化、低优先。
 
-→ ✅ Review gate 3。
+→ ☐ Review gate 3。
 
-### Phase 4 — 编排者 B 最小版
-- 给 CC 增最小编排工具 `dispatch_subtask`(并行拉起子 CC 进程或原生 agent run),结果聚合回主 CC。
-- 复用挂起表 + 进程注册表;并发上限可配。
-- 任务列表在 UI 简单可见(不做完整计划面板)。
+### Phase 4 — 编排者 B 最小版 — ☐ 待办
+- ☐ 给 CC 增最小编排工具 `dispatch_subtask`(并行拉起子 CC 进程或原生 agent run),结果聚合回主 CC。
+- ☐ 复用挂起表 + 进程注册表;并发上限可配。
+- ☐ 任务列表在 UI 简单可见(不做完整计划面板)。
 
-→ ✅ Review gate 4。
+→ ☐ Review gate 4。
 
-### Phase 5 — 多 agent 调度中心 C(本轮只出设计文档)
-- 跨 thread/跨机调度、agent 注册表、任务队列、调度器 → 设计先行,实现待 A+B 稳定。
+### Phase 5 — 多 agent 调度中心 C(本轮只出设计文档) — ☐ 待办
+- ☐ 跨 thread/跨机调度、agent 注册表、任务队列、调度器 → 设计先行,实现待 A+B 稳定。
+
+---
+
+## 待办清单(汇总)
+
+**清理债(承接 Phase 1+2 偏差):**
+- ✅ 废弃旧的自定义 JSON-RPC `agent/mcp_server.rs` + `lib.rs` 的 `mcp_server_start/stop/status` 注册 + stdio `--mcp-server` 分支（`main.rs` dispatch、`cc_bridge/permissions_mcp.rs`、`cc_bridge/tools_mcp.rs`）。三处均已删除，构建通过、cc_bridge 33 测试全绿；活动路径只剩 `cc_bridge/mcp_http.rs`（Streamable-HTTP）。
+
+**Phase 3(cwd + 模型 + 渲染):**
+- ☐ CC 子进程显式 `current_dir` + 本地工作区线程接 `--add-dir`
+- ☐ per-thread 模型 + thinking 预算
+- ☐ `tool_use/tool_result` 结构化卡片 + result 事件的 token/cost/usage
+- ☐ 执行目标消歧(优先 `run_in_terminal`)*(讨论新增,低成本高价值)*
+- ☐ 只读命令确认降噪 *(讨论新增)*
+
+**Phase 4(编排 B 最小版):**
+- ☐ `dispatch_subtask` + 并发上限 + UI 任务列表
+
+**Phase 5(调度中心 C):**
+- ☐ 设计文档(跨 thread/跨机调度、agent 注册表、任务队列、调度器)
 
 ---
 
@@ -119,12 +170,12 @@
 - **测试**:rmcp 服务器(initialize / tools.list / tools.call + 401 无 token + 跨会话拒)、挂起 oneshot 超时回收;前端 `npm test`(vitest);有状态工具配 env 门控的真实 SSH 集成测试(仿 network-proxy 实测约定)。
 - **构建**:Rust `cargo test`(注意默认 `hbase-kerberos` feature);前端 `tsc -b && vite build`。
 - **一致性债**:`agent/commands.rs:13-25` 的 `build_registry` 用第二个私有 DB 连接,接 in-app 服务器时统一走 `AppState.db`。
-- **风险 Top 1**:rmcp ↔ CC 的 MCP-HTTP 传输兼容 —— Phase 1 第一件事 spike。
+- **风险 Top 1**:rmcp ↔ CC 的 MCP-HTTP 传输兼容 —— ✅ 已验证(spike 通过,CC 2.1.185 `type:"http"` + Bearer 连通在跑)。
 
 ---
 
 ## 五、Review 节奏
-1. 本轮:决策 D1–D4 已锁定(见第二节)。
-2. 批准本计划 → 从 Phase 0 开干(独立、最安全)。
-3. Phase 1/2 捆绑交付,避免危险中间态。
+1. 决策 D1–D4 已锁定(见第二节)。
+2. ✅ Phase 0 + Phase 1+2 已交付并通过 gate(HITL 全链路 GUI 验证通过)。
+3. ⏭️ 下一步:Phase 3(建议先做低成本的「执行目标消歧」;`--add-dir`/cwd 仅本地工作区线程需要)。
 4. 每阶段 review gate 通过后才进下一阶段。
