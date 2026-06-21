@@ -1378,6 +1378,10 @@ export async function nmediaToggleMic(callId: string, on: boolean): Promise<void
   return invoke("nmedia_toggle_mic", { callId, on });
 }
 
+export async function nmediaToggleScreen(callId: string, on: boolean): Promise<void> {
+  return invoke("nmedia_toggle_screen", { callId, on });
+}
+
 export async function listenLanChatWb(
   cb: (s: LanSignal) => void,
 ): Promise<UnlistenFn> {

@@ -469,6 +469,7 @@ pub fn run() {
             lanchat::commands::nmedia_remove_peer,
             lanchat::commands::nmedia_peer_state,
             lanchat::commands::nmedia_toggle_mic,
+            lanchat::commands::nmedia_toggle_screen,
             lanchat::commands::lanchat_get_retention,
             lanchat::commands::lanchat_set_retention,
             lanchat::commands::lanchat_get_service_state,

@@ -21,6 +21,8 @@
 #[cfg(feature = "native-av")]
 pub mod audio;
 pub mod relay;
+#[cfg(feature = "native-av")]
+pub mod video;
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -59,6 +61,9 @@ pub struct NativeMediaSession {
     /// start. Only present with the `native-av` feature.
     #[cfg(feature = "native-av")]
     audio: std::sync::Mutex<Option<audio::AudioSender>>,
+    /// Screen-share send path (X11 capture + H.264); `None` when not sharing.
+    #[cfg(feature = "native-av")]
+    screen: std::sync::Mutex<Option<video::VideoSender>>,
 }
 
 impl NativeMediaSession {
@@ -94,6 +99,8 @@ impl NativeMediaSession {
             mic_on,
             #[cfg(feature = "native-av")]
             audio,
+            #[cfg(feature = "native-av")]
+            screen: std::sync::Mutex::new(None),
         }))
     }
 
@@ -109,9 +116,14 @@ impl NativeMediaSession {
     }
 
     /// Register a peer we now exchange media with (the audio task starts fanning
-    /// encoded frames to it immediately).
+    /// encoded frames to it immediately; an active screen share is nudged to emit
+    /// a keyframe so the joiner can decode right away).
     pub async fn add_peer(&self, peer_id: &str) {
         self.peers.write().await.insert(peer_id.to_string());
+        #[cfg(feature = "native-av")]
+        if let Some(s) = self.screen.lock().unwrap().as_ref() {
+            s.request_keyframe();
+        }
     }
 
     /// Stop exchanging media with a peer and drop its tile in the webview.
@@ -124,6 +136,50 @@ impl NativeMediaSession {
     /// Toggle the local microphone (mutes the outgoing Opus stream).
     pub fn set_mic(&self, on: bool) {
         self.mic_on.store(on, Ordering::Relaxed);
+    }
+
+    /// Start or stop screen sharing. `app`/`state` drive the X11 capturer and
+    /// the outbound media frames.
+    #[cfg(feature = "native-av")]
+    pub async fn set_screen(
+        &self,
+        app: AppHandle,
+        state: Arc<LanChatState>,
+        on: bool,
+    ) -> Result<(), String> {
+        if on {
+            if self.screen.lock().unwrap().is_some() {
+                return Ok(());
+            }
+            // start_screen_sender is async; do not hold the std mutex across it.
+            let sender =
+                video::start_screen_sender(app, state, self.call_id.clone(), self.peers.clone())
+                    .await?;
+            let mut g = self.screen.lock().unwrap();
+            if g.is_some() {
+                sender.stop(); // lost a race — keep the existing one
+            } else {
+                *g = Some(sender);
+            }
+        } else if let Some(s) = self.screen.lock().unwrap().take() {
+            s.stop();
+        }
+        Ok(())
+    }
+
+    /// Without the codec feature, native screen share is unavailable.
+    #[cfg(not(feature = "native-av"))]
+    pub async fn set_screen(
+        &self,
+        _app: AppHandle,
+        _state: Arc<LanChatState>,
+        on: bool,
+    ) -> Result<(), String> {
+        if on {
+            Err("native screen share not built in (enable the native-av feature)".into())
+        } else {
+            Ok(())
+        }
     }
 
     /// Forward a peer's mic/cam/screen state to the webview.
@@ -139,8 +195,13 @@ impl NativeMediaSession {
     /// Tear the session down: stop capture/encoding and cancel the relay.
     pub fn stop(&self) {
         #[cfg(feature = "native-av")]
-        if let Some(sender) = self.audio.lock().unwrap().take() {
-            sender.stop();
+        {
+            if let Some(sender) = self.audio.lock().unwrap().take() {
+                sender.stop();
+            }
+            if let Some(screen) = self.screen.lock().unwrap().take() {
+                screen.stop();
+            }
         }
         self.relay.cancel.cancel();
     }

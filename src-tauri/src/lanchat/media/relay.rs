@@ -226,6 +226,9 @@ struct PeerDecoders {
     /// peer → (Opus decoder, frames since last level report).
     #[cfg(feature = "native-av")]
     audio: HashMap<String, (super::audio::OpusStreamDecoder, u32)>,
+    /// peer → H.264 decoder (keyed per logical video stream label).
+    #[cfg(feature = "native-av")]
+    video: HashMap<String, super::video::H264StreamDecoder>,
 }
 
 impl PeerDecoders {
@@ -234,12 +237,17 @@ impl PeerDecoders {
             announced: HashSet::new(),
             #[cfg(feature = "native-av")]
             audio: HashMap::new(),
+            #[cfg(feature = "native-av")]
+            video: HashMap::new(),
         }
     }
     fn remove(&mut self, peer_id: &str) {
         self.announced.remove(peer_id);
         #[cfg(feature = "native-av")]
-        self.audio.remove(peer_id);
+        {
+            self.audio.remove(peer_id);
+            self.video.remove(peer_id);
+        }
     }
 }
 
@@ -261,8 +269,9 @@ fn handle_inbound(peers: &mut PeerDecoders, out_tx: &UnboundedSender<Message>, i
     {
         if frame.kind == wire::MEDIA_AUDIO {
             decode_audio(peers, out_tx, &peer_id, &frame.data);
+        } else if frame.kind == wire::MEDIA_VIDEO {
+            decode_video(peers, out_tx, &peer_id, &frame.data);
         }
-        // Video decode (H.264 → RGBA → WS_BIN_VIDEO) lands in Phase 3/4.
     }
     #[cfg(not(feature = "native-av"))]
     {
@@ -305,6 +314,36 @@ fn decode_audio(
         *since = 0;
         let rms = (pcm.iter().map(|s| s * s).sum::<f32>() / pcm.len() as f32).sqrt();
         let _ = out_tx.send(text(&WsText::Level { peer_id: peer_id.to_string(), level: rms.min(1.0) }));
+    }
+}
+
+/// Decode one H.264 access unit from `peer_id` and forward the RGBA frame to
+/// the webview as `[u32 w][u32 h][RGBA…]`.
+#[cfg(feature = "native-av")]
+fn decode_video(
+    peers: &mut PeerDecoders,
+    out_tx: &UnboundedSender<Message>,
+    peer_id: &str,
+    data: &[u8],
+) {
+    if !peers.video.contains_key(peer_id) {
+        match super::video::H264StreamDecoder::new() {
+            Ok(d) => {
+                peers.video.insert(peer_id.to_string(), d);
+            }
+            Err(e) => {
+                log::warn!("lanchat: h264 decoder init for {peer_id} failed: {e}");
+                return;
+            }
+        }
+    }
+    let dec = peers.video.get_mut(peer_id).unwrap();
+    if let Some((w, h, rgba)) = dec.decode(data) {
+        let mut payload = Vec::with_capacity(8 + rgba.len());
+        payload.extend_from_slice(&w.to_le_bytes());
+        payload.extend_from_slice(&h.to_le_bytes());
+        payload.extend_from_slice(&rgba);
+        let _ = out_tx.send(bin(WS_BIN_VIDEO, peer_id, &payload));
     }
 }
 

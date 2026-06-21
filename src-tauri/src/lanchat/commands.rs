@@ -426,6 +426,21 @@ pub async fn nmedia_toggle_mic(
     }
     Ok(())
 }
+
+/// Start/stop native screen sharing for a call (X11 capture + H.264 to peers).
+#[tauri::command]
+pub async fn nmedia_toggle_screen(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    call_id: String,
+    on: bool,
+) -> Result<(), String> {
+    let session = state.lanchat.media_sessions.read().await.get(&call_id).cloned();
+    match session {
+        Some(s) => s.set_screen(app, state.lanchat.clone(), on).await,
+        None => Err(format!("no native media session for {call_id}")),
+    }
+}
 #[tauri::command]
 pub async fn lanchat_send_dir(
     app: AppHandle,

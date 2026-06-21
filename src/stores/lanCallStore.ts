@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { lanchatSendSignal, lanchatSignalGroup, listenLanChatSignal } from "../lib/ipc";
 import { createMediaSession, type MediaSession } from "../lib/mediaSession";
+import type { NativeSession } from "../lib/nativeSession";
 import { hasWebRtc, isTauriRuntime } from "../lib/runtime";
 import type { LanCallKind, LanSignal } from "../types";
 import { useLanChatStore } from "./lanChatStore";
@@ -259,6 +260,19 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   toggleScreen: async () => {
     const s = get();
     if (!s.callId || !session) return;
+    // Native stack: screen capture + H.264 happen in Rust; no getDisplayMedia.
+    if (session.isNative) {
+      const next = !s.screenOn;
+      try {
+        await (session as NativeSession).setScreen(next);
+      } catch (e) {
+        set({ callError: mediaErrorMessage(e) });
+        return;
+      }
+      set({ screenOn: next });
+      broadcastMediaState();
+      return;
+    }
     if (!s.screenOn) {
       let display: MediaStream;
       try {

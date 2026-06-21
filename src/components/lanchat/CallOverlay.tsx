@@ -40,20 +40,35 @@ function useSpeaking(stream: MediaStream | null): boolean {
 
 function VideoTile({
   stream,
+  canvas,
   muted,
   label,
   camOff,
 }: {
   stream: MediaStream | null;
+  canvas?: HTMLCanvasElement | null;
   muted: boolean;
   label: string;
   camOff: boolean;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
+  const canvasHolder = useRef<HTMLDivElement | null>(null);
   const speaking = useSpeaking(stream);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
+  // Native stack: mount the per-peer render canvas (Rust decodes into it).
+  useEffect(() => {
+    const holder = canvasHolder.current;
+    if (!holder || !canvas) return;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.objectFit = "contain";
+    holder.appendChild(canvas);
+    return () => {
+      if (canvas.parentNode === holder) holder.removeChild(canvas);
+    };
+  }, [canvas]);
   return (
     <div
       className="relative grid place-items-center overflow-hidden rounded-xl"
@@ -64,13 +79,20 @@ function VideoTile({
         minHeight: 160,
       }}
     >
-      <video
-        ref={ref}
-        autoPlay
-        playsInline
-        muted={muted}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block" }}
-      />
+      {canvas ? (
+        <div
+          ref={canvasHolder}
+          style={{ width: "100%", height: "100%", display: camOff ? "none" : "block" }}
+        />
+      ) : (
+        <video
+          ref={ref}
+          autoPlay
+          playsInline
+          muted={muted}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block" }}
+        />
+      )}
       {camOff ? (
         <div
           className="grid h-[74px] w-[74px] place-items-center rounded-full text-[26px] text-white"
@@ -259,6 +281,7 @@ export function CallOverlay() {
               <VideoTile
                 key={peerId}
                 stream={r.stream}
+                canvas={r.canvas}
                 muted={false}
                 label={`${peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
                 camOff={!r.cam && !r.screen}

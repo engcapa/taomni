@@ -23,6 +23,7 @@ import {
   nmediaStart,
   nmediaStop,
   nmediaToggleMic,
+  nmediaToggleScreen,
 } from "./ipc";
 import type { MediaSession, MediaSessionCallbacks } from "./mediaSession";
 
@@ -119,8 +120,26 @@ export class NativeSession implements MediaSession {
     if (kind === WS_BIN_AUDIO) {
       this.playAudio(peerId, new Float32Array(payload));
     } else if (kind === WS_BIN_VIDEO) {
-      // Video render (→ canvas) lands in Phase 3/4.
+      this.drawVideo(peerId, payload);
     }
+  }
+
+  /** Draw a decoded RGBA frame `[u32 w][u32 h][RGBA…]` into the peer's canvas. */
+  private drawVideo(peerId: string, payload: ArrayBuffer): void {
+    const canvas = this.canvases.get(peerId);
+    if (!canvas || payload.byteLength < 8) return;
+    const dv = new DataView(payload);
+    const w = dv.getUint32(0, true);
+    const h = dv.getUint32(4, true);
+    if (w === 0 || h === 0 || payload.byteLength < 8 + w * h * 4) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const rgba = new Uint8ClampedArray(payload, 8, w * h * 4);
+    ctx.putImageData(new ImageData(rgba, w, h), 0, 0);
   }
 
   private ensureAudioCtx(): AudioContext | null {
@@ -239,6 +258,14 @@ export class NativeSession implements MediaSession {
   setMic(on: boolean): void {
     this.localState.mic = on;
     void nmediaToggleMic(this.callId, on).catch(() => undefined);
+  }
+
+  /** Start/stop native screen sharing (drives the Rust X11 capturer + H.264).
+   *  Throws if capture can't start (e.g. no X11 / Wayland-only) so the store can
+   *  surface the failure. */
+  async setScreen(on: boolean): Promise<void> {
+    await nmediaToggleScreen(this.callId, on);
+    this.localState.screen = on;
   }
 
   close(): void {
