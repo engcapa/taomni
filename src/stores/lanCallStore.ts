@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { lanchatSendSignal, lanchatSignalGroup, listenLanChatSignal } from "../lib/ipc";
 import { createMediaSession, type MediaSession } from "../lib/mediaSession";
-import { isTauriRuntime } from "../lib/runtime";
+import { hasWebRtc, isTauriRuntime } from "../lib/runtime";
 import type { LanCallKind, LanSignal } from "../types";
 import { useLanChatStore } from "./lanChatStore";
 
@@ -19,6 +19,8 @@ interface IncomingCall {
 
 interface RemotePeer {
   stream: MediaStream | null;
+  /** Per-peer render canvas on the native (Rust direct-render) stack. */
+  canvas?: HTMLCanvasElement | null;
   mic: boolean;
   cam: boolean;
   screen: boolean;
@@ -117,12 +119,14 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   startCall: async (peerId, kind) => {
     if (get().callId) return;
     const callId = crypto.randomUUID();
-    let local: MediaStream;
-    try {
-      local = await getMedia(kind);
-    } catch (e) {
-      set({ callError: mediaErrorMessage(e) });
-      return; // permission denied / no device
+    let local: MediaStream | null = null;
+    if (hasWebRtc()) {
+      try {
+        local = await getMedia(kind);
+      } catch (e) {
+        set({ callError: mediaErrorMessage(e) });
+        return; // permission denied / no device
+      }
     }
     session = await createMediaSession(callId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
@@ -143,12 +147,14 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   startMeeting: async (groupId, kind) => {
     if (get().callId) return;
     const meetingId = crypto.randomUUID();
-    let local: MediaStream;
-    try {
-      local = await getMedia(kind);
-    } catch (e) {
-      set({ callError: mediaErrorMessage(e) });
-      return;
+    let local: MediaStream | null = null;
+    if (hasWebRtc()) {
+      try {
+        local = await getMedia(kind);
+      } catch (e) {
+        set({ callError: mediaErrorMessage(e) });
+        return;
+      }
     }
     session = await createMediaSession(meetingId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
@@ -171,13 +177,15 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   acceptIncoming: async () => {
     const inc = get().incoming;
     if (!inc) return;
-    let local: MediaStream;
-    try {
-      local = await getMedia(inc.kind);
-    } catch (e) {
-      set({ callError: mediaErrorMessage(e) });
-      get().rejectIncoming();
-      return;
+    let local: MediaStream | null = null;
+    if (hasWebRtc()) {
+      try {
+        local = await getMedia(inc.kind);
+      } catch (e) {
+        set({ callError: mediaErrorMessage(e) });
+        get().rejectIncoming();
+        return;
+      }
     }
     session = await createMediaSession(inc.callId, myNodeId(), mediaCallbacks());
     session.setLocalStream(local);
@@ -286,6 +294,17 @@ function mediaCallbacks() {
         remotes: { ...s.remotes, [peerId]: { ...(s.remotes[peerId] ?? { mic: true, cam: true, screen: false }), stream } },
       }));
     },
+    // Native stack: a peer's decoded media renders into `canvas`. Registering it
+    // also serves as presence — the tile appears even before the first video
+    // frame (audio-only shows the avatar placeholder).
+    onRemoteCanvas: (peerId: string, canvas: HTMLCanvasElement) => {
+      useLanCallStore.setState((s) => ({
+        remotes: {
+          ...s.remotes,
+          [peerId]: { ...(s.remotes[peerId] ?? { stream: null, mic: true, cam: false, screen: false }), canvas },
+        },
+      }));
+    },
     onPeerClosed: (peerId: string) => {
       useLanCallStore.setState((s) => {
         const remotes = { ...s.remotes };
@@ -356,6 +375,8 @@ async function handleSignal(sig: LanSignal) {
           },
         };
       });
+      // Native stack also forwards the state into the relay (tile overlays).
+      void session?.handleSignal(from, type, payload);
       break;
     }
     case "meeting-join": {
@@ -383,7 +404,10 @@ async function handleSignal(sig: LanSignal) {
       break;
     }
     case "signal-sdp":
-    case "signal-ice": {
+    case "signal-ice":
+    case "nmedia-offer":
+    case "nmedia-answer":
+    case "nmedia-stop": {
       await session?.handleSignal(from, type, payload);
       break;
     }

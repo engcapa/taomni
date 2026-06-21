@@ -12,16 +12,19 @@
 //! frames relayed through `lanchat://signal`.
 //!
 //! Build-out is phased (see claudedocs/lanchat-linux-native-av-transport.md):
-//! this module starts as the inbound-routing + per-call session skeleton;
-//! the loopback WS relay, codecs (Opus / H.264), and capture land in later
-//! phases. Forward-declared items carry `#![allow(dead_code)]`, narrowed as
-//! phases start using them.
+//! the relay + per-call session + command surface are always compiled; capture
+//! and the codecs (Opus / H.264) live behind the `native-av` feature and land in
+//! later phases. Forward-declared items carry `#![allow(dead_code)]`, narrowed
+//! as phases start using them.
 #![allow(dead_code)]
 
+pub mod relay;
+
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use tauri::AppHandle;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 
 use crate::lanchat::protocol::wire::MediaFrame;
 use crate::lanchat::LanChatState;
@@ -34,29 +37,71 @@ pub struct InboundMedia {
 }
 
 /// Per-call native media session state. Created when a native call starts and
-/// stored in `LanChatState.media_sessions` keyed by call id. Holds the inbound
-/// pump that feeds the loopback WS relay (later phase) and, once capture lands,
-/// the per-peer encode/send state.
+/// stored in `LanChatState.media_sessions` keyed by call id. Owns the loopback
+/// WS relay (decoded media → webview) and the set of peers this call exchanges
+/// media with; per-peer capture/encode state attaches in later phases.
 pub struct NativeMediaSession {
     pub call_id: String,
     /// Inbound media pump: frames arriving over the mesh are forwarded here and
-    /// drained by the call's loopback WS relay toward the webview.
+    /// drained by the relay toward the webview.
     inbound_tx: mpsc::UnboundedSender<InboundMedia>,
+    /// The loopback WS relay for this call.
+    relay: relay::RelayHandle,
+    /// Peers we are currently exchanging media with.
+    peers: RwLock<HashSet<String>>,
 }
 
 impl NativeMediaSession {
-    /// Build a session and hand back the receiver end of its inbound pump (the
-    /// relay owns it). Kept separate from spawning the relay so the transport
-    /// can route frames the moment the session is registered.
-    pub fn new(call_id: String) -> (Self, mpsc::UnboundedReceiver<InboundMedia>) {
+    /// Start a session: spawn the loopback WS relay and wire the inbound pump
+    /// into it. Returns the session ready to register in `media_sessions`.
+    pub async fn start(call_id: String) -> Result<Arc<Self>, String> {
         let (inbound_tx, inbound_rx) = mpsc::unbounded_channel();
-        (Self { call_id, inbound_tx }, inbound_rx)
+        let relay = relay::spawn_relay(inbound_rx).await?;
+        Ok(Arc::new(Self {
+            call_id,
+            inbound_tx,
+            relay,
+            peers: RwLock::new(HashSet::new()),
+        }))
+    }
+
+    /// The loopback WS port the webview connects to for this call.
+    pub fn ws_port(&self) -> u16 {
+        self.relay.ws_port
     }
 
     /// Forward an inbound media frame into the relay pump. Cheap and lock-free;
     /// called from the transport read loop hot path.
     pub fn forward_inbound(&self, peer_id: &str, frame: MediaFrame) {
         let _ = self.inbound_tx.send(InboundMedia { peer_id: peer_id.to_string(), frame });
+    }
+
+    /// Register a peer we now exchange media with (capture/encode toward it is
+    /// started by the audio/video phases).
+    pub async fn add_peer(&self, peer_id: &str) {
+        self.peers.write().await.insert(peer_id.to_string());
+    }
+
+    /// Stop exchanging media with a peer and drop its tile in the webview.
+    pub async fn remove_peer(&self, peer_id: &str) {
+        if self.peers.write().await.remove(peer_id) {
+            let _ = self.relay.control_tx.send(relay::RelayControl::PeerRemoved(peer_id.to_string()));
+        }
+    }
+
+    /// Forward a peer's mic/cam/screen state to the webview.
+    pub fn peer_state(&self, peer_id: &str, mic: bool, cam: bool, screen: bool) {
+        let _ = self.relay.control_tx.send(relay::RelayControl::PeerState {
+            peer_id: peer_id.to_string(),
+            mic,
+            cam,
+            screen,
+        });
+    }
+
+    /// Tear the session down: cancel the relay (which releases the WS + tasks).
+    pub fn stop(&self) {
+        self.relay.cancel.cancel();
     }
 }
 
