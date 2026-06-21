@@ -116,6 +116,8 @@ interface LanChatStore {
   rejectOffer: (transferId: string) => Promise<void>;
   transferControl: (transferId: string, action: "pause" | "resume" | "cancel") => Promise<void>;
   openTransfer: (transferId: string) => Promise<void>;
+  openTransferFolder: (transferId: string) => Promise<void>;
+  clearCompletedTransfers: () => void;
   saveProfile: (args: {
     name: string;
     avatarBase64?: string | null;
@@ -195,6 +197,19 @@ export function mergedMemberPeers(
 /** Total unread across all conversations (for the global badge). */
 export function totalUnread(convs: LanConversation[]): number {
   return convs.reduce((sum, c) => sum + (c.unread > 0 ? c.unread : 0), 0);
+}
+
+function parentPath(path: string): string | null {
+  const trimmed = path.replace(/[\\/]+$/, "");
+  const slash = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (slash < 0) return null;
+  if (slash === 0) return "/";
+  if (slash === 2 && /^[A-Za-z]:[\\/]/.test(trimmed)) return trimmed.slice(0, 3);
+  return trimmed.slice(0, slash);
+}
+
+function isTerminalTransfer(t: LanTransferProgress): boolean {
+  return t.state === "done" || t.state === "failed" || t.state === "cancelled" || t.state === "rejected";
 }
 
 let unsubscribers: Array<() => void> = [];
@@ -389,6 +404,32 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
       }
     }
   },
+
+  openTransferFolder: async (transferId) => {
+    const path = get().transferPaths[transferId];
+    const dir = path ? parentPath(path) : null;
+    if (dir) {
+      try {
+        await lanchatOpenPath(dir);
+      } catch (e) {
+        console.debug("lanchat openTransferFolder:", e);
+      }
+    }
+  },
+
+  clearCompletedTransfers: () =>
+    set((s) => {
+      const nextTransfers = { ...s.transfers };
+      const nextPaths = { ...s.transferPaths };
+      let changed = false;
+      for (const [id, transfer] of Object.entries(s.transfers)) {
+        if (!isTerminalTransfer(transfer)) continue;
+        delete nextTransfers[id];
+        delete nextPaths[id];
+        changed = true;
+      }
+      return changed ? { transfers: nextTransfers, transferPaths: nextPaths } : {};
+    }),
 
   saveProfile: async (args) => {
     const profile = await lanchatUpdateProfile(args);

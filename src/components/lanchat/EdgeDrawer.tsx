@@ -5,6 +5,7 @@ import { useLanChatStore } from "../../stores/lanChatStore";
 import { Avatar } from "./Avatar";
 import { MessageInput } from "./MessageInput";
 import { MessageThread } from "./MessageThread";
+import { TransferTrayButton } from "./TransferPanel";
 import { useActiveHeader } from "./LanChatPanel";
 
 /** Drawer size: width when docked left/right, height when docked top/bottom. */
@@ -108,10 +109,11 @@ export function EdgeDrawer() {
           {header ? (
             <Avatar name={header.name} colorKey={header.colorKey} label={header.label} status={header.status ?? undefined} size={22} radius={6} />
           ) : null}
-          <span className="truncate">{header?.name ?? "内网通讯"}</span>
+          <span className="min-w-0 flex-1 truncate">{header?.name ?? "内网通讯"}</span>
           <span className="text-[11px] font-normal" style={{ color: "var(--taomni-text-muted)" }}>
             · 边缘抽屉
           </span>
+          <TransferTrayButton placement="bottom" />
           <button
             type="button"
             onClick={() => setEdgeOpen(false)}

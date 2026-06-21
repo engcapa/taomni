@@ -17,6 +17,7 @@ import { isTauriRuntime } from "../../lib/runtime";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { MessageThread } from "../lanchat/MessageThread";
 import { MessageInput } from "../lanchat/MessageInput";
+import { TransferTrayButton } from "../lanchat/TransferPanel";
 import { VaultGate } from "../vault/VaultGate";
 
 export default function LanChatDetachedWindow({ id }: { id: string }) {
@@ -99,13 +100,14 @@ export default function LanChatDetachedWindow({ id }: { id: string }) {
       style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
       <div
-        className="flex h-9 shrink-0 items-center px-3 text-[13px] font-semibold"
+        className="flex h-9 shrink-0 items-center gap-2 px-3 text-[13px] font-semibold"
         style={{
           background: "linear-gradient(to bottom,var(--taomni-titlebar-from),var(--taomni-titlebar-to))",
           borderBottom: "1px solid var(--taomni-chrome-border)",
         }}
       >
-        {headerName}
+        <span className="min-w-0 flex-1 truncate">{headerName}</span>
+        <TransferTrayButton placement="bottom" />
       </div>
       <VaultGate
         lockedTitle="局域网聊天已锁定"

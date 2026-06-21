@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { useLanChatStore } from "../../stores/lanChatStore";
 import type { LanMessage } from "../../types";
 import { Avatar } from "./Avatar";
+import { FileTransferCard } from "./TransferPanel";
 import { dayLabel } from "./util";
 
 /** Split a message body into plain text + highlighted @mentions. */
@@ -55,10 +56,20 @@ export function MessageThread() {
   const messagesByConv = useLanChatStore((s) => s.messagesByConv);
   const profile = useLanChatStore((s) => s.profile);
   const roster = useLanChatStore((s) => s.roster);
+  const transfers = useLanChatStore((s) => s.transfers);
   const resend = useLanChatStore((s) => s.resend);
   const deleteMessage = useLanChatStore((s) => s.deleteMessage);
 
   const messages = activeConvId ? messagesByConv[activeConvId] ?? [] : [];
+  const convTransfers = useMemo(
+    () =>
+      activeConvId
+        ? Object.values(transfers)
+            .filter((t) => t.convId === activeConvId && t.state !== "rejected")
+            .sort((a, b) => a.transferId.localeCompare(b.transferId))
+        : [],
+    [activeConvId, transfers],
+  );
   const myId = profile?.id ?? "";
 
   const nameById = useMemo(() => {
@@ -71,7 +82,7 @@ export function MessageThread() {
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, activeConvId]);
+  }, [messages.length, convTransfers.length, activeConvId]);
 
   if (!activeConvId) {
     return (
@@ -83,7 +94,7 @@ export function MessageThread() {
 
   let lastDay = "";
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {messages.map((msg) => {
         const mine = msg.senderId === myId;
         const day = dayLabel(msg.createdAt);
@@ -169,6 +180,30 @@ export function MessageThread() {
               </button>
             </div>
           </Fragment>
+        );
+      })}
+      {convTransfers.map((transfer) => {
+        const mine = transfer.direction === "send";
+        const senderName = mine
+          ? profile?.name ?? "我"
+          : activeConvId.startsWith("direct:")
+            ? nameById.get(activeConvId.slice("direct:".length)) ?? "对方"
+            : "文件传输";
+        return (
+          <div
+            key={`transfer:${transfer.transferId}`}
+            className="group flex max-w-[78%] items-center gap-2.5"
+            style={mine ? { alignSelf: "flex-end", flexDirection: "row-reverse" } : undefined}
+          >
+            <Avatar
+              name={senderName}
+              colorKey={mine ? myId : activeConvId}
+              label={mine ? "我" : undefined}
+              size={30}
+              radius={8}
+            />
+            <FileTransferCard transfer={transfer} />
+          </div>
         );
       })}
       <div ref={endRef} />

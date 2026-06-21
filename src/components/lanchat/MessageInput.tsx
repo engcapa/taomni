@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AtSign, Camera, Paperclip, Send, Smile } from "lucide-react";
 
 import { useLanChatStore } from "../../stores/lanChatStore";
@@ -12,6 +12,9 @@ interface MentionState {
   /** The partial query after `@`. */
   query: string;
 }
+
+const TEXTAREA_MIN_HEIGHT = 72;
+const TEXTAREA_MAX_HEIGHT = 144;
 
 /** Message composer with @-mention autocomplete (phase 8). Enter sends;
  *  Shift+Enter inserts a newline. While the mention popup is open, Up/Down
@@ -36,6 +39,19 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
   // Files send to a 1:1 peer or a whole group; screenshot/clipboard are 1:1 only.
   const canFile = isDesktop && !!activeConvId;
   const canMedia = isDesktop && !!activePeerId();
+
+  const resizeTextarea = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const next = Math.max(TEXTAREA_MIN_HEIGHT, Math.min(TEXTAREA_MAX_HEIGHT, ta.scrollHeight));
+    ta.style.height = `${next}px`;
+    ta.style.overflowY = ta.scrollHeight > TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
+  };
+
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [text, disabled]);
 
   const candidates = useMemo(() => {
     if (!mention) return [];
@@ -148,53 +164,16 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
         </div>
       ) : null}
 
-      <div className="mb-1.5 flex gap-0.5">
-        <ToolButton title="表情（即将支持）" disabled>
-          <Smile className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          title="@ 提及"
-          disabled={disabled}
-          onClick={() => {
-            setText((t) => `${t}@`);
-            requestAnimationFrame(() => {
-              const ta = taRef.current;
-              if (ta) {
-                ta.focus();
-                detectMention(ta.value, ta.value.length);
-              }
-            });
-          }}
-        >
-          <AtSign className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          title={canFile ? "发送文件" : "发送文件仅支持桌面版"}
-          disabled={!canFile}
-          onClick={() => {
-            void (async () => {
-              const path = await pickFile();
-              if (path) await sendFilePath(path).catch(() => undefined);
-            })();
-          }}
-        >
-          <Paperclip className="h-4 w-4" />
-        </ToolButton>
-        <ToolButton
-          title={canMedia ? "截图并发送" : "截图发送仅支持桌面版的单聊"}
-          disabled={!canMedia}
-          onClick={() => {
-            void sendScreenshot().catch(() => undefined);
-          }}
-        >
-          <Camera className="h-4 w-4" />
-        </ToolButton>
-      </div>
-      <div className="flex items-end gap-2">
+      <div
+        className="rounded-xl p-2"
+        style={{ border: "1px solid var(--taomni-input-border)", background: "var(--taomni-input-bg)" }}
+      >
         <textarea
           ref={taRef}
+          data-testid="lanchat-composer-textarea"
           value={text}
           disabled={disabled}
+          rows={3}
           onChange={onChange}
           onKeyDown={onKeyDown}
           onClick={(e) => detectMention(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
@@ -205,20 +184,66 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
               void sendClipboardImage().catch(() => undefined);
             }
           }}
-          placeholder={disabled ? "选择会话后输入消息…" : "输入消息，@ 提及成员，回车发送…"}
-          className="h-9 flex-1 resize-none rounded-lg px-2.5 py-2 text-[12px] outline-none"
-          style={{ border: "1px solid var(--taomni-input-border)", background: "var(--taomni-input-bg)", color: "var(--taomni-text)" }}
+          placeholder={disabled ? "选择会话后输入消息…" : "输入消息，Enter 发送…"}
+          className="block w-full resize-none rounded-md bg-transparent px-1.5 py-1 text-[12px] leading-5 outline-none"
+          style={{
+            minHeight: TEXTAREA_MIN_HEIGHT,
+            maxHeight: TEXTAREA_MAX_HEIGHT,
+            color: "var(--taomni-text)",
+          }}
         />
-        <button
-          type="button"
-          onClick={() => void send()}
-          disabled={disabled || busy || !text.trim()}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-[12px] font-semibold text-white disabled:opacity-50"
-          style={{ background: "linear-gradient(to bottom,var(--taomni-accent-soft),var(--taomni-accent))", border: "1px solid var(--taomni-accent)" }}
-        >
-          <Send className="h-3.5 w-3.5" />
-          发送
-        </button>
+        <div className="mt-2 flex min-w-0 items-center gap-0.5">
+          <ToolButton title="表情（即将支持）" disabled>
+            <Smile className="h-4 w-4" />
+          </ToolButton>
+          <ToolButton
+            title="@ 提及"
+            disabled={disabled}
+            onClick={() => {
+              setText((t) => `${t}@`);
+              requestAnimationFrame(() => {
+                const ta = taRef.current;
+                if (ta) {
+                  ta.focus();
+                  detectMention(ta.value, ta.value.length);
+                }
+              });
+            }}
+          >
+            <AtSign className="h-4 w-4" />
+          </ToolButton>
+          <ToolButton
+            title={canFile ? "发送文件" : "发送文件仅支持桌面版"}
+            disabled={!canFile}
+            onClick={() => {
+              void (async () => {
+                const path = await pickFile();
+                if (path) await sendFilePath(path).catch(() => undefined);
+              })();
+            }}
+          >
+            <Paperclip className="h-4 w-4" />
+          </ToolButton>
+          <ToolButton
+            title={canMedia ? "截图并发送" : "截图发送仅支持桌面版的单聊"}
+            disabled={!canMedia}
+            onClick={() => {
+              void sendScreenshot().catch(() => undefined);
+            }}
+          >
+            <Camera className="h-4 w-4" />
+          </ToolButton>
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={disabled || busy || !text.trim()}
+            className="ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center gap-1.5 rounded-md text-[12px] font-semibold text-white disabled:opacity-50 sm:w-auto sm:px-3"
+            style={{ background: "linear-gradient(to bottom,var(--taomni-accent-soft),var(--taomni-accent))", border: "1px solid var(--taomni-accent)" }}
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">发送</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -241,7 +266,7 @@ function ToolButton({
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className="grid h-6 w-7 place-items-center rounded-md disabled:opacity-40"
+      className="grid h-7 w-7 place-items-center rounded-md disabled:opacity-40"
       style={{ color: "var(--taomni-text-muted)" }}
     >
       {children}
