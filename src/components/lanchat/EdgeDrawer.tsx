@@ -13,8 +13,8 @@ import { useActiveHeader } from "./LanChatPanel";
 /** Drawer size: width when docked left/right, height when docked top/bottom. */
 const DOCK_W = 380;
 const DOCK_H = 340;
-/** Peek-tab thickness. */
-const PEEK = 28;
+/** Peek-tab thickness. Kept small because it only needs to expose one drag/click affordance. */
+const PEEK = 24;
 /** Compact roster ribbon width inside the drawer. */
 const RIBBON_W = 46;
 
@@ -117,21 +117,20 @@ export function EdgeDrawer() {
   };
 
   const peekStyle: Record<typeof side, React.CSSProperties> = {
-    left: { left: 0, top: "50%", transform: "translateY(-50%)", width: PEEK, height: 88, borderRadius: "0 8px 8px 0" },
-    right: { right: 0, top: "50%", transform: "translateY(-50%)", width: PEEK, height: 88, borderRadius: "8px 0 0 8px" },
-    top: { top: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 104, borderRadius: "0 0 8px 8px" },
-    bottom: { bottom: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 104, borderRadius: "8px 8px 0 0" },
+    left: { left: 0, top: "50%", transform: "translateY(-50%)", width: PEEK, height: 40, borderRadius: "0 7px 7px 0" },
+    right: { right: 0, top: "50%", transform: "translateY(-50%)", width: PEEK, height: 40, borderRadius: "7px 0 0 7px" },
+    top: { top: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 40, borderRadius: "0 0 7px 7px" },
+    bottom: { bottom: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 40, borderRadius: "7px 7px 0 0" },
   };
   const peekDragging = peekDragPoint !== null;
-  const peekVertical = side === "left" || side === "right";
   const activePeekStyle: React.CSSProperties = peekDragging
     ? {
         left: peekDragPoint!.x,
         top: peekDragPoint!.y,
         transform: "translate(-50%, -50%)",
-        width: 96,
-        height: PEEK,
-        borderRadius: 8,
+        width: 30,
+        height: 30,
+        borderRadius: 999,
       }
     : peekStyle[side];
 
@@ -354,19 +353,15 @@ export function EdgeDrawer() {
           display: open ? "none" : "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 6,
           color: "#fff",
           fontWeight: 600,
           background: "linear-gradient(135deg,var(--taomni-accent-soft),var(--taomni-accent))",
           boxShadow: "var(--taomni-shadow-md)",
-          flexDirection: peekVertical && !peekDragging ? "column" : "row",
-          fontSize: 10,
           touchAction: "none",
           ...activePeekStyle,
         }}
       >
         <MessageCircle className="h-3.5 w-3.5 flex-none" />
-        <span>{peekVertical && !peekDragging ? "LAN" : "内网"}</span>
       </button>
     </>
   );

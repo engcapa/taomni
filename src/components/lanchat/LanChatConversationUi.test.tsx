@@ -289,13 +289,45 @@ describe("LanChat conversation UI", () => {
     render(<LanChatPanel />);
 
     const handle = screen.getByTestId("lanchat-roster-resize-handle");
-    fireEvent.pointerDown(handle, { clientX: 236 });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 236 });
     fireEvent.pointerMove(document, { clientX: 306 });
     fireEvent.pointerUp(document);
 
     expect(screen.getByTestId("lanchat-roster-panel")).toHaveStyle({ width: "306px" });
 
+    fireEvent.pointerDown(handle, { button: 0, clientX: 306 });
+    fireEvent.pointerMove(document, { clientX: 520 });
+    fireEvent.pointerUp(document);
+    expect(screen.getByTestId("lanchat-roster-panel")).toHaveStyle({ width: "520px" });
+
     fireEvent.doubleClick(handle);
     expect(screen.getByTestId("lanchat-roster-panel")).toHaveStyle({ width: "236px" });
+  });
+
+  it("collapses and re-expands the member panel by dragging the divider", () => {
+    useLanChatStore.setState({
+      init: vi.fn(async () => undefined),
+      activeConvId: "direct:peer-1",
+      conversations: [
+        { id: "direct:peer-1", kind: "direct", peerOrGroupId: "peer-1", lastMsgAt: 1, unread: 0 },
+      ],
+    });
+
+    render(<LanChatPanel />);
+
+    const handle = screen.getByTestId("lanchat-roster-resize-handle");
+    fireEvent.pointerDown(handle, { button: 0, clientX: 236 });
+    fireEvent.pointerMove(document, { clientX: 80 });
+    fireEvent.pointerUp(document);
+
+    expect(screen.queryByTestId("lanchat-roster-panel")).toBeNull();
+    expect(screen.getByTestId("lanchat-roster-ribbon")).toBeInTheDocument();
+
+    const expandHandle = screen.getByTestId("lanchat-roster-expand-resize-handle");
+    fireEvent.pointerDown(expandHandle, { button: 0, clientX: 34 });
+    fireEvent.pointerMove(document, { clientX: 90 });
+    fireEvent.pointerUp(document);
+
+    expect(screen.getByTestId("lanchat-roster-panel")).toHaveStyle({ width: "292px" });
   });
 });

@@ -39,8 +39,9 @@ import { presenceLabel } from "./util";
 const ROSTER_WIDTH_KEY = "taomni.lanchat.rosterWidth.v1";
 const ROSTER_COLLAPSED_KEY = "taomni.lanchat.rosterCollapsed.v1";
 const ROSTER_DEFAULT_WIDTH = 236;
-const ROSTER_MIN_WIDTH = 190;
-const ROSTER_MAX_WIDTH = 360;
+const ROSTER_MIN_WIDTH = 156;
+const ROSTER_MAX_WIDTH = 560;
+const ROSTER_COLLAPSE_WIDTH = 132;
 
 function clampRosterWidth(width: number): number {
   return Math.max(ROSTER_MIN_WIDTH, Math.min(ROSTER_MAX_WIDTH, Math.round(width)));
@@ -166,6 +167,7 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
   const startRosterResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (rosterCollapsed) return;
+      if (event.button !== 0) return;
       event.preventDefault();
       const startX = event.clientX;
       const startWidth = rosterWidth;
@@ -175,7 +177,44 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
       document.body.style.userSelect = "none";
 
       const onMove = (moveEvent: PointerEvent) => {
-        setRosterWidth(clampRosterWidth(startWidth + moveEvent.clientX - startX));
+        const nextWidth = startWidth + moveEvent.clientX - startX;
+        if (nextWidth <= ROSTER_COLLAPSE_WIDTH) {
+          setRosterCollapsed(true);
+          return;
+        }
+        setRosterCollapsed(false);
+        setRosterWidth(clampRosterWidth(nextWidth));
+      };
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.body.style.cursor = prevCursor;
+        document.body.style.userSelect = prevUserSelect;
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp, { once: true });
+    },
+    [rosterCollapsed, rosterWidth],
+  );
+
+  const startRosterExpandResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!rosterCollapsed) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = Math.max(rosterWidth, ROSTER_MIN_WIDTH);
+      const prevCursor = document.body.style.cursor;
+      const prevUserSelect = document.body.style.userSelect;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const nextWidth = startWidth + moveEvent.clientX - startX;
+        if (nextWidth <= ROSTER_COLLAPSE_WIDTH) return;
+        setRosterCollapsed(false);
+        setRosterWidth(clampRosterWidth(nextWidth));
       };
       const onUp = () => {
         document.removeEventListener("pointermove", onMove);
@@ -329,11 +368,25 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
       )}
 
       {rosterCollapsed ? (
-        <div style={{ width: 1, background: "var(--taomni-divider)" }} />
+        <div
+          data-testid="lanchat-roster-expand-resize-handle"
+          title="拖动展开成员栏"
+          role="separator"
+          aria-orientation="vertical"
+          onPointerDown={startRosterExpandResize}
+          onDoubleClick={() => setRosterCollapsed(false)}
+          className="group relative w-1.5 flex-none cursor-col-resize"
+          style={{ background: "transparent" }}
+        >
+          <div
+            className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors group-hover:w-1"
+            style={{ background: "var(--taomni-divider)" }}
+          />
+        </div>
       ) : (
         <div
           data-testid="lanchat-roster-resize-handle"
-          title="拖动调整成员栏宽度，双击恢复默认"
+          title="拖动调整成员栏宽度，拖到最左收起为 ribbon，双击恢复默认"
           role="separator"
           aria-orientation="vertical"
           aria-valuemin={ROSTER_MIN_WIDTH}
