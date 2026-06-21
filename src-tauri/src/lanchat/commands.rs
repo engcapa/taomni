@@ -484,7 +484,8 @@ pub async fn lanchat_send_screenshot(
     state: State<'_, AppState>,
     peer_id: String,
 ) -> Result<String, String> {
-    let path = tokio::task::spawn_blocking(transfer::capture_screenshot)
+    let log = crate::servers::engine::LogEmitter::new(app.clone(), crate::servers::ServerType::Rdp);
+    let path = tokio::task::spawn_blocking(move || transfer::capture_screenshot(&log))
         .await
         .map_err(|e| e.to_string())??;
     let conv = direct_conv_id(&peer_id);
