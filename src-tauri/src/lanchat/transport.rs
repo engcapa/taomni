@@ -10,9 +10,10 @@
 //! `dispatch_inbound`, extended by later phases; phase 4 handles the
 //! handshake + keepalive set and logs the rest.
 
+use std::collections::VecDeque;
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use futures::{SinkExt, StreamExt};
@@ -20,7 +21,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 use tokio::time::timeout;
 use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
@@ -41,6 +42,14 @@ const MAX_FRAME_LEN: usize = 4 * 1024 * 1024;
 /// disk can never pile the whole file into memory. Control frames use a
 /// separate, prioritized queue so pings/text never wait behind piece data.
 const DATA_QUEUE_CAP: usize = 8;
+/// Bounded depth of a connection's real-time media queue (TAG_MEDIA frames).
+/// Unlike the file-data queue, this is **drop-oldest, never-block**: a media
+/// producer (encoder) must never stall waiting for the network, and stale media
+/// is worthless, so on overflow the oldest queued frame is discarded to keep
+/// latency bounded. ~64 frames is a fraction of a second of audio (or a handful
+/// of video frames) — enough to ride out a transient TCP stall without growing
+/// latency unboundedly.
+const MEDIA_QUEUE_CAP: usize = 64;
 
 /// A length-delimited codec with our explicit frame-length cap.
 fn new_codec() -> LengthDelimitedCodec {
@@ -49,15 +58,56 @@ fn new_codec() -> LengthDelimitedCodec {
     codec
 }
 
-/// A live connection to a peer: its id/address plus two outbound queues drained
-/// by the connection's write task — a small unbounded control queue (JSON
-/// envelopes) and a bounded binary-data queue (file pieces, the backpressure
-/// point). The write task prioritizes control.
+/// A live connection to a peer: its id/address plus three outbound queues
+/// drained by the connection's write task — a small unbounded control queue
+/// (JSON envelopes), a bounded blocking binary-data queue (file pieces, the
+/// backpressure point), and a bounded **drop-oldest** real-time media queue
+/// (TAG_MEDIA frames). The write task prioritizes control > media > file-data.
 pub struct ConnHandle {
     pub peer_id: String,
     pub addr: SocketAddr,
     control_tx: mpsc::UnboundedSender<Envelope>,
     data_tx: mpsc::Sender<bytes::Bytes>,
+    /// Drop-oldest media queue + its wake signal (see [`MediaQueue`]). Read by
+    /// [`send_media`] (wired by the native-media commands in a later phase).
+    #[allow(dead_code)]
+    media: Arc<MediaQueue>,
+}
+
+/// A bounded, drop-oldest queue for real-time media frames. Producers
+/// ([`send_media`]) never block: when full, the oldest frame is discarded.
+/// The connection's write task drains it on `notify`.
+struct MediaQueue {
+    inner: StdMutex<VecDeque<bytes::Bytes>>,
+    notify: Notify,
+}
+
+impl MediaQueue {
+    fn new() -> Self {
+        Self {
+            inner: StdMutex::new(VecDeque::with_capacity(MEDIA_QUEUE_CAP)),
+            notify: Notify::new(),
+        }
+    }
+
+    /// Enqueue a media frame, dropping the oldest if the queue is at capacity.
+    /// Non-blocking; returns the number of frames dropped (0 normally, 1 on
+    /// overflow) for diagnostics.
+    #[allow(dead_code)] // called by send_media, wired by native-media commands
+    fn push(&self, bytes: bytes::Bytes) -> usize {
+        let dropped = {
+            let mut q = self.inner.lock().unwrap();
+            let dropped = if q.len() >= MEDIA_QUEUE_CAP { q.pop_front().is_some() as usize } else { 0 };
+            q.push_back(bytes);
+            dropped
+        };
+        self.notify.notify_one();
+        dropped
+    }
+
+    fn pop(&self) -> Option<bytes::Bytes> {
+        self.inner.lock().unwrap().pop_front()
+    }
 }
 
 impl ConnHandle {
@@ -166,6 +216,22 @@ pub async fn send_data(state: &Arc<LanChatState>, peer_id: &str, bytes: bytes::B
     sender.send(bytes).await.is_ok()
 }
 
+/// Enqueue a real-time media frame (a pre-tagged TAG_MEDIA body) to a peer over
+/// the drop-oldest media queue. Never blocks: if the queue is full the oldest
+/// frame is discarded so the encoder is never throttled and latency stays
+/// bounded. Returns false if there is no live connection. Intended for the hot
+/// path of [`crate::lanchat::media`], so it only takes the connections read lock
+/// briefly and does no `.await` on the queue itself.
+#[allow(dead_code)] // hot path of lanchat::media, wired by native-media commands
+pub async fn send_media(state: &Arc<LanChatState>, peer_id: &str, bytes: bytes::Bytes) -> bool {
+    let media = match state.connections.read().await.get(peer_id) {
+        Some(handle) => handle.media.clone(),
+        None => return false,
+    };
+    media.push(bytes);
+    true
+}
+
 /// Queue an envelope to a peer, dialing on demand if not yet connected.
 pub async fn send_to_peer(
     app: &AppHandle,
@@ -194,6 +260,7 @@ async fn recv_frame<T: AsyncRead + Unpin>(framed: &mut LanFramed<T>) -> Result<E
         Some(Ok(buf)) => match wire::decode_frame(&buf) {
             Some(wire::Frame::Control(env)) => Ok(env),
             Some(wire::Frame::Piece(..)) => Err("unexpected binary frame during handshake".into()),
+            Some(wire::Frame::Media(..)) => Err("unexpected media frame during handshake".into()),
             None => Err("undecodable frame".into()),
         },
         Some(Err(e)) => Err(e.to_string()),
@@ -458,9 +525,13 @@ async fn setup_connection(
     .map_err(|_| "handshake timed out".to_string())??;
     let peer_id = hello.id.clone();
 
-    // Reject pre-v2 peers (defense in depth; v1 plaintext peers already fail the
-    // TLS handshake above and never reach here).
-    if hello.pv < crate::lanchat::protocol::PROTOCOL_VERSION {
+    // Reject peers whose control-channel framing we can't speak. The gate is the
+    // *minimum compatible* version, not the current one: additive bumps (e.g. v4's
+    // media tag) must not lock out an otherwise-compatible older peer, or all
+    // messaging silently breaks the moment two builds drift by one version while
+    // mDNS still shows them online. v1 plaintext peers already fail the TLS
+    // handshake above and never reach here.
+    if hello.pv < crate::lanchat::protocol::MIN_PROTOCOL_VERSION {
         return Err(format!(
             "unsupported protocol version {} from {peer_id}",
             hello.pv
@@ -516,6 +587,7 @@ async fn setup_connection(
     let (mut sink, mut read) = framed.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Envelope>();
     let (data_tx, mut data_rx) = mpsc::channel::<bytes::Bytes>(DATA_QUEUE_CAP);
+    let media = Arc::new(MediaQueue::new());
 
     state.connections.write().await.insert(
         peer_id.clone(),
@@ -524,6 +596,7 @@ async fn setup_connection(
             addr,
             control_tx: tx.clone(),
             data_tx,
+            media: media.clone(),
         },
     );
     log::info!("lanchat: connected to {peer_id} ({addr})");
@@ -554,9 +627,12 @@ async fn setup_connection(
         }
     }
 
-    // Write task: drain both queues into the framed sink, prioritizing control
-    // frames (biased select) so pings/text never wait behind a piece backlog.
-    // Control frames are tagged here; data frames are pre-tagged piece bytes.
+    // Write task: drain the queues into the framed sink, prioritizing control
+    // frames (biased select) so pings/text never wait behind media or a piece
+    // backlog. Priority: control > media (drop-oldest, latency-sensitive) >
+    // file-data (bounded, backpressured). Control frames are tagged here; media
+    // and data frames are pre-tagged bytes.
+    let media_write = media.clone();
     let write_task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -571,6 +647,20 @@ async fn setup_connection(
                         Err(e) => log::debug!("lanchat: encode frame failed: {e}"),
                     },
                     None => break, // control senders dropped → connection gone
+                },
+                _ = media_write.notify.notified() => {
+                    // Drain all currently-queued media frames (drop-oldest is
+                    // enforced at enqueue, so what remains is the freshest set).
+                    let mut send_err = false;
+                    while let Some(bytes) = media_write.pop() {
+                        if sink.send(bytes).await.is_err() {
+                            send_err = true;
+                            break;
+                        }
+                    }
+                    if send_err {
+                        break;
+                    }
                 },
                 data = data_rx.recv() => if let Some(bytes) = data {
                     if sink.send(bytes).await.is_err() {
@@ -614,6 +704,9 @@ async fn setup_connection(
                 }
                 Some(wire::Frame::Piece(file_id, idx, data)) => {
                     crate::lanchat::swarm::handle_piece(&app, &state, &peer_id, &file_id, idx, data).await
+                }
+                Some(wire::Frame::Media(frame)) => {
+                    crate::lanchat::media::handle_media_frame(&app, &state, &peer_id, frame).await
                 }
                 None => log::debug!("lanchat: bad/unknown frame from {peer_id}"),
             }
@@ -695,8 +788,12 @@ async fn dispatch_inbound(
         | frame::SIGNAL_ICE
         | frame::MEETING_JOIN
         | frame::MEETING_LEAVE
-        | frame::MEDIA_STATE => {
-            // Relay WebRTC signaling to the frontend (lanRtc handles it).
+        | frame::MEDIA_STATE
+        | frame::NMEDIA_OFFER
+        | frame::NMEDIA_ANSWER
+        | frame::NMEDIA_STOP => {
+            // Relay call signaling to the frontend. The WebRTC stack (lanRtc)
+            // consumes signal-sdp/ice; the native stack consumes nmedia-*.
             let _ = app.emit(
                 crate::lanchat::events::SIGNAL,
                 &json!({ "from": peer_id, "type": env.frame_type, "payload": env.payload }),
@@ -729,6 +826,25 @@ async fn dispatch_inbound(
 mod tests {
     use super::*;
     use tokio::net::TcpListener;
+
+    #[test]
+    fn media_queue_is_drop_oldest_and_bounded() {
+        let q = MediaQueue::new();
+        // Fill to capacity with identifiable single-byte frames.
+        for i in 0..MEDIA_QUEUE_CAP {
+            assert_eq!(q.push(bytes::Bytes::from(vec![i as u8])), 0, "no drops while filling");
+        }
+        // One more overflows: the oldest (frame 0) is dropped.
+        assert_eq!(q.push(bytes::Bytes::from(vec![0xFFu8])), 1, "overflow drops oldest");
+        {
+            let inner = q.inner.lock().unwrap();
+            assert_eq!(inner.len(), MEDIA_QUEUE_CAP, "stays at cap");
+            assert_eq!(inner.front().unwrap()[0], 1, "front is now the 2nd-oldest");
+            assert_eq!(inner.back().unwrap()[0], 0xFF, "newest is at the back");
+        }
+        // Drain order is FIFO over what survived.
+        assert_eq!(q.pop().unwrap()[0], 1);
+    }
 
     // Real TCP handshake over loopback: both sides learn each other's node id
     // (plus name + advertised control port) through length-delimited JSON
@@ -863,6 +979,7 @@ mod tests {
                 match wire::decode_frame(&buf) {
                     Some(wire::Frame::Control(env)) => ctrl_type = Some(env.frame_type),
                     Some(wire::Frame::Piece(id, idx, data)) => piece = Some((id, idx, data.len())),
+                    Some(wire::Frame::Media(_)) => panic!("unexpected media frame"),
                     None => panic!("undecodable frame"),
                 }
             }

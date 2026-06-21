@@ -29,7 +29,27 @@ pub const SERVICE_TYPE: &str = "_taomni-lan._tcp.local.";
 /// transfer moves to a request/response swarm with per-piece SHA-256. Another
 /// hard cutover: v3 nodes do not interoperate with v2 (the tag byte would be
 /// mis-parsed as JSON).
-pub const PROTOCOL_VERSION: u32 = 3;
+///
+/// v4 (native A/V transport): adds a third wire tag `TAG_MEDIA` (`0x02`) for
+/// real-time media frames (Opus audio / H.264 video) on the Linux native stack,
+/// plus the `nmedia-*` control frames that negotiate them. This is an **additive**
+/// bump: the control/text/file framing is byte-for-byte identical to v3, so v3 and
+/// v4 nodes interoperate for everything except native media. See
+/// [`MIN_PROTOCOL_VERSION`].
+pub const PROTOCOL_VERSION: u32 = 4;
+
+/// Oldest protocol version whose **control-channel wire framing** is still
+/// compatible with the current code — i.e. the lowest `pv` the handshake accepts.
+///
+/// Bump this **only** on a genuinely breaking framing change, not on every
+/// `PROTOCOL_VERSION` bump. The control channel last changed shape at v3 (the
+/// one-byte [`wire`] tag was introduced; pre-v3 frames were raw JSON and decode
+/// as an unknown tag today). v4 only *added* `TAG_MEDIA`, so a v3 peer frames
+/// text/files exactly like a v4 peer and must still be allowed to chat.
+///
+/// Pre-v3 peers are genuinely incompatible: v2 sends untagged JSON (mis-parsed
+/// as an unknown tag) and v1 is plaintext (fails the TLS handshake outright).
+pub const MIN_PROTOCOL_VERSION: u32 = 3;
 
 /// Default file piece size for the swarm transfer engine — 256 KiB raw (no
 /// base64). Bounds per-in-flight-piece memory and the swarm request window.
@@ -85,6 +105,17 @@ pub mod frame {
     pub const MEETING_JOIN: &str = "meeting-join";
     pub const MEETING_LEAVE: &str = "meeting-leave";
     pub const MEDIA_STATE: &str = "media-state";
+    // --- native A/V (v4): media negotiation for the Linux native stack ---
+    // The webview-WebRTC stack (Win/mac) uses signal-sdp/ice above; the native
+    // stack (Linux) uses these instead. Both ride the same `lanchat://signal`
+    // relay. Payloads carry codec/sample-rate/resolution/streamId + initial
+    // mic/cam/screen state.
+    /// Offer a native media stream to a peer (codecs + initial state).
+    pub const NMEDIA_OFFER: &str = "nmedia-offer";
+    /// Answer a native media offer (accepted codecs + own initial state).
+    pub const NMEDIA_ANSWER: &str = "nmedia-answer";
+    /// Tear down a native media stream with a peer.
+    pub const NMEDIA_STOP: &str = "nmedia-stop";
     // --- task 04 (reserved): collaborative whiteboard ---
     pub const WB_OPEN: &str = "wb-open";
     pub const WB_INVITE: &str = "wb-invite";
@@ -193,13 +224,37 @@ pub mod wire {
     pub const TAG_CONTROL: u8 = 0x00;
     /// Raw binary file piece follows.
     pub const TAG_PIECE: u8 = 0x01;
+    /// Real-time media frame follows (Opus audio / H.264 video, native stack).
+    pub const TAG_MEDIA: u8 = 0x02;
+
+    /// Media kind byte carried in a [`Frame::Media`].
+    pub const MEDIA_AUDIO: u8 = 0;
+    /// Media kind byte carried in a [`Frame::Media`].
+    pub const MEDIA_VIDEO: u8 = 1;
 
     /// A decoded inbound frame: either a control envelope (still JSON-encoded
-    /// bytes) or a binary piece.
+    /// bytes), a binary file piece, or a real-time media frame.
     pub enum Frame {
         Control(super::Envelope),
         /// (file_id, piece_index, data)
         Piece(String, u32, Bytes),
+        /// A real-time media frame for the native A/V stack.
+        Media(MediaFrame),
+    }
+
+    /// A real-time media frame (audio or video) on the native stack. `session`
+    /// is the call id (routes to the right `MediaSession`); `stream` is a
+    /// logical label (`"mic"` / `"cam"` / `"screen"`) so the receiver can label
+    /// and lay out the source; `kind` is [`MEDIA_AUDIO`]/[`MEDIA_VIDEO`]; `seq`
+    /// orders packets within a stream; `ts` is the capture timestamp (ms) for
+    /// A/V sync and jitter buffering; `data` is the encoded payload.
+    pub struct MediaFrame {
+        pub session: String,
+        pub stream: String,
+        pub kind: u8,
+        pub seq: u32,
+        pub ts: i64,
+        pub data: Bytes,
     }
 
     /// Prepend the control tag to already-JSON-encoded envelope bytes.
@@ -224,6 +279,33 @@ pub mod wire {
         b.freeze()
     }
 
+    /// Encode a media frame body:
+    /// `[TAG_MEDIA][u8 sLen][session][u8 stLen][stream][u8 kind][u32 BE seq][i64 BE ts][data]`.
+    /// `session`/`stream` are short labels (call id / "mic"|"cam"|"screen"), so
+    /// their lengths fit a u8.
+    pub fn frame_media(
+        session: &str,
+        stream: &str,
+        kind: u8,
+        seq: u32,
+        ts: i64,
+        data: &[u8],
+    ) -> Bytes {
+        let s = session.as_bytes();
+        let st = stream.as_bytes();
+        let mut b = BytesMut::with_capacity(1 + 1 + s.len() + 1 + st.len() + 1 + 4 + 8 + data.len());
+        b.put_u8(TAG_MEDIA);
+        b.put_u8(s.len() as u8);
+        b.extend_from_slice(s);
+        b.put_u8(st.len() as u8);
+        b.extend_from_slice(st);
+        b.put_u8(kind);
+        b.put_u32(seq);
+        b.put_i64(ts);
+        b.extend_from_slice(data);
+        b.freeze()
+    }
+
     /// Parse a received frame body by its leading tag. Returns `None` if the
     /// frame is empty, malformed, or carries an unknown tag.
     pub fn decode_frame(buf: &[u8]) -> Option<Frame> {
@@ -238,6 +320,23 @@ pub mod wire {
                 let piece = u32::from_be_bytes(idx_bytes);
                 let data = Bytes::copy_from_slice(buf.get(idx_end..)?);
                 Some(Frame::Piece(id, piece, data))
+            }
+            &TAG_MEDIA => {
+                let s_len = *buf.get(1)? as usize;
+                let s_end = 2 + s_len;
+                let session = std::str::from_utf8(buf.get(2..s_end)?).ok()?.to_string();
+                let st_len = *buf.get(s_end)? as usize;
+                let st_start = s_end + 1;
+                let st_end = st_start + st_len;
+                let stream = std::str::from_utf8(buf.get(st_start..st_end)?).ok()?.to_string();
+                let kind = *buf.get(st_end)?;
+                let seq_start = st_end + 1;
+                let seq_end = seq_start + 4;
+                let seq = u32::from_be_bytes(buf.get(seq_start..seq_end)?.try_into().ok()?);
+                let ts_end = seq_end + 8;
+                let ts = i64::from_be_bytes(buf.get(seq_end..ts_end)?.try_into().ok()?);
+                let data = Bytes::copy_from_slice(buf.get(ts_end..)?);
+                Some(Frame::Media(MediaFrame { session, stream, kind, seq, ts, data }))
             }
             _ => None,
         }
@@ -270,6 +369,26 @@ pub struct PeerRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn min_version_admits_current_and_blocks_pre_tag_framing() {
+        // The handshake gate (transport.rs) accepts `pv >= MIN_PROTOCOL_VERSION`.
+        // Pin the policy so an additive PROTOCOL_VERSION bump can never silently
+        // re-lock out a wire-compatible peer (the v3↔v4 chat regression).
+        assert!(
+            MIN_PROTOCOL_VERSION <= PROTOCOL_VERSION,
+            "min must not exceed current"
+        );
+        // v3 introduced the one-byte wire tag; it frames text/files like v4 and
+        // must be allowed to chat.
+        assert!(3 >= MIN_PROTOCOL_VERSION, "v3 peers must be accepted");
+        assert!(
+            PROTOCOL_VERSION >= MIN_PROTOCOL_VERSION,
+            "current peers must be accepted"
+        );
+        // Pre-tag peers (v2 untagged JSON, v1 plaintext) are genuinely incompatible.
+        assert!(2 < MIN_PROTOCOL_VERSION, "v2 peers must be rejected");
+    }
 
     #[test]
     fn envelope_round_trips_through_codec() {
@@ -328,5 +447,39 @@ mod tests {
     fn wire_rejects_empty_and_unknown_tags() {
         assert!(wire::decode_frame(&[]).is_none());
         assert!(wire::decode_frame(&[0x7f, 1, 2, 3]).is_none());
+    }
+
+    #[test]
+    fn wire_media_frame_round_trips() {
+        let data = vec![1u8, 2, 3, 4, 5, 6, 7];
+        let framed = wire::frame_media("call-123", "screen", wire::MEDIA_VIDEO, 99, 1_700_000_000_123, &data);
+        assert_eq!(framed[0], wire::TAG_MEDIA);
+        match wire::decode_frame(&framed) {
+            Some(wire::Frame::Media(m)) => {
+                assert_eq!(m.session, "call-123");
+                assert_eq!(m.stream, "screen");
+                assert_eq!(m.kind, wire::MEDIA_VIDEO);
+                assert_eq!(m.seq, 99);
+                assert_eq!(m.ts, 1_700_000_000_123);
+                assert_eq!(&m.data[..], &data[..]);
+            }
+            _ => panic!("expected media frame"),
+        }
+    }
+
+    #[test]
+    fn wire_media_frame_empty_payload_ok() {
+        // A media frame with a zero-length payload (e.g. a keepalive marker)
+        // must still decode with the header intact.
+        let framed = wire::frame_media("c", "mic", wire::MEDIA_AUDIO, 0, 0, &[]);
+        match wire::decode_frame(&framed) {
+            Some(wire::Frame::Media(m)) => {
+                assert_eq!(m.session, "c");
+                assert_eq!(m.stream, "mic");
+                assert_eq!(m.kind, wire::MEDIA_AUDIO);
+                assert!(m.data.is_empty());
+            }
+            _ => panic!("expected media frame"),
+        }
     }
 }

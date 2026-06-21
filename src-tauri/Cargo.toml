@@ -90,6 +90,17 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 keyring = "4"
 keyring-core = "1"
 cpal = { version = "0.17", optional = true }
+# LanChat native A/V stack (lanchat/media, behind the `native-av` feature): Opus
+# audio (audiopus → vendored libopus via cc, no nasm) and software H.264
+# (openh264 → Cisco's BSD encoder/decoder built from source; needs nasm for its
+# x86 asm). Self-contained — no system ffmpeg/gstreamer. Linux-first per the
+# native-AV plan; the deps themselves are cross-platform.
+audiopus = { version = "0.3.0-rc.0", optional = true }
+openh264 = { version = "0.9", optional = true }
+# Camera capture for the native A/V stack (Linux: v4l2 via the `v4l` crate, which
+# uses raw videodev2 ioctls — no libv4l system dep). input-native picks the
+# platform backend; we only drive it on Linux.
+nokhwa = { version = "0.10", optional = true, default-features = false, features = ["input-native"] }
 ash = { version = "0.38", optional = true }
 llama-cpp-2 = { version = "0.1", optional = true }
 plist = "1.9"
@@ -140,6 +151,11 @@ winscard = { path = "vendor/winscard" }
 default = ["hbase-kerberos"]
 voice-capture = ["dep:cpal"]
 screen-capture = ["dep:xcap"]
+# LanChat native A/V transport (Linux / no-WebRTC stack). Pulls in cpal (mic
+# capture), audiopus (Opus) and openh264 (H.264). Off by default; enable for
+# Linux desktop bundles that need native voice/video. See
+# claudedocs/lanchat-linux-native-av-transport.md.
+native-av = ["dep:cpal", "dep:audiopus", "dep:openh264", "dep:nokhwa"]
 asr-sherpa-onnx = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]

@@ -45,7 +45,9 @@ use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 use super::ServerConfig;
 
 mod auth;
-mod capture;
+/// Screen-capture backends (X11 / Wayland). Exposed crate-wide so the LanChat
+/// native A/V stack can reuse the X11 capturer for screen sharing.
+pub(crate) mod capture;
 mod clipboard;
 mod diff;
 mod display;

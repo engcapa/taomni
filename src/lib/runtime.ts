@@ -14,6 +14,17 @@ export function isTauriRuntime(): boolean {
 export const RUNTIME_KIND: "tauri" | "browser" =
   isTauriRuntime() ? "tauri" : "browser";
 
+/**
+ * Whether the webview exposes the WebRTC `RTCPeerConnection` API. This is the
+ * switch between the two LanChat media stacks: Windows (WebView2) and macOS
+ * (WKWebView) expose it; Linux WebKitGTK does NOT (the build does not ship the
+ * WebRTC DOM at all — confirmed, not a settings/timing issue), so those nodes
+ * fall back to the Rust-native capture/encode/transport stack.
+ */
+export function hasWebRtc(): boolean {
+  return typeof RTCPeerConnection === "function";
+}
+
 export type AppPlatform = "windows" | "macos" | "linux" | "unknown";
 
 export function getAppPlatform(): AppPlatform {
