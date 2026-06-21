@@ -508,7 +508,21 @@ pub async fn chat_stream(
         let assistant_id_clone = assistant_id.clone();
         let app_clone = app.clone();
         let event_name_clone = event_name.clone();
-        let events = process.send_with_callback(&clean_content, move |evt| {
+        // Prepend the (redacted) terminal context to the message CC sees, the
+        // same way the native LLM path injects it as a leading user turn
+        // (~line 611). Without this the CC branch silently dropped a field the
+        // frontend already sends, so CC answered terminal questions blind.
+        let cc_message = match &req.terminal_context {
+            Some(ctx) if !ctx.trim().is_empty() => {
+                let (clean_ctx, _) = redact::redact(ctx);
+                format!(
+                    "[Terminal context]\n```\n{}\n```\n\n{}",
+                    clean_ctx, clean_content
+                )
+            }
+            _ => clean_content.clone(),
+        };
+        let events = process.send_with_callback(&cc_message, move |evt| {
             match evt {
                 crate::agent::cc_bridge::protocol::CcEvent::Partial { content } => {
                     let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
