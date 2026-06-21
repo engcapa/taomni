@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 ///
 /// This is the single chokepoint for both the native agent loop
 /// (`agent::mod`) and Claude Code's `permission_prompt` bridge
-/// (`cc_bridge::permissions_mcp`). CC drives a different tool vocabulary
+/// (`cc_bridge::mcp_http`). CC drives a different tool vocabulary
 /// (`Bash`/`Read`/`Edit`/`Write`/`NotebookEdit`) than the native tools
 /// (`run_in_terminal`/`read_terminal_tail`/…), so both are mapped here —
 /// otherwise a CC `Bash` call would fall through to the catch-all and skip
