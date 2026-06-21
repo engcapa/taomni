@@ -188,6 +188,25 @@ pub fn revoke_token(token: &str) {
     }
 }
 
+/// Ensure the server is up and mint a scoped token for one CC thread. Trust is
+/// inferred (D3): a thread linked to a remote SSH session is strict and scoped
+/// to that session; an unlinked (local-workspace) thread is lenient. Returns
+/// the `(server_url, token)` to inject into the thread's `.mcp.json`.
+pub async fn provision_for_thread(
+    app: &AppHandle,
+    thread_id: &str,
+    linked_session_id: Option<String>,
+) -> Result<(String, String), String> {
+    ensure_started(app).await?;
+    let trust = if linked_session_id.is_some() {
+        TrustLevel::Strict
+    } else {
+        TrustLevel::Lenient
+    };
+    let (addr, token) = mint_token(thread_id.to_string(), linked_session_id, trust)?;
+    Ok((server_url(addr), token))
+}
+
 /// Reject any request without a recognised Bearer token (401). Per-call scope
 /// checks happen later, in the handler.
 async fn auth_mw(tokens: TokenMap, req: Request, next: Next) -> Response {

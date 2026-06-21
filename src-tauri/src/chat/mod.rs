@@ -438,6 +438,26 @@ pub async fn chat_stream(
         let process = match existing {
             Some(p) => p,
             None => {
+                // Provision the in-app rmcp MCP server + a per-thread scoped
+                // token (trust inferred from whether the thread is linked to a
+                // remote SSH session). Injected into the thread's .mcp.json.
+                let (cc_server_url, cc_token) =
+                    match crate::agent::cc_bridge::mcp_http::provision_for_thread(
+                        &app,
+                        &req.thread_id,
+                        thread.linked_session_id.clone(),
+                    )
+                    .await
+                    {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
                 // Resolve the user's custom settings.json from the vault (when
                 // configured). A locked vault means we can't read the token, so
                 // surface it as a stream error and let the UI prompt to unlock.
@@ -456,6 +476,8 @@ pub async fn chat_stream(
                 };
                 let files = match crate::agent::cc_bridge::config::create_session_files(
                     custom.as_deref(),
+                    &cc_server_url,
+                    &cc_token,
                 ) {
                     Ok(f) => f,
                     Err(e) => {
@@ -477,6 +499,9 @@ pub async fn chat_stream(
                     files.settings_path.to_string_lossy().to_string(),
                     "--mcp-config".into(),
                     files.mcp_path.to_string_lossy().to_string(),
+                    // Use *only* our MCP config; ignore any user ~/.claude MCP
+                    // that could bypass the permission pipeline.
+                    "--strict-mcp-config".into(),
                     "--permission-prompt-tool".into(),
                     crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
                 ];
@@ -485,11 +510,14 @@ pub async fn chat_stream(
                     extra_args.push(sid.clone());
                 }
 
-                let p = std::sync::Arc::new(crate::agent::cc_bridge::process::CcProcess::new(
-                    &binary,
-                    extra_args,
-                    Some(files.dir),
-                ));
+                let p = std::sync::Arc::new(
+                    crate::agent::cc_bridge::process::CcProcess::new(
+                        &binary,
+                        extra_args,
+                        Some(files.dir),
+                    )
+                    .with_token(cc_token.clone()),
+                );
                 // Re-check under the lock in case a concurrent send for the
                 // same thread created one first; if so, our `p` is dropped and
                 // its temp dir cleaned by the Drop impl.

@@ -55,6 +55,9 @@ pub struct CcProcess {
     temp_dir: Option<PathBuf>,
     /// Idle timeout between successive output lines for a single turn.
     idle_timeout: Duration,
+    /// Bearer token this process uses to authenticate to the in-app rmcp MCP
+    /// server. Revoked on stop/drop so a dead thread's token can't be reused.
+    cc_token: Option<String>,
 }
 
 impl CcProcess {
@@ -87,6 +90,7 @@ impl CcProcess {
             stderr_buf: Arc::new(Mutex::new(String::new())),
             temp_dir,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
+            cc_token: None,
         }
     }
 
@@ -94,6 +98,13 @@ impl CcProcess {
     /// the value from config without changing the `new` signature.
     pub fn with_idle_timeout(mut self, timeout: Duration) -> Self {
         self.idle_timeout = timeout;
+        self
+    }
+
+    /// Attach the in-app MCP server token this process authenticates with, so
+    /// it is revoked when the process stops (builder style).
+    pub fn with_token(mut self, token: impl Into<String>) -> Self {
+        self.cc_token = Some(token.into());
         self
     }
 
@@ -366,6 +377,11 @@ impl CcProcess {
             let _ = child.kill().await;
         }
         *self.stdin.lock().await = None;
+        // Revoke our MCP server token so it can't be reused after the process
+        // is gone.
+        if let Some(token) = &self.cc_token {
+            super::mcp_http::revoke_token(token);
+        }
         // Remove the session's temp files now that the process is gone. The
         // settings file may carry the user's ANTHROPIC_AUTH_TOKEN, so we don't
         // want it lingering in the temp directory after use.
@@ -377,10 +393,13 @@ impl CcProcess {
 
 impl Drop for CcProcess {
     /// Safety net: if the process is dropped without an explicit `stop()`
-    /// (e.g. the registry entry is replaced), still scrub the temp directory.
-    /// `stop()` sets `stopped` before the Arc is dropped, so the watchdog has
-    /// already exited by the time this runs.
+    /// (e.g. the registry entry is replaced), still scrub the temp directory
+    /// and revoke the MCP token. `stop()` sets `stopped` before the Arc is
+    /// dropped, so the watchdog has already exited by the time this runs.
     fn drop(&mut self) {
+        if let Some(token) = &self.cc_token {
+            super::mcp_http::revoke_token(token);
+        }
         if let Some(dir) = &self.temp_dir {
             let _ = std::fs::remove_dir_all(dir);
         }

@@ -160,7 +160,14 @@ fn write_settings_file(value: &serde_json::Value, out_path: &Path) -> std::io::R
 /// MCP config. The directory and the settings filename are randomized so the
 /// file holding the user's credentials is not trivially discoverable, and the
 /// returned `dir` is handed to the `CcProcess` for deletion on stop/drop.
-pub fn create_session_files(custom: Option<&str>) -> Result<CcSessionFiles, String> {
+///
+/// `server_url` + `token` point the generated `.mcp.json` at the in-app rmcp
+/// MCP server (Streamable-HTTP, Bearer-gated) — see [`write_temp_mcp_config`].
+pub fn create_session_files(
+    custom: Option<&str>,
+    server_url: &str,
+    token: &str,
+) -> Result<CcSessionFiles, String> {
     let dir = std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));
     let settings_path = dir.join(format!("{}.json", uuid::Uuid::new_v4().simple()));
     let mcp_path = dir.join(".mcp.json");
@@ -168,7 +175,8 @@ pub fn create_session_files(custom: Option<&str>) -> Result<CcSessionFiles, Stri
     let value = build_settings_value(custom, &sensitive_deny_dirs())?;
     write_settings_file(&value, &settings_path)
         .map_err(|e| format!("Failed to write CC settings: {e}"))?;
-    write_temp_mcp_config(&mcp_path).map_err(|e| format!("Failed to write CC MCP config: {e}"))?;
+    write_temp_mcp_config(&mcp_path, server_url, token)
+        .map_err(|e| format!("Failed to write CC MCP config: {e}"))?;
 
     Ok(CcSessionFiles {
         dir,
@@ -177,32 +185,24 @@ pub fn create_session_files(custom: Option<&str>) -> Result<CcSessionFiles, Stri
     })
 }
 
-/// Generate a temporary `.mcp.json` for CC. Wires up two stdio MCP servers
-/// that re-invoke the Taomni binary with `--mcp-server <name>`:
+/// Generate a temporary `.mcp.json` for CC pointing at the in-app rmcp server.
 ///
-///   - `taomni_permissions` — exposes `permission_prompt`, used via
-///     `--permission-prompt-tool mcp__taomni_permissions__permission_prompt`
-///     so every tool call CC wants to make routes through Taomni's safety
-///     pipeline (blacklist + per-session disable).
-///   - `taomni_tools` — exposes the four stateless Taomni tools so CC can
-///     call them as if they were native (`web_search`, `web_fetch`,
-///     `explain_error`, `redact_text`).
-pub fn write_temp_mcp_config(out_path: &PathBuf) -> std::io::Result<()> {
-    // Resolve the current binary path so the spawned subprocess is always
-    // the same Taomni version that wrote the config.
-    let exe = std::env::current_exe()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "taomni".to_string());
-
+/// A single `type:"http"` entry (`taomni`) hosts both the Taomni tool surface
+/// and the `permission_prompt` tool, Bearer-authenticated with the per-thread
+/// token. Combined with `--strict-mcp-config` on the CLI, this guarantees CC
+/// uses *only* this server (it can't fall back to a user `~/.claude` MCP that
+/// would bypass Taomni's permission pipeline).
+pub fn write_temp_mcp_config(
+    out_path: &PathBuf,
+    server_url: &str,
+    token: &str,
+) -> std::io::Result<()> {
     let mcp = serde_json::json!({
         "mcpServers": {
-            "taomni_permissions": {
-                "command": exe,
-                "args": ["--mcp-server", "permissions"]
-            },
-            "taomni_tools": {
-                "command": exe,
-                "args": ["--mcp-server", "tools"]
+            "taomni": {
+                "type": "http",
+                "url": server_url,
+                "headers": { "Authorization": format!("Bearer {token}") }
             }
         }
     });
@@ -213,8 +213,9 @@ pub fn write_temp_mcp_config(out_path: &PathBuf) -> std::io::Result<()> {
 }
 
 /// Permission prompt tool name CC needs via `--permission-prompt-tool`.
-/// Format follows MCP convention: `mcp__<server-name>__<tool-name>`.
-pub const PERMISSION_PROMPT_TOOL: &str = "mcp__taomni_permissions__permission_prompt";
+/// Format follows MCP convention: `mcp__<server-name>__<tool-name>`. The
+/// in-app rmcp server is registered as `taomni`.
+pub const PERMISSION_PROMPT_TOOL: &str = "mcp__taomni__permission_prompt";
 
 /// Directories that CC must never access.
 pub fn sensitive_deny_dirs() -> Vec<PathBuf> {
@@ -322,5 +323,21 @@ mod tests {
     fn non_object_permissions_errors() {
         let custom = r#"{ "permissions": "nope" }"#;
         assert!(build_settings_value(Some(custom), &deny_dirs()).is_err());
+    }
+
+    #[test]
+    fn mcp_config_is_http_with_bearer() {
+        let dir = std::env::temp_dir().join(format!(".cfgtest-{}", uuid::Uuid::new_v4().simple()));
+        let path = dir.join(".mcp.json");
+        write_temp_mcp_config(&path, "http://127.0.0.1:5555/mcp", "tok-123").unwrap();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let entry = &v["mcpServers"]["taomni"];
+        assert_eq!(entry["type"], "http");
+        assert_eq!(entry["url"], "http://127.0.0.1:5555/mcp");
+        assert_eq!(entry["headers"]["Authorization"], "Bearer tok-123");
+        // The permission-prompt tool name must match the registered server.
+        assert_eq!(PERMISSION_PROMPT_TOOL, "mcp__taomni__permission_prompt");
     }
 }

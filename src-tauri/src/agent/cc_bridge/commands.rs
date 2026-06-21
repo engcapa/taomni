@@ -100,6 +100,7 @@ pub struct CcToolCall {
 #[tauri::command]
 pub async fn cc_send_message(
     req: CcSendRequest,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<CcSendResponse, String> {
     {
@@ -119,13 +120,17 @@ pub async fn cc_send_message(
         config.cc_bridge.binary.clone()
     };
 
-    // Look up the saved session id for this thread (for --resume continuity).
-    let resume_session = {
+    // Look up the saved session id for this thread (for --resume continuity)
+    // and the linked SSH session (for token trust scoping).
+    let (resume_session, linked_session) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
-        crate::chat::store::list_threads(&db, 200)
+        let thread = crate::chat::store::list_threads(&db, 200)
             .ok()
-            .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id))
-            .and_then(|t| t.cc_session_id)
+            .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id));
+        match thread {
+            Some(t) => (t.cc_session_id, t.linked_session_id),
+            None => (None, None),
+        }
     };
 
     // Get or create CC process for this thread. Only a *new* process writes
@@ -135,13 +140,24 @@ pub async fn cc_send_message(
     let process = match existing {
         Some(p) => p,
         None => {
+            // Provision the in-app rmcp MCP server + a per-thread scoped token.
+            let (cc_server_url, cc_token) =
+                crate::agent::cc_bridge::mcp_http::provision_for_thread(
+                    &app,
+                    &req.thread_id,
+                    linked_session.clone(),
+                )
+                .await?;
             // Resolve the user's custom settings.json from the vault (when set).
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
                 &config.cc_bridge,
                 &state.vault,
             )?;
-            let files =
-                crate::agent::cc_bridge::config::create_session_files(custom.as_deref())?;
+            let files = crate::agent::cc_bridge::config::create_session_files(
+                custom.as_deref(),
+                &cc_server_url,
+                &cc_token,
+            )?;
 
             // Build extra args.
             let mut extra_args = vec![
@@ -155,6 +171,7 @@ pub async fn cc_send_message(
                 // and expose Taomni's tool surface back to CC via --mcp-config.
                 "--mcp-config".into(),
                 files.mcp_path.to_string_lossy().to_string(),
+                "--strict-mcp-config".into(),
                 "--permission-prompt-tool".into(),
                 crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
             ];
@@ -172,7 +189,9 @@ pub async fn cc_send_message(
                 extra_args.push(sid.clone());
             }
 
-            let p = Arc::new(CcProcess::new(&binary, extra_args, Some(files.dir)));
+            let p = Arc::new(
+                CcProcess::new(&binary, extra_args, Some(files.dir)).with_token(cc_token.clone()),
+            );
             let mut registry = state.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
@@ -298,24 +317,37 @@ pub async fn cc_stream_message(
         config.cc_bridge.binary.clone()
     };
 
-    let resume_session = {
+    let (resume_session, linked_session) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
-        crate::chat::store::list_threads(&db, 200)
+        let thread = crate::chat::store::list_threads(&db, 200)
             .ok()
-            .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id))
-            .and_then(|t| t.cc_session_id)
+            .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id));
+        match thread {
+            Some(t) => (t.cc_session_id, t.linked_session_id),
+            None => (None, None),
+        }
     };
 
     let existing = { state.cc_processes.lock().await.get(&req.thread_id).cloned() };
     let process = match existing {
         Some(p) => p,
         None => {
+            let (cc_server_url, cc_token) =
+                crate::agent::cc_bridge::mcp_http::provision_for_thread(
+                    &app,
+                    &req.thread_id,
+                    linked_session.clone(),
+                )
+                .await?;
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
                 &config.cc_bridge,
                 &state.vault,
             )?;
-            let files =
-                crate::agent::cc_bridge::config::create_session_files(custom.as_deref())?;
+            let files = crate::agent::cc_bridge::config::create_session_files(
+                custom.as_deref(),
+                &cc_server_url,
+                &cc_token,
+            )?;
 
             let mut extra_args = vec![
                 "--model".into(),
@@ -324,6 +356,11 @@ pub async fn cc_stream_message(
                 config.cc_bridge.max_turns.to_string(),
                 "--settings".into(),
                 files.settings_path.to_string_lossy().to_string(),
+                "--mcp-config".into(),
+                files.mcp_path.to_string_lossy().to_string(),
+                "--strict-mcp-config".into(),
+                "--permission-prompt-tool".into(),
+                crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
             ];
             if let Some(ws) = &req.workspace_dir {
                 let path = PathBuf::from(ws);
@@ -337,7 +374,9 @@ pub async fn cc_stream_message(
                 extra_args.push(sid.clone());
             }
 
-            let p = Arc::new(CcProcess::new(&binary, extra_args, Some(files.dir)));
+            let p = Arc::new(
+                CcProcess::new(&binary, extra_args, Some(files.dir)).with_token(cc_token.clone()),
+            );
             let mut registry = state.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
