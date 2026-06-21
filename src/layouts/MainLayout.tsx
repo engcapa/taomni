@@ -92,6 +92,7 @@ import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor"
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
@@ -2628,6 +2629,8 @@ export function MainLayout() {
       </div>
 
       <StatusBar />
+
+      <CcAgentBridge />
 
       {showSessionEditor && (
         <SessionEditor

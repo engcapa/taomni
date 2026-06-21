@@ -558,20 +558,11 @@ pub async fn chat_stream(
                         content: content.clone(),
                     });
                 }
-                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { id: _, name, input } => {
-                    let marker = format!(
-                        "\n[TOOL_CALL]{}\n",
-                        serde_json::json!({
-                            "tool": name,
-                            "args": input,
-                            "requires_confirmation": crate::agent::safety::requires_confirmation(name),
-                        })
-                    );
-                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
-                        id: assistant_id_clone.clone(),
-                        content: marker,
-                    });
-                }
+                // CC tool calls now run through the in-app MCP server with HITL
+                // confirmation (agent-cc-permission / agent-cc-tool). We no
+                // longer inject decorative [TOOL_CALL] markers into the stream —
+                // doing so triggered a second, native execution of the same
+                // tool via agent_execute_tool in MessageBubble (double-exec).
                 _ => {}
             }
         }).await;
@@ -594,17 +585,7 @@ pub async fn chat_stream(
                 crate::agent::cc_bridge::protocol::CcEvent::AssistantMessage { content } => {
                     final_content.push_str(content);
                 }
-                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
-                    let marker = format!(
-                        "\n[TOOL_CALL]{}\n",
-                        serde_json::json!({
-                            "tool": name,
-                            "args": input,
-                            "requires_confirmation": crate::agent::safety::requires_confirmation(name),
-                        })
-                    );
-                    final_content.push_str(&marker);
-                }
+                // No [TOOL_CALL] markers — see the streaming callback above.
                 _ => {}
             }
         }
