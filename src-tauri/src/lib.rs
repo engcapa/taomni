@@ -145,7 +145,7 @@ pub fn run() {
                         .title_bar_style(tauri::TitleBarStyle::Overlay)
                         .hidden_title(true);
                 }
-                builder.build()?;
+                let main_window = builder.build()?;
 
                 // On Linux the webview is webkit2gtk, which ships with the
                 // media-stream / WebRTC settings OFF — so getUserMedia and
@@ -153,19 +153,37 @@ pub fn run() {
                 // screen-shared (Windows/WebView2 has them on by default). Flip
                 // the settings and auto-allow UserMedia permission requests for
                 // the main window (where the call overlay is mounted).
+                //
+                // Diagnostics: keep the builder's window handle (no re-lookup),
+                // surface with_webview / settings() failures via log::warn!, and
+                // read the flags back after setting them so we can tell "the
+                // setting never applied" apart from "this WebKitGTK build has no
+                // WebRTC backend" (settings stick but RTCPeerConnection stays
+                // undefined).
                 #[cfg(target_os = "linux")]
-                if let Some(main_window) = app.get_webview_window("main") {
-                    let _ = main_window.with_webview(|webview| {
+                {
+                    let webview_result = main_window.with_webview(|webview| {
                         use webkit2gtk::glib::object::Cast;
                         use webkit2gtk::{
                             PermissionRequestExt, SettingsExt, UserMediaPermissionRequest,
                             WebViewExt,
                         };
                         let wv = webview.inner();
-                        if let Some(settings) = WebViewExt::settings(&wv) {
-                            settings.set_enable_media_stream(true);
-                            settings.set_enable_mediasource(true);
-                            settings.set_enable_webrtc(true);
+                        match WebViewExt::settings(&wv) {
+                            Some(settings) => {
+                                settings.set_enable_media_stream(true);
+                                settings.set_enable_mediasource(true);
+                                settings.set_enable_webrtc(true);
+                                log::info!(
+                                    "lanchat: webview media settings after set — media_stream={} mediasource={} webrtc={}",
+                                    settings.enables_media_stream(),
+                                    settings.enables_mediasource(),
+                                    settings.enables_webrtc(),
+                                );
+                            }
+                            None => log::warn!(
+                                "lanchat: WebView settings() returned None — media-stream/WebRTC left disabled"
+                            ),
                         }
                         // LAN-local app: grant mic/camera/screen capture. Other
                         // permission kinds fall through to the default handler.
@@ -178,7 +196,14 @@ pub fn run() {
                             }
                         });
                     });
+                    if let Err(e) = webview_result {
+                        log::warn!(
+                            "lanchat: with_webview failed — WebRTC/media-stream not enabled: {e}"
+                        );
+                    }
                 }
+                #[cfg(not(target_os = "linux"))]
+                let _ = main_window;
             }
             Ok(())
         })
@@ -437,6 +462,15 @@ pub fn run() {
             lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,
             lanchat::commands::lanchat_signal_group,
+            lanchat::commands::nmedia_start,
+            lanchat::commands::nmedia_stop,
+            lanchat::commands::nmedia_ws_port,
+            lanchat::commands::nmedia_add_peer,
+            lanchat::commands::nmedia_remove_peer,
+            lanchat::commands::nmedia_peer_state,
+            lanchat::commands::nmedia_toggle_mic,
+            lanchat::commands::nmedia_toggle_screen,
+            lanchat::commands::nmedia_toggle_cam,
             lanchat::commands::lanchat_get_retention,
             lanchat::commands::lanchat_set_retention,
             lanchat::commands::lanchat_get_service_state,

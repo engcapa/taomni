@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Maximize2, Mic, MicOff, Minus, MonitorUp, Phone, PhoneOff, Video, VideoOff, X } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
+import { hasWebRtc } from "../../lib/runtime";
 import { avatarGradient, avatarInitial } from "./util";
+
+/** This node uses the Rust-native media stack when the webview lacks WebRTC. */
+const isNativeStack = !hasWebRtc();
 
 /** Returns true while the stream's audio is above a speaking threshold. */
 function useSpeaking(stream: MediaStream | null): boolean {
@@ -40,20 +44,39 @@ function useSpeaking(stream: MediaStream | null): boolean {
 
 function VideoTile({
   stream,
+  canvas,
+  level,
   muted,
   label,
   camOff,
 }: {
   stream: MediaStream | null;
+  canvas?: HTMLCanvasElement | null;
+  level?: number;
   muted: boolean;
   label: string;
   camOff: boolean;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
-  const speaking = useSpeaking(stream);
+  const canvasHolder = useRef<HTMLDivElement | null>(null);
+  const streamSpeaking = useSpeaking(stream);
+  // Native peers have no MediaStream to analyse; use the Rust-reported level.
+  const speaking = canvas ? (level ?? 0) > 0.04 : streamSpeaking;
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
+  // Native stack: mount the per-peer render canvas (Rust decodes into it).
+  useEffect(() => {
+    const holder = canvasHolder.current;
+    if (!holder || !canvas) return;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.objectFit = "contain";
+    holder.appendChild(canvas);
+    return () => {
+      if (canvas.parentNode === holder) holder.removeChild(canvas);
+    };
+  }, [canvas]);
   return (
     <div
       className="relative grid place-items-center overflow-hidden rounded-xl"
@@ -64,13 +87,20 @@ function VideoTile({
         minHeight: 160,
       }}
     >
-      <video
-        ref={ref}
-        autoPlay
-        playsInline
-        muted={muted}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block" }}
-      />
+      {canvas ? (
+        <div
+          ref={canvasHolder}
+          style={{ width: "100%", height: "100%", display: camOff ? "none" : "block" }}
+        />
+      ) : (
+        <video
+          ref={ref}
+          autoPlay
+          playsInline
+          muted={muted}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block" }}
+        />
+      )}
       {camOff ? (
         <div
           className="grid h-[74px] w-[74px] place-items-center rounded-full text-[26px] text-white"
@@ -103,6 +133,7 @@ export function CallOverlay() {
   const localStream = useLanCallStore((s) => s.localStream);
   const screenStream = useLanCallStore((s) => s.screenStream);
   const remotes = useLanCallStore((s) => s.remotes);
+  const levels = useLanCallStore((s) => s.levels);
   const acceptIncoming = useLanCallStore((s) => s.acceptIncoming);
   const rejectIncoming = useLanCallStore((s) => s.rejectIncoming);
   const hangup = useLanCallStore((s) => s.hangup);
@@ -236,7 +267,9 @@ export function CallOverlay() {
               · {statusText}
             </span>
             <span className="ml-auto text-[11px] font-normal" style={{ color: "var(--taomni-text-muted)" }}>
-              {Object.keys(remotes).length >= 8 ? "人数较多，mesh 建议 ≤ 8 人 · " : ""}P2P · 无 STUN/TURN
+              {isNativeStack
+                ? `${Object.keys(remotes).length >= 6 ? "人数较多，原生 mesh 建议 ≤ 6 人 · " : ""}Linux 原生 · P2P`
+                : `${Object.keys(remotes).length >= 8 ? "人数较多，mesh 建议 ≤ 8 人 · " : ""}P2P · 无 STUN/TURN`}
             </span>
             <button
               type="button"
@@ -259,6 +292,8 @@ export function CallOverlay() {
               <VideoTile
                 key={peerId}
                 stream={r.stream}
+                canvas={r.canvas}
+                level={levels[peerId]}
                 muted={false}
                 label={`${peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
                 camOff={!r.cam && !r.screen}

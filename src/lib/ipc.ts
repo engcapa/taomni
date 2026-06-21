@@ -1340,6 +1340,52 @@ export async function listenLanChatSignal(
   return listen<LanSignal>("lanchat://signal", (e) => cb(e.payload));
 }
 
+/* ---- Native A/V media (v4, Linux / no-WebRTC stack) ---- */
+
+/** Start a native media session for a call; returns the loopback WS port the
+ *  webview connects to for decoded media. */
+export async function nmediaStart(callId: string): Promise<number> {
+  return invoke<number>("nmedia_start", { callId });
+}
+
+export async function nmediaStop(callId: string): Promise<void> {
+  return invoke("nmedia_stop", { callId });
+}
+
+export async function nmediaWsPort(callId: string): Promise<number> {
+  return invoke<number>("nmedia_ws_port", { callId });
+}
+
+export async function nmediaAddPeer(callId: string, peerId: string): Promise<void> {
+  return invoke("nmedia_add_peer", { callId, peerId });
+}
+
+export async function nmediaRemovePeer(callId: string, peerId: string): Promise<void> {
+  return invoke("nmedia_remove_peer", { callId, peerId });
+}
+
+export async function nmediaPeerState(
+  callId: string,
+  peerId: string,
+  mic: boolean,
+  cam: boolean,
+  screen: boolean,
+): Promise<void> {
+  return invoke("nmedia_peer_state", { callId, peerId, mic, cam, screen });
+}
+
+export async function nmediaToggleMic(callId: string, on: boolean): Promise<void> {
+  return invoke("nmedia_toggle_mic", { callId, on });
+}
+
+export async function nmediaToggleScreen(callId: string, on: boolean): Promise<void> {
+  return invoke("nmedia_toggle_screen", { callId, on });
+}
+
+export async function nmediaToggleCam(callId: string, on: boolean): Promise<void> {
+  return invoke("nmedia_toggle_cam", { callId, on });
+}
+
 export async function listenLanChatWb(
   cb: (s: LanSignal) => void,
 ): Promise<UnlistenFn> {
