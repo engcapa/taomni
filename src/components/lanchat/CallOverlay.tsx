@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Mic, MicOff, Minus, MonitorUp, Phone, PhoneOff, Video, VideoOff, X } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
+import { useLanChatStore } from "../../stores/lanChatStore";
 import { hasWebRtc } from "../../lib/runtime";
 import { avatarGradient, avatarInitial } from "./util";
 
@@ -134,6 +135,7 @@ export function CallOverlay() {
   const screenStream = useLanCallStore((s) => s.screenStream);
   const remotes = useLanCallStore((s) => s.remotes);
   const levels = useLanCallStore((s) => s.levels);
+  const roster = useLanChatStore((s) => s.roster);
   const acceptIncoming = useLanCallStore((s) => s.acceptIncoming);
   const rejectIncoming = useLanCallStore((s) => s.rejectIncoming);
   const hangup = useLanCallStore((s) => s.hangup);
@@ -199,6 +201,7 @@ export function CallOverlay() {
   };
   const transform = `translate(calc(-50% + ${pos.dx}px), calc(-50% + ${pos.dy}px))`;
   const statusText = status === "calling" ? "呼叫中…" : status === "active" ? "进行中" : status;
+  const peerNames = useMemo(() => new Map(roster.map((peer) => [peer.id, peer.name])), [roster]);
 
   return (
     <>
@@ -295,7 +298,7 @@ export function CallOverlay() {
                 canvas={r.canvas}
                 level={levels[peerId]}
                 muted={false}
-                label={`${peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
+                label={`${peerNames.get(peerId) ?? peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
                 camOff={!r.cam && !r.screen}
               />
             ))}

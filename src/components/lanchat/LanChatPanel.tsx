@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   ChevronLeft,
@@ -16,7 +16,7 @@ import {
   Video,
 } from "lucide-react";
 
-import { useLanChatStore, mergedMemberPeers } from "../../stores/lanChatStore";
+import { useLanChatStore, mergedMemberPeers, type LanEdgeSide } from "../../stores/lanChatStore";
 import { useLanCallStore } from "../../stores/lanCallStore";
 import { useLanWbStore } from "../../stores/lanWbStore";
 import { useAppStore } from "../../stores/appStore";
@@ -31,7 +31,7 @@ import { MessageInput } from "./MessageInput";
 import { MessageThread } from "./MessageThread";
 import { PrivacySettings } from "./PrivacySettings";
 import { ProfileEditor } from "./ProfileEditor";
-import { RosterList } from "./RosterList";
+import { RosterList, matchesMemberStatus, type MemberStatusFilter } from "./RosterList";
 import { SecurityAlertBanner } from "./SecurityAlertBanner";
 import { TransferTrayButton } from "./TransferPanel";
 import { presenceLabel } from "./util";
@@ -39,8 +39,9 @@ import { presenceLabel } from "./util";
 const ROSTER_WIDTH_KEY = "taomni.lanchat.rosterWidth.v1";
 const ROSTER_COLLAPSED_KEY = "taomni.lanchat.rosterCollapsed.v1";
 const ROSTER_DEFAULT_WIDTH = 236;
-const ROSTER_MIN_WIDTH = 190;
-const ROSTER_MAX_WIDTH = 360;
+const ROSTER_MIN_WIDTH = 156;
+const ROSTER_MAX_WIDTH = 560;
+const ROSTER_COLLAPSE_WIDTH = 132;
 
 function clampRosterWidth(width: number): number {
   return Math.max(ROSTER_MIN_WIDTH, Math.min(ROSTER_MAX_WIDTH, Math.round(width)));
@@ -62,6 +63,23 @@ function loadRosterCollapsed(): boolean {
   } catch {
     return false;
   }
+}
+
+function nearestWindowEdge(clientX: number, clientY: number): LanEdgeSide {
+  const width = window.innerWidth || 1;
+  const height = window.innerHeight || 1;
+  const distances: Array<[LanEdgeSide, number]> = [
+    ["left", clientX],
+    ["right", width - clientX],
+    ["top", clientY],
+    ["bottom", height - clientY],
+  ];
+  distances.sort((a, b) => a[1] - b[1]);
+  return distances[0][0];
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest("button,a,input,select,textarea,[role='button']"));
 }
 
 /** Header info for the currently selected conversation. */
@@ -108,17 +126,22 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
   const activeConvId = useLanChatStore((s) => s.activeConvId);
   const serviceRunning = useLanChatStore((s) => s.serviceRunning);
   const enableService = useLanChatStore((s) => s.enableService);
+  const openEdgeDock = useLanChatStore((s) => s.openEdgeDock);
 
   const [search, setSearch] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
+  const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>("active");
   const [rosterWidth, setRosterWidth] = useState(loadRosterWidth);
   const [rosterCollapsed, setRosterCollapsed] = useState(loadRosterCollapsed);
   const header = useActiveHeader();
   const memberCount = useMemo(
-    () => mergedMemberPeers(roster, conversations).length,
-    [roster, conversations],
+    () =>
+      mergedMemberPeers(roster, conversations).filter((peer) =>
+        matchesMemberStatus(peer, memberStatusFilter),
+      ).length,
+    [roster, conversations, memberStatusFilter],
   );
 
   useEffect(() => {
@@ -144,6 +167,7 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
   const startRosterResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (rosterCollapsed) return;
+      if (event.button !== 0) return;
       event.preventDefault();
       const startX = event.clientX;
       const startWidth = rosterWidth;
@@ -153,7 +177,44 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
       document.body.style.userSelect = "none";
 
       const onMove = (moveEvent: PointerEvent) => {
-        setRosterWidth(clampRosterWidth(startWidth + moveEvent.clientX - startX));
+        const nextWidth = startWidth + moveEvent.clientX - startX;
+        if (nextWidth <= ROSTER_COLLAPSE_WIDTH) {
+          setRosterCollapsed(true);
+          return;
+        }
+        setRosterCollapsed(false);
+        setRosterWidth(clampRosterWidth(nextWidth));
+      };
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.body.style.cursor = prevCursor;
+        document.body.style.userSelect = prevUserSelect;
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp, { once: true });
+    },
+    [rosterCollapsed, rosterWidth],
+  );
+
+  const startRosterExpandResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!rosterCollapsed) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = Math.max(rosterWidth, ROSTER_MIN_WIDTH);
+      const prevCursor = document.body.style.cursor;
+      const prevUserSelect = document.body.style.userSelect;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const nextWidth = startWidth + moveEvent.clientX - startX;
+        if (nextWidth <= ROSTER_COLLAPSE_WIDTH) return;
+        setRosterCollapsed(false);
+        setRosterWidth(clampRosterWidth(nextWidth));
       };
       const onUp = () => {
         document.removeEventListener("pointermove", onMove);
@@ -208,6 +269,7 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
           onOpenProfile={() => setShowProfile(true)}
           onOpenPrivacy={() => setShowPrivacy(true)}
           onCreateGroup={() => setShowGroupCreate(true)}
+          onDock={openEdgeDock}
         />
       ) : (
         <div
@@ -295,17 +357,36 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
               <Shield className="h-3.5 w-3.5" />
             </button>
           </div>
+          {segment === "members" ? (
+            <div className="mx-2 mb-1 flex items-center gap-1.5">
+              <StatusFilterSelect value={memberStatusFilter} onChange={setMemberStatusFilter} />
+            </div>
+          ) : null}
 
-          <RosterList search={search} />
+          <RosterList search={search} statusFilter={memberStatusFilter} />
         </div>
       )}
 
       {rosterCollapsed ? (
-        <div style={{ width: 1, background: "var(--taomni-divider)" }} />
+        <div
+          data-testid="lanchat-roster-expand-resize-handle"
+          title="拖动展开成员栏"
+          role="separator"
+          aria-orientation="vertical"
+          onPointerDown={startRosterExpandResize}
+          onDoubleClick={() => setRosterCollapsed(false)}
+          className="group relative w-1.5 flex-none cursor-col-resize"
+          style={{ background: "transparent" }}
+        >
+          <div
+            className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors group-hover:w-1"
+            style={{ background: "var(--taomni-divider)" }}
+          />
+        </div>
       ) : (
         <div
           data-testid="lanchat-roster-resize-handle"
-          title="拖动调整成员栏宽度，双击恢复默认"
+          title="拖动调整成员栏宽度，拖到最左收起为 ribbon，双击恢复默认"
           role="separator"
           aria-orientation="vertical"
           aria-valuemin={ROSTER_MIN_WIDTH}
@@ -414,6 +495,10 @@ function GlobalActionButtons({ orientation }: { orientation: "row" | "col" }) {
   const { isDesktop, detach, openEdgeDock } = useGlobalChatActions();
   const [dockMenu, setDockMenu] = useState(false);
   const col = orientation === "col";
+  const btnClass = col
+    ? "grid h-6 w-6 flex-none place-items-center rounded-md disabled:opacity-40"
+    : "grid h-7 w-7 flex-none place-items-center rounded-md disabled:opacity-40";
+  const iconClass = col ? "h-3.5 w-3.5" : "h-4 w-4";
   return (
     <div className={col ? "flex flex-col items-center gap-1" : "flex flex-none items-center gap-0.5"}>
       <button
@@ -422,10 +507,10 @@ function GlobalActionButtons({ orientation }: { orientation: "row" | "col" }) {
         title="弹出为独立窗口"
         disabled={!isDesktop}
         onClick={detach}
-        className="grid h-7 w-7 flex-none place-items-center rounded-md disabled:opacity-40"
+        className={btnClass}
         style={{ color: "var(--taomni-text-muted)" }}
       >
-        <ExternalLink className="h-4 w-4" />
+        <ExternalLink className={iconClass} />
       </button>
       <div className="relative">
         <button
@@ -433,10 +518,10 @@ function GlobalActionButtons({ orientation }: { orientation: "row" | "col" }) {
           data-testid="lanchat-dock"
           title="停靠到窗口边缘（抽屉）"
           onClick={() => setDockMenu((v) => !v)}
-          className="grid h-7 w-7 flex-none place-items-center rounded-md"
+          className={btnClass}
           style={{ color: "var(--taomni-text-muted)" }}
         >
-          <PanelRight className="h-4 w-4" />
+          <PanelRight className={iconClass} />
         </button>
         {dockMenu ? (
           <>
@@ -493,6 +578,7 @@ function RosterRibbon({
   onOpenProfile,
   onOpenPrivacy,
   onCreateGroup,
+  onDock,
 }: {
   profile: LanProfile | null;
   serviceRunning: boolean;
@@ -502,38 +588,84 @@ function RosterRibbon({
   onOpenProfile: () => void;
   onOpenPrivacy: () => void;
   onCreateGroup: () => void;
+  onDock: (side: LanEdgeSide) => void;
 }) {
+  const dragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    if (isInteractiveTarget(event.target)) return;
+    dragRef.current = { x: event.clientX, y: event.clientY, moved: false };
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  };
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y) > 8) {
+      drag.moved = true;
+      setDragging(true);
+    }
+  };
+  const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    setDragging(false);
+    (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+    if (!drag?.moved) return;
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+    onDock(nearestWindowEdge(event.clientX, event.clientY));
+  };
+
   return (
     <div
       data-testid="lanchat-roster-ribbon"
-      className="flex w-[42px] flex-none flex-col items-center gap-2 py-2"
-      style={{ background: "var(--taomni-panel-bg)" }}
+      className="flex w-[34px] flex-none flex-col items-center gap-1.5 py-1.5"
+      title="拖动到窗口边缘停靠"
+      style={{
+        background: "var(--taomni-panel-bg)",
+        cursor: dragging ? "grabbing" : "grab",
+        touchAction: "none",
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onClickCapture={(event) => {
+        if (!suppressClickRef.current) return;
+        suppressClickRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       <button
         type="button"
         data-testid="lanchat-roster-expand"
         title="展开成员栏"
         onClick={onExpand}
-        className="grid h-7 w-7 place-items-center rounded-md"
+        className="grid h-6 w-6 place-items-center rounded-md"
         style={{ color: "var(--taomni-text-muted)" }}
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-3.5 w-3.5" />
       </button>
-      <button type="button" title="个人资料" onClick={onOpenProfile} className="grid h-8 w-8 place-items-center">
-        <Avatar name={profile?.name ?? "我"} avatarBase64={profile?.avatarBase64} status={profile?.status ?? "online"} size={30} radius={8} />
+      <button type="button" title="个人资料" onClick={onOpenProfile} className="grid h-7 w-7 place-items-center">
+        <Avatar name={profile?.name ?? "我"} avatarBase64={profile?.avatarBase64} status={profile?.status ?? "online"} size={26} radius={7} />
       </button>
-      <div className="h-px w-6" style={{ background: "var(--taomni-divider)" }} />
+      <div className="h-px w-5" style={{ background: "var(--taomni-divider)" }} />
       <button
         type="button"
         title={`成员 ${memberCount}`}
         onClick={onExpand}
-        className="grid h-7 w-7 place-items-center rounded-md"
+        className="grid h-6 w-6 place-items-center rounded-md"
         style={{ color: "var(--taomni-text-muted)" }}
       >
-        <Users className="h-4 w-4" />
+        <Users className="h-3.5 w-3.5" />
       </button>
       <div
-        className="rounded-full px-1 text-[10px] font-semibold leading-4"
+        className="rounded-full px-1 text-[9px] font-semibold leading-3.5"
         style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}
       >
         {memberCount}
@@ -542,7 +674,7 @@ function RosterRibbon({
         type="button"
         title={`群组 ${groupCount}`}
         onClick={onExpand}
-        className="grid h-7 w-7 place-items-center rounded-md text-[12px] font-semibold"
+        className="grid h-6 w-6 place-items-center rounded-md text-[11px] font-semibold"
         style={{ color: "var(--taomni-text-muted)" }}
       >
         #
@@ -551,22 +683,22 @@ function RosterRibbon({
         type="button"
         title="新建群组"
         onClick={onCreateGroup}
-        className="grid h-7 w-7 place-items-center rounded-md"
+        className="grid h-6 w-6 place-items-center rounded-md"
         style={{ color: "var(--taomni-text-muted)" }}
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-3.5 w-3.5" />
       </button>
       <div className="mt-auto flex flex-col items-center gap-1">
-        <div className="h-px w-6" style={{ background: "var(--taomni-divider)" }} />
+        <div className="h-px w-5" style={{ background: "var(--taomni-divider)" }} />
         <GlobalActionButtons orientation="col" />
         <button
           type="button"
           title="隐私与安全"
           onClick={onOpenPrivacy}
-          className="grid h-7 w-7 place-items-center rounded-md"
+          className="grid h-6 w-6 place-items-center rounded-md"
           style={{ color: serviceRunning ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
         >
-          <Shield className="h-4 w-4" />
+          <Shield className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
@@ -588,6 +720,35 @@ function SegBtn({ active, onClick, children }: { active: boolean; onClick: () =>
     >
       {children}
     </button>
+  );
+}
+
+function StatusFilterSelect({
+  value,
+  onChange,
+}: {
+  value: MemberStatusFilter;
+  onChange: (value: MemberStatusFilter) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as MemberStatusFilter)}
+      title="按状态过滤成员"
+      className="h-[24px] min-w-0 flex-1 rounded-md px-2 text-[11px] outline-none"
+      style={{
+        border: "1px solid var(--taomni-input-border)",
+        background: "var(--taomni-input-bg)",
+        color: "var(--taomni-text-muted)",
+      }}
+    >
+      <option value="active">隐藏离线</option>
+      <option value="all">全部成员</option>
+      <option value="online">仅在线</option>
+      <option value="away">仅离开</option>
+      <option value="busy">仅忙碌</option>
+      <option value="offline">仅离线</option>
+    </select>
   );
 }
 

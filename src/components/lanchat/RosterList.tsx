@@ -1,21 +1,30 @@
 import { useMemo } from "react";
 
 import { useLanChatStore, directConvId, mergedMemberPeers } from "../../stores/lanChatStore";
-import type { LanConversation } from "../../types";
+import type { LanConversation, LanPeer, LanPresence } from "../../types";
 import { Avatar } from "./Avatar";
 import { presenceLabel, shortTime } from "./util";
 
+export type MemberStatusFilter = "active" | "all" | LanPresence;
+
 interface RosterListProps {
   search: string;
+  statusFilter?: MemberStatusFilter;
   /** Fired after a row is picked (after openDirect/openConversation). Lets the
    *  edge-drawer overlay auto-close once a conversation is selected. */
   onSelect?: () => void;
 }
 
+export function matchesMemberStatus(peer: LanPeer, filter: MemberStatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "active") return peer.status !== "offline";
+  return peer.status === filter;
+}
+
 /** Left-panel list. Members segment lists discovered peers (each opens a
  *  direct chat); Groups segment lists known groups. Both show the matching
  *  conversation's last-activity time + unread badge. */
-export function RosterList({ search, onSelect }: RosterListProps) {
+export function RosterList({ search, statusFilter = "active", onSelect }: RosterListProps) {
   const segment = useLanChatStore((s) => s.segment);
   const roster = useLanChatStore((s) => s.roster);
   const groups = useLanChatStore((s) => s.groups);
@@ -38,15 +47,17 @@ export function RosterList({ search, onSelect }: RosterListProps) {
   );
 
   if (segment === "members") {
-    const peers = memberPeers.filter((p) => !q || p.name.toLowerCase().includes(q));
+    const peers = memberPeers.filter(
+      (p) => matchesMemberStatus(p, statusFilter) && (!q || p.name.toLowerCase().includes(q)),
+    );
     return (
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
         <div className="px-1.5 pt-2 pb-1 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
-          局域网在线成员（mDNS 自动发现）
+          {statusFilter === "active" ? "在线 / 离开 / 忙碌成员" : "成员（含历史离线）"}
         </div>
         {peers.length === 0 ? (
           <div className="px-2 py-6 text-center text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
-            暂未发现同网段成员
+            {statusFilter === "active" ? "暂无在线成员" : "没有匹配的成员"}
           </div>
         ) : (
           peers.map((p) => {

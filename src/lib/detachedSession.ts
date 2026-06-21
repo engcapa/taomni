@@ -300,8 +300,54 @@ export function subscribeReattach(
 ): () => void {
   ensureChannel();
   reattachListeners.add(fn);
+
+  const onStorage = (event: StorageEvent) => {
+    if (!event.key || !event.key.startsWith(REATTACH_PREFIX) || !event.newValue) {
+      return;
+    }
+    const key = event.key;
+    const rest = key.slice(REATTACH_PREFIX.length);
+    const dot = rest.indexOf(".");
+    if (dot <= 0) return;
+    const kindStr = rest.slice(0, dot);
+    const id = rest.slice(dot + 1);
+    if (!isDetachedKind(kindStr)) return;
+
+    try {
+      const parsed = JSON.parse(event.newValue) as HandoffEnvelope<unknown>;
+      if (parsed?.createdAt && Date.now() - parsed.createdAt > HANDOFF_TTL_MS) {
+        return;
+      }
+
+      // Clean up the key so we don't process it again
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* noop */
+      }
+
+      fn({
+        type: "reattach",
+        kind: kindStr,
+        id,
+        payload: parsed.payload,
+        from: "storage",
+        seq: 0,
+      });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", onStorage);
+  }
+
   return () => {
     reattachListeners.delete(fn);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", onStorage);
+    }
   };
 }
 
