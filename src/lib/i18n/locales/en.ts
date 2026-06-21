@@ -408,6 +408,8 @@ const dict = {
     adminTitle: "Open as administrator",
     newSessionTitle: "New session…",
     newSessionDesc: "SSH, RDP, VNC, SFTP, Telnet, Serial, Mosh, WSL, S3 — all in one dialog.",
+    lanChatTitle: "LAN Messenger",
+    lanChatDesc: "Open LanChat to discover peers on your subnet and exchange messages, files, or start a collaboration.",
     importTitle: "Import OpenSSH config",
     importDesc: "Read Host, HostName, User, Port and IdentityFile entries into saved sessions.",
     refreshTitle: "Refresh sessions",

@@ -7,12 +7,15 @@ import { presenceLabel, shortTime } from "./util";
 
 interface RosterListProps {
   search: string;
+  /** Fired after a row is picked (after openDirect/openConversation). Lets the
+   *  edge-drawer overlay auto-close once a conversation is selected. */
+  onSelect?: () => void;
 }
 
 /** Left-panel list. Members segment lists discovered peers (each opens a
  *  direct chat); Groups segment lists known groups. Both show the matching
  *  conversation's last-activity time + unread badge. */
-export function RosterList({ search }: RosterListProps) {
+export function RosterList({ search, onSelect }: RosterListProps) {
   const segment = useLanChatStore((s) => s.segment);
   const roster = useLanChatStore((s) => s.roster);
   const groups = useLanChatStore((s) => s.groups);
@@ -60,7 +63,10 @@ export function RosterList({ search }: RosterListProps) {
                 preview={p.signature || presenceLabel(p.status)}
                 time={conv ? shortTime(conv.lastMsgAt) : ""}
                 unread={conv?.unread ?? 0}
-                onClick={() => void openDirect(p.id)}
+                onClick={() => {
+                  void openDirect(p.id);
+                  onSelect?.();
+                }}
               />
             );
           })
@@ -95,7 +101,10 @@ export function RosterList({ search }: RosterListProps) {
               preview={`${g.members.length} 人`}
               time={conv ? shortTime(conv.lastMsgAt) : ""}
               unread={conv?.unread ?? 0}
-              onClick={() => void openConversation(convId)}
+              onClick={() => {
+                void openConversation(convId);
+                onSelect?.();
+              }}
             />
           );
         })

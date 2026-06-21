@@ -7,6 +7,7 @@ import {
   FolderOpen,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -27,9 +28,10 @@ interface WelcomePanelProps {
   onStartLocalTerminal: (shell?: LocalShellSelection) => void;
   onNewSession: () => void;
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
+  onOpenLanChat?: () => void;
 }
 
-export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath }: WelcomePanelProps) {
+export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath, onOpenLanChat }: WelcomePanelProps) {
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -231,6 +233,16 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
               kbd="Ctrl+Shift+N"
               onClick={() => onNewSession()}
             />
+            {onOpenLanChat ? (
+              <ActionCard
+                testId="welcome-open-lanchat"
+                icon={<MessageCircle className="w-5 h-5" />}
+                title={t("welcome.lanChatTitle")}
+                desc={t("welcome.lanChatDesc")}
+                kbd=""
+                onClick={onOpenLanChat}
+              />
+            ) : null}
           </div>
 
           <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
@@ -524,12 +536,14 @@ function WslCard({
 }
 
 function ActionCard({
+  testId,
   icon,
   title,
   desc,
   kbd,
   onClick,
 }: {
+  testId?: string;
   icon: React.ReactNode;
   title: string;
   desc: string;
@@ -538,6 +552,7 @@ function ActionCard({
 }) {
   return (
     <button
+      data-testid={testId}
       className="text-left p-4 min-h-[138px] h-full rounded-md border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
       onClick={onClick}
