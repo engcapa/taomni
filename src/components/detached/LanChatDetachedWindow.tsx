@@ -176,12 +176,6 @@ export default function LanChatDetachedWindow({ id }: { id: string }) {
   useEffect(() => {
     if (!tauri) {
       const handler = () => {
-        if (!reattachingRef.current) {
-          broadcastReattach("lan-chat", id, {
-            activeConvId: displayedConvId,
-            title: headerName,
-          });
-        }
         clearDetachedHandoff("lan-chat", id);
       };
       window.addEventListener("beforeunload", handler);
@@ -195,10 +189,11 @@ export default function LanChatDetachedWindow({ id }: { id: string }) {
     let disposed = false;
     void getCurrentWindow()
       .onCloseRequested((event) => {
-        // Prevent default Tauri destroy so we can broadcast and close via the Rust path
-        event.preventDefault();
         if (reattachingRef.current) return;
-        void requestReattach();
+        // Native OS close: prevent default Tauri destroy and close without reattaching
+        event.preventDefault();
+        clearDetachedHandoff("lan-chat", id);
+        void closeCurrentDetachedWindow().catch(() => undefined);
       })
       .then((fn) => {
         if (disposed) {
@@ -211,7 +206,7 @@ export default function LanChatDetachedWindow({ id }: { id: string }) {
       disposed = true;
       unlisten?.();
     };
-  }, [displayedConvId, headerName, id, requestReattach, tauri]);
+  }, [id, tauri]);
 
   const startRosterResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
