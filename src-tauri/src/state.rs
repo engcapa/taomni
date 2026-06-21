@@ -35,6 +35,34 @@ pub struct ReadStreamHandle {
 /// responses (or `None` if the user cancelled).
 pub type SshAuthResponder = tokio::sync::oneshot::Sender<Option<Vec<String>>>;
 
+/// Outcome the frontend returns for a Claude Code *side-effect* tool call that
+/// the in-app MCP server dispatched to it (`run_in_terminal`, `sftp_upload`,
+/// `switch_tab`, …). The MCP tool handler registers a oneshot sender keyed by a
+/// per-call id, emits an `agent-cc-tool` event, then blocks on the receiver
+/// until `cc_resolve_tool_call` delivers this outcome (D2 hybrid model — the
+/// human is naturally in the loop because the frontend performs the effect).
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CcToolOutcome {
+    pub ok: bool,
+    pub output: String,
+}
+
+pub type CcToolResponder = tokio::sync::oneshot::Sender<CcToolOutcome>;
+
+/// Human decision for a Claude Code permission prompt (HITL, Phase 2). The
+/// `permission_prompt` MCP tool registers a oneshot keyed by a per-call id,
+/// emits `agent-cc-permission`, and blocks until `cc_resolve_permission`
+/// delivers the user's choice from the ActionCard.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CcPermissionDecision {
+    Allow,
+    AllowSession,
+    Deny,
+}
+
+pub type CcPermissionResponder = tokio::sync::oneshot::Sender<CcPermissionDecision>;
+
 pub struct AppState {
     pub terminals: Arc<RwLock<HashMap<String, ActiveTerminal>>>,
     pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>,
@@ -64,6 +92,12 @@ pub struct AppState {
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
+    /// Pending CC side-effect tool calls awaiting frontend execution, keyed by
+    /// per-call id. See [`CcToolResponder`].
+    pub cc_pending_tool_calls: Arc<Mutex<HashMap<String, CcToolResponder>>>,
+    /// Pending CC permission prompts awaiting a human decision, keyed by
+    /// per-call id. See [`CcPermissionResponder`].
+    pub cc_pending_permissions: Arc<Mutex<HashMap<String, CcPermissionResponder>>>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -99,6 +133,8 @@ impl AppState {
             db: Mutex::new(db),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
+            cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
+            cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

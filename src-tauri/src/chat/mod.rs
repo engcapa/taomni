@@ -349,6 +349,25 @@ pub enum StreamEventOut {
     Error { id: String, message: String },
 }
 
+/// Render a CC tool-use event as a compact, human-readable transcript line.
+///
+/// This is *not* a `[TOOL_CALL]` marker — it carries no machine-parseable JSON,
+/// so MessageBubble never turns it into an ActionCard or re-executes it. It
+/// exists purely so the chat keeps a record of what Claude Code did (the real
+/// confirmation happens live via the in-app MCP server's permission prompt).
+fn format_cc_tool_use(name: &str, input: &serde_json::Value) -> String {
+    let summary = input
+        .get("command")
+        .and_then(|v| v.as_str())
+        .or_else(|| input.get("file_path").and_then(|v| v.as_str()))
+        .or_else(|| input.get("notebook_path").and_then(|v| v.as_str()))
+        .or_else(|| input.get("path").and_then(|v| v.as_str()));
+    match summary {
+        Some(s) => format!("\n> 🔧 `{}` — {}\n", name, s),
+        None => format!("\n> 🔧 `{}`\n", name),
+    }
+}
+
 /// Streaming variant of `chat_send`. Emits events on
 /// `chat-stream:{thread_id}` and resolves once the stream finishes (or errors).
 #[tauri::command]
@@ -438,6 +457,26 @@ pub async fn chat_stream(
         let process = match existing {
             Some(p) => p,
             None => {
+                // Provision the in-app rmcp MCP server + a per-thread scoped
+                // token (trust inferred from whether the thread is linked to a
+                // remote SSH session). Injected into the thread's .mcp.json.
+                let (cc_server_url, cc_token) =
+                    match crate::agent::cc_bridge::mcp_http::provision_for_thread(
+                        &app,
+                        &req.thread_id,
+                        thread.linked_session_id.clone(),
+                    )
+                    .await
+                    {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
                 // Resolve the user's custom settings.json from the vault (when
                 // configured). A locked vault means we can't read the token, so
                 // surface it as a stream error and let the UI prompt to unlock.
@@ -456,6 +495,8 @@ pub async fn chat_stream(
                 };
                 let files = match crate::agent::cc_bridge::config::create_session_files(
                     custom.as_deref(),
+                    &cc_server_url,
+                    &cc_token,
                 ) {
                     Ok(f) => f,
                     Err(e) => {
@@ -477,6 +518,9 @@ pub async fn chat_stream(
                     files.settings_path.to_string_lossy().to_string(),
                     "--mcp-config".into(),
                     files.mcp_path.to_string_lossy().to_string(),
+                    // Use *only* our MCP config; ignore any user ~/.claude MCP
+                    // that could bypass the permission pipeline.
+                    "--strict-mcp-config".into(),
                     "--permission-prompt-tool".into(),
                     crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
                 ];
@@ -485,11 +529,14 @@ pub async fn chat_stream(
                     extra_args.push(sid.clone());
                 }
 
-                let p = std::sync::Arc::new(crate::agent::cc_bridge::process::CcProcess::new(
-                    &binary,
-                    extra_args,
-                    Some(files.dir),
-                ));
+                let p = std::sync::Arc::new(
+                    crate::agent::cc_bridge::process::CcProcess::new(
+                        &binary,
+                        extra_args,
+                        Some(files.dir),
+                    )
+                    .with_token(cc_token.clone()),
+                );
                 // Re-check under the lock in case a concurrent send for the
                 // same thread created one first; if so, our `p` is dropped and
                 // its temp dir cleaned by the Drop impl.
@@ -508,7 +555,21 @@ pub async fn chat_stream(
         let assistant_id_clone = assistant_id.clone();
         let app_clone = app.clone();
         let event_name_clone = event_name.clone();
-        let events = process.send_with_callback(&clean_content, move |evt| {
+        // Prepend the (redacted) terminal context to the message CC sees, the
+        // same way the native LLM path injects it as a leading user turn
+        // (~line 611). Without this the CC branch silently dropped a field the
+        // frontend already sends, so CC answered terminal questions blind.
+        let cc_message = match &req.terminal_context {
+            Some(ctx) if !ctx.trim().is_empty() => {
+                let (clean_ctx, _) = redact::redact(ctx);
+                format!(
+                    "[Terminal context]\n```\n{}\n```\n\n{}",
+                    clean_ctx, clean_content
+                )
+            }
+            _ => clean_content.clone(),
+        };
+        let events = process.send_with_callback(&cc_message, move |evt| {
             match evt {
                 crate::agent::cc_bridge::protocol::CcEvent::Partial { content } => {
                     let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
@@ -516,18 +577,15 @@ pub async fn chat_stream(
                         content: content.clone(),
                     });
                 }
-                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { id: _, name, input } => {
-                    let marker = format!(
-                        "\n[TOOL_CALL]{}\n",
-                        serde_json::json!({
-                            "tool": name,
-                            "args": input,
-                            "requires_confirmation": crate::agent::safety::requires_confirmation(name),
-                        })
-                    );
+                // CC tool calls now run through the in-app MCP server with HITL
+                // confirmation (agent-cc-permission / agent-cc-tool). We emit a
+                // plain-text transcript line for visibility, but no longer
+                // inject [TOOL_CALL] markers — those triggered a second, native
+                // execution of the same tool via agent_execute_tool (double-exec).
+                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
                     let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
                         id: assistant_id_clone.clone(),
-                        content: marker,
+                        content: format_cc_tool_use(name, input),
                     });
                 }
                 _ => {}
@@ -552,16 +610,9 @@ pub async fn chat_stream(
                 crate::agent::cc_bridge::protocol::CcEvent::AssistantMessage { content } => {
                     final_content.push_str(content);
                 }
+                // Plain-text tool record — see the streaming callback above.
                 crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
-                    let marker = format!(
-                        "\n[TOOL_CALL]{}\n",
-                        serde_json::json!({
-                            "tool": name,
-                            "args": input,
-                            "requires_confirmation": crate::agent::safety::requires_confirmation(name),
-                        })
-                    );
-                    final_content.push_str(&marker);
+                    final_content.push_str(&format_cc_tool_use(name, input));
                 }
                 _ => {}
             }
@@ -745,4 +796,29 @@ pub async fn chat_stream(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod cc_tool_use_tests {
+    use super::format_cc_tool_use;
+    use serde_json::json;
+
+    #[test]
+    fn renders_command_without_tool_call_marker() {
+        let line = format_cc_tool_use("run_in_terminal", &json!({ "command": "ls -la" }));
+        assert!(line.contains("run_in_terminal"));
+        assert!(line.contains("ls -la"));
+        // Must NOT be a parseable marker (would trigger native re-execution).
+        assert!(!line.contains("[TOOL_CALL]"));
+    }
+
+    #[test]
+    fn renders_file_path_and_bare_tool() {
+        let edit = format_cc_tool_use("Edit", &json!({ "file_path": "/tmp/x.rs" }));
+        assert!(edit.contains("/tmp/x.rs"));
+        assert!(!edit.contains("[TOOL_CALL]"));
+        let bare = format_cc_tool_use("list_sessions", &json!({}));
+        assert!(bare.contains("list_sessions"));
+        assert!(!bare.contains("[TOOL_CALL]"));
+    }
 }

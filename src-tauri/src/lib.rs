@@ -402,6 +402,8 @@ pub fn run() {
             agent::cc_bridge::commands::cc_send_message,
             agent::cc_bridge::commands::cc_stream_message,
             agent::cc_bridge::commands::cc_stop_session,
+            agent::cc_bridge::commands::cc_resolve_tool_call,
+            agent::cc_bridge::commands::cc_resolve_permission,
             agent::mcp_server::mcp_server_start,
             agent::mcp_server::mcp_server_stop,
             agent::mcp_server::mcp_server_status,

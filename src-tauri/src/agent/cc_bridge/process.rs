@@ -11,6 +11,13 @@ use tokio::sync::Mutex;
 const MAX_RESTART_ATTEMPTS: u32 = 3;
 const HEALTH_CHECK_INTERVAL_SECS: u64 = 30;
 const RESTART_COOLDOWN_SECS: u64 = 60;
+/// How long to wait for the *next* line of output before declaring the turn
+/// dead. This is an idle timeout, not a wall-clock budget: every line CC emits
+/// (including the `--include-partial-messages` token deltas) resets the clock,
+/// so a long-running `Bash` build that streams progress stays alive, while a
+/// genuinely wedged process is still reaped. Default is relaxed; override per
+/// process with `with_idle_timeout`.
+const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 600;
 
 /// One Claude Code child per chat thread.
 ///
@@ -46,6 +53,11 @@ pub struct CcProcess {
     /// see `stop()` and the `Drop` impl. `None` when the caller manages the
     /// files itself.
     temp_dir: Option<PathBuf>,
+    /// Idle timeout between successive output lines for a single turn.
+    idle_timeout: Duration,
+    /// Bearer token this process uses to authenticate to the in-app rmcp MCP
+    /// server. Revoked on stop/drop so a dead thread's token can't be reused.
+    cc_token: Option<String>,
 }
 
 impl CcProcess {
@@ -77,7 +89,23 @@ impl CcProcess {
             watchdog_started: AtomicBool::new(false),
             stderr_buf: Arc::new(Mutex::new(String::new())),
             temp_dir,
+            idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
+            cc_token: None,
         }
+    }
+
+    /// Override the per-turn idle timeout (builder style). Lets the caller wire
+    /// the value from config without changing the `new` signature.
+    pub fn with_idle_timeout(mut self, timeout: Duration) -> Self {
+        self.idle_timeout = timeout;
+        self
+    }
+
+    /// Attach the in-app MCP server token this process authenticates with, so
+    /// it is revoked when the process stops (builder style).
+    pub fn with_token(mut self, token: impl Into<String>) -> Self {
+        self.cc_token = Some(token.into());
+        self
     }
 
     /// Send a message and collect all events until Done or Error.
@@ -275,14 +303,14 @@ impl CcProcess {
         let mut reader = BufReader::new(stdout);
         let mut line = String::new();
 
+        // Captures a read error / idle timeout so we can run the shared
+        // kill+respawn cleanup once, after dropping the child guard, instead
+        // of returning early with a poisoned (still-running, half-read) child.
+        let mut read_failure: Option<String> = None;
+
         loop {
             line.clear();
-            match tokio::time::timeout(
-                std::time::Duration::from_secs(120),
-                reader.read_line(&mut line),
-            )
-            .await
-            {
+            match tokio::time::timeout(self.idle_timeout, reader.read_line(&mut line)).await {
                 Ok(Ok(0)) => break, // EOF — process exited.
                 Ok(Ok(_)) => {
                     let trimmed = line.trim();
@@ -299,15 +327,26 @@ impl CcProcess {
                         }
                     }
                 }
-                Ok(Err(e)) => return Err(format!("CC stdout read error: {}", e)),
-                Err(_) => return Err("CC response timed out after 120s".into()),
+                Ok(Err(e)) => {
+                    read_failure = Some(format!("CC stdout read error: {}", e));
+                    break;
+                }
+                Err(_) => {
+                    read_failure = Some(format!(
+                        "CC response timed out after {}s of inactivity",
+                        self.idle_timeout.as_secs()
+                    ));
+                    break;
+                }
             }
         }
 
-        // EOF without a result/error event means the child died early (bad
-        // flags, auth failure, crash). Reap it, schedule a respawn and surface
-        // whatever it wrote to stderr so the user sees a real error instead of
-        // an empty bubble.
+        // A turn that ended without a terminal event — EOF (child died early
+        // on bad flags / auth failure / crash), a read error, or an idle
+        // timeout — leaves the child in an unusable state. Reap it, schedule a
+        // respawn and trip the failure counter so the breaker can engage, then
+        // surface a real error instead of an empty bubble or a poisoned next
+        // turn reading this turn's leftover output.
         if !terminal_seen {
             drop(child_guard);
             if let Some(mut c) = self.child.lock().await.take() {
@@ -316,6 +355,9 @@ impl CcProcess {
             *self.stdin.lock().await = None;
             self.needs_respawn.store(true, Ordering::SeqCst);
             self.record_failure().await;
+            if let Some(reason) = read_failure {
+                return Err(reason);
+            }
             let stderr = self.stderr_buf.lock().await.trim().to_string();
             let detail = if stderr.is_empty() {
                 "no stderr output".to_string()
@@ -335,6 +377,11 @@ impl CcProcess {
             let _ = child.kill().await;
         }
         *self.stdin.lock().await = None;
+        // Revoke our MCP server token so it can't be reused after the process
+        // is gone.
+        if let Some(token) = &self.cc_token {
+            super::mcp_http::revoke_token(token);
+        }
         // Remove the session's temp files now that the process is gone. The
         // settings file may carry the user's ANTHROPIC_AUTH_TOKEN, so we don't
         // want it lingering in the temp directory after use.
@@ -346,10 +393,13 @@ impl CcProcess {
 
 impl Drop for CcProcess {
     /// Safety net: if the process is dropped without an explicit `stop()`
-    /// (e.g. the registry entry is replaced), still scrub the temp directory.
-    /// `stop()` sets `stopped` before the Arc is dropped, so the watchdog has
-    /// already exited by the time this runs.
+    /// (e.g. the registry entry is replaced), still scrub the temp directory
+    /// and revoke the MCP token. `stop()` sets `stopped` before the Arc is
+    /// dropped, so the watchdog has already exited by the time this runs.
     fn drop(&mut self) {
+        if let Some(token) = &self.cc_token {
+            super::mcp_http::revoke_token(token);
+        }
         if let Some(dir) = &self.temp_dir {
             let _ = std::fs::remove_dir_all(dir);
         }
