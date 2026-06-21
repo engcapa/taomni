@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Maximize2, Mic, MicOff, Minus, MonitorUp, Phone, PhoneOff, Video, VideoOff, X } from "lucide-react";
 
 import { useLanCallStore } from "../../stores/lanCallStore";
+import { hasWebRtc } from "../../lib/runtime";
 import { avatarGradient, avatarInitial } from "./util";
+
+/** This node uses the Rust-native media stack when the webview lacks WebRTC. */
+const isNativeStack = !hasWebRtc();
 
 /** Returns true while the stream's audio is above a speaking threshold. */
 function useSpeaking(stream: MediaStream | null): boolean {
@@ -41,19 +45,23 @@ function useSpeaking(stream: MediaStream | null): boolean {
 function VideoTile({
   stream,
   canvas,
+  level,
   muted,
   label,
   camOff,
 }: {
   stream: MediaStream | null;
   canvas?: HTMLCanvasElement | null;
+  level?: number;
   muted: boolean;
   label: string;
   camOff: boolean;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const canvasHolder = useRef<HTMLDivElement | null>(null);
-  const speaking = useSpeaking(stream);
+  const streamSpeaking = useSpeaking(stream);
+  // Native peers have no MediaStream to analyse; use the Rust-reported level.
+  const speaking = canvas ? (level ?? 0) > 0.04 : streamSpeaking;
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
@@ -125,6 +133,7 @@ export function CallOverlay() {
   const localStream = useLanCallStore((s) => s.localStream);
   const screenStream = useLanCallStore((s) => s.screenStream);
   const remotes = useLanCallStore((s) => s.remotes);
+  const levels = useLanCallStore((s) => s.levels);
   const acceptIncoming = useLanCallStore((s) => s.acceptIncoming);
   const rejectIncoming = useLanCallStore((s) => s.rejectIncoming);
   const hangup = useLanCallStore((s) => s.hangup);
@@ -258,7 +267,9 @@ export function CallOverlay() {
               · {statusText}
             </span>
             <span className="ml-auto text-[11px] font-normal" style={{ color: "var(--taomni-text-muted)" }}>
-              {Object.keys(remotes).length >= 8 ? "人数较多，mesh 建议 ≤ 8 人 · " : ""}P2P · 无 STUN/TURN
+              {isNativeStack
+                ? `${Object.keys(remotes).length >= 6 ? "人数较多，原生 mesh 建议 ≤ 6 人 · " : ""}Linux 原生 · P2P`
+                : `${Object.keys(remotes).length >= 8 ? "人数较多，mesh 建议 ≤ 8 人 · " : ""}P2P · 无 STUN/TURN`}
             </span>
             <button
               type="button"
@@ -282,6 +293,7 @@ export function CallOverlay() {
                 key={peerId}
                 stream={r.stream}
                 canvas={r.canvas}
+                level={levels[peerId]}
                 muted={false}
                 label={`${peerId.slice(0, 6)}${r.screen ? "（共享屏幕）" : ""}`}
                 camOff={!r.cam && !r.screen}

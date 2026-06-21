@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { lanchatSendSignal, lanchatSignalGroup, listenLanChatSignal } from "../lib/ipc";
-import { createMediaSession, type MediaSession } from "../lib/mediaSession";
+import { createMediaSession, localMediaStack, type MediaSession } from "../lib/mediaSession";
 import type { NativeSession } from "../lib/nativeSession";
 import { hasWebRtc, isTauriRuntime } from "../lib/runtime";
 import type { LanCallKind, LanSignal } from "../types";
@@ -41,6 +41,9 @@ interface CallStore {
   /** Local screen-share preview stream (when screenOn). */
   screenStream: MediaStream | null;
   remotes: Record<string, RemotePeer>;
+  /** Per-peer audio level 0..1, reported by the native stack for speaker
+   *  highlight (the WebRTC stack derives it from the stream analyser instead). */
+  levels: Record<string, number>;
   incoming: IncomingCall | null;
   /** Last media/permission failure to surface to the user; null when clear. */
   callError: string | null;
@@ -113,6 +116,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
   localStream: null,
   screenStream: null,
   remotes: {},
+  levels: {},
   incoming: null,
   callError: null,
 
@@ -151,7 +155,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       localStream: local,
       remotes: { [peerId]: { stream: null, mic: true, cam: kind === "video", screen: false } },
     });
-    await lanchatSendSignal(peerId, "call-invite", { callId, kind });
+    await lanchatSendSignal(peerId, "call-invite", { callId, kind, stack: localMediaStack() });
   },
 
   startMeeting: async (groupId, kind) => {
@@ -182,7 +186,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
       remotes: {},
     });
     // Announce to group members; those who accept connect into the mesh.
-    await lanchatSignalGroup(groupId, "meeting-join", { meetingId, groupId, kind });
+    await lanchatSignalGroup(groupId, "meeting-join", { meetingId, groupId, kind, stack: localMediaStack() });
   },
 
   acceptIncoming: async () => {
@@ -217,7 +221,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     if (inc.groupId) {
       // Meeting: connect to the inviter and announce so existing members connect.
       session.connect(inc.from);
-      await lanchatSignalGroup(inc.groupId, "meeting-join", { meetingId: inc.callId, groupId: inc.groupId, kind: inc.kind });
+      await lanchatSignalGroup(inc.groupId, "meeting-join", { meetingId: inc.callId, groupId: inc.groupId, kind: inc.kind, stack: localMediaStack() });
     } else {
       await lanchatSendSignal(inc.from, "call-accept", { callId: inc.callId });
       // 1:1 callee waits for the caller's offer (lanRtc auto-answers).
@@ -245,7 +249,7 @@ export const useLanCallStore = create<CallStore>((set, get) => ({
     session = null;
     const s2 = get();
     s2.screenStream?.getTracks().forEach((t) => t.stop());
-    set({ callId: null, status: "ended", localStream: null, screenStream: null, screenOn: false, remotes: {}, groupId: null });
+    set({ callId: null, status: "ended", localStream: null, screenStream: null, screenOn: false, remotes: {}, levels: {}, groupId: null });
   },
 
   toggleMic: () => {
@@ -334,18 +338,24 @@ function mediaCallbacks() {
         },
       }));
     },
+    // Native stack speaker-level report (0..1) for the speaking highlight.
+    onRemoteLevel: (peerId: string, level: number) => {
+      useLanCallStore.setState((s) => ({ levels: { ...s.levels, [peerId]: level } }));
+    },
     onPeerClosed: (peerId: string) => {
       useLanCallStore.setState((s) => {
         const remotes = { ...s.remotes };
         delete remotes[peerId];
+        const levels = { ...s.levels };
+        delete levels[peerId];
         // 1:1: peer gone => end the call.
         if (!s.groupId && Object.keys(remotes).length === 0 && s.callId) {
           session?.close();
           session = null;
           s.screenStream?.getTracks().forEach((t) => t.stop());
-          return { remotes, callId: null, status: "ended" as CallStatus, localStream: null, screenStream: null, screenOn: false };
+          return { remotes, levels, callId: null, status: "ended" as CallStatus, localStream: null, screenStream: null, screenOn: false };
         }
-        return { remotes };
+        return { remotes, levels };
       });
     },
   };
@@ -359,6 +369,14 @@ async function handleSignal(sig: LanSignal) {
       // Ignore if already in a call (busy).
       if (store.callId) {
         void lanchatSendSignal(from, "call-reject", { callId: payload.callId as string, busy: true });
+        return;
+      }
+      // Cross-stack guard (plan option b): the native (Linux) and WebRTC
+      // (Win/mac) media stacks are not wire-compatible. If the caller's stack
+      // differs from ours, decline with a clear reason instead of a dead call.
+      const callerStack = payload.stack as string | undefined;
+      if (callerStack && callerStack !== localMediaStack()) {
+        void lanchatSendSignal(from, "call-reject", { callId: payload.callId as string, reason: "stack" });
         return;
       }
       useLanCallStore.setState({
@@ -390,6 +408,12 @@ async function handleSignal(sig: LanSignal) {
         session = null;
         store.screenStream?.getTracks().forEach((t) => t.stop());
         useLanCallStore.setState({ callId: null, status: "ended", localStream: null, screenStream: null, screenOn: false, remotes: {} });
+        // Surface a cross-stack rejection clearly (plan option b).
+        if (type === "call-reject" && payload.reason === "stack") {
+          useLanCallStore.setState({
+            callError: "对方平台使用不同的通话引擎(Windows/macOS WebRTC 与 Linux 原生互不兼容),暂无法通话。",
+          });
+        }
       }
       break;
     }
@@ -410,10 +434,13 @@ async function handleSignal(sig: LanSignal) {
     }
     case "meeting-join": {
       const meetingId = payload.meetingId as string;
+      // Cross-stack guard: only mesh with peers on the same media stack.
+      const peerStack = payload.stack as string | undefined;
+      const compatible = !peerStack || peerStack === localMediaStack();
       if (store.callId === meetingId) {
-        // Already in this meeting: connect to the (new) member.
-        session?.connect(from);
-      } else if (!store.callId && !store.incoming) {
+        // Already in this meeting: connect to the (new) compatible member.
+        if (compatible) session?.connect(from);
+      } else if (!store.callId && !store.incoming && compatible) {
         useLanCallStore.setState({
           incoming: {
             callId: meetingId,
