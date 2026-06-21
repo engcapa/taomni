@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Minus, Search, Users, X } from "lucide-react";
+import { Hash, MessageCircle, Minus, Search, Users, X } from "lucide-react";
 
-import { useLanChatStore } from "../../stores/lanChatStore";
+import { useLanChatStore, type LanEdgeSide } from "../../stores/lanChatStore";
 import type { LanConversation, LanGroup, LanPeer } from "../../types";
 import { Avatar } from "./Avatar";
 import { MessageInput } from "./MessageInput";
 import { MessageThread } from "./MessageThread";
-import { RosterList } from "./RosterList";
+import { RosterList, type MemberStatusFilter } from "./RosterList";
 import { TransferTrayButton } from "./TransferPanel";
 import { useActiveHeader } from "./LanChatPanel";
 
@@ -14,9 +14,22 @@ import { useActiveHeader } from "./LanChatPanel";
 const DOCK_W = 380;
 const DOCK_H = 340;
 /** Peek-tab thickness. */
-const PEEK = 34;
+const PEEK = 28;
 /** Compact roster ribbon width inside the drawer. */
 const RIBBON_W = 46;
+
+function nearestEdgeSide(clientX: number, clientY: number): LanEdgeSide {
+  const width = window.innerWidth || 1;
+  const height = window.innerHeight || 1;
+  const distances: Array<[LanEdgeSide, number]> = [
+    ["left", clientX],
+    ["right", width - clientX],
+    ["top", clientY],
+    ["bottom", height - clientY],
+  ];
+  distances.sort((a, b) => a[1] - b[1]);
+  return distances[0][0];
+}
 
 /** Resolve a conversation to display fields for the quick-switch ribbon. */
 function convDisplay(conv: LanConversation, roster: LanPeer[], groups: LanGroup[]) {
@@ -45,6 +58,7 @@ export function EdgeDrawer() {
   const side = useLanChatStore((s) => s.edgeDock);
   const open = useLanChatStore((s) => s.edgeOpen);
   const setEdgeOpen = useLanChatStore((s) => s.setEdgeOpen);
+  const openEdgeDock = useLanChatStore((s) => s.openEdgeDock);
   const closeEdgeDock = useLanChatStore((s) => s.closeEdgeDock);
   const activeConvId = useLanChatStore((s) => s.activeConvId);
   const profile = useLanChatStore((s) => s.profile);
@@ -58,6 +72,9 @@ export function EdgeDrawer() {
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>("active");
+  const peekDragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const [peekDragPoint, setPeekDragPoint] = useState<{ x: number; y: number } | null>(null);
 
   // Esc closes the roster overlay first, then undocks (MainLayout restores tab).
   useEffect(() => {
@@ -100,11 +117,23 @@ export function EdgeDrawer() {
   };
 
   const peekStyle: Record<typeof side, React.CSSProperties> = {
-    left: { left: 0, top: "50%", transform: "translateY(-50%)", writingMode: "vertical-rl", width: PEEK, height: 120, borderRadius: "0 10px 10px 0" },
-    right: { right: 0, top: "50%", transform: "translateY(-50%)", writingMode: "vertical-rl", width: PEEK, height: 120, borderRadius: "10px 0 0 10px" },
-    top: { top: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 150, borderRadius: "0 0 10px 10px" },
-    bottom: { bottom: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 150, borderRadius: "10px 10px 0 0" },
+    left: { left: 0, top: "50%", transform: "translateY(-50%)", width: PEEK, height: 88, borderRadius: "0 8px 8px 0" },
+    right: { right: 0, top: "50%", transform: "translateY(-50%)", width: PEEK, height: 88, borderRadius: "8px 0 0 8px" },
+    top: { top: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 104, borderRadius: "0 0 8px 8px" },
+    bottom: { bottom: 0, left: "50%", transform: "translateX(-50%)", height: PEEK, width: 104, borderRadius: "8px 8px 0 0" },
   };
+  const peekDragging = peekDragPoint !== null;
+  const peekVertical = side === "left" || side === "right";
+  const activePeekStyle: React.CSSProperties = peekDragging
+    ? {
+        left: peekDragPoint!.x,
+        top: peekDragPoint!.y,
+        transform: "translate(-50%, -50%)",
+        width: 96,
+        height: PEEK,
+        borderRadius: 8,
+      }
+    : peekStyle[side];
 
   // Auto-hide on pointer leave (QQ behaviour); cancel if the pointer returns.
   const onLeave = () => {
@@ -119,6 +148,32 @@ export function EdgeDrawer() {
   const openRoster = (seg: "members" | "groups") => {
     setSegment(seg);
     setRosterOpen(true);
+  };
+
+  const onPeekPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    peekDragRef.current = { x: event.clientX, y: event.clientY, moved: false };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const onPeekPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = peekDragRef.current;
+    if (!drag) return;
+    if (Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y) > 6) {
+      drag.moved = true;
+      setPeekDragPoint({ x: event.clientX, y: event.clientY });
+    }
+  };
+  const onPeekPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = peekDragRef.current;
+    peekDragRef.current = null;
+    setPeekDragPoint(null);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (drag?.moved) {
+      openEdgeDock(nearestEdgeSide(event.clientX, event.clientY));
+      setEdgeOpen(false);
+      return;
+    }
+    setEdgeOpen(true);
   };
 
   return (
@@ -264,7 +319,12 @@ export function EdgeDrawer() {
                   style={{ border: "1px solid var(--taomni-input-border)", background: "var(--taomni-input-bg)", color: "var(--taomni-text)" }}
                 />
               </div>
-              <RosterList search={search} onSelect={() => setRosterOpen(false)} />
+              {segment === "members" ? (
+                <div className="mx-2 mb-1">
+                  <DrawerStatusFilter value={statusFilter} onChange={setStatusFilter} />
+                </div>
+              ) : null}
+              <RosterList search={search} statusFilter={statusFilter} onSelect={() => setRosterOpen(false)} />
             </div>
           ) : null}
 
@@ -272,9 +332,20 @@ export function EdgeDrawer() {
 
       </div>
 
-      <div
-        onClick={() => setEdgeOpen(true)}
+      <button
+        type="button"
         title="点击展开内网通讯抽屉"
+        aria-label="展开内网通讯抽屉，拖动可更换停靠边"
+        onPointerDown={onPeekPointerDown}
+        onPointerMove={onPeekPointerMove}
+        onPointerUp={onPeekPointerUp}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setEdgeOpen(true);
+          }
+        }}
+        className="select-none border-0 p-0"
         style={{
           position: "fixed",
           zIndex: 161,
@@ -288,12 +359,45 @@ export function EdgeDrawer() {
           fontWeight: 600,
           background: "linear-gradient(135deg,var(--taomni-accent-soft),var(--taomni-accent))",
           boxShadow: "var(--taomni-shadow-md)",
-          ...peekStyle[side],
+          flexDirection: peekVertical && !peekDragging ? "column" : "row",
+          fontSize: 10,
+          touchAction: "none",
+          ...activePeekStyle,
         }}
       >
-        💬 内网通讯
-      </div>
+        <MessageCircle className="h-3.5 w-3.5 flex-none" />
+        <span>{peekVertical && !peekDragging ? "LAN" : "内网"}</span>
+      </button>
     </>
+  );
+}
+
+function DrawerStatusFilter({
+  value,
+  onChange,
+}: {
+  value: MemberStatusFilter;
+  onChange: (value: MemberStatusFilter) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as MemberStatusFilter)}
+      title="按状态过滤成员"
+      className="h-[24px] w-full rounded-md px-2 text-[11px] outline-none"
+      style={{
+        border: "1px solid var(--taomni-input-border)",
+        background: "var(--taomni-input-bg)",
+        color: "var(--taomni-text-muted)",
+      }}
+    >
+      <option value="active">隐藏离线</option>
+      <option value="all">全部成员</option>
+      <option value="online">仅在线</option>
+      <option value="away">仅离开</option>
+      <option value="busy">仅忙碌</option>
+      <option value="offline">仅离线</option>
+    </select>
   );
 }
 

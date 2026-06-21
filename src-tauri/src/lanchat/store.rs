@@ -489,6 +489,32 @@ impl LanChatStore {
         Ok(())
     }
 
+    /// Load every cached peer, including offline peers kept for display names
+    /// and last-seen history.
+    pub fn list_peers(&self) -> rusqlite::Result<Vec<PeerRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, avatar_hash, signature, last_seen, status, addr, port
+             FROM peers
+             ORDER BY lower(name), last_seen DESC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let status_str: String = r.get(5)?;
+            let port_val: Option<i64> = r.get(7)?;
+            Ok(PeerRecord {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                avatar_hash: r.get(2)?,
+                signature: r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                last_seen: r.get(4)?,
+                status: PresenceStatus::from_txt(&status_str),
+                addr: r.get(6)?,
+                port: port_val.and_then(|v| u16::try_from(v).ok()),
+            })
+        })?;
+        rows.collect()
+    }
+
     /// Load peers seen within `since_ms` milliseconds, with known addr+port.
     /// Used at startup to attempt reconnection to previously known peers.
     pub fn list_recent_peers(&self, since_ms: i64) -> Vec<PeerRecord> {
@@ -1256,5 +1282,29 @@ mod tests {
         assert_eq!(recent[0].id, "p1");
         assert_eq!(recent[0].addr.as_deref(), Some("192.168.1.10"));
         assert_eq!(recent[0].port, Some(4711));
+    }
+
+    #[test]
+    fn list_peers_keeps_cached_offline_names() {
+        let store = LanChatStore::open_in_memory().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        store
+            .store_peer(&PeerRecord {
+                id: "peer-offline".into(),
+                name: "周哲".into(),
+                avatar_hash: None,
+                signature: String::new(),
+                status: PresenceStatus::Online,
+                last_seen: now,
+                addr: Some("192.168.1.55".into()),
+                port: Some(4711),
+            })
+            .unwrap();
+        store.mark_peer_offline("peer-offline").unwrap();
+
+        let peers = store.list_peers().unwrap();
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].name, "周哲");
+        assert_eq!(peers[0].status, PresenceStatus::Offline);
     }
 }

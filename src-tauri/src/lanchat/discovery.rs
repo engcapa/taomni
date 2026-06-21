@@ -195,7 +195,19 @@ fn peer_from_resolved(resolved: &mdns_sd::ResolvedService, my_id: &str) -> Optio
 /// transport can re-emit when it learns a peer from a connection (rather than
 /// from mDNS).
 pub async fn emit_roster(app: &AppHandle, state: &LanChatState) {
-    let mut roster: Vec<PeerRecord> = state.peers.read().await.values().cloned().collect();
+    let mut by_id = std::collections::HashMap::new();
+    match state.store.list_peers() {
+        Ok(cached) => {
+            for peer in cached {
+                by_id.insert(peer.id.clone(), peer);
+            }
+        }
+        Err(e) => log::debug!("lanchat: load cached peers for roster failed: {e}"),
+    }
+    for peer in state.peers.read().await.values().cloned() {
+        by_id.insert(peer.id.clone(), peer);
+    }
+    let mut roster: Vec<PeerRecord> = by_id.into_values().collect();
     roster.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     if let Err(e) = app.emit(events::ROSTER, &roster) {
         log::warn!("lanchat: emit roster failed: {e}");

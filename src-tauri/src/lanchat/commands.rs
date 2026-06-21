@@ -41,12 +41,20 @@ pub async fn lanchat_status(state: State<'_, AppState>) -> Result<LanChatStatus,
     })
 }
 
-/// Current discovered peers (live roster snapshot). Lets a freshly-opened or
-/// detached window populate immediately instead of waiting for the next
-/// debounced roster event.
+/// Current roster: live peers plus cached offline peers so historical chats can
+/// still display the last known name.
 #[tauri::command]
 pub async fn lanchat_list_peers(state: State<'_, AppState>) -> Result<Vec<PeerRecord>, String> {
-    Ok(state.lanchat.peers.read().await.values().cloned().collect())
+    let mut by_id = std::collections::HashMap::new();
+    for peer in state.lanchat.store.list_peers().map_err(|e| e.to_string())? {
+        by_id.insert(peer.id.clone(), peer);
+    }
+    for peer in state.lanchat.peers.read().await.values().cloned() {
+        by_id.insert(peer.id.clone(), peer);
+    }
+    let mut roster: Vec<PeerRecord> = by_id.into_values().collect();
+    roster.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(roster)
 }
 
 /// Read this node's local profile.

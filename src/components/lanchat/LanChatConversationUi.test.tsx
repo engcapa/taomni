@@ -28,6 +28,16 @@ const peer = {
   port: 7777,
 };
 
+const offlinePeer = {
+  id: "peer-offline",
+  name: "周哲",
+  signature: "",
+  status: "offline" as const,
+  lastSeen: 2,
+  addr: null,
+  port: null,
+};
+
 function transfer(overrides: Partial<LanTransferProgress>): LanTransferProgress {
   return {
     transferId: "tx-1",
@@ -184,6 +194,26 @@ describe("LanChat conversation UI", () => {
     await waitFor(() => expect(textarea.value).toBe(""));
   });
 
+  it("hides offline members by default but keeps their last known names available", () => {
+    useLanChatStore.setState({
+      init: vi.fn(async () => undefined),
+      activeConvId: "direct:peer-1",
+      roster: [peer, offlinePeer],
+      conversations: [
+        { id: "direct:peer-1", kind: "direct", peerOrGroupId: "peer-1", lastMsgAt: 10, unread: 0 },
+        { id: "direct:peer-offline", kind: "direct", peerOrGroupId: "peer-offline", lastMsgAt: 8, unread: 0 },
+      ],
+    });
+
+    render(<LanChatPanel />);
+
+    expect(screen.getAllByText("赵敏").length).toBeGreaterThan(0);
+    expect(screen.queryByText("周哲")).toBeNull();
+
+    fireEvent.change(screen.getByTitle("按状态过滤成员"), { target: { value: "all" } });
+    expect(screen.getByText("周哲")).toBeInTheDocument();
+  });
+
   it("collapses the member panel into a ribbon and expands it again", () => {
     useLanChatStore.setState({
       init: vi.fn(async () => undefined),
@@ -203,6 +233,48 @@ describe("LanChat conversation UI", () => {
 
     fireEvent.click(screen.getByTestId("lanchat-roster-expand"));
     expect(screen.getByTestId("lanchat-roster-panel")).toBeInTheDocument();
+  });
+
+  it("keeps collapsed ribbon buttons clickable without starting dock drag", () => {
+    useLanChatStore.setState({
+      init: vi.fn(async () => undefined),
+      activeConvId: "direct:peer-1",
+      conversations: [
+        { id: "direct:peer-1", kind: "direct", peerOrGroupId: "peer-1", lastMsgAt: 1, unread: 0 },
+      ],
+    });
+
+    render(<LanChatPanel />);
+    fireEvent.click(screen.getByTestId("lanchat-roster-collapse"));
+
+    const expand = screen.getByTestId("lanchat-roster-expand");
+    fireEvent.pointerDown(expand, { button: 0, pointerId: 1, clientX: 36, clientY: 42 });
+    fireEvent.pointerMove(expand, { pointerId: 1, clientX: 2, clientY: 42 });
+    fireEvent.pointerUp(expand, { pointerId: 1, clientX: 2, clientY: 42 });
+    expect(useLanChatStore.getState().edgeDock).toBeNull();
+
+    fireEvent.click(expand);
+    expect(screen.getByTestId("lanchat-roster-panel")).toBeInTheDocument();
+  });
+
+  it("docks the collapsed ribbon to the nearest window edge when dragged", () => {
+    useLanChatStore.setState({
+      init: vi.fn(async () => undefined),
+      activeConvId: "direct:peer-1",
+      conversations: [
+        { id: "direct:peer-1", kind: "direct", peerOrGroupId: "peer-1", lastMsgAt: 1, unread: 0 },
+      ],
+    });
+
+    render(<LanChatPanel />);
+    fireEvent.click(screen.getByTestId("lanchat-roster-collapse"));
+
+    const ribbon = screen.getByTestId("lanchat-roster-ribbon");
+    fireEvent.pointerDown(ribbon, { button: 0, pointerId: 1, clientX: 80, clientY: 120 });
+    fireEvent.pointerMove(ribbon, { pointerId: 1, clientX: 4, clientY: 130 });
+    fireEvent.pointerUp(ribbon, { pointerId: 1, clientX: 4, clientY: 130 });
+
+    expect(useLanChatStore.getState().edgeDock).toBe("left");
   });
 
   it("resizes the member panel by dragging the conversation divider", () => {
