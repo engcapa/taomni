@@ -40,6 +40,53 @@ fn local_ipv4s() -> Vec<Ipv4Addr> {
         .collect()
 }
 
+/// Local IPv4 interfaces as (address, netmask) pairs (multi-NIC aware). Used to
+/// score which of a peer's advertised addresses is actually reachable from here.
+fn local_ipv4_subnets() -> Vec<(Ipv4Addr, Ipv4Addr)> {
+    if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|i| !i.is_loopback())
+        .filter_map(|i| match i.addr {
+            if_addrs::IfAddr::V4(v4) => Some((v4.ip, v4.netmask)),
+            if_addrs::IfAddr::V6(_) => None,
+        })
+        .collect()
+}
+
+/// Choose the advertised address most likely reachable from this host: prefer
+/// one whose subnet matches a local interface, else fall back to the first
+/// advertised address. Windows peers commonly advertise Hyper-V / WSL / VM
+/// virtual-adapter IPs (e.g. `172.x`, `192.168.56.x`) alongside their real LAN
+/// IP; picking the first arbitrarily (the old behaviour) frequently selected an
+/// unreachable one, so cross-subnet dials timed out and the peer looked online
+/// but unreachable. Returns `None` only when `candidates` is empty.
+fn pick_reachable_addr(candidates: &[Ipv4Addr]) -> Option<Ipv4Addr> {
+    pick_reachable_addr_among(candidates, &local_ipv4_subnets())
+}
+
+/// Pure core of [`pick_reachable_addr`], parameterized on the local interface
+/// (address, netmask) set so it is deterministically testable.
+fn pick_reachable_addr_among(
+    candidates: &[Ipv4Addr],
+    locals: &[(Ipv4Addr, Ipv4Addr)],
+) -> Option<Ipv4Addr> {
+    if candidates.is_empty() {
+        return None;
+    }
+    let same_subnet = |cand: &Ipv4Addr| {
+        locals.iter().any(|(lip, mask)| {
+            let m = u32::from(*mask);
+            m != 0 && (u32::from(*lip) & m) == (u32::from(*cand) & m)
+        })
+    };
+    candidates
+        .iter()
+        .find(|c| same_subnet(c))
+        .or_else(|| candidates.first())
+        .copied()
+}
+
 /// Build the `ServiceInfo` advertised for this node from its current profile.
 fn build_service_info(state: &LanChatState, control_port: u16) -> Result<ServiceInfo, String> {
     let profile = state
@@ -116,11 +163,12 @@ fn peer_from_resolved(resolved: &mdns_sd::ResolvedService, my_id: &str) -> Optio
         .get_property_val_str("name")
         .unwrap_or("")
         .to_string();
-    let addr = resolved
+    let v4s: Vec<Ipv4Addr> = resolved
         .get_addresses_v4()
         .iter()
-        .next()
-        .map(|ip| ip.to_string());
+        .filter_map(|ip| ip.to_string().parse().ok())
+        .collect();
+    let addr = pick_reachable_addr(&v4s).map(|ip| ip.to_string());
     let port = resolved
         .get_property_val_str("port")
         .and_then(|s| s.parse::<u16>().ok())
@@ -192,8 +240,20 @@ pub async fn run(app: AppHandle, state: Arc<LanChatState>, control_port: u16) {
             event = receiver.recv_async() => {
                 match event {
                     Ok(ServiceEvent::ServiceResolved(resolved)) => {
-                        if let Some(peer) = peer_from_resolved(&resolved, &my_id) {
+                        if let Some(mut peer) = peer_from_resolved(&resolved, &my_id) {
                             fullname_to_id.insert(resolved.get_fullname().to_string(), peer.id.clone());
+                            // If we already hold a live connection to this peer, its
+                            // current addr/port are proven reachable. Don't let an
+                            // mDNS re-resolve (which may now advertise a non-routable
+                            // virtual-adapter IP) overwrite them and break sends.
+                            if state.connections.read().await.contains_key(&peer.id) {
+                                if let Some(existing) = state.peers.read().await.get(&peer.id) {
+                                    if existing.addr.is_some() {
+                                        peer.addr = existing.addr.clone();
+                                        peer.port = existing.port;
+                                    }
+                                }
+                            }
                             let _ = state.store.store_peer(&peer);
                             state.peers.write().await.insert(peer.id.clone(), peer);
                             dirty = true;
@@ -234,6 +294,36 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let state = LanChatState::new(&dir);
         (dir, state)
+    }
+
+    #[test]
+    fn pick_reachable_addr_falls_back_and_handles_empty() {
+        // No candidates → None.
+        assert_eq!(pick_reachable_addr_among(&[], &[]), None);
+        // Candidates but no local-subnet info → first candidate (old behaviour,
+        // preserved as the fallback so a peer is never dropped).
+        let a: Ipv4Addr = "203.0.113.7".parse().unwrap();
+        let b: Ipv4Addr = "198.51.100.9".parse().unwrap();
+        assert_eq!(pick_reachable_addr_among(&[a, b], &[]), Some(a));
+    }
+
+    #[test]
+    fn pick_reachable_addr_prefers_same_subnet() {
+        // Local interface 192.168.1.50/24.
+        let locals = [(
+            "192.168.1.50".parse::<Ipv4Addr>().unwrap(),
+            "255.255.255.0".parse::<Ipv4Addr>().unwrap(),
+        )];
+        let lan: Ipv4Addr = "192.168.1.23".parse().unwrap(); // same /24 → reachable
+        let virt: Ipv4Addr = "172.27.96.1".parse().unwrap(); // WSL/Hyper-V style
+
+        // The same-subnet address wins even when the virtual one is advertised
+        // first (the old `.iter().next()` would have wrongly picked the virtual).
+        assert_eq!(pick_reachable_addr_among(&[virt, lan], &locals), Some(lan));
+        assert_eq!(pick_reachable_addr_among(&[lan, virt], &locals), Some(lan));
+        // With only an unreachable candidate, still return it (better than nothing;
+        // a later inbound connection corrects the address — see transport.rs).
+        assert_eq!(pick_reachable_addr_among(&[virt], &locals), Some(virt));
     }
 
     #[test]

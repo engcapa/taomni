@@ -458,9 +458,21 @@ pub async fn send(
         "manifest": manifest.to_json(), "kind": "file", "mime": mime,
         "convId": conv_id, "groupId": group_id, "members": members,
     });
+    let mut delivered = 0usize;
     for target in &targets {
         let env = Envelope::new(frame::SWARM_OFFER, &my_id, Some(target.clone()), payload.clone());
-        let _ = transport::send_to_peer(app, state, target, env).await;
+        match transport::send_to_peer(app, state, target, env).await {
+            Ok(()) => delivered += 1,
+            Err(e) => log::warn!("lanchat: swarm offer for {file_id} to {target} failed: {e}"),
+        }
+    }
+    // If the offer reached no one (peer offline / unreachable address / firewall),
+    // surface a terminal failure instead of leaving the sender stuck on a silent
+    // "offering" card, and drop the dead seed so it does not leak.
+    if delivered == 0 && !targets.is_empty() {
+        sf.emit(app, Some("failed")).await;
+        state.swarms.write().await.remove(&file_id);
+        return Err("could not reach any recipient (peer offline or unreachable)".into());
     }
     sf.emit(app, Some("offering")).await;
     Ok(file_id)

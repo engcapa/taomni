@@ -7,7 +7,8 @@
     "sftp-*",
     "rdp-*",
     "vnc-*",
-    "terminal-*"
+    "terminal-*",
+    "lan-chat-*"
   ],
   "permissions": [
     "core:default",

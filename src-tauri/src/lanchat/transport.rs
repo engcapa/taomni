@@ -12,7 +12,7 @@
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
@@ -58,6 +58,11 @@ fn new_codec() -> LengthDelimitedCodec {
     codec
 }
 
+/// Monotonic per-process connection id. Stamped onto every [`ConnHandle`] so the
+/// read loop's teardown only removes the map entry if it is still *its own*
+/// connection — a replaced/older socket closing later must not evict the live one.
+static CONN_SEQ: AtomicU64 = AtomicU64::new(1);
+
 /// A live connection to a peer: its id/address plus three outbound queues
 /// drained by the connection's write task — a small unbounded control queue
 /// (JSON envelopes), a bounded blocking binary-data queue (file pieces, the
@@ -66,6 +71,14 @@ fn new_codec() -> LengthDelimitedCodec {
 pub struct ConnHandle {
     pub peer_id: String,
     pub addr: SocketAddr,
+    /// Unique id for this physical connection (see [`CONN_SEQ`]).
+    conn_id: u64,
+    /// True if we dialed this connection, false if we accepted it. Drives the
+    /// deterministic glare tie-break when both peers connect simultaneously.
+    outbound: bool,
+    /// Signals the connection's read loop to tear down (used when a duplicate
+    /// connection deterministically replaces this one).
+    close: Arc<Notify>,
     control_tx: mpsc::UnboundedSender<Envelope>,
     data_tx: mpsc::Sender<bytes::Bytes>,
     /// Drop-oldest media queue + its wake signal (see [`MediaQueue`]). Read by
@@ -358,6 +371,27 @@ async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     }
 }
 
+/// Deterministic glare tie-break: should a newly-established connection replace
+/// the existing one to the same peer? Both ends compute this identically, so
+/// they keep the *same* physical connection when they dialed each other at once.
+///
+/// Rule: keep the connection dialed by the peer with the smaller node id. A
+/// same-direction duplicate (e.g. two outbound dials racing) is always redundant
+/// — keep the existing one. For the opposite-direction glare pair, exactly one
+/// connection was dialed by the min-id peer; that is the one both ends keep.
+fn duplicate_replaces_existing(
+    new_outbound: bool,
+    existing_outbound: bool,
+    my_id: &str,
+    peer_id: &str,
+) -> bool {
+    if new_outbound == existing_outbound {
+        return false;
+    }
+    let new_dialer_id = if new_outbound { my_id } else { peer_id };
+    new_dialer_id == std::cmp::min(my_id, peer_id)
+}
+
 /// Learn / refresh a peer from a freshly established connection. Peers that
 /// mDNS never resolved (cross-segment Wi-Fi, multicast-pruned networks) are
 /// synthesized from the connection's source IP + the `hello` identity so they
@@ -374,15 +408,21 @@ async fn learn_peer_from_conn(
     let mut peers = state.peers.write().await;
     match peers.get_mut(peer_id) {
         Some(existing) => {
-            // Already known (typically from mDNS). Keep it fresh and backfill
-            // any missing reach info without forcing a roster churn.
+            // Already known (typically from mDNS). A live connection's remote IP
+            // is proven reachable, so adopt it: this corrects a stale or
+            // non-routable address that mDNS may have seeded (e.g. a Windows
+            // Hyper-V/WSL/VM virtual-adapter IP) and is the only way a peer we
+            // could never dial first (we only ever accepted from it) becomes
+            // dial-able. The listening port comes from the peer's hello — the
+            // socket's source port is ephemeral — so only override it when the
+            // hello carried one. Persist so historic reconnect uses the good
+            // address across restarts.
             existing.last_seen = now;
-            if existing.addr.is_none() {
-                existing.addr = Some(ip);
+            existing.addr = Some(ip);
+            if let Some(p) = hello.port {
+                existing.port = Some(p);
             }
-            if existing.port.is_none() {
-                existing.port = hello.port;
-            }
+            let _ = state.store.store_peer(existing);
             false
         }
         None => {
@@ -555,12 +595,6 @@ async fn setup_connection(
         }
     }
 
-    // Single connection per peer: keep the existing one, drop this duplicate.
-    if state.connections.read().await.contains_key(&peer_id) {
-        log::debug!("lanchat: duplicate connection to {peer_id} dropped");
-        return Ok(());
-    }
-
     // Trust-on-first-use pin (audit + defense in depth): record the cert on first
     // sight, block if a previously pinned cert ever changes. The latter is
     // structurally unreachable while the id==fingerprint check above holds, so a
@@ -588,17 +622,45 @@ async fn setup_connection(
     let (tx, mut rx) = mpsc::unbounded_channel::<Envelope>();
     let (data_tx, mut data_rx) = mpsc::channel::<bytes::Bytes>(DATA_QUEUE_CAP);
     let media = Arc::new(MediaQueue::new());
+    let close = Arc::new(Notify::new());
+    let outbound = expected.is_some();
+    let conn_id = CONN_SEQ.fetch_add(1, Ordering::Relaxed);
 
-    state.connections.write().await.insert(
-        peer_id.clone(),
-        ConnHandle {
-            peer_id: peer_id.clone(),
-            addr,
-            control_tx: tx.clone(),
-            data_tx,
-            media: media.clone(),
-        },
-    );
+    // Single connection per peer, decided atomically. When both peers dial each
+    // other at once ("glare"), each side must independently keep the *same* one
+    // of the two connections or both tear down and chat silently breaks. The whole
+    // check+insert holds the write lock so two concurrent setups can't both
+    // register (and then evict each other on close).
+    let handle = ConnHandle {
+        peer_id: peer_id.clone(),
+        addr,
+        conn_id,
+        outbound,
+        close: close.clone(),
+        control_tx: tx.clone(),
+        data_tx,
+        media: media.clone(),
+    };
+    let displaced = {
+        let mut conns = state.connections.write().await;
+        let old = match conns.get(&peer_id) {
+            Some(existing) => {
+                if !duplicate_replaces_existing(outbound, existing.outbound, &my_id, &peer_id) {
+                    log::debug!("lanchat: duplicate connection to {peer_id} dropped (kept existing)");
+                    return Ok(());
+                }
+                Some(existing.close.clone())
+            }
+            None => None,
+        };
+        conns.insert(peer_id.clone(), handle);
+        old
+    };
+    // Tell the displaced connection's read loop to tear down. Its teardown is
+    // conn_id-guarded, so it won't evict the entry we just inserted.
+    if let Some(old_close) = displaced {
+        old_close.notify_one();
+    }
     log::info!("lanchat: connected to {peer_id} ({addr})");
 
     // Gossip: share our known peers so the new connection can discover nodes
@@ -687,10 +749,20 @@ async fn setup_connection(
         }
     });
 
-    // Read loop owns teardown: on disconnect it removes the connection and
-    // aborts the write + ping tasks.
+    // Read loop owns teardown: on disconnect (or when displaced by a duplicate)
+    // it removes the connection and aborts the write + ping tasks.
     tokio::spawn(async move {
-        while let Some(frame_res) = read.next().await {
+        loop {
+            let frame_res = tokio::select! {
+                biased;
+                // Displaced by a deterministically-preferred duplicate: stop now
+                // so we drop our socket without evicting the replacement.
+                _ = close.notified() => break,
+                f = read.next() => match f {
+                    Some(f) => f,
+                    None => break,
+                },
+            };
             let buf = match frame_res {
                 Ok(b) => b,
                 Err(e) => {
@@ -711,7 +783,15 @@ async fn setup_connection(
                 None => log::debug!("lanchat: bad/unknown frame from {peer_id}"),
             }
         }
-        state.connections.write().await.remove(&peer_id);
+        // Only evict the map entry if it is still *this* connection: a duplicate
+        // may have deterministically replaced us, and a stale socket closing must
+        // not remove the live replacement.
+        {
+            let mut conns = state.connections.write().await;
+            if conns.get(&peer_id).map(|h| h.conn_id) == Some(conn_id) {
+                conns.remove(&peer_id);
+            }
+        }
         ping_task.abort();
         write_task.abort();
         log::info!("lanchat: disconnected from {peer_id}");
@@ -826,6 +906,32 @@ async fn dispatch_inbound(
 mod tests {
     use super::*;
     use tokio::net::TcpListener;
+
+    #[test]
+    fn glare_tie_break_keeps_same_connection_on_both_ends() {
+        // Two peers, lexically "aaa" < "bbb". Glare creates two connections:
+        // X dialed by "aaa" (inbound on "bbb"), Y dialed by "bbb" (inbound on "aaa").
+        // Whatever the local registration order, both ends must keep the *same*
+        // physical connection — the one dialed by the min id ("aaa", via X).
+        let (lo, hi) = ("aaa", "bbb");
+        // On lo's side (my=lo, peer=hi): X is outbound, Y is inbound.
+        assert!(duplicate_replaces_existing(true, false, lo, hi), "lo: X replaces existing Y");
+        assert!(!duplicate_replaces_existing(false, true, lo, hi), "lo: Y dropped, keep X");
+        // On hi's side (my=hi, peer=lo): X is inbound, Y is outbound.
+        assert!(duplicate_replaces_existing(false, true, hi, lo), "hi: X replaces existing Y");
+        assert!(!duplicate_replaces_existing(true, false, hi, lo), "hi: Y dropped, keep X");
+        // Both ends converge on X (the connection dialed by the min id).
+    }
+
+    #[test]
+    fn same_direction_duplicate_never_replaces() {
+        // A redundant dial in the same direction is always dropped, regardless of
+        // ids — only the opposite-direction glare pair triggers a replacement.
+        for (a, b) in [("aaa", "bbb"), ("bbb", "aaa")] {
+            assert!(!duplicate_replaces_existing(true, true, a, b));
+            assert!(!duplicate_replaces_existing(false, false, a, b));
+        }
+    }
 
     #[test]
     fn media_queue_is_drop_oldest_and_bounded() {
