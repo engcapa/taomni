@@ -56,6 +56,25 @@ function App() {
     return () => window.removeEventListener("contextmenu", suppressNativeMenu, { capture: true });
   }, []);
 
+  // Production builds: also block the WebView's reload shortcuts (F5 and
+  // Ctrl/Cmd+R, including their Shift hard-reload variants). Like the native
+  // Reload menu item, these reload the whole webview and tear down every live
+  // session. We only preventDefault (never stopPropagation), so components that
+  // legitimately use these keys still receive them: F5 still runs a query in
+  // the SQL editor, Ctrl+R still reaches the terminal (bash reverse-search) and
+  // RDP/VNC viewers forward the keys to the remote.
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    const blockReloadKeys = (event: KeyboardEvent) => {
+      const isReload =
+        event.key === "F5" ||
+        ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "r");
+      if (isReload) event.preventDefault();
+    };
+    window.addEventListener("keydown", blockReloadKeys, { capture: true });
+    return () => window.removeEventListener("keydown", blockReloadKeys, { capture: true });
+  }, []);
+
   // Mirror the transfer queue across same-origin windows so a user can see
   // the same uploads/downloads from both the main app and a detached SFTP
   // window. The cleanup tears the channel down on hot-reload too.
