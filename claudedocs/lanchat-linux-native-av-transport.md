@@ -1,6 +1,6 @@
 # LanChat Linux 原生 A/V 传输方案(绕过 WebRTC)
 
-> 状态:计划 / 待评审。本文承接 LanChat 任务 03(WebRTC 音视频会议),专门解决 **Linux WebKitGTK 不提供 `RTCPeerConnection`** 导致语音/视频/屏幕共享在 Linux 上完全不可用的问题。
+> 状态:**已实现(v1,待真机联调)**。分支 `feat/lanchat-linux-native-av`。本文承接 LanChat 任务 03(WebRTC 音视频会议),专门解决 **Linux WebKitGTK 不提供 `RTCPeerConnection`** 导致语音/视频/屏幕共享在 Linux 上完全不可用的问题。实施状态与对计划的偏离见文末「§12 实施状态」。
 
 ## 1. 背景与根因(已确认)
 
@@ -148,3 +148,24 @@ lanCallStore
 - 根因与诊断:memory `webkitgtk-linux-webrtc-unavailable`;分支 `fix/lanchat-linux-webrtc-diagnostics`(`src-tauri/src/lib.rs` 读回日志)。
 - 原 WebRTC 方案:`lanchat-av-meeting-03.md`(Win/mac 仍沿用)。
 - **截图(独立、不依赖 WebRTC,可立即做)**:LanChat 截图发送走 LAN TCP 控制通道,只需在发布构建启用 `screen-capture`(xcap)feature 即可在 X11 下工作(无需 portal);`getDisplayMedia` 在无 ScreenCast portal 的 X11 失败。详见根因 memory。
+
+## 12. 实施状态(2026-06-20)
+
+分支 `feat/lanchat-linux-native-av`,分阶段提交,每段 `cargo check`(default + `native-av`)+ `tsc` + 单测均过。**真机两端联调未做(headless 环境无法采集/播放/双机)**,以下功能均为「编译/类型/单测通过,待真机验证」。
+
+**已完成**
+- **阶段 1**:`MediaSession` 抽象(`src/lib/mediaSession.ts`)+ 运行时选栈(`hasWebRtc()`)。`WebRtcSession`(原 `lanRtc`,Win/mac 行为不变)/ `NativeSession`(新)。后端 v4 wire:`TAG_MEDIA` 帧 + `frame_media` + transport 独立 **drop-oldest** 媒体队列(`send_media`,优先级 control>media>file)+ `media_sessions` 状态 + `lanchat/media/{mod,relay}.rs`(每通话 loopback WS,仿 `vnc/ws.rs`)+ `nmedia_*` 命令。
+- **阶段 2(语音 MVP)**:`media/audio.rs` —— cpal 采集(独立线程)→ 48k 单声道重采样 → 20ms Opus 编码(audiopus)→ mesh;收端 Opus 解码 → loopback WS PCM → webview `AudioBufferSourceNode` 排程播放(复用 RdpPanel 的 WebKitGTK 可行范式,**非 AudioWorklet**)。mic 开关驱动 Rust 编码。
+- **阶段 3(屏幕共享)**:`media/video.rs` —— 复用 RDP X11 capturer(`servers/rdp/capture`,已改 `pub(crate)`)→ tight BGRA → openh264 软编(12fps,周期/入会关键帧)→ mesh;收端解码 → RGBA → WS → `<canvas>` `putImageData`。
+- **阶段 4(摄像头)**:nokhwa(v4l2)→ RGB → openh264 → mesh,复用阶段 3 收端路径;`kind:"video"` 原生通话自动开摄像头。
+- **阶段 5(多人 mesh)**:每对端独立编码/解码/canvas(架构天然支持);说话人高亮改用后端 RMS 电平上报(原生无 MediaStream);性能护栏文案原生 ≤6 人。
+- **阶段 6**:跨栈不兼容检测(**采用风险#1 默认 (b)**:呼叫帧带 `stack` 标签,native↔webrtc 1:1 自动拒接并明确提示,会议跳过异栈成员);CI(`release.yml`)Linux 构建启用 `native-av` + 安装 `nasm`/`libasound2-dev`/`libv4l-dev`;挂断释放设备路径(`session.stop()` → 停 cpal/X11/nokhwa 采集 + 关 relay)。
+
+**对计划的偏离 / 取舍(已确认或务实决定)**
+- **编解码后端**:用户拍板用计划的自带 crate(`openh264` + `audiopus`),**非系统 ffmpeg**(本机虽装有 libav*)。`openh264` 软编需 `nasm`。
+- **音频播放**:用 RDP 已验证的 `AudioBufferSourceNode` 排程(WebKitGTK 可行),替代计划写的 AudioWorklet —— 更低风险、复用既有范式。
+- **AEC/降噪:仍是 v1 缺口**(计划标记高风险)。当前无回声消除,**外放会啸叫,建议戴耳机**;后续可评估 `speexdsp`/`webrtc-audio-processing`。
+- **本地自预览(摄像头)**:原生栈未做本地预览(v4l2 不可被 getUserMedia 与 nokhwa 同时打开),自己的画面格显示头像;对端能看到你的摄像头。后续可由 Rust 把本地帧回环到 self canvas。
+- **视频走 loopback WS 传原始 RGBA**:全屏 RGBA 帧较大(1080p≈8MB/帧),loopback 可承受但偏重;后续可降分辨率/重编码优化(计划已列为未来项)。
+
+**真机联调清单(下一步)**:两台 Linux 局域网 —— 1:1 语音(延迟/回声)、屏幕共享(实时性)、摄像头(音视频同步)、3+ 人 mesh(CPU/上限)、挂断后设备释放、Linux↔Win/mac 跨栈拒接提示。
