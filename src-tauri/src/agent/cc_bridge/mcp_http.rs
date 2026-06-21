@@ -257,6 +257,18 @@ fn deny_result(message: impl Into<String>) -> CallToolResult {
     CallToolResult::success(vec![Content::text(deny_json(message))])
 }
 
+/// CC names MCP tools as `mcp__<server>__<tool>` when it asks the
+/// `--permission-prompt-tool` for a decision. Strip that prefix so the call is
+/// graded against Taomni's bare tool vocabulary (`run_in_terminal`, …) — the
+/// same names `is_write_tool` / `check_tool_call` recognize. CC's own built-in
+/// tools (`Bash`, `Edit`, …) arrive unprefixed and pass through unchanged.
+fn normalize_tool_name(name: &str) -> &str {
+    name.strip_prefix("mcp__")
+        .and_then(|rest| rest.split_once("__"))
+        .map(|(_server, tool)| tool)
+        .unwrap_or(name)
+}
+
 /// Enforce that any `session_id` named in a tool call is the one this token is
 /// bound to. Tokens with no bound session may not touch a session at all.
 fn enforce_session_scope(scope: &TokenScope, args: &serde_json::Value) -> Result<(), String> {
@@ -326,8 +338,8 @@ impl CcHandler {
         let _ = self.app.emit(
             "agent-cc-tool",
             serde_json::json!({
-                "call_id": call_id,
-                "thread_id": scope.thread_id,
+                "callId": call_id,
+                "threadId": scope.thread_id,
                 "tool": tool,
                 "args": args,
             }),
@@ -371,8 +383,8 @@ impl CcHandler {
         let _ = self.app.emit(
             "agent-cc-permission",
             serde_json::json!({
-                "call_id": call_id,
-                "thread_id": scope.thread_id,
+                "callId": call_id,
+                "threadId": scope.thread_id,
                 "tool": tool,
                 "args": input,
                 "trust": scope.trust.as_str(),
@@ -451,12 +463,30 @@ struct SaveAsRunbookParams {
 #[derive(Deserialize, schemars::JsonSchema)]
 struct PermissionParams {
     tool_name: String,
-    #[serde(default)]
+    // Claude Code's permission-prompt protocol sends the requested tool's input
+    // under `input`. Accept `tool_input` as an alias for forward/back-compat.
+    // Without this the field silently defaulted to `Null`, so we emitted
+    // `args: null` to the UI and handed CC back `updatedInput: null`.
+    #[serde(default, alias = "input")]
     tool_input: serde_json::Value,
 }
 
 fn as_value<T: serde::Serialize>(p: &T) -> serde_json::Value {
     serde_json::to_value(p).unwrap_or(serde_json::Value::Null)
+}
+
+/// CC usually omits `session_id` — it doesn't know the thread's bound session.
+/// Fill it from the token scope so the effect targets the linked terminal and
+/// the session-scope check passes. No-op when the arg is already present or the
+/// thread is global (no bound session).
+fn fill_session_id(args: &mut serde_json::Value, scope: &TokenScope) {
+    let present = args.get("session_id").and_then(|v| v.as_str()).is_some();
+    if present {
+        return;
+    }
+    if let (Some(sid), Some(obj)) = (scope.allowed_session_id.clone(), args.as_object_mut()) {
+        obj.insert("session_id".into(), serde_json::Value::String(sid));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -529,7 +559,8 @@ impl CcHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        let args = as_value(&p);
+        let mut args = as_value(&p);
+        fill_session_id(&mut args, &scope);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
         self.dispatch_side_effect(&scope, "read_terminal_tail", args).await
     }
@@ -541,7 +572,8 @@ impl CcHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        let args = as_value(&p);
+        let mut args = as_value(&p);
+        fill_session_id(&mut args, &scope);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
         // Defense in depth: re-run the blacklist even though permission_prompt
         // already did (CC may have an allowlist that skips the prompt).
@@ -607,13 +639,16 @@ impl CcHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
 
+        // CC sends MCP tools as `mcp__taomni__<tool>`; grade the bare name.
+        let tool_name = normalize_tool_name(&p.tool_name).to_string();
+
         // 1. Session/thread scope.
         if let Err(reason) = enforce_session_scope(&scope, &p.tool_input) {
             return Ok(deny_result(reason));
         }
         // 2. Blacklist / sensitive-path deny-list.
         let call = ToolCall {
-            tool: p.tool_name.clone(),
+            tool: tool_name.clone(),
             args: p.tool_input.clone(),
         };
         if let Err(reason) = crate::agent::safety::check_tool_call(&call) {
@@ -631,21 +666,21 @@ impl CcHandler {
             .session_approved
             .lock()
             .unwrap()
-            .contains(&p.tool_name);
+            .contains(&tool_name);
         let needs_confirm =
-            crate::agent::safety::requires_confirmation(&p.tool_name) && !already;
+            crate::agent::safety::requires_confirmation(&tool_name) && !already;
         if !needs_confirm {
             return Ok(allow_result(&p.tool_input));
         }
         // 5. Human-in-the-loop.
-        match self.await_permission(&scope, &p.tool_name, &p.tool_input).await {
+        match self.await_permission(&scope, &tool_name, &p.tool_input).await {
             CcPermissionDecision::Allow => Ok(allow_result(&p.tool_input)),
             CcPermissionDecision::AllowSession => {
                 scope
                     .session_approved
                     .lock()
                     .unwrap()
-                    .insert(p.tool_name.clone());
+                    .insert(tool_name.clone());
                 Ok(allow_result(&p.tool_input))
             }
             CcPermissionDecision::Deny => Ok(deny_result("denied by user")),
@@ -718,6 +753,74 @@ mod tests {
             serde_json::from_str(&deny_json("blocked: rm -rf /")).unwrap();
         assert_eq!(parsed["behavior"], "deny");
         assert_eq!(parsed["message"], "blocked: rm -rf /");
+    }
+
+    #[test]
+    fn normalize_strips_mcp_prefix() {
+        // CC sends our tools prefixed; grading must see the bare name so
+        // `requires_confirmation` recognizes the write tool and fires a card.
+        assert_eq!(
+            normalize_tool_name("mcp__taomni__run_in_terminal"),
+            "run_in_terminal"
+        );
+        assert!(crate::agent::safety::requires_confirmation(normalize_tool_name(
+            "mcp__taomni__run_in_terminal"
+        )));
+    }
+
+    #[test]
+    fn normalize_leaves_builtin_tools_untouched() {
+        assert_eq!(normalize_tool_name("Bash"), "Bash");
+        assert_eq!(normalize_tool_name("Edit"), "Edit");
+    }
+
+    #[test]
+    fn permission_params_reads_cc_input_field() {
+        // CC's permission-prompt protocol sends the requested tool's args under
+        // `input`. If we only accept `tool_input` the field defaults to Null and
+        // we emit `args: null` (crashing the UI card) + hand CC `updatedInput: null`.
+        let p: PermissionParams = serde_json::from_value(json!({
+            "tool_name": "mcp__taomni__run_in_terminal",
+            "input": { "command": "uname -a" }
+        }))
+        .unwrap();
+        assert_eq!(p.tool_input["command"], "uname -a");
+    }
+
+    #[test]
+    fn permission_params_still_reads_tool_input_alias() {
+        let p: PermissionParams = serde_json::from_value(json!({
+            "tool_name": "Bash",
+            "tool_input": { "command": "ls" }
+        }))
+        .unwrap();
+        assert_eq!(p.tool_input["command"], "ls");
+    }
+
+    #[test]
+    fn fill_session_id_uses_bound_session_when_omitted() {
+        let s = scope("t1", Some("sess-a"));
+        let mut args = json!({ "command": "uname -a" });
+        fill_session_id(&mut args, &s);
+        assert_eq!(args["session_id"], "sess-a");
+        // And the scope check now passes for the injected id.
+        assert!(enforce_session_scope(&s, &args).is_ok());
+    }
+
+    #[test]
+    fn fill_session_id_respects_explicit_arg() {
+        let s = scope("t1", Some("sess-a"));
+        let mut args = json!({ "session_id": "sess-a", "command": "ls" });
+        fill_session_id(&mut args, &s);
+        assert_eq!(args["session_id"], "sess-a");
+    }
+
+    #[test]
+    fn fill_session_id_noop_for_global_thread() {
+        let s = scope("t1", None);
+        let mut args = json!({ "command": "ls" });
+        fill_session_id(&mut args, &s);
+        assert!(args.get("session_id").is_none());
     }
 
     // Exercises the Bearer auth boundary over a real loopback HTTP round-trip,
