@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
-import { writeTerminal, encodeBase64 } from "../../lib/ipc";
+import { getTerminal } from "../../lib/terminal/terminalRegistry";
 
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
@@ -34,7 +34,8 @@ interface ToolDispatch {
 }
 
 /** Short human description of what a tool call will do, for the ActionCard. */
-function describe(tool: string, args: Record<string, unknown>): string {
+function describe(tool: string, rawArgs: Record<string, unknown> | null | undefined): string {
+  const args = rawArgs ?? {};
   switch (tool) {
     case "run_in_terminal":
     case "Bash":
@@ -54,7 +55,8 @@ function describe(tool: string, args: Record<string, unknown>): string {
 }
 
 /** The most useful preview string for a tool call (command / path), if any. */
-function preview(args: Record<string, unknown>): string | null {
+function preview(rawArgs: Record<string, unknown> | null | undefined): string | null {
+  const args = rawArgs ?? {};
   if (typeof args.command === "string") return args.command;
   if (typeof args.file_path === "string") return args.file_path;
   if (typeof args.remote_path === "string") return args.remote_path;
@@ -68,12 +70,21 @@ export function CcAgentBridge() {
   // --- permission prompts (HITL) ---------------------------------------
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
+    let disposed = false;
     void listen<PermissionPrompt>("agent-cc-permission", (event) => {
-      setQueue((q) => [...q, event.payload]);
+      // Dedupe by callId: a stray double-emit must not stack two cards.
+      setQueue((q) =>
+        q.some((p) => p.callId === event.payload.callId) ? q : [...q, event.payload],
+      );
     }).then((fn) => {
-      unlisten = fn;
+      // `listen` resolves async. If the effect was already torn down (React
+      // StrictMode double-mount in dev), unregister immediately instead of
+      // leaking this listener — a leak would fire every handler twice.
+      if (disposed) void fn();
+      else unlisten = fn;
     });
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);
@@ -101,12 +112,17 @@ export function CcAgentBridge() {
   // --- side-effect tool dispatch ---------------------------------------
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
+    let disposed = false;
     void listen<ToolDispatch>("agent-cc-tool", (event) => {
       void executeTool(event.payload);
     }).then((fn) => {
-      unlisten = fn;
+      // See the permission listener above: avoid leaking a duplicate listener,
+      // which here would write the command into the terminal twice.
+      if (disposed) void fn();
+      else unlisten = fn;
     });
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);
@@ -135,20 +151,47 @@ export function CcAgentBridge() {
 async function executeTool(dispatch: ToolDispatch): Promise<void> {
   let ok = false;
   let output = "";
+  const args = dispatch.args ?? {};
   try {
     switch (dispatch.tool) {
       case "run_in_terminal": {
-        const sessionId = String(dispatch.args.session_id ?? "");
-        const command = String(dispatch.args.command ?? "");
-        if (!sessionId) {
+        // `session_id` here is the thread's bound terminal *tabId* (what
+        // linked_session_id stores), not the backend session id. Look the live
+        // panel up in the registry and use its writeInput(): it targets the
+        // correct backend session and base64-encodes internally. Passing the
+        // tabId straight to writeTerminal would address the wrong session.
+        const tabId = String(args.session_id ?? "");
+        const command = String(args.command ?? "");
+        if (!tabId) {
           output = "run_in_terminal requires a session_id";
           break;
         }
-        // write_terminal injects raw input into the live SSH session; append a
-        // newline so the command actually runs.
-        await writeTerminal(sessionId, encodeBase64(command + "\n"));
+        const term = getTerminal(tabId);
+        if (!term) {
+          output = `no live terminal for session ${tabId}`;
+          break;
+        }
+        term.writeInput(command + "\n");
         ok = true;
         output = "command sent to terminal";
+        break;
+      }
+      case "read_terminal_tail": {
+        // Lets CC read back what a command actually produced in the bound SSH
+        // session, instead of guessing the output from environment context.
+        const tabId = String(args.session_id ?? "");
+        if (!tabId) {
+          output = "read_terminal_tail requires a session_id";
+          break;
+        }
+        const term = getTerminal(tabId);
+        if (!term) {
+          output = `no live terminal for session ${tabId}`;
+          break;
+        }
+        const n = Number(args.lines ?? 50);
+        output = term.getLastLines(Number.isFinite(n) && n > 0 ? n : 50);
+        ok = true;
         break;
       }
       default:

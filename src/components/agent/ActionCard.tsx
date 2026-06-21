@@ -43,10 +43,10 @@ export function ActionCard({
 
   return (
     <div
-      className={`rounded-lg border p-3 shadow-md max-w-md w-full ${
+      className={`rounded-lg border p-3 shadow-md max-w-md w-full bg-[var(--taomni-panel-bg)] ${
         isWrite
-          ? "border-yellow-500/40 bg-yellow-500/5"
-          : "border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
+          ? "border-yellow-500/50"
+          : "border-[var(--taomni-divider)]"
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
