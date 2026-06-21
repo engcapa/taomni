@@ -32,9 +32,24 @@ pub const SERVICE_TYPE: &str = "_taomni-lan._tcp.local.";
 ///
 /// v4 (native A/V transport): adds a third wire tag `TAG_MEDIA` (`0x02`) for
 /// real-time media frames (Opus audio / H.264 video) on the Linux native stack,
-/// plus the `nmedia-*` control frames that negotiate them. The handshake rejects
-/// peers below this version so both ends agree on the framing.
+/// plus the `nmedia-*` control frames that negotiate them. This is an **additive**
+/// bump: the control/text/file framing is byte-for-byte identical to v3, so v3 and
+/// v4 nodes interoperate for everything except native media. See
+/// [`MIN_PROTOCOL_VERSION`].
 pub const PROTOCOL_VERSION: u32 = 4;
+
+/// Oldest protocol version whose **control-channel wire framing** is still
+/// compatible with the current code — i.e. the lowest `pv` the handshake accepts.
+///
+/// Bump this **only** on a genuinely breaking framing change, not on every
+/// `PROTOCOL_VERSION` bump. The control channel last changed shape at v3 (the
+/// one-byte [`wire`] tag was introduced; pre-v3 frames were raw JSON and decode
+/// as an unknown tag today). v4 only *added* `TAG_MEDIA`, so a v3 peer frames
+/// text/files exactly like a v4 peer and must still be allowed to chat.
+///
+/// Pre-v3 peers are genuinely incompatible: v2 sends untagged JSON (mis-parsed
+/// as an unknown tag) and v1 is plaintext (fails the TLS handshake outright).
+pub const MIN_PROTOCOL_VERSION: u32 = 3;
 
 /// Default file piece size for the swarm transfer engine — 256 KiB raw (no
 /// base64). Bounds per-in-flight-piece memory and the swarm request window.
@@ -354,6 +369,26 @@ pub struct PeerRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn min_version_admits_current_and_blocks_pre_tag_framing() {
+        // The handshake gate (transport.rs) accepts `pv >= MIN_PROTOCOL_VERSION`.
+        // Pin the policy so an additive PROTOCOL_VERSION bump can never silently
+        // re-lock out a wire-compatible peer (the v3↔v4 chat regression).
+        assert!(
+            MIN_PROTOCOL_VERSION <= PROTOCOL_VERSION,
+            "min must not exceed current"
+        );
+        // v3 introduced the one-byte wire tag; it frames text/files like v4 and
+        // must be allowed to chat.
+        assert!(3 >= MIN_PROTOCOL_VERSION, "v3 peers must be accepted");
+        assert!(
+            PROTOCOL_VERSION >= MIN_PROTOCOL_VERSION,
+            "current peers must be accepted"
+        );
+        // Pre-tag peers (v2 untagged JSON, v1 plaintext) are genuinely incompatible.
+        assert!(2 < MIN_PROTOCOL_VERSION, "v2 peers must be rejected");
+    }
 
     #[test]
     fn envelope_round_trips_through_codec() {

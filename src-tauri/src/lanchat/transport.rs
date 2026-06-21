@@ -525,9 +525,13 @@ async fn setup_connection(
     .map_err(|_| "handshake timed out".to_string())??;
     let peer_id = hello.id.clone();
 
-    // Reject pre-v2 peers (defense in depth; v1 plaintext peers already fail the
-    // TLS handshake above and never reach here).
-    if hello.pv < crate::lanchat::protocol::PROTOCOL_VERSION {
+    // Reject peers whose control-channel framing we can't speak. The gate is the
+    // *minimum compatible* version, not the current one: additive bumps (e.g. v4's
+    // media tag) must not lock out an otherwise-compatible older peer, or all
+    // messaging silently breaks the moment two builds drift by one version while
+    // mDNS still shows them online. v1 plaintext peers already fail the TLS
+    // handshake above and never reach here.
+    if hello.pv < crate::lanchat::protocol::MIN_PROTOCOL_VERSION {
         return Err(format!(
             "unsupported protocol version {} from {peer_id}",
             hello.pv
