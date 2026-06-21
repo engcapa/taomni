@@ -188,7 +188,7 @@ export function detectDetachedRoute():
       }
     }
     const url = new URL(window.location.href);
-    for (const kind of ["sftp", "rdp", "vnc", "terminal", "database"] as const) {
+    for (const kind of ["sftp", "rdp", "vnc", "terminal", "database", "lan-chat"] as const) {
       const value = url.searchParams.get(kind);
       if (value) return { kind, id: value };
     }

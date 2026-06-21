@@ -20,8 +20,9 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
         "rdp" | "vnc" => (1280.0, 800.0, 800.0, 480.0),
         "terminal" => (1024.0, 680.0, 640.0, 360.0),
         "database" => (1280.0, 820.0, 780.0, 480.0),
-        // A detached LanChat conversation is a compact chat window.
-        "lan-chat" => (380.0, 560.0, 320.0, 400.0),
+        // A detached LanChat window mirrors the main panel's two-pane
+        // layout (≈252px roster + conversation), so it needs room for both.
+        "lan-chat" => (820.0, 620.0, 600.0, 440.0),
         // SFTP keeps its historical default so existing user layouts
         // don't shift after the migration.
         "sftp" => (1200.0, 760.0, 720.0, 420.0),

@@ -764,6 +764,29 @@ export function MainLayout() {
         return;
       }
       recentReattach.set(burstKey, now);
+      if (msg.kind === "lan-chat") {
+        const p = msg.payload as { activeConvId?: string; title?: string } | undefined;
+        const convId = p?.activeConvId || msg.id;
+        const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
+        if (existing) {
+          setActiveTab(existing.id);
+        } else {
+          addTab({
+            id: "lan-chat",
+            type: "lan-chat",
+            title: tr("tabs.lanChat"),
+            closable: true,
+          });
+        }
+        if (convId) {
+          if (convId.startsWith("direct:") || convId.startsWith("group:")) {
+            void useLanChatStore.getState().openConversation(convId);
+          }
+        }
+        setStatusMessage(tr("status.reattached"));
+        clearReattachHandoff(msg.kind, msg.id);
+        return;
+      }
       // Idempotent tab identity: derive the tab id from the detachedId so
       // the same window can never materialize two tabs. If a tab already
       // exists for this detachedId, just focus it.
@@ -1590,6 +1613,12 @@ export function MainLayout() {
   }, [addTab, setActiveTab]);
 
   const openLanChatTab = useCallback(() => {
+    // If LanChat is currently docked as an edge drawer, undock it; the
+    // edgeDock effect below restores and focuses the tab.
+    if (useLanChatStore.getState().edgeDock) {
+      useLanChatStore.getState().closeEdgeDock();
+      return;
+    }
     const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
     if (existing) {
       setActiveTab(existing.id);
@@ -1608,6 +1637,30 @@ export function MainLayout() {
   useEffect(() => {
     void useLanChatStore.getState().init();
   }, []);
+
+  // Keep the lan-chat tab and the in-app edge drawer mutually exclusive.
+  // Docking (null → side) hides the main-window tab; undocking (side → null,
+  // via the drawer close button or Esc) restores and focuses it. Chat state
+  // survives because the store stays alive regardless of the tab's presence.
+  const edgeDock = useLanChatStore((s) => s.edgeDock);
+  const prevEdgeDock = useRef(edgeDock);
+  useEffect(() => {
+    const prev = prevEdgeDock.current;
+    prevEdgeDock.current = edgeDock;
+    if (prev === null && edgeDock !== null) {
+      removeTab("lan-chat");
+    } else if (prev !== null && edgeDock === null) {
+      if (!tabsRef.current.some((tab) => tab.id === "lan-chat")) {
+        addTab({
+          id: "lan-chat",
+          type: "lan-chat",
+          title: tr("tabs.lanChat"),
+          closable: true,
+        });
+      }
+      setActiveTab("lan-chat");
+    }
+  }, [edgeDock, addTab, removeTab, setActiveTab]);
 
   // Mirror total LanChat unread onto the lan-chat tab's new-output indicator
   // (cleared while that tab is active).
@@ -2052,6 +2105,7 @@ export function MainLayout() {
                     onStartLocalTerminal={(localShell) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)}
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
+                    onOpenLanChat={openLanChatTab}
                   />
                 )}
 

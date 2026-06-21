@@ -407,6 +407,8 @@ export const zhCN: DeepPartial<typeof en> = {
     adminTitle: "以管理员身份打开",
     newSessionTitle: "新建会话…",
     newSessionDesc: "SSH、RDP、VNC、SFTP、Telnet、Serial、Mosh、WSL、S3 — 全部在一个对话框中完成。",
+    lanChatTitle: "局域网通讯",
+    lanChatDesc: "打开 LanChat，发现同网段成员并收发消息、文件或发起协作。",
     importTitle: "导入 OpenSSH 配置",
     importDesc: "读取 Host、HostName、User、Port 与 IdentityFile 条目并存入会话。",
     refreshTitle: "刷新会话",
