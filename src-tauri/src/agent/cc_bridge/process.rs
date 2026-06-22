@@ -18,6 +18,27 @@ const RESTART_COOLDOWN_SECS: u64 = 60;
 /// genuinely wedged process is still reaped. Default is relaxed; override per
 /// process with `with_idle_timeout`.
 const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 600;
+/// Upper bound on how long CC's stdout may legitimately stay silent *while a
+/// tool call is in flight*. Between a `tool_use` line and its matching
+/// `tool_result`, CC blocks on the Taomni MCP round-trip — the human
+/// confirmation (≤ `mcp_http::PERMISSION_TIMEOUT_SECS` = 300s) plus the tool's
+/// own execution (≤ `mcp_http::TOOL_TIMEOUT_SECS` = 600s). The normal idle
+/// reaper would kill that healthy turn, so we widen the deadline to this
+/// ceiling whenever a tool is outstanding. Must stay ≥ 300 + 600 so the idle
+/// reaper never fires before the tool's own timeout resolves the call.
+const TOOL_WAIT_CEILING_SECS: u64 = 960;
+
+/// Pick the per-line read deadline. While one or more tool calls are in flight
+/// (CC blocked waiting on us), use the wider ceiling; otherwise the normal idle
+/// timeout. Pulled out as a pure fn so the decision is unit-testable without a
+/// live child process.
+fn effective_read_timeout(tools_in_flight: u32, idle: Duration) -> Duration {
+    if tools_in_flight > 0 {
+        Duration::from_secs(TOOL_WAIT_CEILING_SECS)
+    } else {
+        idle
+    }
+}
 
 /// One Claude Code child per chat thread.
 ///
@@ -193,6 +214,8 @@ impl CcProcess {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        // Windows: don't pop a console window for the claude .cmd/.ps1 shim.
+        super::no_console_window(&mut cmd);
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
@@ -232,10 +255,11 @@ impl CcProcess {
 
         *child_guard = Some(child);
         *self.stdin.lock().await = Some(stdin);
-        // Drop the guard before kicking the watchdog so it can lock back in.
+        // Drop the guard so callers (and the watchdog) can lock back in. The
+        // watchdog is started by the owner of the `Arc<CcProcess>` (see
+        // `start_watchdog`), not here, because it needs a `Weak<Self>`.
         drop(child_guard);
 
-        self.start_watchdog_if_needed();
         Ok(())
     }
 
@@ -244,25 +268,26 @@ impl CcProcess {
         *self.last_failure_at.lock().await = Some(Instant::now());
     }
 
-    /// Lazily spawn one watchdog per CcProcess. The Arc<Self> is materialised
-    /// from the AppState by the caller; we only need a weak self-reference to
-    /// poke the atomics — no Arc handle is required at this level because the
-    /// watchdog stops itself on `stopped`.
-    fn start_watchdog_if_needed(self: &Self) {
+    /// Spawn the liveness watchdog for this process. Holds only a `Weak<Self>`
+    /// between ticks, so it never keeps the process alive on its own: once the
+    /// registry drops the last strong `Arc` (e.g. `recycle_thread_process` or a
+    /// replaced entry), the next `upgrade()` fails and the task exits. This
+    /// replaces the previous raw-pointer (`self as *const Self as usize`)
+    /// approach and its fragile "the Arc outlives the task" contract.
+    ///
+    /// Idempotent — the `watchdog_started` guard makes repeat calls a no-op, so
+    /// the caller can invoke it unconditionally on every send.
+    pub fn start_watchdog(self: &Arc<Self>) {
         if self.watchdog_started.swap(true, Ordering::SeqCst) {
             return;
         }
-        // SAFETY: we leverage the fact that AppState holds an Arc<Self> for
-        // the lifetime of the process registry, so a raw pointer captured in
-        // the spawned task is valid as long as we never drop the Arc in the
-        // background. `cc_stop_session` removes from the registry, then calls
-        // stop(), then drops the Arc — the watchdog observes `stopped` and
-        // exits before any drop happens.
-        let ptr = self as *const Self as usize;
+        let weak = Arc::downgrade(self);
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(HEALTH_CHECK_INTERVAL_SECS)).await;
-                let this: &Self = unsafe { &*(ptr as *const Self) };
+                // Upgrade only for the duration of this tick; if the last strong
+                // Arc is gone, stop watching.
+                let Some(this) = weak.upgrade() else { break };
                 if this.stopped.load(Ordering::SeqCst) {
                     break;
                 }
@@ -284,6 +309,8 @@ impl CcProcess {
                     this.needs_respawn.store(true, Ordering::SeqCst);
                     this.record_failure().await;
                 }
+                // `this` (the strong Arc) drops here → back to Weak-only until
+                // the next tick, so the watchdog never extends the lifetime.
             }
         });
     }
@@ -308,9 +335,17 @@ impl CcProcess {
         // of returning early with a poisoned (still-running, half-read) child.
         let mut read_failure: Option<String> = None;
 
+        // Count of tool calls CC has emitted a `tool_use` for but not yet a
+        // `tool_result`. While > 0, CC's stdout is legitimately silent for the
+        // duration of the MCP round-trip (confirmation + execution), so we
+        // widen the read deadline (see `TOOL_WAIT_CEILING_SECS`). Saturating
+        // decrement keeps a stray unmatched `tool_result` from underflowing.
+        let mut tools_in_flight: u32 = 0;
+
         loop {
             line.clear();
-            match tokio::time::timeout(self.idle_timeout, reader.read_line(&mut line)).await {
+            let effective = effective_read_timeout(tools_in_flight, self.idle_timeout);
+            match tokio::time::timeout(effective, reader.read_line(&mut line)).await {
                 Ok(Ok(0)) => break, // EOF — process exited.
                 Ok(Ok(_)) => {
                     let trimmed = line.trim();
@@ -318,8 +353,15 @@ impl CcProcess {
                         continue;
                     }
                     if let Some(event) = parse_ndjson_line(trimmed) {
+                        match &event {
+                            CcEvent::ToolUse { .. } => tools_in_flight += 1,
+                            CcEvent::ToolResult { .. } => {
+                                tools_in_flight = tools_in_flight.saturating_sub(1);
+                            }
+                            _ => {}
+                        }
                         on_event(&event);
-                        let done = matches!(event, CcEvent::Done | CcEvent::Error { .. });
+                        let done = matches!(event, CcEvent::Done { .. } | CcEvent::Error { .. });
                         events.push(event);
                         if done {
                             terminal_seen = true;
@@ -334,7 +376,7 @@ impl CcProcess {
                 Err(_) => {
                     read_failure = Some(format!(
                         "CC response timed out after {}s of inactivity",
-                        self.idle_timeout.as_secs()
+                        effective.as_secs()
                     ));
                     break;
                 }
@@ -403,5 +445,42 @@ impl Drop for CcProcess {
         if let Some(dir) = &self.temp_dir {
             let _ = std::fs::remove_dir_all(dir);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn idle_timeout_used_when_no_tool_in_flight() {
+        let idle = Duration::from_secs(600);
+        assert_eq!(effective_read_timeout(0, idle), idle);
+    }
+
+    #[test]
+    fn ceiling_used_while_a_tool_is_in_flight() {
+        let idle = Duration::from_secs(600);
+        let eff = effective_read_timeout(1, idle);
+        assert_eq!(eff, Duration::from_secs(TOOL_WAIT_CEILING_SECS));
+        assert!(eff > idle, "in-flight deadline must exceed the idle one");
+    }
+
+    #[test]
+    fn ceiling_covers_permission_plus_tool_wait() {
+        // The ceiling must outlast a human confirmation (300s) followed by the
+        // tool's own execution budget (600s); otherwise the idle reaper would
+        // kill CC mid-call. Mirrors mcp_http::{PERMISSION_TIMEOUT_SECS,
+        // TOOL_TIMEOUT_SECS} — keep in sync if those change.
+        assert!(TOOL_WAIT_CEILING_SECS >= 300 + 600);
+    }
+
+    #[test]
+    fn multiple_in_flight_tools_still_use_ceiling() {
+        let idle = Duration::from_secs(600);
+        assert_eq!(
+            effective_read_timeout(3, idle),
+            Duration::from_secs(TOOL_WAIT_CEILING_SECS)
+        );
     }
 }

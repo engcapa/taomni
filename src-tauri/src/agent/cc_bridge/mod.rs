@@ -16,6 +16,23 @@ use tokio::time::timeout;
 
 pub const MIN_VERSION: &str = "1.0.0";
 
+/// Apply `CREATE_NO_WINDOW` so spawning the `claude` CLI — an npm `.cmd`/`.ps1`
+/// shim on Windows — doesn't flash a PowerShell/console window. No-op on
+/// non-Windows. Call on every `Command` that launches the binary (conversation
+/// process, version check, auth probe).
+pub(crate) fn no_console_window(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        // winapi CREATE_NO_WINDOW.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = cmd;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CcStatus {
@@ -191,11 +208,10 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
     };
 
     // Run `claude --version`.
-    let version_out = timeout(
-        Duration::from_secs(5),
-        Command::new(&bin).arg("--version").output(),
-    )
-    .await;
+    let mut version_cmd = Command::new(&bin);
+    version_cmd.arg("--version");
+    no_console_window(&mut version_cmd);
+    let version_out = timeout(Duration::from_secs(5), version_cmd.output()).await;
 
     let version_str = match version_out {
         Ok(Ok(out)) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
@@ -262,13 +278,10 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
 
 /// Run a minimal probe to check authentication.
 async fn probe_auth(binary: &str) -> bool {
-    let result = timeout(
-        Duration::from_secs(10),
-        Command::new(binary)
-            .args(["--print", "ping", "--output-format", "json"])
-            .output(),
-    )
-    .await;
+    let mut cmd = Command::new(binary);
+    cmd.args(["--print", "ping", "--output-format", "json"]);
+    no_console_window(&mut cmd);
+    let result = timeout(Duration::from_secs(10), cmd.output()).await;
 
     match result {
         Ok(Ok(out)) => out.status.success(),

@@ -65,6 +65,8 @@ export interface CcBridgeConfig {
   default_model: string;
   permission_mode: string;
   max_turns: number;
+  /** When true, read-only Bash/run_in_terminal commands still need a confirmation (3.6). */
+  confirm_readonly?: boolean;
   custom_settings_profiles?: CcCustomSettingsProfile[];
   active_profile_id?: string;
 }
@@ -142,6 +144,7 @@ const DEFAULT_CONFIG: AiConfig = {
     default_model: "sonnet",
     permission_mode: "default",
     max_turns: 20,
+    confirm_readonly: false,
   },
   full_local_mode: false,
   fully_disabled: false,

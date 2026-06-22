@@ -69,6 +69,16 @@ fn tool_call_path(call: &ToolCall) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Returns true if `path` resolves inside a sensitive directory (ssh keys, app
+/// config, …). Public so the read-only command classifier (3.6,
+/// `agent::cmd_classify`) can refuse to silently auto-allow a read-only command
+/// that would dump a secret path's contents into the model context. Mirrors the
+/// deny check applied to CC's file tools in `check_tool_call`.
+pub fn path_is_sensitive(path: &str) -> bool {
+    let deny = crate::agent::cc_bridge::config::sensitive_deny_dirs();
+    path_is_denied(path, &deny, dirs::home_dir().as_deref())
+}
+
 /// Returns true if `path` resolves inside any of `deny_dirs`. Performs leading
 /// `~` expansion (using `home`) and lexical normalization (resolving `.`/`..`)
 /// without touching the filesystem — the target file need not exist, and we

@@ -13,6 +13,11 @@ pub struct ChatThread {
     /// Claude Code session ID for --resume (v2.6).
     #[serde(default)]
     pub cc_session_id: Option<String>,
+    /// Per-thread Claude Code model override ("opus" | "sonnet" | "haiku").
+    /// `None` means "inherit AiConfig.cc_bridge.default_model". Baked into the
+    /// child's `--model` at spawn, so changing it recycles the CC process.
+    #[serde(default)]
+    pub cc_model: Option<String>,
     /// Per-thread output format override: "md" | "html" | "plain".
     /// `None` means "inherit AiConfig.chat_output_format".
     #[serde(default)]
@@ -67,18 +72,23 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
         "ALTER TABLE ai_chat_threads ADD COLUMN output_format TEXT",
         [],
     );
+    // Idempotent column add for the per-thread Claude Code model override.
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_threads ADD COLUMN cc_model TEXT",
+        [],
+    );
     Ok(())
 }
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
-            thread.output_format,
+            thread.output_format, thread.cc_model,
         ],
     )?;
     Ok(())
@@ -86,7 +96,7 @@ pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -100,6 +110,7 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             source: row.get(6)?,
             cc_session_id: row.get(7).ok(),
             output_format: row.get(8).ok(),
+            cc_model: row.get(9).ok(),
         })
     })?;
     rows.collect()
@@ -169,6 +180,22 @@ pub fn update_thread_provider(conn: &Connection, id: &str, provider_id: &str) ->
     conn.execute(
         "UPDATE ai_chat_threads SET provider_id = ?1 WHERE id = ?2",
         params![provider_id, id],
+    )?;
+    Ok(())
+}
+
+/// Set or clear the per-thread Claude Code model override.
+/// `None` (or `Some("")`) clears it so the thread inherits the configured
+/// `cc_bridge.default_model`.
+pub fn update_thread_cc_model(
+    conn: &Connection,
+    id: &str,
+    model: Option<&str>,
+) -> SqlResult<()> {
+    let normalized = model.filter(|s| !s.trim().is_empty());
+    conn.execute(
+        "UPDATE ai_chat_threads SET cc_model = ?1 WHERE id = ?2",
+        params![normalized, id],
     )?;
     Ok(())
 }

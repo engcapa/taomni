@@ -2,9 +2,10 @@
 //! `--append-system-prompt-file`.
 //!
 //! Goal: CC reliably knows *which saved Taomni session a chat thread is bound
-//! to* without having to call `list_sessions` to locate itself, and prefers the
-//! remote `run_in_terminal` MCP tool over its built-in local Bash when the
-//! binding is a remote host.
+//! to* without having to call `list_sessions` to locate itself, and treats that
+//! bound session as the sole target of all its work — routing every operation
+//! through the terminal MCP tools instead of its built-in local Bash / file
+//! tools, which only ever touch the unrelated Taomni host.
 //!
 //! Snapshot-at-spawn only: a `CcProcess`'s args are fixed for the thread's life
 //! (it is spawned once and reused with `--resume`). That is fine here because
@@ -42,6 +43,56 @@ fn is_remote(t: &SessionType) -> bool {
         t,
         SessionType::SSH | SessionType::Telnet | SessionType::SFTP | SessionType::Serial
     )
+}
+
+/// Shared guidance for any thread bound to a terminal — saved-remote,
+/// saved-local, or a live tab with no saved session. It states one *uniform*
+/// operating principle (not a per-field hint): every operation in this thread
+/// targets the bound session, so "current dir / files / processes / env"
+/// questions are all about that session and are answered through the terminal
+/// MCP tools. Two jobs fall out of that:
+///
+/// ① Routing: steer execution through the bound terminal's MCP tools
+///    (`run_in_terminal` / `read_terminal_tail`) instead of CC's built-in local
+///    Bash / file tools. `remote` adds the remote-only extra (`sftp_upload`).
+/// ② Env demotion: CC's native `<env>` (cwd / git / OS) only ever describes the
+///    local host process that runs Taomni, never the bound session. Without this
+///    note an un-anchored turn slides back to that local `<env>` + built-in Bash
+///    (they sit in CC's higher-authority primary prompt and carry less friction)
+///    — observed in practice: a bare "查询当前目录" was answered by running `ls`
+///    on the Taomni host. So we relabel the native `<env>` as a host sandbox and
+///    point every "where am I / what's here" question at the bound terminal.
+///
+/// Not emitted for truly unbound threads: there the local `<env>` genuinely is
+/// the working environment, so we leave CC's defaults alone.
+fn push_terminal_routing(s: &mut String, remote: bool) {
+    // Uniform principle first, so CC doesn't treat "查询当前目录 / 看文件 / 看进程"
+    // as inspecting its own (local) environment and reach for built-in Bash.
+    s.push_str(
+        "本线程的一切操作都针对上面这个绑定的会话:你遇到的任何「当前目录 / 文件 / 进程 / 环境」\
+         问题都是指这个会话,而不是运行 Taomni 的本机。\n",
+    );
+    if remote {
+        s.push_str(
+            "统一用 MCP 工具操作它:执行命令用 run_in_terminal、读回显用 read_terminal_tail、\
+             传文件用 sftp_upload(危险动作会停下等用户确认);它们作用于这个绑定终端、\
+             继承其真实当前目录。\n",
+        );
+    } else {
+        s.push_str(
+            "统一用 MCP 工具操作它:执行命令用 run_in_terminal、读回显用 read_terminal_tail\
+             (危险动作会停下等用户确认);它们作用于这个绑定终端、继承其真实当前目录。\n",
+        );
+    }
+    s.push_str(
+        "不要用你内置的本地 Bash / Read / Glob / Grep 去访问本机文件系统来回答这些问题——\
+         那是另一台机器(运行 Taomni 的宿主沙箱),不是你的工作对象。\n",
+    );
+    s.push_str(
+        "你自带的 <env>(工作目录 / git 状态 / 操作系统)只描述那台宿主沙箱;判断\
+         「我在哪 / 当前目录是什么」一律以绑定终端的实际状态(用 run_in_terminal 查)\
+         或每轮提供的「当前工作目录」为准,不要据本地 <env> 作答。\n",
+    );
 }
 
 /// Render the (pre-redaction) card text.
@@ -83,13 +134,9 @@ pub fn render_card(
                 thread_id,
                 if linked { "Strict" } else { "Lenient" }
             ));
-            if is_remote(&sc.session_type) {
-                s.push_str(
-                    "这是远端会话:操作远端请用 MCP 工具 run_in_terminal / sftp_upload\
-                     (危险动作会停下等用户确认),读回显用 read_terminal_tail;\
-                     不要用本地 Bash 执行面向远端的命令。\n",
-                );
-            }
+            // ① + ② — bound to a saved session (remote or local): route through
+            // the terminal MCP tools and demote CC's native local <env>.
+            push_terminal_routing(&mut s, is_remote(&sc.session_type));
         }
         None => {
             // We could not resolve a saved SessionConfig. Be honest about what
@@ -102,7 +149,14 @@ pub fn render_card(
                     "本线程已绑定到一个终端标签(thread = {thread_id}),但它未关联到已保存会话\
                      (可能是本地 shell 或临时连接),无法展示会话名 / 主机详情。\n"
                 ));
+                // ① + ② — still bound to a live terminal. We don't know
+                // remote-vs-local, so use the generic routing (no sftp); both
+                // run_in_terminal and read_terminal_tail act on the live tab.
+                push_terminal_routing(&mut s, false);
             } else {
+                // Truly unbound global / workspace thread — no terminal at all.
+                // Here CC's native <env> genuinely is the environment, so we
+                // intentionally emit no routing / env-demotion guidance.
                 s.push_str(&format!(
                     "本线程未绑定任何终端(全局 / 本地工作区线程;thread = {thread_id})。\n"
                 ));
@@ -179,9 +233,15 @@ mod tests {
         assert!(card.contains("thread = thread-9"));
         // linked ⇒ Strict.
         assert!(card.contains("信任级 = Strict"));
-        // Tool-routing disambiguation (folds in old "执行目标消歧").
+        // ① Tool-routing disambiguation — remote variant mentions sftp_upload.
         assert!(card.contains("run_in_terminal"));
-        assert!(card.contains("不要用本地 Bash"));
+        assert!(card.contains("sftp_upload"));
+        assert!(card.contains("内置的本地 Bash"));
+        // Uniform operating principle (not just one field).
+        assert!(card.contains("本线程的一切操作都针对"));
+        assert!(card.contains("当前目录 / 文件 / 进程 / 环境"));
+        // ② Native <env> is demoted to a host sandbox.
+        assert!(card.contains("宿主沙箱"));
         // History snapshot, newest first.
         assert!(card.contains("- systemctl status nginx"));
         assert!(card.contains("- df -h"));
@@ -194,17 +254,22 @@ mod tests {
         let card = render_card(None, "thread-local", false, &[]);
         assert!(card.contains("未绑定任何终端"));
         assert!(card.contains("thread = thread-local"));
-        // No remote routing note when there is no remote session.
+        // Truly unbound: no routing and NO env-demotion — CC's native <env> is
+        // the real environment here, so we leave its defaults alone.
         assert!(!card.contains("run_in_terminal"));
+        assert!(!card.contains("宿主沙箱"));
     }
 
     #[test]
-    fn card_linked_but_unsaved_is_honest() {
-        // Bound to a live tab but no saved SessionConfig — don't claim local,
-        // don't claim remote.
+    fn card_linked_but_unsaved_routes_and_demotes_env() {
+        // Bound to a live tab but no saved SessionConfig — still a terminal, so
+        // ① route through it and ② demote the native <env>. Unknown remote/local
+        // ⇒ generic variant (no sftp_upload).
         let card = render_card(None, "t-quick", true, &[]);
         assert!(card.contains("未关联到已保存会话"));
-        assert!(!card.contains("run_in_terminal"));
+        assert!(card.contains("run_in_terminal"));
+        assert!(!card.contains("sftp_upload"));
+        assert!(card.contains("宿主沙箱"));
     }
 
     #[test]
@@ -215,9 +280,14 @@ mod tests {
     }
 
     #[test]
-    fn card_local_session_type_omits_remote_routing() {
+    fn card_local_bound_session_routes_to_terminal() {
+        // ① Local-bound saved session now gets routing too (previously silent),
+        // via the generic variant — run_in_terminal but no remote sftp_upload —
+        // and ② the native <env> demotion.
         let sc = sample(SessionType::LocalShell, None, AuthMethod::None);
         let card = render_card(Some(&sc), "t", false, &[]);
-        assert!(!card.contains("run_in_terminal"));
+        assert!(card.contains("run_in_terminal"));
+        assert!(!card.contains("sftp_upload"));
+        assert!(card.contains("宿主沙箱"));
     }
 }
