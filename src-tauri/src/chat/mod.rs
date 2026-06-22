@@ -185,6 +185,14 @@ pub struct ChatSendRequest {
     pub content: String,
     /// Optional terminal content to attach as @terminal context.
     pub terminal_context: Option<String>,
+    /// Phase 3.S — the `SessionConfig.id` of the saved session this CC thread
+    /// is bound to, resolved by the frontend from the linked terminal tab's
+    /// registry entry (`thread.linked_session_id` is a *tab* id, not a
+    /// `SessionConfig.id`, so the backend cannot derive this on its own). Used
+    /// to build the session-identity card injected into Claude Code. `None` for
+    /// unbound / local / unsaved-tab threads.
+    #[serde(default)]
+    pub bound_session_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -508,6 +516,48 @@ pub async fn chat_stream(
                     }
                 };
 
+                // Phase 3.S — assemble the session-identity card so CC knows
+                // which saved session this thread is bound to, then inject it
+                // as CC's appended system prompt. Written into the process temp
+                // dir (scrubbed on stop/drop) and passed via the *file* flag so
+                // the bound host/user never appear in argv (which other local
+                // users can read via `ps`).
+                let session_card = {
+                    let db = state.db.lock().map_err(|e| e.to_string())?;
+                    let session = req
+                        .bound_session_id
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(|sid| crate::session::db::get_session(&db, sid).ok());
+                    let recent = session
+                        .as_ref()
+                        .map(|sc| {
+                            crate::history::db_list_recent(
+                                &db,
+                                &crate::agent::cc_bridge::session_card::host_key_for(sc),
+                                crate::agent::cc_bridge::session_card::HISTORY_LIMIT,
+                            )
+                            .unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                    let raw = crate::agent::cc_bridge::session_card::render_card(
+                        session.as_ref(),
+                        &req.thread_id,
+                        thread.linked_session_id.is_some(),
+                        &recent,
+                    );
+                    redact::redact(&raw).0
+                };
+                let card_path = files.dir.join("system-prompt.txt");
+                let card_file: Option<String> = match std::fs::write(&card_path, &session_card) {
+                    Ok(()) => Some(card_path.to_string_lossy().to_string()),
+                    Err(e) => {
+                        eprintln!("[cc] session card write failed, continuing without it: {e}");
+                        None
+                    }
+                };
+
                 // Build extra args.
                 let mut extra_args = vec![
                     "--model".into(),
@@ -524,6 +574,12 @@ pub async fn chat_stream(
                     "--permission-prompt-tool".into(),
                     crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
                 ];
+                // Phase 3.S — inject the session-identity card (file variant
+                // keeps host/user out of argv).
+                if let Some(path) = card_file {
+                    extra_args.push("--append-system-prompt-file".into());
+                    extra_args.push(path);
+                }
                 if let Some(sid) = &resume_session {
                     extra_args.push("--resume".into());
                     extra_args.push(sid.clone());

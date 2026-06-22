@@ -195,6 +195,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   sendMessage: async (threadId: string, content: string, terminalContext?: string) => {
     set({ sending: true });
 
+    // Phase 3.S — resolve the saved SessionConfig.id this thread is bound to so
+    // the backend can build Claude Code's session-identity card.
+    // `thread.linked_session_id` is a terminal *tab* id; the saved-session id
+    // lives on the Tab as `sessionId` (set when the tab was opened from a saved
+    // session). Null for global / local / unsaved-tab threads — the backend
+    // then emits a degraded "local workspace" card.
+    let boundSessionId: string | null = null;
+    {
+      const tabId = get().threads.find((t) => t.id === threadId)?.linked_session_id ?? null;
+      if (tabId) {
+        try {
+          const { useAppStore } = await import("./appStore");
+          boundSessionId =
+            useAppStore.getState().tabs.find((t) => t.id === tabId)?.sessionId ?? null;
+        } catch (err) {
+          console.warn("bound_session_id resolution failed:", err);
+        }
+      }
+    }
+
     let unlisten: UnlistenFn | null = null;
     try {
       unlisten = await listen<StreamEvent>(`chat-stream:${threadId}`, (event) => {
@@ -276,7 +296,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       });
 
       await invoke("chat_stream", {
-        req: { thread_id: threadId, content, terminal_context: terminalContext ?? null },
+        req: {
+          thread_id: threadId,
+          content,
+          terminal_context: terminalContext ?? null,
+          bound_session_id: boundSessionId,
+        },
       });
     } catch (e) {
       if (isVaultLockedError(e)) {
@@ -300,7 +325,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           assistant_message: ChatMessage;
           redacted_count: number;
         }>("chat_send", {
-          req: { thread_id: threadId, content, terminal_context: terminalContext ?? null },
+          req: {
+            thread_id: threadId,
+            content,
+            terminal_context: terminalContext ?? null,
+            bound_session_id: boundSessionId,
+          },
         });
         set((s) => ({
           messages: {

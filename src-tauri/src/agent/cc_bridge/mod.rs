@@ -6,6 +6,7 @@ pub mod config;
 pub mod mcp_http;
 pub mod process;
 pub mod protocol;
+pub mod session_card;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
