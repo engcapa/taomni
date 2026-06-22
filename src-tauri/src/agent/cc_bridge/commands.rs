@@ -262,6 +262,41 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
     if let Some(process) = process {
         process.stop().await;
     }
+    // Best-effort `rm -f` of any remote (C-path) capture temp files before we
+    // drop the captures; the local scrub in purge_thread can't reach a remote
+    // host. The session may already be gone — failures are harmless.
+    let remote = state.captures.remote_files(thread_id);
+    if !remote.is_empty() {
+        let terms = state.terminals.read().await;
+        for (session_id, path) in remote {
+            if let Some(crate::terminal::ActiveTerminal::Ssh { handle, .. }) = terms.get(&session_id) {
+                crate::agent::capture::exec_c::cleanup_remote(handle, &path).await;
+            }
+        }
+    }
+    // Drop + scrub this thread's captures (方案4); their files are tied to the
+    // process lifetime the same way the temp dir is.
+    state.captures.purge_thread(thread_id);
+}
+
+/// Cancel an in-flight captured run (方案4). Fires the capture's cancel
+/// `Notify`, which drops the SSH exec channel / kills the local child; the
+/// run loop then finalizes the capture as `cancelled`. Idempotent.
+#[tauri::command]
+pub async fn cc_cancel_capture(
+    capture_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let notify = state
+        .cc_capture_cancels
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(&capture_id)
+        .cloned();
+    if let Some(n) = notify {
+        n.notify_waiters();
+    }
+    Ok(())
 }
 
 /// Resolve a pending CC side-effect tool call. The frontend calls this after it

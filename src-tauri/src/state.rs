@@ -98,6 +98,17 @@ pub struct AppState {
     /// Pending CC permission prompts awaiting a human decision, keyed by
     /// per-call id. See [`CcPermissionResponder`].
     pub cc_pending_permissions: Arc<Mutex<HashMap<String, CcPermissionResponder>>>,
+    /// Per-thread captured-command store (方案4). Holds the full stdout/stderr
+    /// of `run_captured` runs (B path: Taomni-local files) so CC can grep/page
+    /// large output without dumping it into context. Reduction happens here.
+    pub captures: Arc<crate::agent::capture::CaptureRegistry>,
+    /// Cancel handles for in-flight captures, keyed by capture id. Firing the
+    /// `Notify` drops the SSH exec channel / kills the local child.
+    pub cc_capture_cancels: Arc<Mutex<HashMap<String, Arc<tokio::sync::Notify>>>>,
+    /// Last working directory reported for a CC thread (filled each turn from
+    /// `ChatSendRequest.cwd`). The B executor bridges it into `run_captured`
+    /// (`cd <cwd> && …`) since an MCP tool call has no per-turn cwd of its own.
+    pub cc_thread_cwd: Arc<Mutex<HashMap<String, String>>>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -135,6 +146,11 @@ impl AppState {
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
             cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
             cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
+            captures: Arc::new(crate::agent::capture::CaptureRegistry::new(
+                std::env::temp_dir().join("taomni-cc-captures"),
+            )),
+            cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
+            cc_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

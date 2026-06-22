@@ -53,6 +53,11 @@ use crate::state::{AppState, CcPermissionDecision, CcToolOutcome};
 const PERMISSION_TIMEOUT_SECS: u64 = 300;
 /// How long a side-effect tool waits for the frontend to perform the effect.
 const TOOL_TIMEOUT_SECS: u64 = 600;
+/// Hard wall-clock cap on a single captured run (方案4). Kept below the CC
+/// idle-reaper's in-flight ceiling (`process::TOOL_WAIT_CEILING_SECS` = 960) so
+/// the capture's own timeout fires first and the CC process is never reaped
+/// mid-capture.
+const CAPTURE_TIMEOUT_SECS: u64 = 900;
 
 /// Trust tier inferred for a CC thread (D3). Local working dirs are lenient;
 /// remote SSH sessions are strict. Surfaced to the UI; the safety pipeline
@@ -407,6 +412,286 @@ impl CcHandler {
             }
         }
     }
+
+    /// Run a command on the bound host capturing its full output (方案4), then
+    /// return only a bounded summary. `reflect_session=false` → B path
+    /// (independent channel, Taomni-local file); `true` → C path (live
+    /// interactive session, remote temp file, POSIX SSH only). Blocks with
+    /// progress events + a hard timeout; cancellable via `cc_cancel_capture`.
+    async fn run_captured_impl(
+        &self,
+        scope: &TokenScope,
+        command: &str,
+        reflect_session: bool,
+        session_id: Option<String>,
+    ) -> Result<CallToolResult, ErrorData> {
+        use crate::agent::capture::{exec_b, exec_c, CaptureSource, CaptureStatus};
+        use crate::terminal::ActiveTerminal;
+
+        let sid = session_id
+            .or_else(|| scope.allowed_session_id.clone())
+            .ok_or_else(|| {
+                ErrorData::invalid_params(
+                    "run_captured requires a bound terminal session".to_string(),
+                    None,
+                )
+            })?;
+        let state = self.app_state();
+
+        if state.captures.running_count(&scope.thread_id) >= 2 {
+            return Err(ErrorData::internal_error(
+                "too many captures already running for this thread; retry shortly".to_string(),
+                None,
+            ));
+        }
+
+        // Clone connection handles out of the terminals map so we don't hold its
+        // lock across a possibly-minutes-long run.
+        type SshHandle = Arc<russh::client::Handle<crate::terminal::ssh::SshHandler>>;
+        type SshWrite = Arc<tokio::sync::Mutex<russh::ChannelWriteHalf<russh::client::Msg>>>;
+        enum Target {
+            Ssh(SshHandle, SshWrite),
+            Local,
+        }
+        let target = {
+            let terms = state.terminals.read().await;
+            match terms.get(&sid) {
+                Some(ActiveTerminal::Ssh { handle, channel, .. }) => {
+                    Target::Ssh(handle.clone(), channel.clone())
+                }
+                Some(ActiveTerminal::Local { .. }) => Target::Local,
+                None => {
+                    return Err(ErrorData::invalid_params(
+                        format!("no live terminal for session {sid}"),
+                        None,
+                    ))
+                }
+            }
+        };
+
+        let cwd = state.cc_thread_cwd.lock().unwrap().get(&scope.thread_id).cloned();
+
+        // Shared live counts (C reads these for the final tally; B reads the
+        // writer). The progress closure also emits to the UI.
+        let counts = Arc::new(std::sync::Mutex::new((0u64, 0u64)));
+        let app = self.app.clone();
+        let cap_thread = scope.thread_id.clone();
+        let counts_cb = counts.clone();
+        let make_progress = move |cap_id: String| {
+            let app = app.clone();
+            let thread = cap_thread.clone();
+            let counts = counts_cb.clone();
+            move |lines: u64, bytes: u64| {
+                *counts.lock().unwrap() = (lines, bytes);
+                let _ = app.emit(
+                    "agent-cc-capture-progress",
+                    serde_json::json!({
+                        "captureId": cap_id, "threadId": thread, "lines": lines, "bytes": bytes,
+                    }),
+                );
+            }
+        };
+
+        let cancel = Arc::new(tokio::sync::Notify::new());
+
+        // ---- C path: in-session, remote temp file (POSIX SSH only) ---------
+        if reflect_session {
+            let (handle, write_half) = match target {
+                Target::Ssh(h, w) => (h, w),
+                Target::Local => {
+                    return Err(ErrorData::invalid_params(
+                        "reflect_session=true is only available for remote SSH sessions; \
+                         use reflect_session=false here"
+                            .to_string(),
+                        None,
+                    ))
+                }
+            };
+            let meta = state.captures.begin(
+                &scope.thread_id,
+                command,
+                CaptureSource::RemoteFile {
+                    session_id: sid.clone(),
+                    path: String::new(),
+                    family: crate::agent::capture::ShellFamily::Posix,
+                },
+            );
+            let (family, path) = exec_c::start_c_ssh(&handle, &write_half, command, &meta.id)
+                .await
+                .map_err(|e| {
+                    state.captures.finish(&meta.id, CaptureStatus::Failed, None, 0, 0, false);
+                    ErrorData::invalid_params(e, None)
+                })?;
+            state.captures.set_source(
+                &meta.id,
+                CaptureSource::RemoteFile { session_id: sid.clone(), path: path.clone(), family },
+            );
+            state
+                .cc_capture_cancels
+                .lock()
+                .unwrap()
+                .insert(meta.id.clone(), cancel.clone());
+
+            let progress = make_progress(meta.id.clone());
+            let marker = format!("__TAOMNI_END_{}", meta.id);
+            let poll = exec_c::poll_c_ssh(&handle, &write_half, &path, &marker, cancel.clone(), progress);
+            let (status, rc) =
+                match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), poll).await {
+                    Ok(r) => r,
+                    Err(_) => {
+                        cancel.notify_waiters();
+                        (CaptureStatus::TimedOut, None)
+                    }
+                };
+            state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+            let (lines, bytes) = *counts.lock().unwrap();
+            state.captures.finish(&meta.id, status, rc, lines, bytes, false);
+            self.emit_capture_end(&meta.id, &scope.thread_id, status, lines, bytes, rc, false);
+
+            let head = exec_c::reduce_remote(&handle, family, &path, &meta.id,
+                &crate::agent::capture::reduce::ReduceOp::Head { n: crate::agent::capture::SUMMARY_HEAD })
+                .await.map(|r| r.text).unwrap_or_default();
+            let tail = exec_c::reduce_remote(&handle, family, &path, &meta.id,
+                &crate::agent::capture::reduce::ReduceOp::Tail { n: crate::agent::capture::SUMMARY_TAIL })
+                .await.map(|r| r.text).unwrap_or_default();
+            return Ok(CallToolResult::success(vec![Content::text(capture_summary(
+                &meta.id, status, rc, lines, bytes, false, &head, &tail,
+            ))]));
+        }
+
+        // ---- B path: independent channel / local child, Taomni-local file --
+        let dir = state.captures.thread_dir(&scope.thread_id);
+        let meta = state.captures.begin(
+            &scope.thread_id,
+            command,
+            CaptureSource::LocalFile(dir.join("placeholder")),
+        );
+        let writer = crate::agent::capture::CaptureWriter::create(&dir, &meta.id)
+            .map_err(|e| ErrorData::internal_error(format!("capture file: {e}"), None))?;
+        state
+            .captures
+            .set_source(&meta.id, CaptureSource::LocalFile(writer.path()));
+        state
+            .cc_capture_cancels
+            .lock()
+            .unwrap()
+            .insert(meta.id.clone(), cancel.clone());
+
+        let progress = make_progress(meta.id.clone());
+        let run = async {
+            match target {
+                Target::Ssh(handle, _) => {
+                    exec_b::run_ssh(&handle, command, cwd.as_deref(), &writer, cancel.clone(), progress).await
+                }
+                Target::Local => {
+                    exec_b::run_local(command, cwd.as_deref(), &writer, cancel.clone(), progress).await
+                }
+            }
+        };
+        let outcome = match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), run).await {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
+                state.captures.finish(&meta.id, CaptureStatus::Failed, None,
+                    writer.lines(), writer.bytes(), writer.truncated());
+                state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+                return Err(ErrorData::internal_error(e, None));
+            }
+            Err(_) => {
+                cancel.notify_waiters();
+                exec_b::ExecOutcome { status: CaptureStatus::TimedOut, exit_code: None }
+            }
+        };
+
+        state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+        let truncated = writer.truncated();
+        state.captures.finish(&meta.id, outcome.status, outcome.exit_code,
+            writer.lines(), writer.bytes(), truncated);
+        self.emit_capture_end(&meta.id, &scope.thread_id, outcome.status,
+            writer.lines(), writer.bytes(), outcome.exit_code, truncated);
+
+        let path = writer.path();
+        let head = crate::agent::capture::reduce::reduce_file(&path,
+            &crate::agent::capture::reduce::ReduceOp::Head { n: crate::agent::capture::SUMMARY_HEAD })
+            .map(|r| r.text).unwrap_or_default();
+        let tail = crate::agent::capture::reduce::reduce_file(&path,
+            &crate::agent::capture::reduce::ReduceOp::Tail { n: crate::agent::capture::SUMMARY_TAIL })
+            .map(|r| r.text).unwrap_or_default();
+        Ok(CallToolResult::success(vec![Content::text(capture_summary(
+            &meta.id, outcome.status, outcome.exit_code,
+            writer.lines(), writer.bytes(), truncated, &head, &tail,
+        ))]))
+    }
+
+    /// Emit the capture-end event so the UI progress card clears.
+    fn emit_capture_end(
+        &self,
+        id: &str,
+        thread_id: &str,
+        status: crate::agent::capture::CaptureStatus,
+        lines: u64,
+        bytes: u64,
+        exit_code: Option<i32>,
+        truncated: bool,
+    ) {
+        let _ = self.app.emit(
+            "agent-cc-capture-end",
+            serde_json::json!({
+                "captureId": id, "threadId": thread_id,
+                "status": format!("{status:?}"), "lines": lines, "bytes": bytes,
+                "exitCode": exit_code, "truncated": truncated,
+            }),
+        );
+    }
+
+    /// Reduce a previously-captured output (方案4). Read-only, thread-scoped.
+    async fn read_capture_impl(
+        &self,
+        scope: &TokenScope,
+        p: &ReadCaptureParams,
+    ) -> Result<CallToolResult, ErrorData> {
+        use crate::agent::capture::CaptureSource;
+        let meta = self
+            .app_state()
+            .captures
+            .get_scoped(&scope.thread_id, &p.capture_id)
+            .ok_or_else(|| {
+                ErrorData::invalid_params(
+                    format!("no capture '{}' for this thread", p.capture_id),
+                    None,
+                )
+            })?;
+        let op = parse_reduce_op(p).map_err(|e| ErrorData::invalid_params(e, None))?;
+        match &meta.source {
+            CaptureSource::LocalFile(path) => {
+                let r = crate::agent::capture::reduce::reduce_file(path, &op)
+                    .map_err(|e| ErrorData::internal_error(e, None))?;
+                Ok(CallToolResult::success(vec![Content::text(annotate_reduce(r))]))
+            }
+            CaptureSource::RemoteFile { session_id, path, family } => {
+                use crate::terminal::ActiveTerminal;
+                // Re-resolve the SSH handle (the run may have been turns ago).
+                let st = self.app_state();
+                let handle = {
+                    let terms = st.terminals.read().await;
+                    match terms.get(session_id) {
+                        Some(ActiveTerminal::Ssh { handle, .. }) => handle.clone(),
+                        _ => {
+                            return Err(ErrorData::internal_error(
+                                "the session backing this capture is no longer connected".to_string(),
+                                None,
+                            ))
+                        }
+                    }
+                };
+                let r = crate::agent::capture::exec_c::reduce_remote(
+                    &handle, *family, path, &meta.id, &op,
+                )
+                .await
+                .map_err(|e| ErrorData::internal_error(e, None))?;
+                Ok(CallToolResult::success(vec![Content::text(annotate_reduce(r))]))
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -467,6 +752,36 @@ struct SaveAsRunbookParams {
     commands: Vec<String>,
 }
 
+#[derive(Deserialize, schemars::JsonSchema, serde::Serialize)]
+struct RunCapturedParams {
+    /// Command to run on the bound session's host. Its full stdout+stderr are
+    /// captured; only a summary is returned. Use read_capture to grep/page it.
+    command: String,
+    /// false (default): run in an independent channel (clean output, divorced
+    /// from interactive shell state, cwd bridged). true: run in the live
+    /// interactive session (visible, full shell state) — C path.
+    #[serde(default)]
+    reflect_session: bool,
+    session_id: Option<String>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema, serde::Serialize, Clone)]
+struct ReadCaptureParams {
+    capture_id: String,
+    /// One of: head | tail | range | grep | jq | stats.
+    op: String,
+    /// head/tail: number of lines.
+    n: Option<u32>,
+    /// range: 1-based inclusive bounds.
+    start: Option<u32>,
+    end: Option<u32>,
+    /// grep: regex pattern + optional context lines.
+    pattern: Option<String>,
+    context: Option<u32>,
+    /// jq: filter expression.
+    filter: Option<String>,
+}
+
 #[derive(Deserialize, schemars::JsonSchema)]
 struct PermissionParams {
     tool_name: String,
@@ -480,6 +795,68 @@ struct PermissionParams {
 
 fn as_value<T: serde::Serialize>(p: &T) -> serde_json::Value {
     serde_json::to_value(p).unwrap_or(serde_json::Value::Null)
+}
+
+/// Map `read_capture` params onto a typed reduction op, validating presence of
+/// the fields each op needs.
+fn parse_reduce_op(
+    p: &ReadCaptureParams,
+) -> Result<crate::agent::capture::reduce::ReduceOp, String> {
+    use crate::agent::capture::reduce::ReduceOp;
+    match p.op.as_str() {
+        "head" => Ok(ReduceOp::Head { n: p.n.unwrap_or(50) as usize }),
+        "tail" => Ok(ReduceOp::Tail { n: p.n.unwrap_or(50) as usize }),
+        "range" => {
+            let start = p.start.ok_or("range requires `start`")? as usize;
+            let end = p.end.ok_or("range requires `end`")? as usize;
+            Ok(ReduceOp::Range { start, end })
+        }
+        "grep" => Ok(ReduceOp::Grep {
+            pattern: p.pattern.clone().ok_or("grep requires `pattern`")?,
+            context: p.context.unwrap_or(0) as usize,
+        }),
+        "jq" => Ok(ReduceOp::Jq {
+            filter: p.filter.clone().ok_or("jq requires `filter`")?,
+        }),
+        "stats" => Ok(ReduceOp::Stats),
+        other => Err(format!(
+            "unknown op '{other}' (expected head|tail|range|grep|jq|stats)"
+        )),
+    }
+}
+
+/// Append the reduction's note / truncation receipt to its text for CC.
+fn annotate_reduce(r: crate::agent::capture::reduce::ReduceResult) -> String {
+    let mut text = r.text;
+    if let Some(note) = r.note {
+        text.push_str(&format!("\n[{note}]"));
+    }
+    if r.truncated {
+        text.push_str("\n[output clipped by read_capture cap — narrow with grep/range]");
+    }
+    text
+}
+
+/// Build the bounded `run_captured` summary (shared by B and C paths).
+fn capture_summary(
+    id: &str,
+    status: crate::agent::capture::CaptureStatus,
+    rc: Option<i32>,
+    lines: u64,
+    bytes: u64,
+    truncated: bool,
+    head: &str,
+    tail: &str,
+) -> String {
+    format!(
+        "[capture {id}] status={status:?} exit={exit} lines={lines} bytes≈{bytes} truncated={trunc}\n\
+         --- head {h} ---\n{head}--- tail {t} ---\n{tail}\
+         提示：完整输出已捕获。用 read_capture(capture_id=\"{id}\", op=\"grep|head|tail|range|jq|stats\", …) 按需检索，不要重跑命令。",
+        exit = rc.map(|c| c.to_string()).unwrap_or_else(|| "?".into()),
+        trunc = truncated,
+        h = crate::agent::capture::SUMMARY_HEAD,
+        t = crate::agent::capture::SUMMARY_TAIL,
+    )
 }
 
 /// CC usually omits `session_id` — it doesn't know the thread's bound session.
@@ -636,6 +1013,48 @@ impl CcHandler {
     }
 
     #[tool(
+        name = "run_captured",
+        description = "在绑定会话主机上运行命令并完整捕获输出（stdout+stderr+退出码），只返回摘要；用于输出很大、需要后续 grep/分页分析的场景，避免把大量输出灌进上下文。之后用 read_capture 检索。reflect_session=false（默认）在独立通道运行（输出干净、与交互 shell 状态隔离）；true 在当前交互会话内运行并可见（保留 cwd/环境，仅支持 POSIX 远端 SSH）。危险动作需用户确认。"
+    )]
+    async fn run_captured(
+        &self,
+        Parameters(p): Parameters<RunCapturedParams>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let scope = self.scope(&ctx)?;
+        let mut args = as_value(&p);
+        fill_session_id(&mut args, &scope);
+        enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
+        // Defense in depth: re-run the blacklist (permission_prompt already did,
+        // but CC may have an allowlist that skips the prompt).
+        let call = ToolCall {
+            tool: "run_captured".into(),
+            args: args.clone(),
+        };
+        crate::agent::safety::check_tool_call(&call)
+            .map_err(|e| ErrorData::invalid_params(e, None))?;
+        let session_id = args
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        self.run_captured_impl(&scope, &p.command, p.reflect_session, session_id)
+            .await
+    }
+
+    #[tool(
+        name = "read_capture",
+        description = "检索 run_captured 的完整输出：op=head|tail|range|grep|jq|stats（grep 用正则、jq 用 jq 表达式）。每次返回有界，必要时用 grep/range 收窄。只读、限本线程自己的捕获。"
+    )]
+    async fn read_capture(
+        &self,
+        Parameters(p): Parameters<ReadCaptureParams>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let scope = self.scope(&ctx)?;
+        self.read_capture_impl(&scope, &p).await
+    }
+
+    #[tool(
         name = "permission_prompt",
         description = "Approve or deny a Claude Code tool call per Taomni's safety rules + human-in-the-loop confirmation."
     )]
@@ -680,7 +1099,7 @@ impl CcHandler {
         // blacklist + sensitive-path checks above already ran, so this only
         // ever waives *confirmation*, never safety.
         let is_readonly = !scope.confirm_readonly
-            && matches!(tool_name.as_str(), "Bash" | "run_in_terminal")
+            && matches!(tool_name.as_str(), "Bash" | "run_in_terminal" | "run_captured")
             && p.tool_input
                 .get("command")
                 .and_then(|v| v.as_str())
@@ -795,6 +1214,67 @@ mod tests {
     fn normalize_leaves_builtin_tools_untouched() {
         assert_eq!(normalize_tool_name("Bash"), "Bash");
         assert_eq!(normalize_tool_name("Edit"), "Edit");
+    }
+
+    #[test]
+    fn parse_reduce_op_maps_each_op() {
+        use crate::agent::capture::reduce::ReduceOp;
+        let base = |op: &str| ReadCaptureParams {
+            capture_id: "c".into(),
+            op: op.into(),
+            n: None,
+            start: None,
+            end: None,
+            pattern: None,
+            context: None,
+            filter: None,
+        };
+        assert_eq!(
+            parse_reduce_op(&ReadCaptureParams { n: Some(10), ..base("head") }).unwrap(),
+            ReduceOp::Head { n: 10 }
+        );
+        assert_eq!(
+            parse_reduce_op(&base("tail")).unwrap(),
+            ReduceOp::Tail { n: 50 } // default
+        );
+        assert_eq!(
+            parse_reduce_op(&ReadCaptureParams { start: Some(2), end: Some(5), ..base("range") })
+                .unwrap(),
+            ReduceOp::Range { start: 2, end: 5 }
+        );
+        assert_eq!(
+            parse_reduce_op(&ReadCaptureParams {
+                pattern: Some("ERR".into()),
+                context: Some(2),
+                ..base("grep")
+            })
+            .unwrap(),
+            ReduceOp::Grep { pattern: "ERR".into(), context: 2 }
+        );
+        assert_eq!(
+            parse_reduce_op(&ReadCaptureParams { filter: Some(".a".into()), ..base("jq") }).unwrap(),
+            ReduceOp::Jq { filter: ".a".into() }
+        );
+        assert_eq!(parse_reduce_op(&base("stats")).unwrap(), ReduceOp::Stats);
+    }
+
+    #[test]
+    fn parse_reduce_op_requires_op_fields() {
+        let p = ReadCaptureParams {
+            capture_id: "c".into(),
+            op: "range".into(),
+            n: None,
+            start: None,
+            end: None,
+            pattern: None,
+            context: None,
+            filter: None,
+        };
+        assert!(parse_reduce_op(&p).is_err(), "range without start/end must error");
+        let p2 = ReadCaptureParams { op: "grep".into(), ..p.clone() };
+        assert!(parse_reduce_op(&p2).is_err(), "grep without pattern must error");
+        let p3 = ReadCaptureParams { op: "bogus".into(), ..p };
+        assert!(parse_reduce_op(&p3).is_err(), "unknown op must error");
     }
 
     #[test]
