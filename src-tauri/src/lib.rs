@@ -404,6 +404,7 @@ pub fn run() {
             agent::cc_bridge::commands::cc_stop_session,
             agent::cc_bridge::commands::cc_resolve_tool_call,
             agent::cc_bridge::commands::cc_resolve_permission,
+            agent::cc_bridge::commands::cc_cancel_capture,
             chat::chat_new_thread,
             chat::chat_list_threads,
             chat::chat_list_messages,

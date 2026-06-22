@@ -700,6 +700,18 @@ pub async fn chat_stream(
         let assistant_id_clone = assistant_id.clone();
         let app_clone = app.clone();
         let event_name_clone = event_name.clone();
+        // Stash the live cwd for this thread so backend-side tools invoked
+        // mid-turn (run_captured → B executor) can bridge it (`cd <cwd> && …`);
+        // an MCP tool call has no per-turn cwd of its own. Volatile, so refresh
+        // every turn.
+        if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            state
+                .cc_thread_cwd
+                .lock()
+                .unwrap()
+                .insert(req.thread_id.clone(), cwd.to_string());
+        }
+
         // Build the per-turn context prefix CC sees: the live working
         // directory (3.3 — volatile, so injected each turn rather than in the
         // spawn-time identity card) followed by any attached terminal context,

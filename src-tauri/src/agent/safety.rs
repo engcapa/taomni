@@ -15,8 +15,9 @@ use std::path::{Path, PathBuf};
 pub fn check_tool_call(call: &ToolCall) -> Result<(), String> {
     match call.tool.as_str() {
         // Native terminal command + CC's Bash both carry the command under
-        // `command`; run both through the shell blacklist.
-        "run_in_terminal" | "Bash" => {
+        // `command`; run both through the shell blacklist. `run_captured`
+        // (方案4) is the same — a command executed on the bound host.
+        "run_in_terminal" | "Bash" | "run_captured" => {
             if let Some(cmd) = call.args.get("command").and_then(|v| v.as_str()) {
                 let safety = crate::ai::shell_safety::check_blacklist(cmd);
                 if safety.blocked {
@@ -165,6 +166,7 @@ pub fn is_write_tool(tool: &str) -> bool {
     matches!(
         tool,
         "run_in_terminal"
+            | "run_captured"
             | "sftp_upload"
             | "save_as_runbook"
             | "Bash"
@@ -284,5 +286,19 @@ mod tests {
             assert!(is_write_tool(t), "{t} should be a write tool");
         }
         assert!(!requires_confirmation("Read"));
+    }
+
+    #[test]
+    fn run_captured_is_a_confirmed_command_tool() {
+        // 方案4 — run_captured executes a command on the bound host, so it must
+        // run the shell blacklist and require confirmation, while read_capture
+        // (read-only) does not.
+        assert!(requires_confirmation("run_captured"));
+        assert!(is_write_tool("run_captured"));
+        assert!(!is_write_tool("read_capture"));
+        let blocked = call("run_captured", json!({ "command": "rm -rf /" }));
+        assert!(check_tool_call(&blocked).is_err(), "rm -rf / must be blocked");
+        let ok = call("run_captured", json!({ "command": "journalctl -n 100000" }));
+        assert!(check_tool_call(&ok).is_ok());
     }
 }

@@ -33,6 +33,21 @@ interface ToolDispatch {
   args: Record<string, unknown>;
 }
 
+/** Live progress of an in-flight `run_captured` run (方案4). */
+interface CaptureProgress {
+  captureId: string;
+  threadId: string;
+  lines: number;
+  bytes: number;
+}
+
+/** Human-readable byte size for the capture progress card. */
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /** Short human description of what a tool call will do, for the ActionCard. */
 function describe(tool: string, rawArgs: Record<string, unknown> | null | undefined): string {
   const args = rawArgs ?? {};
@@ -66,6 +81,7 @@ function preview(rawArgs: Record<string, unknown> | null | undefined): string | 
 export function CcAgentBridge() {
   const [queue, setQueue] = useState<PermissionPrompt[]>([]);
   const [deciding, setDeciding] = useState(false);
+  const [captures, setCaptures] = useState<CaptureProgress[]>([]);
 
   // --- permission prompts (HITL) ---------------------------------------
   useEffect(() => {
@@ -82,6 +98,9 @@ export function CcAgentBridge() {
       // leaking this listener — a leak would fire every handler twice.
       if (disposed) void fn();
       else unlisten = fn;
+    }).catch(() => {
+      // `listen` can reject outside Tauri (e.g. jsdom tests); ignore — the
+      // bridge is simply inert there.
     });
     return () => {
       disposed = true;
@@ -120,6 +139,9 @@ export function CcAgentBridge() {
       // which here would write the command into the terminal twice.
       if (disposed) void fn();
       else unlisten = fn;
+    }).catch(() => {
+      // `listen` can reject outside Tauri (e.g. jsdom tests); ignore — the
+      // bridge is simply inert there.
     });
     return () => {
       disposed = true;
@@ -129,8 +151,67 @@ export function CcAgentBridge() {
 
   const head = queue[0] ?? null;
 
+  // --- captured-run progress (方案4) -----------------------------------
+  useEffect(() => {
+    let unlistenProgress: UnlistenFn | null = null;
+    let unlistenEnd: UnlistenFn | null = null;
+    let disposed = false;
+    void listen<CaptureProgress>("agent-cc-capture-progress", (event) => {
+      setCaptures((cs) => {
+        const i = cs.findIndex((c) => c.captureId === event.payload.captureId);
+        if (i === -1) return [...cs, event.payload];
+        const next = cs.slice();
+        next[i] = event.payload;
+        return next;
+      });
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlistenProgress = fn;
+    }).catch(() => {});
+    void listen<{ captureId: string }>("agent-cc-capture-end", (event) => {
+      setCaptures((cs) => cs.filter((c) => c.captureId !== event.payload.captureId));
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlistenEnd = fn;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlistenProgress?.();
+      unlistenEnd?.();
+    };
+  }, []);
+
+  const cancelCapture = useCallback(async (captureId: string) => {
+    try {
+      await invoke("cc_cancel_capture", { captureId });
+    } catch (e) {
+      console.error("cc_cancel_capture failed:", e);
+    }
+  }, []);
+
   return (
     <>
+      {captures.length > 0 && (
+        <div className="fixed bottom-4 left-4 z-[1000] flex max-w-[360px] flex-col gap-2">
+          {captures.map((c) => (
+            <div
+              key={c.captureId}
+              className="flex items-center justify-between gap-3 rounded bg-[var(--taomni-bg-elevated,#222)] px-3 py-2 text-xs shadow-lg"
+            >
+              <span className="truncate text-[var(--taomni-text-muted)]">
+                捕获中 {c.lines.toLocaleString()} 行 · {fmtBytes(c.bytes)}
+              </span>
+              <button
+                type="button"
+                className="shrink-0 rounded border border-[var(--taomni-border,#444)] px-2 py-0.5 hover:bg-[var(--taomni-bg-hover,#333)]"
+                onClick={() => void cancelCapture(c.captureId)}
+              >
+                取消
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {head && (
         <div className="fixed bottom-4 right-4 z-[1000] max-w-[420px] shadow-lg">
           <ActionCard

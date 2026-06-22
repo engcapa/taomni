@@ -93,6 +93,15 @@ fn push_terminal_routing(s: &mut String, remote: bool) {
          「我在哪 / 当前目录是什么」一律以绑定终端的实际状态(用 run_in_terminal 查)\
          或每轮提供的「当前工作目录」为准,不要据本地 <env> 作答。\n",
     );
+    // 方案4 — output-volume discipline. run_in_terminal is fire-and-forget and
+    // read_terminal_tail only returns a scrollback *tail*, so large output
+    // loses its head/middle. Steer big-output work to run_captured (full
+    // capture) + read_capture (grep/page) instead of dumping + tailing.
+    s.push_str(
+        "当命令可能产生大量输出(日志、扫描、跑脚本等),不要用 run_in_terminal 直接 dump 再 \
+         read_terminal_tail 取尾巴——那样会丢失开头和中间。改用 run_captured 运行并完整捕获,\
+         再用 read_capture(op=grep/head/tail/range/jq/stats)按需检索,不要为了再看一遍而重跑命令。\n",
+    );
 }
 
 /// Render the (pre-redaction) card text.
@@ -242,6 +251,9 @@ mod tests {
         assert!(card.contains("当前目录 / 文件 / 进程 / 环境"));
         // ② Native <env> is demoted to a host sandbox.
         assert!(card.contains("宿主沙箱"));
+        // 方案4 — large-output discipline steers to run_captured + read_capture.
+        assert!(card.contains("run_captured"));
+        assert!(card.contains("read_capture"));
         // History snapshot, newest first.
         assert!(card.contains("- systemctl status nginx"));
         assert!(card.contains("- df -h"));
