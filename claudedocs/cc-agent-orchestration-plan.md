@@ -128,11 +128,60 @@
 - ☐ live `chat_stream` 接 `--add-dir`(搬 `commands.rs` 逻辑),cwd 由前端 OSC-7 传入(扩 `chat_stream` 请求字段)。**注**:仅对本地工作区线程有意义;远端 SSH 线程 N/A。还需先给 CC 子进程显式设 `current_dir`(现继承 Taomni 工作目录,无意义)。
 - ☐ per-thread 模型(opus/sonnet/haiku)+ thinking 预算,在 provider 切换处暴露。
 - ☐ CC 的 `tool_use/tool_result` 渲染为结构化卡片;从 result 事件捞 token/cost/usage。
-- ☐(新增候选,讨论结论)**执行目标消歧**:让 CC 在绑定会话时优先 `run_in_terminal`(远端)而非内置 Bash(本地)——system-prompt 一句消歧,或 Strict 线程 deny 本地 Bash。小而高价值。
+- ☐(新增候选,讨论结论)**执行目标消歧**:让 CC 在绑定会话时优先 `run_in_terminal`(远端)而非内置 Bash(本地)。**已并入下方 3.S 会话身份卡**(由身份卡里的工具路由指引一句话实现);Strict 线程 deny 本地 Bash 作为可选加强保留。
 - ☐(新增候选,讨论结论)**只读命令确认降噪**:区分只读/改动命令,只读免逐条弹卡(或引导 allow-session),降低「跑→读→调整」循环的点击摩擦。
-- ❌(讨论结论)**环境事实卡** —— 不做:`read_terminal_tail` 反馈闭环已覆盖,纯优化、低优先。
+- ☐ **3.S 会话身份卡注入(本轮新增,详见下「Phase 3.S」)**:把绑定会话的非敏感身份 + 最近命令历史经 `--append-system-prompt-file` 注入 CC,让 CC 自知"我在哪个会话",减少自我定位的无谓 `list_sessions`/本地 Bash 误用。
+- ⚠️(原结论修订)**环境事实卡**:此前判「不做」是针对**命令正确性**(`read_terminal_tail` 闭环已覆盖)。本轮诉求不同 —— **会话身份感知**(CC 不知自己绑在哪个 session、误用本地 Bash、重复自我定位),闭环不覆盖。故**作用域化复活**为 3.S(仅身份 + 历史,不做命令正确性提示)。
 
 → ☐ Review gate 3。
+
+#### Phase 3.S — 会话身份卡注入(本轮细化,已锁定取舍)
+
+**目标**:CC 经常"不知道自己绑在哪个 session" → 重复调 `list_sessions` 自我定位、或在绑定远端时误用本地 `Bash`。把**绑定会话的非敏感身份 + 最近命令历史**推给 CC,让它无需本地查询即知现状。
+
+**已锁定取舍(本轮 review)**:
+- **注入方式 = 全塞 system prompt 快照**:spawn 时经 `--append-system-prompt-file` 注入一张快照(已验证 CC v2.1.185 支持 `--system-prompt` / `--append-system-prompt[-file]`)。**不**做每轮消息前言注入。
+- **v1 范围 = 身份卡 + 历史;cwd 留到下轮**。理由见下「数据可用性」:cwd 后端不持久化。
+- 为何快照可接受:CC 进程**每线程 spawn 一次、参数终生固定**(`process.rs:22`、`chat/mod.rs:512`)。身份在线程内**不变**(绑定固定),快照恒准;历史标注为"会话开始时最近命令",轻微陈旧可接受;唯一强易变项 cwd 本轮不做,故无须每轮刷新。
+
+**数据可用性(已核实,2026-06-21)**:
+- **SessionConfig**(`session/models.rs:3-24`,`sessions` 表):非敏感字段白名单 = `id / name / session_type / group_path / host / port / username / auth_method 标签 / last_connected_at`。**绝不**取 `options_json`(含 vault 凭据引用)。无明文密钥。
+- **`linked_session_id` 是终端 *tab id*,不是 `SessionConfig.id`**(`chatStore.ts:93-95`)。后端 `state.terminals` 也按 tab id 作键、`ActiveTerminal` 不存 config id(`state.rs:67`)→ **后端单凭 thread 无法解析会话元数据**。
+- **cwd 不持久化**:后端无任何内存 HashMap 存 cwd(`state.rs` 全部 HashMap 已查);所有 `cwd` 都是 spawn 瞬时参数(`pty.rs:577`)。cwd 仅前端 OSC-7 持有,按调用传参(先例 `ai/commands.rs:138` 把前端 cwd 拼成"当前工作目录：…")。**v1 不传 cwd**。
+- **命令历史在 SQLite**:`command_history` 表按 `host_key`(=`ssh:host:port:user` 或 `local`)。`history_list_recent(host_key, limit)` 可取该 host 最近命令。**非按 SessionConfig.id**,由会话的 host/port/user 推出 host_key。
+
+**实现(前端解析身份 + 后端读 DB 组卡)**:
+1. **前端**:发 CC 消息时,由绑定 tab → 终端 registry 取 `sessionId`(= `SessionConfig.id`),作为**新请求字段 `bound_session_id`** 传入(区别于 tab 维度的 `linked_session_id`)。本地/未保存线程则为空。
+2. **后端 `chat/mod.rs` CC spawn 分支(进程首建时)**:
+   - 若有 `bound_session_id` → `session::db::get_session` 取 `SessionConfig`;按白名单组身份段;由 host/port/user 推 `host_key` → 查 `command_history` 最近 N 条(如 15)。
+   - 无 → 降级为"本地工作区线程,无绑定远端会话"卡。
+   - 拼好卡 → 过 `redact::redact`(防御纵深)→ 写进程已有 obscure `temp_dir` 的 `system-prompt.txt`(随 stop/Drop 清理)→ `extra_args` 增 `--append-system-prompt-file <path>`。
+3. 卡片模板(示意):
+
+   ```text
+   你当前绑定到 Taomni 会话「<name>」:<username>@<host>:<port>(类型 SSH,认证 PrivateKey)。
+   信任级=Strict(远端,危险动作会停下等用户确认)。
+   会话 SessionConfig id=<sid>;聊天线程 thread=<tid>。
+   在本会话操作远端:用 run_in_terminal/sftp_upload,不要用本地 Bash;读回显用 read_terminal_tail。
+   该主机最近命令(会话开始时快照):
+     - <cmd1>
+     - <cmd2>
+     …
+   ```
+
+**安全**:
+- 用 `--append-system-prompt-file` 而非 `--append-system-prompt`,避免 host/user/会话名进 argv 被本机其他用户 `ps` 看到。
+- 字段白名单,不碰 `options_json`;成卡再过 `redact`。
+- Vault 锁**不挡**:SessionConfig 的 host/user 是明文列,不走 vault,锁着也能组卡,不新增解锁依赖。
+
+**边界**:
+- 未保存/本地快终端 → 身份段降级,仍给"本地工作区"+(可选)`local` 历史。
+- **绑定中途改变**:进程已用旧卡 spawn → 卡会过期。低成本兜底 = spawn 分支侦测 `bound_session_id` 与进程创建时不一致 → `stop()` 重建进程(可选,绑定改变罕见,v1 可先不做、文档标注已知限制)。
+- 历史为快照,不随会话内新命令更新(易变项延后到"每轮前言"或专用工具,本轮不做)。
+
+**测试**:身份卡内容快照测(给定 SessionConfig → 期望文本);无 `bound_session_id` 降级测;`host_key` 推导 + 历史注入测;`redact` 命中(构造含密文的 name);断言 argv **不含** host(走文件变体)。
+
+→ ☐ Review gate 3.S(并入 gate 3)。
 
 ### Phase 4 — 编排者 B 最小版 — ☐ 待办
 - ☐ 给 CC 增最小编排工具 `dispatch_subtask`(并行拉起子 CC 进程或原生 agent run),结果聚合回主 CC。
@@ -152,10 +201,11 @@
 - ✅ 废弃旧的自定义 JSON-RPC `agent/mcp_server.rs` + `lib.rs` 的 `mcp_server_start/stop/status` 注册 + stdio `--mcp-server` 分支（`main.rs` dispatch、`cc_bridge/permissions_mcp.rs`、`cc_bridge/tools_mcp.rs`）。三处均已删除，构建通过、cc_bridge 33 测试全绿；活动路径只剩 `cc_bridge/mcp_http.rs`（Streamable-HTTP）。
 
 **Phase 3(cwd + 模型 + 渲染):**
+- ☐ **3.S 会话身份卡注入**:前端传 `bound_session_id`;后端首建进程时 `get_session` + `command_history`(host_key)组卡 → `redact` → `--append-system-prompt-file`。v1 含身份 + 历史,**不含 cwd**。*(本轮新增,详见 Phase 3.S;并入旧「执行目标消歧」、作用域化复活旧「环境事实卡」)*
 - ☐ CC 子进程显式 `current_dir` + 本地工作区线程接 `--add-dir`
+- ☐ cwd 注入(前端 OSC-7 → 请求字段,先例 `ai/commands.rs:138`)*(3.S 下轮)*
 - ☐ per-thread 模型 + thinking 预算
 - ☐ `tool_use/tool_result` 结构化卡片 + result 事件的 token/cost/usage
-- ☐ 执行目标消歧(优先 `run_in_terminal`)*(讨论新增,低成本高价值)*
 - ☐ 只读命令确认降噪 *(讨论新增)*
 
 **Phase 4(编排 B 最小版):**

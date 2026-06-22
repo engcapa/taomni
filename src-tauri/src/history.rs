@@ -152,3 +152,23 @@ pub fn db_search(
     })?;
     rows.collect()
 }
+
+/// Non-command version: most-recently-used commands for a `host_key`, newest
+/// first. Used by the CC session-identity card (`agent::cc_bridge::session_card`)
+/// to snapshot recent activity on the bound session's host at spawn time.
+pub fn db_list_recent(
+    conn: &rusqlite::Connection,
+    host_key: &str,
+    limit: usize,
+) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT command FROM command_history
+         WHERE host_key = ?1
+         ORDER BY last_used_at DESC
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![host_key, limit as i64], |row| {
+        row.get::<_, String>(0)
+    })?;
+    rows.collect()
+}
