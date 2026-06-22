@@ -11,8 +11,8 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
-    IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    send_query_stream_event, CatalogInfo, ColumnDescription, ColumnInfo, DbConfig, DbHandle,
+    DbObject, IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -196,6 +196,23 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
 async fn request_context(client: &PrestoClient) -> (Option<String>, Option<String>) {
     let catalog = client.catalog.lock().await.clone();
     let schema = client.schema.lock().await.clone();
+    (catalog, schema)
+}
+
+async fn request_context_with_overrides(
+    client: &PrestoClient,
+    catalog_override: Option<&str>,
+    schema_override: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    let (catalog, schema) = request_context(client).await;
+    let catalog = catalog_override
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .or(catalog);
+    let schema = schema_override
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .or(schema);
     (catalog, schema)
 }
 
@@ -405,8 +422,20 @@ async fn post_statement(
     token: &CancellationToken,
     track_cancel: bool,
 ) -> Result<PrestoResults, String> {
+    post_statement_with_context(client, sql, token, track_cancel, None, None).await
+}
+
+async fn post_statement_with_context(
+    client: &PrestoClient,
+    sql: &str,
+    token: &CancellationToken,
+    track_cancel: bool,
+    catalog_override: Option<&str>,
+    schema_override: Option<&str>,
+) -> Result<PrestoResults, String> {
     let statement = normalize_presto_statement(sql)?;
-    let (catalog, schema) = request_context(client).await;
+    let (catalog, schema) =
+        request_context_with_overrides(client, catalog_override, schema_override).await;
     let req = add_presto_headers(
         client,
         client
@@ -437,7 +466,19 @@ async fn get_next(
     token: &CancellationToken,
     track_cancel: bool,
 ) -> Result<PrestoResults, String> {
-    let (catalog, schema) = request_context(client).await;
+    get_next_with_context(client, uri, token, track_cancel, None, None).await
+}
+
+async fn get_next_with_context(
+    client: &PrestoClient,
+    uri: &str,
+    token: &CancellationToken,
+    track_cancel: bool,
+    catalog_override: Option<&str>,
+    schema_override: Option<&str>,
+) -> Result<PrestoResults, String> {
+    let (catalog, schema) =
+        request_context_with_overrides(client, catalog_override, schema_override).await;
     let req = add_presto_headers(
         client,
         client.client.get(uri),
@@ -525,6 +566,18 @@ async fn run_statement(
     token: &CancellationToken,
     track_cancel: bool,
 ) -> Result<StatementOutcome, String> {
+    run_statement_with_context(client, sql, max_rows, token, track_cancel, None, None).await
+}
+
+async fn run_statement_with_context(
+    client: &PrestoClient,
+    sql: &str,
+    max_rows: Option<u64>,
+    token: &CancellationToken,
+    track_cancel: bool,
+    catalog_override: Option<&str>,
+    schema_override: Option<&str>,
+) -> Result<StatementOutcome, String> {
     let start = Instant::now();
     let mut columns = Vec::new();
     let mut rows = Vec::new();
@@ -532,7 +585,15 @@ async fn run_statement(
     let mut limit_reached = false;
     let max_rows = max_rows.filter(|value| *value > 0);
 
-    let first = post_statement(client, sql, token, track_cancel).await?;
+    let first = post_statement_with_context(
+        client,
+        sql,
+        token,
+        track_cancel,
+        catalog_override,
+        schema_override,
+    )
+    .await?;
     if let Some(error) = first.error {
         return Err(format_presto_error(error));
     }
@@ -556,7 +617,15 @@ async fn run_statement(
             delete_uri(client, &uri).await?;
             break;
         }
-        let result = get_next(client, &uri, token, track_cancel).await?;
+        let result = get_next_with_context(
+            client,
+            &uri,
+            token,
+            track_cancel,
+            catalog_override,
+            schema_override,
+        )
+        .await?;
         if let Some(error) = result.error {
             return Err(format_presto_error(error));
         }
@@ -760,16 +829,37 @@ fn table_kind(table_type: &str) -> String {
     }
 }
 
-pub async fn list_schemas(client: &PrestoClient) -> Result<Vec<SchemaInfo>, String> {
-    current_catalog(client).await?;
+pub async fn list_catalogs(client: &PrestoClient) -> Result<Vec<CatalogInfo>, String> {
     let token = CancellationToken::new();
-    let res = run_statement(
+    let res = run_statement(client, "SHOW CATALOGS", None, &token, false)
+        .await?
+        .result;
+    Ok(res
+        .rows
+        .into_iter()
+        .filter_map(|row| row.into_iter().next().flatten())
+        .map(|name| CatalogInfo { name })
+        .collect())
+}
+
+pub async fn list_schemas(
+    client: &PrestoClient,
+    catalog: Option<&str>,
+) -> Result<Vec<SchemaInfo>, String> {
+    let catalog = match catalog.filter(|value| !value.is_empty()) {
+        Some(catalog) => catalog.to_string(),
+        None => current_catalog(client).await?,
+    };
+    let token = CancellationToken::new();
+    let res = run_statement_with_context(
         client,
         "SELECT schema_name FROM information_schema.schemata \
          WHERE schema_name <> 'information_schema' ORDER BY schema_name",
         None,
         &token,
         false,
+        Some(&catalog),
+        None,
     )
     .await?
     .result;
@@ -783,9 +873,13 @@ pub async fn list_schemas(client: &PrestoClient) -> Result<Vec<SchemaInfo>, Stri
 
 pub async fn list_tables(
     client: &PrestoClient,
+    catalog: Option<&str>,
     schema: Option<&str>,
 ) -> Result<Vec<TableInfo>, String> {
-    current_catalog(client).await?;
+    let catalog = match catalog.filter(|value| !value.is_empty()) {
+        Some(catalog) => catalog.to_string(),
+        None => current_catalog(client).await?,
+    };
     let schema = match schema.filter(|value| !value.is_empty()) {
         Some(schema) => schema.to_string(),
         None => client.schema.lock().await.clone().ok_or_else(|| {
@@ -798,9 +892,17 @@ pub async fn list_tables(
         sql_literal(&schema)
     );
     let token = CancellationToken::new();
-    let res = run_statement(client, &sql, None, &token, false)
-        .await?
-        .result;
+    let res = run_statement_with_context(
+        client,
+        &sql,
+        None,
+        &token,
+        false,
+        Some(&catalog),
+        Some(&schema),
+    )
+    .await?
+    .result;
     Ok(res
         .rows
         .into_iter()
@@ -823,10 +925,14 @@ pub async fn list_tables(
 
 pub async fn describe_table(
     client: &PrestoClient,
+    catalog: Option<&str>,
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<ColumnDescription>, String> {
-    current_catalog(client).await?;
+    let catalog = match catalog.filter(|value| !value.is_empty()) {
+        Some(catalog) => catalog.to_string(),
+        None => current_catalog(client).await?,
+    };
     let schema = match schema.filter(|value| !value.is_empty()) {
         Some(schema) => schema.to_string(),
         None => client.schema.lock().await.clone().ok_or_else(|| {
@@ -842,9 +948,17 @@ pub async fn describe_table(
         sql_literal(table),
     );
     let token = CancellationToken::new();
-    let res = run_statement(client, &sql, None, &token, false)
-        .await?
-        .result;
+    let res = run_statement_with_context(
+        client,
+        &sql,
+        None,
+        &token,
+        false,
+        Some(&catalog),
+        Some(&schema),
+    )
+    .await?
+    .result;
     Ok(res
         .rows
         .into_iter()
@@ -920,7 +1034,9 @@ pub async fn object_ddl(
     let verb = if kind == "view" { "VIEW" } else { "TABLE" };
     let sql = format!("SHOW CREATE {verb} {qualified}");
     let token = CancellationToken::new();
-    let res = run_statement(client, &sql, None, &token, false).await?.result;
+    let res = run_statement(client, &sql, None, &token, false)
+        .await?
+        .result;
     res.rows
         .first()
         .and_then(|r| r.first().cloned().flatten())
@@ -935,7 +1051,9 @@ pub async fn table_stats(
     let qualified = presto_qualified(client, schema, table).await?;
     let sql = format!("SHOW STATS FOR {qualified}");
     let token = CancellationToken::new();
-    Ok(run_statement(client, &sql, None, &token, false).await?.result)
+    Ok(run_statement(client, &sql, None, &token, false)
+        .await?
+        .result)
 }
 
 #[cfg(test)]
@@ -1228,6 +1346,19 @@ mod tests {
                 ExpectedRequest {
                     method: "POST",
                     path: "/v1/statement".to_string(),
+                    body_contains: None,
+                    body_equals: Some("SHOW CATALOGS"),
+                    headers: vec![
+                        ("X-Presto-User", "analyst"),
+                        ("X-Presto-Catalog", "hive"),
+                        ("X-Presto-Schema", "sales"),
+                    ],
+                    response_body: r#"{"id":"catalogs","data":[["hive"],["iceberg"]]}"#
+                        .to_string(),
+                },
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
                     body_contains: Some("information_schema.schemata"),
                     body_equals: None,
                     headers: vec![
@@ -1264,17 +1395,39 @@ mod tests {
                     response_body: r#"{"id":"columns","data":[["id","bigint","NO",null],["note","varchar","YES","'new'"]]}"#
                         .to_string(),
                 },
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
+                    body_contains: Some("information_schema.schemata"),
+                    body_equals: None,
+                    headers: vec![
+                        ("X-Presto-User", "analyst"),
+                        ("X-Presto-Catalog", "iceberg"),
+                        ("X-Presto-Schema", "sales"),
+                    ],
+                    response_body: r#"{"id":"iceberg-schemas","data":[["lake"]]}"#
+                        .to_string(),
+                },
             ],
         ));
         let client = test_client(base_url);
 
-        let schemas = list_schemas(&client).await.unwrap();
-        let tables = list_tables(&client, Some("sales")).await.unwrap();
-        let columns = describe_table(&client, Some("sales"), "orders")
+        let catalogs = list_catalogs(&client).await.unwrap();
+        let schemas = list_schemas(&client, None).await.unwrap();
+        let tables = list_tables(&client, None, Some("sales")).await.unwrap();
+        let columns = describe_table(&client, None, Some("sales"), "orders")
             .await
             .unwrap();
+        let iceberg_schemas = list_schemas(&client, Some("iceberg")).await.unwrap();
         server.await.unwrap();
 
+        assert_eq!(
+            catalogs
+                .into_iter()
+                .map(|catalog| catalog.name)
+                .collect::<Vec<_>>(),
+            vec!["hive", "iceberg"]
+        );
         assert_eq!(
             schemas
                 .into_iter()
@@ -1294,5 +1447,6 @@ mod tests {
         assert_eq!(columns[1].name, "note");
         assert!(columns[1].nullable);
         assert_eq!(columns[1].default.as_deref(), Some("'new'"));
+        assert_eq!(iceberg_schemas[0].name, "lake");
     }
 }

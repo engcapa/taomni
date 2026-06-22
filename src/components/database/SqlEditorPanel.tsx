@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { EditorState, Compartment } from "@codemirror/state";
 import {
   EditorView,
@@ -22,7 +22,10 @@ import {
   MySQL,
   PostgreSQL,
   StandardSQL,
+  keywordCompletionSource,
+  schemaCompletionSource,
   type SQLDialect,
+  type SQLNamespace,
 } from "@codemirror/lang-sql";
 import {
   autocompletion,
@@ -31,13 +34,23 @@ import {
   type CompletionSource,
 } from "@codemirror/autocomplete";
 import { bracketMatching, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import type { DbMetadataCache } from "../../lib/dbMetadataCache";
+import { createSqlMetadataCompletionSource } from "../../lib/sqlMetadataCompletions";
 
 interface SqlEditorPanelProps {
   engine: string;
   /** Initial document; the editor owns its content thereafter. */
   initialDoc?: string;
   /** Table/column names for schema-aware autocomplete. */
-  schema?: Record<string, string[]>;
+  schema?: SQLNamespace;
+  /** Shared database metadata cache for async dot completions. */
+  metadataCache?: DbMetadataCache | null;
+  /** Current default schema/database for resolving `table.` and aliases. */
+  activeSchema?: string | null;
+  /** Current/default Presto catalog for resolving catalog-qualified names. */
+  catalog?: string | null;
+  /** Surface non-blocking metadata completion failures. */
+  onMetadataStatus?: (message: string) => void;
   /**
    * When provided, these sources fully replace the language's built-in
    * keyword/schema completion. Used by the HBase shell editor to suggest HBase
@@ -55,10 +68,15 @@ interface SqlEditorPanelProps {
  * override the language-data sources (so lang-sql's SQL keyword completion is
  * suppressed); otherwise the default language-driven completion is used.
  */
-function autocompleteFor(sources?: readonly CompletionSource[]) {
-  return sources && sources.length > 0
-    ? autocompletion({ override: [...sources] })
-    : autocompletion();
+function autocompleteFor(
+  sources?: readonly CompletionSource[],
+  defaultSources?: readonly CompletionSource[],
+) {
+  if (sources && sources.length > 0) return autocompletion({ override: [...sources] });
+  if (defaultSources && defaultSources.length > 0) {
+    return autocompletion({ override: [...defaultSources] });
+  }
+  return autocompletion();
 }
 
 function dialectFor(engine: string): SQLDialect {
@@ -70,6 +88,22 @@ function dialectFor(engine: string): SQLDialect {
     default:
       return StandardSQL;
   }
+}
+
+function defaultCompletionSources(
+  engine: string,
+  schema?: SQLNamespace,
+  extraSources: readonly CompletionSource[] = [],
+): readonly CompletionSource[] {
+  const dialect = dialectFor(engine);
+  const sources: CompletionSource[] = [
+    keywordCompletionSource(dialect, true),
+  ];
+  if (schema) {
+    sources.push(schemaCompletionSource({ dialect, schema, upperCaseKeywords: true }));
+  }
+  sources.push(...extraSources);
+  return sources;
 }
 
 export interface SqlEditorHandle {
@@ -89,6 +123,10 @@ export function SqlEditorPanel({
   engine,
   initialDoc = "",
   schema,
+  metadataCache,
+  activeSchema,
+  catalog,
+  onMetadataStatus,
   completionSources,
   onDocChange,
   onRun,
@@ -105,6 +143,28 @@ export function SqlEditorPanel({
   onRunRef.current = onRun;
   onDocChangeRef.current = onDocChange;
   onFocusRef.current = onFocus;
+  const metadataCompletionSource = useMemo(
+    () =>
+      metadataCache
+        ? createSqlMetadataCompletionSource({
+            cache: metadataCache,
+            engine,
+            activeSchema,
+            catalog,
+            onError: (message) => onMetadataStatus?.(`Metadata autocomplete failed: ${message}`),
+          })
+        : null,
+    [activeSchema, catalog, engine, metadataCache, onMetadataStatus],
+  );
+  const defaultSources = useMemo(
+    () =>
+      defaultCompletionSources(
+        engine,
+        schema,
+        metadataCompletionSource ? [metadataCompletionSource] : [],
+      ),
+    [engine, metadataCompletionSource, schema],
+  );
 
   // Build editor once on mount.
   useEffect(() => {
@@ -138,7 +198,7 @@ export function SqlEditorPanel({
         history(),
         bracketMatching(),
         closeBrackets(),
-        autocompleteCompartment.current.of(autocompleteFor(completionSources)),
+        autocompleteCompartment.current.of(autocompleteFor(completionSources, defaultSources)),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         langCompartment.current.of(
           sql({ dialect: dialectFor(engine), upperCaseKeywords: true }),
@@ -253,15 +313,16 @@ export function SqlEditorPanel({
     });
   }, [engine, schema]);
 
-  // Reconfigure completion sources when an override is supplied or changes
-  // (e.g. HBase command/table suggestions as the object tree loads).
+  // Reconfigure completion sources when an override or SQL metadata source changes.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: autocompleteCompartment.current.reconfigure(autocompleteFor(completionSources)),
+      effects: autocompleteCompartment.current.reconfigure(
+        autocompleteFor(completionSources, defaultSources),
+      ),
     });
-  }, [completionSources]);
+  }, [completionSources, defaultSources]);
 
   return <div ref={hostRef} className="h-full w-full overflow-hidden" data-testid="sql-editor" />;
 }
