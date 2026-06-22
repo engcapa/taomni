@@ -72,6 +72,7 @@ pub async fn chat_new_thread(
         cc_session_id: None,
         // New threads inherit the global default; the user can override per-thread later.
         output_format: None,
+        cc_model: None,
     };
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::create_thread(&db, &thread).map_err(|e| e.to_string())?;
@@ -116,8 +117,35 @@ pub async fn chat_set_thread_provider(
     provider_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    store::update_thread_provider(&db, &thread_id, &provider_id).map_err(|e| e.to_string())
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        store::update_thread_provider(&db, &thread_id, &provider_id).map_err(|e| e.to_string())?;
+    }
+    // Switching away from Claude Code orphans its per-thread child; recycle it
+    // so we don't leak the process / MCP token / temp dir. (No-op if none.)
+    if provider_id != "claude-code" {
+        crate::agent::cc_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
+    }
+    Ok(())
+}
+
+/// Set or clear the per-thread Claude Code model override ("opus"|"sonnet"|
+/// "haiku"). Pass `None`/empty to inherit `cc_bridge.default_model`. The model
+/// is a spawn-time `--model` arg the live process can't adopt, so we recycle
+/// the thread's CC process — the next message respawns it with the new model.
+#[tauri::command]
+pub async fn chat_set_thread_cc_model(
+    thread_id: String,
+    model: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        store::update_thread_cc_model(&db, &thread_id, model.as_deref())
+            .map_err(|e| e.to_string())?;
+    }
+    crate::agent::cc_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
+    Ok(())
 }
 
 /// Set or clear the per-thread output-format override ("md" | "html" | "plain").
@@ -193,6 +221,14 @@ pub struct ChatSendRequest {
     /// unbound / local / unsaved-tab threads.
     #[serde(default)]
     pub bound_session_id: Option<String>,
+    /// Phase 3.3 — the bound terminal's live working directory (from the
+    /// frontend's OSC-7 tracking). Unlike the session-identity card, cwd is
+    /// volatile (the user `cd`s around), so it is injected *per turn* as a
+    /// message prefix rather than baked into the spawn-time card. Informational
+    /// only — it does not set the CC child's `current_dir` or grant `--add-dir`
+    /// access (that is 3.2, deliberately out of scope). `None` when unknown.
+    #[serde(default)]
+    pub cwd: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -355,6 +391,40 @@ pub enum StreamEventOut {
     },
     /// Stream ended with an error (assistant message NOT persisted).
     Error { id: String, message: String },
+    /// Claude Code tool activity for live, display-only cards (3.5). Carries NO
+    /// re-executable payload — confirmation already happened via the MCP
+    /// permission prompt; this is purely for rendering. The persisted message
+    /// still contains the compact text transcript line (history durability), so
+    /// the frontend shows these cards only while the message is streaming.
+    CcToolActivity {
+        /// Assistant message id these cards group under.
+        id: String,
+        /// CC tool_use id, pairing a "use" with its later "result".
+        call_id: String,
+        /// "use" | "result".
+        phase: String,
+        tool: String,
+        detail: String,
+    },
+    /// Claude Code token/cost/timing rollup for the assistant message footer
+    /// (3.5). Live-only (not persisted), emitted once on the final result.
+    Usage {
+        id: String,
+        input_tokens: Option<u64>,
+        output_tokens: Option<u64>,
+        cost_usd: Option<f64>,
+        duration_ms: Option<u64>,
+    },
+}
+
+/// The one-line argument summary for a CC tool call ("ls -la", "/tmp/x.rs", …).
+fn cc_tool_arg_summary(input: &serde_json::Value) -> Option<&str> {
+    input
+        .get("command")
+        .and_then(|v| v.as_str())
+        .or_else(|| input.get("file_path").and_then(|v| v.as_str()))
+        .or_else(|| input.get("notebook_path").and_then(|v| v.as_str()))
+        .or_else(|| input.get("path").and_then(|v| v.as_str()))
 }
 
 /// Render a CC tool-use event as a compact, human-readable transcript line.
@@ -364,15 +434,21 @@ pub enum StreamEventOut {
 /// exists purely so the chat keeps a record of what Claude Code did (the real
 /// confirmation happens live via the in-app MCP server's permission prompt).
 fn format_cc_tool_use(name: &str, input: &serde_json::Value) -> String {
-    let summary = input
-        .get("command")
-        .and_then(|v| v.as_str())
-        .or_else(|| input.get("file_path").and_then(|v| v.as_str()))
-        .or_else(|| input.get("notebook_path").and_then(|v| v.as_str()))
-        .or_else(|| input.get("path").and_then(|v| v.as_str()));
-    match summary {
+    match cc_tool_arg_summary(input) {
         Some(s) => format!("\n> 🔧 `{}` — {}\n", name, s),
         None => format!("\n> 🔧 `{}`\n", name),
+    }
+}
+
+/// A short, single-line preview of a CC tool result for the transcript /
+/// display card (collapses whitespace, truncates).
+fn cc_tool_result_preview(content: &str) -> String {
+    let flat = content.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() > 200 {
+        let truncated: String = flat.chars().take(200).collect();
+        format!("{truncated}…")
+    } else {
+        flat
     }
 }
 
@@ -473,6 +549,7 @@ pub async fn chat_stream(
                         &app,
                         &req.thread_id,
                         thread.linked_session_id.clone(),
+                        ai_config.cc_bridge.confirm_readonly,
                     )
                     .await
                     {
@@ -558,10 +635,17 @@ pub async fn chat_stream(
                     }
                 };
 
-                // Build extra args.
+                // Build extra args. The model is per-thread (3.4) when set,
+                // else the configured default. Baked into argv at spawn, so a
+                // model change recycles the process (chat_set_thread_cc_model).
+                let model = thread
+                    .cc_model
+                    .clone()
+                    .filter(|m| !m.trim().is_empty())
+                    .unwrap_or_else(|| ai_config.cc_bridge.default_model.clone());
                 let mut extra_args = vec![
                     "--model".into(),
-                    ai_config.cc_bridge.default_model.clone(),
+                    model,
                     "--max-turns".into(),
                     ai_config.cc_bridge.max_turns.to_string(),
                     "--settings".into(),
@@ -607,41 +691,76 @@ pub async fn chat_stream(
             }
         };
 
+        // Start the liveness watchdog on the chosen Arc (idempotent). It holds
+        // only a Weak<CcProcess>, so it exits cleanly once the registry drops
+        // the process (provider switch / model change → recycle_thread_process).
+        process.start_watchdog();
+
         // 7. Run process with callback to stream
         let assistant_id_clone = assistant_id.clone();
         let app_clone = app.clone();
         let event_name_clone = event_name.clone();
-        // Prepend the (redacted) terminal context to the message CC sees, the
-        // same way the native LLM path injects it as a leading user turn
-        // (~line 611). Without this the CC branch silently dropped a field the
-        // frontend already sends, so CC answered terminal questions blind.
-        let cc_message = match &req.terminal_context {
-            Some(ctx) if !ctx.trim().is_empty() => {
-                let (clean_ctx, _) = redact::redact(ctx);
-                format!(
-                    "[Terminal context]\n```\n{}\n```\n\n{}",
-                    clean_ctx, clean_content
-                )
+        // Build the per-turn context prefix CC sees: the live working
+        // directory (3.3 — volatile, so injected each turn rather than in the
+        // spawn-time identity card) followed by any attached terminal context,
+        // mirroring how the native LLM path injects context as a leading user
+        // turn. Both are redacted. Without this the CC branch silently dropped
+        // fields the frontend already sends.
+        let cc_message = {
+            let mut prefix = String::new();
+            if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                let (clean_cwd, _) = redact::redact(cwd);
+                prefix.push_str(&format!("当前工作目录：{}\n\n", clean_cwd));
             }
-            _ => clean_content.clone(),
+            if let Some(ctx) = req
+                .terminal_context
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+            {
+                let (clean_ctx, _) = redact::redact(ctx);
+                prefix.push_str(&format!("[Terminal context]\n```\n{}\n```\n\n", clean_ctx));
+            }
+            format!("{}{}", prefix, clean_content)
         };
         let events = process.send_with_callback(&cc_message, move |evt| {
+            use crate::agent::cc_bridge::protocol::CcEvent;
             match evt {
-                crate::agent::cc_bridge::protocol::CcEvent::Partial { content } => {
+                CcEvent::Partial { content } => {
                     let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
                         id: assistant_id_clone.clone(),
                         content: content.clone(),
                     });
                 }
-                // CC tool calls now run through the in-app MCP server with HITL
-                // confirmation (agent-cc-permission / agent-cc-tool). We emit a
-                // plain-text transcript line for visibility, but no longer
-                // inject [TOOL_CALL] markers — those triggered a second, native
-                // execution of the same tool via agent_execute_tool (double-exec).
-                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
-                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
+                // 3.5 — emit a structured, display-only card for tool use. It
+                // carries no machine-parseable payload, so the frontend never
+                // re-executes it (confirmation already happened live via the
+                // MCP permission prompt). The compact text record is persisted
+                // separately below, so reload still shows the activity as text.
+                CcEvent::ToolUse { id, name, input } => {
+                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::CcToolActivity {
                         id: assistant_id_clone.clone(),
-                        content: format_cc_tool_use(name, input),
+                        call_id: id.clone(),
+                        phase: "use".into(),
+                        tool: name.clone(),
+                        detail: cc_tool_arg_summary(input).unwrap_or("").to_string(),
+                    });
+                }
+                CcEvent::ToolResult { tool_use_id, content } => {
+                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::CcToolActivity {
+                        id: assistant_id_clone.clone(),
+                        call_id: tool_use_id.clone(),
+                        phase: "result".into(),
+                        tool: String::new(),
+                        detail: cc_tool_result_preview(content),
+                    });
+                }
+                CcEvent::Done { usage: Some(u) } => {
+                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Usage {
+                        id: assistant_id_clone.clone(),
+                        input_tokens: u.input_tokens,
+                        output_tokens: u.output_tokens,
+                        cost_usd: u.total_cost_usd,
+                        duration_ms: u.duration_ms,
                     });
                 }
                 _ => {}
@@ -659,16 +778,25 @@ pub async fn chat_stream(
             }
         };
 
-        // 8. Extract final answer and persist
+        // 8. Extract final answer and persist. The persisted content keeps a
+        // compact *text* transcript of tool activity (history durability); the
+        // live structured cards (above) are ephemeral, so on reload the message
+        // still shows what CC did, as text.
         let mut final_content = String::new();
         for event in &events {
+            use crate::agent::cc_bridge::protocol::CcEvent;
             match event {
-                crate::agent::cc_bridge::protocol::CcEvent::AssistantMessage { content } => {
+                CcEvent::AssistantMessage { content } => {
                     final_content.push_str(content);
                 }
-                // Plain-text tool record — see the streaming callback above.
-                crate::agent::cc_bridge::protocol::CcEvent::ToolUse { name, input, .. } => {
+                CcEvent::ToolUse { name, input, .. } => {
                     final_content.push_str(&format_cc_tool_use(name, input));
+                }
+                CcEvent::ToolResult { content, .. } => {
+                    let preview = cc_tool_result_preview(content);
+                    if !preview.is_empty() {
+                        final_content.push_str(&format!("> ↳ {}\n", preview));
+                    }
                 }
                 _ => {}
             }

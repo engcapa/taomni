@@ -224,6 +224,22 @@ export function ClaudeCodePanel() {
           <div className="text-[10px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.ccLocalModeNote")}
           </div>
+          <label className="flex items-start gap-2 text-[11px] cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={cc.confirm_readonly ?? false}
+              onChange={(e) =>
+                saveConfig({ ...config, cc_bridge: { ...cc, confirm_readonly: e.target.checked } })
+              }
+            />
+            <span>
+              <span className="block">{t("aiSettings.ccConfirmReadonly")}</span>
+              <span className="block text-[10px] text-[var(--taomni-text-muted)]">
+                {t("aiSettings.ccConfirmReadonlyHint")}
+              </span>
+            </span>
+          </label>
         </div>
       )}
 

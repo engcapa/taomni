@@ -456,6 +456,9 @@ export function MainLayout() {
     terminalCwdsRef.current[tabId] = cwd;
     setTerminalCwds((prev) => (prev[tabId] === cwd ? prev : { ...prev, [tabId]: cwd }));
     setTerminalCwdVersions((prev) => ({ ...prev, [tabId]: (prev[tabId] ?? 0) + 1 }));
+    // Mirror into the app store so the AI chat store can read the bound tab's
+    // live cwd when sending a turn to Claude Code (Phase 3.3).
+    useAppStore.getState().setTabCwd(tabId, cwd);
     // Hand the freshly reported cwd to anyone awaiting it (e.g. a pending tab
     // duplication) before broadcasting to other windows.
     const resolvers = cwdQueryResolversRef.current[tabId];

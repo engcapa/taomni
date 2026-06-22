@@ -17,7 +17,7 @@
 |---|---|---|
 | **Phase 0** 止血 + 地基 | ✅ 已完成(在 main) | `safety.rs` 工具名映射、`process.rs` 空闲超时 + kill/respawn、CC 分支接 `terminal_context` |
 | **Phase 1+2** 有状态工具 + HITL | ✅ 已完成,**端到端打通** | rmcp in-app MCP 服务器 `cc_bridge/mcp_http.rs`(8 个有状态工具)+ `permission_prompt` HITL + 挂起 oneshot 回填 + per-thread token/会话作用域。基础提交 `44f7169`/`ed51c67`(已并入 main);本轮 `5305df2`/`1c78791` 修好 HITL 全链路(见下方「本轮修复」) |
-| **Phase 3** cwd + 模型 + 渲染保真 | ☐ 待办 | `--add-dir`、per-thread 模型/思考预算、结构化工具卡 |
+| **Phase 3** cwd + 模型 + 渲染保真 | ◑ 实现完成,待 GUI 验证 | 3.S 已验证 ✅;本轮在 `feat/cc-phase3-closure` 落地 3.3 cwd / 3.4 模型 / 3.5 结构化卡+用量 / 3.6 只读降噪 + 3 项稳定性(B1/B2/B3)。3.2 跳过、thinking 预算不做 |
 | **Phase 4** 编排者 B 最小版 | ☐ 待办 | `dispatch_subtask` |
 | **Phase 5** 调度中心 C | ☐ 待办(仅设计文档) | — |
 
@@ -124,16 +124,23 @@
 
 → ✅ **Review gate 1+2**(已通过):CC 在绑定会话真实跑命令、危险动作停下等人点、跨会话被拒。**全链路已在 GUI 验证**(绑定 SSH 会话执行 `uname -a`,确认卡 → 允许 → 远端执行 → `read_terminal_tail` 读回真实输出)。
 
-### Phase 3 — 真实 cwd + 模型 / 渲染保真 — ☐ 待办
-- ☐ live `chat_stream` 接 `--add-dir`(搬 `commands.rs` 逻辑),cwd 由前端 OSC-7 传入(扩 `chat_stream` 请求字段)。**注**:仅对本地工作区线程有意义;远端 SSH 线程 N/A。还需先给 CC 子进程显式设 `current_dir`(现继承 Taomni 工作目录,无意义)。
-- ☐ per-thread 模型(opus/sonnet/haiku)+ thinking 预算,在 provider 切换处暴露。
-- ☐ CC 的 `tool_use/tool_result` 渲染为结构化卡片;从 result 事件捞 token/cost/usage。
-- ☐(新增候选,讨论结论)**执行目标消歧**:让 CC 在绑定会话时优先 `run_in_terminal`(远端)而非内置 Bash(本地)。**已并入下方 3.S 会话身份卡**(由身份卡里的工具路由指引一句话实现);Strict 线程 deny 本地 Bash 作为可选加强保留。
-- ☐(新增候选,讨论结论)**只读命令确认降噪**:区分只读/改动命令,只读免逐条弹卡(或引导 allow-session),降低「跑→读→调整」循环的点击摩擦。
-- ☐ **3.S 会话身份卡注入(本轮新增,详见下「Phase 3.S」)**:把绑定会话的非敏感身份 + 最近命令历史经 `--append-system-prompt-file` 注入 CC,让 CC 自知"我在哪个会话",减少自我定位的无谓 `list_sessions`/本地 Bash 误用。
-- ⚠️(原结论修订)**环境事实卡**:此前判「不做」是针对**命令正确性**(`read_terminal_tail` 闭环已覆盖)。本轮诉求不同 —— **会话身份感知**(CC 不知自己绑在哪个 session、误用本地 Bash、重复自我定位),闭环不覆盖。故**作用域化复活**为 3.S(仅身份 + 历史,不做命令正确性提示)。
+### Phase 3 — 真实 cwd + 模型 / 渲染保真 — ◑ 实现完成,待 GUI 验证
 
-→ ☐ Review gate 3。
+> 本轮(`feat/cc-phase3-closure`)决策:**3.2 跳过**(进程 `current_dir`/`--add-dir` 暂不做);**thinking 预算不做**(3.4 仅模型选择);3.5 用「实时结构化卡 + 历史存紧凑文本行」。`cargo test --lib` 522 passed;`tsc -b` + `vite build` 通过。**尚未 GUI 端到端验证。**
+
+- ✅ **3.S 会话身份卡注入** — 已 GUI 验证(`139e114`)。
+- ☐ **3.2** CC 子进程显式 `current_dir` + 本地工作区线程接 `--add-dir` — **本轮跳过**(顺延)。
+- ✅ **3.3 cwd 逐轮注入** — `ChatSendRequest.cwd`(前端从 `MainLayout.terminalCwds[boundTab]` → appStore `cwdByTab` → `chatStore.sendMessage`);CC 分支每轮拼 `当前工作目录：<cwd>` 前言(过 redact)。仅文本告知,**不**设进程 cwd / `--add-dir`。
+- ✅ **3.4 per-thread 模型**(无 thinking) — `ai_chat_threads.cc_model`(迁移)+ `chat_set_thread_cc_model`(改模型 → `recycle_thread_process` 重建)+ spawn `--model` 取 `thread.cc_model` 回退 `default_model`;前端 `ChatDrawer` 模型选择器(仅 `claude-code`)。
+- ✅ **3.5 结构化工具卡 + token/cost/usage** — `protocol` 把 `result` 的 `usage`/`total_cost_usd`/`duration_ms`/`num_turns` 解进 `CcEvent::Done{usage}`;新 `StreamEventOut::CcToolActivity`(纯展示,不触发 `agent_execute_tool`)+ `Usage`;前端 `CcToolCards.tsx`(实时卡 + 用量页脚,`end` 时清卡);历史仍持久化紧凑文本行(tool_use + tool_result preview)。
+- ✅ **3.6 只读命令确认降噪** — `agent/cmd_classify.rs`(默认 `Mutating`;白名单 + 分段 + 重定向/sudo/未知/命令替换严格;`sed -i`/`find -delete|-exec`/`sort -o`/`uniq` 写形检测;secret 路径读取仍弹卡)。接入 `mcp_http::permission_prompt`;`CcBridgeConfig.confirm_readonly`(默认 false)+ 设置面板开关。
+
+**稳定性(本轮新增,随 Phase 3):**
+- ✅ **B1 空闲超时误杀修复** — `process.rs::collect_events` 由 stdout 的 `ToolUse`/`ToolResult` 驱动 `tools_in_flight` 计数,在途时读取上限放宽到 `TOOL_WAIT_CEILING_SECS`(960 ≥ 300+600),长 HITL/长远端命令不再被 600s 空闲超时误杀。
+- ✅ **B2 去 watchdog unsafe** — `start_watchdog(self: &Arc<Self>)` 用 `Weak<CcProcess>`,每 tick `upgrade()`;删除 `self as *const Self as usize` 裸指针;由 `chat/mod.rs` + `commands.rs` 持 Arc 处显式启动。
+- ✅ **B3 进程回收 helper** — `recycle_thread_process(state, thread_id)`;`chat_set_thread_provider` 切走 claude-code 时调用,3.4 改模型复用。
+
+→ ☐ Review gate 3(待 GUI 验证:`ls` 免卡直跑 / `sleep 600` 不被误杀 / `rm`·读 secret 弹卡 / 切模型生效 / cwd 被引用 / 工具卡+用量页脚显示且不双执行)。
 
 #### Phase 3.S — 会话身份卡注入(本轮细化,已锁定取舍)
 
@@ -200,13 +207,14 @@
 **清理债(承接 Phase 1+2 偏差):**
 - ✅ 废弃旧的自定义 JSON-RPC `agent/mcp_server.rs` + `lib.rs` 的 `mcp_server_start/stop/status` 注册 + stdio `--mcp-server` 分支（`main.rs` dispatch、`cc_bridge/permissions_mcp.rs`、`cc_bridge/tools_mcp.rs`）。三处均已删除，构建通过、cc_bridge 33 测试全绿；活动路径只剩 `cc_bridge/mcp_http.rs`（Streamable-HTTP）。
 
-**Phase 3(cwd + 模型 + 渲染):**
-- ☐ **3.S 会话身份卡注入**:前端传 `bound_session_id`;后端首建进程时 `get_session` + `command_history`(host_key)组卡 → `redact` → `--append-system-prompt-file`。v1 含身份 + 历史,**不含 cwd**。*(本轮新增,详见 Phase 3.S;并入旧「执行目标消歧」、作用域化复活旧「环境事实卡」)*
-- ☐ CC 子进程显式 `current_dir` + 本地工作区线程接 `--add-dir`
-- ☐ cwd 注入(前端 OSC-7 → 请求字段,先例 `ai/commands.rs:138`)*(3.S 下轮)*
-- ☐ per-thread 模型 + thinking 预算
-- ☐ `tool_use/tool_result` 结构化卡片 + result 事件的 token/cost/usage
-- ☐ 只读命令确认降噪 *(讨论新增)*
+**Phase 3(cwd + 模型 + 渲染)— ◑ 实现完成,待 GUI 验证(`feat/cc-phase3-closure`):**
+- ✅ **3.S 会话身份卡注入** — 已 GUI 验证。
+- ✅ **3.3 cwd 逐轮注入**(前端 OSC-7 → `cwd` 请求字段 → 每轮前言;不设进程 cwd)
+- ✅ **3.4 per-thread 模型**(`cc_model` 列 + `chat_set_thread_cc_model` + recycle + 前端选择器;**thinking 预算不做**)
+- ✅ **3.5 结构化工具卡 + token/cost/usage**(实时卡 + 用量页脚,历史存紧凑文本行;反双执行不变量保持)
+- ✅ **3.6 只读命令确认降噪**(`cmd_classify`,安全默认=写,secret 路径仍弹卡;`confirm_readonly` 开关)
+- ✅ **稳定性 B1/B2/B3**(空闲超时误杀修复 / watchdog 去 unsafe / 进程回收 helper)
+- ☐ **3.2** CC 子进程显式 `current_dir` + `--add-dir` — **顺延**(本轮跳过)
 
 **Phase 4(编排 B 最小版):**
 - ☐ `dispatch_subtask` + 并发上限 + UI 任务列表

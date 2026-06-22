@@ -78,6 +78,10 @@ pub struct TokenScope {
     pub thread_id: String,
     pub allowed_session_id: Option<String>,
     pub trust: TrustLevel,
+    /// When true, read-only `Bash`/`run_in_terminal` commands still require a
+    /// confirmation (3.6 noise-reduction disabled by config). Snapshotted from
+    /// `CcBridgeConfig.confirm_readonly` at provision time.
+    pub confirm_readonly: bool,
     /// Tools the user pre-approved for the rest of this session via the
     /// ActionCard's "allow for session" choice.
     pub session_approved: Arc<Mutex<HashSet<String>>>,
@@ -165,6 +169,7 @@ pub fn mint_token(
     thread_id: String,
     allowed_session_id: Option<String>,
     trust: TrustLevel,
+    confirm_readonly: bool,
 ) -> Result<(SocketAddr, String), String> {
     let guard = slot().lock().unwrap();
     let server = guard.as_ref().ok_or("CC MCP server not started")?;
@@ -175,6 +180,7 @@ pub fn mint_token(
             thread_id,
             allowed_session_id,
             trust,
+            confirm_readonly,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         },
     );
@@ -196,6 +202,7 @@ pub async fn provision_for_thread(
     app: &AppHandle,
     thread_id: &str,
     linked_session_id: Option<String>,
+    confirm_readonly: bool,
 ) -> Result<(String, String), String> {
     ensure_started(app).await?;
     let trust = if linked_session_id.is_some() {
@@ -203,7 +210,7 @@ pub async fn provision_for_thread(
     } else {
         TrustLevel::Lenient
     };
-    let (addr, token) = mint_token(thread_id.to_string(), linked_session_id, trust)?;
+    let (addr, token) = mint_token(thread_id.to_string(), linked_session_id, trust, confirm_readonly)?;
     Ok((server_url(addr), token))
 }
 
@@ -667,8 +674,23 @@ impl CcHandler {
             .lock()
             .unwrap()
             .contains(&tool_name);
+        // 3.6 — a confidently read-only shell command waives the card (unless
+        // the user forced confirm-all via config). Anything not provably
+        // read-only stays Mutating (the safe default) and still confirms. The
+        // blacklist + sensitive-path checks above already ran, so this only
+        // ever waives *confirmation*, never safety.
+        let is_readonly = !scope.confirm_readonly
+            && matches!(tool_name.as_str(), "Bash" | "run_in_terminal")
+            && p.tool_input
+                .get("command")
+                .and_then(|v| v.as_str())
+                .map(|cmd| {
+                    crate::agent::cmd_classify::classify(cmd)
+                        == crate::agent::cmd_classify::CommandClass::ReadOnly
+                })
+                .unwrap_or(false);
         let needs_confirm =
-            crate::agent::safety::requires_confirmation(&tool_name) && !already;
+            crate::agent::safety::requires_confirmation(&tool_name) && !already && !is_readonly;
         if !needs_confirm {
             return Ok(allow_result(&p.tool_input));
         }
@@ -710,6 +732,7 @@ mod tests {
             thread_id: thread.into(),
             allowed_session_id: allowed.map(|s| s.to_string()),
             trust: TrustLevel::Strict,
+            confirm_readonly: false,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         }
     }

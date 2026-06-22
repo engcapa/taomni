@@ -41,6 +41,15 @@ interface AppState {
    */
   tabFilter: TabFilter | null;
 
+  /**
+   * Latest known working directory per terminal tab id, mirrored from the
+   * terminal's OSC-7 cwd reports (MainLayout.handleTerminalCwd). Ephemeral —
+   * used by the AI chat store to tell Claude Code the bound terminal's live
+   * cwd each turn (Phase 3.3). Keyed by tab id; absent until the shell first
+   * reports a cwd, or for shells that can't (e.g. cmd.exe).
+   */
+  cwdByTab: Record<string, string>;
+
   addTab: (tab: Tab) => void;
   /**
    * Duplicate an existing tab, inserting the copy immediately to the right of
@@ -84,6 +93,8 @@ interface AppState {
   setUiFontSize: (size: number) => void;
   setTabFilter: (filter: TabFilter | null) => void;
   clearTabFilter: () => void;
+  /** Record a terminal tab's latest OSC-7 cwd (see {@link cwdByTab}). */
+  setTabCwd: (tabId: string, cwd: string) => void;
 }
 
 function readUiFontFamily(): string {
@@ -199,6 +210,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeTabId: "welcome",
   sidebarCollapsed: false,
   activeSideTab: "sessions",
+  cwdByTab: {},
   xServerEnabled: false,
   xServerStatus: null,
   statusMessage: tr("status.ready"),
@@ -497,4 +509,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   setTabFilter: (filter) => set({ tabFilter: filter }),
   clearTabFilter: () => set({ tabFilter: null }),
+  setTabCwd: (tabId, cwd) =>
+    set((s) => (s.cwdByTab[tabId] === cwd ? s : { cwdByTab: { ...s.cwdByTab, [tabId]: cwd } })),
 }));

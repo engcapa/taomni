@@ -22,6 +22,12 @@ pub struct CcBridgeConfig {
     /// "default" | "acceptEdits" | "plan" — never "bypassPermissions"
     pub permission_mode: String,
     pub max_turns: u32,
+    /// When true, even confidently read-only `Bash`/`run_in_terminal` commands
+    /// require a confirmation card (3.6). Default false: read-only commands are
+    /// auto-allowed to cut run→read→adjust friction, while anything not
+    /// provably read-only still confirms.
+    #[serde(default)]
+    pub confirm_readonly: bool,
     #[serde(default)]
     pub custom_settings_profiles: Vec<CcCustomSettingsProfile>,
     #[serde(default)]
@@ -37,6 +43,7 @@ impl Default for CcBridgeConfig {
             default_model: "sonnet".into(),
             permission_mode: "default".into(),
             max_turns: 20,
+            confirm_readonly: false,
             custom_settings_profiles: Vec::new(),
             active_profile_id: None,
         }

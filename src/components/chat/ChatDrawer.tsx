@@ -4,6 +4,7 @@ import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
+import { CcToolCards } from "./CcToolCards";
 import { Composer } from "./Composer";
 import { ChatThreadList } from "./ChatThreadList";
 import { NewThreadFormatPicker } from "./NewThreadFormatPicker";
@@ -82,6 +83,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     providerIds.push("claude-code");
   }
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
+  const setThreadCcModel = useChatStore((s) => s.setThreadCcModel);
   const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
 
   // Effective format for rendering this thread's messages. Resolution order:
@@ -395,6 +397,22 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             ) : (
               <span className="text-[var(--taomni-accent)]">{activeThread.provider_id}</span>
             )}
+            {activeThread.provider_id === "claude-code" && (
+              <select
+                className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
+                value={activeThread.cc_model ?? ""}
+                aria-label={t("chat.threadModelAria")}
+                title={t("chat.threadModelTitle")}
+                onChange={(e) => {
+                  void setThreadCcModel(activeThread.id, e.target.value || null);
+                }}
+              >
+                <option value="">{t("chat.modelDefault")}</option>
+                <option value="opus">opus</option>
+                <option value="sonnet">sonnet</option>
+                <option value="haiku">haiku</option>
+              </select>
+            )}
             <span className="ml-2">{t("chat.formatLabel")}</span>
             {formatLocked ? (
               // Locked once the thread has any messages — issue #3.
@@ -443,13 +461,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             </div>
           )}
           {activeMessages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              format={effectiveFormat}
-              preferredTerminalTabId={activeThread?.linked_session_id ?? null}
-              preferredQueryTabId={activeThread?.linked_session_id ?? null}
-            />
+            <div key={msg.id}>
+              <MessageBubble
+                message={msg}
+                format={effectiveFormat}
+                preferredTerminalTabId={activeThread?.linked_session_id ?? null}
+                preferredQueryTabId={activeThread?.linked_session_id ?? null}
+              />
+              {msg.role === "assistant" && <CcToolCards messageId={msg.id} />}
+            </div>
           ))}
           {sending && (
             <div className="flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">

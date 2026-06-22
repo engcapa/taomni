@@ -13,6 +13,25 @@ export interface ChatThread {
   source: string;
   /** Per-thread output format override ("md" | "html" | "plain"). null = inherit AiConfig. */
   output_format?: string | null;
+  /** Per-thread Claude Code model override ("opus"|"sonnet"|"haiku"). null = inherit default. */
+  cc_model?: string | null;
+}
+
+/** A live, display-only Claude Code tool-activity card (3.5). */
+export interface CcToolCard {
+  call_id: string;
+  tool: string;
+  detail: string;
+  /** Result preview, once the tool's result arrives. */
+  result?: string;
+}
+
+/** Claude Code token/cost/timing rollup for the assistant message footer (3.5). */
+export interface CcUsage {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cost_usd?: number | null;
+  duration_ms?: number | null;
 }
 
 export interface ChatMessage {
@@ -29,7 +48,23 @@ type StreamEvent =
   | { kind: "assistant_start"; id: string; thread_id: string; created_at: number }
   | { kind: "token"; id: string; content: string }
   | { kind: "end"; id: string; thread_id: string; content: string; redacted_count: number }
-  | { kind: "error"; id: string; message: string };
+  | { kind: "error"; id: string; message: string }
+  | {
+      kind: "cc_tool_activity";
+      id: string;
+      call_id: string;
+      phase: "use" | "result";
+      tool: string;
+      detail: string;
+    }
+  | {
+      kind: "usage";
+      id: string;
+      input_tokens?: number | null;
+      output_tokens?: number | null;
+      cost_usd?: number | null;
+      duration_ms?: number | null;
+    };
 
 type DrawerScope = "global" | "tab" | null;
 type ComposerAttachScope = "global" | "tab";
@@ -41,6 +76,12 @@ interface ChatStore {
   messages: Record<string, ChatMessage[]>;
   /// Currently-streaming assistant message id per thread (for cursor display).
   streamingId: Record<string, string | null>;
+  /// Live, display-only Claude Code tool cards per assistant message id (3.5).
+  /// Cleared when the message stops streaming (the persisted content then holds
+  /// the text transcript).
+  ccToolCards: Record<string, CcToolCard[]>;
+  /// Claude Code usage rollup per assistant message id (3.5), for the footer.
+  ccUsage: Record<string, CcUsage>;
   sending: boolean;
   drawerOpen: boolean;
   /// "global" for title/status/shortcut entry points, "tab" for terminal-bound chat.
@@ -59,6 +100,7 @@ interface ChatStore {
   newThread: (providerId?: string, linkedSessionId?: string) => Promise<ChatThread>;
   deleteThread: (threadId: string) => Promise<void>;
   setThreadProvider: (threadId: string, providerId: string) => Promise<void>;
+  setThreadCcModel: (threadId: string, model: string | null) => Promise<void>;
   /// Set or clear the per-thread output-format override.
   /// Pass `null` (or omit) to clear so the thread inherits the global setting.
   setThreadOutputFormat: (threadId: string, format: string | null) => Promise<void>;
@@ -110,6 +152,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   activeThreadId: null,
   messages: {},
   streamingId: {},
+  ccToolCards: {},
+  ccUsage: {},
   sending: false,
   drawerOpen: false,
   drawerScope: null,
@@ -165,6 +209,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }));
   },
 
+  setThreadCcModel: async (threadId: string, model: string | null) => {
+    // Backend recycles the CC process so the next message respawns with the
+    // new --model; empty/null clears the override (inherit default).
+    await invoke("chat_set_thread_cc_model", { threadId, model: model ?? null });
+    set((s) => ({
+      threads: s.threads.map((t) =>
+        t.id === threadId ? { ...t, cc_model: model } : t
+      ),
+    }));
+  },
+
   setThreadOutputFormat: async (threadId: string, format: string | null) => {
     // Backend treats empty/null the same — clears the override.
     await invoke("chat_set_thread_output_format", {
@@ -202,13 +257,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // session). Null for global / local / unsaved-tab threads — the backend
     // then emits a degraded "local workspace" card.
     let boundSessionId: string | null = null;
+    // Phase 3.3 — the bound terminal's live cwd (OSC-7), injected per-turn so
+    // CC knows the working directory without re-querying. Volatile, so resolved
+    // fresh each send. Null for global/local/unsaved-tab threads or shells that
+    // can't report a cwd.
+    let cwd: string | null = null;
     {
       const tabId = get().threads.find((t) => t.id === threadId)?.linked_session_id ?? null;
       if (tabId) {
         try {
           const { useAppStore } = await import("./appStore");
-          boundSessionId =
-            useAppStore.getState().tabs.find((t) => t.id === tabId)?.sessionId ?? null;
+          const appState = useAppStore.getState();
+          boundSessionId = appState.tabs.find((t) => t.id === tabId)?.sessionId ?? null;
+          cwd = appState.cwdByTab[tabId] ?? null;
         } catch (err) {
           console.warn("bound_session_id resolution failed:", err);
         }
@@ -259,13 +320,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             if (idx >= 0) {
               const next = [...list];
               next[idx] = { ...next[idx], content: e.content };
-              set((s) => ({
-                messages: { ...s.messages, [threadId]: next },
-                streamingId: { ...s.streamingId, [threadId]: null },
-                threads: s.threads.map((t) =>
-                  t.id === threadId ? { ...t, updated_at: Date.now() / 1000 } : t
-                ),
-              }));
+              set((s) => {
+                // The persisted content now holds the text transcript of tool
+                // activity, so the live cards would duplicate it — drop them.
+                const cards = { ...s.ccToolCards };
+                delete cards[e.id];
+                return {
+                  messages: { ...s.messages, [threadId]: next },
+                  streamingId: { ...s.streamingId, [threadId]: null },
+                  ccToolCards: cards,
+                  threads: s.threads.map((t) =>
+                    t.id === threadId ? { ...t, updated_at: Date.now() / 1000 } : t
+                  ),
+                };
+              });
             }
             break;
           }
@@ -292,6 +360,38 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             }
             break;
           }
+          case "cc_tool_activity": {
+            set((s) => {
+              const cards = [...(s.ccToolCards[e.id] ?? [])];
+              if (e.phase === "use") {
+                cards.push({ call_id: e.call_id, tool: e.tool, detail: e.detail });
+              } else {
+                // "result" — attach the preview to the matching pending card.
+                const ci = cards.findIndex(
+                  (c) => c.call_id === e.call_id && c.result === undefined,
+                );
+                if (ci >= 0) {
+                  cards[ci] = { ...cards[ci], result: e.detail };
+                }
+              }
+              return { ccToolCards: { ...s.ccToolCards, [e.id]: cards } };
+            });
+            break;
+          }
+          case "usage": {
+            set((s) => ({
+              ccUsage: {
+                ...s.ccUsage,
+                [e.id]: {
+                  input_tokens: e.input_tokens,
+                  output_tokens: e.output_tokens,
+                  cost_usd: e.cost_usd,
+                  duration_ms: e.duration_ms,
+                },
+              },
+            }));
+            break;
+          }
         }
       });
 
@@ -301,6 +401,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           content,
           terminal_context: terminalContext ?? null,
           bound_session_id: boundSessionId,
+          cwd,
         },
       });
     } catch (e) {
@@ -330,6 +431,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             content,
             terminal_context: terminalContext ?? null,
             bound_session_id: boundSessionId,
+            cwd,
           },
         });
         set((s) => ({

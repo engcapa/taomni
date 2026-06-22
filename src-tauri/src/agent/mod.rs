@@ -1,4 +1,5 @@
 pub mod cc_bridge;
+pub mod cmd_classify;
 pub mod commands;
 pub mod safety;
 pub mod search;

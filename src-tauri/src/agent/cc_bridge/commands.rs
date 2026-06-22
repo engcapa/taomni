@@ -146,6 +146,7 @@ pub async fn cc_send_message(
                     &app,
                     &req.thread_id,
                     linked_session.clone(),
+                    config.cc_bridge.confirm_readonly,
                 )
                 .await?;
             // Resolve the user's custom settings.json from the vault (when set).
@@ -203,12 +204,13 @@ pub async fn cc_send_message(
         }
     };
 
+    // Start the Weak-based liveness watchdog (idempotent).
+    process.start_watchdog();
+
     let events = process.send(&req.message).await?;
 
     let answer = extract_answer(&events);
     let session_id = extract_session_id(&events).or(resume_session);
-
-    // Persist the session id so the next call resumes the same conversation.
     if let Some(sid) = &session_id {
         if let Ok(db) = state.db.lock() {
             let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
@@ -243,6 +245,23 @@ pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> R
         process.stop().await;
     }
     Ok(())
+}
+
+/// Stop and drop the CC process bound to a thread (if any) so the next send
+/// re-spawns it. Use this whenever a *spawn-time* argument changes — the
+/// provider switched away from `claude-code`, or the per-thread model changed —
+/// since those are baked into the child's argv and a live, reused process
+/// can't adopt them. Removing the Arc from the registry revokes the MCP token,
+/// scrubs the temp dir (via `stop()`/`Drop`), and lets the Weak-based watchdog
+/// exit. No-op when the thread has no live process.
+///
+/// The registry lock is released before `stop()` so we don't hold it across the
+/// child kill.
+pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
+    let process = { state.cc_processes.lock().await.remove(thread_id) };
+    if let Some(process) = process {
+        process.stop().await;
+    }
 }
 
 /// Resolve a pending CC side-effect tool call. The frontend calls this after it
@@ -337,6 +356,7 @@ pub async fn cc_stream_message(
                     &app,
                     &req.thread_id,
                     linked_session.clone(),
+                    config.cc_bridge.confirm_readonly,
                 )
                 .await?;
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
@@ -390,6 +410,7 @@ pub async fn cc_stream_message(
 
     let event_name = format!("cc-stream:{}", req.thread_id);
     let app_clone = app.clone();
+    process.start_watchdog();
     let events = process
         .send_with_callback(&req.message, move |evt| {
             let _ = app_clone.emit(&event_name, evt.clone());

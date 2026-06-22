@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 
+/// Token / cost / timing rollup from Claude Code's final `result` event (3.5).
+/// All fields optional — older CLIs or error results may omit them.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct CcUsage {
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+    pub total_cost_usd: Option<f64>,
+    pub duration_ms: Option<u64>,
+    pub num_turns: Option<u64>,
+}
+
 /// Events emitted by Claude Code's stream-json output format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -19,8 +30,8 @@ pub enum CcEvent {
     },
     /// Session header; emitted on the first event with a fresh session id.
     SessionInit { session_id: String },
-    /// Session is complete.
-    Done,
+    /// Session is complete. Carries the final usage rollup when present (3.5).
+    Done { usage: Option<CcUsage> },
     /// An error occurred.
     Error { message: String },
     /// Partial/streaming text (included with --include-partial-messages).
@@ -125,7 +136,9 @@ pub fn parse_ndjson_line(line: &str) -> Option<CcEvent> {
                     .to_string();
                 Some(CcEvent::Error { message: msg })
             } else {
-                Some(CcEvent::Done)
+                Some(CcEvent::Done {
+                    usage: Some(parse_usage(&value)),
+                })
             }
         }
         "error" => {
@@ -166,6 +179,22 @@ pub fn parse_ndjson_line(line: &str) -> Option<CcEvent> {
         _ => Some(CcEvent::Unknown {
             raw: line.to_string(),
         }),
+    }
+}
+
+/// Pull the token/cost/timing rollup out of CC's `result` event. CC nests the
+/// token counts under `usage` and puts cost/timing at the top level.
+fn parse_usage(value: &serde_json::Value) -> CcUsage {
+    let usage = value.get("usage");
+    let u64_at = |obj: Option<&serde_json::Value>, key: &str| {
+        obj.and_then(|o| o.get(key)).and_then(|v| v.as_u64())
+    };
+    CcUsage {
+        input_tokens: u64_at(usage, "input_tokens"),
+        output_tokens: u64_at(usage, "output_tokens"),
+        total_cost_usd: value.get("total_cost_usd").and_then(|v| v.as_f64()),
+        duration_ms: value.get("duration_ms").and_then(|v| v.as_u64()),
+        num_turns: value.get("num_turns").and_then(|v| v.as_u64()),
     }
 }
 
@@ -232,7 +261,22 @@ mod tests {
     #[test]
     fn parses_success_result_as_done() {
         let line = r#"{"type":"result","subtype":"success","is_error":false,"result":"Hi!"}"#;
-        assert!(matches!(parse_ndjson_line(line), Some(CcEvent::Done)));
+        assert!(matches!(parse_ndjson_line(line), Some(CcEvent::Done { .. })));
+    }
+
+    #[test]
+    fn parses_result_usage_tokens_cost_and_timing() {
+        let line = r#"{"type":"result","subtype":"success","is_error":false,"result":"ok","duration_ms":1234,"num_turns":3,"total_cost_usd":0.0125,"usage":{"input_tokens":100,"output_tokens":250}}"#;
+        match parse_ndjson_line(line) {
+            Some(CcEvent::Done { usage: Some(u) }) => {
+                assert_eq!(u.input_tokens, Some(100));
+                assert_eq!(u.output_tokens, Some(250));
+                assert_eq!(u.total_cost_usd, Some(0.0125));
+                assert_eq!(u.duration_ms, Some(1234));
+                assert_eq!(u.num_turns, Some(3));
+            }
+            other => panic!("expected Done with usage, got {other:?}"),
+        }
     }
 
     #[test]
@@ -273,6 +317,6 @@ mod tests {
             })
             .collect();
         assert_eq!(partials, vec!["Hi", "!"]);
-        assert!(events.iter().any(|e| matches!(e, CcEvent::Done)));
+        assert!(events.iter().any(|e| matches!(e, CcEvent::Done { .. })));
     }
 }
