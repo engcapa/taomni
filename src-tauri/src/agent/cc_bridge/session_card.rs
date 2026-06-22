@@ -2,9 +2,10 @@
 //! `--append-system-prompt-file`.
 //!
 //! Goal: CC reliably knows *which saved Taomni session a chat thread is bound
-//! to* without having to call `list_sessions` to locate itself, and prefers the
-//! remote `run_in_terminal` MCP tool over its built-in local Bash when the
-//! binding is a remote host.
+//! to* without having to call `list_sessions` to locate itself, and treats that
+//! bound session as the sole target of all its work — routing every operation
+//! through the terminal MCP tools instead of its built-in local Bash / file
+//! tools, which only ever touch the unrelated Taomni host.
 //!
 //! Snapshot-at-spawn only: a `CcProcess`'s args are fixed for the thread's life
 //! (it is spawned once and reused with `--resume`). That is fine here because
@@ -45,37 +46,52 @@ fn is_remote(t: &SessionType) -> bool {
 }
 
 /// Shared guidance for any thread bound to a terminal — saved-remote,
-/// saved-local, or a live tab with no saved session. Two jobs:
+/// saved-local, or a live tab with no saved session. It states one *uniform*
+/// operating principle (not a per-field hint): every operation in this thread
+/// targets the bound session, so "current dir / files / processes / env"
+/// questions are all about that session and are answered through the terminal
+/// MCP tools. Two jobs fall out of that:
 ///
 /// ① Routing: steer execution through the bound terminal's MCP tools
 ///    (`run_in_terminal` / `read_terminal_tail`) instead of CC's built-in local
-///    Bash. `remote` adds the remote-only extras (`sftp_upload`, remote framing).
+///    Bash / file tools. `remote` adds the remote-only extra (`sftp_upload`).
 /// ② Env demotion: CC's native `<env>` (cwd / git / OS) only ever describes the
 ///    local host process that runs Taomni, never the bound session. Without this
 ///    note an un-anchored turn slides back to that local `<env>` + built-in Bash
-///    (they sit in CC's higher-authority primary prompt and carry less friction).
-///    So we explicitly relabel the native `<env>` as a host sandbox and point the
-///    "where am I" question at the per-turn cwd / the bound terminal.
+///    (they sit in CC's higher-authority primary prompt and carry less friction)
+///    — observed in practice: a bare "查询当前目录" was answered by running `ls`
+///    on the Taomni host. So we relabel the native `<env>` as a host sandbox and
+///    point every "where am I / what's here" question at the bound terminal.
 ///
 /// Not emitted for truly unbound threads: there the local `<env>` genuinely is
 /// the working environment, so we leave CC's defaults alone.
 fn push_terminal_routing(s: &mut String, remote: bool) {
+    // Uniform principle first, so CC doesn't treat "查询当前目录 / 看文件 / 看进程"
+    // as inspecting its own (local) environment and reach for built-in Bash.
+    s.push_str(
+        "本线程的一切操作都针对上面这个绑定的会话:你遇到的任何「当前目录 / 文件 / 进程 / 环境」\
+         问题都是指这个会话,而不是运行 Taomni 的本机。\n",
+    );
     if remote {
         s.push_str(
-            "操作该会话请用 MCP 工具 run_in_terminal / sftp_upload(危险动作会停下等用户确认),\
-             读回显用 read_terminal_tail;不要用内置本地 Bash 执行面向该远端会话的命令。\n",
+            "统一用 MCP 工具操作它:执行命令用 run_in_terminal、读回显用 read_terminal_tail、\
+             传文件用 sftp_upload(危险动作会停下等用户确认);它们作用于这个绑定终端、\
+             继承其真实当前目录。\n",
         );
     } else {
         s.push_str(
-            "操作该会话请用 MCP 工具 run_in_terminal 执行命令(危险动作会停下等用户确认),\
-             读回显用 read_terminal_tail;它们作用于这个绑定的终端、会继承其真实当前目录,\
-             不要用内置本地 Bash 去做面向该会话的事。\n",
+            "统一用 MCP 工具操作它:执行命令用 run_in_terminal、读回显用 read_terminal_tail\
+             (危险动作会停下等用户确认);它们作用于这个绑定终端、继承其真实当前目录。\n",
         );
     }
     s.push_str(
-        "注意:你自带的本地 <env>(工作目录 / git 状态 / 操作系统)只是运行 Taomni 的宿主沙箱,\
-         不是你的工作对象;你的真实工作目录以每轮提供的「当前工作目录」或绑定终端的实际目录为准,\
-         不要据本地 <env> 判断你身处的环境。\n",
+        "不要用你内置的本地 Bash / Read / Glob / Grep 去访问本机文件系统来回答这些问题——\
+         那是另一台机器(运行 Taomni 的宿主沙箱),不是你的工作对象。\n",
+    );
+    s.push_str(
+        "你自带的 <env>(工作目录 / git 状态 / 操作系统)只描述那台宿主沙箱;判断\
+         「我在哪 / 当前目录是什么」一律以绑定终端的实际状态(用 run_in_terminal 查)\
+         或每轮提供的「当前工作目录」为准,不要据本地 <env> 作答。\n",
     );
 }
 
@@ -220,7 +236,10 @@ mod tests {
         // ① Tool-routing disambiguation — remote variant mentions sftp_upload.
         assert!(card.contains("run_in_terminal"));
         assert!(card.contains("sftp_upload"));
-        assert!(card.contains("不要用内置本地 Bash"));
+        assert!(card.contains("内置的本地 Bash"));
+        // Uniform operating principle (not just one field).
+        assert!(card.contains("本线程的一切操作都针对"));
+        assert!(card.contains("当前目录 / 文件 / 进程 / 环境"));
         // ② Native <env> is demoted to a host sandbox.
         assert!(card.contains("宿主沙箱"));
         // History snapshot, newest first.
