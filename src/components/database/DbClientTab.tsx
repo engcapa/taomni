@@ -69,6 +69,8 @@ import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { sqlStatementsForExecution } from "../../lib/sqlStatements";
+import { createDbMetadataCache } from "../../lib/dbMetadataCache";
+import { sqlNamespaceFromMetadata } from "../../lib/sqlMetadataCompletions";
 import {
   asSqlEngine,
   quoteIdent as dialectQuoteIdent,
@@ -415,6 +417,7 @@ export default function DbClientTab({
   const [schemas, setSchemas] = useState<string[]>([]);
   const [activeSchema, setActiveSchema] = useState<string | null>(info.database ?? null);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
+  const [metadataVersion, setMetadataVersion] = useState(0);
   const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
   const [leftPanelTab, setLeftPanelTab] = useState<"schema" | "bookmarks">("schema");
   const addBookmarkTriggerRef = useRef<(() => void) | null>(null);
@@ -442,6 +445,16 @@ export default function DbClientTab({
 
   const sessionId = info.sessionId;
   const workspaceSessionId = info.workspaceSessionId ?? info.sessionId;
+  const metadataCache = useMemo(
+    () =>
+      connectionSessionId
+        ? createDbMetadataCache({
+            sessionId: connectionSessionId,
+            defaultCatalog: info.catalog,
+          })
+        : null,
+    [connectionSessionId, info.catalog],
+  );
 
   useEffect(() => {
     panelsRef.current = panels;
@@ -450,6 +463,14 @@ export default function DbClientTab({
   useEffect(() => {
     activePanelIdRef.current = activePanelId;
   }, [activePanelId]);
+
+  useEffect(() => {
+    if (!metadataCache) return;
+    setMetadataVersion((version) => version + 1);
+    return metadataCache.subscribe(() => {
+      setMetadataVersion((version) => version + 1);
+    });
+  }, [metadataCache]);
 
   // Global keyboard shortcut to add a bookmark: Ctrl+Alt+B / Cmd+Alt+B
   useEffect(() => {
@@ -707,6 +728,11 @@ export default function DbClientTab({
         if (!sawDone) {
           patchSheet(panelId, sheetId, { running: false, cancelling: false });
         }
+        metadataCache?.invalidateSql(sql, {
+          engine: info.engine,
+          activeSchema,
+          defaultCatalog: info.catalog,
+        });
         return true;
       } catch (err) {
         patchSheet(panelId, sheetId, {
@@ -724,7 +750,7 @@ export default function DbClientTab({
         }
       }
     },
-    [connectionSessionId, patchSheet, updateSheet],
+    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, patchSheet, updateSheet],
   );
 
   const runQuery = useCallback(
@@ -910,7 +936,9 @@ export default function DbClientTab({
       let described: DbColumnDescription[] = [];
       try {
         if (!connectionSessionId) throw new Error("Database connection is still starting.");
-        described = await dbDescribeTable(connectionSessionId, schema, target.table);
+        described = metadataCache
+          ? await metadataCache.describeTable(schema, target.table, info.catalog)
+          : await dbDescribeTable(connectionSessionId, schema, target.table, info.catalog);
       } catch {
         described = [];
       }
@@ -953,7 +981,7 @@ export default function DbClientTab({
       );
       await refreshSheet(panelId, sheetId, "clearView");
     },
-    [activeSchema, connectionSessionId, info.catalog, info.engine, panels, refreshSheet, setStatusMessage],
+    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, panels, refreshSheet, setStatusMessage],
   );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
@@ -974,6 +1002,50 @@ export default function DbClientTab({
       return names[0] ?? null;
     });
   }, [info.database]);
+
+  useEffect(() => {
+    if (!metadataCache) return;
+    let cancelled = false;
+    void metadataCache
+      .listSchemas(info.catalog)
+      .then((names) => {
+        if (!cancelled) onSchemasLoaded(names);
+      })
+      .catch((error) => {
+        if (!cancelled) setStatusMessage(`Schema metadata failed: ${String(error)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [info.catalog, metadataCache, onSchemasLoaded, setStatusMessage]);
+
+  useEffect(() => {
+    if (!metadataCache || !activeSchema) return;
+    let cancelled = false;
+    void metadataCache
+      .listTables(activeSchema, info.catalog)
+      .catch((error) => {
+        if (!cancelled) setStatusMessage(`Table metadata failed: ${String(error)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSchema, info.catalog, metadataCache, setStatusMessage]);
+
+  const metadataSchema = useMemo(
+    () =>
+      metadataCache
+        ? sqlNamespaceFromMetadata({
+            cache: metadataCache,
+            engine: info.engine,
+            activeSchema,
+            catalog: info.catalog,
+          })
+        : undefined,
+    [activeSchema, info.catalog, info.engine, metadataCache, metadataVersion],
+  );
+
+  const editorSchema = metadataSchema ?? (Object.keys(schemaMap).length > 0 ? schemaMap : undefined);
 
   const switchSchema = useCallback(
     async (schema: string) => {
@@ -1453,6 +1525,7 @@ export default function DbClientTab({
                     onStatus={setStatusMessage}
                     onSchemasLoaded={onSchemasLoaded}
                     onSchemaLoaded={onSchemaLoaded}
+                    metadataCache={metadataCache ?? undefined}
                   />
                 )
               ) : (
@@ -1585,7 +1658,11 @@ export default function DbClientTab({
                     <SqlEditorPanel
                       engine={info.engine}
                       initialDoc={activePanel.doc}
-                      schema={schemaMap}
+                      schema={editorSchema}
+                      metadataCache={metadataCache}
+                      activeSchema={activeSchema}
+                      catalog={info.catalog}
+                      onMetadataStatus={setStatusMessage}
                       handleRef={(h) => {
                         editorHandles.current[activePanel.id] = h;
                       }}

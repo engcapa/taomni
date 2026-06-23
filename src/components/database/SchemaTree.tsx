@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -18,10 +18,7 @@ import {
   BookText,
 } from "lucide-react";
 import {
-  dbListSchemas,
-  dbListTables,
   dbListObjects,
-  dbDescribeTable,
   dbListIndexes,
   dbExecute,
   dbObjectDdl,
@@ -32,6 +29,7 @@ import {
   type DbIndex,
   type DbQueryResult,
 } from "../../lib/ipc";
+import { createDbMetadataCache, type DbMetadataCache } from "../../lib/dbMetadataCache";
 import {
   asSqlEngine,
   categoriesForEngine,
@@ -91,6 +89,8 @@ interface SchemaTreeProps {
   onSchemasLoaded?: (schemas: string[]) => void;
   /** Bubble up the loaded schema → tables/columns for editor autocomplete. */
   onSchemaLoaded?: (tables: Map<string, string[]>) => void;
+  /** Shared lazy metadata cache used by both schema tree and SQL editor. */
+  metadataCache?: DbMetadataCache;
 }
 
 const CATEGORY_META: Record<
@@ -146,6 +146,7 @@ export function SchemaTree({
   onStatus,
   onSchemasLoaded,
   onSchemaLoaded,
+  metadataCache,
 }: SchemaTreeProps) {
   const t = useT();
   const sqlEngine = asSqlEngine(engine);
@@ -165,13 +166,17 @@ export function SchemaTree({
   const [error, setError] = useState<string | null>(null);
   const [loadingSchemas, setLoadingSchemas] = useState(false);
   const { show: openMenu, render: menu } = useContextMenu();
+  const ownedMetadataCache = useMemo(
+    () => createDbMetadataCache({ sessionId, defaultCatalog: catalog }),
+    [catalog, sessionId],
+  );
+  const cache = metadataCache ?? ownedMetadataCache;
 
   const loadSchemas = useCallback(async () => {
     setLoadingSchemas(true);
     setError(null);
     try {
-      const list = await dbListSchemas(sessionId);
-      const names = list.map((s) => s.name);
+      const names = await cache.listSchemas(catalog);
       setSchemas(names);
       onSchemasLoaded?.(names);
     } catch (err) {
@@ -179,7 +184,7 @@ export function SchemaTree({
     } finally {
       setLoadingSchemas(false);
     }
-  }, [sessionId, onSchemasLoaded]);
+  }, [cache, catalog, onSchemasLoaded]);
 
   useEffect(() => {
     void loadSchemas();
@@ -189,14 +194,14 @@ export function SchemaTree({
     async (db: string) => {
       if (tablesByDb[db]) return;
       try {
-        const list = await dbListTables(sessionId, db);
+        const list = await cache.listTables(db, catalog);
         setTablesByDb((prev) => ({ ...prev, [db]: list }));
         onSchemaLoaded?.(new Map(list.map((t) => [t.name, [] as string[]])));
       } catch (err) {
         setError(String(err));
       }
     },
-    [sessionId, tablesByDb, onSchemaLoaded],
+    [cache, catalog, tablesByDb, onSchemaLoaded],
   );
 
   const ensureObjects = useCallback(
@@ -239,7 +244,7 @@ export function SchemaTree({
       setObjState((prev) => ({ ...prev, [key]: { ...prev[key], expanded, loading: true } }));
       try {
         const [columns, indexes] = await Promise.all([
-          dbDescribeTable(sessionId, db, name),
+          cache.describeTable(db, name, catalog),
           showIndexes
             ? dbListIndexes(sessionId, db, name).catch(() => [] as DbIndex[])
             : Promise.resolve([] as DbIndex[]),
@@ -262,6 +267,7 @@ export function SchemaTree({
   };
 
   const refreshAll = () => {
+    cache.clearAll();
     setTablesByDb({});
     setObjectsByCat({});
     setObjState({});
@@ -300,7 +306,8 @@ export function SchemaTree({
     async (db: string, kind: ObjectKind) => {
       if (TABLE_CATEGORIES.includes(kind)) {
         try {
-          const list = await dbListTables(sessionId, db);
+          cache.invalidate({ catalog, schema: db });
+          const list = await cache.listTables(db, catalog);
           setTablesByDb((prev) => ({ ...prev, [db]: list }));
         } catch {
           /* surfaced elsewhere */
@@ -314,13 +321,14 @@ export function SchemaTree({
         }
       }
     },
-    [sessionId],
+    [cache, catalog, sessionId],
   );
 
   const runExec = async (sql: string, db: string, kind: ObjectKind) => {
     try {
       await dbExecute(sessionId, sql);
       onStatus?.(t("dbObjects.executed", { sql }));
+      cache.invalidate({ catalog, schema: db });
       setObjState((prev) => {
         const next = { ...prev };
         for (const key of Object.keys(next)) {
@@ -358,7 +366,7 @@ export function SchemaTree({
   const getColumns = async (db: string, name: string): Promise<DbColumnDescription[]> => {
     const cached = objState[objKey(db, "table", name)]?.columns ?? objState[objKey(db, "view", name)]?.columns;
     if (cached) return cached;
-    return dbDescribeTable(sessionId, db, name).catch(() => [] as DbColumnDescription[]);
+    return cache.describeTable(db, name, catalog).catch(() => [] as DbColumnDescription[]);
   };
 
   const insertDml = async (db: string, name: string, type: "select" | "insert" | "update" | "delete") => {

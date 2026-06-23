@@ -166,6 +166,12 @@ pub struct SchemaInfo {
     pub name: String,
 }
 
+/// A top-level catalog node (currently used by Presto/Trino).
+#[derive(Debug, Clone, Serialize)]
+pub struct CatalogInfo {
+    pub name: String,
+}
+
 /// A table/view node.
 #[derive(Debug, Clone, Serialize)]
 pub struct TableInfo {
@@ -500,16 +506,32 @@ pub async fn db_disconnect(state: State<'_, AppState>, session_id: String) -> Re
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
+pub async fn db_list_catalogs(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<Vec<CatalogInfo>, String> {
+    let session = get_session(&state, &session_id).await?;
+    match &session.handle {
+        DbHandle::Presto(client) => presto::list_catalogs(client).await,
+        DbHandle::MySql(_)
+        | DbHandle::Postgres(_)
+        | DbHandle::ClickHouse(_)
+        | DbHandle::Redis(_) => Ok(Vec::new()),
+    }
+}
+
+#[tauri::command]
 pub async fn db_list_schemas(
     state: State<'_, AppState>,
     session_id: String,
+    catalog: Option<String>,
 ) -> Result<Vec<SchemaInfo>, String> {
     let session = get_session(&state, &session_id).await?;
     match &session.handle {
         DbHandle::MySql(pool) => sql::list_schemas_mysql(pool).await,
         DbHandle::Postgres(pool) => sql::list_schemas_postgres(pool).await,
         DbHandle::ClickHouse(client) => clickhouse::list_schemas(client).await,
-        DbHandle::Presto(client) => presto::list_schemas(client).await,
+        DbHandle::Presto(client) => presto::list_schemas(client, catalog.as_deref()).await,
         DbHandle::Redis(_) => Err("Redis has no SQL schemas".into()),
     }
 }
@@ -519,13 +541,16 @@ pub async fn db_list_tables(
     state: State<'_, AppState>,
     session_id: String,
     schema: Option<String>,
+    catalog: Option<String>,
 ) -> Result<Vec<TableInfo>, String> {
     let session = get_session(&state, &session_id).await?;
     match &session.handle {
         DbHandle::MySql(pool) => sql::list_tables_mysql(pool, schema.as_deref()).await,
         DbHandle::Postgres(pool) => sql::list_tables_postgres(pool, schema.as_deref()).await,
         DbHandle::ClickHouse(client) => clickhouse::list_tables(client, schema.as_deref()).await,
-        DbHandle::Presto(client) => presto::list_tables(client, schema.as_deref()).await,
+        DbHandle::Presto(client) => {
+            presto::list_tables(client, catalog.as_deref(), schema.as_deref()).await
+        }
         DbHandle::Redis(_) => Err("Redis has no tables".into()),
     }
 }
@@ -536,6 +561,7 @@ pub async fn db_describe_table(
     session_id: String,
     schema: Option<String>,
     table: String,
+    catalog: Option<String>,
 ) -> Result<Vec<ColumnDescription>, String> {
     let session = get_session(&state, &session_id).await?;
     match &session.handle {
@@ -546,7 +572,9 @@ pub async fn db_describe_table(
         DbHandle::ClickHouse(client) => {
             clickhouse::describe_table(client, schema.as_deref(), &table).await
         }
-        DbHandle::Presto(client) => presto::describe_table(client, schema.as_deref(), &table).await,
+        DbHandle::Presto(client) => {
+            presto::describe_table(client, catalog.as_deref(), schema.as_deref(), &table).await
+        }
         DbHandle::Redis(_) => Err("Redis has no tables".into()),
     }
 }

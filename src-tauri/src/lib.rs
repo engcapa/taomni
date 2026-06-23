@@ -311,6 +311,7 @@ pub fn run() {
             database::db_connect,
             database::db_ping,
             database::db_disconnect,
+            database::db_list_catalogs,
             database::db_list_schemas,
             database::db_list_tables,
             database::db_describe_table,

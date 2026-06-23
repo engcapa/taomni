@@ -19,6 +19,9 @@ const ipcMock = vi.hoisted(() => ({
     onEvent({ kind: "done", rowsAffected: 0, durationMs: 1, warnings: [] });
   }),
   dbCancel: vi.fn(async () => undefined),
+  dbListCatalogs: vi.fn(async () => []),
+  dbListSchemas: vi.fn(async () => [{ name: "cdp" }]),
+  dbListTables: vi.fn(async () => []),
   dbDescribeTable: vi.fn(async () => []),
 }));
 
@@ -51,6 +54,9 @@ vi.mock("../../lib/ipc", () => ({
   dbExecute: ipcMock.dbExecute,
   dbExecuteStream: ipcMock.dbExecuteStream,
   dbCancel: ipcMock.dbCancel,
+  dbListCatalogs: ipcMock.dbListCatalogs,
+  dbListSchemas: ipcMock.dbListSchemas,
+  dbListTables: ipcMock.dbListTables,
   dbDescribeTable: ipcMock.dbDescribeTable,
   dbListBookmarks: vi.fn(async () => []),
   dbSaveBookmark: vi.fn(async () => undefined),
@@ -64,20 +70,29 @@ vi.mock("../../lib/ipc", () => ({
   writeStreamOpen: vi.fn(async () => "stream-1"),
 }));
 
+const dbChildProps = vi.hoisted(() => ({
+  schemaTree: null as null | { metadataCache?: unknown },
+  sqlEditor: null as null | { metadataCache?: unknown },
+}));
+
 vi.mock("./SchemaTree", () => ({
-  SchemaTree: ({ sessionId }: { sessionId: string }) => (
-    <div data-testid="schema-tree" data-session-id={sessionId} />
-  ),
+  SchemaTree: (props: { sessionId: string; metadataCache?: unknown }) => {
+    dbChildProps.schemaTree = props;
+    return <div data-testid="schema-tree" data-session-id={props.sessionId} />;
+  },
 }));
 
 vi.mock("./SqlEditorPanel", () => ({
   SqlEditorPanel: ({
     handleRef,
     onRun,
+    metadataCache,
   }: {
     handleRef: (handle: unknown | null) => void;
     onRun: (sql: string) => void;
+    metadataCache?: unknown;
   }) => {
+    dbChildProps.sqlEditor = { metadataCache };
     useEffect(() => {
       const handle = {
         getValue: () => "select 1",
@@ -143,6 +158,8 @@ describe("DbClientTab connection lifecycle", () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     localStorage.clear();
+    dbChildProps.schemaTree = null;
+    dbChildProps.sqlEditor = null;
   });
 
   it("keeps queries on the latest runtime connection when a stale StrictMode connect resolves late", async () => {
@@ -198,5 +215,17 @@ describe("DbClientTab connection lifecycle", () => {
     });
     const disconnectCalls = ipcMock.dbDisconnect.mock.calls as unknown as Array<[string]>;
     expect(disconnectCalls.some(([id]) => id === secondRuntimeId)).toBe(false);
+  });
+
+  it("shares one metadata cache between schema tree and SQL editor", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("schema-tree")).toBeInTheDocument();
+      expect(dbChildProps.schemaTree?.metadataCache).toBeTruthy();
+      expect(dbChildProps.sqlEditor?.metadataCache).toBe(dbChildProps.schemaTree?.metadataCache);
+    });
   });
 });

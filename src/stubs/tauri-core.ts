@@ -926,6 +926,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "db_connect":
     case "db_ping":
     case "db_disconnect":
+    case "db_list_catalogs":
     case "db_list_schemas":
     case "db_list_tables":
     case "db_describe_table":

@@ -828,6 +828,10 @@ export interface DbSchema {
   name: string;
 }
 
+export interface DbCatalog {
+  name: string;
+}
+
 export interface DbTable {
   name: string;
   kind: "table" | "view" | "materialized_view";
@@ -875,26 +879,40 @@ export type DbQueryStreamEvent =
   | { kind: "rows"; rows: (string | null)[][] }
   | { kind: "done"; rowsAffected: number; durationMs: number; warnings: string[] };
 
-export async function dbListSchemas(sessionId: string): Promise<DbSchema[]> {
-  return invoke<DbSchema[]>("db_list_schemas", { sessionId });
+export async function dbListCatalogs(sessionId: string): Promise<DbCatalog[]> {
+  return invoke<DbCatalog[]>("db_list_catalogs", { sessionId });
+}
+
+export async function dbListSchemas(
+  sessionId: string,
+  catalog?: string | null,
+): Promise<DbSchema[]> {
+  return invoke<DbSchema[]>("db_list_schemas", { sessionId, catalog: catalog ?? null });
 }
 
 export async function dbListTables(
   sessionId: string,
   schema?: string | null,
+  catalog?: string | null,
 ): Promise<DbTable[]> {
-  return invoke<DbTable[]>("db_list_tables", { sessionId, schema: schema ?? null });
+  return invoke<DbTable[]>("db_list_tables", {
+    sessionId,
+    schema: schema ?? null,
+    catalog: catalog ?? null,
+  });
 }
 
 export async function dbDescribeTable(
   sessionId: string,
   schema: string | null,
   table: string,
+  catalog?: string | null,
 ): Promise<DbColumnDescription[]> {
   return invoke<DbColumnDescription[]>("db_describe_table", {
     sessionId,
     schema: schema ?? null,
     table,
+    catalog: catalog ?? null,
   });
 }
 

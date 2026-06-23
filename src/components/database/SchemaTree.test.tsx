@@ -55,7 +55,7 @@ describe("SchemaTree folder model", () => {
   it("loads tables eagerly and splits them by kind under Tables/Views", async () => {
     render(<SchemaTree sessionId="s1" engine="MySQL" />);
     fireEvent.click(await screen.findByText("ecommerce"));
-    await waitFor(() => expect(ipcMock.dbListTables).toHaveBeenCalledWith("s1", "ecommerce"));
+    await waitFor(() => expect(ipcMock.dbListTables).toHaveBeenCalledWith("s1", "ecommerce", null));
     fireEvent.click(await screen.findByText("Tables"));
     expect(await screen.findByText("orders")).toBeInTheDocument();
     // The view is not under Tables.
@@ -79,7 +79,7 @@ describe("SchemaTree folder model", () => {
     fireEvent.click(await screen.findByText("ecommerce"));
     fireEvent.click(await screen.findByText("Tables"));
     fireEvent.click(await screen.findByText("orders"));
-    await waitFor(() => expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "ecommerce", "orders"));
+    await waitFor(() => expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "ecommerce", "orders", null));
     expect(await screen.findByText("id")).toBeInTheDocument();
     expect(await screen.findByText("idx_user")).toBeInTheDocument();
   });
