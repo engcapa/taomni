@@ -494,6 +494,10 @@ export async function selectFilePath(currentPath?: string): Promise<string | nul
   return invoke<string | null>("select_file_path", { currentPath: currentPath ?? null });
 }
 
+export async function getHomeDir(): Promise<string | null> {
+  return invoke<string | null>("get_home_dir", {});
+}
+
 export async function selectFolderPath(currentPath?: string): Promise<string | null> {
   return invoke<string | null>("select_folder_path", { currentPath: currentPath ?? null });
 }

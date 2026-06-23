@@ -18,6 +18,7 @@ import {
 import { SessionImportPreview } from "../session/SessionImportPreview";
 import { t as translate } from "../../lib/i18n";
 import { alertAppDialog } from "../../lib/appDialogs";
+import { getHomeDir } from "../../lib/ipc";
 
 /**
  * Session import/export handlers shared by the in-app {@link MenuBar} (used on
@@ -70,9 +71,10 @@ export function useSessionImportExport(): UseSessionImportExport {
   };
 
   const importMoba = () => {
-    openBinaryFile(".mxtsessions,.moba,text/plain,application/octet-stream").then((bytes) => {
+    openBinaryFile(".mxtsessions,.moba,text/plain,application/octet-stream").then(async (bytes) => {
       if (!bytes) return;
-      queueImportPreview(parseMobaXtermSessions(bytes, { existingSessions: sessions }), "MobaXterm");
+      const homeDir = await getHomeDir().catch(() => null);
+      queueImportPreview(parseMobaXtermSessions(bytes, { existingSessions: sessions, homeDir }), "MobaXterm");
     }).catch(reportError);
   };
 

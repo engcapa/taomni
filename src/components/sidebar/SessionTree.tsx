@@ -30,6 +30,7 @@ import {
   importPuttySessions,
   importWslSessions,
   isVaultLockedError,
+  getHomeDir,
   keychainLookupBatch,
   readPlistSessionFile,
   scanLocalSessionFiles,
@@ -315,9 +316,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const importMoba = (folderPath: string | null) => {
-    openBinaryFile(".mxtsessions,.moba,text/plain,application/octet-stream").then((bytes) => {
+    openBinaryFile(".mxtsessions,.moba,text/plain,application/octet-stream").then(async (bytes) => {
       if (!bytes) return;
-      const result = parseMobaXtermSessions(bytes, { targetFolder: folderPath, existingSessions: sessions });
+      const homeDir = await getHomeDir().catch(() => null);
+      const result = parseMobaXtermSessions(bytes, { targetFolder: folderPath, existingSessions: sessions, homeDir });
       queueImportPreview(result, folderPath, "MobaXterm");
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));

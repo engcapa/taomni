@@ -334,6 +334,7 @@ describe("MobaXterm session import/export", () => {
     const result = parseMobaXtermSessions(text, {
       targetFolder: "Imported",
       now: 3333,
+      homeDir: "/home/importer",
     });
 
     expect(result.sessions).toHaveLength(1);
@@ -345,7 +346,7 @@ describe("MobaXterm session import/export", () => {
       port: 22,
       username: "azroot",
     });
-    expect(result.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "_ProfileDir_\\keys\\id.ppk" } });
+    expect(result.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "/home/importer/keys/id.ppk" } });
     expect(JSON.parse(result.sessions[0].options_json)).toMatchObject({
       x11: true,
       compression: true,
@@ -354,6 +355,25 @@ describe("MobaXterm session import/export", () => {
       jumpPort: "2222",
       jumpUser: "jump",
       description: "SSH#comment",
+    });
+  });
+
+  it("resolves MobaXterm _ProfileDir_ private keys against Windows home", () => {
+    const text = [
+      "[Bookmarks]",
+      "SubRep=aliyun",
+      "ImgNum=41",
+      "172.28.8.25 (grafana)=#109#0%172.28.8.25%22%yuhang.zhao%%-1%-1%%%%%0%0%0%_ProfileDir_\\.ssh\\id_rsa%%-1%0%0%0%%1080%%0%0%1%%0%%%%0%-1%-1%0#MobaFont%12%0%0%-1%15%236,236,236%30,30,30%180,180,192%0%-1%0%%xterm%-1%0%_Std_Colors_0_%80%24%0%1%-1%<none>%%0%0%-1%-1#0# #-1",
+    ].join("\r\n");
+
+    const result = parseMobaXtermSessions(text, {
+      homeDir: "C:\\Users\\alice",
+      now: 5555,
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].auth_method).toEqual({
+      PrivateKey: { key_path: "C:\\Users\\alice\\.ssh\\id_rsa" },
     });
   });
 
