@@ -50,6 +50,15 @@ interface AppState {
    */
   cwdByTab: Record<string, string>;
 
+  /**
+   * Live DB-client runtime connection id per tab (Phase 6). The DB/Redis tab
+   * generates this id when it connects (`createRuntimeDbSessionId`) and the
+   * backend can't derive it, so we mirror it here keyed by tab id; the chat
+   * store reads it to bridge `bound_db_connection_id` to the CC DB MCP each
+   * turn. Absent until the tab connects; cleared on disconnect/unmount.
+   */
+  dbConnByTab: Record<string, string>;
+
   addTab: (tab: Tab) => void;
   /**
    * Duplicate an existing tab, inserting the copy immediately to the right of
@@ -95,6 +104,11 @@ interface AppState {
   clearTabFilter: () => void;
   /** Record a terminal tab's latest OSC-7 cwd (see {@link cwdByTab}). */
   setTabCwd: (tabId: string, cwd: string) => void;
+  /**
+   * Record (or clear, with `null`) a DB/Redis tab's live runtime connection id
+   * (see {@link dbConnByTab}). Called by the DB client on connect/disconnect.
+   */
+  setTabDbConn: (tabId: string, connId: string | null) => void;
 }
 
 function readUiFontFamily(): string {
@@ -211,6 +225,7 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarCollapsed: false,
   activeSideTab: "sessions",
   cwdByTab: {},
+  dbConnByTab: {},
   xServerEnabled: false,
   xServerStatus: null,
   statusMessage: tr("status.ready"),
@@ -511,4 +526,17 @@ export const useAppStore = create<AppState>((set) => ({
   clearTabFilter: () => set({ tabFilter: null }),
   setTabCwd: (tabId, cwd) =>
     set((s) => (s.cwdByTab[tabId] === cwd ? s : { cwdByTab: { ...s.cwdByTab, [tabId]: cwd } })),
+
+  setTabDbConn: (tabId, connId) =>
+    set((s) => {
+      if (connId === null) {
+        if (!(tabId in s.dbConnByTab)) return s;
+        const next = { ...s.dbConnByTab };
+        delete next[tabId];
+        return { dbConnByTab: next };
+      }
+      return s.dbConnByTab[tabId] === connId
+        ? s
+        : { dbConnByTab: { ...s.dbConnByTab, [tabId]: connId } };
+    }),
 }));

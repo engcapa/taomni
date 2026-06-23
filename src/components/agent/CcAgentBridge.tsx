@@ -64,15 +64,27 @@ function describe(tool: string, rawArgs: Record<string, unknown> | null | undefi
       return `上传文件到 ${String(args.remote_path ?? "")}`;
     case "save_as_runbook":
       return `保存 Runbook: ${String(args.name ?? "")}`;
+    case "run_sql":
+    case "run_sql_captured":
+      return `执行 SQL: ${String(args.sql ?? "")}`;
+    case "export_result":
+      return `导出查询结果 (${String(args.format ?? "csv")})`;
+    case "redis_set_key":
+      return `写入 Redis 键: ${String(args.key ?? "")}`;
+    case "redis_del_key":
+      return `删除 Redis 键: ${String(args.key ?? "")}`;
+    case "redis_exec":
+      return `执行 Redis 命令: ${String(args.command ?? "")}`;
     default:
       return `Claude Code 请求执行工具 "${tool}"`;
   }
 }
 
-/** The most useful preview string for a tool call (command / path), if any. */
+/** The most useful preview string for a tool call (command / path / sql), if any. */
 function preview(rawArgs: Record<string, unknown> | null | undefined): string | null {
   const args = rawArgs ?? {};
   if (typeof args.command === "string") return args.command;
+  if (typeof args.sql === "string") return args.sql;
   if (typeof args.file_path === "string") return args.file_path;
   if (typeof args.remote_path === "string") return args.remote_path;
   return null;

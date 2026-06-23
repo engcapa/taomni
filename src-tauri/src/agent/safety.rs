@@ -158,10 +158,14 @@ pub fn check_session_disable(state: &AppState, call: &ToolCall) -> Result<(), St
 /// Returns true if this tool performs a write/destructive action that should
 /// be blocked under per-session disable + go through confirmation cards.
 ///
-/// Covers both the native vocabulary and CC's write tools (`Bash` can run
+/// Covers the native vocabulary, CC's built-in write tools (`Bash` can run
 /// arbitrary mutating commands; `Write`/`Edit`/`MultiEdit`/`NotebookEdit`
-/// mutate files), so confirmation cards and the per-session AI-write disable
-/// flag apply uniformly regardless of which driver issued the call.
+/// mutate files), and the DB MCP write tools (Phase 6). `run_sql` /
+/// `run_sql_captured` can mutate (the read-only SELECT case is waived from the
+/// *confirmation* card by the SQL classifier, not here); `export_result` writes
+/// a file; the Redis `set`/`del`/`exec` tools can mutate the keyspace. So
+/// confirmation cards and the per-session AI-write disable flag apply uniformly
+/// regardless of which driver issued the call.
 pub fn is_write_tool(tool: &str) -> bool {
     matches!(
         tool,
@@ -174,6 +178,13 @@ pub fn is_write_tool(tool: &str) -> bool {
             | "Edit"
             | "MultiEdit"
             | "NotebookEdit"
+            // Phase 6 — DB MCP write tools.
+            | "run_sql"
+            | "run_sql_captured"
+            | "export_result"
+            | "redis_set_key"
+            | "redis_del_key"
+            | "redis_exec"
     )
 }
 

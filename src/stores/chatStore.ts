@@ -262,6 +262,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // fresh each send. Null for global/local/unsaved-tab threads or shells that
     // can't report a cwd.
     let cwd: string | null = null;
+    // Phase 6 — the live DB connection id for a thread bound to a DB/Redis tab,
+    // bridged per-turn so the CC DB MCP can target it (the backend can't derive
+    // the runtime key). Null for non-DB threads or a disconnected DB tab.
+    let boundDbConnectionId: string | null = null;
     {
       const tabId = get().threads.find((t) => t.id === threadId)?.linked_session_id ?? null;
       if (tabId) {
@@ -270,6 +274,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           const appState = useAppStore.getState();
           boundSessionId = appState.tabs.find((t) => t.id === tabId)?.sessionId ?? null;
           cwd = appState.cwdByTab[tabId] ?? null;
+          boundDbConnectionId = appState.dbConnByTab[tabId] ?? null;
         } catch (err) {
           console.warn("bound_session_id resolution failed:", err);
         }
@@ -402,6 +407,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           terminal_context: terminalContext ?? null,
           bound_session_id: boundSessionId,
           cwd,
+          bound_db_connection_id: boundDbConnectionId,
         },
       });
     } catch (e) {
@@ -432,6 +438,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             terminal_context: terminalContext ?? null,
             bound_session_id: boundSessionId,
             cwd,
+            bound_db_connection_id: boundDbConnectionId,
           },
         });
         set((s) => ({

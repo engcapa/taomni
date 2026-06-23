@@ -59,6 +59,67 @@ const TOOL_TIMEOUT_SECS: u64 = 600;
 /// mid-capture.
 const CAPTURE_TIMEOUT_SECS: u64 = 900;
 
+/// Which tool surface a CC thread's MCP endpoint exposes. Selected at spawn
+/// from the bound session's type (E): a terminal/SSH/local thread gets `Shell`;
+/// a SQL DB session (MySQL/PG/ClickHouse/Presto) gets `Sql`; a Redis session
+/// gets `Redis`. One listener serves all three at distinct nest paths, and a
+/// thread's `.mcp.json` lists *only* its flavor's server — so a DB thread never
+/// sees shell tools, and vice-versa (reduces cross-surface confusion).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Flavor {
+    Shell,
+    Sql,
+    Redis,
+}
+
+impl Flavor {
+    /// Nest path this flavor's `StreamableHttpService` is mounted at. Shell keeps
+    /// the legacy `/mcp` so the GUI-verified shell path is byte-for-byte
+    /// unchanged.
+    pub fn path(self) -> &'static str {
+        match self {
+            Flavor::Shell => "/mcp",
+            Flavor::Sql => "/mcp/sql",
+            Flavor::Redis => "/mcp/redis",
+        }
+    }
+
+    /// Server name CC sees in `.mcp.json` (and thus in `mcp__<name>__<tool>`).
+    pub fn server_name(self) -> &'static str {
+        match self {
+            Flavor::Shell => "taomni",
+            Flavor::Sql => "taomni_sql",
+            Flavor::Redis => "taomni_redis",
+        }
+    }
+
+    /// The `--permission-prompt-tool` name for this flavor's server.
+    pub fn permission_prompt_tool(self) -> &'static str {
+        match self {
+            Flavor::Shell => "mcp__taomni__permission_prompt",
+            Flavor::Sql => "mcp__taomni_sql__permission_prompt",
+            Flavor::Redis => "mcp__taomni_redis__permission_prompt",
+        }
+    }
+
+    /// Pick the MCP flavor for a thread from its bound session's type: SQL DB
+    /// engines (MySQL/PG/ClickHouse/Presto) → `Sql`, Redis → `Redis`, anything
+    /// else (SSH/terminal/local/unbound) → `Shell`.
+    pub fn for_session_type(t: Option<&crate::session::models::SessionType>) -> Flavor {
+        use crate::session::models::SessionType;
+        match t {
+            Some(
+                SessionType::MySQL
+                | SessionType::PostgreSQL
+                | SessionType::ClickHouse
+                | SessionType::Presto,
+            ) => Flavor::Sql,
+            Some(SessionType::Redis) => Flavor::Redis,
+            _ => Flavor::Shell,
+        }
+    }
+}
+
 /// Trust tier inferred for a CC thread (D3). Local working dirs are lenient;
 /// remote SSH sessions are strict. Surfaced to the UI; the safety pipeline
 /// itself stays conservative regardless.
@@ -83,6 +144,8 @@ pub struct TokenScope {
     pub thread_id: String,
     pub allowed_session_id: Option<String>,
     pub trust: TrustLevel,
+    /// Which tool surface this token's thread uses (Shell / Sql / Redis).
+    pub flavor: Flavor,
     /// When true, read-only `Bash`/`run_in_terminal` commands still require a
     /// confirmation (3.6 noise-reduction disabled by config). Snapshotted from
     /// `CcBridgeConfig.confirm_readonly` at provision time.
@@ -92,7 +155,7 @@ pub struct TokenScope {
     pub session_approved: Arc<Mutex<HashSet<String>>>,
 }
 
-type TokenMap = Arc<Mutex<HashMap<String, TokenScope>>>;
+pub(crate) type TokenMap = Arc<Mutex<HashMap<String, TokenScope>>>;
 
 struct RunningServer {
     addr: SocketAddr,
@@ -105,9 +168,9 @@ fn slot() -> &'static Mutex<Option<RunningServer>> {
     SERVER.get_or_init(|| Mutex::new(None))
 }
 
-/// Loopback MCP endpoint URL for an address (the `/mcp` nest path).
-pub fn server_url(addr: SocketAddr) -> String {
-    format!("http://{addr}/mcp")
+/// Loopback MCP endpoint URL for an address + flavor (the flavor's nest path).
+pub fn server_url(addr: SocketAddr, flavor: Flavor) -> String {
+    format!("http://{addr}{}", flavor.path())
 }
 
 fn generate_token() -> String {
@@ -117,7 +180,9 @@ fn generate_token() -> String {
 }
 
 /// Start the in-app CC MCP server if it isn't running yet; returns its address.
-/// Idempotent — repeated calls return the existing listener.
+/// Idempotent — repeated calls return the existing listener. One listener hosts
+/// all flavors at distinct nest paths (`/mcp`, `/mcp/sql`, `/mcp/redis`), behind
+/// one Bearer auth layer + one shared token map.
 pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
     {
         let guard = slot().lock().unwrap();
@@ -132,17 +197,44 @@ pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
     let addr = listener.local_addr().map_err(|e| e.to_string())?;
     let tokens: TokenMap = Arc::new(Mutex::new(HashMap::new()));
 
-    let handler_app = app.clone();
-    let handler_tokens = tokens.clone();
-    let service = StreamableHttpService::new(
-        move || Ok(CcHandler::new(handler_app.clone(), handler_tokens.clone())),
-        Arc::new(LocalSessionManager::default()),
-        Default::default(),
-    );
+    // Shell flavor (legacy `/mcp`) — the existing CcHandler tool surface.
+    let shell_service = {
+        let app = app.clone();
+        let toks = tokens.clone();
+        StreamableHttpService::new(
+            move || Ok(CcHandler::new(app.clone(), toks.clone())),
+            Arc::new(LocalSessionManager::default()),
+            Default::default(),
+        )
+    };
+    // SQL flavor (`/mcp/sql`) — MySQL/PG/ClickHouse/Presto.
+    let sql_service = {
+        let app = app.clone();
+        let toks = tokens.clone();
+        StreamableHttpService::new(
+            move || Ok(super::mcp_sql::SqlHandler::new(app.clone(), toks.clone())),
+            Arc::new(LocalSessionManager::default()),
+            Default::default(),
+        )
+    };
+    // Redis flavor (`/mcp/redis`).
+    let redis_service = {
+        let app = app.clone();
+        let toks = tokens.clone();
+        StreamableHttpService::new(
+            move || Ok(super::mcp_redis::RedisHandler::new(app.clone(), toks.clone())),
+            Arc::new(LocalSessionManager::default()),
+            Default::default(),
+        )
+    };
 
     let auth_tokens = tokens.clone();
     let router = axum::Router::new()
-        .nest_service("/mcp", service)
+        .nest_service(Flavor::Sql.path(), sql_service)
+        .nest_service(Flavor::Redis.path(), redis_service)
+        // Shell at `/mcp` is mounted last so the more specific `/mcp/sql` and
+        // `/mcp/redis` nests take precedence over the `/mcp` prefix.
+        .nest_service(Flavor::Shell.path(), shell_service)
         .layer(axum::middleware::from_fn(move |req: Request, next: Next| {
             let toks = auth_tokens.clone();
             async move { auth_mw(toks, req, next).await }
@@ -174,6 +266,7 @@ pub fn mint_token(
     thread_id: String,
     allowed_session_id: Option<String>,
     trust: TrustLevel,
+    flavor: Flavor,
     confirm_readonly: bool,
 ) -> Result<(SocketAddr, String), String> {
     let guard = slot().lock().unwrap();
@@ -185,6 +278,7 @@ pub fn mint_token(
             thread_id,
             allowed_session_id,
             trust,
+            flavor,
             confirm_readonly,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         },
@@ -200,13 +294,15 @@ pub fn revoke_token(token: &str) {
 }
 
 /// Ensure the server is up and mint a scoped token for one CC thread. Trust is
-/// inferred (D3): a thread linked to a remote SSH session is strict and scoped
-/// to that session; an unlinked (local-workspace) thread is lenient. Returns
-/// the `(server_url, token)` to inject into the thread's `.mcp.json`.
+/// inferred (D3): a thread linked to a remote session is strict and scoped to
+/// that session; an unlinked (local-workspace) thread is lenient. `flavor`
+/// selects the tool surface (Shell / Sql / Redis). Returns the
+/// `(server_url, token)` to inject into the thread's `.mcp.json`.
 pub async fn provision_for_thread(
     app: &AppHandle,
     thread_id: &str,
     linked_session_id: Option<String>,
+    flavor: Flavor,
     confirm_readonly: bool,
 ) -> Result<(String, String), String> {
     ensure_started(app).await?;
@@ -215,8 +311,14 @@ pub async fn provision_for_thread(
     } else {
         TrustLevel::Lenient
     };
-    let (addr, token) = mint_token(thread_id.to_string(), linked_session_id, trust, confirm_readonly)?;
-    Ok((server_url(addr), token))
+    let (addr, token) = mint_token(
+        thread_id.to_string(),
+        linked_session_id,
+        trust,
+        flavor,
+        confirm_readonly,
+    )?;
+    Ok((server_url(addr, flavor), token))
 }
 
 /// Reject any request without a recognised Bearer token (401). Per-call scope
@@ -243,29 +345,22 @@ async fn auth_mw(tokens: TokenMap, req: Request, next: Next) -> Response {
 // Handler
 // ---------------------------------------------------------------------------
 
-#[derive(Clone)]
-struct CcHandler {
-    app: AppHandle,
-    tokens: TokenMap,
-    tool_router: ToolRouter<Self>,
-}
-
 /// Build the CC permission-prompt `allow` reply CC expects from its
 /// `--permission-prompt-tool`: `{behavior:"allow", updatedInput:{...}}`.
-fn allow_json(input: &serde_json::Value) -> String {
+pub(crate) fn allow_json(input: &serde_json::Value) -> String {
     serde_json::json!({ "behavior": "allow", "updatedInput": input }).to_string()
 }
 
 /// Build the CC permission-prompt `deny` reply: `{behavior:"deny", message}`.
-fn deny_json(message: impl Into<String>) -> String {
+pub(crate) fn deny_json(message: impl Into<String>) -> String {
     serde_json::json!({ "behavior": "deny", "message": message.into() }).to_string()
 }
 
-fn allow_result(input: &serde_json::Value) -> CallToolResult {
+pub(crate) fn allow_result(input: &serde_json::Value) -> CallToolResult {
     CallToolResult::success(vec![Content::text(allow_json(input))])
 }
 
-fn deny_result(message: impl Into<String>) -> CallToolResult {
+pub(crate) fn deny_result(message: impl Into<String>) -> CallToolResult {
     CallToolResult::success(vec![Content::text(deny_json(message))])
 }
 
@@ -274,7 +369,7 @@ fn deny_result(message: impl Into<String>) -> CallToolResult {
 /// graded against Taomni's bare tool vocabulary (`run_in_terminal`, …) — the
 /// same names `is_write_tool` / `check_tool_call` recognize. CC's own built-in
 /// tools (`Bash`, `Edit`, …) arrive unprefixed and pass through unchanged.
-fn normalize_tool_name(name: &str) -> &str {
+pub(crate) fn normalize_tool_name(name: &str) -> &str {
     name.strip_prefix("mcp__")
         .and_then(|rest| rest.split_once("__"))
         .map(|(_server, tool)| tool)
@@ -283,7 +378,10 @@ fn normalize_tool_name(name: &str) -> &str {
 
 /// Enforce that any `session_id` named in a tool call is the one this token is
 /// bound to. Tokens with no bound session may not touch a session at all.
-fn enforce_session_scope(scope: &TokenScope, args: &serde_json::Value) -> Result<(), String> {
+pub(crate) fn enforce_session_scope(
+    scope: &TokenScope,
+    args: &serde_json::Value,
+) -> Result<(), String> {
     if let Some(sid) = args.get("session_id").and_then(|v| v.as_str()) {
         match scope.allowed_session_id.as_deref() {
             Some(allowed) if allowed == sid => Ok(()),
@@ -294,6 +392,127 @@ fn enforce_session_scope(scope: &TokenScope, args: &serde_json::Value) -> Result
     } else {
         Ok(())
     }
+}
+
+/// Resolve the calling token's scope from a request's Bearer header. Shared by
+/// every flavor's handler (`scope()` methods delegate here).
+pub(crate) fn scope_from_ctx(
+    tokens: &TokenMap,
+    ctx: &RequestContext<RoleServer>,
+) -> Result<TokenScope, ErrorData> {
+    let parts = ctx
+        .extensions
+        .get::<axum::http::request::Parts>()
+        .ok_or_else(|| ErrorData::internal_error("missing http request parts", None))?;
+    let token = parts
+        .headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or_else(|| ErrorData::invalid_params("missing bearer token", None))?;
+    tokens
+        .lock()
+        .unwrap()
+        .get(token)
+        .cloned()
+        .ok_or_else(|| ErrorData::invalid_params("unknown token", None))
+}
+
+/// Emit `agent-cc-permission` and block until a human decision arrives via
+/// `cc_resolve_permission` (defaults to deny on timeout). Shared by all flavors.
+pub(crate) async fn await_permission(
+    app: &AppHandle,
+    scope: &TokenScope,
+    tool: &str,
+    input: &serde_json::Value,
+) -> CcPermissionDecision {
+    let call_id = Uuid::new_v4().to_string();
+    let (tx, rx) = tokio::sync::oneshot::channel::<CcPermissionDecision>();
+    {
+        let state = app.state::<AppState>();
+        state
+            .cc_pending_permissions
+            .lock()
+            .unwrap()
+            .insert(call_id.clone(), tx);
+    }
+    let _ = app.emit(
+        "agent-cc-permission",
+        serde_json::json!({
+            "callId": call_id,
+            "threadId": scope.thread_id,
+            "tool": tool,
+            "args": input,
+            "trust": scope.trust.as_str(),
+        }),
+    );
+
+    match tokio::time::timeout(Duration::from_secs(PERMISSION_TIMEOUT_SECS), rx).await {
+        Ok(Ok(decision)) => decision,
+        _ => {
+            let state = app.state::<AppState>();
+            state.cc_pending_permissions.lock().unwrap().remove(&call_id);
+            CcPermissionDecision::Deny
+        }
+    }
+}
+
+/// The shared `permission_prompt` grading pipeline used by every flavor's
+/// `permission_prompt` tool. `raw_tool_name` is CC's `mcp__server__tool` (or a
+/// built-in like `Bash`); `is_readonly` is the flavor-specific verdict that a
+/// confidently read-only operation may waive the *confirmation* card (never the
+/// safety checks, which always run). Returns the CC allow/deny reply.
+pub(crate) async fn decide_permission(
+    app: &AppHandle,
+    scope: &TokenScope,
+    raw_tool_name: &str,
+    input: &serde_json::Value,
+    is_readonly: bool,
+) -> CallToolResult {
+    let tool_name = normalize_tool_name(raw_tool_name).to_string();
+
+    // 1. Session/thread scope.
+    if let Err(reason) = enforce_session_scope(scope, input) {
+        return deny_result(reason);
+    }
+    // 2. Blacklist / sensitive-path deny-list.
+    let call = ToolCall {
+        tool: tool_name.clone(),
+        args: input.clone(),
+    };
+    if let Err(reason) = crate::agent::safety::check_tool_call(&call) {
+        return deny_result(reason);
+    }
+    // 3. Per-session "AI 写动作禁用".
+    {
+        let state = app.state::<AppState>();
+        if let Err(reason) = crate::agent::safety::check_session_disable(&state, &call) {
+            return deny_result(reason);
+        }
+    }
+    // 4. Grading: writes need a human unless already approved for session.
+    let already = scope.session_approved.lock().unwrap().contains(&tool_name);
+    let needs_confirm =
+        crate::agent::safety::requires_confirmation(&tool_name) && !already && !is_readonly;
+    if !needs_confirm {
+        return allow_result(input);
+    }
+    // 5. Human-in-the-loop.
+    match await_permission(app, scope, &tool_name, input).await {
+        CcPermissionDecision::Allow => allow_result(input),
+        CcPermissionDecision::AllowSession => {
+            scope.session_approved.lock().unwrap().insert(tool_name);
+            allow_result(input)
+        }
+        CcPermissionDecision::Deny => deny_result("denied by user"),
+    }
+}
+
+#[derive(Clone)]
+struct CcHandler {
+    app: AppHandle,
+    tokens: TokenMap,
+    tool_router: ToolRouter<Self>,
 }
 
 impl CcHandler {
@@ -307,22 +526,7 @@ impl CcHandler {
 
     /// Resolve the calling token's scope from the request's Bearer header.
     fn scope(&self, ctx: &RequestContext<RoleServer>) -> Result<TokenScope, ErrorData> {
-        let parts = ctx
-            .extensions
-            .get::<axum::http::request::Parts>()
-            .ok_or_else(|| ErrorData::internal_error("missing http request parts", None))?;
-        let token = parts
-            .headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix("Bearer "))
-            .ok_or_else(|| ErrorData::invalid_params("missing bearer token", None))?;
-        self.tokens
-            .lock()
-            .unwrap()
-            .get(token)
-            .cloned()
-            .ok_or_else(|| ErrorData::invalid_params("unknown token", None))
+        scope_from_ctx(&self.tokens, ctx)
     }
 
     fn app_state(&self) -> tauri::State<'_, AppState> {
@@ -370,45 +574,6 @@ impl CcHandler {
                     "tool call timed out or was cancelled".to_string(),
                     None,
                 ))
-            }
-        }
-    }
-
-    /// Emit `agent-cc-permission` and block until a human decision arrives via
-    /// `cc_resolve_permission` (defaults to deny on timeout).
-    async fn await_permission(
-        &self,
-        scope: &TokenScope,
-        tool: &str,
-        input: &serde_json::Value,
-    ) -> CcPermissionDecision {
-        let call_id = Uuid::new_v4().to_string();
-        let (tx, rx) = tokio::sync::oneshot::channel::<CcPermissionDecision>();
-        {
-            let state = self.app_state();
-            state
-                .cc_pending_permissions
-                .lock()
-                .unwrap()
-                .insert(call_id.clone(), tx);
-        }
-        let _ = self.app.emit(
-            "agent-cc-permission",
-            serde_json::json!({
-                "callId": call_id,
-                "threadId": scope.thread_id,
-                "tool": tool,
-                "args": input,
-                "trust": scope.trust.as_str(),
-            }),
-        );
-
-        match tokio::time::timeout(Duration::from_secs(PERMISSION_TIMEOUT_SECS), rx).await {
-            Ok(Ok(decision)) => decision,
-            _ => {
-                let state = self.app_state();
-                state.cc_pending_permissions.lock().unwrap().remove(&call_id);
-                CcPermissionDecision::Deny
             }
         }
     }
@@ -783,17 +948,17 @@ struct ReadCaptureParams {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
-struct PermissionParams {
-    tool_name: String,
+pub(crate) struct PermissionParams {
+    pub(crate) tool_name: String,
     // Claude Code's permission-prompt protocol sends the requested tool's input
     // under `input`. Accept `tool_input` as an alias for forward/back-compat.
     // Without this the field silently defaulted to `Null`, so we emitted
     // `args: null` to the UI and handed CC back `updatedInput: null`.
     #[serde(default, alias = "input")]
-    tool_input: serde_json::Value,
+    pub(crate) tool_input: serde_json::Value,
 }
 
-fn as_value<T: serde::Serialize>(p: &T) -> serde_json::Value {
+pub(crate) fn as_value<T: serde::Serialize>(p: &T) -> serde_json::Value {
     serde_json::to_value(p).unwrap_or(serde_json::Value::Null)
 }
 
@@ -1068,36 +1233,11 @@ impl CcHandler {
         // CC sends MCP tools as `mcp__taomni__<tool>`; grade the bare name.
         let tool_name = normalize_tool_name(&p.tool_name).to_string();
 
-        // 1. Session/thread scope.
-        if let Err(reason) = enforce_session_scope(&scope, &p.tool_input) {
-            return Ok(deny_result(reason));
-        }
-        // 2. Blacklist / sensitive-path deny-list.
-        let call = ToolCall {
-            tool: tool_name.clone(),
-            args: p.tool_input.clone(),
-        };
-        if let Err(reason) = crate::agent::safety::check_tool_call(&call) {
-            return Ok(deny_result(reason));
-        }
-        // 3. Per-session "AI 写动作禁用".
-        {
-            let state = self.app_state();
-            if let Err(reason) = crate::agent::safety::check_session_disable(&state, &call) {
-                return Ok(deny_result(reason));
-            }
-        }
-        // 4. Grading: writes need a human unless already approved for session.
-        let already = scope
-            .session_approved
-            .lock()
-            .unwrap()
-            .contains(&tool_name);
-        // 3.6 — a confidently read-only shell command waives the card (unless
-        // the user forced confirm-all via config). Anything not provably
-        // read-only stays Mutating (the safe default) and still confirms. The
-        // blacklist + sensitive-path checks above already ran, so this only
-        // ever waives *confirmation*, never safety.
+        // 3.6 — a confidently read-only shell command waives the *confirmation*
+        // card (unless the user forced confirm-all via config). Anything not
+        // provably read-only stays Mutating (the safe default) and still
+        // confirms. The safety checks inside `decide_permission` always run, so
+        // this only ever waives confirmation, never safety.
         let is_readonly = !scope.confirm_readonly
             && matches!(tool_name.as_str(), "Bash" | "run_in_terminal" | "run_captured")
             && p.tool_input
@@ -1108,24 +1248,8 @@ impl CcHandler {
                         == crate::agent::cmd_classify::CommandClass::ReadOnly
                 })
                 .unwrap_or(false);
-        let needs_confirm =
-            crate::agent::safety::requires_confirmation(&tool_name) && !already && !is_readonly;
-        if !needs_confirm {
-            return Ok(allow_result(&p.tool_input));
-        }
-        // 5. Human-in-the-loop.
-        match self.await_permission(&scope, &tool_name, &p.tool_input).await {
-            CcPermissionDecision::Allow => Ok(allow_result(&p.tool_input)),
-            CcPermissionDecision::AllowSession => {
-                scope
-                    .session_approved
-                    .lock()
-                    .unwrap()
-                    .insert(tool_name.clone());
-                Ok(allow_result(&p.tool_input))
-            }
-            CcPermissionDecision::Deny => Ok(deny_result("denied by user")),
-        }
+
+        Ok(decide_permission(&self.app, &scope, &p.tool_name, &p.tool_input, is_readonly).await)
     }
 }
 
@@ -1151,6 +1275,7 @@ mod tests {
             thread_id: thread.into(),
             allowed_session_id: allowed.map(|s| s.to_string()),
             trust: TrustLevel::Strict,
+            flavor: Flavor::Shell,
             confirm_readonly: false,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         }
@@ -1214,6 +1339,38 @@ mod tests {
     fn normalize_leaves_builtin_tools_untouched() {
         assert_eq!(normalize_tool_name("Bash"), "Bash");
         assert_eq!(normalize_tool_name("Edit"), "Edit");
+    }
+
+    #[test]
+    fn flavor_for_session_type_maps_db_engines() {
+        use crate::session::models::SessionType;
+        let sql = [
+            SessionType::MySQL,
+            SessionType::PostgreSQL,
+            SessionType::ClickHouse,
+            SessionType::Presto,
+        ];
+        for t in sql {
+            assert_eq!(Flavor::for_session_type(Some(&t)), Flavor::Sql, "{t:?} → Sql");
+        }
+        assert_eq!(Flavor::for_session_type(Some(&SessionType::Redis)), Flavor::Redis);
+        // Terminal / object-storage / unbound all fall back to Shell.
+        assert_eq!(Flavor::for_session_type(Some(&SessionType::SSH)), Flavor::Shell);
+        assert_eq!(Flavor::for_session_type(Some(&SessionType::HBaseShell)), Flavor::Shell);
+        assert_eq!(Flavor::for_session_type(None), Flavor::Shell);
+    }
+
+    #[test]
+    fn flavor_paths_and_servers_are_distinct() {
+        // Each flavor mounts a distinct path + names a distinct server, so a
+        // thread's .mcp.json (one server) can't accidentally expose another
+        // flavor's tools.
+        for f in [Flavor::Shell, Flavor::Sql, Flavor::Redis] {
+            assert!(f.permission_prompt_tool().contains(f.server_name()));
+        }
+        assert_ne!(Flavor::Sql.path(), Flavor::Redis.path());
+        assert_ne!(Flavor::Sql.path(), Flavor::Shell.path());
+        assert_ne!(Flavor::Sql.server_name(), Flavor::Shell.server_name());
     }
 
     #[test]

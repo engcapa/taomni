@@ -434,6 +434,7 @@ export default function DbClientTab({
   const [schemaCollapsed, setSchemaCollapsed] = useState(false);
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const setTabDbConn = useAppStore((s) => s.setTabDbConn);
   const { fontSize: dbFontSize } = useDbSessionFontSize(visible, rootRef);
   const dbFontStyle = useMemo(
     () => ({
@@ -498,6 +499,9 @@ export default function DbClientTab({
           return;
         }
         setConnectionSessionId(runtimeSessionId);
+        // Phase 6 — publish the live connection id so the CC DB MCP (when a
+        // chat thread is bound to this tab) can target it each turn.
+        setTabDbConn(tabId, runtimeSessionId);
       })
       .catch((err) => {
         if (!cancelled) setConnError(String(err));
@@ -505,6 +509,7 @@ export default function DbClientTab({
     return () => {
       cancelled = true;
       void dbDisconnect(runtimeSessionId).catch(() => undefined);
+      setTabDbConn(tabId, null);
       Object.values(timersRef.current).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
