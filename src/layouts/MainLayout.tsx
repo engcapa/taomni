@@ -2570,7 +2570,15 @@ export function MainLayout() {
                       style={{ display: isActive ? "block" : "none" }}
                     >
                       <Suspense fallback={<DbLoadingPanel />}>
-                        <RedisClientTab tabId={tab.id} info={tab.db} visible={isActive} />
+                        <RedisClientTab
+                          tabId={tab.id}
+                          info={tab.db}
+                          visible={isActive}
+                          chatToggle={!aiFullyDisabled ? {
+                            open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
+                            onToggle: () => void toggleTabChat(tab.id),
+                          } : undefined}
+                        />
                       </Suspense>
                     </div>
                   );

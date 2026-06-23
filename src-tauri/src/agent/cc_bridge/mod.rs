@@ -4,6 +4,8 @@
 pub mod commands;
 pub mod config;
 pub mod mcp_http;
+pub mod mcp_redis;
+pub mod mcp_sql;
 pub mod process;
 pub mod protocol;
 pub mod session_card;

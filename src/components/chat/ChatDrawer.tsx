@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, X } from "lucide-react";
+import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, TerminalSquare, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
@@ -57,6 +57,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeTabType = useAppStore((s) =>
     s.tabs.find((t) => t.id === s.activeTabId)?.type ?? null,
   );
+  // SQL echo toggle (Phase 6) — appended to the linked query tab when CC runs
+  // SQL. Subscribed so the toggle reflects/persists across the app.
+  const sqlEcho = useAppStore((s) => s.sqlEcho);
+  const setSqlEcho = useAppStore((s) => s.setSqlEcho);
   const focusedTerminal = useMemo(() => {
     if (activeTabType !== "terminal") return null;
     return activeTabId ? getTerminal(activeTabId) : null;
@@ -73,6 +77,14 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         ?? activeThread.linked_session_id.slice(0, 8)
       )
     : null;
+  // The SQL echo toggle only applies to threads bound to a SQL ("database")
+  // tab. Resolved from the tab type so it stays reactive as tabs open/close.
+  const linkedTabType = useAppStore((s) =>
+    activeThread?.linked_session_id
+      ? s.tabs.find((t) => t.id === activeThread.linked_session_id)?.type ?? null
+      : null,
+  );
+  const isQueryThread = linkedTabType === "database";
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiConfig = useAiStore((s) => s.config);
@@ -506,6 +518,23 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               <RefreshCw className="w-2.5 h-2.5" />
               <span>{t("chat.convertLabel", { format: effectiveFormat })}</span>
             </button>
+            {isQueryThread && (
+              <button
+                type="button"
+                className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${
+                  sqlEcho
+                    ? "text-[var(--taomni-accent)]"
+                    : "text-[var(--taomni-text-muted)]"
+                }`}
+                onClick={() => setSqlEcho(!sqlEcho)}
+                title={t("chat.sqlEchoTitle")}
+                aria-pressed={sqlEcho}
+                data-testid="chat-sql-echo-toggle"
+              >
+                <TerminalSquare className="w-2.5 h-2.5" />
+                <span>{sqlEcho ? t("chat.sqlEchoOn") : t("chat.sqlEchoOff")}</span>
+              </button>
+            )}
           </div>
         )}
 

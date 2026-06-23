@@ -141,6 +141,9 @@ pub async fn cc_send_message(
         Some(p) => p,
         None => {
             // Provision the in-app rmcp MCP server + a per-thread scoped token.
+            // This alternate path is shell-only (DB flavor selection lives in
+            // the active `chat_stream` path), so it uses the Shell flavor.
+            let flavor = crate::agent::cc_bridge::mcp_http::Flavor::Shell;
             let (cc_server_url, cc_token) =
                 crate::agent::cc_bridge::mcp_http::provision_for_thread(
                     &app,
@@ -150,6 +153,7 @@ pub async fn cc_send_message(
                     // resolved here (only the chat_stream path carries it), so
                     // config-id scope acceptance is unavailable on this path.
                     None,
+                    flavor,
                     config.cc_bridge.confirm_readonly,
                 )
                 .await?;
@@ -160,6 +164,7 @@ pub async fn cc_send_message(
             )?;
             let files = crate::agent::cc_bridge::config::create_session_files(
                 custom.as_deref(),
+                flavor.server_name(),
                 &cc_server_url,
                 &cc_token,
             )?;
@@ -178,7 +183,7 @@ pub async fn cc_send_message(
                 files.mcp_path.to_string_lossy().to_string(),
                 "--strict-mcp-config".into(),
                 "--permission-prompt-tool".into(),
-                crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
+                flavor.permission_prompt_tool().into(),
             ];
             // §21: thread workspace whitelist. CC walks files via the Read/Glob
             // tools; `--add-dir` constrains those to the requested workspace tree.
@@ -435,6 +440,8 @@ pub async fn cc_stream_message(
     let process = match existing {
         Some(p) => p,
         None => {
+            // Shell-only alternate path (see the streaming variant above).
+            let flavor = crate::agent::cc_bridge::mcp_http::Flavor::Shell;
             let (cc_server_url, cc_token) =
                 crate::agent::cc_bridge::mcp_http::provision_for_thread(
                     &app,
@@ -444,6 +451,7 @@ pub async fn cc_stream_message(
                     // resolved here (only the chat_stream path carries it), so
                     // config-id scope acceptance is unavailable on this path.
                     None,
+                    flavor,
                     config.cc_bridge.confirm_readonly,
                 )
                 .await?;
@@ -453,6 +461,7 @@ pub async fn cc_stream_message(
             )?;
             let files = crate::agent::cc_bridge::config::create_session_files(
                 custom.as_deref(),
+                flavor.server_name(),
                 &cc_server_url,
                 &cc_token,
             )?;
@@ -468,7 +477,7 @@ pub async fn cc_stream_message(
                 files.mcp_path.to_string_lossy().to_string(),
                 "--strict-mcp-config".into(),
                 "--permission-prompt-tool".into(),
-                crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
+                flavor.permission_prompt_tool().into(),
             ];
             if let Some(ws) = &req.workspace_dir {
                 let path = PathBuf::from(ws);

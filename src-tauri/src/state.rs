@@ -118,7 +118,13 @@ pub struct AppState {
     /// `read_capture`) can resolve the live terminal that `run_in_terminal`
     /// reaches indirectly through the frontend registry. Refreshed on reconnect.
     pub cc_tab_sessions: Arc<Mutex<HashMap<String, String>>>,
-    /// Top-level AI context — holds AsrManager + LlmRouter.
+    /// Live DB connection id a CC thread is bound to (Phase 6). The runtime key
+    /// for `db_connections` is generated in the frontend (`createRuntimeDbSessionId`)
+    /// and isn't derivable backend-side, so the frontend bridges it over each
+    /// turn via `ChatSendRequest.bound_db_connection_id`. The SQL/Redis MCP
+    /// handlers resolve their bound connection from here (CC never names a
+    /// connection id, so this is the only target — scope-safe by construction).
+    pub cc_db_bindings: Arc<RwLock<HashMap<String, String>>>,    /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
     /// Decentralized LAN messenger (LanChat) runtime state. Distinct from the
@@ -161,7 +167,7 @@ impl AppState {
             cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
             cc_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
             cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
-            ai_ctx: Arc::new(RwLock::new(ai_ctx)),
+            cc_db_bindings: Arc::new(RwLock::new(HashMap::new())),            ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }
     }

@@ -4,8 +4,10 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
 import { getTerminal } from "../../lib/terminal/terminalRegistry";
 import { formatCcTerminalEcho, type CcTerminalEcho } from "../../lib/terminal/ccEcho";
+import { getQueryTab } from "../../lib/queryRegistry";
 import { useAiStore } from "../../stores/aiStore";
-
+import { useChatStore } from "../../stores/chatStore";
+import { useAppStore } from "../../stores/appStore";
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
  *
@@ -43,6 +45,41 @@ interface CaptureProgress {
   bytes: number;
 }
 
+/**
+ * A statement CC just ran on a bound DB connection (`agent-cc-sql-echo`). When
+ * SQL echo is enabled, the linked query tab appends it to a query editor.
+ */
+interface SqlEcho {
+  threadId: string;
+  sql: string;
+  ok: boolean;
+  rowsAffected: number;
+  rowCount: number;
+  durationMs: number;
+  captured: boolean;
+  error?: string | null;
+}
+
+/** Zero-padded HH:MM:SS for the echoed comment. */
+function clockHms(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** Build the SQL comment line prepended above an echoed statement. */
+function buildEchoNote(e: SqlEcho): string {
+  const parts = [`Claude Code ${clockHms(new Date())}`];
+  if (e.ok) {
+    parts.push(e.captured ? "captured" : "ok");
+    parts.push(`${e.rowCount} rows`);
+    if (e.rowsAffected > 0) parts.push(`${e.rowsAffected} affected`);
+    parts.push(`${e.durationMs}ms`);
+  } else {
+    parts.push(`error: ${(e.error ?? "failed").replace(/\s+/g, " ").slice(0, 200)}`);
+  }
+  return `-- ⟦${parts.join(" · ")}⟧`;
+}
+
 /** Human-readable byte size for the capture progress card. */
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -66,15 +103,27 @@ function describe(tool: string, rawArgs: Record<string, unknown> | null | undefi
       return `上传文件到 ${String(args.remote_path ?? "")}`;
     case "save_as_runbook":
       return `保存 Runbook: ${String(args.name ?? "")}`;
+    case "run_sql":
+    case "run_sql_captured":
+      return `执行 SQL: ${String(args.sql ?? "")}`;
+    case "export_result":
+      return `导出查询结果 (${String(args.format ?? "csv")})`;
+    case "redis_set_key":
+      return `写入 Redis 键: ${String(args.key ?? "")}`;
+    case "redis_del_key":
+      return `删除 Redis 键: ${String(args.key ?? "")}`;
+    case "redis_exec":
+      return `执行 Redis 命令: ${String(args.command ?? "")}`;
     default:
       return `Claude Code 请求执行工具 "${tool}"`;
   }
 }
 
-/** The most useful preview string for a tool call (command / path), if any. */
+/** The most useful preview string for a tool call (command / path / sql), if any. */
 function preview(rawArgs: Record<string, unknown> | null | undefined): string | null {
   const args = rawArgs ?? {};
   if (typeof args.command === "string") return args.command;
+  if (typeof args.sql === "string") return args.sql;
   if (typeof args.file_path === "string") return args.file_path;
   if (typeof args.remote_path === "string") return args.remote_path;
   return null;
@@ -188,7 +237,7 @@ export function CcAgentBridge() {
   // appears in the bound terminal. The backend emits this once a captured run
   // finishes; we paint a compact, read-only trace (command + output head +
   // stats) into that terminal so the user sees what CC did. Display-only
-  // (writeEcho → xterm.write), never touches stdin.
+  // (writeEcho -> xterm.write), never touches stdin.
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
     let disposed = false;
@@ -197,11 +246,41 @@ export function CcAgentBridge() {
         return;
       }
       const term = getTerminal(event.payload.sessionId);
-      if (!term?.writeEcho) return; // terminal closed / no display sink — chat still has it
+      if (!term?.writeEcho) return; // terminal closed / no display sink; chat still has it
       try {
         term.writeEcho(formatCcTerminalEcho(event.payload));
       } catch (e) {
         console.error("cc terminal echo failed:", e);
+      }
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  // --- SQL echo to the linked query tab --------------------------------
+  // When CC runs SQL on a bound DB connection the backend emits
+  // `agent-cc-sql-echo`; if the toggle is on we resolve the thread's linked
+  // query tab and append the statement to its editor (never run it).
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let disposed = false;
+    void listen<SqlEcho>("agent-cc-sql-echo", (event) => {
+      if (!useAppStore.getState().sqlEcho) return;
+      const e = event.payload;
+      const tabId =
+        useChatStore.getState().threads.find((t) => t.id === e.threadId)
+          ?.linked_session_id ?? null;
+      const entry = getQueryTab(tabId);
+      if (!entry) return;
+      try {
+        entry.appendEchoSql(e.sql, buildEchoNote(e));
+      } catch (err) {
+        console.error("sql echo append failed:", err);
       }
     }).then((fn) => {
       if (disposed) void fn();
