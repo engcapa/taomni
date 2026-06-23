@@ -15,7 +15,7 @@ describe("buildSshCwdIntegration", () => {
     expect(SSH_CWD_INTEGRATION_BODY).toContain(
       'PROMPT_COMMAND="__taomni_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}"',
     );
-    expect(SSH_CWD_INTEGRATION_BODY.trimEnd().endsWith("__taomni_osc7")).toBe(true);
+    expect(SSH_CWD_INTEGRATION_BODY).toContain(" __taomni_osc7;");
   });
 
   it("is idempotent for bash so reconnects don't stack the hook", () => {
@@ -23,7 +23,10 @@ describe("buildSshCwdIntegration", () => {
     expect(SSH_CWD_INTEGRATION_BODY).toContain('case ";$PROMPT_COMMAND;" in *";__taomni_osc7;"*)');
   });
 
-  it("has a leading space to dodge shell history (HISTCONTROL=ignorespace)", () => {
+  it("guards bash history while installing the hidden prompt hook", () => {
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("set +o history");
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("history -d $((HISTCMD-1))");
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("set -o history");
     expect(buildSshCwdIntegration()).toMatch(/^ /);
     expect(buildSshCwdIntegration("/var/log")).toMatch(/^ /);
   });
@@ -35,8 +38,9 @@ describe("buildSshCwdIntegration", () => {
 
   it("cd's into the source directory first so a duplicate follows it", () => {
     const out = buildSshCwdIntegration("/var/log");
-    expect(out.startsWith(" cd '/var/log' 2>/dev/null;")).toBe(true);
-    expect(out.endsWith(SSH_CWD_INTEGRATION_BODY)).toBe(true);
+    expect(out).toContain(" cd '/var/log' 2>/dev/null;");
+    expect(out.indexOf("set +o history")).toBeLessThan(out.indexOf(" cd '/var/log' 2>/dev/null;"));
+    expect(out.indexOf(" cd '/var/log' 2>/dev/null;")).toBeLessThan(out.indexOf("__taomni_osc7(){"));
   });
 
   it("single-quote-escapes the directory to resist injection", () => {

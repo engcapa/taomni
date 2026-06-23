@@ -412,6 +412,7 @@ export function TerminalPanel({
   const blockSelectionRef = useRef<TerminalBlockSelection | null>(null);
   const blockSelectionTextRef = useRef("");
   const lastMacMiddlePasteAtRef = useRef(0);
+  const lastTerminalSizeSyncRef = useRef<{ sessionId: string; cols: number; rows: number } | null>(null);
   const lastCwdRequestTokenRef = useRef(cwdRequestToken);
   const quickFontOptions = useMemo(() => {
     const available = fontState.fonts;
@@ -421,7 +422,25 @@ export function TerminalPanel({
     return preferred.length > 0 ? preferred : available.slice(0, 8);
   }, [fontState.fonts]);
 
-  const fitVisibleTerminal = useCallback(() => {
+  const syncTerminalSize = useCallback((force = false) => {
+    const sid = sessionIdRef.current;
+    const term = termRef.current;
+    if (!sid || !term) return;
+
+    const { cols, rows } = currentTerminalSize(term);
+    const previous = lastTerminalSizeSyncRef.current;
+    if (!force && previous?.sessionId === sid && previous.cols === cols && previous.rows === rows) {
+      return;
+    }
+    lastTerminalSizeSyncRef.current = { sessionId: sid, cols, rows };
+    resizeTerminal(sid, cols, rows).catch(() => {
+      if (lastTerminalSizeSyncRef.current?.sessionId === sid) {
+        lastTerminalSizeSyncRef.current = null;
+      }
+    });
+  }, []);
+
+  const fitVisibleTerminal = useCallback((forceSync = false) => {
     const el = containerRef.current;
     const term = termRef.current;
     const fitAddon = fitAddonRef.current;
@@ -432,14 +451,23 @@ export function TerminalPanel({
     try {
       fitAddon.fit();
       term.refresh(0, term.rows - 1);
-      const sid = sessionIdRef.current;
-      if (sid) {
-        resizeTerminal(sid, term.cols, term.rows).catch(() => {});
-      }
+      syncTerminalSize(forceSync);
     } catch {
       // Hidden tabs can briefly report invalid dimensions while switching.
     }
-  }, []);
+  }, [syncTerminalSize]);
+
+  const scheduleTerminalFitAndSync = useCallback((forceSync = false) => {
+    const run = () => {
+      if (!termRef.current) return;
+      window.requestAnimationFrame(() => {
+        if (termRef.current) fitVisibleTerminal(forceSync);
+      });
+    };
+    run();
+    window.setTimeout(run, 80);
+    window.setTimeout(run, 300);
+  }, [fitVisibleTerminal]);
 
   const focusTerminal = useCallback(() => {
     termRef.current?.focus();
@@ -1299,6 +1327,11 @@ export function TerminalPanel({
         return false;
       }
     }
+    if (isMac && isMacPrintableOptionInput(event)) {
+      event.preventDefault();
+      writeBroadcastInput(event.key);
+      return false;
+    }
     if (event.key === "Escape" && blockSelectionRef.current) {
       event.preventDefault();
       clearTerminalBlockSelection();
@@ -1427,6 +1460,7 @@ export function TerminalPanel({
     resetFontSize,
     saveBufferToFile,
     searchOpen,
+    writeBroadcastInput,
   ]);
 
   const buildContextMenu = useCallback((): MenuItem[] => {
@@ -1806,6 +1840,7 @@ export function TerminalPanel({
       cursorBlink,
       cursorStyle,
       scrollback,
+      macOptionIsMeta: false,
     });
     termRef.current = term;
 
@@ -1962,6 +1997,7 @@ export function TerminalPanel({
     const resizeDisposable = term.onResize(({ cols, rows }) => {
       setViewportVersion((v) => v + 1);
       appendEvent("resize", `${cols}x${rows}`);
+      syncTerminalSize();
     });
 
     const observer = new ResizeObserver(() => {
@@ -1988,7 +2024,6 @@ export function TerminalPanel({
     };
     el.addEventListener("scroll", onContainerScroll, { passive: true });
 
-    const { cols, rows } = term;
     const adopted = adoptedTerminalRef.current;
     const sid = adopted?.sessionId ?? createTerminalSessionId();
     if (adopted?.snapshotText) {
@@ -2181,6 +2216,7 @@ export function TerminalPanel({
 
       connectionStateRef.current = "connected";
       sessionIdRef.current = connectedSid;
+      lastTerminalSizeSyncRef.current = null;
       setRegisteredSessionId(connectedSid);
       zmodemRef.current = zmodem;
       if (shellId) setResolvedLocalShellId(shellId);
@@ -2192,6 +2228,7 @@ export function TerminalPanel({
         "connection",
         `${adopted ? "Reattached" : mode === "reconnect" ? "Reconnected" : "Connected"} (${connectedSid})`,
       );
+      scheduleTerminalFitAndSync(true);
       if (ssh && !adopted) {
         if (mode === "reconnect") {
           term.write(`\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`);
@@ -2315,6 +2352,9 @@ export function TerminalPanel({
         term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
       }
 
+      fitVisibleTerminal();
+      const { cols, rows } = currentTerminalSize(term);
+
       const ns = getSessionNetworkSettings(ssh.optionsJson);
       const opts = parseSessionOptions(ssh.optionsJson);
       createSshTerminal(
@@ -2355,6 +2395,8 @@ export function TerminalPanel({
     } else {
       connectionStateRef.current = "connecting";
       appendEvent("connection", `Starting ${localShell?.name ?? "local terminal"}`);
+      fitVisibleTerminal();
+      const { cols, rows } = currentTerminalSize(term);
       // A duplicated terminal carries the source's cwd (from OSC 7). Translate
       // it into a native start directory; skip it if it can't be mapped (e.g. a
       // WSL/MSYS path with no Windows drive) so the shell still launches.
@@ -2433,8 +2475,9 @@ export function TerminalPanel({
       cursorBlink,
       cursorStyle,
       scrollback,
+      macOptionIsMeta: false,
     };
-    window.setTimeout(() => requestAnimationFrame(fitVisibleTerminal), 0);
+    window.setTimeout(() => requestAnimationFrame(() => fitVisibleTerminal()), 0);
   }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, scrollback, themeName]);
 
   // When a hidden tab becomes visible again, re-measure xterm. Focus is
@@ -3202,6 +3245,25 @@ function terminalCursorCell(term: Terminal): TerminalBlockSelectionCell | null {
     row: Math.max(0, Math.min(buffer.length - 1, buffer.baseY + buffer.cursorY)),
     col: Math.max(0, Math.min(term.cols - 1, buffer.cursorX)),
   };
+}
+
+function currentTerminalSize(term: Pick<Terminal, "cols" | "rows"> | null): { cols: number; rows: number } {
+  return {
+    cols: Math.max(2, Math.floor(term?.cols || 80)),
+    rows: Math.max(1, Math.floor(term?.rows || 24)),
+  };
+}
+
+function isMacPrintableOptionInput(event: KeyboardEvent): boolean {
+  return (
+    event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.isComposing &&
+    event.key.length === 1 &&
+    event.key.charCodeAt(0) >= 0x20 &&
+    event.key !== " "
+  );
 }
 
 function isTerminalBlockSelectionMouseEvent(
