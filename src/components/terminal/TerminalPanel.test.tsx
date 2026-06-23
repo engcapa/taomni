@@ -10,6 +10,7 @@ const terminalMocks = vi.hoisted(() => {
   const oscHandlers = new Map<number, (data: string) => boolean | Promise<boolean>>();
   const state = {
     onDataHandler: null as ((data: string) => void) | null,
+    onResizeHandler: null as ((size: { cols: number; rows: number }) => void) | null,
   };
   const terminalCtor = vi.fn().mockImplementation(function () {
     return {
@@ -42,7 +43,10 @@ const terminalMocks = vi.hoisted(() => {
       onBinary: vi.fn(() => ({ dispose: vi.fn() })),
       onScroll: vi.fn(() => ({ dispose: vi.fn() })),
       onRender: vi.fn(() => ({ dispose: vi.fn() })),
-      onResize: vi.fn(() => ({ dispose: vi.fn() })),
+      onResize: vi.fn((handler: (size: { cols: number; rows: number }) => void) => {
+        state.onResizeHandler = handler;
+        return { dispose: vi.fn() };
+      }),
       onSelectionChange: vi.fn(() => ({ dispose: vi.fn() })),
       attachCustomKeyEventHandler: vi.fn(),
       refresh: vi.fn(),
@@ -196,6 +200,7 @@ describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
+    terminalMocks.state.onResizeHandler = null;
     ipcMocks.terminalExitHandlers.clear();
     ipcMocks.createTerminalSessionId.mockImplementation(() => "terminal-session");
     ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
@@ -944,6 +949,54 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("uses the latest measured terminal size when reconnecting SSH", async () => {
+    ipcMocks.createTerminalSessionId
+      .mockReturnValueOnce("terminal-session")
+      .mockReturnValueOnce("terminal-session-reconnect");
+    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(960);
+    const clientHeight = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(480);
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      term.cols = 132;
+      term.rows = 37;
+      ipcMocks.terminalExitHandlers.get("terminal-session")?.();
+
+      terminalMocks.state.onDataHandler?.("\r");
+
+      await waitFor(() => {
+        expect(ipcMocks.createSshTerminal).toHaveBeenCalledTimes(2);
+      });
+      expect(ipcMocks.createSshTerminal).toHaveBeenLastCalledWith(
+        "terminal-session-reconnect",
+        sshInfo.host,
+        sshInfo.port,
+        sshInfo.username,
+        sshInfo.authMethod,
+        sshInfo.authData,
+        132,
+        37,
+        expect.any(String),
+        expect.any(Function),
+        true,
+        true,
+      );
+      await waitFor(() => {
+        expect(ipcMocks.resizeTerminal).toHaveBeenCalledWith("terminal-session-reconnect", 132, 37);
+      });
+    } finally {
+      clientWidth.mockRestore();
+      clientHeight.mockRestore();
+    }
+  });
+
   it("shows a retry prompt when SSH reconnect fails and does not write Enter to the old session", async () => {
     ipcMocks.createTerminalSessionId
       .mockReturnValueOnce("terminal-session")
@@ -979,6 +1032,34 @@ describe("TerminalPanel focus behavior", () => {
       expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
     } finally {
       consoleError.mockRestore();
+    }
+  });
+
+  it("sends macOS Option printable characters directly to the terminal", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    const onSessionReady = vi.fn();
+
+    try {
+      render(<TerminalPanel visible onSessionReady={onSessionReady} />);
+
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      });
+
+      fireEvent.keyDown(window, { key: "@", code: "Digit2", altKey: true });
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledWith("terminal-session", btoa("@"));
+      });
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
     }
   });
 
