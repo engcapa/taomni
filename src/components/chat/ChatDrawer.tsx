@@ -74,10 +74,13 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     : null;
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
-  const aiProviders = useAiStore((s) => s.config?.llm.providers);
-  const ccBridgeEnabled = useAiStore((s) => s.config?.cc_bridge.enabled);
-  const globalOutputFormat = useAiStore((s) => s.config?.chat_output_format) ?? "md";
+  const aiConfig = useAiStore((s) => s.config);
+  const aiProviders = aiConfig?.llm.providers;
+  const ccBridgeEnabled = aiConfig?.cc_bridge.enabled;
+  const ccTerminalEchoEnabled = aiConfig?.cc_bridge.terminal_echo_enabled ?? true;
+  const globalOutputFormat = aiConfig?.chat_output_format ?? "md";
   const loadAiConfig = useAiStore((s) => s.loadConfig);
+  const saveAiConfig = useAiStore((s) => s.saveConfig);
   const providerIds = Object.keys(aiProviders ?? {});
   if (ccBridgeEnabled) {
     providerIds.push("claude-code");
@@ -208,6 +211,16 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     const idx = order.indexOf(effectiveFormat);
     const next = order[(idx + 1) % order.length];
     setRenderFormatOverride((m) => ({ ...m, [activeThreadId]: next }));
+  };
+
+  const setCcTerminalEcho = (enabled: boolean) => {
+    if (!aiConfig) return;
+    void saveAiConfig({
+      ...aiConfig,
+      cc_bridge: { ...aiConfig.cc_bridge, terminal_echo_enabled: enabled },
+    }).catch((e) => {
+      console.warn("save CC terminal echo setting failed:", e);
+    });
   };
 
   const resolveTerminalText = (lines: number): string | undefined => {
@@ -412,6 +425,22 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                 <option value="sonnet">sonnet</option>
                 <option value="haiku">haiku</option>
               </select>
+            )}
+            {activeThread.provider_id === "claude-code" && activeThread.linked_session_id && (
+              <label
+                className="inline-flex items-center gap-1 text-[10px] cursor-pointer select-none"
+                title={t("chat.ccTerminalEchoTitle")}
+              >
+                <input
+                  type="checkbox"
+                  className="h-3 w-3"
+                  checked={ccTerminalEchoEnabled}
+                  disabled={!aiConfig}
+                  aria-label={t("chat.ccTerminalEchoAria")}
+                  onChange={(e) => setCcTerminalEcho(e.target.checked)}
+                />
+                <span>{t("chat.ccTerminalEcho")}</span>
+              </label>
             )}
             <span className="ml-2">{t("chat.formatLabel")}</span>
             {formatLocked ? (

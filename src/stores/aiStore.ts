@@ -67,6 +67,8 @@ export interface CcBridgeConfig {
   max_turns: number;
   /** When true, read-only Bash/run_in_terminal commands still need a confirmation (3.6). */
   confirm_readonly?: boolean;
+  /** Mirror finished captured runs into the bound terminal as display-only traces. */
+  terminal_echo_enabled?: boolean;
   custom_settings_profiles?: CcCustomSettingsProfile[];
   active_profile_id?: string;
 }
@@ -145,6 +147,7 @@ const DEFAULT_CONFIG: AiConfig = {
     permission_mode: "default",
     max_turns: 20,
     confirm_readonly: false,
+    terminal_echo_enabled: true,
   },
   full_local_mode: false,
   fully_disabled: false,

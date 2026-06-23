@@ -36,11 +36,23 @@ describe("formatCcTerminalEcho", () => {
     expect(out).toContain("共 1 行");
   });
 
-  it("notes hidden lines and points at the chat when output exceeds the head", () => {
+  it("notes hidden lines and shows the capture file when output exceeds the head", () => {
     const head = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join("\n");
-    const out = formatCcTerminalEcho(sample({ head, lines: 148, bytes: 4096 }));
+    const out = formatCcTerminalEcho(sample({
+      head,
+      lines: 148,
+      bytes: 4096,
+      capturePath: "C:\\Temp\\taomni\\cap-1.log",
+    }));
     expect(out).toContain("+128 行未显示");
-    expect(out).toContain("完整见对话 / read_capture");
+    expect(out).toContain("完整输出: C:\\Temp\\taomni\\cap-1.log");
+    expect(out).not.toContain("read_capture");
+  });
+
+  it("uses a generic full-output hint when no capture file path is available", () => {
+    const out = formatCcTerminalEcho(sample({ truncated: true, capturePath: null }));
+    expect(out).toContain("完整输出已捕获");
+    expect(out).not.toContain("read_capture");
   });
 
   it("marks truncation", () => {

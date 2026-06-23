@@ -23,6 +23,8 @@ export interface CcTerminalEcho {
   command: string;
   /** Head slice of the captured output (first ~SUMMARY_HEAD lines). */
   head: string;
+  /** Taomni-local backing file for the full capture, when one exists. */
+  capturePath?: string | null;
   /** Total lines captured (may exceed what `head` shows). */
   lines: number;
   /** Total bytes captured (approximate). */
@@ -94,7 +96,10 @@ export function formatCcTerminalEcho(p: CcTerminalEcho): string {
   const hidden = Math.max(0, p.lines - headLines.length);
   if (hidden > 0) parts.push(`+${hidden} 行未显示`);
   if (p.truncated) parts.push("已截断");
-  if (hidden > 0 || p.truncated) parts.push("完整见对话 / read_capture");
+  if (hidden > 0 || p.truncated) {
+    const path = p.capturePath?.trim();
+    parts.push(path ? `完整输出: ${path}` : "完整输出已捕获");
+  }
 
   out.push(`${DIM}┃ [CC] ${parts.join(" · ")}${RESET}`);
 

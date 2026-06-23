@@ -28,10 +28,19 @@ pub struct CcBridgeConfig {
     /// provably read-only still confirms.
     #[serde(default)]
     pub confirm_readonly: bool,
+    /// When true, finished `run_captured` B-path runs are mirrored into the
+    /// bound terminal as display-only traces. Default true to preserve the
+    /// existing visible audit trail.
+    #[serde(default = "default_terminal_echo_enabled")]
+    pub terminal_echo_enabled: bool,
     #[serde(default)]
     pub custom_settings_profiles: Vec<CcCustomSettingsProfile>,
     #[serde(default)]
     pub active_profile_id: Option<String>,
+}
+
+fn default_terminal_echo_enabled() -> bool {
+    true
 }
 
 impl Default for CcBridgeConfig {
@@ -44,6 +53,7 @@ impl Default for CcBridgeConfig {
             permission_mode: "default".into(),
             max_turns: 20,
             confirm_readonly: false,
+            terminal_echo_enabled: true,
             custom_settings_profiles: Vec::new(),
             active_profile_id: None,
         }

@@ -652,7 +652,7 @@ impl CcHandler {
             .map(|r| r.text).unwrap_or_default();
         // Mirror this run into the bound terminal as a read-only trace (the B
         // path is otherwise invisible there). `sid` is the terminal tab id.
-        self.emit_terminal_echo(&sid, &scope.thread_id, &meta.id, command, &head,
+        self.emit_terminal_echo(&sid, &scope.thread_id, &meta.id, command, &head, Some(&path),
             outcome.status, writer.lines(), writer.bytes(), outcome.exit_code, truncated);
         Ok(CallToolResult::success(vec![Content::text(capture_summary(
             &meta.id, outcome.status, outcome.exit_code,
@@ -697,17 +697,19 @@ impl CcHandler {
         capture_id: &str,
         command: &str,
         head: &str,
+        capture_path: Option<&std::path::Path>,
         status: crate::agent::capture::CaptureStatus,
         lines: u64,
         bytes: u64,
         exit_code: Option<i32>,
         truncated: bool,
     ) {
+        let capture_path = capture_path.map(|p| p.to_string_lossy().to_string());
         let _ = self.app.emit(
             "agent-cc-terminal-echo",
             serde_json::json!({
                 "sessionId": session_id, "threadId": thread_id, "captureId": capture_id,
-                "command": command, "head": head,
+                "command": command, "head": head, "capturePath": capture_path,
                 "status": format!("{status:?}"), "lines": lines, "bytes": bytes,
                 "exitCode": exit_code, "truncated": truncated,
             }),

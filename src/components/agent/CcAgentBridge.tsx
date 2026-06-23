@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
 import { getTerminal } from "../../lib/terminal/terminalRegistry";
 import { formatCcTerminalEcho, type CcTerminalEcho } from "../../lib/terminal/ccEcho";
+import { useAiStore } from "../../stores/aiStore";
 
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
@@ -192,6 +193,9 @@ export function CcAgentBridge() {
     let unlisten: UnlistenFn | null = null;
     let disposed = false;
     void listen<CcTerminalEcho>("agent-cc-terminal-echo", (event) => {
+      if (useAiStore.getState().config?.cc_bridge.terminal_echo_enabled === false) {
+        return;
+      }
       const term = getTerminal(event.payload.sessionId);
       if (!term?.writeEcho) return; // terminal closed / no display sink — chat still has it
       try {
