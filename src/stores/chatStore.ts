@@ -13,7 +13,7 @@ export interface ChatThread {
   source: string;
   /** Per-thread output format override ("md" | "html" | "plain"). null = inherit AiConfig. */
   output_format?: string | null;
-  /** Per-thread Claude Code model override ("opus"|"sonnet"|"haiku"). null = inherit default. */
+  /** Per-thread Claude Code model override. null = inherit the Claude Code default model. */
   cc_model?: string | null;
 }
 

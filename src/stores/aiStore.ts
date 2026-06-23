@@ -6,6 +6,8 @@ import {
   VAULT_LOCKED_ERROR,
 } from "../lib/ipc";
 
+export const DEFAULT_CLAUDE_CODE_MODEL = "claude-sonnet-4-5";
+
 export interface AsrProviderConfig {
   engine: string;
   model: string;
@@ -143,7 +145,7 @@ const DEFAULT_CONFIG: AiConfig = {
     enabled: false,
     binary: "auto",
     min_version: "1.0.0",
-    default_model: "sonnet",
+    default_model: DEFAULT_CLAUDE_CODE_MODEL,
     permission_mode: "default",
     max_turns: 20,
     confirm_readonly: false,
@@ -153,6 +155,21 @@ const DEFAULT_CONFIG: AiConfig = {
   fully_disabled: false,
   chat_output_format: "md",
 };
+
+function normalizeModelName(model: string | undefined | null): string {
+  const trimmed = (model ?? "").trim();
+  return trimmed === "" || trimmed === "sonnet" ? DEFAULT_CLAUDE_CODE_MODEL : trimmed;
+}
+
+function normalizeAiConfig(config: AiConfig): AiConfig {
+  return {
+    ...config,
+    cc_bridge: {
+      ...config.cc_bridge,
+      default_model: normalizeModelName(config.cc_bridge.default_model),
+    },
+  };
+}
 
 export const useAiStore = create<AiStore>((set, get) => ({
   config: null,
@@ -167,13 +184,14 @@ export const useAiStore = create<AiStore>((set, get) => ({
     set({ loading: true });
     try {
       const config = await invoke<AiConfig>("get_ai_config");
-      set({ config, loading: false });
+      set({ config: normalizeAiConfig(config), loading: false });
     } catch {
       set({ config: DEFAULT_CONFIG, loading: false });
     }
   },
 
   saveConfig: async (config: AiConfig) => {
+    config = normalizeAiConfig(config);
     set({ saving: true });
     try {
       // Identify providers carrying a fresh plaintext API key — those are the
