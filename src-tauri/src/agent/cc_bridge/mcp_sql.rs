@@ -18,8 +18,8 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, Content, ServerCapabilities, ServerInfo};
 use rmcp::service::{RequestContext, RoleServer};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
-use serde::Deserialize;
-use tauri::{AppHandle, Manager};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
 
 use super::mcp_http::{decide_permission, scope_from_ctx, PermissionParams, TokenMap, TokenScope};
 use crate::agent::capture::reduce::{reduce_file, ReduceOp, ReduceResult};
@@ -90,6 +90,59 @@ fn text(s: impl Into<String>) -> CallToolResult {
 
 fn err(e: impl Into<String>) -> ErrorData {
     ErrorData::internal_error(e.into(), None)
+}
+
+/// Event payload echoed to the frontend after CC runs a statement on the bound
+/// connection, so the linked query tab can append it to a query editor (gated
+/// by a frontend toggle, default on). Emitted for reads and approved writes
+/// alike, on success and failure — the frontend decides whether to surface it.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct SqlEcho {
+    thread_id: String,
+    sql: String,
+    ok: bool,
+    rows_affected: u64,
+    row_count: usize,
+    duration_ms: u64,
+    /// True when the statement ran via `run_sql_captured` (full result spooled
+    /// to a file); the frontend annotates the echoed comment accordingly.
+    captured: bool,
+    error: Option<String>,
+}
+
+/// Best-effort emit of `agent-cc-sql-echo` for a just-executed statement. A
+/// failed emit must never affect the tool result, so the error is swallowed.
+fn emit_sql_echo(
+    app: &AppHandle,
+    thread_id: &str,
+    sql: &str,
+    res: &Result<QueryResult, String>,
+    captured: bool,
+) {
+    let payload = match res {
+        Ok(r) => SqlEcho {
+            thread_id: thread_id.to_string(),
+            sql: sql.to_string(),
+            ok: true,
+            rows_affected: r.rows_affected,
+            row_count: r.rows.len(),
+            duration_ms: r.duration_ms,
+            captured,
+            error: None,
+        },
+        Err(e) => SqlEcho {
+            thread_id: thread_id.to_string(),
+            sql: sql.to_string(),
+            ok: false,
+            rows_affected: 0,
+            row_count: 0,
+            duration_ms: 0,
+            captured,
+            error: Some(e.clone()),
+        },
+    };
+    let _ = app.emit("agent-cc-sql-echo", payload);
 }
 
 // --- result formatters (compact text for CC) -------------------------------
@@ -497,9 +550,9 @@ impl SqlHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
-        let r = crate::database::db_execute(self.state(), conn, p.sql)
-            .await
-            .map_err(err)?;
+        let res = crate::database::db_execute(self.state(), conn, p.sql.clone()).await;
+        emit_sql_echo(&self.app, &scope.thread_id, &p.sql, &res, false);
+        let r = res.map_err(err)?;
         Ok(text(fmt_query_result(&r)))
     }
 
@@ -524,9 +577,9 @@ impl SqlHandler {
 
         // v1 materializes the full result, then streams it to a CSV capture
         // file. (A future optimization can stream via db_execute_stream.)
-        let r = crate::database::db_execute(state, conn, p.sql.clone())
-            .await
-            .map_err(err)?;
+        let res = crate::database::db_execute(state, conn, p.sql.clone()).await;
+        emit_sql_echo(&self.app, &scope.thread_id, &p.sql, &res, true);
+        let r = res.map_err(err)?;
 
         let state = self.state();
         let dir = state.captures.thread_dir(&scope.thread_id);
@@ -739,6 +792,33 @@ mod tests {
         assert!(parse_read_op(&base("jq")).is_err(), "jq not supported for CSV");
         assert!(parse_read_op(&base("range")).is_err(), "range needs bounds");
         assert!(parse_read_op(&base("grep")).is_err(), "grep needs pattern");
+    }
+
+    #[test]
+    fn sql_echo_serializes_camel_case() {
+        let r = QueryResult {
+            columns: vec![col("id")],
+            rows: vec![vec![Some("1".into())], vec![Some("2".into())]],
+            rows_affected: 0,
+            duration_ms: 7,
+            warnings: vec![],
+        };
+        let payload = SqlEcho {
+            thread_id: "t1".into(),
+            sql: "SELECT 1".into(),
+            ok: true,
+            rows_affected: r.rows_affected,
+            row_count: r.rows.len(),
+            duration_ms: r.duration_ms,
+            captured: true,
+            error: None,
+        };
+        let v = serde_json::to_value(&payload).unwrap();
+        assert_eq!(v["threadId"], "t1");
+        assert_eq!(v["rowCount"], 2);
+        assert_eq!(v["durationMs"], 7);
+        assert_eq!(v["captured"], true);
+        assert_eq!(v["error"], serde_json::Value::Null);
     }
 }
 

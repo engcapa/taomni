@@ -10,6 +10,7 @@ export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
+const SQL_ECHO_KEY = "taomni.sqlEcho";
 
 interface AppState {
   tabs: Tab[];
@@ -58,6 +59,13 @@ interface AppState {
    * turn. Absent until the tab connects; cleared on disconnect/unmount.
    */
   dbConnByTab: Record<string, string>;
+
+  /**
+   * Whether SQL run by the in-app AI/Claude Code agent is echoed into the
+   * linked query tab's editor (appended, never auto-run). Toggled from the chat
+   * drawer; persisted to localStorage, default on.
+   */
+  sqlEcho: boolean;
 
   addTab: (tab: Tab) => void;
   /**
@@ -109,6 +117,8 @@ interface AppState {
    * (see {@link dbConnByTab}). Called by the DB client on connect/disconnect.
    */
   setTabDbConn: (tabId: string, connId: string | null) => void;
+  /** Toggle SQL echo to the linked query tab (see {@link sqlEcho}). */
+  setSqlEcho: (enabled: boolean) => void;
 }
 
 function readUiFontFamily(): string {
@@ -170,6 +180,23 @@ function writeTerminalSplitLayout(layout: TerminalSplitLayout) {
   }
 }
 
+function readSqlEcho(): boolean {
+  try {
+    // Default on: only an explicit "false" disables it.
+    return window.localStorage.getItem(SQL_ECHO_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeSqlEcho(enabled: boolean) {
+  try {
+    window.localStorage.setItem(SQL_ECHO_KEY, enabled ? "true" : "false");
+  } catch {
+    // Ignore storage failures; the toggle still applies for this run.
+  }
+}
+
 function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
   const next = new Set<string>();
   for (const id of ids) {
@@ -226,6 +253,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeSideTab: "sessions",
   cwdByTab: {},
   dbConnByTab: {},
+  sqlEcho: readSqlEcho(),
   xServerEnabled: false,
   xServerStatus: null,
   statusMessage: tr("status.ready"),
@@ -538,5 +566,12 @@ export const useAppStore = create<AppState>((set) => ({
       return s.dbConnByTab[tabId] === connId
         ? s
         : { dbConnByTab: { ...s.dbConnByTab, [tabId]: connId } };
+    }),
+
+  setSqlEcho: (enabled) =>
+    set((s) => {
+      if (s.sqlEcho === enabled) return s;
+      writeSqlEcho(enabled);
+      return { sqlEcho: enabled };
     }),
 }));

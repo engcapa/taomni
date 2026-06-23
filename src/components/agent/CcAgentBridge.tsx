@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
 import { getTerminal } from "../../lib/terminal/terminalRegistry";
+import { getQueryTab } from "../../lib/queryRegistry";
+import { useChatStore } from "../../stores/chatStore";
+import { useAppStore } from "../../stores/appStore";
 
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
@@ -39,6 +42,41 @@ interface CaptureProgress {
   threadId: string;
   lines: number;
   bytes: number;
+}
+
+/**
+ * A statement CC just ran on a bound DB connection (`agent-cc-sql-echo`). When
+ * SQL echo is enabled, the linked query tab appends it to a query editor.
+ */
+interface SqlEcho {
+  threadId: string;
+  sql: string;
+  ok: boolean;
+  rowsAffected: number;
+  rowCount: number;
+  durationMs: number;
+  captured: boolean;
+  error?: string | null;
+}
+
+/** Zero-padded HH:MM:SS for the echoed comment. */
+function clockHms(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** Build the SQL comment line prepended above an echoed statement. */
+function buildEchoNote(e: SqlEcho): string {
+  const parts = [`Claude Code ${clockHms(new Date())}`];
+  if (e.ok) {
+    parts.push(e.captured ? "captured" : "ok");
+    parts.push(`${e.rowCount} rows`);
+    if (e.rowsAffected > 0) parts.push(`${e.rowsAffected} affected`);
+    parts.push(`${e.durationMs}ms`);
+  } else {
+    parts.push(`error: ${(e.error ?? "failed").replace(/\s+/g, " ").slice(0, 200)}`);
+  }
+  return `-- ⟦${parts.join(" · ")}⟧`;
 }
 
 /** Human-readable byte size for the capture progress card. */
@@ -190,6 +228,36 @@ export function CcAgentBridge() {
       disposed = true;
       unlistenProgress?.();
       unlistenEnd?.();
+    };
+  }, []);
+
+  // --- SQL echo to the linked query tab --------------------------------
+  // When CC runs SQL on a bound DB connection the backend emits
+  // `agent-cc-sql-echo`; if the toggle is on we resolve the thread's linked
+  // query tab and append the statement to its editor (never run it).
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let disposed = false;
+    void listen<SqlEcho>("agent-cc-sql-echo", (event) => {
+      if (!useAppStore.getState().sqlEcho) return;
+      const e = event.payload;
+      const tabId =
+        useChatStore.getState().threads.find((t) => t.id === e.threadId)
+          ?.linked_session_id ?? null;
+      const entry = getQueryTab(tabId);
+      if (!entry) return;
+      try {
+        entry.appendEchoSql(e.sql, buildEchoNote(e));
+      } catch (err) {
+        console.error("sql echo append failed:", err);
+      }
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
     };
   }, []);
 

@@ -18,6 +18,14 @@ export interface QueryRegistryEntry {
       position?: "caret" | "first" | "last" | "replaceAll";
     },
   ) => void;
+  /**
+   * Append a statement echoed from an AI/Claude Code SQL execution to a
+   * dedicated echo editor panel — never runs it. Reuses the same panel across
+   * calls (creating one if the tab has none) so the whole chat session's SQL
+   * accumulates in one place. `note` is an optional comment line rendered above
+   * the statement.
+   */
+  appendEchoSql: (sql: string, note?: string) => void;
 }
 
 interface QueryRegistryShape {
