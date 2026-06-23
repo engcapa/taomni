@@ -82,6 +82,13 @@ impl TrustLevel {
 pub struct TokenScope {
     pub thread_id: String,
     pub allowed_session_id: Option<String>,
+    /// The saved `SessionConfig.id` of the bound session, when the thread is
+    /// bound to one. Distinct from `allowed_session_id` (a terminal *tab id*):
+    /// the session-identity card advertises *this* id to CC, so CC will often
+    /// name it as `session_id`. Accepting it here (and normalizing it back to
+    /// the canonical tab id in `fill_session_id`) keeps the card, the scope
+    /// check, and the tools speaking one id space instead of three.
+    pub allowed_config_id: Option<String>,
     pub trust: TrustLevel,
     /// When true, read-only `Bash`/`run_in_terminal` commands still require a
     /// confirmation (3.6 noise-reduction disabled by config). Snapshotted from
@@ -173,6 +180,7 @@ pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
 pub fn mint_token(
     thread_id: String,
     allowed_session_id: Option<String>,
+    allowed_config_id: Option<String>,
     trust: TrustLevel,
     confirm_readonly: bool,
 ) -> Result<(SocketAddr, String), String> {
@@ -184,6 +192,7 @@ pub fn mint_token(
         TokenScope {
             thread_id,
             allowed_session_id,
+            allowed_config_id,
             trust,
             confirm_readonly,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
@@ -207,6 +216,7 @@ pub async fn provision_for_thread(
     app: &AppHandle,
     thread_id: &str,
     linked_session_id: Option<String>,
+    linked_config_id: Option<String>,
     confirm_readonly: bool,
 ) -> Result<(String, String), String> {
     ensure_started(app).await?;
@@ -215,7 +225,13 @@ pub async fn provision_for_thread(
     } else {
         TrustLevel::Lenient
     };
-    let (addr, token) = mint_token(thread_id.to_string(), linked_session_id, trust, confirm_readonly)?;
+    let (addr, token) = mint_token(
+        thread_id.to_string(),
+        linked_session_id,
+        linked_config_id,
+        trust,
+        confirm_readonly,
+    )?;
     Ok((server_url(addr), token))
 }
 
@@ -281,15 +297,29 @@ fn normalize_tool_name(name: &str) -> &str {
         .unwrap_or(name)
 }
 
-/// Enforce that any `session_id` named in a tool call is the one this token is
-/// bound to. Tokens with no bound session may not touch a session at all.
+/// Resolve a caller-named `session_id` against the token's bound terminal. CC
+/// may name the bound session either by its terminal *tab id* (the canonical
+/// scope id) or by the saved `SessionConfig.id` the identity card advertises;
+/// both refer to the one bound terminal. Returns the canonical *tab id* when
+/// `sid` is in scope, else `None` (foreign session, or a thread bound to none).
+fn canonical_bound_id<'a>(scope: &'a TokenScope, sid: &str) -> Option<&'a str> {
+    let tab = scope.allowed_session_id.as_deref()?;
+    if sid == tab || scope.allowed_config_id.as_deref() == Some(sid) {
+        Some(tab)
+    } else {
+        None
+    }
+}
+
+/// Enforce that any `session_id` named in a tool call refers to the terminal
+/// this token is bound to — by tab id or by the advertised `SessionConfig.id`.
+/// Tokens with no bound session may not touch a session at all.
 fn enforce_session_scope(scope: &TokenScope, args: &serde_json::Value) -> Result<(), String> {
     if let Some(sid) = args.get("session_id").and_then(|v| v.as_str()) {
-        match scope.allowed_session_id.as_deref() {
-            Some(allowed) if allowed == sid => Ok(()),
-            _ => Err(format!(
-                "session '{sid}' is out of scope for this thread"
-            )),
+        if canonical_bound_id(scope, sid).is_some() {
+            Ok(())
+        } else {
+            Err(format!("session '{sid}' is out of scope for this thread"))
         }
     } else {
         Ok(())
@@ -454,8 +484,12 @@ impl CcHandler {
             Local,
         }
         let target = {
+            // `sid` is a tab id (token scope / fill_session_id). `state.terminals`
+            // is keyed by the backend session id, so translate before lookup —
+            // otherwise this always misses and reports a live terminal as dead.
+            let backend_sid = resolve_backend_session_id(&state, &sid);
             let terms = state.terminals.read().await;
-            match terms.get(&sid) {
+            match terms.get(&backend_sid) {
                 Some(ActiveTerminal::Ssh { handle, channel, .. }) => {
                     Target::Ssh(handle.clone(), channel.clone())
                 }
@@ -616,6 +650,10 @@ impl CcHandler {
         let tail = crate::agent::capture::reduce::reduce_file(&path,
             &crate::agent::capture::reduce::ReduceOp::Tail { n: crate::agent::capture::SUMMARY_TAIL })
             .map(|r| r.text).unwrap_or_default();
+        // Mirror this run into the bound terminal as a read-only trace (the B
+        // path is otherwise invisible there). `sid` is the terminal tab id.
+        self.emit_terminal_echo(&sid, &scope.thread_id, &meta.id, command, &head,
+            outcome.status, writer.lines(), writer.bytes(), outcome.exit_code, truncated);
         Ok(CallToolResult::success(vec![Content::text(capture_summary(
             &meta.id, outcome.status, outcome.exit_code,
             writer.lines(), writer.bytes(), truncated, &head, &tail,
@@ -637,6 +675,39 @@ impl CcHandler {
             "agent-cc-capture-end",
             serde_json::json!({
                 "captureId": id, "threadId": thread_id,
+                "status": format!("{status:?}"), "lines": lines, "bytes": bytes,
+                "exitCode": exit_code, "truncated": truncated,
+            }),
+        );
+    }
+
+    /// Mirror a finished B-path captured run into its bound terminal as a
+    /// read-only trace. The default `run_captured` path runs in an independent
+    /// channel and is invisible in the live terminal; this event lets the
+    /// frontend paint the command + a head of the output + stats into that
+    /// terminal so the user sees what CC ran. `session_id` is the terminal *tab
+    /// id* (the frontend registry key), not the backend session id. Not emitted
+    /// for the C path (already visible via `tee`) or `run_in_terminal` (writes
+    /// to the live session directly).
+    #[allow(clippy::too_many_arguments)]
+    fn emit_terminal_echo(
+        &self,
+        session_id: &str,
+        thread_id: &str,
+        capture_id: &str,
+        command: &str,
+        head: &str,
+        status: crate::agent::capture::CaptureStatus,
+        lines: u64,
+        bytes: u64,
+        exit_code: Option<i32>,
+        truncated: bool,
+    ) {
+        let _ = self.app.emit(
+            "agent-cc-terminal-echo",
+            serde_json::json!({
+                "sessionId": session_id, "threadId": thread_id, "captureId": capture_id,
+                "command": command, "head": head,
                 "status": format!("{status:?}"), "lines": lines, "bytes": bytes,
                 "exitCode": exit_code, "truncated": truncated,
             }),
@@ -670,10 +741,14 @@ impl CcHandler {
             CaptureSource::RemoteFile { session_id, path, family } => {
                 use crate::terminal::ActiveTerminal;
                 // Re-resolve the SSH handle (the run may have been turns ago).
+                // `session_id` is the tab id stored at capture time; translate to
+                // the live backend session id (the connection — and its key — may
+                // have changed across a reconnect since the capture ran).
                 let st = self.app_state();
+                let backend_sid = resolve_backend_session_id(&st, session_id);
                 let handle = {
                     let terms = st.terminals.read().await;
-                    match terms.get(session_id) {
+                    match terms.get(&backend_sid) {
                         Some(ActiveTerminal::Ssh { handle, .. }) => handle.clone(),
                         _ => {
                             return Err(ErrorData::internal_error(
@@ -859,18 +934,58 @@ fn capture_summary(
     )
 }
 
-/// CC usually omits `session_id` — it doesn't know the thread's bound session.
-/// Fill it from the token scope so the effect targets the linked terminal and
-/// the session-scope check passes. No-op when the arg is already present or the
-/// thread is global (no bound session).
+/// Normalize a tool call's `session_id` to the canonical terminal *tab id*.
+///
+/// - Omitted (the common case — CC doesn't know the thread's bound session):
+///   inject the bound tab id so the effect targets the linked terminal and the
+///   scope check passes. No-op for a global thread (no bound session).
+/// - Present as the advertised `SessionConfig.id`: rewrite it to the tab id, so
+///   downstream registry / `state.terminals` lookups (which key on the tab id)
+///   resolve instead of missing. The identity card hands CC the config id, so
+///   this is the path CC takes when it "helpfully" names the session.
+/// - Present as the tab id already, or as a foreign id: left unchanged (a
+///   foreign id is then rejected by `enforce_session_scope`).
 fn fill_session_id(args: &mut serde_json::Value, scope: &TokenScope) {
-    let present = args.get("session_id").and_then(|v| v.as_str()).is_some();
-    if present {
-        return;
-    }
-    if let (Some(sid), Some(obj)) = (scope.allowed_session_id.clone(), args.as_object_mut()) {
+    // Own the present value first so the immutable borrow of `args` is released
+    // before we may mutate it below.
+    let present: Option<String> = args
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let target: Option<String> = match present {
+        // Omitted: inject the bound tab id (None for a global thread → no-op).
+        None => scope.allowed_session_id.clone(),
+        // Present: rewrite an advertised config id to the canonical tab id; a
+        // tab id (already canonical) or a foreign id needs no change here (a
+        // foreign id is rejected later by `enforce_session_scope`).
+        Some(sid) => match canonical_bound_id(scope, &sid) {
+            Some(tab) if tab != sid => Some(tab.to_string()),
+            _ => None,
+        },
+    };
+    if let (Some(sid), Some(obj)) = (target, args.as_object_mut()) {
         obj.insert("session_id".into(), serde_json::Value::String(sid));
     }
+}
+
+/// Resolve a caller-facing session id (a terminal *tab id* — what the token
+/// scope and `fill_session_id` use) to the *backend terminal session id* that
+/// keys `state.terminals`. The frontend reports this mapping as terminals
+/// connect (`cc_track_terminal`). `run_in_terminal` / `read_terminal_tail`
+/// don't need this — they dispatch the tab id to the frontend registry, which
+/// owns the indirection — but the backend-side capture tools (`run_captured` /
+/// `read_capture`) index `state.terminals` directly and must translate first.
+///
+/// Falls back to the id unchanged when no mapping exists, so a caller that
+/// already passes a backend session id, or a test/local setup with no tracking,
+/// still resolves (a miss then surfaces as the usual "no live terminal").
+fn resolve_backend_session_id(state: &AppState, sid: &str) -> String {
+    state
+        .cc_tab_sessions
+        .lock()
+        .ok()
+        .and_then(|m| m.get(sid).cloned())
+        .unwrap_or_else(|| sid.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -1150,6 +1265,20 @@ mod tests {
         TokenScope {
             thread_id: thread.into(),
             allowed_session_id: allowed.map(|s| s.to_string()),
+            allowed_config_id: None,
+            trust: TrustLevel::Strict,
+            confirm_readonly: false,
+            session_approved: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    /// Variant carrying a bound `SessionConfig.id` (the id the identity card
+    /// advertises), so we can exercise config-id acceptance / normalization.
+    fn scope_with_config(thread: &str, tab: &str, config: &str) -> TokenScope {
+        TokenScope {
+            thread_id: thread.into(),
+            allowed_session_id: Some(tab.to_string()),
+            allowed_config_id: Some(config.to_string()),
             trust: TrustLevel::Strict,
             confirm_readonly: false,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
@@ -1324,6 +1453,33 @@ mod tests {
         let mut args = json!({ "command": "ls" });
         fill_session_id(&mut args, &s);
         assert!(args.get("session_id").is_none());
+    }
+
+    #[test]
+    fn config_id_is_in_scope_and_normalized_to_tab_id() {
+        // The identity card hands CC the SessionConfig.id; CC then names it as
+        // session_id. It must be accepted (scope) and rewritten to the tab id
+        // (fill) so downstream registry / state.terminals lookups resolve.
+        let s = scope_with_config("t1", "ssh-cfg-123", "cfg-uuid");
+        let mut args = json!({ "session_id": "cfg-uuid", "command": "free -h" });
+        assert!(enforce_session_scope(&s, &args).is_ok());
+        fill_session_id(&mut args, &s);
+        assert_eq!(args["session_id"], "ssh-cfg-123");
+        assert!(enforce_session_scope(&s, &args).is_ok());
+    }
+
+    #[test]
+    fn tab_id_stays_canonical_with_config_bound() {
+        let s = scope_with_config("t1", "ssh-cfg-123", "cfg-uuid");
+        let mut args = json!({ "session_id": "ssh-cfg-123", "command": "ls" });
+        fill_session_id(&mut args, &s);
+        assert_eq!(args["session_id"], "ssh-cfg-123");
+    }
+
+    #[test]
+    fn foreign_session_id_rejected_even_with_config_bound() {
+        let s = scope_with_config("t1", "ssh-cfg-123", "cfg-uuid");
+        assert!(enforce_session_scope(&s, &json!({ "session_id": "ssh-other-999" })).is_err());
     }
 
     // Exercises the Bearer auth boundary over a real loopback HTTP round-trip,

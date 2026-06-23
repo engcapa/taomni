@@ -109,6 +109,15 @@ pub struct AppState {
     /// `ChatSendRequest.cwd`). The B executor bridges it into `run_captured`
     /// (`cd <cwd> && …`) since an MCP tool call has no per-turn cwd of its own.
     pub cc_thread_cwd: Arc<Mutex<HashMap<String, String>>>,
+    /// Maps a terminal *tab id* (the caller-facing id CC's tools see — equal to
+    /// `chat thread.linked_session_id` / the token's `allowed_session_id`) to the
+    /// *backend terminal session id* used as the `terminals` map key (a fresh
+    /// `crypto.randomUUID()` per connection, distinct from the tab id). The
+    /// frontend reports this as terminals connect/disconnect (`cc_track_terminal`
+    /// / `cc_untrack_terminal`), so backend-side CC tools (`run_captured` /
+    /// `read_capture`) can resolve the live terminal that `run_in_terminal`
+    /// reaches indirectly through the frontend registry. Refreshed on reconnect.
+    pub cc_tab_sessions: Arc<Mutex<HashMap<String, String>>>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -151,6 +160,7 @@ impl AppState {
             )),
             cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
             cc_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
+            cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

@@ -549,6 +549,7 @@ pub async fn chat_stream(
                         &app,
                         &req.thread_id,
                         thread.linked_session_id.clone(),
+                        req.bound_session_id.clone(),
                         ai_config.cc_bridge.confirm_readonly,
                     )
                     .await

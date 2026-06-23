@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
 import { getTerminal } from "../../lib/terminal/terminalRegistry";
+import { formatCcTerminalEcho, type CcTerminalEcho } from "../../lib/terminal/ccEcho";
 
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
@@ -178,6 +179,33 @@ export function CcAgentBridge() {
       disposed = true;
       unlistenProgress?.();
       unlistenEnd?.();
+    };
+  }, []);
+
+  // --- captured-run terminal echo (方案4 mirror) -----------------------
+  // The default run_captured path runs in an independent channel, so it never
+  // appears in the bound terminal. The backend emits this once a captured run
+  // finishes; we paint a compact, read-only trace (command + output head +
+  // stats) into that terminal so the user sees what CC did. Display-only
+  // (writeEcho → xterm.write), never touches stdin.
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let disposed = false;
+    void listen<CcTerminalEcho>("agent-cc-terminal-echo", (event) => {
+      const term = getTerminal(event.payload.sessionId);
+      if (!term?.writeEcho) return; // terminal closed / no display sink — chat still has it
+      try {
+        term.writeEcho(formatCcTerminalEcho(event.payload));
+      } catch (e) {
+        console.error("cc terminal echo failed:", e);
+      }
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
     };
   }, []);
 

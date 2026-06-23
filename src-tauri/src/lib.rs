@@ -406,6 +406,8 @@ pub fn run() {
             agent::cc_bridge::commands::cc_resolve_tool_call,
             agent::cc_bridge::commands::cc_resolve_permission,
             agent::cc_bridge::commands::cc_cancel_capture,
+            agent::cc_bridge::commands::cc_track_terminal,
+            agent::cc_bridge::commands::cc_untrack_terminal,
             chat::chat_new_thread,
             chat::chat_list_threads,
             chat::chat_list_messages,

@@ -313,6 +313,23 @@ export async function closeTerminal(sessionId: string): Promise<void> {
   return invoke("close_terminal", { sessionId });
 }
 
+/**
+ * Tell the backend that a terminal *tab* (`tabId` — the id CC's tools see, equal
+ * to a chat thread's `linked_session_id`) is backed by a concrete backend
+ * terminal session (`sessionId`, the `state.terminals` key). This lets
+ * backend-side Claude Code tools (`run_captured` / `read_capture`) resolve the
+ * live terminal that `run_in_terminal` reaches indirectly via the frontend
+ * registry. Called as a terminal connects; safe to call repeatedly.
+ */
+export async function ccTrackTerminal(tabId: string, sessionId: string): Promise<void> {
+  return invoke("cc_track_terminal", { tabId, sessionId });
+}
+
+/** Drop a tab → backend-session mapping recorded by {@link ccTrackTerminal}. */
+export async function ccUntrackTerminal(tabId: string, sessionId: string): Promise<void> {
+  return invoke("cc_untrack_terminal", { tabId, sessionId });
+}
+
 export async function listenTerminalExit(
   sessionId: string,
   callback: () => void,

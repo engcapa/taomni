@@ -146,6 +146,10 @@ pub async fn cc_send_message(
                     &app,
                     &req.thread_id,
                     linked_session.clone(),
+                    // Legacy direct-CC path: the saved SessionConfig.id isn't
+                    // resolved here (only the chat_stream path carries it), so
+                    // config-id scope acceptance is unavailable on this path.
+                    None,
                     config.cc_bridge.confirm_readonly,
                 )
                 .await?;
@@ -269,7 +273,15 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
     if !remote.is_empty() {
         let terms = state.terminals.read().await;
         for (session_id, path) in remote {
-            if let Some(crate::terminal::ActiveTerminal::Ssh { handle, .. }) = terms.get(&session_id) {
+            // `session_id` is the tab id stored at capture time; `terminals` is
+            // keyed by the backend session id, so translate via the live map.
+            let backend_sid = state
+                .cc_tab_sessions
+                .lock()
+                .ok()
+                .and_then(|m| m.get(&session_id).cloned())
+                .unwrap_or(session_id);
+            if let Some(crate::terminal::ActiveTerminal::Ssh { handle, .. }) = terms.get(&backend_sid) {
                 crate::agent::capture::exec_c::cleanup_remote(handle, &path).await;
             }
         }
@@ -295,6 +307,43 @@ pub async fn cc_cancel_capture(
         .cloned();
     if let Some(n) = notify {
         n.notify_waiters();
+    }
+    Ok(())
+}
+
+/// Record that a live terminal tab (`tab_id`, the caller-facing id CC's tools
+/// see) is backed by a concrete backend terminal session (`session_id`, the
+/// `state.terminals` key). The frontend calls this from its terminal registry
+/// as a panel connects, so backend-side CC tools (`run_captured` /
+/// `read_capture`) can resolve the live terminal that `run_in_terminal` reaches
+/// indirectly through the frontend registry. Overwrites on reconnect. Idempotent.
+#[tauri::command]
+pub async fn cc_track_terminal(
+    tab_id: String,
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .cc_tab_sessions
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(tab_id, session_id);
+    Ok(())
+}
+
+/// Drop a terminal tab → backend session mapping recorded by
+/// [`cc_track_terminal`]. Only removes the entry when it still points at
+/// `session_id`, so a stale unmount can't clobber a newer reconnect's mapping
+/// (mirrors the frontend registry's own ownership guard). Idempotent.
+#[tauri::command]
+pub async fn cc_untrack_terminal(
+    tab_id: String,
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mut map = state.cc_tab_sessions.lock().map_err(|e| e.to_string())?;
+    if map.get(&tab_id).is_some_and(|s| *s == session_id) {
+        map.remove(&tab_id);
     }
     Ok(())
 }
@@ -391,6 +440,10 @@ pub async fn cc_stream_message(
                     &app,
                     &req.thread_id,
                     linked_session.clone(),
+                    // Legacy direct-CC path: the saved SessionConfig.id isn't
+                    // resolved here (only the chat_stream path carries it), so
+                    // config-id scope acceptance is unavailable on this path.
+                    None,
                     config.cc_bridge.confirm_readonly,
                 )
                 .await?;
