@@ -63,6 +63,7 @@ export interface SessionImportOptions {
   existingSessions?: readonly SessionConfig[];
   now?: number;
   sourcePath?: string | null;
+  homeDir?: string | null;
   includeSecrets?: boolean;
 }
 
@@ -262,7 +263,7 @@ export function parseMobaXtermSessions(
     const groupPath = combineImportFolder(options.targetFolder ?? null, sectionFolder);
 
     for (const entry of section.entries) {
-      const session = mobaEntryToSession(entry.key, entry.value, groupPath, now, warnings);
+      const session = mobaEntryToSession(entry.key, entry.value, groupPath, now, warnings, options.homeDir ?? null);
       if (session) {
         sessions.push(session);
       } else {
@@ -2125,6 +2126,7 @@ function mobaEntryToSession(
   groupPath: string | null,
   now: number,
   warnings: string[],
+  homeDir: string | null,
 ): SessionConfig | null {
   const value = rawValue.trimStart();
   const parts = value.split("#");
@@ -2152,7 +2154,7 @@ function mobaEntryToSession(
   const port = sanitizePort(basic[2], DEFAULT_PORTS[sessionType] ?? 0);
   const username = sessionType === "VNC" ? null : optionalCleanText(mobaUnescape(basic[3] ?? ""), MAX_NAME_LENGTH);
   const options = mobaBasicToOptions(sessionType, basic, parts[iconIndex + 4] ?? "");
-  const authMethod = mobaBasicToAuth(sessionType, basic);
+  const authMethod = mobaBasicToAuth(sessionType, basic, homeDir);
 
   return {
     id: createSessionId(),
@@ -2218,14 +2220,39 @@ function firstPipeValue(value: string | undefined): string {
   return cleanText(mobaUnescape((value ?? "").split("__PIPE__")[0] ?? ""), MAX_NAME_LENGTH);
 }
 
-function mobaBasicToAuth(sessionType: string, basic: string[]): AuthMethod {
+function mobaBasicToAuth(
+  sessionType: string,
+  basic: string[],
+  homeDir: string | null,
+): AuthMethod {
   const keyPath = sessionType === "SSH"
-    ? cleanText(mobaUnescape(basic[14] ?? ""), MAX_PATH_LENGTH)
+    ? mobaPrivateKeyPath(basic[14] ?? "", homeDir)
     : sessionType === "SFTP"
-      ? cleanText(mobaUnescape(basic[9] ?? ""), MAX_PATH_LENGTH)
+      ? mobaPrivateKeyPath(basic[9] ?? "", homeDir)
       : "";
 
   return keyPath ? { PrivateKey: { key_path: keyPath } } : sessionType === "SSH" || sessionType === "SFTP" ? "Password" : "None";
+}
+
+function mobaPrivateKeyPath(rawPath: string, homeDir: string | null): string {
+  const path = cleanText(mobaUnescape(rawPath), MAX_PATH_LENGTH);
+  if (!path) return "";
+  const profileMacro = "_ProfileDir_";
+  if (!path.toLowerCase().startsWith(profileMacro.toLowerCase())) return path;
+
+  const home = cleanText(homeDir, MAX_PATH_LENGTH) || "~";
+  return joinHomeRelativePath(home, path.slice(profileMacro.length));
+}
+
+function joinHomeRelativePath(homeDir: string, relativePath: string): string {
+  const home = homeDir.trim().replace(/[\\/]+$/, "");
+  if (!home) return cleanText(relativePath, MAX_PATH_LENGTH);
+  const windows = /^[A-Za-z]:[\\/]/.test(home) || /^\\\\/.test(home);
+  const sep = windows ? "\\" : "/";
+  const relative = relativePath
+    .replace(/^[\\/]+/, "")
+    .replace(/[\\/]+/g, sep);
+  return cleanText(relative ? `${home}${sep}${relative}` : home, MAX_PATH_LENGTH);
 }
 
 function mobaSessionLine(

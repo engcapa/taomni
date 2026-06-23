@@ -50,6 +50,11 @@ pub fn select_save_file_path(
 }
 
 #[tauri::command]
+pub fn get_home_dir() -> Option<String> {
+    dirs::home_dir().map(|path| path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn read_file_bytes(path: String) -> Result<Response, String> {
     let expanded = shellexpand::tilde(&path).to_string();
     let bytes = std::fs::read(&expanded).map_err(|e| format!("Failed to read file: {}", e))?;
