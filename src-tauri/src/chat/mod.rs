@@ -229,6 +229,14 @@ pub struct ChatSendRequest {
     /// access (that is 3.2, deliberately out of scope). `None` when unknown.
     #[serde(default)]
     pub cwd: Option<String>,
+    /// Phase 6 — the live `db_connections` runtime id this CC thread is bound to,
+    /// for SQL/Redis DB sessions. Like `cwd`, it is volatile (the frontend
+    /// regenerates it on each (re)connect and the backend can't derive it), so
+    /// it is bridged *per turn* and stored into `AppState.cc_db_bindings` so the
+    /// DB MCP handlers can resolve their bound connection. `None` for non-DB
+    /// threads or a DB tab that isn't connected.
+    #[serde(default)]
+    pub bound_db_connection_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -541,14 +549,36 @@ pub async fn chat_stream(
         let process = match existing {
             Some(p) => p,
             None => {
+                // Phase 6 — pick the MCP flavor from the bound session's type so
+                // the thread loads *only* the right tool surface: a SQL DB
+                // session (MySQL/PG/ClickHouse/Presto) gets the SQL tools, Redis
+                // gets the Redis tools, everything else (SSH/local/unbound) gets
+                // the shell tools. Resolve in a tight scope so the db lock is
+                // dropped before the async provision call.
+                let flavor = {
+                    use crate::agent::cc_bridge::mcp_http::Flavor;
+                    let session_type = req
+                        .bound_session_id
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(|sid| {
+                            let db = state.db.lock().ok()?;
+                            crate::session::db::get_session(&db, sid).ok()
+                        })
+                        .map(|sc| sc.session_type);
+                    Flavor::for_session_type(session_type.as_ref())
+                };
+
                 // Provision the in-app rmcp MCP server + a per-thread scoped
                 // token (trust inferred from whether the thread is linked to a
-                // remote SSH session). Injected into the thread's .mcp.json.
+                // remote session). Injected into the thread's .mcp.json.
                 let (cc_server_url, cc_token) =
                     match crate::agent::cc_bridge::mcp_http::provision_for_thread(
                         &app,
                         &req.thread_id,
                         thread.linked_session_id.clone(),
+                        flavor,
                         ai_config.cc_bridge.confirm_readonly,
                     )
                     .await
@@ -580,6 +610,7 @@ pub async fn chat_stream(
                 };
                 let files = match crate::agent::cc_bridge::config::create_session_files(
                     custom.as_deref(),
+                    flavor.server_name(),
                     &cc_server_url,
                     &cc_token,
                 ) {
@@ -656,7 +687,7 @@ pub async fn chat_stream(
                     // that could bypass the permission pipeline.
                     "--strict-mcp-config".into(),
                     "--permission-prompt-tool".into(),
-                    crate::agent::cc_bridge::config::PERMISSION_PROMPT_TOOL.into(),
+                    flavor.permission_prompt_tool().into(),
                 ];
                 // Phase 3.S — inject the session-identity card (file variant
                 // keeps host/user out of argv).
@@ -710,6 +741,28 @@ pub async fn chat_stream(
                 .lock()
                 .unwrap()
                 .insert(req.thread_id.clone(), cwd.to_string());
+        }
+
+        // Phase 6 — stash the live DB connection id this thread is bound to so
+        // the SQL/Redis MCP handlers can resolve their target connection (the
+        // runtime `db_connections` key is frontend-generated and not derivable
+        // here). Volatile (regenerated on reconnect), so refreshed every turn;
+        // cleared when absent so a stale, disconnected id never lingers.
+        {
+            let conn = req
+                .bound_db_connection_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            let mut bindings = state.cc_db_bindings.write().await;
+            match conn {
+                Some(c) => {
+                    bindings.insert(req.thread_id.clone(), c.to_string());
+                }
+                None => {
+                    bindings.remove(&req.thread_id);
+                }
+            }
         }
 
         // Build the per-turn context prefix CC sees: the live working

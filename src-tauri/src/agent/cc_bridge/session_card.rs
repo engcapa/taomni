@@ -45,6 +45,72 @@ fn is_remote(t: &SessionType) -> bool {
     )
 }
 
+/// Which DB MCP flavor (if any) a bound session uses — drives the routing block
+/// so a DB thread is steered to its SQL/Redis tools, not the terminal tools its
+/// `.mcp.json` doesn't even expose (Phase 6).
+enum DbRouting {
+    /// MySQL / PostgreSQL / ClickHouse / Presto — the `taomni_sql` tools.
+    Sql,
+    /// Redis — the `taomni_redis` tools.
+    Redis,
+    /// Not a DB session — use the terminal routing.
+    None,
+}
+
+fn db_routing(t: &SessionType) -> DbRouting {
+    match t {
+        SessionType::MySQL
+        | SessionType::PostgreSQL
+        | SessionType::ClickHouse
+        | SessionType::Presto => DbRouting::Sql,
+        SessionType::Redis => DbRouting::Redis,
+        _ => DbRouting::None,
+    }
+}
+
+/// Routing block for a thread bound to a SQL database session. CC's `.mcp.json`
+/// for this thread exposes *only* the `taomni_sql` tools, so steer every "look
+/// at the data / schema / run a query" intent through them — never CC's built-in
+/// local Bash / Read (which only touch the unrelated Taomni host), and never the
+/// terminal tools (which this thread doesn't have).
+fn push_sql_routing(s: &mut String, engine: &str) {
+    s.push_str(&format!(
+        "本线程绑定的是一个 {engine} 数据库连接。你的一切操作都针对这个连接,\
+         用 SQL MCP 工具完成,不要用你内置的本地 Bash/Read/Glob,也没有终端工具。\n"
+    ));
+    s.push_str(
+        "查看结构:list_schemas / list_tables / describe_table / list_indexes / list_objects / \
+         object_ddl / table_stats(Presto 还有 list_catalogs)。\n",
+    );
+    s.push_str(
+        "执行查询:run_sql(返回有界结果,只读语句自动放行,写/DDL 会停下等用户确认)。\
+         结果很大时用 run_sql_captured 完整捕获、再用 read_result(op=head/tail/range/grep/stats)\
+         按需检索,需要落盘用 export_result;不要为了再看一遍而重跑查询。\n",
+    );
+    s.push_str(
+        "你自带的 <env>(工作目录 / git / 操作系统)只描述运行 Taomni 的宿主沙箱,与这个数据库无关;\
+         「有哪些表 / 这列什么类型 / 数据长什么样」一律用上面的工具查,不要据本地 <env> 作答。\n",
+    );
+}
+
+/// Routing block for a thread bound to a Redis session — only the
+/// `taomni_redis` tools are exposed.
+fn push_redis_routing(s: &mut String) {
+    s.push_str(
+        "本线程绑定的是一个 Redis 连接。你的一切操作都针对这个连接,用 Redis MCP 工具完成,\
+         不要用你内置的本地 Bash/Read,也没有终端工具。\n",
+    );
+    s.push_str(
+        "扫描键:redis_list_keys(按 pattern 分页);读值:redis_get_key;\
+         写/删:redis_set_key / redis_del_key(写动作,会停下等用户确认);\
+         其他命令:redis_exec(读命令自动放行,写命令需确认)。\n",
+    );
+    s.push_str(
+        "你自带的 <env> 只描述运行 Taomni 的宿主沙箱,与这个 Redis 实例无关;\
+         「有哪些键 / 某键的值」一律用上面的工具查。\n",
+    );
+}
+
 /// Shared guidance for any thread bound to a terminal — saved-remote,
 /// saved-local, or a live tab with no saved session. It states one *uniform*
 /// operating principle (not a per-field hint): every operation in this thread
@@ -143,9 +209,15 @@ pub fn render_card(
                 thread_id,
                 if linked { "Strict" } else { "Lenient" }
             ));
-            // ① + ② — bound to a saved session (remote or local): route through
-            // the terminal MCP tools and demote CC's native local <env>.
-            push_terminal_routing(&mut s, is_remote(&sc.session_type));
+            // Routing depends on the session kind: DB sessions (Phase 6) get
+            // their SQL/Redis MCP tools, everything else routes through the
+            // terminal MCP tools. In all cases CC's native local <env> is
+            // demoted to "the host sandbox", not the work target.
+            match db_routing(&sc.session_type) {
+                DbRouting::Sql => push_sql_routing(&mut s, sc.session_type.as_str()),
+                DbRouting::Redis => push_redis_routing(&mut s),
+                DbRouting::None => push_terminal_routing(&mut s, is_remote(&sc.session_type)),
+            }
         }
         None => {
             // We could not resolve a saved SessionConfig. Be honest about what
@@ -301,5 +373,40 @@ mod tests {
         assert!(card.contains("run_in_terminal"));
         assert!(!card.contains("sftp_upload"));
         assert!(card.contains("宿主沙箱"));
+    }
+
+    #[test]
+    fn card_sql_session_routes_to_sql_tools_not_terminal() {
+        // A SQL DB session's thread only has the taomni_sql tools, so the card
+        // must steer to them and must NOT mention the terminal tools (which the
+        // thread's .mcp.json doesn't expose).
+        for engine in [
+            SessionType::MySQL,
+            SessionType::PostgreSQL,
+            SessionType::ClickHouse,
+            SessionType::Presto,
+        ] {
+            let label = engine.as_str().to_string();
+            let sc = sample(engine, Some("dba"), AuthMethod::Password);
+            let card = render_card(Some(&sc), "t-sql", true, &[]);
+            assert!(card.contains(&label), "card should name the engine {label}");
+            assert!(card.contains("run_sql"), "{label}: should mention run_sql");
+            assert!(card.contains("describe_table"), "{label}: schema tools");
+            assert!(card.contains("run_sql_captured"), "{label}: big-result guidance");
+            assert!(!card.contains("run_in_terminal"), "{label}: no terminal tool");
+            assert!(!card.contains("sftp_upload"), "{label}: no sftp");
+            assert!(card.contains("宿主沙箱"), "{label}: <env> still demoted");
+        }
+    }
+
+    #[test]
+    fn card_redis_session_routes_to_redis_tools() {
+        let sc = sample(SessionType::Redis, None, AuthMethod::Password);
+        let card = render_card(Some(&sc), "t-redis", true, &[]);
+        assert!(card.contains("Redis"));
+        assert!(card.contains("redis_list_keys"));
+        assert!(card.contains("redis_get_key"));
+        assert!(!card.contains("run_in_terminal"));
+        assert!(!card.contains("run_sql"));
     }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { AlertTriangle, ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown, Bot } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import { dbConnect, dbDisconnect, redisDelKey, redisExec } from "../../lib/ipc";
 import { RedisKeyBrowser } from "./RedisKeyBrowser";
@@ -10,6 +10,10 @@ import { RedisNewKeyDialog } from "./RedisNewKeyDialog";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
+import { useAppStore } from "../../stores/appStore";
+import { TabActions } from "../tabbar/TabActionSlot";
+import { FT_BUTTON_ACTIVE_OVERRIDE, FT_ICON_BUTTON_STYLE } from "../floating-toolbar/floatingToolbarStyles";
+import { useT } from "../../lib/i18n";
 
 function createRuntimeDbSessionId(baseSessionId: string): string {
   const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -20,10 +24,17 @@ interface RedisClientTabProps {
   tabId: string;
   info: DbConnectInfo;
   visible: boolean;
+  /** Toggle the per-tab Claude Code chat drawer bound to this Redis session. */
+  chatToggle?: {
+    open: boolean;
+    onToggle: () => void;
+  };
 }
 
-export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
+export default function RedisClientTab({ tabId, info, visible, chatToggle }: RedisClientTabProps) {
   const sessionId = info.sessionId;
+  const setTabDbConn = useAppStore((s) => s.setTabDbConn);
+  const t = useT();
   const [connectionSessionId, setConnectionSessionId] = useState<string | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -53,6 +64,8 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
           return;
         }
         setConnectionSessionId(runtimeSessionId);
+        // Phase 6 — publish the live connection id for the CC Redis MCP.
+        setTabDbConn(tabId, runtimeSessionId);
       })
       .catch((err) => {
         if (!cancelled) setConnError(String(err));
@@ -60,6 +73,7 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
     return () => {
       cancelled = true;
       void dbDisconnect(runtimeSessionId).catch(() => undefined);
+      setTabDbConn(tabId, null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -96,6 +110,23 @@ export default function RedisClientTab({ info, visible }: RedisClientTabProps) {
 
   return (
     <div ref={rootRef} className="h-full w-full flex flex-col" style={{ ...dbFontStyle, background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
+      {chatToggle && (
+        <TabActions active={visible}>
+          <button
+            type="button"
+            data-testid="redis-chat-toggle"
+            onClick={chatToggle.onToggle}
+            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
+            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
+            style={{
+              ...FT_ICON_BUTTON_STYLE,
+              ...(chatToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
+            }}
+          >
+            <Bot size={14} />
+          </button>
+        </TabActions>
+      )}
       {/* Toolbar: DB index switcher */}
       <div
         className="h-7 shrink-0 flex items-center gap-2 px-2 text-[11px]"

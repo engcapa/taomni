@@ -4,6 +4,7 @@ pub mod cmd_classify;
 pub mod commands;
 pub mod safety;
 pub mod search;
+pub mod sql_classify;
 pub mod tools;
 
 use crate::llm::{ChatMessage, ChatRequest, Llm, TaskKind};

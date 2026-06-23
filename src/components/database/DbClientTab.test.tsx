@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DbClientTab from "./DbClientTab";
 import type { DbConnectInfo } from "../../types";
+import { getQueryTab } from "../../lib/queryRegistry";
 
 const ipcMock = vi.hoisted(() => ({
   dbConnect: vi.fn(),
@@ -73,6 +74,7 @@ vi.mock("../../lib/ipc", () => ({
 const dbChildProps = vi.hoisted(() => ({
   schemaTree: null as null | { metadataCache?: unknown },
   sqlEditor: null as null | { metadataCache?: unknown },
+  editorInitialDocFallback: "select 1",
 }));
 
 vi.mock("./SchemaTree", () => ({
@@ -87,22 +89,28 @@ vi.mock("./SqlEditorPanel", () => ({
     handleRef,
     onRun,
     metadataCache,
+    initialDoc,
   }: {
     handleRef: (handle: unknown | null) => void;
     onRun: (sql: string) => void;
     metadataCache?: unknown;
+    initialDoc?: string;
   }) => {
     dbChildProps.sqlEditor = { metadataCache };
     useEffect(() => {
+      let doc = initialDoc || dbChildProps.editorInitialDocFallback;
       const handle = {
-        getValue: () => "select 1",
+        getValue: () => doc,
         getSelectionOrAll: () => "select 1",
         insertText: vi.fn(),
-        setValue: vi.fn(),
+        setValue: vi.fn((text: string) => {
+          doc = text;
+        }),
+        focus: vi.fn(),
       };
       handleRef(handle);
       return () => handleRef(null);
-    }, [handleRef]);
+    }, [handleRef, initialDoc]);
     return (
       <button type="button" data-testid="mock-sql-editor" onClick={() => onRun("select 1")}>
         editor
@@ -160,6 +168,7 @@ describe("DbClientTab connection lifecycle", () => {
     localStorage.clear();
     dbChildProps.schemaTree = null;
     dbChildProps.sqlEditor = null;
+    dbChildProps.editorInitialDocFallback = "select 1";
   });
 
   it("keeps queries on the latest runtime connection when a stale StrictMode connect resolves late", async () => {
@@ -226,6 +235,38 @@ describe("DbClientTab connection lifecycle", () => {
       expect(screen.getByTestId("schema-tree")).toBeInTheDocument();
       expect(dbChildProps.schemaTree?.metadataCache).toBeTruthy();
       expect(dbChildProps.sqlEditor?.metadataCache).toBe(dbChildProps.schemaTree?.metadataCache);
+    });
+  });
+
+  it("appends echoed agent SQL with comments and semicolons into one query panel", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "";
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    expect(getQueryTab("tab-1")).toBeTruthy();
+    const entry = getQueryTab("tab-1");
+    expect(entry).toBeTruthy();
+
+    act(() => {
+      entry?.appendEchoSql("select * from foo", "-- Claude Code ok");
+      entry?.appendEchoSql("select * from bar;\n", "-- Claude Code captured");
+    });
+
+    await waitFor(() => {
+      const editorButton = screen.getByTestId("mock-sql-editor");
+      expect(editorButton).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+
+    await waitFor(() => {
+      expect(ipcMock.dbExecuteStream).toHaveBeenCalledWith(
+        expect.stringMatching(/^saved-pg::/),
+        "-- Claude Code ok\nselect * from foo;\n\n-- Claude Code captured\nselect * from bar;",
+        1000,
+        expect.any(Function),
+      );
     });
   });
 });

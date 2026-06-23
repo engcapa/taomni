@@ -423,6 +423,10 @@ export default function DbClientTab({
   const addBookmarkTriggerRef = useRef<(() => void) | null>(null);
   const historyRef = useRef<Record<string, string[]>>({});
   const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
+  // Stable "echo target" panel for AI/Claude Code SQL echo (queryRegistry
+  // `appendEchoSql`): once chosen it's reused so a whole chat session's SQL
+  // accumulates in one editor, instead of scattering across panels.
+  const echoPanelIdRef = useRef<string | null>(null);
   const timersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const panelsRef = useRef<PanelState[]>(panels);
   const activePanelIdRef = useRef(activePanelId);
@@ -434,6 +438,7 @@ export default function DbClientTab({
   const [schemaCollapsed, setSchemaCollapsed] = useState(false);
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const setTabDbConn = useAppStore((s) => s.setTabDbConn);
   const { fontSize: dbFontSize } = useDbSessionFontSize(visible, rootRef);
   const dbFontStyle = useMemo(
     () => ({
@@ -498,6 +503,9 @@ export default function DbClientTab({
           return;
         }
         setConnectionSessionId(runtimeSessionId);
+        // Phase 6 — publish the live connection id so the CC DB MCP (when a
+        // chat thread is bound to this tab) can target it each turn.
+        setTabDbConn(tabId, runtimeSessionId);
       })
       .catch((err) => {
         if (!cancelled) setConnError(String(err));
@@ -505,6 +513,7 @@ export default function DbClientTab({
     return () => {
       cancelled = true;
       void dbDisconnect(runtimeSessionId).catch(() => undefined);
+      setTabDbConn(tabId, null);
       Object.values(timersRef.current).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -834,6 +843,55 @@ export default function DbClientTab({
     [activePanelId, panels, patchPanel, runQuery],
   );
 
+  // Append a statement echoed from an AI/Claude Code SQL execution to a stable
+  // "echo target" panel — never runs it. The whole chat session's SQL
+  // accumulates in one editor (reusing the remembered panel, else the active
+  // panel, else a fresh one when the tab has none).
+  const appendEchoSqlFromOutside = useCallback((sql: string, note?: string) => {
+    const cleaned = sql.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    if (!cleaned) return;
+    // Each statement ends with exactly one semicolon; prepend the comment note.
+    const stmt = `${cleaned.replace(/;+\s*$/, "")};`;
+    const block = note ? `${note}\n${stmt}` : stmt;
+
+    const livePanels = panelsRef.current;
+    const remembered =
+      echoPanelIdRef.current && livePanels.some((p) => p.id === echoPanelIdRef.current)
+        ? echoPanelIdRef.current
+        : null;
+    const activeId = activePanelIdRef.current;
+    const targetId =
+      remembered ??
+      (livePanels.some((p) => p.id === activeId) ? activeId : livePanels[0]?.id ?? null);
+
+    if (!targetId) {
+      // Tab has no panel yet → open one seeded with the statement.
+      const panel = newPanel({ doc: block, dirty: true });
+      echoPanelIdRef.current = panel.id;
+      setPanels((prev) => {
+        const next = [...prev, panel].slice(-MAX_PANELS);
+        panelsRef.current = next;
+        return next;
+      });
+      setActivePanelId(panel.id);
+      return;
+    }
+
+    echoPanelIdRef.current = targetId;
+    const editor = editorHandles.current[targetId];
+    const current = editor?.getValue() ?? livePanels.find((p) => p.id === targetId)?.doc ?? "";
+    const joined = current.trim() ? `${current.replace(/\n+$/, "")}\n\n${block}` : block;
+    // `editor` is only live for the mounted (active) panel; for others the doc
+    // patch is enough — the editor picks it up when that panel mounts.
+    editor?.setValue(joined);
+    panelsRef.current = livePanels.map((p) =>
+      p.id === targetId ? { ...p, doc: joined, dirty: true } : p
+    );
+    patchPanel(targetId, { doc: joined, dirty: true });
+    setActivePanelId(targetId);
+    editor?.focus();
+  }, [patchPanel]);
+
   const queryRegistryTitle = useMemo(() => {
     const database = info.engine === "Presto"
       ? [info.catalog, info.database].filter(Boolean).join(".")
@@ -847,8 +905,9 @@ export default function DbClientTab({
       title: queryRegistryTitle,
       engine: info.engine,
       insertQuery: insertQueryFromOutside,
+      appendEchoSql: appendEchoSqlFromOutside,
     });
-  }, [info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
+  }, [appendEchoSqlFromOutside, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
 
   const captureDbFrame = useCallback(async () => {
     if (!rootRef.current) return null;

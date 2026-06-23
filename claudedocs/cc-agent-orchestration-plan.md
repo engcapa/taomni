@@ -20,6 +20,7 @@
 | **Phase 3** cwd + 模型 + 渲染保真 | ◑ 实现完成,待 GUI 验证 | 3.S 已验证 ✅;本轮在 `feat/cc-phase3-closure` 落地 3.3 cwd / 3.4 模型 / 3.5 结构化卡+用量 / 3.6 只读降噪 + 3 项稳定性(B1/B2/B3)。3.2 跳过、thinking 预算不做 |
 | **Phase 4** 编排者 B 最小版 | ☐ 待办 | `dispatch_subtask` |
 | **Phase 5** 调度中心 C | ☐ 待办(仅设计文档) | — |
+| **Phase 6** CC → DB 会话集成 | ◑ 实现中 | 独立 DB MCP(`taomni_sql`/`taomni_redis`),计划见 [`cc-db-sessions-plan.md`](cc-db-sessions-plan.md);分支 `feat/cc-db-sessions` |
 
 **本轮修复(`5305df2` + `1c78791`,使 HITL 真正可用):**
 - `permission_prompt` 读 CC 的 `input` 字段(原只认 `tool_input` → 退化成 `null`,卡片崩溃 + 回 CC `updatedInput:null`)。
