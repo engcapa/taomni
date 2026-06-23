@@ -129,8 +129,8 @@ pub async fn chat_set_thread_provider(
     Ok(())
 }
 
-/// Set or clear the per-thread Claude Code model override ("opus"|"sonnet"|
-/// "haiku"). Pass `None`/empty to inherit `cc_bridge.default_model`. The model
+/// Set or clear the per-thread Claude Code model override. Pass `None`/empty
+/// to inherit `cc_bridge.default_model`. The model
 /// is a spawn-time `--model` arg the live process can't adopt, so we recycle
 /// the thread's CC process — the next message respawns it with the new model.
 #[tauri::command]
@@ -578,6 +578,7 @@ pub async fn chat_stream(
                         &app,
                         &req.thread_id,
                         thread.linked_session_id.clone(),
+                        req.bound_session_id.clone(),
                         flavor,
                         ai_config.cc_bridge.confirm_readonly,
                     )

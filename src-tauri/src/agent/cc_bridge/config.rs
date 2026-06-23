@@ -2,6 +2,8 @@ use crate::vault::Vault;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+pub const DEFAULT_CLAUDE_CODE_MODEL: &str = "claude-sonnet-4-5";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CcCustomSettingsProfile {
     pub id: String,
@@ -28,10 +30,19 @@ pub struct CcBridgeConfig {
     /// provably read-only still confirms.
     #[serde(default)]
     pub confirm_readonly: bool,
+    /// When true, finished `run_captured` B-path runs are mirrored into the
+    /// bound terminal as display-only traces. Default true to preserve the
+    /// existing visible audit trail.
+    #[serde(default = "default_terminal_echo_enabled")]
+    pub terminal_echo_enabled: bool,
     #[serde(default)]
     pub custom_settings_profiles: Vec<CcCustomSettingsProfile>,
     #[serde(default)]
     pub active_profile_id: Option<String>,
+}
+
+fn default_terminal_echo_enabled() -> bool {
+    true
 }
 
 impl Default for CcBridgeConfig {
@@ -40,13 +51,28 @@ impl Default for CcBridgeConfig {
             enabled: false,
             binary: "auto".into(),
             min_version: super::MIN_VERSION.into(),
-            default_model: "sonnet".into(),
+            default_model: DEFAULT_CLAUDE_CODE_MODEL.into(),
             permission_mode: "default".into(),
             max_turns: 20,
             confirm_readonly: false,
+            terminal_echo_enabled: true,
             custom_settings_profiles: Vec::new(),
             active_profile_id: None,
         }
+    }
+}
+
+impl CcBridgeConfig {
+    pub fn normalize(&mut self) {
+        self.default_model = normalize_model_name(&self.default_model);
+    }
+}
+
+pub fn normalize_model_name(model: &str) -> String {
+    let trimmed = model.trim();
+    match trimmed {
+        "" | "sonnet" => DEFAULT_CLAUDE_CODE_MODEL.into(),
+        _ => trimmed.into(),
     }
 }
 
@@ -257,6 +283,16 @@ mod tests {
             .iter()
             .map(|v| v.as_str().unwrap().to_string())
             .collect()
+    }
+
+    #[test]
+    fn default_model_uses_full_sonnet_id() {
+        assert_eq!(
+            CcBridgeConfig::default().default_model,
+            DEFAULT_CLAUDE_CODE_MODEL
+        );
+        assert_eq!(normalize_model_name("sonnet"), DEFAULT_CLAUDE_CODE_MODEL);
+        assert_eq!(normalize_model_name(" claude-opus-4-1 "), "claude-opus-4-1");
     }
 
     #[test]

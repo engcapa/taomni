@@ -41,8 +41,9 @@ pub async fn get_ai_config() -> Result<AiConfig, String> {
 /// Save the AI configuration. Rebuilds the LlmRouter so changes take
 /// effect immediately without an app restart.
 #[tauri::command]
-pub async fn save_ai_config(config: AiConfig, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn save_ai_config(mut config: AiConfig, state: State<'_, AppState>) -> Result<(), String> {
     let path = default_ai_config_path();
+    config.normalize();
     config.save(&path).map_err(|e| e.to_string())?;
 
     let mut ai_ctx = state.ai_ctx.write().await;

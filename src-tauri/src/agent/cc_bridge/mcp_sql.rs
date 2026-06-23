@@ -821,4 +821,3 @@ mod tests {
         assert_eq!(v["error"], serde_json::Value::Null);
     }
 }
-

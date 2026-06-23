@@ -31,6 +31,15 @@ export interface TerminalRegistryEntry {
   getLastLines: (n: number) => string;
   /** Write text to the terminal's stdin (newlines flow as-is). */
   writeInput: (data: string) => void;
+  /**
+   * Write display-only text directly to the terminal screen (xterm `write`),
+   * WITHOUT sending it to the backend pty/ssh stdin. Used to mirror Claude
+   * Code's captured-run activity (`run_captured`, the independent-channel B
+   * path that is otherwise invisible) into the bound terminal as a read-only
+   * trace, so the user can see what the assistant ran. Accepts ANSI; lines must
+   * use `\r\n`. Optional — not every registrant provides it (e.g. test fakes).
+   */
+  writeEcho?: (data: string) => void;
 }
 
 interface TerminalRegistryShape {

@@ -271,4 +271,3 @@ mod tests {
         assert!(!redis_command_is_readonly(""));
     }
 }
-

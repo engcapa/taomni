@@ -79,6 +79,8 @@ import {
   resizeTerminal,
   sendTerminalSignal,
   closeTerminal,
+  ccTrackTerminal,
+  ccUntrackTerminal,
   listenTerminalExit,
   listenTerminalForwardError,
   encodeBase64,
@@ -2644,8 +2646,24 @@ export function TerminalPanel({
         if (readOnlyRef.current) return;
         writeTerminal(registeredSessionId, encodeBase64(data)).catch(console.error);
       },
+      // Display-only echo (xterm.write): mirror Claude Code's captured-run
+      // activity into this terminal as a read-only trace. Intentionally NOT
+      // gated by readOnlyRef — it never reaches stdin, it only paints the
+      // screen, so a read-only/locked session can still show what CC ran.
+      writeEcho: (data: string) => {
+        termRef.current?.write(data);
+      },
     });
-    return unregister;
+    // Mirror the tab → backend-session mapping to the backend so Claude Code's
+    // server-side tools (run_captured / read_capture) can resolve this live
+    // terminal by tab id — run_in_terminal reaches it via the frontend registry
+    // above, but those tools index state.terminals directly. Best-effort; a miss
+    // just degrades to the existing "no live terminal" behaviour.
+    void ccTrackTerminal(tabId, registeredSessionId).catch(() => {});
+    return () => {
+      unregister();
+      void ccUntrackTerminal(tabId, registeredSessionId).catch(() => {});
+    };
   }, [tabId, registeredSessionId, tabTitle]);
 
   // Publish this terminal's capture source while it's the active tab, so the

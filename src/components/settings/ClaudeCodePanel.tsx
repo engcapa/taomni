@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle, Copy, Loader2, Terminal, XCircle, AlertTriangle } from "lucide-react";
-import { useAiStore } from "../../stores/aiStore";
+import { DEFAULT_CLAUDE_CODE_MODEL, useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
 import { ClaudeCodeSettingsDialog } from "./ClaudeCodeSettingsDialog";
 import { Sliders, Shield } from "lucide-react";
@@ -46,11 +46,18 @@ export function ClaudeCodePanel() {
   const [status, setStatus] = useState<CcStatusResult | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
+  const [defaultModelDraft, setDefaultModelDraft] = useState(DEFAULT_CLAUDE_CODE_MODEL);
   const t = useT();
 
   useEffect(() => {
     if (!config) loadConfig();
   }, []);
+
+  useEffect(() => {
+    if (config) {
+      setDefaultModelDraft(config.cc_bridge.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL);
+    }
+  }, [config?.cc_bridge.default_model]);
 
   const handleDetect = async () => {
     setDetecting(true);
@@ -85,6 +92,19 @@ export function ClaudeCodePanel() {
 
   const hasProfiles = cc.custom_settings_profiles && cc.custom_settings_profiles.length > 0;
   const profileCount = cc.custom_settings_profiles?.length ?? 0;
+
+  const commitDefaultModel = () => {
+    const next = defaultModelDraft.trim() || DEFAULT_CLAUDE_CODE_MODEL;
+    setDefaultModelDraft(next);
+    if (next === cc.default_model) return;
+    void saveConfig({
+      ...config,
+      cc_bridge: { ...cc, default_model: next },
+    }).catch((e) => {
+      console.warn("save Claude Code default model failed:", e);
+      setDefaultModelDraft(cc.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL);
+    });
+  };
 
   const activeProfileName = (() => {
     if (cc.active_profile_id && cc.custom_settings_profiles) {
@@ -199,15 +219,23 @@ export function ClaudeCodePanel() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
-              <select
-                className="taomni-input h-7 w-full text-[12px]"
-                value={cc.default_model}
-                onChange={(e) => saveConfig({ ...config, cc_bridge: { ...cc, default_model: e.target.value } })}
-              >
-                <option value="sonnet">{t("aiSettings.ccModelSonnet")}</option>
-                <option value="opus">{t("aiSettings.ccModelOpus")}</option>
-                <option value="haiku">{t("aiSettings.ccModelHaiku")}</option>
-              </select>
+              <input
+                type="text"
+                className="taomni-input h-7 w-full text-[12px] font-mono"
+                value={defaultModelDraft}
+                placeholder={DEFAULT_CLAUDE_CODE_MODEL}
+                spellCheck={false}
+                onChange={(e) => setDefaultModelDraft(e.target.value)}
+                onBlur={commitDefaultModel}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  } else if (e.key === "Escape") {
+                    setDefaultModelDraft(cc.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL);
+                    e.currentTarget.blur();
+                  }
+                }}
+              />
             </div>
             <div>
               <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccMaxTurns")}</label>

@@ -46,17 +46,25 @@ impl Default for AiConfig {
 
 impl AiConfig {
     pub fn load(path: &PathBuf) -> Self {
-        std::fs::read_to_string(path)
+        let mut config: Self = std::fs::read_to_string(path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        config.normalize();
+        config
+    }
+
+    pub fn normalize(&mut self) {
+        self.cc_bridge.normalize();
     }
 
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(self)
+        let mut config = self.clone();
+        config.normalize();
+        let json = serde_json::to_string_pretty(&config)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         std::fs::write(path, json)
     }

@@ -13,7 +13,7 @@ pub struct ChatThread {
     /// Claude Code session ID for --resume (v2.6).
     #[serde(default)]
     pub cc_session_id: Option<String>,
-    /// Per-thread Claude Code model override ("opus" | "sonnet" | "haiku").
+    /// Per-thread Claude Code model override.
     /// `None` means "inherit AiConfig.cc_bridge.default_model". Baked into the
     /// child's `--model` at spawn, so changing it recycles the CC process.
     #[serde(default)]
