@@ -579,6 +579,11 @@ interface DbeaverUrlInfo {
   ssl?: boolean;
 }
 
+interface NavicatConnectionInput {
+  attrs: Record<string, string>;
+  folderPath: string | null;
+}
+
 export function parseDbeaverSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
   assertImportSize(text);
 
@@ -617,6 +622,40 @@ export function parseDbeaverSessions(text: string, options: SessionImportOptions
   return finalizeImportResult(sessions, skipped, warnings, options.existingSessions, secrets);
 }
 
+export async function parseNavicatSessions(text: string, options: SessionImportOptions = {}): Promise<SessionImportResult> {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const now = resolveNow(options.now);
+  const inputs = extractNavicatConnections(text, warnings);
+  const limited = limitRows(inputs, warnings);
+  const sessions: SessionConfig[] = [];
+  const secrets: SessionImportSecret[] = [];
+  let skipped = limited.skipped;
+
+  for (const input of limited.rows as NavicatConnectionInput[]) {
+    const imported = navicatConnectionToSession(input, options.targetFolder ?? null, now, warnings);
+    if (!imported) {
+      skipped += 1;
+      continue;
+    }
+    sessions.push(imported.session);
+
+    const password = await decryptNavicatPassword(input.attrs, imported.session.name, warnings);
+    if (password) {
+      secrets.push({
+        sessionId: imported.session.id,
+        kind: "password",
+        label: `${imported.session.name} (${imported.session.host}:${imported.session.port})`,
+        value: password,
+        attachment: "session",
+      });
+    }
+  }
+
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions, secrets);
+}
+
 function extractDbeaverConnections(text: string, warnings: string[]): DbeaverConnectionInput[] {
   try {
     const parsed = JSON.parse(text) as unknown;
@@ -629,6 +668,205 @@ function extractDbeaverConnections(text: string, warnings: string[]): DbeaverCon
     if (out.length > 0) return out;
     throw new Error("The selected DBeaver file is not valid data-sources JSON or XML.");
   }
+}
+
+function extractNavicatConnections(text: string, warnings: string[]): NavicatConnectionInput[] {
+  const domRows = extractNavicatConnectionsFromDom(text);
+  if (domRows.length > 0) return domRows;
+
+  const rows = parseXmlElementAttributes(text)
+    .filter(looksLikeNavicatConnection)
+    .map((attrs) => ({
+      attrs,
+      folderPath: normalizeGroupPath(firstXmlAttr(attrs, ["folder", "folderPath", "group", "groupName", "path"])),
+    }));
+  if (rows.length > 0) return rows;
+  warnings.push("No Navicat connections were found in the selected .ncx file.");
+  return [];
+}
+
+function extractNavicatConnectionsFromDom(text: string): NavicatConnectionInput[] {
+  if (typeof DOMParser === "undefined") return [];
+
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(text, "application/xml");
+  } catch {
+    return [];
+  }
+  if (doc.querySelector("parsererror")) return [];
+
+  const rows: NavicatConnectionInput[] = [];
+  const walk = (element: Element, folders: string[]) => {
+    const attrs = navicatAttrsFromElement(element);
+    const tag = element.tagName.toLowerCase();
+    const folderName = navicatFolderName(tag, attrs);
+    const nextFolders = folderName ? [...folders, folderName] : folders;
+
+    if (looksLikeNavicatConnection(attrs)) {
+      rows.push({
+        attrs,
+        folderPath: normalizeGroupPath(firstXmlAttr(attrs, ["folder", "folderPath", "group", "groupName", "path"]))
+          ?? normalizeGroupPath(folders.join(" / ")),
+      });
+    }
+
+    for (const child of Array.from(element.children)) {
+      walk(child, nextFolders);
+    }
+  };
+
+  for (const child of Array.from(doc.children)) {
+    walk(child, []);
+  }
+  return rows;
+}
+
+function navicatAttrsFromElement(element: Element): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  for (const attr of Array.from(element.attributes)) {
+    attrs[attr.name.toLowerCase()] = attr.value;
+  }
+
+  for (const child of Array.from(element.children)) {
+    if (child.children.length > 0) continue;
+    const value = child.textContent?.trim() ?? "";
+    if (value) attrs[child.tagName.toLowerCase()] = value;
+  }
+  return attrs;
+}
+
+function navicatFolderName(tag: string, attrs: Record<string, string>): string | null {
+  if (!/(folder|group|category)/i.test(tag) || looksLikeNavicatConnection(attrs)) return null;
+  return optionalCleanText(firstXmlAttr(attrs, ["name", "label", "caption", "folderName", "groupName"]), MAX_NAME_LENGTH);
+}
+
+function looksLikeNavicatConnection(attrs: Record<string, string>): boolean {
+  return Boolean(
+    firstXmlAttr(attrs, ["connType", "connectionType", "type", "driver", "dbType", "dbms"]) &&
+      firstXmlAttr(attrs, ["host", "hostname", "server", "serverHost", "address", "ipAddress"]),
+  );
+}
+
+function navicatConnectionToSession(
+  input: NavicatConnectionInput,
+  targetFolder: string | null,
+  now: number,
+  warnings: string[],
+): { session: SessionConfig } | null {
+  const attrs = input.attrs;
+  const label = cleanText(firstXmlAttr(attrs, ["connectionName", "name", "title", "caption"]), MAX_NAME_LENGTH) || "Navicat connection";
+  const sessionType = navicatSessionType(firstXmlAttr(attrs, ["connType", "connectionType", "type", "driver", "dbType", "dbms"]));
+  if (!sessionType) {
+    warnings.push(`Skipped Navicat connection "${label}" because its database type is not supported by Taomni.`);
+    return null;
+  }
+
+  const host = cleanText(firstXmlAttr(attrs, ["host", "hostname", "server", "serverHost", "address", "ipAddress"]), MAX_HOST_LENGTH);
+  if (!host) {
+    warnings.push(`Skipped Navicat connection "${label}" because host is empty.`);
+    return null;
+  }
+
+  const database = cleanText(firstXmlAttr(attrs, ["database", "databaseName", "dbName", "initialDatabase", "schema"]), MAX_NAME_LENGTH);
+  const catalog = cleanText(firstXmlAttr(attrs, ["catalog", "catalogName"]), MAX_NAME_LENGTH);
+  const redisDbIndex = cleanText(firstXmlAttr(attrs, ["db", "dbIndex", "database"]), 16);
+  const ssl = navicatTruthy(firstXmlAttr(attrs, ["ssl", "useSsl", "useSSL", "encrypt", "useEncryption", "sslMode"]));
+  const importedFolder = combineImportFolder("Navicat", normalizeGroupPath(input.folderPath));
+
+  const session = importedSession({
+    name: label,
+    sessionType,
+    host,
+    port: firstKnown(firstXmlAttr(attrs, ["port", "serverPort"]), DEFAULT_PORTS[sessionType] ?? 0),
+    username: optionalCleanText(firstXmlAttr(attrs, ["userName", "username", "user", "userId", "userid"]), MAX_NAME_LENGTH),
+    groupPath: combineImportFolder(targetFolder, importedFolder),
+    authMethod: "Password",
+    options: {
+      description: "Imported from Navicat .ncx",
+      dbDatabase: sessionType === "Redis" ? "" : database,
+      dbCatalog: sessionType === "Presto" ? catalog : "",
+      dbSsl: ssl,
+      dbTimeout: "15",
+      dbHttpPort: sessionType === "ClickHouse" ? String(sanitizePort(firstXmlAttr(attrs, ["httpPort", "http_port"]), 8123)) : "",
+      dbChProtocol: sessionType === "ClickHouse" ? "HTTP" : "",
+      dbRedisIndex: sessionType === "Redis" ? redisDbIndex || database || "0" : "",
+    },
+    now,
+    warnings,
+  });
+  return session ? { session } : null;
+}
+
+function navicatSessionType(value: string): string | null {
+  const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
+  if (/\b(postgresql|postgres|pgsql)\b/.test(key)) return "PostgreSQL";
+  if (/\b(sqlserver|sql server|mssql|azure sql)\b/.test(key)) return "SQLServer";
+  if (/\b(clickhouse|click house)\b/.test(key)) return "ClickHouse";
+  if (/\b(presto|trino)\b/.test(key)) return "Presto";
+  if (/\b(redis|valkey)\b/.test(key)) return "Redis";
+  return null;
+}
+
+async function decryptNavicatPassword(
+  attrs: Record<string, string>,
+  label: string,
+  warnings: string[],
+): Promise<string | null> {
+  const encrypted = firstXmlAttr(attrs, ["password", "pwd", "encryptedPassword"]);
+  if (!encrypted) {
+    if (firstXmlAttr(attrs, ["pwd_2", "password_2", "password2"])) {
+      warnings.push(`Navicat connection "${label}" uses the newer Pwd_2 credential format; local config password recovery is planned for phase 2.`);
+    }
+    return null;
+  }
+
+  try {
+    return await decryptNavicatNcxPassword(encrypted);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    warnings.push(`Could not decrypt saved password for Navicat connection "${label}": ${reason}`);
+    return null;
+  }
+}
+
+const NAVICAT_NCX_KEY = bytesToArrayBuffer(new TextEncoder().encode("libcckeylibcckey"));
+const NAVICAT_NCX_IV = bytesToArrayBuffer(new TextEncoder().encode("libcciv libcciv "));
+
+async function decryptNavicatNcxPassword(value: string): Promise<string> {
+  const ciphertext = hexToBytes(value);
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error("WebCrypto AES-CBC support is unavailable");
+  }
+  const key = await subtle.importKey("raw", NAVICAT_NCX_KEY, "AES-CBC", false, ["decrypt"]);
+  const plaintext = await subtle.decrypt({ name: "AES-CBC", iv: NAVICAT_NCX_IV }, key, bytesToArrayBuffer(ciphertext));
+  return new TextDecoder().decode(plaintext).replace(/\u0000+$/g, "");
+}
+
+function hexToBytes(value: string): Uint8Array {
+  const hex = value.trim();
+  if (!hex || hex.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(hex)) {
+    throw new Error("unsupported Navicat password ciphertext");
+  }
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const out = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(out).set(bytes);
+  return out;
+}
+
+function navicatTruthy(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  return /^(true|yes|1|required|verify-ca|verify-full|enabled|enable|on)$/i.test(firstString(value).trim());
 }
 
 function extractDbeaverJsonConnections(parsed: unknown): DbeaverConnectionInput[] {

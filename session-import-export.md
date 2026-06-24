@@ -35,6 +35,7 @@
 |------|----------|------|---------|
 | **Taomni JSON** (`.taomni-sessions.json`) | `parseTaomniSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import Taomni sessions" |
 | **MobaXterm** (`.mxtsessions` / `.moba`) | `parseMobaXtermSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import MobaXterm sessions" |
+| **Navicat** (`.ncx`) | `parseNavicatSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import sessions from third-party programs" → "Import Navicat connections" |
 | **CSV** (`.csv`) | `parseCsvSessions()` | `sessionImportExport.ts` | SessionTree 右键菜单 → "Import sessions from a CSV file" |
 | **OpenSSH config** | `parseOpenSshConfig()` | `quickConnect.ts` | WelcomePanel → "Import OpenSSH config" 卡片 |
 
@@ -146,6 +147,12 @@
 - 本机配置路径扫描已在后端完成，返回文本后由前端解析器转换
 
 **决策**：保持现有前端解析架构（Taomni JSON / MobaXterm / CSV / OpenSSH / 第三方导出文件），仅在需要系统 API 或跨目录读取时通过 Rust 后端命令提供扫描能力。
+
+### 3.5.1 ✅ Navicat 数据库连接导入（第一阶段已完成，第二阶段待办）
+
+**第一阶段**：支持导入 Navicat 导出的 `.ncx` 连接文件，解析 MySQL/PostgreSQL/SQL Server/ClickHouse/Presto/Redis 连接，保留组层级、用户名、数据库名、SSL 等字段；`.ncx` 内保存的密码按 Navicat 12+ AES-CBC 格式解密后进入 Taomni credential vault，Session 只保存 `passwordRef`。
+
+**第二阶段待办**：自动扫描 Navicat 本地配置（Windows Registry、macOS `conn.plist`、Linux `connections.json`），并研究/实现新版本地 `Pwd_2` + `navicat_cred` 恢复路径；当无法读取系统凭据时，再提示用户输入/粘贴保护密钥。
 
 ### 3.6 ✅ IPC 类型包装（P3）
 
