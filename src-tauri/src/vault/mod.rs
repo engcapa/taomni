@@ -234,6 +234,56 @@ impl Vault {
         Ok(())
     }
 
+    pub fn put_fixed(
+        &self,
+        id: &str,
+        kind: &str,
+        label: &str,
+        plaintext: &str,
+    ) -> Result<(), String> {
+        let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let key = inner
+            .root_key
+            .as_ref()
+            .ok_or_else(|| ERR_VAULT_LOCKED.to_string())?;
+
+        let nonce = crypto::random_nonce();
+        let ciphertext =
+            crypto::aead_encrypt(key, &nonce, plaintext.as_bytes()).map_err(|e| e.to_string())?;
+        db::upsert_entry(
+            &inner.conn,
+            id,
+            label,
+            kind,
+            &ciphertext,
+            &nonce,
+            Self::now(),
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    pub fn get_fixed(&self, id: &str) -> Result<Option<Zeroizing<String>>, String> {
+        let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let key = inner
+            .root_key
+            .as_ref()
+            .ok_or_else(|| ERR_VAULT_LOCKED.to_string())?;
+        let Some(entry) = db::get_entry(&inner.conn, id).map_err(|e| e.to_string())? else {
+            return Ok(None);
+        };
+        let nonce: [u8; crypto::NONCE_LEN] = entry
+            .nonce
+            .as_slice()
+            .try_into()
+            .map_err(|_| "stored nonce shape".to_string())?;
+        let plaintext_bytes =
+            crypto::aead_decrypt(key, &nonce, &entry.ciphertext).map_err(|e| e.to_string())?;
+        let plaintext_str = std::str::from_utf8(plaintext_bytes.as_slice())
+            .map_err(|_| "stored plaintext is not utf-8".to_string())?
+            .to_string();
+        Ok(Some(Zeroizing::new(plaintext_str)))
+    }
+
     pub fn delete(&self, id: &str) -> Result<(), String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         let removed = db::delete_entry(&inner.conn, id).map_err(|e| e.to_string())?;

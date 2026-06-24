@@ -41,8 +41,15 @@ export function LanChatGate() {
 /** Rendered only after the vault is unlocked. Handles the enable prompt. */
 function ServiceGate() {
   const serviceRunning = useLanChatStore((s) => s.serviceRunning);
+  const startOnLaunch = useLanChatStore((s) => s.startOnLaunch);
   const enableService = useLanChatStore((s) => s.enableService);
   const [asked, setAsked] = useState(false);
+
+  useEffect(() => {
+    if (serviceRunning || !startOnLaunch || asked) return;
+    setAsked(true);
+    void enableService();
+  }, [asked, enableService, serviceRunning, startOnLaunch]);
 
   // Service already running (e.g. start-on-launch) → full panel, no prompt.
   if (serviceRunning) return <LanChatPanel />;

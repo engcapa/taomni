@@ -517,9 +517,10 @@ async fn setup_connection(
     // Upgrade the raw TCP stream to mutual TLS before any application data: the
     // dialer takes the client role, the acceptor the server role. Both present
     // and require the self-signed identity certificate.
+    let crypto = state.crypto().await?;
     let tls: TlsStream<TcpStream> = match &expected {
         Some(_) => {
-            let connector = TlsConnector::from(state.tls_client.clone());
+            let connector = TlsConnector::from(crypto.tls_client.clone());
             let sni = rustls::pki_types::ServerName::try_from(tls::SNI)
                 .map_err(|e| format!("bad sni: {e}"))?;
             let s = timeout(HANDSHAKE_TIMEOUT, connector.connect(sni, stream))
@@ -529,7 +530,7 @@ async fn setup_connection(
             TlsStream::from(s)
         }
         None => {
-            let acceptor = TlsAcceptor::from(state.tls_server.clone());
+            let acceptor = TlsAcceptor::from(crypto.tls_server.clone());
             let s = timeout(HANDSHAKE_TIMEOUT, acceptor.accept(stream))
                 .await
                 .map_err(|_| "tls accept timed out".to_string())?

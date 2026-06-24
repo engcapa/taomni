@@ -181,6 +181,30 @@ pub fn insert_entry(
     Ok(())
 }
 
+pub fn upsert_entry(
+    conn: &Connection,
+    id: &str,
+    label: &str,
+    kind: &str,
+    ciphertext: &[u8],
+    nonce: &[u8],
+    now: i64,
+) -> SqlResult<()> {
+    conn.execute(
+        "INSERT INTO vault_entries
+            (id, label, kind, ciphertext, nonce, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+         ON CONFLICT(id) DO UPDATE SET
+            label = excluded.label,
+            kind = excluded.kind,
+            ciphertext = excluded.ciphertext,
+            nonce = excluded.nonce,
+            updated_at = excluded.updated_at",
+        params![id, label, kind, ciphertext, nonce, now],
+    )?;
+    Ok(())
+}
+
 pub fn update_entry(
     conn: &Connection,
     id: &str,

@@ -8,21 +8,16 @@
 //! unforgeable: a peer cannot claim an id it does not own. This replaces the
 //! legacy random-UUID node id.
 //!
-//! The private key (PKCS#8 DER) lives in the OS keychain via [`super::keystore`];
-//! the certificate (public) is cached in the `profile` row. On first launch — or
-//! when migrating from a legacy UUID identity — a fresh key pair + certificate are
-//! generated, and the old identity's local references are migrated.
+//! The private key (PKCS#8 DER) lives in Taomni's master-password vault; the
+//! certificate (public) is cached in the `profile` row. On first launch a fresh
+//! key pair + certificate are generated.
 
 use rcgen::{CertificateParams, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
-use super::keystore::KeyStore;
 use super::store::LanChatStore;
-
-/// keychain label for the identity private key (PKCS#8 DER).
-const KEY_LABEL: &str = "identity-key-v1";
 
 /// Node id = lowercase hex of SHA-256 over the certificate DER.
 pub fn fingerprint(cert_der: &[u8]) -> String {
@@ -96,25 +91,28 @@ fn build_cert(key_pair: &KeyPair) -> Result<Vec<u8>, String> {
 /// existed, the local data that referenced the old id is migrated (own messages'
 /// `sender_id` rewritten, stale peer cache cleared — peer ids changed network-wide
 /// under the hard cutover).
-pub fn ensure(store: &LanChatStore, keystore: &KeyStore) -> Result<Identity, String> {
+pub fn ensure(
+    store: &LanChatStore,
+    stored_key: Option<Zeroizing<Vec<u8>>>,
+) -> Result<(Identity, bool), String> {
     let existing = store
         .get_profile_id_and_cert()
         .map_err(|e| format!("read identity row: {e}"))?;
-    let stored_key = keystore.get(KEY_LABEL);
 
     if let (Some((id, Some(cert_der))), Some(key_der)) = (&existing, &stored_key) {
         if fingerprint(cert_der) == *id {
-            return Identity::from_stored(key_der.clone(), cert_der.clone());
+            match Identity::from_stored(key_der.clone(), cert_der.clone()) {
+                Ok(identity) => return Ok((identity, false)),
+                Err(e) => log::warn!(
+                    "lanchat identity: stored private key is invalid ({e}); regenerating"
+                ),
+            }
         }
         log::warn!("lanchat identity: cached cert no longer matches node id; regenerating");
     }
 
-    // Fresh identity (first launch or legacy/inconsistent state).
+    // Fresh identity (first launch or inconsistent preview data).
     let identity = Identity::generate()?;
-    keystore
-        .put(KEY_LABEL, identity.key_der.as_slice())
-        .map_err(|e| format!("persist identity key: {e}"))?;
-
     let old_id = existing.as_ref().map(|(id, _)| id.clone());
     if let Some(old) = &old_id {
         if old != &identity.node_id {
@@ -127,7 +125,7 @@ pub fn ensure(store: &LanChatStore, keystore: &KeyStore) -> Result<Identity, Str
         .set_identity(&identity.node_id, &identity.cert_der, old_id.as_deref())
         .map_err(|e| format!("persist identity row: {e}"))?;
 
-    Ok(identity)
+    Ok((identity, true))
 }
 
 #[cfg(test)]

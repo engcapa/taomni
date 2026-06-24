@@ -213,6 +213,7 @@ function isTerminalTransfer(t: LanTransferProgress): boolean {
 }
 
 let unsubscribers: Array<() => void> = [];
+let initPromise: Promise<void> | null = null;
 
 export const useLanChatStore = create<LanChatStore>((set, get) => ({
   isDesktop: isTauriRuntime(),
@@ -237,48 +238,59 @@ export const useLanChatStore = create<LanChatStore>((set, get) => ({
 
   init: async () => {
     if (get().initialized) return;
-    set({ initialized: true });
-    try {
-      const [profile, conversations, groups, peers] = await Promise.all([
-        lanchatGetProfile(),
-        lanchatListConversations(),
-        lanchatListGroups(),
-        lanchatListPeers(),
-      ]);
-      set({ profile, conversations, groups, roster: peers });
-      // Retention policy is best-effort; ignore if unavailable.
+    if (initPromise) return initPromise;
+
+    initPromise = (async () => {
       try {
-        set({ retention: await lanchatGetRetention() });
+        const [profile, conversations, groups, peers] = await Promise.all([
+          lanchatGetProfile(),
+          lanchatListConversations(),
+          lanchatListGroups(),
+          lanchatListPeers(),
+        ]);
+        set({ initialized: true, profile, conversations, groups, roster: peers });
+        // Retention policy is best-effort; ignore if unavailable.
+        try {
+          set({ retention: await lanchatGetRetention() });
+        } catch (e) {
+          console.debug("lanchat retention:", e);
+        }
+        // Service enablement state (running + start-on-launch). Best-effort.
+        try {
+          const svc = await lanchatGetServiceState();
+          set({ serviceRunning: svc.running, startOnLaunch: svc.startOnLaunch });
+        } catch (e) {
+          console.debug("lanchat service state:", e);
+        }
       } catch (e) {
-        console.debug("lanchat retention:", e);
+        // Browser preview / backend not ready / vault locked: leave retryable.
+        console.debug("lanchat init:", e);
       }
-      // Service enablement state (running + start-on-launch). Best-effort.
+
+      // Subscribe to backend events (each window has its own store + listeners).
+      if (unsubscribers.length > 0) return;
       try {
-        const svc = await lanchatGetServiceState();
-        set({ serviceRunning: svc.running, startOnLaunch: svc.startOnLaunch });
+        unsubscribers.push(await listenLanChatRoster((peers) => get().applyRoster(peers)));
+        unsubscribers.push(await listenLanChatMessage((msg) => get().applyMessage(msg)));
+        unsubscribers.push(
+          await listenLanChatConversation((conv) => get().applyConversation(conv)),
+        );
+        unsubscribers.push(await listenLanChatGroup((group) => get().applyGroup(group)));
+        unsubscribers.push(await listenLanChatTransfer((p) => get().applyTransfer(p)));
+        unsubscribers.push(await listenLanChatFileOffer((o) => get().applyOffer(o)));
+        unsubscribers.push(await listenLanChatSecurity((e) => get().applySecurityEvent(e)));
+        unsubscribers.push(
+          await listenLanChatService((running) => set({ serviceRunning: running })),
+        );
       } catch (e) {
-        console.debug("lanchat service state:", e);
+        console.debug("lanchat listen:", e);
       }
-    } catch (e) {
-      // Browser preview / backend not ready: leave defaults, stub fills mocks.
-      console.debug("lanchat init:", e);
-    }
-    // Subscribe to backend events (each window has its own store + listeners).
+    })();
+
     try {
-      unsubscribers.push(await listenLanChatRoster((peers) => get().applyRoster(peers)));
-      unsubscribers.push(await listenLanChatMessage((msg) => get().applyMessage(msg)));
-      unsubscribers.push(
-        await listenLanChatConversation((conv) => get().applyConversation(conv)),
-      );
-      unsubscribers.push(await listenLanChatGroup((group) => get().applyGroup(group)));
-      unsubscribers.push(await listenLanChatTransfer((p) => get().applyTransfer(p)));
-      unsubscribers.push(await listenLanChatFileOffer((o) => get().applyOffer(o)));
-      unsubscribers.push(await listenLanChatSecurity((e) => get().applySecurityEvent(e)));
-      unsubscribers.push(
-        await listenLanChatService((running) => set({ serviceRunning: running })),
-      );
-    } catch (e) {
-      console.debug("lanchat listen:", e);
+      await initPromise;
+    } finally {
+      initPromise = null;
     }
   },
 
