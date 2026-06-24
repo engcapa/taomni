@@ -9529,6 +9529,8 @@ dependencies = [
  "audiopus",
  "axum",
  "base64 0.22.1",
+ "bcrypt-pbkdf",
+ "blowfish",
  "byteorder",
  "bytes",
  "cbc 0.2.1",

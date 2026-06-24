@@ -92,11 +92,18 @@ export interface ExternalVaultPrompt {
   description: string;
 }
 
+export interface SecureCrtEncryptedPassword {
+  sessionId: string;
+  label: string;
+  encrypted: string;
+}
+
 export interface SessionImportResult {
   sessions: SessionConfig[];
   warnings: string[];
   skipped: number;
   secrets: SessionImportSecret[];
+  secureCrtPasswords?: SecureCrtEncryptedPassword[];
   /**
    * Set when the imported config carries an encrypted secret blob the user
    * must unlock with the source tool's master password. The orchestrator
@@ -110,7 +117,7 @@ export interface SessionImportResult {
    * tool's naming convention. Independent of `externalVault` because some
    * Tabby installs use only the keychain, with no encrypted vault block.
    */
-  externalSecretsTool?: "tabby";
+  externalSecretsTool?: "tabby" | "securecrt";
 }
 
 export interface SessionExportResult {
@@ -290,6 +297,7 @@ export function createSessionImportResult(
     warnings?: readonly string[];
     skipped?: number;
     secrets?: readonly SessionImportSecret[];
+    secureCrtPasswords?: readonly SecureCrtEncryptedPassword[];
     externalVault?: ExternalVaultPrompt;
     externalSecretsTool?: SessionImportResult["externalSecretsTool"];
   } = {},
@@ -300,6 +308,7 @@ export function createSessionImportResult(
     [...(options.warnings ?? [])],
     options.existingSessions,
     options.secrets ?? [],
+    options.secureCrtPasswords ?? [],
     options.externalVault,
     options.externalSecretsTool,
   );
@@ -545,6 +554,7 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
     warnings,
     options.existingSessions,
     secrets,
+    [],
     externalVault,
     "tabby",
   );
@@ -1213,7 +1223,8 @@ export function parseSecureCrtSessions(text: string, options: SessionImportOptio
   const warnings: string[] = [];
   const values = parseSecureCrtIni(text);
   const host = cleanText(firstNonEmptyString(values.hostname, values.host), MAX_HOST_LENGTH);
-  const keyPath = cleanText(firstNonEmptyString(values["identity filename"], values.identityfile), MAX_PATH_LENGTH);
+  const keyPath = cleanText(firstNonEmptyString(values["identity filename v2"], values["identity filename"], values.identityfile), MAX_PATH_LENGTH);
+  const encryptedPassword = cleanText(firstNonEmptyString(values["password v2"], values.password), MAX_OPTION_LENGTH);
   const folder = folderFromSourcePath(options.sourcePath);
   const session = host
     ? importedSession({
@@ -1228,12 +1239,27 @@ export function parseSecureCrtSessions(text: string, options: SessionImportOptio
       warnings,
     })
     : null;
+  const secureCrtPasswords: SecureCrtEncryptedPassword[] = [];
+  if (session && encryptedPassword) {
+    secureCrtPasswords.push({
+      sessionId: session.id,
+      label: `${session.username ?? "user"}@${session.host}:${session.port}`,
+      encrypted: encryptedPassword,
+    });
+    warnings.push(
+      "SecureCRT saved password detected. Taomni will try the default empty SecureCRT passphrase first and prompt for the SecureCRT configuration passphrase if needed.",
+    );
+  }
 
   return finalizeImportResult(
     session ? [session] : [],
     session ? 0 : 1,
     session ? warnings : [...warnings, "Skipped a SecureCRT session because host is empty."],
     options.existingSessions,
+    [],
+    secureCrtPasswords,
+    undefined,
+    secureCrtPasswords.length > 0 ? "securecrt" : undefined,
   );
 }
 
@@ -2177,11 +2203,14 @@ function firstXmlAttr(attrs: Record<string, string>, keys: string[]): string {
 function parseSecureCrtIni(text: string): Record<string, unknown> {
   const values: Record<string, unknown> = {};
   for (const rawLine of text.split(/\r?\n/)) {
-    const match = /^[A-Z]:"([^"]+)"=(.*)$/.exec(rawLine.trim());
+    const match = /^([A-Z]):"([^"]+)"=(.*)$/i.exec(rawLine.trim());
     if (!match) continue;
-    const key = match[1].trim().toLowerCase();
-    const value = match[2].trim();
-    values[key] = /^[0-9a-f]{8}$/i.test(value) ? Number.parseInt(value, 16) : value;
+    const valueType = match[1].toUpperCase();
+    const key = match[2].trim().toLowerCase();
+    const value = match[3].trim();
+    values[key] = valueType === "D" && /^[0-9a-f]{8}$/i.test(value)
+      ? Number.parseInt(value, 16)
+      : value;
   }
   return values;
 }
@@ -3143,6 +3172,7 @@ function finalizeImportResult(
   warnings: string[],
   existingSessions: readonly SessionConfig[] | undefined,
   secrets: readonly SessionImportSecret[] = [],
+  secureCrtPasswords: readonly SecureCrtEncryptedPassword[] = [],
   externalVault?: ExternalVaultPrompt,
   externalSecretsTool?: SessionImportResult["externalSecretsTool"],
 ): SessionImportResult {
@@ -3151,6 +3181,7 @@ function finalizeImportResult(
     warnings: uniqueWarnings(warnings),
     skipped,
     secrets: [...secrets],
+    secureCrtPasswords: [...secureCrtPasswords],
     externalVault,
     externalSecretsTool,
   };

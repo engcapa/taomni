@@ -799,6 +799,38 @@ export async function tabbyDecryptVault(
   });
 }
 
+export interface SecureCrtPasswordRequest {
+  sessionId: string;
+  encrypted: string;
+}
+
+export interface SecureCrtPasswordHit {
+  sessionId: string;
+  value: string;
+}
+
+export interface SecureCrtPasswordFailure {
+  sessionId: string;
+  error: string;
+  needsPassphrase: boolean;
+}
+
+export interface SecureCrtDecryptResponse {
+  secrets: SecureCrtPasswordHit[];
+  failures: SecureCrtPasswordFailure[];
+}
+
+export const SECURECRT_PASSWORD_BAD_PASSPHRASE = "securecrt_password_bad_passphrase";
+
+export async function secureCrtDecryptPasswords(
+  passwords: SecureCrtPasswordRequest[],
+  passphrase: string,
+): Promise<SecureCrtDecryptResponse> {
+  return invoke<SecureCrtDecryptResponse>("securecrt_decrypt_passwords", {
+    args: { passwords, passphrase },
+  });
+}
+
 // --- Database client (MySQL / PostgreSQL / SQL Server / ClickHouse / Presto / Redis) ---
 
 /** Strip the frontend-only `sessionId` to build the Rust `DbConfig` payload. */

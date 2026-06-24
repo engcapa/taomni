@@ -18,4 +18,5 @@
 
 pub mod crypto;
 pub mod keychain;
+pub mod securecrt;
 pub mod tabby;
