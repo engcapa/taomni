@@ -1347,6 +1347,8 @@ export const zhCN: DeepPartial<typeof en> = {
     threadModelAria: "本对话的 Claude Code 模型",
     threadModelTitle: "本对话使用的模型（切换会重启 Claude Code 会话）",
     ccTerminalEcho: "回显到终端",
+    ccTerminalEchoOn: "终端回显：开",
+    ccTerminalEchoOff: "终端回显：关",
     ccTerminalEchoTitle: "将 Claude Code 捕获执行摘要回显到绑定终端",
     ccTerminalEchoAria: "将 Claude Code 捕获执行回显到终端",
     modelDefault: "默认",

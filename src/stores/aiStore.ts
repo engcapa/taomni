@@ -89,6 +89,29 @@ export interface TestConnectionResult {
   latency_ms: number;
 }
 
+export function isClaudeCodeAvailableForChat(config: AiConfig | null | undefined): boolean {
+  return (
+    config?.cc_bridge.enabled === true &&
+    config.full_local_mode !== true &&
+    config.fully_disabled !== true
+  );
+}
+
+export function defaultChatProviderId(config: AiConfig | null | undefined): string | undefined {
+  return isClaudeCodeAvailableForChat(config) ? "claude-code" : undefined;
+}
+
+export function chatDrawerProviderIds(config: AiConfig | null | undefined): string[] {
+  const ids = Object.keys(config?.llm.providers ?? {}).filter((id) => id !== "claude-code");
+  const active = config?.llm.active;
+  const orderedLlmIds = active && ids.includes(active)
+    ? [active, ...ids.filter((id) => id !== active)]
+    : ids;
+  return isClaudeCodeAvailableForChat(config)
+    ? ["claude-code", ...orderedLlmIds]
+    : orderedLlmIds;
+}
+
 interface AiStore {
   config: AiConfig | null;
   loading: boolean;
