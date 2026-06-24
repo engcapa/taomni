@@ -6,6 +6,7 @@ import {
   parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
+  parseNavicatSessions,
   parseTaomniSessions,
   parseSecureCrtSessions,
   parseTabbySessions,
@@ -561,6 +562,67 @@ describe("DBeaver session import", () => {
       },
     ]);
     expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("Navicat session import", () => {
+  it("imports Navicat .ncx database connections and decrypts saved passwords", async () => {
+    const text = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      "<Connections>",
+      '  <Group Name="Production">',
+      '    <Connection ConnectionName="Prod MySQL" ConnType="MYSQL" Host="mysql.example.com" Port="3307" UserName="app" Database="appdb" Ssl="true" Password="4B1C473F8F0856717EF48AA51DA9855B" />',
+      "  </Group>",
+      '  <Connection ConnectionName="Cache" ConnType="REDIS" Host="redis.example.com" Port="6380" UserName="default" Database="2" />',
+      '  <Connection ConnectionName="Skipped Oracle" ConnType="ORACLE" Host="oracle.example.com" Port="1521" />',
+      "</Connections>",
+    ].join("\n");
+
+    const result = await parseNavicatSessions(text, { targetFolder: "Imported", now: 6060 });
+
+    expect(result.sessions.map((s) => s.session_type)).toEqual(["MySQL", "Redis"]);
+    expect(result.skipped).toBe(1);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Prod MySQL",
+      group_path: "User sessions / Imported / Navicat / Production",
+      host: "mysql.example.com",
+      port: 3307,
+      username: "app",
+      auth_method: "Password",
+      created_at: 6060,
+      updated_at: 6060,
+    });
+    expect(JSON.parse(result.sessions[0].options_json)).toMatchObject({
+      description: "Imported from Navicat .ncx",
+      dbDatabase: "appdb",
+      dbSsl: true,
+      dbTimeout: "15",
+    });
+    expect(JSON.parse(result.sessions[1].options_json)).toMatchObject({
+      dbRedisIndex: "2",
+    });
+    expect(result.secrets).toEqual([
+      {
+        sessionId: result.sessions[0].id,
+        kind: "password",
+        label: "Prod MySQL (mysql.example.com:3307)",
+        value: "secret123",
+        attachment: "session",
+      },
+    ]);
+    expect(result.warnings).toContain('Skipped Navicat connection "Skipped Oracle" because its database type is not supported by Taomni.');
+  });
+
+  it("keeps Navicat Pwd_2 local credential recovery as a phase 2 warning", async () => {
+    const text = '<Connections><Connection ConnectionName="Local MySQL" ConnType="MYSQL" Host="local.example.com" UserName="app" Pwd_2="encrypted-local-credential" /></Connections>';
+
+    const result = await parseNavicatSessions(text, { now: 6061 });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.secrets).toEqual([]);
+    expect(result.warnings).toEqual([
+      'Navicat connection "Local MySQL" uses the newer Pwd_2 credential format; local config password recovery is planned for phase 2.',
+    ]);
   });
 });
 

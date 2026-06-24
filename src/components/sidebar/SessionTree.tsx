@@ -57,6 +57,7 @@ import {
   parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
+  parseNavicatSessions,
   parseTaomniSessions,
   parseSecureCrtSessions,
   parseTabbySessions,
@@ -97,6 +98,7 @@ import { useT } from "../../lib/i18n";
 import { ensureVaultReady } from "../../lib/vaultGate";
 
 const SESSION_DRAG_MIME = "taomni/session";
+const DB_PASSWORD_SESSION_TYPES = new Set(["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis", "HBaseShell"]);
 
 interface SessionDragPayload {
   sessionId: string;
@@ -782,7 +784,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       const session = sessionsById.get(secret.sessionId);
       if (!session) continue;
       try {
-        const saved = await vaultPut("ssh-password", secret.label, secret.value);
+        const kind = secret.kind === "key-passphrase"
+          ? "ssh-key-passphrase"
+          : DB_PASSWORD_SESSION_TYPES.has(session.session_type) ? "db-password" : "ssh-password";
+        const saved = await vaultPut(kind, secret.label, secret.value);
         const parsedOptions = parseSessionOptions(session.options_json);
         session.options_json = JSON.stringify({
           ...parsedOptions,
@@ -950,6 +955,20 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   const dbeaverCredentialOptions = async (path: string): Promise<Partial<SessionImportOptions>> => {
     const credentials = await readDbeaverCredentialsForDataSources(path);
     return Object.keys(credentials).length > 0 ? { dbeaverCredentials: credentials } : {};
+  };
+
+  const importNavicatFile = (folderPath: string | null) => {
+    openTextFileWithName(".ncx,.xml,text/xml,application/xml").then(async (file) => {
+      if (!file) return;
+      const result = await parseNavicatSessions(file.text, {
+        targetFolder: folderPath,
+        existingSessions: sessions,
+        sourcePath: file.name,
+      });
+      queueImportPreview(result, folderPath, "Navicat");
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
   };
 
   const importDbeaverFile = (folderPath: string | null) => {
@@ -1190,6 +1209,18 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
             icon: <FolderOpen className="w-3 h-3" />,
             onClick: () => importScannedTextSessions(folderPath, "windterm", "WindTerm", parseWindTermSessions),
           },
+        ],
+      },
+      {
+        label: t("sessionTree.contextImportNavicat"),
+        icon: <Database className="w-3 h-3" />,
+        children: [
+          {
+            label: t("sessionTree.fromNavicatNcxFile"),
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importNavicatFile(folderPath),
+          },
+          // Phase 2 TODO: local Navicat config scanning plus Pwd_2/navicat_cred recovery.
         ],
       },
       {
