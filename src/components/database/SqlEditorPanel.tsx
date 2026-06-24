@@ -85,6 +85,8 @@ function dialectFor(engine: string): SQLDialect {
       return MySQL;
     case "PostgreSQL":
       return PostgreSQL;
+    case "SQLServer":
+      return StandardSQL;
     default:
       return StandardSQL;
   }

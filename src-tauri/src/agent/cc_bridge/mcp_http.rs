@@ -61,7 +61,7 @@ const CAPTURE_TIMEOUT_SECS: u64 = 900;
 
 /// Which tool surface a CC thread's MCP endpoint exposes. Selected at spawn
 /// from the bound session's type (E): a terminal/SSH/local thread gets `Shell`;
-/// a SQL DB session (MySQL/PG/ClickHouse/Presto) gets `Sql`; a Redis session
+/// a SQL DB session (MySQL/PG/SQL Server/ClickHouse/Presto) gets `Sql`; a Redis session
 /// gets `Redis`. One listener serves all three at distinct nest paths, and a
 /// thread's `.mcp.json` lists *only* its flavor's server — so a DB thread never
 /// sees shell tools, and vice-versa (reduces cross-surface confusion).
@@ -103,7 +103,7 @@ impl Flavor {
     }
 
     /// Pick the MCP flavor for a thread from its bound session's type: SQL DB
-    /// engines (MySQL/PG/ClickHouse/Presto) → `Sql`, Redis → `Redis`, anything
+    /// engines (MySQL/PG/SQL Server/ClickHouse/Presto) → `Sql`, Redis → `Redis`, anything
     /// else (SSH/terminal/local/unbound) → `Shell`.
     pub fn for_session_type(t: Option<&crate::session::models::SessionType>) -> Flavor {
         use crate::session::models::SessionType;
@@ -111,6 +111,7 @@ impl Flavor {
             Some(
                 SessionType::MySQL
                 | SessionType::PostgreSQL
+                | SessionType::SQLServer
                 | SessionType::ClickHouse
                 | SessionType::Presto,
             ) => Flavor::Sql,
@@ -214,7 +215,7 @@ pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
             Default::default(),
         )
     };
-    // SQL flavor (`/mcp/sql`) — MySQL/PG/ClickHouse/Presto.
+    // SQL flavor (`/mcp/sql`) — MySQL/PG/SQL Server/ClickHouse/Presto.
     let sql_service = {
         let app = app.clone();
         let toks = tokens.clone();
@@ -1388,6 +1389,7 @@ mod tests {
             allowed_session_id: allowed.map(|s| s.to_string()),
             allowed_config_id: None,
             trust: TrustLevel::Strict,
+            flavor: Flavor::Shell,
             confirm_readonly: false,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         }
@@ -1473,6 +1475,7 @@ mod tests {
         let sql = [
             SessionType::MySQL,
             SessionType::PostgreSQL,
+            SessionType::SQLServer,
             SessionType::ClickHouse,
             SessionType::Presto,
         ];

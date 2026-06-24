@@ -6,7 +6,7 @@
  * menus, and the query editor all agree on how to talk to each engine.
  */
 
-export type SqlEngine = "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto";
+export type SqlEngine = "MySQL" | "PostgreSQL" | "SQLServer" | "ClickHouse" | "Presto";
 
 /** Canonical object kinds surfaced as tree folders / context menus. */
 export type ObjectKind =
@@ -46,13 +46,16 @@ const DOUBLE_QUOTE_ENGINES: SqlEngine[] = ["PostgreSQL", "Presto"];
 
 /** Narrow an arbitrary engine string to a known `SqlEngine` (else MySQL). */
 export function asSqlEngine(engine: string): SqlEngine {
-  return engine === "PostgreSQL" || engine === "ClickHouse" || engine === "Presto"
+  return engine === "PostgreSQL" || engine === "SQLServer" || engine === "ClickHouse" || engine === "Presto"
     ? engine
     : "MySQL";
 }
 
 /** Quote a single identifier for `engine`, escaping the quote char. */
 export function quoteIdent(engine: SqlEngine, ident: string): string {
+  if (engine === "SQLServer") {
+    return `[${ident.replace(/]/g, "]]")}]`;
+  }
   if (DOUBLE_QUOTE_ENGINES.includes(engine)) {
     return `"${ident.replace(/"/g, '""')}"`;
   }
@@ -83,6 +86,7 @@ export function setDefaultSchemaSql(
   catalog?: string | null,
 ): string {
   if (engine === "PostgreSQL") return `SET search_path TO ${quoteIdent(engine, schema)}`;
+  if (engine === "SQLServer") return `-- SQL Server schemas are selected by using two-part names such as ${quoteIdent(engine, schema)}.${quoteIdent(engine, "table_name")}`;
   if (engine === "Presto" && catalog) {
     return `USE ${quoteIdent(engine, catalog)}.${quoteIdent(engine, schema)}`;
   }
@@ -96,6 +100,7 @@ export function setDefaultSchemaSql(
 const ENGINE_CATEGORIES: Record<SqlEngine, ObjectKind[]> = {
   MySQL: ["table", "view", "procedure", "function", "trigger", "event"],
   PostgreSQL: ["table", "view", "materialized_view", "function", "sequence"],
+  SQLServer: ["table", "view", "procedure", "function", "trigger", "sequence"],
   ClickHouse: ["table", "view", "materialized_view", "dictionary"],
   Presto: ["table", "view"],
 };
@@ -107,12 +112,12 @@ export function categoriesForEngine(engine: SqlEngine): ObjectKind[] {
 
 /** Inline grid write-back (UPDATE/DELETE/INSERT) is only safe on row stores. */
 export function supportsInlineEdit(engine: SqlEngine): boolean {
-  return engine === "MySQL" || engine === "PostgreSQL";
+  return engine === "MySQL" || engine === "PostgreSQL" || engine === "SQLServer";
 }
 
 /** Index introspection is only meaningful for the row-store engines. */
 export function supportsIndexes(engine: SqlEngine): boolean {
-  return engine === "MySQL" || engine === "PostgreSQL";
+  return engine === "MySQL" || engine === "PostgreSQL" || engine === "SQLServer";
 }
 
 /** ClickHouse mutates rows via `ALTER TABLE … UPDATE/DELETE`, not DML. */
@@ -132,11 +137,11 @@ export function actionMode(engine: SqlEngine, action: DialectAction): ActionMode
   }
   switch (action) {
     case "renameDatabase":
-      // MySQL has no safe RENAME DATABASE.
-      return engine === "MySQL" ? "disabled" : "execute";
+      // MySQL has no safe RENAME DATABASE; SQL Server has no direct schema rename.
+      return engine === "MySQL" || engine === "SQLServer" ? "disabled" : "execute";
     case "disableTrigger":
-      // Only PostgreSQL supports per-trigger enable/disable.
-      return engine === "PostgreSQL" ? "execute" : "disabled";
+      // PostgreSQL and SQL Server support per-trigger enable/disable.
+      return engine === "PostgreSQL" || engine === "SQLServer" ? "execute" : "disabled";
     default:
       return "execute";
   }
@@ -157,6 +162,9 @@ export function selectStatement(
 ): string {
   const cols =
     columns.length > 0 ? columns.map((c) => quoteIdent(engine, c)).join(", ") : "*";
+  if (engine === "SQLServer") {
+    return `SELECT TOP (${limit}) ${cols}\nFROM ${qualifiedName(engine, target)};`;
+  }
   return `SELECT ${cols}\nFROM ${qualifiedName(engine, target)}\nLIMIT ${limit};`;
 }
 
@@ -243,6 +251,9 @@ export function renameTableStatement(
     const renamed = qualifiedName(engine, { ...target, name: newName });
     return `RENAME TABLE ${oldName} TO ${renamed};`;
   }
+  if (engine === "SQLServer") {
+    return `EXEC sp_rename ${sqlLiteral(oldName)}, ${sqlLiteral(newName)};`;
+  }
   // PostgreSQL / Presto: rename target is unqualified.
   return `ALTER TABLE ${oldName} RENAME TO ${quoteIdent(engine, newName)};`;
 }
@@ -319,6 +330,13 @@ export function alterColumnStatement(
     }
     return lines.join("\n");
   }
+  if (engine === "SQLServer") {
+    const lines = [`ALTER TABLE ${tbl} ALTER COLUMN ${oldCol} ${change.type}${nullSuffix};`];
+    if (change.newName && change.newName !== change.oldName) {
+      lines.push(`EXEC sp_rename ${sqlLiteral(`${tbl}.${change.oldName}`)}, ${sqlLiteral(change.newName)}, 'COLUMN';`);
+    }
+    return lines.join("\n");
+  }
   // MySQL / ClickHouse: CHANGE renames, MODIFY keeps the name.
   if (engine === "MySQL" && change.newName && change.newName !== change.oldName) {
     return `ALTER TABLE ${tbl} CHANGE COLUMN ${oldCol} ${newCol} ${change.type}${nullSuffix};`;
@@ -339,13 +357,16 @@ export function dropIndexStatement(
   if (engine === "ClickHouse") {
     return `ALTER TABLE ${tbl} DROP INDEX ${quoteIdent(engine, index)};`;
   }
+  if (engine === "SQLServer") {
+    return `DROP INDEX ${quoteIdent(engine, index)} ON ${tbl};`;
+  }
   // PostgreSQL: indexes live in the schema namespace.
   return `DROP INDEX ${qualifiedName(engine, { schema, name: index })};`;
 }
 
 export function dropDatabaseStatement(engine: SqlEngine, db: string): string {
   const name = quoteIdent(engine, db);
-  return engine === "PostgreSQL" || engine === "Presto"
+  return engine === "PostgreSQL" || engine === "Presto" || engine === "SQLServer"
     ? `DROP SCHEMA ${name};`
     : `DROP DATABASE ${name};`;
 }
@@ -358,6 +379,7 @@ export function renameDatabaseStatement(
   const from = quoteIdent(engine, db);
   const to = quoteIdent(engine, newName);
   if (engine === "ClickHouse") return `RENAME DATABASE ${from} TO ${to};`;
+  if (engine === "SQLServer") return `-- SQL Server does not support direct schema rename. Create ${to}, transfer objects from ${from}, then drop ${from}.`;
   // PostgreSQL / Presto operate on schemas.
   return `ALTER SCHEMA ${from} RENAME TO ${to};`;
 }
@@ -374,6 +396,9 @@ export function dropTriggerStatement(
       name: table,
     })};`;
   }
+  if (engine === "SQLServer" && table) {
+    return `DROP TRIGGER ${qualifiedName(engine, { schema, name: trigger })};`;
+  }
   return `DROP TRIGGER ${qualifiedName(engine, { schema, name: trigger })};`;
 }
 
@@ -383,6 +408,9 @@ export function disableTriggerStatement(
   trigger: string,
   table: string,
 ): string {
+  if (engine === "SQLServer") {
+    return `DISABLE TRIGGER ${quoteIdent(engine, trigger)} ON ${qualifiedName(engine, { schema, name: table })};`;
+  }
   return `ALTER TABLE ${qualifiedName(engine, { schema, name: table })} DISABLE TRIGGER ${quoteIdent(
     engine,
     trigger,
@@ -395,6 +423,7 @@ export function disableTriggerStatement(
 
 /** `CALL <proc>(...)` for stored procedures. */
 export function callStatement(engine: SqlEngine, target: ObjectTarget): string {
+  if (engine === "SQLServer") return `EXEC ${qualifiedName(engine, target)} /* params */;`;
   return `CALL ${qualifiedName(engine, target)}(/* params */);`;
 }
 
@@ -421,6 +450,9 @@ export function createTemplate(
       if (engine === "Presto") {
         return `CREATE TABLE ${q("new_table")} (\n  "id" bigint\n);`;
       }
+      if (engine === "SQLServer") {
+        return `CREATE TABLE ${q("new_table")} (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY\n);`;
+      }
       return `CREATE TABLE ${q("new_table")} (\n  \`id\` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (\`id\`)\n);`;
     case "view":
     case "materialized_view": {
@@ -431,15 +463,24 @@ export function createTemplate(
       if (engine === "PostgreSQL") {
         return `CREATE PROCEDURE ${q("new_procedure")}()\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  -- body\nEND;\n$$;`;
       }
+      if (engine === "SQLServer") {
+        return `CREATE OR ALTER PROCEDURE ${q("new_procedure")}\nAS\nBEGIN\n  SET NOCOUNT ON;\n  -- body\nEND;`;
+      }
       return `DELIMITER //\nCREATE PROCEDURE ${q("new_procedure")}()\nBEGIN\n  -- body\nEND //\nDELIMITER ;`;
     case "function":
       if (engine === "PostgreSQL") {
         return `CREATE FUNCTION ${q("new_function")}()\nRETURNS integer\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  RETURN 0;\nEND;\n$$;`;
       }
+      if (engine === "SQLServer") {
+        return `CREATE OR ALTER FUNCTION ${q("new_function")}()\nRETURNS int\nAS\nBEGIN\n  RETURN 0;\nEND;`;
+      }
       return `DELIMITER //\nCREATE FUNCTION ${q("new_function")}()\nRETURNS INT DETERMINISTIC\nBEGIN\n  RETURN 0;\nEND //\nDELIMITER ;`;
     case "trigger":
       if (engine === "PostgreSQL") {
         return `CREATE TRIGGER new_trigger\nBEFORE INSERT ON ${q("table_name")}\nFOR EACH ROW EXECUTE FUNCTION trigger_function();`;
+      }
+      if (engine === "SQLServer") {
+        return `CREATE OR ALTER TRIGGER ${q("new_trigger")}\nON ${q("table_name")}\nAFTER INSERT\nAS\nBEGIN\n  SET NOCOUNT ON;\n  -- body\nEND;`;
       }
       return `CREATE TRIGGER ${q("new_trigger")}\nBEFORE INSERT ON ${q("table_name")}\nFOR EACH ROW\nBEGIN\n  -- body\nEND;`;
     case "event":
@@ -452,4 +493,3 @@ export function createTemplate(
       return `-- new ${kind}`;
   }
 }
-

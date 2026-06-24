@@ -37,6 +37,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   File: 0,
   MySQL: 3306,
   PostgreSQL: 5432,
+  SQLServer: 1433,
   ClickHouse: 9000,
   Presto: 8080,
   Redis: 6379,
@@ -545,6 +546,440 @@ export function parseTabbySessions(text: string, options: SessionImportOptions =
     secrets,
     externalVault,
     "tabby",
+  );
+}
+
+interface DbeaverConnectionInput {
+  id: string;
+  record: Record<string, unknown>;
+  folderPath: string | null;
+}
+
+interface DbeaverUrlInfo {
+  driverKey?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  catalog?: string;
+  schema?: string;
+  username?: string;
+  password?: string;
+  redisDbIndex?: string;
+  ssl?: boolean;
+}
+
+export function parseDbeaverSessions(text: string, options: SessionImportOptions = {}): SessionImportResult {
+  assertImportSize(text);
+
+  const warnings: string[] = [];
+  const now = resolveNow(options.now);
+  const inputs = extractDbeaverConnections(text, warnings);
+  const limited = limitRows(inputs, warnings);
+  const sessions: SessionConfig[] = [];
+  const secrets: SessionImportSecret[] = [];
+  let skipped = limited.skipped;
+
+  for (const input of limited.rows as DbeaverConnectionInput[]) {
+    const imported = dbeaverConnectionToSession(input, options.targetFolder ?? null, now, warnings);
+    if (!imported) {
+      skipped += 1;
+      continue;
+    }
+    sessions.push(imported.session);
+    if (imported.password) {
+      secrets.push({
+        sessionId: imported.session.id,
+        kind: "password",
+        label: `${imported.session.name} (${imported.session.host}:${imported.session.port})`,
+        value: imported.password,
+      });
+    }
+  }
+
+  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions, secrets);
+}
+
+function extractDbeaverConnections(text: string, warnings: string[]): DbeaverConnectionInput[] {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    const out = extractDbeaverJsonConnections(parsed);
+    if (out.length > 0) return out;
+    warnings.push("No DBeaver connections were found in the selected JSON file.");
+    return [];
+  } catch {
+    const out = extractDbeaverXmlConnections(text);
+    if (out.length > 0) return out;
+    throw new Error("The selected DBeaver file is not valid data-sources JSON or XML.");
+  }
+}
+
+function extractDbeaverJsonConnections(parsed: unknown): DbeaverConnectionInput[] {
+  const out: DbeaverConnectionInput[] = [];
+  const seen = new WeakSet<object>();
+  const rootFolders = isRecord(parsed) ? dbeaverFolderLookup(parsed) : new Map<string, string>();
+
+  const visit = (value: unknown, folderLookup: Map<string, string>, depth: number) => {
+    if (depth > 8) return;
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, folderLookup, depth + 1);
+      return;
+    }
+    if (!isRecord(value)) return;
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    const localFolders = dbeaverFolderLookup(value);
+    const folders = localFolders.size > 0 ? localFolders : folderLookup;
+    const connections = value.connections ?? value.dataSources ?? value.datasources ?? value["data-sources"];
+    if (isRecord(connections)) {
+      for (const [id, connection] of Object.entries(connections)) {
+        if (!isRecord(connection)) continue;
+        out.push({
+          id,
+          record: connection,
+          folderPath: dbeaverFolderPath(connection.folder ?? connection.folderId, folders),
+        });
+      }
+    } else if (Array.isArray(connections)) {
+      for (const connection of connections) {
+        if (!isRecord(connection)) continue;
+        out.push({
+          id: cleanText(firstNonEmptyString(connection.id, connection.name), MAX_NAME_LENGTH),
+          record: connection,
+          folderPath: dbeaverFolderPath(connection.folder ?? connection.folderId, folders),
+        });
+      }
+    } else if (looksLikeDbeaverConnection(value)) {
+      out.push({
+        id: cleanText(firstNonEmptyString(value.id, value.name), MAX_NAME_LENGTH),
+        record: value,
+        folderPath: dbeaverFolderPath(value.folder ?? value.folderId, folders),
+      });
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      if (key === "connections" || key === "folders") continue;
+      visit(child, folders, depth + 1);
+    }
+  };
+
+  visit(parsed, rootFolders, 0);
+  return out;
+}
+
+function extractDbeaverXmlConnections(text: string): DbeaverConnectionInput[] {
+  return parseXmlElementAttributes(text)
+    .filter((attrs) => looksLikeDbeaverConnection(attrs))
+    .map((attrs, index) => ({
+      id: attrs.id || `xml-${index}`,
+      record: attrs,
+      folderPath: normalizeGroupPath(firstNonEmptyString(attrs.folder, attrs.group, attrs.path)),
+    }));
+}
+
+function dbeaverConnectionToSession(
+  input: DbeaverConnectionInput,
+  targetFolder: string | null,
+  now: number,
+  warnings: string[],
+): { session: SessionConfig; password?: string } | null {
+  const record = input.record;
+  const configuration = firstRecord(record.configuration, record.connection, record.config, record);
+  const properties = firstRecord(configuration.properties, record.properties);
+  const url = cleanText(firstNonEmptyString(
+    configuration.url,
+    configuration.jdbcUrl,
+    configuration.jdbc_url,
+    record.url,
+    record.jdbcUrl,
+  ), MAX_OPTION_LENGTH);
+  const urlInfo = parseDbeaverJdbcUrl(url);
+  const driverKey = [
+    record.provider,
+    record.driver,
+    record.driverId,
+    record.driver_id,
+    record.type,
+    configuration.provider,
+    configuration.driver,
+    configuration.driverId,
+    urlInfo.driverKey,
+    url,
+  ].map((value) => firstString(value)).join(" ");
+  const sessionType = dbeaverSessionType(driverKey);
+  const label = cleanText(firstNonEmptyString(record.name, configuration.name, input.id, url), MAX_NAME_LENGTH) || "DBeaver connection";
+  if (!sessionType) {
+    warnings.push(`Skipped DBeaver connection "${label}" because its driver is not supported by Taomni.`);
+    return null;
+  }
+
+  const host = cleanText(firstNonEmptyString(
+    configuration.host,
+    configuration.hostname,
+    configuration.server,
+    configuration.serverHost,
+    configuration["server.host"],
+    record.host,
+    urlInfo.host,
+  ), MAX_HOST_LENGTH);
+  if (!host) {
+    warnings.push(`Skipped DBeaver connection "${label}" because host is empty.`);
+    return null;
+  }
+
+  const parsedPort = firstKnown(configuration.port, record.port, urlInfo.port);
+  const port = sessionType === "ClickHouse"
+    ? DEFAULT_PORTS.ClickHouse
+    : sanitizePort(parsedPort, DEFAULT_PORTS[sessionType] ?? 0);
+  const database = cleanText(firstNonEmptyString(
+    configuration.database,
+    configuration.databaseName,
+    configuration["database.name"],
+    configuration.schema,
+    record.database,
+    urlInfo.database,
+  ), MAX_NAME_LENGTH);
+  const catalog = cleanText(firstNonEmptyString(
+    configuration.catalog,
+    record.catalog,
+    urlInfo.catalog,
+  ), MAX_NAME_LENGTH);
+  const schema = cleanText(firstNonEmptyString(
+    configuration.schema,
+    configuration.database,
+    record.schema,
+    urlInfo.schema,
+  ), MAX_NAME_LENGTH);
+  const redisDbIndex = cleanText(firstNonEmptyString(
+    configuration.db,
+    configuration.dbIndex,
+    configuration.database,
+    urlInfo.redisDbIndex,
+  ), 16);
+  const httpPort = sessionType === "ClickHouse"
+    ? String(sanitizePort(parsedPort, 8123))
+    : "";
+  const ssl = dbeaverSslEnabled(configuration, properties, urlInfo);
+  const password = cleanText(firstNonEmptyString(
+    configuration.password,
+    configuration.userPassword,
+    record.password,
+    urlInfo.password,
+  ), MAX_OPTION_LENGTH);
+  const hasExternalPassword = dbeaverTruthy(record["save-password"] ?? record.savePassword ?? configuration["save-password"]);
+  if (!password && hasExternalPassword) {
+    warnings.push(`DBeaver connection "${label}" has a saved password, but encrypted DBeaver credentials were not imported.`);
+  }
+
+  const importedFolder = combineImportFolder("DBeaver", normalizeGroupPath(input.folderPath));
+  const optionsJson = JSON.stringify(sanitizeOptions({
+    description: "Imported from DBeaver",
+    dbDatabase: sessionType === "Redis" ? "" : (sessionType === "Presto" ? schema : database),
+    dbCatalog: sessionType === "Presto" ? catalog : "",
+    dbSsl: ssl,
+    dbTimeout: "15",
+    dbHttpPort: httpPort,
+    dbChProtocol: sessionType === "ClickHouse" ? "HTTP" : "",
+    dbRedisIndex: sessionType === "Redis" ? redisDbIndex || database || "0" : "",
+  }));
+
+  const session = importedSession({
+    name: label,
+    sessionType,
+    host,
+    port,
+    username: optionalCleanText(firstNonEmptyString(
+      configuration.user,
+      configuration.username,
+      configuration["user.name"],
+      record.user,
+      record.username,
+      urlInfo.username,
+    ), MAX_NAME_LENGTH),
+    groupPath: combineImportFolder(targetFolder, importedFolder),
+    authMethod: "Password",
+    options: JSON.parse(optionsJson) as Record<string, unknown>,
+    now,
+    warnings,
+  });
+  return session ? { session, password: password || undefined } : null;
+}
+
+function dbeaverSessionType(value: string): string | null {
+  const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
+  if (/\b(postgresql|postgres|cockroach|yugabyte)\b/.test(key)) return "PostgreSQL";
+  if (/\b(sqlserver|sql server|mssql|jtds|azure sql)\b/.test(key)) return "SQLServer";
+  if (/\b(clickhouse|click house|chjdbc)\b/.test(key)) return "ClickHouse";
+  if (/\b(presto|trino)\b/.test(key)) return "Presto";
+  if (/\b(redis|valkey)\b/.test(key)) return "Redis";
+  return null;
+}
+
+function parseDbeaverJdbcUrl(rawUrl: string): DbeaverUrlInfo {
+  const raw = rawUrl.trim();
+  if (!raw) return {};
+  let url = raw.replace(/^jdbc:/i, "");
+  if (url.toLowerCase().startsWith("jtds:")) {
+    url = url.slice(5);
+  }
+  if (/^sqlserver:/i.test(url)) {
+    return parseSqlServerJdbcUrl(url);
+  }
+
+  const driverKey = url.slice(0, Math.max(url.indexOf(":"), 0)) || undefined;
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/^\/+/, "").split("/").filter(Boolean).map(decodeURIComponent);
+    const info: DbeaverUrlInfo = {
+      driverKey: driverKey ?? parsed.protocol.replace(/:$/, ""),
+      host: parsed.hostname,
+      port: parsed.port ? sanitizePort(parsed.port, 0) : undefined,
+      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+      ssl: urlSearchSsl(parsed.searchParams),
+    };
+    const protocol = parsed.protocol.replace(/:$/, "").toLowerCase();
+    if (protocol === "presto" || protocol === "trino") {
+      info.catalog = path[0];
+      info.schema = path[1];
+    } else if (protocol === "redis" || protocol === "valkey") {
+      info.redisDbIndex = path[0];
+      info.database = path[0];
+    } else {
+      info.database = path[0];
+    }
+    return info;
+  } catch {
+    return { driverKey };
+  }
+}
+
+function parseSqlServerJdbcUrl(url: string): DbeaverUrlInfo {
+  const withoutScheme = url.replace(/^sqlserver:/i, "");
+  const parts = withoutScheme.split(";").filter(Boolean);
+  const authority = (parts.shift() ?? "").replace(/^\/+/, "");
+  const props: Record<string, string> = {};
+  for (const part of parts) {
+    const index = part.indexOf("=");
+    if (index > 0) props[part.slice(0, index).trim().toLowerCase()] = part.slice(index + 1).trim();
+  }
+  const slashIndex = authority.indexOf("/");
+  const hostText = slashIndex >= 0 ? authority.slice(0, slashIndex) : authority;
+  const pathDatabase = slashIndex >= 0 ? authority.slice(slashIndex + 1).split("/").find(Boolean) : undefined;
+  const hostPort = parseHostPort(hostText);
+  const database = firstNonEmptyString(props.databasename, props.database, pathDatabase ? decodeURIComponent(pathDatabase) : undefined);
+  const portNumber = firstNonEmptyString(props.portnumber, props.port);
+  return {
+    driverKey: "sqlserver",
+    host: hostPort.host || firstNonEmptyString(props.servername, props.server, props.host),
+    port: hostPort.port ?? (portNumber ? sanitizePort(portNumber, 0) : undefined),
+    database,
+    username: firstNonEmptyString(props.user, props.username),
+    password: firstNonEmptyString(props.password),
+    ssl: dbeaverTruthy(props.encrypt) || dbeaverTruthy(props.ssl),
+  };
+}
+
+function parseHostPort(value: string): { host?: string; port?: number } {
+  const text = value.trim();
+  if (!text) return {};
+  const ipv6 = /^\[([^\]]+)](?::(\d+))?$/.exec(text);
+  if (ipv6) return { host: ipv6[1], port: ipv6[2] ? sanitizePort(ipv6[2], 0) : undefined };
+  const index = text.lastIndexOf(":");
+  if (index > 0 && /^\d+$/.test(text.slice(index + 1))) {
+    return { host: text.slice(0, index), port: sanitizePort(text.slice(index + 1), 0) };
+  }
+  return { host: text };
+}
+
+function urlSearchSsl(params: URLSearchParams): boolean | undefined {
+  for (const key of ["ssl", "useSSL", "encrypt", "SSL"]) {
+    const value = params.get(key);
+    if (value !== null) return dbeaverTruthy(value);
+  }
+  const sslMode = params.get("sslmode");
+  if (sslMode) return !/^(disable|off|false)$/i.test(sslMode);
+  return undefined;
+}
+
+function dbeaverSslEnabled(
+  configuration: Record<string, unknown>,
+  properties: Record<string, unknown>,
+  urlInfo: DbeaverUrlInfo,
+): boolean {
+  const explicit = firstKnown(
+    configuration.ssl,
+    configuration.useSSL,
+    configuration.encrypt,
+    properties.ssl,
+    properties.useSSL,
+    properties.encrypt,
+    urlInfo.ssl,
+  );
+  if (explicit !== undefined) return dbeaverTruthy(explicit);
+  const sslMode = firstNonEmptyString(configuration.sslmode, configuration.sslMode, properties.sslmode, properties.sslMode);
+  return Boolean(sslMode && !/^(disable|off|false)$/i.test(sslMode));
+}
+
+function dbeaverTruthy(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  return /^(true|yes|1|required|verify-ca|verify-full)$/i.test(firstString(value).trim());
+}
+
+function dbeaverFolderLookup(root: Record<string, unknown>): Map<string, string> {
+  const folders = isRecord(root.folders) ? root.folders : {};
+  const entries = new Map<string, Record<string, unknown>>();
+  for (const [id, folder] of Object.entries(folders)) {
+    if (isRecord(folder)) entries.set(id, folder);
+  }
+  const resolved = new Map<string, string>();
+  const resolve = (id: string, trail: Set<string> = new Set()): string | null => {
+    if (resolved.has(id)) return resolved.get(id) ?? null;
+    if (trail.has(id)) return null;
+    const folder = entries.get(id);
+    if (!folder) return null;
+    trail.add(id);
+    const explicit = normalizeGroupPath(firstNonEmptyString(folder.path, folder.folderPath));
+    if (explicit) {
+      resolved.set(id, explicit);
+      return explicit;
+    }
+    const name = cleanText(firstNonEmptyString(folder.name, folder.label, id), MAX_NAME_LENGTH);
+    const parentId = cleanText(firstNonEmptyString(folder.parent, folder.parentId), MAX_NAME_LENGTH);
+    const parent = parentId ? resolve(parentId, trail) : null;
+    const path = normalizeGroupPath(parent && name ? `${parent} / ${name}` : name);
+    if (path) resolved.set(id, path);
+    return path;
+  };
+  for (const id of entries.keys()) resolve(id);
+  return resolved;
+}
+
+function dbeaverFolderPath(value: unknown, folders: Map<string, string>): string | null {
+  const raw = cleanText(firstString(value), MAX_PATH_LENGTH);
+  if (!raw) return null;
+  return normalizeGroupPath(folders.get(raw) ?? raw);
+}
+
+function firstRecord(...values: unknown[]): Record<string, unknown> {
+  for (const value of values) {
+    if (isRecord(value)) return value;
+  }
+  return {};
+}
+
+function looksLikeDbeaverConnection(value: Record<string, unknown>): boolean {
+  return Boolean(
+    isRecord(value.configuration) ||
+      value.url ||
+      value.jdbcUrl ||
+      value.driver ||
+      value.driverId ||
+      value.provider ||
+      value.host ||
+      value.hostname,
   );
 }
 

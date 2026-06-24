@@ -34,6 +34,7 @@ describe("sqlDialect identifiers", () => {
     expect(quoteIdent("ClickHouse", "x")).toBe("`x`");
     expect(quoteIdent("PostgreSQL", 'a"b')).toBe('"a""b"');
     expect(quoteIdent("Presto", "x")).toBe('"x"');
+    expect(quoteIdent("SQLServer", "a]b")).toBe("[a]]b]");
   });
 
   it("builds qualified names, including Presto catalog", () => {
@@ -43,6 +44,9 @@ describe("sqlDialect identifiers", () => {
       '"c"."s"."t"',
     );
     expect(qualifiedName("Presto", { schema: "s", name: "t" })).toBe('"s"."t"');
+    expect(qualifiedName("SQLServer", { schema: "dbo", name: "orders" })).toBe(
+      "[dbo].[orders]",
+    );
   });
 
   it("escapes string literals and passes NULL through", () => {
@@ -52,6 +56,7 @@ describe("sqlDialect identifiers", () => {
 
   it("narrows engine strings", () => {
     expect(asSqlEngine("PostgreSQL")).toBe("PostgreSQL");
+    expect(asSqlEngine("SQLServer")).toBe("SQLServer");
     expect(asSqlEngine("nonsense")).toBe("MySQL");
   });
 
@@ -59,6 +64,7 @@ describe("sqlDialect identifiers", () => {
     expect(setDefaultSchemaSql("PostgreSQL", "s")).toBe('SET search_path TO "s"');
     expect(setDefaultSchemaSql("Presto", "s", "c")).toBe('USE "c"."s"');
     expect(setDefaultSchemaSql("MySQL", "s")).toBe("USE `s`");
+    expect(setDefaultSchemaSql("SQLServer", "dbo")).toContain("[dbo].[table_name]");
   });
 });
 
@@ -66,14 +72,17 @@ describe("sqlDialect capabilities", () => {
   it("exposes per-engine folder categories", () => {
     expect(categoriesForEngine("MySQL")).toContain("trigger");
     expect(categoriesForEngine("PostgreSQL")).toContain("sequence");
+    expect(categoriesForEngine("SQLServer")).toContain("procedure");
     expect(categoriesForEngine("ClickHouse")).toContain("dictionary");
     expect(categoriesForEngine("Presto")).toEqual(["table", "view"]);
   });
 
   it("gates inline edit / indexes to row stores", () => {
     expect(supportsInlineEdit("MySQL")).toBe(true);
+    expect(supportsInlineEdit("SQLServer")).toBe(true);
     expect(supportsInlineEdit("ClickHouse")).toBe(false);
     expect(supportsIndexes("PostgreSQL")).toBe(true);
+    expect(supportsIndexes("SQLServer")).toBe(true);
     expect(supportsIndexes("Presto")).toBe(false);
   });
 
@@ -82,6 +91,8 @@ describe("sqlDialect capabilities", () => {
     expect(actionMode("MySQL", "renameDatabase")).toBe("disabled");
     expect(actionMode("PostgreSQL", "renameDatabase")).toBe("execute");
     expect(actionMode("PostgreSQL", "disableTrigger")).toBe("execute");
+    expect(actionMode("SQLServer", "disableTrigger")).toBe("execute");
+    expect(actionMode("SQLServer", "renameDatabase")).toBe("disabled");
     expect(actionMode("MySQL", "disableTrigger")).toBe("disabled");
     expect(actionMode("Presto", "drop")).toBe("editor");
     expect(actionMode("Presto", "disableTrigger")).toBe("disabled");
@@ -96,6 +107,9 @@ describe("sqlDialect DML templates", () => {
       "SELECT `id`, `total`\nFROM `db`.`orders`\nLIMIT 100;",
     );
     expect(selectStatement("MySQL", t, [], 50)).toContain("SELECT *\nFROM `db`.`orders`");
+    expect(selectStatement("SQLServer", t, ["id"], 25)).toContain(
+      "SELECT TOP (25) [id]\nFROM [db].[orders];",
+    );
   });
 
   it("builds INSERT with placeholders", () => {

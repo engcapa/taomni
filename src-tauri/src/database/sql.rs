@@ -1,9 +1,10 @@
-//! MySQL / PostgreSQL backend via `sqlx`. Values are decoded to `Option<String>`
-//! based on the column's SQL type so the frontend grid can render them as text
-//! with a distinct NULL badge.
+//! MySQL / PostgreSQL backend via `sqlx` and SQL Server via `tiberius`. Values
+//! are decoded to `Option<String>` based on the column's SQL type so the
+//! frontend grid can render them as text with a distinct NULL badge.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -18,6 +19,14 @@ use sqlx_core::types::{BigDecimal, Uuid};
 use sqlx_core::Error as SqlxError;
 use sqlx_mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions, MySqlRow, MySqlSslMode};
 use sqlx_postgres::{PgConnectOptions, PgPoolOptions, PgRow, PgSslMode, Postgres};
+use tiberius::{
+    AuthMethod as TdsAuthMethod, Client as TdsClient, ColumnType as TdsColumnType,
+    Config as TdsConfig, EncryptionLevel as TdsEncryptionLevel, QueryItem as TdsQueryItem,
+    Row as TdsRow, ToSql as TdsToSql,
+};
+use tokio::net::TcpStream;
+use tokio::sync::Mutex as AsyncMutex;
+use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tokio_util::sync::CancellationToken;
 
 use super::{
@@ -27,6 +36,8 @@ use super::{
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
 const STREAM_BATCH_ROWS: usize = 100;
+
+pub type SqlServerClient = TdsClient<Compat<TcpStream>>;
 
 fn timeout(config: &DbConfig) -> Duration {
     Duration::from_secs(match config.timeout_secs {
@@ -98,6 +109,50 @@ pub async fn connect_postgres(
     Ok(DbHandle::Postgres(pool))
 }
 
+pub async fn connect_sqlserver(
+    config: &DbConfig,
+    password: Option<&str>,
+) -> Result<DbHandle, String> {
+    let mut opts = TdsConfig::new();
+    opts.host(&config.host);
+    opts.port(config.port);
+    opts.application_name("Taomni");
+    if let Some(db) = config.database.as_deref().filter(|d| !d.is_empty()) {
+        opts.database(db);
+    }
+
+    let user = config.username.as_deref().unwrap_or("");
+    if !user.is_empty() || password.is_some() {
+        opts.authentication(TdsAuthMethod::sql_server(user, password.unwrap_or("")));
+    }
+
+    if config.ssl {
+        opts.encryption(TdsEncryptionLevel::Required);
+        // Many SQL Server developer and intranet deployments use self-signed
+        // certificates. Match the app's boolean TLS model by encrypting without
+        // requiring a separate CA picker.
+        opts.trust_cert();
+    } else {
+        opts.encryption(TdsEncryptionLevel::Off);
+    }
+
+    let connect = async {
+        let tcp = TcpStream::connect(opts.get_addr())
+            .await
+            .map_err(|e| format!("SQL Server TCP connect failed: {e}"))?;
+        tcp.set_nodelay(true)
+            .map_err(|e| format!("SQL Server TCP option failed: {e}"))?;
+        TdsClient::connect(opts, tcp.compat_write())
+            .await
+            .map_err(|e| format!("SQL Server connect failed: {e}"))
+    };
+
+    let client = tokio::time::timeout(timeout(config), connect)
+        .await
+        .map_err(|_| "SQL Server connect timed out".to_string())??;
+    Ok(DbHandle::SqlServer(Arc::new(AsyncMutex::new(client))))
+}
+
 // ---------------------------------------------------------------------------
 // Ping
 // ---------------------------------------------------------------------------
@@ -116,6 +171,16 @@ pub async fn ping_postgres(pool: &Pool<Postgres>) -> Result<String, String> {
         .await
         .map_err(|e| format!("PostgreSQL ping failed: {e}"))?;
     Ok("PostgreSQL connection OK".into())
+}
+
+pub async fn ping_sqlserver(client: &AsyncMutex<SqlServerClient>) -> Result<String, String> {
+    let rows = sqlserver_fetch(client, "SELECT 1", &[])
+        .await
+        .map_err(|e| format!("SQL Server ping failed: {e}"))?;
+    if rows.is_empty() {
+        return Err("SQL Server ping failed: no response".into());
+    }
+    Ok("SQL Server connection OK".into())
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +270,83 @@ fn pg_value_to_string(row: &PgRow, i: usize) -> Option<String> {
     None
 }
 
+fn sqlserver_column_type_name(kind: TdsColumnType) -> &'static str {
+    match kind {
+        TdsColumnType::Null => "null",
+        TdsColumnType::Bit | TdsColumnType::Bitn => "bit",
+        TdsColumnType::Int1 => "tinyint",
+        TdsColumnType::Int2 => "smallint",
+        TdsColumnType::Int4 => "int",
+        TdsColumnType::Int8 => "bigint",
+        TdsColumnType::Intn => "int",
+        TdsColumnType::Float4 => "real",
+        TdsColumnType::Float8 | TdsColumnType::Floatn => "float",
+        TdsColumnType::Money | TdsColumnType::Money4 => "money",
+        TdsColumnType::Decimaln => "decimal",
+        TdsColumnType::Numericn => "numeric",
+        TdsColumnType::Datetime | TdsColumnType::Datetime4 | TdsColumnType::Datetimen => "datetime",
+        TdsColumnType::Daten => "date",
+        TdsColumnType::Timen => "time",
+        TdsColumnType::Datetime2 => "datetime2",
+        TdsColumnType::DatetimeOffsetn => "datetimeoffset",
+        TdsColumnType::Guid => "uniqueidentifier",
+        TdsColumnType::BigVarBin | TdsColumnType::BigBinary => "varbinary",
+        TdsColumnType::BigVarChar | TdsColumnType::BigChar | TdsColumnType::Text => "varchar",
+        TdsColumnType::NVarchar | TdsColumnType::NChar | TdsColumnType::NText => "nvarchar",
+        TdsColumnType::Xml => "xml",
+        TdsColumnType::Udt => "udt",
+        TdsColumnType::Image => "image",
+        TdsColumnType::SSVariant => "sql_variant",
+    }
+}
+
+fn sqlserver_value_to_string(row: &TdsRow, i: usize) -> Option<String> {
+    let kind = row.columns()[i].column_type();
+    macro_rules! try_as {
+        ($t:ty) => {
+            if let Ok(v) = row.try_get::<$t, _>(i) {
+                return v.map(|x| x.to_string());
+            }
+        };
+    }
+    match kind {
+        TdsColumnType::Bit | TdsColumnType::Bitn => try_as!(bool),
+        TdsColumnType::Int1 => try_as!(u8),
+        TdsColumnType::Int2 => try_as!(i16),
+        TdsColumnType::Int4 | TdsColumnType::Intn => try_as!(i32),
+        TdsColumnType::Int8 => try_as!(i64),
+        TdsColumnType::Float4 => try_as!(f32),
+        TdsColumnType::Float8 | TdsColumnType::Floatn => try_as!(f64),
+        TdsColumnType::Decimaln
+        | TdsColumnType::Numericn
+        | TdsColumnType::Money
+        | TdsColumnType::Money4 => {
+            try_as!(tiberius::numeric::Numeric)
+        }
+        TdsColumnType::Guid => try_as!(Uuid),
+        TdsColumnType::Daten => try_as!(chrono::NaiveDate),
+        TdsColumnType::Timen => try_as!(chrono::NaiveTime),
+        TdsColumnType::Datetime
+        | TdsColumnType::Datetime4
+        | TdsColumnType::Datetimen
+        | TdsColumnType::Datetime2 => try_as!(chrono::NaiveDateTime),
+        TdsColumnType::DatetimeOffsetn => try_as!(chrono::DateTime<chrono::FixedOffset>),
+        TdsColumnType::Xml => {
+            if let Ok(v) = row.try_get::<&tiberius::xml::XmlData, _>(i) {
+                return v.map(|x| x.to_string());
+            }
+        }
+        _ => {}
+    }
+    if let Ok(v) = row.try_get::<&str, _>(i) {
+        return v.map(|x| x.to_string());
+    }
+    if let Ok(v) = row.try_get::<&[u8], _>(i) {
+        return v.map(|b| String::from_utf8_lossy(b).into_owned());
+    }
+    None
+}
+
 /// Heuristic: does the statement return rows? (SELECT/SHOW/DESCRIBE/WITH/...)
 fn is_query(sql: &str) -> bool {
     let head: String = executable_sql_head(sql)
@@ -261,6 +403,99 @@ fn limit_warning(limit_reached: bool, max_rows: Option<u64>) -> Vec<String> {
     match (limit_reached, max_rows) {
         (true, Some(limit)) => vec![format!("Result limited to {limit} rows")],
         _ => Vec::new(),
+    }
+}
+
+async fn sqlserver_fetch(
+    client: &AsyncMutex<SqlServerClient>,
+    sql: &str,
+    params: &[&dyn TdsToSql],
+) -> Result<Vec<TdsRow>, String> {
+    let mut guard = client.lock().await;
+    let stream = guard
+        .query(sql, params)
+        .await
+        .map_err(|e| format!("Query failed: {e}"))?;
+    stream
+        .into_first_result()
+        .await
+        .map_err(|e| format!("Query failed: {e}"))
+}
+
+async fn sqlserver_query_result(
+    client: &AsyncMutex<SqlServerClient>,
+    sql: &str,
+    max_rows: Option<u64>,
+    token: &CancellationToken,
+) -> Result<(Vec<ColumnInfo>, Vec<Vec<Option<String>>>, bool), String> {
+    let max_rows = max_rows.filter(|value| *value > 0);
+    let run = async {
+        let mut guard = client.lock().await;
+        let mut stream = guard
+            .simple_query(sql)
+            .await
+            .map_err(|e| format!("Query failed: {e}"))?;
+        let mut columns: Vec<ColumnInfo> = Vec::new();
+        let mut rows: Vec<Vec<Option<String>>> = Vec::new();
+        let mut first_result_index: Option<usize> = None;
+        let mut limit_reached = false;
+
+        while let Some(item) = stream
+            .try_next()
+            .await
+            .map_err(|e| format!("Query failed: {e}"))?
+        {
+            match item {
+                TdsQueryItem::Metadata(meta) => {
+                    if first_result_index.is_some() {
+                        break;
+                    }
+                    first_result_index = Some(meta.result_index());
+                    columns = meta
+                        .columns()
+                        .iter()
+                        .map(|c| ColumnInfo {
+                            name: c.name().to_string(),
+                            type_name: sqlserver_column_type_name(c.column_type()).to_string(),
+                        })
+                        .collect();
+                }
+                TdsQueryItem::Row(row) => {
+                    let row_result_index = row.result_index();
+                    if let Some(index) = first_result_index {
+                        if row_result_index != index {
+                            break;
+                        }
+                    } else {
+                        first_result_index = Some(row_result_index);
+                    }
+                    if columns.is_empty() {
+                        columns = row
+                            .columns()
+                            .iter()
+                            .map(|c| ColumnInfo {
+                                name: c.name().to_string(),
+                                type_name: sqlserver_column_type_name(c.column_type()).to_string(),
+                            })
+                            .collect();
+                    }
+                    if max_rows.is_some_and(|limit| rows.len() as u64 >= limit) {
+                        limit_reached = true;
+                        break;
+                    }
+                    rows.push(
+                        (0..row.len())
+                            .map(|i| sqlserver_value_to_string(&row, i))
+                            .collect(),
+                    );
+                }
+            }
+        }
+        Ok((columns, rows, limit_reached))
+    };
+    tokio::select! {
+        _ = token.cancelled() => Err("Query cancelled".into()),
+        r = run => r,
     }
 }
 
@@ -372,6 +607,45 @@ pub async fn execute_postgres(
             columns: Vec::new(),
             rows: Vec::new(),
             rows_affected: res.rows_affected(),
+            duration_ms: start.elapsed().as_millis() as u64,
+            warnings: Vec::new(),
+        })
+    }
+}
+
+pub async fn execute_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    sql: &str,
+    token: &CancellationToken,
+) -> Result<QueryResult, String> {
+    let start = Instant::now();
+    if is_query(sql) {
+        let (columns, rows, _limit_reached) =
+            sqlserver_query_result(client, sql, None, token).await?;
+        Ok(QueryResult {
+            columns,
+            rows_affected: 0,
+            rows,
+            duration_ms: start.elapsed().as_millis() as u64,
+            warnings: Vec::new(),
+        })
+    } else {
+        let run = async {
+            let mut guard = client.lock().await;
+            guard
+                .execute(sql, &[])
+                .await
+                .map(|res| res.total())
+                .map_err(|e| format!("Statement failed: {e}"))
+        };
+        let rows_affected = tokio::select! {
+            _ = token.cancelled() => return Err("Query cancelled".into()),
+            r = run => r?,
+        };
+        Ok(QueryResult {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            rows_affected,
             duration_ms: start.elapsed().as_millis() as u64,
             warnings: Vec::new(),
         })
@@ -543,6 +817,60 @@ pub async fn execute_postgres_stream(
             on_event,
             QueryStreamEvent::Done {
                 rows_affected: res.rows_affected(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
+            },
+        )
+    }
+}
+
+pub async fn execute_sqlserver_stream(
+    client: &AsyncMutex<SqlServerClient>,
+    sql: &str,
+    max_rows: Option<u64>,
+    token: &CancellationToken,
+    on_event: &QueryStreamChannel,
+) -> Result<(), String> {
+    let start = Instant::now();
+    if is_query(sql) {
+        let (columns, rows, limit_reached) =
+            sqlserver_query_result(client, sql, max_rows, token).await?;
+        if !columns.is_empty() {
+            send_query_stream_event(on_event, QueryStreamEvent::Columns { columns })?;
+        }
+        for batch in rows.chunks(STREAM_BATCH_ROWS) {
+            send_query_stream_event(
+                on_event,
+                QueryStreamEvent::Rows {
+                    rows: batch.to_vec(),
+                },
+            )?;
+        }
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: 0,
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: limit_warning(limit_reached, max_rows.filter(|value| *value > 0)),
+            },
+        )
+    } else {
+        let run = async {
+            let mut guard = client.lock().await;
+            guard
+                .execute(sql, &[])
+                .await
+                .map(|res| res.total())
+                .map_err(|e| format!("Statement failed: {e}"))
+        };
+        let rows_affected = tokio::select! {
+            _ = token.cancelled() => return Err("Query cancelled".into()),
+            r = run => r?,
+        };
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected,
                 duration_ms: start.elapsed().as_millis() as u64,
                 warnings: Vec::new(),
             },
@@ -882,6 +1210,200 @@ pub async fn list_indexes_mysql(
 }
 
 // ---------------------------------------------------------------------------
+// Schema introspection — SQL Server
+// ---------------------------------------------------------------------------
+
+fn quote_sqlserver_ident(ident: &str) -> String {
+    format!("[{}]", ident.replace(']', "]]"))
+}
+
+fn sqlserver_qualified(schema: Option<&str>, name: &str) -> String {
+    match schema {
+        Some(s) if !s.is_empty() => {
+            format!(
+                "{}.{}",
+                quote_sqlserver_ident(s),
+                quote_sqlserver_ident(name)
+            )
+        }
+        _ => quote_sqlserver_ident(name),
+    }
+}
+
+fn sqlserver_default_schema(schema: Option<&str>) -> String {
+    schema
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("dbo")
+        .to_string()
+}
+
+fn sqlserver_text(row: &TdsRow, index: usize) -> Option<String> {
+    sqlserver_value_to_string(row, index)
+}
+
+fn sqlserver_bool(row: &TdsRow, index: usize) -> bool {
+    row.try_get::<bool, _>(index)
+        .ok()
+        .flatten()
+        .unwrap_or(false)
+}
+
+fn sqlserver_i64(row: &TdsRow, index: usize) -> Option<i64> {
+    row.try_get::<i64, _>(index)
+        .ok()
+        .flatten()
+        .or_else(|| row.try_get::<i32, _>(index).ok().flatten().map(i64::from))
+}
+
+pub async fn list_schemas_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+) -> Result<Vec<SchemaInfo>, String> {
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT name FROM sys.schemas \
+         WHERE name NOT IN (N'sys', N'INFORMATION_SCHEMA') \
+         ORDER BY name",
+        &[],
+    )
+    .await
+    .map_err(|e| format!("list schemas failed: {e}"))?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| sqlserver_text(r, 0))
+        .map(|name| SchemaInfo { name })
+        .collect())
+}
+
+pub async fn list_tables_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+) -> Result<Vec<TableInfo>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let params: [&dyn TdsToSql; 1] = [&schema_ref];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT o.name, \
+                CASE WHEN o.type = 'V' THEN N'view' ELSE N'table' END AS kind, \
+                CASE WHEN o.type = 'U' THEN SUM(CASE WHEN p.index_id IN (0,1) THEN p.rows ELSE 0 END) ELSE NULL END AS row_count \
+         FROM sys.objects o \
+         JOIN sys.schemas s ON s.schema_id = o.schema_id \
+         LEFT JOIN sys.partitions p ON p.object_id = o.object_id \
+         WHERE s.name = @P1 AND o.type IN ('U','V') \
+         GROUP BY o.name, o.type \
+         ORDER BY o.name",
+        &params,
+    )
+    .await
+    .map_err(|e| format!("list tables failed: {e}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            let name = sqlserver_text(r, 0)?;
+            let kind = sqlserver_text(r, 1).unwrap_or_else(|| "table".to_string());
+            Some(TableInfo {
+                name,
+                kind,
+                row_count: sqlserver_i64(r, 2),
+            })
+        })
+        .collect())
+}
+
+pub async fn describe_table_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ColumnDescription>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let table_ref = table;
+    let params: [&dyn TdsToSql; 2] = [&schema_ref, &table_ref];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT c.name, \
+                t.name + \
+                CASE \
+                  WHEN t.name IN (N'varchar', N'char', N'varbinary', N'binary') \
+                    THEN N'(' + CASE WHEN c.max_length = -1 THEN N'max' ELSE CONVERT(nvarchar(16), c.max_length) END + N')' \
+                  WHEN t.name IN (N'nvarchar', N'nchar') \
+                    THEN N'(' + CASE WHEN c.max_length = -1 THEN N'max' ELSE CONVERT(nvarchar(16), c.max_length / 2) END + N')' \
+                  WHEN t.name IN (N'decimal', N'numeric') \
+                    THEN N'(' + CONVERT(nvarchar(16), c.precision) + N',' + CONVERT(nvarchar(16), c.scale) + N')' \
+                  WHEN t.name IN (N'time', N'datetime2', N'datetimeoffset') \
+                    THEN N'(' + CONVERT(nvarchar(16), c.scale) + N')' \
+                  ELSE N'' \
+                END AS type_name, \
+                c.is_nullable, dc.definition, \
+                CASE WHEN pk.column_id IS NULL THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS is_pk \
+         FROM sys.columns c \
+         JOIN sys.objects o ON o.object_id = c.object_id \
+         JOIN sys.schemas s ON s.schema_id = o.schema_id \
+         JOIN sys.types t ON t.user_type_id = c.user_type_id \
+         LEFT JOIN sys.default_constraints dc ON dc.object_id = c.default_object_id \
+         LEFT JOIN ( \
+             SELECT ic.object_id, ic.column_id \
+             FROM sys.indexes i \
+             JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id \
+             WHERE i.is_primary_key = 1 \
+         ) pk ON pk.object_id = c.object_id AND pk.column_id = c.column_id \
+         WHERE s.name = @P1 AND o.name = @P2 AND o.type IN ('U','V') \
+         ORDER BY c.column_id",
+        &params,
+    )
+    .await
+    .map_err(|e| format!("describe table failed: {e}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            Some(ColumnDescription {
+                name: sqlserver_text(r, 0)?,
+                type_name: sqlserver_text(r, 1).unwrap_or_default(),
+                nullable: sqlserver_bool(r, 2),
+                default: sqlserver_text(r, 3),
+                primary_key: sqlserver_bool(r, 4),
+            })
+        })
+        .collect())
+}
+
+pub async fn list_indexes_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<IndexInfo>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let table_ref = table;
+    let params: [&dyn TdsToSql; 2] = [&schema_ref, &table_ref];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT i.name, c.name, i.is_unique \
+         FROM sys.indexes i \
+         JOIN sys.objects o ON o.object_id = i.object_id \
+         JOIN sys.schemas s ON s.schema_id = o.schema_id \
+         JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id \
+         JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id \
+         WHERE s.name = @P1 AND o.name = @P2 AND i.name IS NOT NULL AND i.is_hypothetical = 0 \
+         ORDER BY i.name, ic.key_ordinal, ic.index_column_id",
+        &params,
+    )
+    .await
+    .map_err(|e| format!("list indexes failed: {e}"))?;
+
+    Ok(group_indexes(rows.iter().filter_map(|r| {
+        Some((
+            sqlserver_text(r, 0)?,
+            sqlserver_text(r, 1).unwrap_or_default(),
+            sqlserver_bool(r, 2),
+        ))
+    })))
+}
+
+// ---------------------------------------------------------------------------
 // Schema introspection — PostgreSQL
 // ---------------------------------------------------------------------------
 
@@ -1087,7 +1609,11 @@ pub async fn list_objects_mysql(
         .iter()
         .filter_map(|r| {
             let name = mysql_value_to_string(r, 0)?;
-            let owner = if owner_col { mysql_value_to_string(r, 1) } else { None };
+            let owner = if owner_col {
+                mysql_value_to_string(r, 1)
+            } else {
+                None
+            };
             Some(DbObject {
                 name,
                 kind: kind.to_string(),
@@ -1130,6 +1656,62 @@ pub async fn list_objects_postgres(
                 name,
                 kind: kind.to_string(),
                 owner: None,
+            })
+        })
+        .collect())
+}
+
+pub async fn list_objects_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    kind: &str,
+) -> Result<Vec<DbObject>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let params: [&dyn TdsToSql; 1] = [&schema_ref];
+    let (sql, owner_col) = match kind {
+        "procedure" => (
+            "SELECT o.name, CAST(NULL AS nvarchar(128)) AS owner \
+             FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id \
+             WHERE s.name = @P1 AND o.type IN ('P','PC') ORDER BY o.name",
+            false,
+        ),
+        "function" => (
+            "SELECT o.name, CAST(NULL AS nvarchar(128)) AS owner \
+             FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id \
+             WHERE s.name = @P1 AND o.type IN ('FN','IF','TF','FS','FT') ORDER BY o.name",
+            false,
+        ),
+        "trigger" => (
+            "SELECT tr.name, parent.name AS owner \
+             FROM sys.triggers tr \
+             JOIN sys.objects parent ON parent.object_id = tr.parent_id \
+             JOIN sys.schemas s ON s.schema_id = parent.schema_id \
+             WHERE s.name = @P1 ORDER BY tr.name",
+            true,
+        ),
+        "sequence" => (
+            "SELECT seq.name, CAST(NULL AS nvarchar(128)) AS owner \
+             FROM sys.sequences seq JOIN sys.schemas s ON s.schema_id = seq.schema_id \
+             WHERE s.name = @P1 ORDER BY seq.name",
+            false,
+        ),
+        _ => return Ok(Vec::new()),
+    };
+    let rows = sqlserver_fetch(client, sql, &params)
+        .await
+        .map_err(|e| format!("list {kind} failed: {e}"))?;
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            Some(DbObject {
+                name: sqlserver_text(r, 0)?,
+                kind: kind.to_string(),
+                owner: if owner_col {
+                    sqlserver_text(r, 1)
+                } else {
+                    None
+                },
             })
         })
         .collect())
@@ -1197,7 +1779,11 @@ pub async fn object_ddl_postgres(
             let def: String = row
                 .and_then(|r| r.try_get::<String, _>(0).ok())
                 .ok_or_else(|| format!("View {name} not found"))?;
-            let kw = if kind == "materialized_view" { "MATERIALIZED VIEW" } else { "VIEW" };
+            let kw = if kind == "materialized_view" {
+                "MATERIALIZED VIEW"
+            } else {
+                "VIEW"
+            };
             Ok(format!(
                 "CREATE OR REPLACE {kw} \"{schema}\".\"{name}\" AS\n{def}"
             ))
@@ -1245,6 +1831,74 @@ pub async fn object_ddl_postgres(
             }
             Ok(format!(
                 "CREATE TABLE \"{schema}\".\"{name}\" (\n{}\n);",
+                lines.join(",\n")
+            ))
+        }
+    }
+}
+
+pub async fn object_ddl_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    kind: &str,
+    name: &str,
+) -> Result<String, String> {
+    let schema = sqlserver_default_schema(schema);
+    match kind {
+        "view" | "procedure" | "function" | "trigger" => {
+            let schema_ref = schema.as_str();
+            let name_ref = name;
+            let params: [&dyn TdsToSql; 2] = [&schema_ref, &name_ref];
+            let rows = sqlserver_fetch(
+                client,
+                "SELECT OBJECT_DEFINITION(OBJECT_ID(QUOTENAME(@P1) + N'.' + QUOTENAME(@P2)))",
+                &params,
+            )
+            .await
+            .map_err(|e| format!("object definition failed: {e}"))?;
+            rows.first()
+                .and_then(|r| sqlserver_text(r, 0))
+                .filter(|ddl| !ddl.trim().is_empty())
+                .ok_or_else(|| format!("No DDL returned for {name}"))
+        }
+        "sequence" => Ok(format!(
+            "CREATE SEQUENCE {};",
+            sqlserver_qualified(Some(&schema), name)
+        )),
+        _ => {
+            let cols = describe_table_sqlserver(client, Some(&schema), name).await?;
+            if cols.is_empty() {
+                return Err(format!("Table {name} not found"));
+            }
+            let mut lines: Vec<String> = cols
+                .iter()
+                .map(|c| {
+                    let null = if c.nullable { " NULL" } else { " NOT NULL" };
+                    let default = c
+                        .default
+                        .as_ref()
+                        .map(|d| format!(" DEFAULT {d}"))
+                        .unwrap_or_default();
+                    format!(
+                        "  {} {}{}{}",
+                        quote_sqlserver_ident(&c.name),
+                        c.type_name,
+                        null,
+                        default
+                    )
+                })
+                .collect();
+            let pks: Vec<String> = cols
+                .iter()
+                .filter(|c| c.primary_key)
+                .map(|c| quote_sqlserver_ident(&c.name))
+                .collect();
+            if !pks.is_empty() {
+                lines.push(format!("  PRIMARY KEY ({})", pks.join(", ")));
+            }
+            Ok(format!(
+                "CREATE TABLE {} (\n{}\n);",
+                sqlserver_qualified(Some(&schema), name),
                 lines.join(",\n")
             ))
         }
@@ -1302,12 +1956,53 @@ pub async fn table_stats_postgres(
     .await
     .map_err(|e| format!("table stats failed: {e}"))?
     .ok_or_else(|| format!("Table {table} not found"))?;
-    let num = |idx: usize| row.try_get::<Option<i64>, _>(idx).ok().flatten().map(|v| v.to_string());
+    let num = |idx: usize| {
+        row.try_get::<Option<i64>, _>(idx)
+            .ok()
+            .flatten()
+            .map(|v| v.to_string())
+    };
     let pairs = vec![
         ("Total size (bytes)", num(0)),
         ("Table size (bytes)", num(1)),
         ("Indexes size (bytes)", num(2)),
         ("Live rows (estimate)", num(3)),
+    ];
+    Ok(super::metric_result(pairs))
+}
+
+pub async fn table_stats_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<QueryResult, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let table_ref = table;
+    let params: [&dyn TdsToSql; 2] = [&schema_ref, &table_ref];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT SUM(CASE WHEN p.index_id IN (0,1) THEN p.rows ELSE 0 END) AS row_count, \
+                SUM(a.total_pages) * 8192 AS reserved_bytes, \
+                SUM(a.used_pages) * 8192 AS used_bytes, \
+                SUM(a.data_pages) * 8192 AS data_bytes \
+         FROM sys.objects o \
+         JOIN sys.schemas s ON s.schema_id = o.schema_id \
+         LEFT JOIN sys.partitions p ON p.object_id = o.object_id \
+         LEFT JOIN sys.allocation_units a ON a.container_id = p.partition_id \
+         WHERE s.name = @P1 AND o.name = @P2 AND o.type = 'U'",
+        &params,
+    )
+    .await
+    .map_err(|e| format!("table stats failed: {e}"))?;
+    let row = rows
+        .first()
+        .ok_or_else(|| format!("Table {table} not found"))?;
+    let pairs = vec![
+        ("Rows", sqlserver_text(row, 0)),
+        ("Reserved bytes", sqlserver_text(row, 1)),
+        ("Used bytes", sqlserver_text(row, 2)),
+        ("Data bytes", sqlserver_text(row, 3)),
     ];
     Ok(super::metric_result(pairs))
 }
@@ -1349,6 +2044,22 @@ mod tests {
     fn mysql_table_kind_maps_views() {
         assert_eq!(mysql_table_kind("VIEW"), "view");
         assert_eq!(mysql_table_kind("BASE TABLE"), "table");
+    }
+
+    #[test]
+    fn sqlserver_identifier_quoting_escapes_brackets() {
+        assert_eq!(quote_sqlserver_ident("te]st"), "[te]]st]");
+        assert_eq!(
+            sqlserver_qualified(Some("dbo]x"), "ta]ble"),
+            "[dbo]]x].[ta]]ble]"
+        );
+    }
+
+    #[test]
+    fn sqlserver_default_schema_falls_back_to_dbo() {
+        assert_eq!(sqlserver_default_schema(None), "dbo");
+        assert_eq!(sqlserver_default_schema(Some("  ")), "dbo");
+        assert_eq!(sqlserver_default_schema(Some("sales")), "sales");
     }
 
     #[test]

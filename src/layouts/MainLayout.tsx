@@ -1429,6 +1429,7 @@ export function MainLayout() {
     } else if (
       session.session_type === "MySQL" ||
       session.session_type === "PostgreSQL" ||
+      session.session_type === "SQLServer" ||
       session.session_type === "ClickHouse" ||
       session.session_type === "Presto" ||
       session.session_type === "Redis"
