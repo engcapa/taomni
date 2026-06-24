@@ -229,6 +229,12 @@ pub struct ChatSendRequest {
     /// access (that is 3.2, deliberately out of scope). `None` when unknown.
     #[serde(default)]
     pub cwd: Option<String>,
+    /// Live local-terminal facts (platform / shell id / shell args / cwd) for
+    /// Claude Code's appended system prompt. Only present for local terminal
+    /// tabs; SSH/remote tabs leave this absent so their saved session card stays
+    /// the source of truth.
+    #[serde(default)]
+    pub local_terminal_env: Option<crate::agent::cc_bridge::session_card::LocalTerminalEnv>,
     /// Phase 6 — the live `db_connections` runtime id this CC thread is bound to,
     /// for SQL/Redis DB sessions. Like `cwd`, it is volatile (the frontend
     /// regenerates it on each (re)connect and the backend can't derive it), so
@@ -526,7 +532,9 @@ pub async fn chat_stream(
         if !ai_config.cc_bridge.enabled || ai_config.fully_disabled || ai_config.full_local_mode {
             emit(&StreamEventOut::Error {
                 id: assistant_id,
-                message: "Claude Code is unavailable in full-local / fully-disabled mode or is disabled.".into(),
+                message:
+                    "Claude Code is unavailable in full-local / fully-disabled mode or is disabled."
+                        .into(),
             });
             return Ok(());
         }
@@ -655,6 +663,7 @@ pub async fn chat_stream(
                         &req.thread_id,
                         thread.linked_session_id.is_some(),
                         &recent,
+                        req.local_terminal_env.as_ref(),
                     );
                     redact::redact(&raw).0
                 };
@@ -788,50 +797,67 @@ pub async fn chat_stream(
             }
             format!("{}{}", prefix, clean_content)
         };
-        let events = process.send_with_callback(&cc_message, move |evt| {
-            use crate::agent::cc_bridge::protocol::CcEvent;
-            match evt {
-                CcEvent::Partial { content } => {
-                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Token {
-                        id: assistant_id_clone.clone(),
-                        content: content.clone(),
-                    });
+        let events = process
+            .send_with_callback(&cc_message, move |evt| {
+                use crate::agent::cc_bridge::protocol::CcEvent;
+                match evt {
+                    CcEvent::Partial { content } => {
+                        let _ = app_clone.emit(
+                            &event_name_clone,
+                            StreamEventOut::Token {
+                                id: assistant_id_clone.clone(),
+                                content: content.clone(),
+                            },
+                        );
+                    }
+                    // 3.5 — emit a structured, display-only card for tool use. It
+                    // carries no machine-parseable payload, so the frontend never
+                    // re-executes it (confirmation already happened live via the
+                    // MCP permission prompt). The compact text record is persisted
+                    // separately below, so reload still shows the activity as text.
+                    CcEvent::ToolUse { id, name, input } => {
+                        let _ = app_clone.emit(
+                            &event_name_clone,
+                            StreamEventOut::CcToolActivity {
+                                id: assistant_id_clone.clone(),
+                                call_id: id.clone(),
+                                phase: "use".into(),
+                                tool: name.clone(),
+                                detail: cc_tool_arg_summary(input).unwrap_or("").to_string(),
+                            },
+                        );
+                    }
+                    CcEvent::ToolResult {
+                        tool_use_id,
+                        content,
+                    } => {
+                        let _ = app_clone.emit(
+                            &event_name_clone,
+                            StreamEventOut::CcToolActivity {
+                                id: assistant_id_clone.clone(),
+                                call_id: tool_use_id.clone(),
+                                phase: "result".into(),
+                                tool: String::new(),
+                                detail: cc_tool_result_preview(content),
+                            },
+                        );
+                    }
+                    CcEvent::Done { usage: Some(u) } => {
+                        let _ = app_clone.emit(
+                            &event_name_clone,
+                            StreamEventOut::Usage {
+                                id: assistant_id_clone.clone(),
+                                input_tokens: u.input_tokens,
+                                output_tokens: u.output_tokens,
+                                cost_usd: u.total_cost_usd,
+                                duration_ms: u.duration_ms,
+                            },
+                        );
+                    }
+                    _ => {}
                 }
-                // 3.5 — emit a structured, display-only card for tool use. It
-                // carries no machine-parseable payload, so the frontend never
-                // re-executes it (confirmation already happened live via the
-                // MCP permission prompt). The compact text record is persisted
-                // separately below, so reload still shows the activity as text.
-                CcEvent::ToolUse { id, name, input } => {
-                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::CcToolActivity {
-                        id: assistant_id_clone.clone(),
-                        call_id: id.clone(),
-                        phase: "use".into(),
-                        tool: name.clone(),
-                        detail: cc_tool_arg_summary(input).unwrap_or("").to_string(),
-                    });
-                }
-                CcEvent::ToolResult { tool_use_id, content } => {
-                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::CcToolActivity {
-                        id: assistant_id_clone.clone(),
-                        call_id: tool_use_id.clone(),
-                        phase: "result".into(),
-                        tool: String::new(),
-                        detail: cc_tool_result_preview(content),
-                    });
-                }
-                CcEvent::Done { usage: Some(u) } => {
-                    let _ = app_clone.emit(&event_name_clone, StreamEventOut::Usage {
-                        id: assistant_id_clone.clone(),
-                        input_tokens: u.input_tokens,
-                        output_tokens: u.output_tokens,
-                        cost_usd: u.total_cost_usd,
-                        duration_ms: u.duration_ms,
-                    });
-                }
-                _ => {}
-            }
-        }).await;
+            })
+            .await;
 
         let events = match events {
             Ok(ev) => ev,
@@ -868,7 +894,8 @@ pub async fn chat_stream(
             }
         }
 
-        let session_id = crate::agent::cc_bridge::protocol::extract_session_id(&events).or(resume_session);
+        let session_id =
+            crate::agent::cc_bridge::protocol::extract_session_id(&events).or(resume_session);
         if let Some(sid) = &session_id {
             if let Ok(db) = state.db.lock() {
                 let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
@@ -890,7 +917,8 @@ pub async fn chat_stream(
             store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
             if is_first {
                 let title = user_msg.content.chars().take(40).collect::<String>();
-                store::update_thread_title(&db, &req.thread_id, &title).map_err(|e| e.to_string())?;
+                store::update_thread_title(&db, &req.thread_id, &title)
+                    .map_err(|e| e.to_string())?;
             }
         }
 
