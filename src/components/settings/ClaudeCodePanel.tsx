@@ -213,8 +213,8 @@ export function ClaudeCodePanel() {
         </div>
       )}
 
-      {/* Ready — show config options */}
-      {isReady && cc.enabled && (
+      {/* Enabled: show config options even before a detection pass. */}
+      {cc.enabled && (
         <div className="space-y-2 pt-2 border-t border-[var(--taomni-divider)]">
           <div className="grid grid-cols-2 gap-3">
             <div>
