@@ -1351,6 +1351,8 @@ const dict = {
     threadModelAria: "Claude Code model for this thread",
     threadModelTitle: "Model for this thread (changing it restarts the Claude Code session)",
     ccTerminalEcho: "Echo to terminal",
+    ccTerminalEchoOn: "Terminal echo: on",
+    ccTerminalEchoOff: "Terminal echo: off",
     ccTerminalEchoTitle: "Mirror Claude Code captured-run summaries into the bound terminal",
     ccTerminalEchoAria: "Echo Claude Code captured runs to terminal",
     modelDefault: "default",

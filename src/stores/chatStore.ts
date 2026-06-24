@@ -128,12 +128,27 @@ interface ChatStore {
   setDrawerWidth: (w: number) => void;
 }
 
-function latestGlobalThread(threads: ChatThread[]): ChatThread | undefined {
-  return threads.find((thread) => !thread.linked_session_id);
+function latestGlobalThread(
+  threads: ChatThread[],
+  preferredProviderId?: string | null,
+): ChatThread | undefined {
+  const candidates = threads.filter((thread) => !thread.linked_session_id);
+  if (preferredProviderId) {
+    return candidates.find((thread) => thread.provider_id === preferredProviderId);
+  }
+  return candidates[0];
 }
 
-function latestTabThread(threads: ChatThread[], tabId: string): ChatThread | undefined {
-  return threads.find((thread) => thread.linked_session_id === tabId);
+function latestTabThread(
+  threads: ChatThread[],
+  tabId: string,
+  preferredProviderId?: string | null,
+): ChatThread | undefined {
+  const candidates = threads.filter((thread) => thread.linked_session_id === tabId);
+  if (preferredProviderId) {
+    return candidates.find((thread) => thread.provider_id === preferredProviderId);
+  }
+  return candidates[0];
 }
 
 function scopeForThread(thread: ChatThread | undefined | null): {
@@ -144,6 +159,20 @@ function scopeForThread(thread: ChatThread | undefined | null): {
   return thread.linked_session_id
     ? { drawerScope: "tab", drawerTabId: thread.linked_session_id }
     : { drawerScope: "global", drawerTabId: null };
+}
+
+async function resolveDefaultProviderId(): Promise<string | null> {
+  try {
+    const { defaultChatProviderId, useAiStore } = await import("./aiStore");
+    const aiStore = useAiStore.getState();
+    if (!aiStore.config) {
+      await aiStore.loadConfig();
+    }
+    return defaultChatProviderId(useAiStore.getState().config) ?? null;
+  } catch (e) {
+    console.warn("resolve default chat provider failed:", e);
+    return null;
+  }
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -173,8 +202,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   newThread: async (providerId?: string, linkedSessionId?: string) => {
+    const resolvedProviderId = providerId ?? (await resolveDefaultProviderId());
     const thread = await invoke<ChatThread>("chat_new_thread", {
-      providerId: providerId ?? null,
+      providerId: resolvedProviderId,
       linkedSessionId: linkedSessionId ?? null,
     });
     const scope = scopeForThread(thread);
@@ -483,9 +513,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!get().threadsLoaded) {
       await get().loadThreads();
     }
-    let thread = latestGlobalThread(get().threads);
+    const defaultProviderId = await resolveDefaultProviderId();
+    let thread = latestGlobalThread(get().threads, defaultProviderId);
     if (!thread) {
-      thread = await get().newThread(undefined, undefined);
+      thread = await get().newThread(defaultProviderId ?? undefined, undefined);
     }
     set({
       activeThreadId: thread.id,
@@ -509,9 +540,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!get().threadsLoaded) {
       await get().loadThreads();
     }
-    let thread = latestTabThread(get().threads, tabId);
+    const defaultProviderId = await resolveDefaultProviderId();
+    let thread = latestTabThread(get().threads, tabId, defaultProviderId);
     if (!thread) {
-      thread = await get().newThread(undefined, tabId);
+      thread = await get().newThread(defaultProviderId ?? undefined, tabId);
     }
     set((s) => ({
       activeThreadId: thread.id,

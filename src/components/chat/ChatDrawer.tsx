@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, TerminalSquare, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
-import { DEFAULT_CLAUDE_CODE_MODEL, useAiStore } from "../../stores/aiStore";
+import { chatDrawerProviderIds, DEFAULT_CLAUDE_CODE_MODEL, useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
 import { CcToolCards } from "./CcToolCards";
@@ -88,17 +88,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiConfig = useAiStore((s) => s.config);
-  const aiProviders = aiConfig?.llm.providers;
-  const ccBridgeEnabled = aiConfig?.cc_bridge.enabled;
   const defaultCcModel = aiConfig?.cc_bridge.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL;
   const ccTerminalEchoEnabled = aiConfig?.cc_bridge.terminal_echo_enabled ?? true;
   const globalOutputFormat = aiConfig?.chat_output_format ?? "md";
   const loadAiConfig = useAiStore((s) => s.loadConfig);
   const saveAiConfig = useAiStore((s) => s.saveConfig);
-  const providerIds = Object.keys(aiProviders ?? {});
-  if (ccBridgeEnabled) {
-    providerIds.push("claude-code");
-  }
+  const providerIds = useMemo(() => chatDrawerProviderIds(aiConfig), [aiConfig]);
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
   const setThreadCcModel = useChatStore((s) => s.setThreadCcModel);
   const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
@@ -467,20 +462,23 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               />
             )}
             {activeThread.provider_id === "claude-code" && activeThread.linked_session_id && (
-              <label
-                className="inline-flex items-center gap-1 text-[10px] cursor-pointer select-none"
+              <button
+                type="button"
+                className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${
+                  ccTerminalEchoEnabled
+                    ? "text-[var(--taomni-accent)]"
+                    : "text-[var(--taomni-text-muted)]"
+                }`}
+                onClick={() => setCcTerminalEcho(!ccTerminalEchoEnabled)}
+                disabled={!aiConfig}
                 title={t("chat.ccTerminalEchoTitle")}
+                aria-pressed={ccTerminalEchoEnabled}
+                aria-label={t("chat.ccTerminalEchoAria")}
+                data-testid="chat-cc-terminal-echo-toggle"
               >
-                <input
-                  type="checkbox"
-                  className="h-3 w-3"
-                  checked={ccTerminalEchoEnabled}
-                  disabled={!aiConfig}
-                  aria-label={t("chat.ccTerminalEchoAria")}
-                  onChange={(e) => setCcTerminalEcho(e.target.checked)}
-                />
-                <span>{t("chat.ccTerminalEcho")}</span>
-              </label>
+                <TerminalSquare className="w-2.5 h-2.5" />
+                <span>{ccTerminalEchoEnabled ? t("chat.ccTerminalEchoOn") : t("chat.ccTerminalEchoOff")}</span>
+              </button>
             )}
             <span className="ml-2">{t("chat.formatLabel")}</span>
             {formatLocked ? (
