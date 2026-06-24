@@ -1,4 +1,4 @@
-import type { AuthMethod, SessionConfig } from "./ipc";
+import type { AuthMethod, DbeaverCredentialEntry, SessionConfig } from "./ipc";
 import {
   groupPathContains,
   leafGroupName,
@@ -66,6 +66,7 @@ export interface SessionImportOptions {
   sourcePath?: string | null;
   homeDir?: string | null;
   includeSecrets?: boolean;
+  dbeaverCredentials?: Record<string, DbeaverCredentialEntry | null | undefined>;
 }
 
 export interface SessionImportSecret {
@@ -580,7 +581,14 @@ export function parseDbeaverSessions(text: string, options: SessionImportOptions
   let skipped = limited.skipped;
 
   for (const input of limited.rows as DbeaverConnectionInput[]) {
-    const imported = dbeaverConnectionToSession(input, options.targetFolder ?? null, now, warnings);
+    const imported = dbeaverConnectionToSession(
+      input,
+      options.targetFolder ?? null,
+      now,
+      warnings,
+      options.dbeaverCredentials?.[input.id],
+      options.dbeaverCredentials !== undefined,
+    );
     if (!imported) {
       skipped += 1;
       continue;
@@ -682,10 +690,19 @@ function dbeaverConnectionToSession(
   targetFolder: string | null,
   now: number,
   warnings: string[],
+  credential: DbeaverCredentialEntry | null | undefined,
+  credentialsLoaded: boolean,
 ): { session: SessionConfig; password?: string } | null {
   const record = input.record;
   const configuration = firstRecord(record.configuration, record.connection, record.config, record);
   const properties = firstRecord(configuration.properties, record.properties);
+  const authProperties = firstRecord(
+    configuration["auth-properties"],
+    configuration.authProperties,
+    record["auth-properties"],
+    record.authProperties,
+  );
+  const credentialSection = firstRecord(credential?.sections?.["#connection"]);
   const url = cleanText(firstNonEmptyString(
     configuration.url,
     configuration.jdbcUrl,
@@ -764,11 +781,16 @@ function dbeaverConnectionToSession(
     configuration.password,
     configuration.userPassword,
     record.password,
+    authProperties.password,
+    credential?.password,
+    credentialSection.password,
     urlInfo.password,
   ), MAX_OPTION_LENGTH);
   const hasExternalPassword = dbeaverTruthy(record["save-password"] ?? record.savePassword ?? configuration["save-password"]);
   if (!password && hasExternalPassword) {
-    warnings.push(`DBeaver connection "${label}" has a saved password, but encrypted DBeaver credentials were not imported.`);
+    warnings.push(credentialsLoaded
+      ? `DBeaver connection "${label}" has a saved password, but credentials-config.json did not contain a password for this connection.`
+      : `DBeaver connection "${label}" has a saved password, but encrypted DBeaver credentials were not imported.`);
   }
 
   const importedFolder = combineImportFolder("DBeaver", normalizeGroupPath(input.folderPath));
@@ -794,6 +816,11 @@ function dbeaverConnectionToSession(
       configuration["user.name"],
       record.user,
       record.username,
+      authProperties.user,
+      authProperties.username,
+      credential?.user,
+      credentialSection.user,
+      credentialSection.username,
       urlInfo.username,
     ), MAX_NAME_LENGTH),
     groupPath: combineImportFolder(targetFolder, importedFolder),

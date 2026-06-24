@@ -1811,6 +1811,7 @@ export const zhCN: DeepPartial<typeof en> = {
     standaloneTabbyPassphrases: "{count} 条 Tabby 私钥口令将作为独立条目存入凭据库 —— 请在 设置 → 凭据库 中手动关联。",
     skippedStandalone: "由于凭据库未初始化或已锁定，已跳过独立 Tabby 密钥。",
     skippedVaultLocked: "因 {reason}，已跳过“{name}”的密码保存。",
+    skippedVaultUnlockCancelled: "由于凭据库未解锁，已跳过 {count} 条导入密钥。",
     vaultLockedReason: "凭据库未初始化或已锁定",
     standaloneSaved: "已将 {count} 条独立密钥存入凭据库 —— 请在 设置 → 凭据库 中关联。",
     standaloneSkipped: "凭据库拒绝写入，已跳过 {count} 条独立密钥。",

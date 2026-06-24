@@ -234,6 +234,7 @@ pub fn run() {
             session::import::import_wsl_sessions,
             session::import::import_external_bash_sessions,
             session::import::scan_local_session_files,
+            session::import::read_dbeaver_credentials_for_data_sources,
             session::import::read_plist_session_file,
             session::import_secrets::keychain::keychain_lookup_batch,
             session::import_secrets::tabby::tabby_decrypt_vault,

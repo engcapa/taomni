@@ -32,6 +32,8 @@ import {
   isVaultLockedError,
   getHomeDir,
   keychainLookupBatch,
+  readDbeaverCredentialsForDataSources,
+  readFileBytes,
   readPlistSessionFile,
   scanLocalSessionFiles,
   selectFilePath,
@@ -89,6 +91,7 @@ import { SessionImportPreview } from "../session/SessionImportPreview";
 import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useT } from "../../lib/i18n";
+import { ensureVaultReady } from "../../lib/vaultGate";
 
 const SESSION_DRAG_MIME = "taomni/session";
 
@@ -609,6 +612,21 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   const prepareImportResultForSave = async (result: SessionImportResult): Promise<SessionImportResult> => {
     if (result.secrets.length === 0) return result;
 
+    const vaultReady = await ensureVaultReady(t("vault.gateReasonSession"));
+    if (!vaultReady) {
+      return {
+        ...result,
+        warnings: [...new Set([
+          ...result.warnings,
+          t("sessionTree.skippedVaultUnlockCancelled", {
+            count: result.secrets.length,
+            plural: result.secrets.length === 1 ? "" : "s",
+          }),
+        ])],
+        secrets: [],
+      };
+    }
+
     const sessionsById = new Map(result.sessions.map((session) => [session.id, { ...session }]));
     const warnings = [...result.warnings];
     let standaloneSaved = 0;
@@ -788,6 +806,48 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         ...(extraOptions?.() ?? {}),
       });
       queueImportPreview(result, folderPath, source);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const dbeaverCredentialOptions = async (path: string): Promise<Partial<SessionImportOptions>> => {
+    const credentials = await readDbeaverCredentialsForDataSources(path);
+    return Object.keys(credentials).length > 0 ? { dbeaverCredentials: credentials } : {};
+  };
+
+  const importDbeaverFile = (folderPath: string | null) => {
+    selectFilePath().then(async (path) => {
+      if (!path) return;
+      const text = new TextDecoder().decode(await readFileBytes(path));
+      const result = parseDbeaverSessions(text, {
+        targetFolder: folderPath,
+        existingSessions: sessions,
+        sourcePath: path,
+        ...(await dbeaverCredentialOptions(path)),
+      });
+      queueImportPreview(result, folderPath, "DBeaver");
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const importScannedDbeaverSessions = (folderPath: string | null) => {
+    scanLocalSessionFiles("dbeaver").then(async (files) => {
+      if (files.length === 0) {
+        setStatusMessage(t("sessionTree.noLocalConfigFound", { source: "DBeaver" }));
+        return;
+      }
+      const results = await Promise.all(files.map(async (file) =>
+        parseDbeaverSessions(file.text, {
+          targetFolder: folderPath,
+          existingSessions: sessions,
+          sourcePath: file.relativePath || file.path,
+          ...(await dbeaverCredentialOptions(file.path)),
+        }),
+      ));
+      const result = mergeImportResults(results);
+      queueImportPreview(result, folderPath, "DBeaver local config");
     }).catch((error) => {
       window.alert(error instanceof Error ? error.message : String(error));
     });
@@ -1003,12 +1063,12 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           {
             label: t("sessionTree.fromDbeaverDataSources"),
             icon: <FileText className="w-3 h-3" />,
-            onClick: () => importTextSessions(folderPath, "DBeaver", ".json,.xml,data-sources.json,application/json,text/xml,application/xml,text/plain", parseDbeaverSessions),
+            onClick: () => importDbeaverFile(folderPath),
           },
           {
             label: t("sessionTree.fromLocalDbeaver"),
             icon: <FolderOpen className="w-3 h-3" />,
-            onClick: () => importScannedTextSessions(folderPath, "dbeaver", "DBeaver", parseDbeaverSessions),
+            onClick: () => importScannedDbeaverSessions(folderPath),
           },
         ],
       },

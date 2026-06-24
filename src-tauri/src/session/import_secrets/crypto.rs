@@ -1,10 +1,11 @@
-use aes::Aes256;
+use aes::{Aes128, Aes256};
 use cbc::cipher::block_padding::Pkcs7;
 use cbc::cipher::{BlockModeDecrypt, KeyIvInit};
 use sha2::Sha512;
 use zeroize::Zeroizing;
 
 type Aes256CbcDec = cbc::Decryptor<Aes256>;
+type Aes128CbcDec = cbc::Decryptor<Aes128>;
 
 #[derive(Debug)]
 pub enum SecretCryptoError {
@@ -56,14 +57,33 @@ pub fn aes_256_cbc_decrypt_pkcs7(
     Ok(Zeroizing::new(buf))
 }
 
+pub fn aes_128_cbc_decrypt_pkcs7(
+    key: &[u8],
+    iv: &[u8],
+    ciphertext: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, SecretCryptoError> {
+    if key.len() != 16 || iv.len() != 16 {
+        return Err(SecretCryptoError::InvalidKeyOrIvLength);
+    }
+    let mut buf = ciphertext.to_vec();
+    let plaintext_len = Aes128CbcDec::new_from_slices(key, iv)
+        .map_err(|_| SecretCryptoError::InvalidKeyOrIvLength)?
+        .decrypt_padded::<Pkcs7>(&mut buf)
+        .map_err(|_| SecretCryptoError::BadPadding)?
+        .len();
+    buf.truncate(plaintext_len);
+    Ok(Zeroizing::new(buf))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aes::Aes256;
+    use aes::{Aes128, Aes256};
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockModeEncrypt, KeyIvInit};
 
     type Aes256CbcEnc = cbc::Encryptor<Aes256>;
+    type Aes128CbcEnc = cbc::Encryptor<Aes128>;
 
     fn cbc_encrypt_pkcs7(key: &[u8; 32], iv: &[u8; 16], plaintext: &[u8]) -> Vec<u8> {
         let block_size = 16;
@@ -71,6 +91,20 @@ mod tests {
         let mut buf = vec![0u8; plaintext.len() + pad];
         buf[..plaintext.len()].copy_from_slice(plaintext);
         let ct_len = Aes256CbcEnc::new_from_slices(key, iv)
+            .expect("key and iv lengths are fixed")
+            .encrypt_padded::<Pkcs7>(&mut buf, plaintext.len())
+            .expect("encrypt")
+            .len();
+        buf.truncate(ct_len);
+        buf
+    }
+
+    fn cbc_128_encrypt_pkcs7(key: &[u8; 16], iv: &[u8; 16], plaintext: &[u8]) -> Vec<u8> {
+        let block_size = 16;
+        let pad = block_size - (plaintext.len() % block_size);
+        let mut buf = vec![0u8; plaintext.len() + pad];
+        buf[..plaintext.len()].copy_from_slice(plaintext);
+        let ct_len = Aes128CbcEnc::new_from_slices(key, iv)
             .expect("key and iv lengths are fixed")
             .encrypt_padded::<Pkcs7>(&mut buf, plaintext.len())
             .expect("encrypt")
@@ -95,6 +129,16 @@ mod tests {
         let plaintext = b"the quick brown fox jumps over the lazy dog";
         let ct = cbc_encrypt_pkcs7(&key, &iv, plaintext);
         let decoded = aes_256_cbc_decrypt_pkcs7(&key, &iv, &ct).unwrap();
+        assert_eq!(&decoded[..], plaintext);
+    }
+
+    #[test]
+    fn cbc_128_round_trip() {
+        let key = [7u8; 16];
+        let iv = [9u8; 16];
+        let plaintext = b"dbeaver credentials";
+        let ct = cbc_128_encrypt_pkcs7(&key, &iv, plaintext);
+        let decoded = aes_128_cbc_decrypt_pkcs7(&key, &iv, &ct).unwrap();
         assert_eq!(&decoded[..], plaintext);
     }
 
