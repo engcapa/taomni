@@ -36,11 +36,14 @@ import {
   readFileBytes,
   readPlistSessionFile,
   scanLocalSessionFiles,
+  secureCrtDecryptPasswords,
   selectFilePath,
   tabbyDecryptVault,
   vaultPut,
   type KeychainHit,
   type KeychainQuery,
+  type SecureCrtPasswordFailure,
+  type SecureCrtPasswordHit,
   type TabbySecret,
 } from "../../lib/ipc";
 import {
@@ -149,7 +152,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   } | null>(null);
   const [externalVaultPrompt, setExternalVaultPrompt] = useState<{
     toolName: string;
+    title?: string;
     description: string;
+    passwordLabel?: string;
     errorMessage: string | null;
     onSubmit: (password: string) => Promise<void>;
     onSkip: () => void;
@@ -347,6 +352,14 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   ) => {
     if (result.externalSecretsTool === "tabby") {
       void enrichTabbyResult(result)
+        .then((enriched) => setPendingImport({ result: enriched, folderPath, source }))
+        .catch((error) => {
+          window.alert(error instanceof Error ? error.message : String(error));
+        });
+      return;
+    }
+    if (result.externalSecretsTool === "securecrt") {
+      void enrichSecureCrtResult(result)
         .then((enriched) => setPendingImport({ result: enriched, folderPath, source }))
         .catch((error) => {
           window.alert(error instanceof Error ? error.message : String(error));
@@ -562,6 +575,120 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     };
   };
 
+  const enrichSecureCrtResult = async (
+    result: SessionImportResult,
+  ): Promise<SessionImportResult> => {
+    if (result.externalSecretsTool !== "securecrt") return result;
+    const pendingPasswords = result.secureCrtPasswords ?? [];
+    if (pendingPasswords.length === 0) {
+      return { ...result, externalSecretsTool: undefined };
+    }
+
+    const firstPass = await secureCrtDecryptPasswords(
+      pendingPasswords.map(({ sessionId, encrypted }) => ({ sessionId, encrypted })),
+      "",
+    );
+
+    let hits: SecureCrtPasswordHit[] = [...firstPass.secrets];
+    let failures: SecureCrtPasswordFailure[] = [...firstPass.failures];
+    const needsPassphraseIds = new Set(
+      failures.filter((failure) => failure.needsPassphrase).map((failure) => failure.sessionId),
+    );
+
+    if (needsPassphraseIds.size > 0) {
+      const retryPasswords = pendingPasswords.filter((password) => needsPassphraseIds.has(password.sessionId));
+      const retry = await promptSecureCrtPassphraseUnlock(retryPasswords);
+      hits = [...hits, ...retry.secrets];
+      const retried = new Set(retryPasswords.map((password) => password.sessionId));
+      failures = [
+        ...failures.filter((failure) => !retried.has(failure.sessionId)),
+        ...retry.failures,
+      ];
+    }
+
+    return mergeSecureCrtSecrets(result, hits, failures);
+  };
+
+  const promptSecureCrtPassphraseUnlock = (
+    passwords: NonNullable<SessionImportResult["secureCrtPasswords"]>,
+  ): Promise<{ secrets: SecureCrtPasswordHit[]; failures: SecureCrtPasswordFailure[] }> =>
+    new Promise((resolve) => {
+      const close = (response: { secrets: SecureCrtPasswordHit[]; failures: SecureCrtPasswordFailure[] }) => {
+        setExternalVaultPrompt(null);
+        resolve(response);
+      };
+      let attempts = 0;
+      setExternalVaultPrompt({
+        toolName: "SecureCRT",
+        title: t("sessionTree.secureCrtPassphraseTitle"),
+        description: t("sessionTree.secureCrtPassphraseDescription"),
+        passwordLabel: t("sessionTree.secureCrtPassphraseLabel"),
+        errorMessage: null,
+        onSkip: () => close({
+          secrets: [],
+          failures: passwords.map((password) => ({
+            sessionId: password.sessionId,
+            error: "securecrt_password_passphrase_skipped",
+            needsPassphrase: false,
+          })),
+        }),
+        onSubmit: async (passphrase) => {
+          attempts += 1;
+          const response = await secureCrtDecryptPasswords(
+            passwords.map(({ sessionId, encrypted }) => ({ sessionId, encrypted })),
+            passphrase,
+          );
+          const stillNeedsPassphrase = response.failures.some((failure) => failure.needsPassphrase);
+          if (stillNeedsPassphrase && response.secrets.length === 0) {
+            throw new Error(t("sessionTree.secureCrtIncorrectPassphrase", { attempt: attempts }));
+          }
+          close(response);
+        },
+      });
+    });
+
+  const mergeSecureCrtSecrets = (
+    result: SessionImportResult,
+    hits: readonly SecureCrtPasswordHit[],
+    failures: readonly SecureCrtPasswordFailure[],
+  ): SessionImportResult => {
+    const pendingById = new Map((result.secureCrtPasswords ?? []).map((password) => [password.sessionId, password]));
+    const newSecrets = [...result.secrets];
+    const warnings = [...result.warnings];
+    const seenSecret = new Set(newSecrets.filter((secret) => secret.kind === "password").map((secret) => secret.sessionId));
+    let recovered = 0;
+
+    for (const hit of hits) {
+      const pending = pendingById.get(hit.sessionId);
+      if (!pending || seenSecret.has(hit.sessionId)) continue;
+      newSecrets.push({
+        sessionId: hit.sessionId,
+        kind: "password",
+        label: pending.label,
+        value: hit.value,
+        attachment: "session",
+      });
+      seenSecret.add(hit.sessionId);
+      recovered += 1;
+    }
+
+    const unrecovered = failures.filter((failure) => pendingById.has(failure.sessionId)).length;
+    if (recovered > 0) {
+      warnings.push(t("sessionTree.secureCrtRecoveredPasswords", { count: recovered }));
+    }
+    if (unrecovered > 0) {
+      warnings.push(t("sessionTree.secureCrtUnrecoveredPasswords", { count: unrecovered }));
+    }
+
+    return {
+      ...result,
+      secrets: newSecrets,
+      warnings: [...new Set(warnings)],
+      secureCrtPasswords: [],
+      externalSecretsTool: undefined,
+    };
+  };
+
 
   const confirmPendingImport = async (selectedIds: ReadonlySet<string>) => {
     const pending = pendingImport;
@@ -585,11 +712,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       if (isStandalone) return true;
       return selectedIds.has(secret.sessionId);
     });
+    const selectedSecureCrtPasswords = result.secureCrtPasswords?.filter((password) =>
+      selectedIds.has(password.sessionId),
+    );
     const droppedCount = result.sessions.length - selectedSessions.length;
     return {
       ...result,
       sessions: selectedSessions,
       secrets: selectedSecrets,
+      secureCrtPasswords: selectedSecureCrtPasswords,
       skipped: result.skipped + droppedCount,
     };
   };
@@ -745,6 +876,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       warnings: results.flatMap((result) => result.warnings),
       skipped: results.reduce((sum, result) => sum + result.skipped, 0),
       secrets: results.flatMap((result) => result.secrets),
+      secureCrtPasswords: results.flatMap((result) => result.secureCrtPasswords ?? []),
+      externalVault: results.find((result) => result.externalVault)?.externalVault,
+      externalSecretsTool: results.some((result) => result.externalSecretsTool === "securecrt")
+        ? "securecrt"
+        : results.find((result) => result.externalSecretsTool)?.externalSecretsTool,
     });
 
   const retargetImportedSessions = (
@@ -1325,7 +1461,9 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       {externalVaultPrompt && (
         <ExternalVaultUnlockDialog
           toolName={externalVaultPrompt.toolName}
+          title={externalVaultPrompt.title}
           description={externalVaultPrompt.description}
+          passwordLabel={externalVaultPrompt.passwordLabel}
           errorMessage={externalVaultPrompt.errorMessage}
           onSubmit={externalVaultPrompt.onSubmit}
           onSkip={externalVaultPrompt.onSkip}

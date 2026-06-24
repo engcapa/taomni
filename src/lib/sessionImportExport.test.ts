@@ -1191,7 +1191,7 @@ describe("third-party session import parsers", () => {
       'S:"Username"=ops',
       'S:"Protocol Name"=SSH2',
       'D:"[SSH2] Port"=000008AE',
-      'S:"Identity Filename"=C:\\keys\\ops.pem',
+      'S:"Identity Filename V2"=C:\\keys\\ops.pem',
     ].join("\n"), {
       targetFolder: "SecureCRT",
       sourcePath: "Linux/secure.ini",
@@ -1206,6 +1206,36 @@ describe("third-party session import parsers", () => {
       username: "ops",
       auth_method: { PrivateKey: { key_path: "C:\\keys\\ops.pem" } },
     });
+  });
+
+  it("tracks SecureCRT encrypted passwords without dropping usernames", () => {
+    const result = parseSecureCrtSessions([
+      'S:"Hostname"=secure.example.com',
+      'S:"Username"=ops',
+      'S:"Protocol Name"=SSH2',
+      'D:"[SSH2] Port"=00000016',
+      'S:"Password V2"=02:00112233445566778899aabbccddeeff',
+    ].join("\n"), {
+      targetFolder: "SecureCRT",
+      sourcePath: "Linux/secure.ini",
+      now: 6006,
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      host: "secure.example.com",
+      port: 22,
+      username: "ops",
+      auth_method: "Password",
+    });
+    expect(result.externalSecretsTool).toBe("securecrt");
+    expect(result.secureCrtPasswords).toEqual([
+      {
+        sessionId: result.sessions[0].id,
+        label: "ops@secure.example.com:22",
+        encrypted: "02:00112233445566778899aabbccddeeff",
+      },
+    ]);
   });
 
   it("preserves LocalShell launch arguments in Taomni round trips", () => {

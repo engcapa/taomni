@@ -4,8 +4,12 @@ import { useT } from "../../lib/i18n";
 export interface ExternalVaultUnlockDialogProps {
   /** Source tool name, e.g. "Tabby". Drives the dialog title. */
   toolName: string;
+  /** Optional title override for tools that do not call this a vault unlock. */
+  title?: string;
   /** Body copy shown above the password field. */
   description: string;
+  /** Optional password-label override, e.g. "SecureCRT passphrase". */
+  passwordLabel?: string;
   /** Resolves on success; throw to display an error and stay open. */
   onSubmit: (masterPassword: string) => Promise<void>;
   onSkip: () => void;
@@ -21,7 +25,9 @@ export interface ExternalVaultUnlockDialogProps {
  */
 export function ExternalVaultUnlockDialog({
   toolName,
+  title,
   description,
+  passwordLabel,
   onSubmit,
   onSkip,
   errorMessage,
@@ -89,7 +95,7 @@ export function ExternalVaultUnlockDialog({
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-1">{t("externalVault.title", { tool: toolName })}</div>
+        <div className="text-sm font-semibold mb-1">{title ?? t("externalVault.title", { tool: toolName })}</div>
         <div
           className="text-[12px] mb-3"
           style={{ color: "var(--taomni-text-muted)" }}
@@ -99,7 +105,7 @@ export function ExternalVaultUnlockDialog({
         </div>
 
         <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
-          {t("externalVault.masterPasswordLabel", { tool: toolName })}
+          {passwordLabel ?? t("externalVault.masterPasswordLabel", { tool: toolName })}
         </label>
         <input
           ref={inputRef}

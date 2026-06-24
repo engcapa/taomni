@@ -237,6 +237,7 @@ pub fn run() {
             session::import::read_dbeaver_credentials_for_data_sources,
             session::import::read_plist_session_file,
             session::import_secrets::keychain::keychain_lookup_batch,
+            session::import_secrets::securecrt::securecrt_decrypt_passwords,
             session::import_secrets::tabby::tabby_decrypt_vault,
             filebrowser::sftp_attach,
             filebrowser::sftp_detach,
