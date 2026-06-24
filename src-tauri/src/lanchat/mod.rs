@@ -15,7 +15,6 @@ pub mod beacon;
 pub mod commands;
 pub mod discovery;
 pub mod identity;
-pub mod keystore;
 pub mod media;
 pub mod messaging;
 pub mod protocol;
@@ -28,15 +27,27 @@ pub mod transport;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU16};
+use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use mdns_sd::ServiceDaemon;
 use tauri::AppHandle;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::RwLock;
+use zeroize::Zeroizing;
 
 use protocol::PeerRecord;
+
+const MSG_KEY_VAULT_ID: &str = "lanchat.message-key-v1";
+const IDENTITY_KEY_VAULT_ID: &str = "lanchat.identity-key-v1";
+
+pub struct LanChatCrypto {
+    pub tls_server: Arc<rustls::ServerConfig>,
+    pub tls_client: Arc<rustls::ClientConfig>,
+}
 
 /// Tauri event channel names emitted to the frontend (all windows).
 pub mod events {
@@ -75,17 +86,12 @@ pub struct LanChatState {
     pub db_path: PathBuf,
     /// SQLite-backed persistence (profile / peers / groups / messages).
     pub store: store::LanChatStore,
-    /// Machine-bound secret store (OS keychain + file fallback) for the identity
-    /// key and the at-rest message-encryption key.
-    pub keystore: keystore::KeyStore,
-    /// This node's self-certifying identity (cert + private key DER); the TLS
-    /// transport (phase 2) builds its rustls config from this.
-    pub identity: identity::Identity,
-    /// Shared mutual-TLS configs for the control channel (built once from the
-    /// identity): server side accepts inbound, client side dials out.
-    pub tls_server: std::sync::Arc<rustls::ServerConfig>,
-    pub tls_client: std::sync::Arc<rustls::ClientConfig>,
-    /// This node's stable identity (loaded/generated on construction).
+    /// Master-password-backed crypto state. This is initialized lazily after the
+    /// vault is unlocked so app startup never touches macOS Keychain.
+    pub crypto: RwLock<Option<Arc<LanChatCrypto>>>,
+    init_lock: AsyncMutex<()>,
+    /// This node's stable identity. Empty until the vault-backed identity is
+    /// initialized; may be prefilled from the cached profile row for status UI.
     pub node_id: RwLock<String>,
     /// Whether the background service (discovery + transport + beacon) has been
     /// started. A one-way latch: set true on first `start_service`, never
@@ -113,44 +119,22 @@ pub struct LanChatState {
 }
 
 impl LanChatState {
-    /// Build state, opening `lanchat.sqlite` and bootstrapping this node's
-    /// stable identity. `app_data_dir` is the resolved Tauri app-data dir; the
-    /// SQLite file lives alongside the main `taomni.db` but is separate.
+    /// Build state, opening `lanchat.sqlite` without loading any secret material.
+    /// The SQLite file lives alongside the main `taomni.db` but is separate.
     pub fn new(app_data_dir: &Path) -> Self {
         let db_path = app_data_dir.join("lanchat.sqlite");
         let store = store::LanChatStore::open(&db_path).expect("failed to open lanchat.sqlite");
-        let keystore = keystore::KeyStore::new(app_data_dir);
-        // At-rest message encryption: load (or create) the machine key, attach it
-        // to the store, and encrypt any legacy plaintext rows. If the key is
-        // unavailable, messages stay plaintext rather than failing to start.
-        match keystore.load_or_create_random("message-key-v1", 32) {
-            Ok(key) => {
-                store.set_message_key(&key);
-                match store.migrate_message_encryption() {
-                    Ok(n) if n > 0 => log::info!("lanchat: encrypted {n} legacy message(s) at rest"),
-                    Ok(_) => {}
-                    Err(e) => log::warn!("lanchat: message encryption migration failed: {e}"),
-                }
-            }
-            Err(e) => {
-                log::error!("lanchat: message key unavailable ({e}); messages stored in plaintext")
-            }
-        }
-        // Bootstrap the self-certifying identity (generates a key pair + cert on
-        // first launch, migrates from a legacy UUID identity if present).
-        let identity = identity::ensure(&store, &keystore)
-            .expect("failed to initialize lanchat identity");
-        let node_id = identity.node_id.clone();
-        log::info!("lanchat: node identity {}", node_id);
-        let tls_server = tls::server_config(&identity).expect("build lanchat server TLS config");
-        let tls_client = tls::client_config(&identity).expect("build lanchat client TLS config");
+        let node_id = store
+            .get_profile_id_and_cert()
+            .ok()
+            .flatten()
+            .map(|(id, _)| id)
+            .unwrap_or_default();
         Self {
             db_path,
             store,
-            keystore,
-            identity,
-            tls_server,
-            tls_client,
+            crypto: RwLock::new(None),
+            init_lock: AsyncMutex::new(()),
             node_id: RwLock::new(node_id),
             running: AtomicBool::new(false),
             peers: RwLock::new(HashMap::new()),
@@ -167,6 +151,97 @@ impl LanChatState {
     /// This node's stable id.
     pub async fn node_id(&self) -> String {
         self.node_id.read().await.clone()
+    }
+
+    pub async fn crypto(&self) -> Result<Arc<LanChatCrypto>, String> {
+        self.crypto
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| crate::vault::ERR_VAULT_LOCKED.to_string())
+    }
+
+    pub async fn ensure_unlocked(&self, vault: &crate::vault::Vault) -> Result<(), String> {
+        if self.crypto.read().await.is_some() {
+            return Ok(());
+        }
+
+        let _guard = self.init_lock.lock().await;
+        if self.crypto.read().await.is_some() {
+            return Ok(());
+        }
+
+        let message_key = match self.load_vault_bytes(vault, MSG_KEY_VAULT_ID)? {
+            Some(key) => key,
+            None => {
+                let mut key = vec![0u8; crate::vault::crypto::KEY_LEN];
+                rand::fill(key.as_mut_slice());
+                self.save_vault_bytes(
+                    vault,
+                    MSG_KEY_VAULT_ID,
+                    "lanchat_secret",
+                    "LanChat Message Key",
+                    &key,
+                )?;
+                Zeroizing::new(key)
+            }
+        };
+        self.store.set_message_key(message_key.as_slice());
+        match self.store.migrate_message_encryption() {
+            Ok(n) if n > 0 => log::info!("lanchat: encrypted {n} legacy message(s) at rest"),
+            Ok(_) => {}
+            Err(e) => log::warn!("lanchat: message encryption migration failed: {e}"),
+        }
+
+        let stored_identity_key = self.load_vault_bytes(vault, IDENTITY_KEY_VAULT_ID)?;
+        let (identity, generated) = identity::ensure(&self.store, stored_identity_key)
+            .map_err(|e| format!("initialize lanchat identity: {e}"))?;
+        if generated {
+            self.save_vault_bytes(
+                vault,
+                IDENTITY_KEY_VAULT_ID,
+                "lanchat_secret",
+                "LanChat Identity Key",
+                identity.key_der.as_slice(),
+            )?;
+        }
+
+        let node_id = identity.node_id.clone();
+        let tls_server = tls::server_config(&identity).expect("build lanchat server TLS config");
+        let tls_client = tls::client_config(&identity).expect("build lanchat client TLS config");
+        log::info!("lanchat: node identity {}", node_id);
+        *self.node_id.write().await = node_id;
+        *self.crypto.write().await = Some(Arc::new(LanChatCrypto {
+            tls_server,
+            tls_client,
+        }));
+        Ok(())
+    }
+
+    fn load_vault_bytes(
+        &self,
+        vault: &crate::vault::Vault,
+        id: &str,
+    ) -> Result<Option<Zeroizing<Vec<u8>>>, String> {
+        let Some(encoded) = vault.get_fixed(id)? else {
+            return Ok(None);
+        };
+        BASE64
+            .decode(encoded.trim())
+            .map(Zeroizing::new)
+            .map(Some)
+            .map_err(|e| format!("decode lanchat vault secret: {e}"))
+    }
+
+    fn save_vault_bytes(
+        &self,
+        vault: &crate::vault::Vault,
+        id: &str,
+        kind: &str,
+        label: &str,
+        secret: &[u8],
+    ) -> Result<(), String> {
+        vault.put_fixed(id, kind, label, &BASE64.encode(secret))
     }
 
     /// Number of peers currently in the live roster.
@@ -189,7 +264,14 @@ pub async fn start_service(app: AppHandle) {
     use std::sync::atomic::Ordering;
     use tauri::{Emitter, Manager};
 
-    let lanchat = app.state::<crate::state::AppState>().lanchat.clone();
+    let app_state = app.state::<crate::state::AppState>();
+    let lanchat = app_state.lanchat.clone();
+    let vault = app_state.vault.clone();
+    if let Err(e) = lanchat.ensure_unlocked(&vault).await {
+        log::warn!("lanchat: service start skipped; vault is not ready ({e})");
+        let _ = app.emit(events::SERVICE, serde_json::json!({ "running": false }));
+        return;
+    }
 
     // One-way latch: if already started, do nothing.
     if lanchat.running.swap(true, Ordering::SeqCst) {

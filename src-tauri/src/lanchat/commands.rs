@@ -16,6 +16,10 @@ use crate::lanchat::swarm;
 use crate::lanchat::transfer;
 use crate::state::AppState;
 
+async fn ensure_ready(state: &State<'_, AppState>) -> Result<(), String> {
+    state.lanchat.ensure_unlocked(&state.vault).await
+}
+
 /// Snapshot of the LanChat service for the status bar.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,6 +64,7 @@ pub async fn lanchat_list_peers(state: State<'_, AppState>) -> Result<Vec<PeerRe
 /// Read this node's local profile.
 #[tauri::command]
 pub async fn lanchat_get_profile(state: State<'_, AppState>) -> Result<Profile, String> {
+    ensure_ready(&state).await?;
     state
         .lanchat
         .store
@@ -90,6 +95,7 @@ pub async fn lanchat_update_profile(
     state: State<'_, AppState>,
     args: UpdateProfileArgs,
 ) -> Result<Profile, String> {
+    ensure_ready(&state).await?;
     let avatar = match args.avatar_base64.as_deref() {
         Some(s) if !s.trim().is_empty() => Some(decode_avatar_base64(s)?),
         _ => None,
@@ -126,6 +132,7 @@ pub async fn lanchat_send_text(
     state: State<'_, AppState>,
     args: SendTextArgs,
 ) -> Result<LanMessage, String> {
+    ensure_ready(&state).await?;
     if args.text.trim().is_empty() {
         return Err("message text is empty".into());
     }
@@ -139,6 +146,7 @@ pub async fn lanchat_resend_message(
     state: State<'_, AppState>,
     msg_id: String,
 ) -> Result<LanMessage, String> {
+    ensure_ready(&state).await?;
     messaging::resend(&app, &state.lanchat, &msg_id).await
 }
 
@@ -157,6 +165,7 @@ pub async fn lanchat_list_messages(
     conv_id: String,
     limit: Option<i64>,
 ) -> Result<Vec<LanMessage>, String> {
+    ensure_ready(&state).await?;
     state
         .lanchat
         .store
@@ -189,6 +198,7 @@ pub async fn lanchat_create_group(
     state: State<'_, AppState>,
     args: CreateGroupArgs,
 ) -> Result<Group, String> {
+    ensure_ready(&state).await?;
     if args.name.trim().is_empty() {
         return Err("group name is empty".into());
     }
@@ -212,6 +222,7 @@ pub async fn lanchat_send_group_text(
     state: State<'_, AppState>,
     args: SendGroupTextArgs,
 ) -> Result<LanMessage, String> {
+    ensure_ready(&state).await?;
     if args.text.trim().is_empty() {
         return Err("message text is empty".into());
     }
@@ -231,6 +242,7 @@ pub async fn lanchat_leave_group(
     state: State<'_, AppState>,
     group_id: String,
 ) -> Result<(), String> {
+    ensure_ready(&state).await?;
     messaging::leave_group(&app, &state.lanchat, &group_id).await
 }
 
@@ -245,6 +257,7 @@ pub async fn lanchat_send_file(
     peer_id: String,
     path: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     let conv = direct_conv_id(&peer_id);
     swarm::send(
         &app,
@@ -267,6 +280,7 @@ pub async fn lanchat_send_group_file(
     group_id: String,
     path: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     swarm::send_to_group(&app, &state.lanchat, &group_id, std::path::PathBuf::from(path)).await
 }
 
@@ -279,6 +293,7 @@ pub async fn lanchat_accept_file(
     transfer_id: String,
     save_path: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     swarm::accept_offer(&app, &state.lanchat, &transfer_id, std::path::PathBuf::from(save_path)).await
 }
 
@@ -299,6 +314,7 @@ pub async fn lanchat_send_signal(
     frame_type: String,
     payload: serde_json::Value,
 ) -> Result<(), String> {
+    ensure_ready(&state).await?;
     let my_id = state.lanchat.node_id().await;
     let env = crate::lanchat::protocol::Envelope::new(&frame_type, &my_id, Some(peer_id.clone()), payload);
     crate::lanchat::transport::send_to_peer(&app, &state.lanchat, &peer_id, env).await
@@ -313,6 +329,7 @@ pub async fn lanchat_signal_group(
     frame_type: String,
     payload: serde_json::Value,
 ) -> Result<(), String> {
+    ensure_ready(&state).await?;
     let my_id = state.lanchat.node_id().await;
     let members = state.lanchat.store.list_group_members(&group_id).map_err(|e| e.to_string())?;
     for member in members {
@@ -332,6 +349,7 @@ pub async fn lanchat_reject_file(
     state: State<'_, AppState>,
     transfer_id: String,
 ) -> Result<(), String> {
+    ensure_ready(&state).await?;
     swarm::reject_offer(&app, &state.lanchat, &transfer_id).await
 }
 
@@ -342,6 +360,7 @@ pub async fn lanchat_reject_file(
 /// port if the session already exists.
 #[tauri::command]
 pub async fn nmedia_start(state: State<'_, AppState>, call_id: String) -> Result<u16, String> {
+    ensure_ready(&state).await?;
     let lan = &state.lanchat;
     if let Some(existing) = lan.media_sessions.read().await.get(&call_id) {
         return Ok(existing.ws_port());
@@ -470,6 +489,7 @@ pub async fn lanchat_send_dir(
     peer_id: String,
     path: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     let conv = direct_conv_id(&peer_id);
     swarm::send_dir(&app, &state.lanchat, vec![peer_id], std::path::PathBuf::from(path), conv, None).await
 }
@@ -492,6 +512,7 @@ pub async fn lanchat_send_screenshot(
     state: State<'_, AppState>,
     peer_id: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     let log = crate::servers::engine::LogEmitter::new(app.clone(), crate::servers::ServerType::Rdp);
     let path = tokio::task::spawn_blocking(move || transfer::capture_screenshot(&log))
         .await
@@ -510,6 +531,7 @@ pub async fn lanchat_send_image_bytes(
     peer_id: String,
     data: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
     let bytes = BASE64
         .decode(data.as_bytes())
@@ -524,6 +546,7 @@ pub async fn lanchat_send_clipboard_image(
     state: State<'_, AppState>,
     peer_id: String,
 ) -> Result<String, String> {
+    ensure_ready(&state).await?;
     let path = {
         let mut guard = state.clipboard.lock().map_err(|_| "clipboard lock".to_string())?;
         if guard.is_none() {
@@ -602,6 +625,7 @@ pub async fn lanchat_start_service(app: AppHandle, state: State<'_, AppState>) -
     {
         return Ok(());
     }
+    ensure_ready(&state).await?;
     tauri::async_runtime::spawn(async move {
         crate::lanchat::start_service(app).await;
     });

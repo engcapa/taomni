@@ -11,7 +11,7 @@
 //! an id it does not own, and an active MITM cannot impersonate a known id
 //! without its private key.
 
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
@@ -22,11 +22,17 @@ use rustls::{
 };
 
 use super::identity::Identity;
-use super::keystore::ensure_crypto_provider;
 
 /// SNI used when dialing. Our verifier ignores names (identity is by
 /// fingerprint), so any stable value works.
 pub const SNI: &str = "taomni-lanchat";
+
+fn ensure_crypto_provider() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 fn ring_provider() -> Arc<rustls::crypto::CryptoProvider> {
     Arc::new(rustls::crypto::ring::default_provider())

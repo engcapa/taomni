@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Shared mutable mock state for the two zustand stores the gate reads.
@@ -11,6 +11,7 @@ const vault = vi.hoisted(() => ({
 const lan = vi.hoisted(() => ({
   isDesktop: true,
   serviceRunning: false,
+  startOnLaunch: false,
   enableService: vi.fn(async () => undefined),
   loadServiceState: vi.fn(async () => undefined),
 }));
@@ -34,6 +35,9 @@ beforeEach(() => {
   vault.state = "unlocked";
   lan.isDesktop = true;
   lan.serviceRunning = false;
+  lan.startOnLaunch = false;
+  lan.enableService.mockClear();
+  lan.loadServiceState.mockClear();
 });
 
 describe("LanChatGate", () => {
@@ -50,6 +54,17 @@ describe("LanChatGate", () => {
     lan.serviceRunning = false;
     render(<LanChatGate />);
     expect(screen.getByTestId("lanchat-enable-prompt")).toBeInTheDocument();
+    expect(screen.getByTestId("lan-panel")).toHaveAttribute("data-readonly", "1");
+  });
+
+  it("auto-starts after unlock when start on launch was configured", async () => {
+    vault.state = "unlocked";
+    lan.serviceRunning = false;
+    lan.startOnLaunch = true;
+    render(<LanChatGate />);
+
+    await waitFor(() => expect(lan.enableService).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("lanchat-enable-prompt")).toBeNull();
     expect(screen.getByTestId("lan-panel")).toHaveAttribute("data-readonly", "1");
   });
 

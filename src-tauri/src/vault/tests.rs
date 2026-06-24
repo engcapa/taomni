@@ -57,6 +57,43 @@ fn put_resolve_roundtrip() {
 }
 
 #[test]
+fn fixed_entries_roundtrip_and_update() {
+    let (_d, v) = fresh_vault();
+    v.init(PW).unwrap();
+    assert!(v.get_fixed("lanchat.message-key-v1").unwrap().is_none());
+
+    v.put_fixed(
+        "lanchat.message-key-v1",
+        "lanchat_secret",
+        "LanChat Message Key",
+        "first",
+    )
+    .unwrap();
+    assert_eq!(
+        v.get_fixed("lanchat.message-key-v1")
+            .unwrap()
+            .unwrap()
+            .as_str(),
+        "first"
+    );
+
+    v.put_fixed(
+        "lanchat.message-key-v1",
+        "lanchat_secret",
+        "LanChat Message Key",
+        "second",
+    )
+    .unwrap();
+    assert_eq!(
+        v.get_fixed("lanchat.message-key-v1")
+            .unwrap()
+            .unwrap()
+            .as_str(),
+        "second"
+    );
+}
+
+#[test]
 fn resolve_passes_through_non_references() {
     let (_d, v) = fresh_vault();
     v.init(PW).unwrap();
