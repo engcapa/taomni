@@ -53,6 +53,18 @@ describe("HBaseSchemaTree", () => {
     expect(screen.getByText("logs")).toBeInTheDocument();
   });
 
+  it("filters table names and can clear the filter", async () => {
+    render(<HBaseSchemaTree sessionId="s1" transport="native" />);
+    expect(await screen.findByText("users")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Filter HBase tables"), { target: { value: "log" } });
+    expect(screen.getByText("logs")).toBeInTheDocument();
+    expect(screen.queryByText("users")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Clear filter"));
+    expect(screen.getByText("users")).toBeInTheDocument();
+    expect(screen.getByText("logs")).toBeInTheDocument();
+  });
+
   it("offers read + write actions in the table context menu", async () => {
     render(<HBaseSchemaTree sessionId="s1" transport="native" />);
     const row = await screen.findByText("users");

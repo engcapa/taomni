@@ -74,6 +74,21 @@ describe("SchemaTree folder model", () => {
     expect(await screen.findByText("sp_sync")).toBeInTheDocument();
   });
 
+  it("filters object names and keeps matching ancestors visible", async () => {
+    render(<SchemaTree sessionId="s1" engine="MySQL" />);
+    await screen.findByText("ecommerce");
+    fireEvent.change(screen.getByLabelText("Filter database objects"), { target: { value: "ord" } });
+    expect(await screen.findByText("orders")).toBeInTheDocument();
+    expect(screen.getByText("ecommerce")).toBeInTheDocument();
+    expect(screen.getByText("Tables")).toBeInTheDocument();
+    expect(screen.queryByText("report_v")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Filter database objects"), { target: { value: "report" } });
+    expect(await screen.findByText("report_v")).toBeInTheDocument();
+    expect(screen.getByText("Views")).toBeInTheDocument();
+    expect(screen.queryByText("orders")).not.toBeInTheDocument();
+  });
+
   it("expands a table to show its columns and indexes", async () => {
     render(<SchemaTree sessionId="s1" engine="MySQL" />);
     fireEvent.click(await screen.findByText("ecommerce"));
@@ -140,4 +155,3 @@ describe("SchemaTree context menus", () => {
     expect(labels()).toContain("New query");
   });
 });
-
