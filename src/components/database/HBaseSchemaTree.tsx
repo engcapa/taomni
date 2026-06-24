@@ -7,7 +7,9 @@ import {
   Database,
   Loader2,
   RefreshCw,
+  Search,
   Table2,
+  X,
 } from "lucide-react";
 import {
   hbaseCancel,
@@ -135,6 +137,7 @@ export function HBaseSchemaTree({
   const [tableState, setTableState] = useState<Record<string, FamilyState>>({});
   const [expandedNs, setExpandedNs] = useState<Record<string, boolean>>({});
   const [detail, setDetail] = useState<ObjectDetail | null>(null);
+  const [filterText, setFilterText] = useState("");
 
   const adminEnabled = useCallback(
     (verb: string) => commandSupported(verb, transport),
@@ -305,7 +308,16 @@ export function HBaseSchemaTree({
   ];
 
   // RENDER_PLACEHOLDER
-  const { grouped, groups } = useMemo(() => groupByNamespace(tables), [tables]);
+  const filterNeedle = filterText.trim().toLowerCase();
+  const filterActive = filterNeedle.length > 0;
+  const filteredTables = useMemo(
+    () =>
+      filterActive
+        ? tables.filter((table) => table.toLowerCase().includes(filterNeedle))
+        : tables,
+    [filterActive, filterNeedle, tables],
+  );
+  const { grouped, groups } = useMemo(() => groupByNamespace(filteredTables), [filteredTables]);
 
   const renderTableRow = (full: string, short: string, indent: number) => {
     const st = tableState[full];
@@ -383,6 +395,37 @@ export function HBaseSchemaTree({
         </div>
       )}
       <div
+        className="h-7 flex items-center px-1.5 shrink-0"
+        style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+      >
+        <div className="relative flex-1">
+          <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)] pointer-events-none" />
+          <input
+            className="taomni-input h-5 w-full text-[11px]"
+            style={{ paddingLeft: 22, paddingRight: filterActive ? 22 : undefined }}
+            value={filterText}
+            placeholder={t("hbaseObjects.filterPlaceholder")}
+            aria-label={t("hbaseObjects.filterLabel")}
+            data-testid="hbase-schema-tree-filter"
+            onChange={(e) => setFilterText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setFilterText("");
+            }}
+          />
+          {filterActive && (
+            <button
+              type="button"
+              className="h-5 w-5 absolute right-0.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+              title={t("hbaseObjects.clearFilter")}
+              aria-label={t("hbaseObjects.clearFilter")}
+              onClick={() => setFilterText("")}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div
         className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]"
         onContextMenu={(e) => {
           if (e.target === e.currentTarget) openMenu(e, rootMenu());
@@ -411,6 +454,9 @@ export function HBaseSchemaTree({
         {sessionId && !loading && !timedOut && tables.length === 0 && (
           <div className="px-2 py-1 text-[var(--taomni-text-muted)]">{t("hbaseObjects.noTables")}</div>
         )}
+        {sessionId && !loading && !timedOut && tables.length > 0 && filterActive && filteredTables.length === 0 && (
+          <div className="px-2 py-1 text-[var(--taomni-text-muted)]">{t("hbaseObjects.noFilterMatches")}</div>
+        )}
         {!loading && grouped &&
           groups.map((g) => {
             const key = g.namespace ?? "(default)";
@@ -432,8 +478,10 @@ export function HBaseSchemaTree({
             );
           })}
         {!loading && !grouped &&
-          groups[0].tables.slice(0, visibleCount).map((tbl) => renderTableRow(tbl.full, tbl.short, 6))}
-        {!loading && !grouped && tables.length > visibleCount && (
+          groups[0].tables
+            .slice(0, filterActive ? groups[0].tables.length : visibleCount)
+            .map((tbl) => renderTableRow(tbl.full, tbl.short, 6))}
+        {!loading && !grouped && !filterActive && tables.length > visibleCount && (
           <div className="px-2 py-1.5 flex justify-center border-t mt-1" style={{ borderColor: "var(--taomni-divider)" }}>
             <button
               type="button"
@@ -451,6 +499,4 @@ export function HBaseSchemaTree({
     </div>
   );
 }
-
-
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -16,6 +16,8 @@ import {
   CalendarClock,
   ListOrdered,
   BookText,
+  Search,
+  X,
 } from "lucide-react";
 import {
   dbListObjects,
@@ -165,6 +167,8 @@ export function SchemaTree({
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingSchemas, setLoadingSchemas] = useState(false);
+  const [filterText, setFilterText] = useState("");
+  const loadingTablesRef = useRef(new Set<string>());
   const { show: openMenu, render: menu } = useContextMenu();
   const ownedMetadataCache = useMemo(
     () => createDbMetadataCache({ sessionId, defaultCatalog: catalog }),
@@ -192,13 +196,17 @@ export function SchemaTree({
 
   const ensureTables = useCallback(
     async (db: string) => {
-      if (tablesByDb[db]) return;
+      if (tablesByDb[db] || loadingTablesRef.current.has(db)) return;
+      loadingTablesRef.current.add(db);
       try {
         const list = await cache.listTables(db, catalog);
         setTablesByDb((prev) => ({ ...prev, [db]: list }));
         onSchemaLoaded?.(new Map(list.map((t) => [t.name, [] as string[]])));
       } catch (err) {
         setError(String(err));
+        setTablesByDb((prev) => ({ ...prev, [db]: prev[db] ?? [] }));
+      } finally {
+        loadingTablesRef.current.delete(db);
       }
     },
     [cache, catalog, tablesByDb, onSchemaLoaded],
@@ -261,6 +269,21 @@ export function SchemaTree({
     }
   };
 
+  const filterNeedle = filterText.trim().toLowerCase();
+  const filterActive = filterNeedle.length > 0;
+  const matchesFilter = useCallback(
+    (...parts: Array<string | null | undefined>) =>
+      !filterActive || parts.some((part) => part?.toLowerCase().includes(filterNeedle)),
+    [filterActive, filterNeedle],
+  );
+
+  useEffect(() => {
+    if (!filterActive) return;
+    for (const db of schemas) {
+      void ensureTables(db);
+    }
+  }, [ensureTables, filterActive, schemas]);
+
   const selectObject = (db: string, kind: ObjectKind, name: string) => {
     setSelected(objKey(db, kind, name));
     onSelectTable?.(db, name);
@@ -287,7 +310,20 @@ export function SchemaTree({
     return (objectsByCat[catKey(db, kind)] ?? []).map((o) => ({ name: o.name, owner: o.owner }));
   };
 
+  const filteredObjectsFor = (
+    db: string,
+    kind: ObjectKind,
+  ): { name: string; rowCount?: number | null; owner?: string }[] =>
+    objectsFor(db, kind).filter((obj) => matchesFilter(obj.name, obj.owner));
+
+  const categoryVisible = (db: string, kind: ObjectKind): boolean =>
+    !filterActive || filteredObjectsFor(db, kind).length > 0;
+
+  const databaseVisible = (db: string): boolean =>
+    !filterActive || matchesFilter(db) || categories.some((kind) => categoryVisible(db, kind));
+
   const categoryCount = (db: string, kind: ObjectKind): number | null => {
+    if (filterActive) return filteredObjectsFor(db, kind).length;
     if (TABLE_CATEGORIES.includes(kind)) {
       return tablesByDb[db] ? tablesByDb[db].filter((t) => t.kind === kind).length : null;
     }
@@ -727,7 +763,7 @@ export function SchemaTree({
 
   const renderObjects = (db: string, kind: ObjectKind) => {
     const expandable = COLUMN_CATEGORIES.includes(kind);
-    const items = objectsFor(db, kind);
+    const items = filterActive ? filteredObjectsFor(db, kind) : objectsFor(db, kind);
     const { Icon, color } = CATEGORY_META[kind];
     if (items.length === 0) {
       return (
@@ -856,6 +892,41 @@ export function SchemaTree({
       </div>
 
       <div
+        className="h-7 flex items-center px-1.5 shrink-0"
+        style={{
+          background: "var(--taomni-quick-bg)",
+          borderBottom: "1px solid var(--taomni-divider)",
+        }}
+      >
+        <div className="relative flex-1">
+          <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)] pointer-events-none" />
+          <input
+            className="taomni-input h-5 w-full text-[11px]"
+            style={{ paddingLeft: 22, paddingRight: filterActive ? 22 : undefined }}
+            value={filterText}
+            placeholder={t("dbObjects.filterPlaceholder")}
+            aria-label={t("dbObjects.filterLabel")}
+            data-testid="schema-tree-filter"
+            onChange={(e) => setFilterText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setFilterText("");
+            }}
+          />
+          {filterActive && (
+            <button
+              type="button"
+              className="h-5 w-5 absolute right-0.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+              title={t("dbObjects.clearFilter")}
+              aria-label={t("dbObjects.clearFilter")}
+              onClick={() => setFilterText("")}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div
         className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]"
         style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
       >
@@ -867,7 +938,10 @@ export function SchemaTree({
         {loadingSchemas && schemas.length === 0 && (
           <div className="px-2 py-1 text-[var(--taomni-text-muted)]">Loading…</div>
         )}
-        {schemas.map((db) => (
+        {filterActive && !schemas.some(databaseVisible) && (
+          <div className="px-2 py-1 text-[var(--taomni-text-muted)]">{t("dbObjects.noFilterMatches")}</div>
+        )}
+        {schemas.filter(databaseVisible).map((db) => (
           <div key={db}>
             <button
               type="button"
@@ -875,7 +949,7 @@ export function SchemaTree({
               onClick={() => toggleDb(db)}
               onContextMenu={(e) => openMenu(e, databaseMenu(db))}
             >
-              {expandedDb[dbKey(db)] ? (
+              {expandedDb[dbKey(db)] || filterActive ? (
                 <ChevronDown className="w-3 h-3" />
               ) : (
                 <ChevronRight className="w-3 h-3" />
@@ -883,8 +957,8 @@ export function SchemaTree({
               <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
               <span className="flex-1 truncate">{db}</span>
             </button>
-            {expandedDb[dbKey(db)] &&
-              categories.map((kind) => {
+            {(expandedDb[dbKey(db)] || filterActive) &&
+              categories.filter((kind) => categoryVisible(db, kind)).map((kind) => {
                 const meta = CATEGORY_META[kind];
                 const CatIcon = meta.Icon;
                 const ckey = catKey(db, kind);
@@ -898,7 +972,7 @@ export function SchemaTree({
                       onClick={() => toggleCategory(db, kind)}
                       onContextMenu={(e) => openMenu(e, categoryMenu(db, kind))}
                     >
-                      {expandedCat[ckey] ? (
+                      {expandedCat[ckey] || filterActive ? (
                         <ChevronDown className="w-3 h-3" />
                       ) : (
                         <ChevronRight className="w-3 h-3" />
@@ -909,7 +983,7 @@ export function SchemaTree({
                         <span className="text-[10px] text-[var(--taomni-text-muted)]">{count}</span>
                       )}
                     </button>
-                    {expandedCat[ckey] && renderObjects(db, kind)}
+                    {(expandedCat[ckey] || filterActive) && renderObjects(db, kind)}
                   </div>
                 );
               })}
@@ -924,9 +998,4 @@ export function SchemaTree({
       )}
     </div>
   );
-
 }
-
-
-
-
