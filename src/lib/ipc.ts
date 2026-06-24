@@ -440,6 +440,12 @@ export interface LocalSessionFile {
   text: string;
 }
 
+export interface DbeaverCredentialEntry {
+  user?: string | null;
+  password?: string | null;
+  sections?: Record<string, Record<string, string>>;
+}
+
 export async function importPuttySessions(): Promise<SessionConfig[]> {
   return invoke<SessionConfig[]>("import_putty_sessions", {});
 }
@@ -454,6 +460,12 @@ export async function importExternalBashSessions(): Promise<SessionConfig[]> {
 
 export async function scanLocalSessionFiles(source: string): Promise<LocalSessionFile[]> {
   return invoke<LocalSessionFile[]>("scan_local_session_files", { source });
+}
+
+export async function readDbeaverCredentialsForDataSources(
+  path: string,
+): Promise<Record<string, DbeaverCredentialEntry>> {
+  return invoke<Record<string, DbeaverCredentialEntry>>("read_dbeaver_credentials_for_data_sources", { path });
 }
 
 export async function readPlistSessionFile(path: string): Promise<LocalSessionFile> {

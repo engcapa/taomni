@@ -15,6 +15,8 @@ const ipcMocks = vi.hoisted(() => ({
   listSessionGroups: vi.fn<() => Promise<SessionGroup[]>>(async () => []),
   listSessions: vi.fn<() => Promise<SessionConfig[]>>(async () => []),
   markSessionConnected: vi.fn(async () => 0),
+  readDbeaverCredentialsForDataSources: vi.fn(async () => ({})),
+  readFileBytes: vi.fn(async () => new Uint8Array()),
   readPlistSessionFile: vi.fn(async () => ({ text: "", path: "", relativePath: "" })),
   saveSession: vi.fn<(cfg: SessionConfig) => Promise<void>>(async () => undefined),
   saveSessionGroup: vi.fn(async () => undefined),
@@ -25,6 +27,10 @@ const ipcMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../lib/ipc", () => ipcMocks);
+
+vi.mock("../../lib/vaultGate", () => ({
+  ensureVaultReady: vi.fn(async () => true),
+}));
 
 function makeSession(id: string, name: string, groupPath: string): SessionConfig {
   return {

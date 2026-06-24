@@ -426,6 +426,142 @@ describe("DBeaver session import", () => {
       dbRedisIndex: "2",
     });
   });
+
+  it("reads DBeaver credentials from auth-properties and authProperties", () => {
+    const text = JSON.stringify({
+      connections: {
+        hyphen: {
+          driver: "postgresql",
+          name: "Hyphen Auth",
+          configuration: {
+            host: "pg-auth.example.com",
+            port: "5432",
+            "auth-properties": {
+              user: "pg_auth_user",
+              password: "pg-auth-pass",
+            },
+          },
+        },
+        camel: {
+          driver: "mysql",
+          name: "Camel Auth",
+          configuration: {
+            host: "mysql-auth.example.com",
+            authProperties: {
+              username: "mysql_auth_user",
+              password: "mysql-auth-pass",
+            },
+          },
+        },
+      },
+    });
+
+    const result = parseDbeaverSessions(text, { now: 8888 });
+
+    expect(result.sessions).toHaveLength(2);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Hyphen Auth",
+      session_type: "PostgreSQL",
+      host: "pg-auth.example.com",
+      port: 5432,
+      username: "pg_auth_user",
+    });
+    expect(result.sessions[1]).toMatchObject({
+      name: "Camel Auth",
+      session_type: "MySQL",
+      host: "mysql-auth.example.com",
+      port: 3306,
+      username: "mysql_auth_user",
+    });
+    expect(result.secrets.map((secret) => ({
+      sessionId: secret.sessionId,
+      kind: secret.kind,
+      value: secret.value,
+    }))).toEqual([
+      {
+        sessionId: result.sessions[0].id,
+        kind: "password",
+        value: "pg-auth-pass",
+      },
+      {
+        sessionId: result.sessions[1].id,
+        kind: "password",
+        value: "mysql-auth-pass",
+      },
+    ]);
+  });
+
+  it("merges DBeaver credentials-config entries by connection id", () => {
+    const text = JSON.stringify({
+      connections: {
+        direct: {
+          driver: "mysql",
+          name: "Direct Secure",
+          "save-password": true,
+          configuration: {
+            host: "direct.example.com",
+          },
+        },
+        sectionOnly: {
+          driver: "postgresql",
+          name: "Section Secure",
+          "save-password": true,
+          configuration: {
+            host: "section.example.com",
+          },
+        },
+      },
+    });
+
+    const result = parseDbeaverSessions(text, {
+      now: 9999,
+      dbeaverCredentials: {
+        direct: {
+          user: "direct_user",
+          password: "direct-pass",
+        },
+        sectionOnly: {
+          sections: {
+            "#connection": {
+              user: "section_user",
+              password: "section-pass",
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.sessions).toHaveLength(2);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Direct Secure",
+      session_type: "MySQL",
+      host: "direct.example.com",
+      username: "direct_user",
+    });
+    expect(result.sessions[1]).toMatchObject({
+      name: "Section Secure",
+      session_type: "PostgreSQL",
+      host: "section.example.com",
+      username: "section_user",
+    });
+    expect(result.secrets.map((secret) => ({
+      sessionId: secret.sessionId,
+      kind: secret.kind,
+      value: secret.value,
+    }))).toEqual([
+      {
+        sessionId: result.sessions[0].id,
+        kind: "password",
+        value: "direct-pass",
+      },
+      {
+        sessionId: result.sessions[1].id,
+        kind: "password",
+        value: "section-pass",
+      },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
 });
 
 describe("MobaXterm session import/export", () => {

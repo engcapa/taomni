@@ -1815,6 +1815,7 @@ const dict = {
     standaloneTabbyPassphrases: "{count} Tabby private-key passphrase(s) will be saved as standalone vault entries — assign them manually under Settings → Vault.",
     skippedStandalone: "Skipped standalone Tabby secrets because the credential vault is locked or has not been initialized.",
     skippedVaultLocked: "Skipped saved password for \"{name}\" because {reason}.",
+    skippedVaultUnlockCancelled: "Skipped {count} imported secret(s) because the credential vault was not unlocked.",
     vaultLockedReason: "the credential vault is locked or has not been initialized",
     standaloneSaved: "Saved {count} standalone secret(s) to the credential vault — assign them under Settings → Vault.",
     standaloneSkipped: "Skipped {count} standalone secret(s) because the credential vault rejected the write.",

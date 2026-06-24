@@ -1,7 +1,9 @@
+use super::import_secrets::crypto::aes_128_cbc_decrypt_pkcs7;
 use super::models::{AuthMethod, SessionConfig, SessionType};
 use serde::Serialize;
 use serde_json::json;
-use std::collections::HashSet;
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
@@ -10,6 +12,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 const MAX_LOCAL_SESSION_FILE_BYTES: u64 = 2_000_000;
+const DBEAVER_CREDENTIALS_CONFIG_FILE: &str = "credentials-config.json";
+const DBEAVER_LOCAL_CREDENTIALS_KEY: [u8; 16] = [
+    0xba, 0xbb, 0x4a, 0x9f, 0x77, 0x4a, 0xb8, 0x53, 0xc9, 0x6c, 0x2d, 0x65, 0x3d, 0xfe, 0x54, 0x4a,
+];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +24,15 @@ pub struct LocalSessionFile {
     pub path: String,
     pub relative_path: String,
     pub text: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DbeaverCredentialEntry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
 }
 
 #[tauri::command]
@@ -55,6 +70,42 @@ pub fn scan_local_session_files(source: String) -> Result<Vec<LocalSessionFile>,
 }
 
 #[tauri::command]
+pub fn read_dbeaver_credentials_for_data_sources(
+    path: String,
+) -> Result<HashMap<String, DbeaverCredentialEntry>, String> {
+    let expanded = shellexpand::tilde(&path).to_string();
+    let data_sources_path = PathBuf::from(&expanded);
+    let data_sources_meta = fs::metadata(&data_sources_path)
+        .map_err(|e| format!("Failed to read DBeaver data-source metadata: {}", e))?;
+    if !data_sources_meta.is_file() {
+        return Err("The selected DBeaver data-source path is not a file.".to_string());
+    }
+    let credentials_path = data_sources_path
+        .parent()
+        .ok_or_else(|| "The selected DBeaver data-source path has no parent folder.".to_string())?
+        .join(DBEAVER_CREDENTIALS_CONFIG_FILE);
+    if !credentials_path.exists() {
+        return Ok(HashMap::new());
+    }
+
+    let credentials_meta = fs::metadata(&credentials_path)
+        .map_err(|e| format!("Failed to read DBeaver credentials metadata: {}", e))?;
+    if !credentials_meta.is_file() {
+        return Err("The DBeaver credentials-config.json path is not a file.".to_string());
+    }
+    if credentials_meta.len() > MAX_LOCAL_SESSION_FILE_BYTES {
+        return Err(
+            "The DBeaver credentials-config.json file is too large to import safely.".to_string(),
+        );
+    }
+
+    let encrypted = fs::read(&credentials_path)
+        .map_err(|e| format!("Failed to read DBeaver credentials-config.json: {}", e))?;
+    parse_dbeaver_credentials_config(&encrypted)
+        .map_err(|e| format!("Failed to decrypt DBeaver credentials-config.json: {}", e))
+}
+
+#[tauri::command]
 pub fn read_plist_session_file(path: String) -> Result<LocalSessionFile, String> {
     let expanded = shellexpand::tilde(&path).to_string();
     let path_buf = PathBuf::from(&expanded);
@@ -87,6 +138,61 @@ pub fn read_plist_session_file(path: String) -> Result<LocalSessionFile, String>
         relative_path,
         text,
     })
+}
+
+fn parse_dbeaver_credentials_config(
+    encrypted: &[u8],
+) -> Result<HashMap<String, DbeaverCredentialEntry>, String> {
+    if encrypted.len() <= 16 {
+        return Err("encrypted payload is too short".to_string());
+    }
+    let iv = &encrypted[..16];
+    let ciphertext = &encrypted[16..];
+    let plaintext = aes_128_cbc_decrypt_pkcs7(&DBEAVER_LOCAL_CREDENTIALS_KEY, iv, ciphertext)
+        .map_err(|e| e.to_string())?;
+    let parsed: Value = serde_json::from_slice(plaintext.as_slice())
+        .map_err(|e| format!("decrypted payload is not valid JSON: {}", e))?;
+    Ok(extract_dbeaver_credentials(parsed))
+}
+
+fn extract_dbeaver_credentials(parsed: Value) -> HashMap<String, DbeaverCredentialEntry> {
+    let mut out = HashMap::new();
+    let Some(root) = parsed.as_object() else {
+        return out;
+    };
+
+    for (connection_id, raw_sections) in root {
+        let Some(section_object) = raw_sections.as_object() else {
+            continue;
+        };
+        let Some(connection_section) = section_object.get("#connection").and_then(|value| value.as_object()) else {
+            continue;
+        };
+        let mut entry = DbeaverCredentialEntry::default();
+        entry.user = first_non_empty_json_field(connection_section, &["user", "username"]);
+        entry.password = first_non_empty_json_field(connection_section, &["password"]);
+        if entry.user.is_some() || entry.password.is_some() {
+            out.insert(connection_id.clone(), entry);
+        }
+    }
+
+    out
+}
+
+fn first_non_empty_json_field(
+    fields: &serde_json::Map<String, Value>,
+    names: &[&str],
+) -> Option<String> {
+    for name in names {
+        if let Some(value) = fields.get(*name) {
+            if let Some(text) = value.as_str() {
+                if !text.trim().is_empty() {
+                    return Some(text.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(windows)]
@@ -796,4 +902,70 @@ fn env_join(var: &str, child: &str) -> Option<PathBuf> {
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
         .map(|base| base.join(child))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aes::Aes128;
+    use cbc::cipher::block_padding::Pkcs7;
+    use cbc::cipher::{BlockModeEncrypt, KeyIvInit};
+    use serde_json::json;
+
+    type Aes128CbcEnc = cbc::Encryptor<Aes128>;
+
+    fn encrypt_dbeaver_credentials_fixture(plaintext: &[u8]) -> Vec<u8> {
+        let iv = [0x42u8; 16];
+        let block_size = 16;
+        let pad = block_size - (plaintext.len() % block_size);
+        let mut buf = vec![0u8; plaintext.len() + pad];
+        buf[..plaintext.len()].copy_from_slice(plaintext);
+        let ct_len = Aes128CbcEnc::new_from_slices(&DBEAVER_LOCAL_CREDENTIALS_KEY, &iv)
+            .expect("key and iv lengths are fixed")
+            .encrypt_padded::<Pkcs7>(&mut buf, plaintext.len())
+            .expect("encrypt")
+            .len();
+        buf.truncate(ct_len);
+
+        let mut encrypted = iv.to_vec();
+        encrypted.extend_from_slice(&buf);
+        encrypted
+    }
+
+    #[test]
+    fn decrypts_dbeaver_credentials_config() {
+        let payload = json!({
+            "conn-1": {
+                "#connection": {
+                    "user": "db_user",
+                    "password": "db_pass"
+                },
+                "#ssh": {
+                    "password": "ssh_pass"
+                }
+            },
+            "conn-2": {
+                "#connection": {
+                    "user": "readonly"
+                }
+            }
+        })
+        .to_string();
+        let encrypted = encrypt_dbeaver_credentials_fixture(payload.as_bytes());
+
+        let parsed = parse_dbeaver_credentials_config(&encrypted).unwrap();
+
+        let first = parsed.get("conn-1").unwrap();
+        assert_eq!(first.user.as_deref(), Some("db_user"));
+        assert_eq!(first.password.as_deref(), Some("db_pass"));
+        let second = parsed.get("conn-2").unwrap();
+        assert_eq!(second.user.as_deref(), Some("readonly"));
+        assert_eq!(second.password, None);
+    }
+
+    #[test]
+    fn rejects_short_dbeaver_credentials_payload() {
+        let err = parse_dbeaver_credentials_config(&[0u8; 16]).unwrap_err();
+        assert!(err.contains("too short"));
+    }
 }
