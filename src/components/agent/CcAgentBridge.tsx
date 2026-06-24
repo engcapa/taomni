@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
 import { getTerminal } from "../../lib/terminal/terminalRegistry";
 import { formatCcTerminalEcho, type CcTerminalEcho } from "../../lib/terminal/ccEcho";
+import { buildInteractiveCommandInput } from "../../lib/terminal/commandInput";
 import { getQueryTab } from "../../lib/queryRegistry";
 import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
@@ -363,7 +364,7 @@ async function executeTool(dispatch: ToolDispatch): Promise<void> {
           output = `no live terminal for session ${tabId}`;
           break;
         }
-        term.writeInput(command + "\n");
+        term.writeInput(buildInteractiveCommandInput(command));
         ok = true;
         output = "command sent to terminal";
         break;

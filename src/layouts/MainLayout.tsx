@@ -2233,7 +2233,7 @@ export function MainLayout() {
                             const sid = terminalSessionIds.current[tab.id];
                             if (!sid) return;
                             const escaped = p.replace(/'/g, "'\\''");
-                            void writeTerminal(sid, encodeBase64(`cd '${escaped}'\n`));
+                            void writeTerminal(sid, encodeBase64(`cd '${escaped}'\r`));
                           }}
                           onDetach={() => {
                             setSftpDetachedTabs((prev) => ({ ...prev, [tab.id]: true }));

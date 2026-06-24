@@ -2677,6 +2677,14 @@ export function TerminalPanel({
       tabId,
       sessionId: registeredSessionId,
       title: tabTitle,
+      localEnvironment: isLocal
+        ? {
+            platform: getAppPlatform(),
+            shellId: resolvedLocalShellId ?? localShell?.id ?? null,
+            shellName: localShell?.name ?? null,
+            shellArgs: localShell?.args ?? [],
+          }
+        : null,
       getBufferText: () => {
         const t = termRef.current;
         return t ? getBufferText(t) : "";
@@ -2707,7 +2715,7 @@ export function TerminalPanel({
       unregister();
       void ccUntrackTerminal(tabId, registeredSessionId).catch(() => {});
     };
-  }, [tabId, registeredSessionId, tabTitle]);
+  }, [isLocal, localShell?.args, localShell?.id, localShell?.name, resolvedLocalShellId, tabId, registeredSessionId, tabTitle]);
 
   // Publish this terminal's capture source while it's the active tab, so the
   // screenshot actions (folded into the tab-strip `⋯` menu in the main window,

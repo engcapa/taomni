@@ -25,6 +25,16 @@ export interface TerminalRegistryEntry {
   sessionId: string;
   /** Title shown in the global chat picker ("global chat ↔ terminal X"). */
   title: string;
+  /**
+   * Facts about a bound LOCAL terminal. Absent for SSH/remote terminals, where
+   * the saved session card is the source of truth.
+   */
+  localEnvironment?: {
+    platform: string;
+    shellId?: string | null;
+    shellName?: string | null;
+    shellArgs?: string[];
+  } | null;
   /** Full scrollback as plain text. */
   getBufferText: () => string;
   /** Last `n` non-wrapped lines as plain text. */

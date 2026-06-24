@@ -19,9 +19,28 @@
 //! module warning in `cc_bridge/mod.rs`).
 
 use crate::session::models::{SessionConfig, SessionType};
+use serde::{Deserialize, Serialize};
 
 /// How many recent commands to snapshot into the card.
 pub const HISTORY_LIMIT: usize = 15;
+
+/// Facts the frontend knows about a live local terminal tab. This is separate
+/// from `SessionConfig`: ad-hoc local terminals often have no saved session,
+/// and the backend only learns the actually launched shell id after PTY spawn.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalTerminalEnv {
+    #[serde(default)]
+    pub platform: Option<String>,
+    #[serde(default)]
+    pub shell_id: Option<String>,
+    #[serde(default)]
+    pub shell_name: Option<String>,
+    #[serde(default)]
+    pub shell_args: Option<Vec<String>>,
+    #[serde(default)]
+    pub cwd: Option<String>,
+}
 
 /// Replicate the frontend `makeHostKey` (`src/lib/history.ts`) so we read the
 /// same `command_history` bucket the terminal wrote into. Format:
@@ -153,7 +172,7 @@ fn push_terminal_routing(s: &mut String, remote: bool) {
     }
     s.push_str(
         "不要用你内置的本地 Bash / Read / Glob / Grep 去访问本机文件系统来回答这些问题——\
-         那是另一台机器(运行 Taomni 的宿主沙箱),不是你的工作对象。\n",
+         那是另一个执行环境(运行 Taomni / Claude Code 的宿主沙箱),不是这个绑定终端会话。\n",
     );
     s.push_str(
         "你自带的 <env>(工作目录 / git 状态 / 操作系统)只描述那台宿主沙箱;判断\
@@ -171,6 +190,96 @@ fn push_terminal_routing(s: &mut String, remote: bool) {
     );
 }
 
+fn clean_opt(value: Option<&String>) -> Option<&str> {
+    value.map(|s| s.trim()).filter(|s| !s.is_empty())
+}
+
+fn shell_syntax_hint(shell_id: Option<&str>, shell_name: Option<&str>) -> Option<&'static str> {
+    let mut haystack = String::new();
+    if let Some(id) = shell_id {
+        haystack.push_str(id);
+    }
+    haystack.push(' ');
+    if let Some(name) = shell_name {
+        haystack.push_str(name);
+    }
+    let lower = haystack.to_lowercase();
+    if lower.contains("powershell") || lower.contains("pwsh") {
+        Some("命令语法按 PowerShell 生成;不要默认使用 POSIX bash 语法。")
+    } else if lower.contains("command-prompt") || lower.contains("cmd") {
+        Some("命令语法按 Windows cmd.exe 生成;不要默认使用 POSIX bash 语法。")
+    } else if lower.contains("wsl") {
+        Some("这是 WSL 入口;终端内命令语法通常按该 WSL Linux 发行版的 shell 生成。")
+    } else if lower.contains("git-bash")
+        || lower.contains("bash")
+        || lower.contains("zsh")
+        || lower.contains("sh")
+    {
+        Some("命令语法可按 POSIX shell 生成。")
+    } else {
+        None
+    }
+}
+
+fn push_local_terminal_environment(s: &mut String, env: &LocalTerminalEnv) {
+    let platform = clean_opt(env.platform.as_ref());
+    let shell_id = clean_opt(env.shell_id.as_ref());
+    let shell_name = clean_opt(env.shell_name.as_ref());
+    let cwd = clean_opt(env.cwd.as_ref());
+    let has_args = env
+        .shell_args
+        .as_ref()
+        .map(|args| args.iter().any(|arg| !arg.trim().is_empty()))
+        .unwrap_or(false);
+
+    if platform.is_none()
+        && shell_id.is_none()
+        && shell_name.is_none()
+        && cwd.is_none()
+        && !has_args
+    {
+        return;
+    }
+
+    s.push_str("[本地终端环境 / local terminal environment]\n");
+    s.push_str("这个绑定目标是用户本机上的 live local terminal,不是远程 SSH 会话。\n");
+    if let Some(platform) = platform {
+        s.push_str(&format!("宿主平台: {platform}。\n"));
+    }
+    match (shell_name, shell_id) {
+        (Some(name), Some(id)) => s.push_str(&format!("Shell: {name}(id={id})。\n")),
+        (Some(name), None) => s.push_str(&format!("Shell: {name}。\n")),
+        (None, Some(id)) => s.push_str(&format!("Shell id: {id}。\n")),
+        (None, None) => {}
+    }
+    if has_args {
+        let args = env
+            .shell_args
+            .as_ref()
+            .map(|args| {
+                args.iter()
+                    .map(|arg| arg.trim())
+                    .filter(|arg| !arg.is_empty())
+                    .take(8)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .unwrap_or_default();
+        if !args.is_empty() {
+            s.push_str(&format!("启动参数: {args}。\n"));
+        }
+    }
+    if let Some(cwd) = cwd {
+        s.push_str(&format!(
+            "当前工作目录快照: {cwd};若每轮消息另有「当前工作目录」,以每轮值为准。\n"
+        ));
+    }
+    if let Some(hint) = shell_syntax_hint(shell_id, shell_name) {
+        s.push_str(hint);
+        s.push('\n');
+    }
+}
+
 /// Render the (pre-redaction) card text.
 ///
 /// - `session`: resolved bound session, or `None` for an unbound / local /
@@ -185,6 +294,7 @@ pub fn render_card(
     thread_id: &str,
     linked: bool,
     recent: &[String],
+    local_env: Option<&LocalTerminalEnv>,
 ) -> String {
     let mut s = String::from("[Taomni 会话绑定 / session binding]\n");
     match session {
@@ -217,7 +327,15 @@ pub fn render_card(
             match db_routing(&sc.session_type) {
                 DbRouting::Sql => push_sql_routing(&mut s, sc.session_type.as_str()),
                 DbRouting::Redis => push_redis_routing(&mut s),
-                DbRouting::None => push_terminal_routing(&mut s, is_remote(&sc.session_type)),
+                DbRouting::None => {
+                    let remote = is_remote(&sc.session_type);
+                    if !remote {
+                        if let Some(env) = local_env {
+                            push_local_terminal_environment(&mut s, env);
+                        }
+                    }
+                    push_terminal_routing(&mut s, remote);
+                }
             }
         }
         None => {
@@ -227,10 +345,19 @@ pub fn render_card(
             // saved session (local shell or ad-hoc connect); an unlinked thread
             // is a global / workspace chat with no terminal at all.
             if linked {
-                s.push_str(&format!(
-                    "本线程已绑定到一个终端标签(thread = {thread_id}),但它未关联到已保存会话\
-                     (可能是本地 shell 或临时连接),无法展示会话名 / 主机详情。\n"
-                ));
+                if local_env.is_some() {
+                    s.push_str(&format!(
+                        "本线程已绑定到一个本地终端标签(thread = {thread_id}),但它未关联到已保存会话。\n"
+                    ));
+                } else {
+                    s.push_str(&format!(
+                        "本线程已绑定到一个终端标签(thread = {thread_id}),但它未关联到已保存会话\
+                         (可能是本地 shell 或临时连接),无法展示会话名 / 主机详情。\n"
+                    ));
+                }
+                if let Some(env) = local_env {
+                    push_local_terminal_environment(&mut s, env);
+                }
                 // ① + ② — still bound to a live terminal. We don't know
                 // remote-vs-local, so use the generic routing (no sftp); both
                 // run_in_terminal and read_terminal_tail act on the live tab.
@@ -262,7 +389,11 @@ mod tests {
     use super::*;
     use crate::session::models::{AuthMethod, SessionType};
 
-    fn sample(session_type: SessionType, username: Option<&str>, auth: AuthMethod) -> SessionConfig {
+    fn sample(
+        session_type: SessionType,
+        username: Option<&str>,
+        auth: AuthMethod,
+    ) -> SessionConfig {
         SessionConfig {
             id: "sess-123".into(),
             name: "prod-db".into(),
@@ -303,7 +434,7 @@ mod tests {
             },
         );
         let recent = vec!["systemctl status nginx".to_string(), "df -h".to_string()];
-        let card = render_card(Some(&sc), "thread-9", true, &recent);
+        let card = render_card(Some(&sc), "thread-9", true, &recent, None);
 
         // Identity: name, user@host:port, type, auth label.
         assert!(card.contains("「prod-db」"));
@@ -336,7 +467,7 @@ mod tests {
 
     #[test]
     fn card_unbound_not_linked_is_global_local() {
-        let card = render_card(None, "thread-local", false, &[]);
+        let card = render_card(None, "thread-local", false, &[], None);
         assert!(card.contains("未绑定任何终端"));
         assert!(card.contains("thread = thread-local"));
         // Truly unbound: no routing and NO env-demotion — CC's native <env> is
@@ -350,7 +481,7 @@ mod tests {
         // Bound to a live tab but no saved SessionConfig — still a terminal, so
         // ① route through it and ② demote the native <env>. Unknown remote/local
         // ⇒ generic variant (no sftp_upload).
-        let card = render_card(None, "t-quick", true, &[]);
+        let card = render_card(None, "t-quick", true, &[], None);
         assert!(card.contains("未关联到已保存会话"));
         assert!(card.contains("run_in_terminal"));
         assert!(!card.contains("sftp_upload"));
@@ -358,9 +489,48 @@ mod tests {
     }
 
     #[test]
+    fn card_unsaved_local_includes_local_terminal_environment() {
+        let env = LocalTerminalEnv {
+            platform: Some("windows".into()),
+            shell_id: Some("powershell".into()),
+            shell_name: Some("PowerShell".into()),
+            shell_args: Some(vec!["-NoLogo".into()]),
+            cwd: Some("C:\\Users\\zhyha".into()),
+        };
+        let card = render_card(None, "t-local", true, &[], Some(&env));
+        assert!(card.contains("本地终端标签"));
+        assert!(card.contains("live local terminal"));
+        assert!(card.contains("宿主平台: windows"));
+        assert!(card.contains("Shell: PowerShell(id=powershell)"));
+        assert!(card.contains("启动参数: -NoLogo"));
+        assert!(card.contains("C:\\Users\\zhyha"));
+        assert!(card.contains("命令语法按 PowerShell"));
+        assert!(card.contains("run_in_terminal"));
+        assert!(!card.contains("sftp_upload"));
+    }
+
+    #[test]
+    fn card_remote_session_ignores_local_terminal_environment() {
+        let sc = sample(SessionType::SSH, Some("deploy"), AuthMethod::Agent);
+        let env = LocalTerminalEnv {
+            platform: Some("windows".into()),
+            shell_id: Some("powershell".into()),
+            shell_name: Some("PowerShell".into()),
+            shell_args: None,
+            cwd: Some("C:\\Users\\zhyha".into()),
+        };
+        let card = render_card(Some(&sc), "t-ssh", true, &[], Some(&env));
+        assert!(card.contains("deploy@Prod.Example.COM:2222"));
+        assert!(card.contains("sftp_upload"));
+        assert!(!card.contains("live local terminal"));
+        assert!(!card.contains("PowerShell(id=powershell)"));
+        assert!(!card.contains("C:\\Users\\zhyha"));
+    }
+
+    #[test]
     fn card_lenient_when_not_linked() {
         let sc = sample(SessionType::SSH, Some("u"), AuthMethod::Agent);
-        let card = render_card(Some(&sc), "t", false, &[]);
+        let card = render_card(Some(&sc), "t", false, &[], None);
         assert!(card.contains("信任级 = Lenient"));
     }
 
@@ -370,7 +540,7 @@ mod tests {
         // via the generic variant — run_in_terminal but no remote sftp_upload —
         // and ② the native <env> demotion.
         let sc = sample(SessionType::LocalShell, None, AuthMethod::None);
-        let card = render_card(Some(&sc), "t", false, &[]);
+        let card = render_card(Some(&sc), "t", false, &[], None);
         assert!(card.contains("run_in_terminal"));
         assert!(!card.contains("sftp_upload"));
         assert!(card.contains("宿主沙箱"));
@@ -390,12 +560,18 @@ mod tests {
         ] {
             let label = engine.as_str().to_string();
             let sc = sample(engine, Some("dba"), AuthMethod::Password);
-            let card = render_card(Some(&sc), "t-sql", true, &[]);
+            let card = render_card(Some(&sc), "t-sql", true, &[], None);
             assert!(card.contains(&label), "card should name the engine {label}");
             assert!(card.contains("run_sql"), "{label}: should mention run_sql");
             assert!(card.contains("describe_table"), "{label}: schema tools");
-            assert!(card.contains("run_sql_captured"), "{label}: big-result guidance");
-            assert!(!card.contains("run_in_terminal"), "{label}: no terminal tool");
+            assert!(
+                card.contains("run_sql_captured"),
+                "{label}: big-result guidance"
+            );
+            assert!(
+                !card.contains("run_in_terminal"),
+                "{label}: no terminal tool"
+            );
             assert!(!card.contains("sftp_upload"), "{label}: no sftp");
             assert!(card.contains("宿主沙箱"), "{label}: <env> still demoted");
         }
@@ -404,7 +580,7 @@ mod tests {
     #[test]
     fn card_redis_session_routes_to_redis_tools() {
         let sc = sample(SessionType::Redis, None, AuthMethod::Password);
-        let card = render_card(Some(&sc), "t-redis", true, &[]);
+        let card = render_card(Some(&sc), "t-redis", true, &[], None);
         assert!(card.contains("Redis"));
         assert!(card.contains("redis_list_keys"));
         assert!(card.contains("redis_get_key"));

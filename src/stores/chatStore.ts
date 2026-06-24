@@ -34,6 +34,14 @@ export interface CcUsage {
   duration_ms?: number | null;
 }
 
+interface LocalTerminalEnv {
+  platform: string;
+  shellId?: string | null;
+  shellName?: string | null;
+  shellArgs?: string[];
+  cwd?: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   thread_id: string;
@@ -296,15 +304,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // bridged per-turn so the CC DB MCP can target it (the backend can't derive
     // the runtime key). Null for non-DB threads or a disconnected DB tab.
     let boundDbConnectionId: string | null = null;
+    // Local terminal facts for Claude Code's appended system prompt. Only set
+    // for a live local terminal; SSH/remote tabs deliberately leave this null.
+    let localTerminalEnv: LocalTerminalEnv | null = null;
     {
       const tabId = get().threads.find((t) => t.id === threadId)?.linked_session_id ?? null;
       if (tabId) {
         try {
           const { useAppStore } = await import("./appStore");
+          const { getTerminal } = await import("../lib/terminal/terminalRegistry");
           const appState = useAppStore.getState();
           boundSessionId = appState.tabs.find((t) => t.id === tabId)?.sessionId ?? null;
           cwd = appState.cwdByTab[tabId] ?? null;
           boundDbConnectionId = appState.dbConnByTab[tabId] ?? null;
+          const localEnv = getTerminal(tabId)?.localEnvironment ?? null;
+          if (localEnv) {
+            localTerminalEnv = { ...localEnv, cwd };
+          }
         } catch (err) {
           console.warn("bound_session_id resolution failed:", err);
         }
@@ -437,6 +453,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           terminal_context: terminalContext ?? null,
           bound_session_id: boundSessionId,
           cwd,
+          local_terminal_env: localTerminalEnv,
           bound_db_connection_id: boundDbConnectionId,
         },
       });
@@ -468,6 +485,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             terminal_context: terminalContext ?? null,
             bound_session_id: boundSessionId,
             cwd,
+            local_terminal_env: localTerminalEnv,
             bound_db_connection_id: boundDbConnectionId,
           },
         });
