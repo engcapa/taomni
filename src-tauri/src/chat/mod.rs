@@ -551,7 +551,7 @@ pub async fn chat_stream(
             None => {
                 // Phase 6 — pick the MCP flavor from the bound session's type so
                 // the thread loads *only* the right tool surface: a SQL DB
-                // session (MySQL/PG/ClickHouse/Presto) gets the SQL tools, Redis
+                // session (MySQL/PG/SQL Server/ClickHouse/Presto) gets the SQL tools, Redis
                 // gets the Redis tools, everything else (SSH/local/unbound) gets
                 // the shell tools. Resolve in a tight scope so the db lock is
                 // dropped before the async provision call.

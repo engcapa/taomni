@@ -573,6 +573,8 @@ function dbEngineColor(engine?: string): string {
       return "#00758f";
     case "PostgreSQL":
       return "#336791";
+    case "SQLServer":
+      return "#cc2927";
     case "ClickHouse":
       return "#e6a817";
     case "Presto":

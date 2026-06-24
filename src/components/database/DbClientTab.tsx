@@ -1109,6 +1109,11 @@ export default function DbClientTab({
   const switchSchema = useCallback(
     async (schema: string) => {
       if (!schema || schema === activeSchema) return;
+      if (info.engine === "SQLServer") {
+        setActiveSchema(schema);
+        setStatusMessage(`Active schema: ${schema}`);
+        return;
+      }
       const panelId = activePanelId;
       const sql = schemaSwitchSql(info.engine, schema, info.catalog);
       const panel = panels.find((p) => p.id === panelId);

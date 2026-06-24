@@ -47,6 +47,13 @@ describe("splitSqlStatements", () => {
     ]);
   });
 
+  it("splits SQL Server scripts while preserving bracketed identifiers", () => {
+    expect(sqlStatementsForExecution("SQLServer", "select [a;b] from [dbo].[t]; select 2;")).toEqual([
+      "select [a;b] from [dbo].[t]",
+      "select 2",
+    ]);
+  });
+
   it("does not split engines that still rely on backend single-call execution semantics", () => {
     expect(sqlStatementsForExecution("PostgreSQL", "select 1; select 2;")).toEqual([
       "select 1; select 2;",

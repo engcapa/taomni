@@ -556,6 +556,33 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists SQL Server database settings with the default port", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "SQLServer" });
+
+    await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "sql.example.com");
+    await user.type(screen.getByLabelText("Database username"), "sa");
+    await user.type(screen.getByLabelText("Database name"), "warehouse");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "SQLServer",
+      host: "sql.example.com",
+      port: 1433,
+      username: "sa",
+    });
+    expect(savedOptions).toMatchObject({
+      dbDatabase: "warehouse",
+      dbTimeout: "15",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists HBase shell REST settings through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "HBaseShell" });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SessionConfig } from "./ipc";
 import {
   parseCsvSessions,
+  parseDbeaverSessions,
   parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
@@ -287,6 +288,142 @@ describe("CSV session import/export", () => {
       username: "deploy\"ops",
       created_at: 5555,
       updated_at: 5555,
+    });
+  });
+});
+
+describe("DBeaver session import", () => {
+  it("maps supported DBeaver database drivers to Taomni DB session types", () => {
+    const text = JSON.stringify({
+      folders: {
+        prod: { name: "Production" },
+      },
+      connections: {
+        maria: {
+          provider: "mariadb",
+          driver: "mariadb",
+          name: "Maria Prod",
+          folder: "prod",
+          "save-password": true,
+          configuration: {
+            host: "db.example.com",
+            port: "3307",
+            database: "app",
+            user: "appuser",
+            password: "secret",
+            properties: { useSSL: "true" },
+          },
+        },
+        mssql: {
+          driver: "Microsoft SQL Server",
+          name: "Warehouse",
+          configuration: {
+            url: "jdbc:jtds:sqlserver://sql.example.com:1444/warehouse;encrypt=true;user=sa",
+          },
+        },
+        pg: {
+          driver: "postgresql",
+          name: "Analytics",
+          configuration: {
+            url: "jdbc:postgresql://pg.example.com:5433/analytics?sslmode=require",
+            user: "reporter",
+          },
+        },
+        clickhouse: {
+          driver: "clickhouse",
+          name: "Events",
+          configuration: {
+            url: "jdbc:clickhouse://ch.example.com:8123/events?ssl=true",
+            user: "reader",
+          },
+        },
+        trino: {
+          driver: "trino",
+          name: "Lakehouse",
+          configuration: {
+            url: "jdbc:trino://trino.example.com:8443/hive/sales?SSL=true",
+            user: "analyst",
+          },
+        },
+        redis: {
+          driver: "redis",
+          name: "Cache",
+          configuration: {
+            url: "redis://:redis-pass@redis.example.com:6380/2",
+          },
+        },
+        oracle: {
+          driver: "oracle",
+          name: "Skipped Oracle",
+          configuration: {
+            host: "oracle.example.com",
+            port: "1521",
+          },
+        },
+      },
+    });
+
+    const result = parseDbeaverSessions(text, { targetFolder: "Imported", now: 7777 });
+
+    expect(result.sessions.map((s) => s.session_type)).toEqual([
+      "MySQL",
+      "SQLServer",
+      "PostgreSQL",
+      "ClickHouse",
+      "Presto",
+      "Redis",
+    ]);
+    expect(result.skipped).toBe(1);
+    expect(result.secrets).toHaveLength(2);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Maria Prod",
+      group_path: "User sessions / Imported / DBeaver / Production",
+      host: "db.example.com",
+      port: 3307,
+      username: "appuser",
+      created_at: 7777,
+      updated_at: 7777,
+    });
+    expect(JSON.parse(result.sessions[0].options_json)).toMatchObject({
+      dbDatabase: "app",
+      dbSsl: true,
+      dbTimeout: "15",
+    });
+    expect(result.sessions[1]).toMatchObject({
+      name: "Warehouse",
+      session_type: "SQLServer",
+      host: "sql.example.com",
+      port: 1444,
+      username: "sa",
+    });
+    expect(JSON.parse(result.sessions[1].options_json)).toMatchObject({
+      dbDatabase: "warehouse",
+      dbSsl: true,
+    });
+    expect(JSON.parse(result.sessions[2].options_json)).toMatchObject({
+      dbDatabase: "analytics",
+      dbSsl: true,
+    });
+    expect(result.sessions[3]).toMatchObject({
+      name: "Events",
+      session_type: "ClickHouse",
+      host: "ch.example.com",
+      port: 9000,
+      username: "reader",
+    });
+    expect(JSON.parse(result.sessions[3].options_json)).toMatchObject({
+      dbDatabase: "events",
+      dbHttpPort: "8123",
+      dbChProtocol: "HTTP",
+      dbSsl: true,
+    });
+    expect(JSON.parse(result.sessions[4].options_json)).toMatchObject({
+      dbCatalog: "hive",
+      dbDatabase: "sales",
+      dbSsl: true,
+    });
+    expect(JSON.parse(result.sessions[5].options_json)).toMatchObject({
+      dbRedisIndex: "2",
     });
   });
 });

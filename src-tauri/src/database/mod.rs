@@ -1,5 +1,6 @@
-//! Database client backend: MySQL / PostgreSQL (via `sqlx`), ClickHouse and
-//! Presto (via the existing `reqwest` HTTP client), and Redis (via `redis-rs`).
+//! Database client backend: MySQL / PostgreSQL (via `sqlx`), SQL Server (via
+//! `tiberius`), ClickHouse and Presto (via the existing `reqwest` HTTP client),
+//! and Redis (via `redis-rs`).
 //!
 //! SQL engines surface a single Tauri command surface (`db_*`, with
 //! `redis_*` for Redis). Live connections are cached in
@@ -36,7 +37,7 @@ use crate::state::AppState;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DbConfig {
-    /// Backend engine: "MySQL" | "PostgreSQL" | "ClickHouse" | "Presto" | "Redis".
+    /// Backend engine: "MySQL" | "PostgreSQL" | "SQLServer" | "ClickHouse" | "Presto" | "Redis".
     pub engine: String,
     pub host: String,
     pub port: u16,
@@ -223,6 +224,7 @@ pub struct DbObject {
 pub enum DbHandle {
     MySql(Pool<MySql>),
     Postgres(Pool<Postgres>),
+    SqlServer(Arc<AsyncMutex<sql::SqlServerClient>>),
     ClickHouse(clickhouse::ClickHouseClient),
     Presto(presto::PrestoClient),
     Redis(AsyncMutex<redis::aio::MultiplexedConnection>),
@@ -299,6 +301,22 @@ fn start_keepalive(handle: &DbHandle, shutdown: CancellationToken) -> Option<Joi
                 }
             }))
         }
+        DbHandle::SqlServer(client) => {
+            let client = client.clone();
+            Some(tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(Duration::from_secs(KEEPALIVE_INTERVAL_SECS));
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        _ = shutdown.cancelled() => break,
+                        _ = interval.tick() => {
+                            let _ = sql::ping_sqlserver(&client).await;
+                        }
+                    }
+                }
+            }))
+        }
         DbHandle::ClickHouse(client) => {
             let client = client.clone();
             Some(tokio::spawn(async move {
@@ -347,7 +365,10 @@ async fn close_session(session: Arc<DbSession>) {
     match &session.handle {
         DbHandle::MySql(pool) => pool.close().await,
         DbHandle::Postgres(pool) => pool.close().await,
-        DbHandle::ClickHouse(_) | DbHandle::Presto(_) | DbHandle::Redis(_) => {}
+        DbHandle::SqlServer(_)
+        | DbHandle::ClickHouse(_)
+        | DbHandle::Presto(_)
+        | DbHandle::Redis(_) => {}
     }
 }
 
@@ -406,6 +427,7 @@ pub async fn db_connect(
     let handle = match config.engine.as_str() {
         "MySQL" => sql::connect_mysql(&config, password.as_deref()).await?,
         "PostgreSQL" => sql::connect_postgres(&config, password.as_deref()).await?,
+        "SQLServer" => sql::connect_sqlserver(&config, password.as_deref()).await?,
         "ClickHouse" => clickhouse::connect(&config, password.as_deref()).await?,
         "Presto" => presto::connect(&config, password.as_deref()).await?,
         "Redis" => redis_ops::connect(&config, password.as_deref()).await?,
@@ -483,6 +505,7 @@ pub async fn db_ping(state: State<'_, AppState>, session_id: String) -> Result<S
     match &session.handle {
         DbHandle::MySql(pool) => sql::ping_mysql(pool).await,
         DbHandle::Postgres(pool) => sql::ping_postgres(pool).await,
+        DbHandle::SqlServer(client) => sql::ping_sqlserver(client).await,
         DbHandle::ClickHouse(client) => clickhouse::ping(client).await,
         DbHandle::Presto(client) => presto::ping(client).await,
         DbHandle::Redis(conn) => redis_ops::ping(conn).await,
@@ -515,6 +538,7 @@ pub async fn db_list_catalogs(
         DbHandle::Presto(client) => presto::list_catalogs(client).await,
         DbHandle::MySql(_)
         | DbHandle::Postgres(_)
+        | DbHandle::SqlServer(_)
         | DbHandle::ClickHouse(_)
         | DbHandle::Redis(_) => Ok(Vec::new()),
     }
@@ -530,6 +554,7 @@ pub async fn db_list_schemas(
     match &session.handle {
         DbHandle::MySql(pool) => sql::list_schemas_mysql(pool).await,
         DbHandle::Postgres(pool) => sql::list_schemas_postgres(pool).await,
+        DbHandle::SqlServer(client) => sql::list_schemas_sqlserver(client).await,
         DbHandle::ClickHouse(client) => clickhouse::list_schemas(client).await,
         DbHandle::Presto(client) => presto::list_schemas(client, catalog.as_deref()).await,
         DbHandle::Redis(_) => Err("Redis has no SQL schemas".into()),
@@ -547,6 +572,7 @@ pub async fn db_list_tables(
     match &session.handle {
         DbHandle::MySql(pool) => sql::list_tables_mysql(pool, schema.as_deref()).await,
         DbHandle::Postgres(pool) => sql::list_tables_postgres(pool, schema.as_deref()).await,
+        DbHandle::SqlServer(client) => sql::list_tables_sqlserver(client, schema.as_deref()).await,
         DbHandle::ClickHouse(client) => clickhouse::list_tables(client, schema.as_deref()).await,
         DbHandle::Presto(client) => {
             presto::list_tables(client, catalog.as_deref(), schema.as_deref()).await
@@ -568,6 +594,9 @@ pub async fn db_describe_table(
         DbHandle::MySql(pool) => sql::describe_table_mysql(pool, schema.as_deref(), &table).await,
         DbHandle::Postgres(pool) => {
             sql::describe_table_postgres(pool, schema.as_deref(), &table).await
+        }
+        DbHandle::SqlServer(client) => {
+            sql::describe_table_sqlserver(client, schema.as_deref(), &table).await
         }
         DbHandle::ClickHouse(client) => {
             clickhouse::describe_table(client, schema.as_deref(), &table).await
@@ -592,6 +621,9 @@ pub async fn db_list_indexes(
         DbHandle::Postgres(pool) => {
             sql::list_indexes_postgres(pool, schema.as_deref(), &table).await
         }
+        DbHandle::SqlServer(client) => {
+            sql::list_indexes_sqlserver(client, schema.as_deref(), &table).await
+        }
         DbHandle::ClickHouse(_) => Ok(Vec::new()),
         DbHandle::Presto(client) => presto::list_indexes(client, schema.as_deref(), &table).await,
         DbHandle::Redis(_) => Err("Redis has no indexes".into()),
@@ -610,6 +642,9 @@ pub async fn db_list_objects(
         DbHandle::MySql(pool) => sql::list_objects_mysql(pool, schema.as_deref(), &kind).await,
         DbHandle::Postgres(pool) => {
             sql::list_objects_postgres(pool, schema.as_deref(), &kind).await
+        }
+        DbHandle::SqlServer(client) => {
+            sql::list_objects_sqlserver(client, schema.as_deref(), &kind).await
         }
         DbHandle::ClickHouse(client) => {
             clickhouse::list_objects(client, schema.as_deref(), &kind).await
@@ -633,6 +668,9 @@ pub async fn db_object_ddl(
         DbHandle::Postgres(pool) => {
             sql::object_ddl_postgres(pool, schema.as_deref(), &kind, &name).await
         }
+        DbHandle::SqlServer(client) => {
+            sql::object_ddl_sqlserver(client, schema.as_deref(), &kind, &name).await
+        }
         DbHandle::ClickHouse(client) => {
             clickhouse::object_ddl(client, schema.as_deref(), &kind, &name).await
         }
@@ -655,6 +693,9 @@ pub async fn db_table_stats(
         DbHandle::MySql(pool) => sql::table_stats_mysql(pool, schema.as_deref(), &table).await,
         DbHandle::Postgres(pool) => {
             sql::table_stats_postgres(pool, schema.as_deref(), &table).await
+        }
+        DbHandle::SqlServer(client) => {
+            sql::table_stats_sqlserver(client, schema.as_deref(), &table).await
         }
         DbHandle::ClickHouse(client) => {
             clickhouse::table_stats(client, schema.as_deref(), &table).await
@@ -699,6 +740,7 @@ pub async fn db_execute(
     match &session.handle {
         DbHandle::MySql(pool) => sql::execute_mysql(pool, &sql, &token).await,
         DbHandle::Postgres(pool) => sql::execute_postgres(pool, &sql, &token).await,
+        DbHandle::SqlServer(client) => sql::execute_sqlserver(client, &sql, &token).await,
         DbHandle::ClickHouse(client) => clickhouse::execute(client, &sql, &token).await,
         DbHandle::Presto(client) => presto::execute(client, &sql, &token).await,
         DbHandle::Redis(_) => Err("Use redis_exec for Redis commands".into()),
@@ -721,6 +763,9 @@ pub async fn db_execute_stream(
         }
         DbHandle::Postgres(pool) => {
             sql::execute_postgres_stream(pool, &sql, max_rows, &token, &on_event).await
+        }
+        DbHandle::SqlServer(client) => {
+            sql::execute_sqlserver_stream(client, &sql, max_rows, &token, &on_event).await
         }
         DbHandle::ClickHouse(client) => {
             clickhouse::execute_stream(client, &sql, max_rows, &token, &on_event).await

@@ -4,6 +4,7 @@ use serde_json::json;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "macos")]
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -42,6 +43,7 @@ pub fn scan_local_session_files(source: String) -> Result<Vec<LocalSessionFile>,
         "xshell" => scan_xshell(&mut files),
         "tabby" => scan_tabby(&mut files),
         "windterm" => scan_windterm(&mut files),
+        "dbeaver" => scan_dbeaver(&mut files),
         "iterm2" | "iterm" => scan_iterm2(&mut files),
         "terminal" | "terminal.app" => scan_terminal_app(&mut files),
         "termius" => scan_termius_exports(&mut files),
@@ -471,6 +473,60 @@ fn scan_windterm(files: &mut Vec<LocalSessionFile>) {
     }
 }
 
+fn scan_dbeaver(files: &mut Vec<LocalSessionFile>) {
+    let mut roots = Vec::new();
+    if let Some(workspace) = std::env::var_os("DBEAVER_WORKSPACE").map(PathBuf::from) {
+        roots.push(workspace);
+    }
+    if let Some(home) = home_dir() {
+        roots.push(home.join(".dbeaver4"));
+        roots.push(home.join(".local").join("share").join("DBeaverData"));
+        roots.push(home.join(".config").join("DBeaverData"));
+        roots.push(
+            home.join("snap")
+                .join("dbeaver-ce")
+                .join("current")
+                .join(".local")
+                .join("share")
+                .join("DBeaverData"),
+        );
+
+        #[cfg(target_os = "macos")]
+        {
+            roots.push(home.join("Library").join("DBeaverData"));
+            roots.push(
+                home.join("Library")
+                    .join("Application Support")
+                    .join("DBeaverData"),
+            );
+        }
+    }
+    #[cfg(windows)]
+    {
+        if let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) {
+            roots.push(appdata.join("DBeaverData"));
+            roots.push(appdata.join("DBeaver"));
+        }
+        if let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+            roots.push(local.join("DBeaverData"));
+            roots.push(local.join("DBeaver"));
+        }
+        if let Some(profile) = std::env::var_os("USERPROFILE").map(PathBuf::from) {
+            roots.push(profile.join(".dbeaver4"));
+        }
+    }
+
+    let names = [
+        "data-sources.json",
+        "data-sources.xml",
+        ".dbeaver-data-sources.xml",
+    ];
+    for root in roots {
+        scan_dir_for_names("dbeaver", &root, &names, files);
+    }
+    dedup_files_by_path_case_insensitive(files);
+}
+
 fn scan_iterm2(_files: &mut Vec<LocalSessionFile>) {
     #[cfg(target_os = "macos")]
     if let Some(home) = home_dir() {
@@ -632,6 +688,11 @@ where
             push_file(source, &path, &relative, files);
         }
     }
+}
+
+fn dedup_files_by_path_case_insensitive(files: &mut Vec<LocalSessionFile>) {
+    let mut seen = HashSet::new();
+    files.retain(|file| seen.insert(file.path.to_ascii_lowercase()));
 }
 
 fn push_file(source: &str, path: &Path, relative_path: &str, files: &mut Vec<LocalSessionFile>) {

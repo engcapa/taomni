@@ -48,6 +48,7 @@ import {
 } from "../../lib/customDnD";
 import {
   parseCsvSessions,
+  parseDbeaverSessions,
   parseExceedSessions,
   parseItermDynamicProfiles,
   parseMobaXtermSessions,
@@ -995,6 +996,22 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           },
         ],
       },
+      {
+        label: t("sessionTree.contextImportDbeaver"),
+        icon: <Database className="w-3 h-3" />,
+        children: [
+          {
+            label: t("sessionTree.fromDbeaverDataSources"),
+            icon: <FileText className="w-3 h-3" />,
+            onClick: () => importTextSessions(folderPath, "DBeaver", ".json,.xml,data-sources.json,application/json,text/xml,application/xml,text/plain", parseDbeaverSessions),
+          },
+          {
+            label: t("sessionTree.fromLocalDbeaver"),
+            icon: <FolderOpen className="w-3 h-3" />,
+            onClick: () => importScannedTextSessions(folderPath, "dbeaver", "DBeaver", parseDbeaverSessions),
+          },
+        ],
+      },
       { label: "", separator: true },
       {
         label: t("sessionTree.contextImportIterm2"),
@@ -1547,6 +1564,8 @@ function sessionIcon(type: string) {
       return <Database className="w-3.5 h-3.5" style={{ color: "#00758f" }} />;
     case "PostgreSQL":
       return <Database className="w-3.5 h-3.5" style={{ color: "#336791" }} />;
+    case "SQLServer":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#cc2927" }} />;
     case "ClickHouse":
       return <Database className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />;
     case "Redis":
