@@ -601,6 +601,7 @@ pub async fn cc_test_settings(
         "--strict-mcp-config".into(),
         "--permission-prompt-tool".into(),
         flavor.permission_prompt_tool().into(),
+        "--bare".into(),
     ];
 
     let process = Arc::new(
