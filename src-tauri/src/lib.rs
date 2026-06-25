@@ -85,6 +85,30 @@ pub fn run() {
 
             app.manage(AppState::new(conn, vault_arc, ai_ctx, lanchat_state));
 
+            let handle_for_reaper = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    let state = handle_for_reaper.state::<AppState>();
+                    let mut registry = state.cc_processes.lock().await;
+                    let now = std::time::Instant::now();
+                    let mut to_remove = Vec::new();
+                    for (thread_id, proc) in registry.iter() {
+                        let last_active = *proc.last_active_at.lock().unwrap();
+                        if now.duration_since(last_active).as_secs() >= 300 {
+                            to_remove.push(thread_id.clone());
+                        }
+                    }
+                    for tid in to_remove {
+                        if let Some(proc) = registry.remove(&tid) {
+                            tokio::spawn(async move {
+                                proc.stop().await;
+                            });
+                        }
+                    }
+                }
+            });
+
             // Start the LanChat background service only if the user opted into
             // "start on launch". Otherwise it stays dark (no mDNS/beacon/listen)
             // until the user opens the chat and confirms enabling it. The state

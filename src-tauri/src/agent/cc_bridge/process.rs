@@ -79,6 +79,8 @@ pub struct CcProcess {
     /// Bearer token this process uses to authenticate to the in-app rmcp MCP
     /// server. Revoked on stop/drop so a dead thread's token can't be reused.
     cc_token: Option<String>,
+    /// Last activity time of this process (for reaping idle processes)
+    pub last_active_at: std::sync::Mutex<std::time::Instant>,
 }
 
 impl CcProcess {
@@ -112,6 +114,7 @@ impl CcProcess {
             temp_dir,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
             cc_token: None,
+            last_active_at: std::sync::Mutex::new(std::time::Instant::now()),
         }
     }
 
@@ -146,6 +149,7 @@ impl CcProcess {
         message: &str,
         mut on_event: F,
     ) -> Result<Vec<CcEvent>, String> {
+        *self.last_active_at.lock().unwrap() = std::time::Instant::now();
         self.ensure_running().await?;
 
         // Write the message as a JSON line to stdin. CC's stream-json input

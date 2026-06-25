@@ -524,17 +524,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ sending: false });
   },
 
-  toggleDrawer: () => set((s) => {
+  toggleDrawer: () => {
+    const s = get();
     const closing = s.drawerOpen;
     const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
-    return {
+    if (closing && s.activeThreadId) {
+      void get().stopSending(s.activeThreadId);
+    }
+    set({
       drawerOpen: !s.drawerOpen,
       ...(closing && tabId
         ? { tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false } }
         : {}),
-    };
-  }),
-  setDrawerOpen: (open) => set({ drawerOpen: open }),
+    });
+  },
+  setDrawerOpen: (open) => {
+    if (!open) {
+      const s = get();
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
+    }
+    set({ drawerOpen: open });
+  },
   setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
 
   openGlobalChat: async () => {
@@ -557,6 +569,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   toggleGlobalChat: async () => {
     const s = get();
     if (s.drawerOpen && s.drawerScope === "global") {
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
       set({ drawerOpen: false });
       return;
     }
@@ -586,6 +601,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!tabId) return;
     const s = get();
     if (s.drawerOpen && s.drawerScope === "tab" && s.drawerTabId === tabId) {
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
       set({
         drawerOpen: false,
         tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false },
@@ -601,6 +619,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     if (!tabId) {
       if (s.drawerScope === "tab" && s.drawerOpen) {
+        if (s.activeThreadId) {
+          void get().stopSending(s.activeThreadId);
+        }
         set({ drawerOpen: false, drawerTabId: null });
       }
       return;
@@ -612,6 +633,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     if (s.drawerScope === "tab" && s.drawerOpen) {
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
       set({ drawerOpen: false, drawerTabId: tabId });
     }
   },
