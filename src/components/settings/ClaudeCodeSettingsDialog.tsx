@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Sliders, Loader2, X, Plus, Trash2, Shield, AlertTriangle } from "lucide-react";
 import { useAiStore, CcCustomSettingsProfile } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
@@ -60,15 +60,33 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
 
+  const testSessionRef = useRef(0);
+
   // Reset test state on profile change
   useEffect(() => {
+    testSessionRef.current += 1;
     setTestResult(null);
     setTestError(null);
     setTesting(false);
+
+    // Kill the previous test process immediately when switching profiles
+    void invoke("cc_stop_session", { threadId: "cc_test_settings_thread" }).catch(() => {});
   }, [selectedProfileId]);
+
+  // Clean up test process on dialog unmount
+  useEffect(() => {
+    return () => {
+      testSessionRef.current += 1;
+      void invoke("cc_stop_session", { threadId: "cc_test_settings_thread" }).catch(() => {});
+    };
+  }, []);
 
   const handleTestSettings = async () => {
     if (!selectedContent) return;
+
+    testSessionRef.current += 1;
+    const currentSession = testSessionRef.current;
+
     setTesting(true);
     setTestResult("");
     setTestError(null);
@@ -76,6 +94,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
     let unlisten: UnlistenFn | null = null;
     try {
       unlisten = await listen<any>("cc-test-settings-stream", (event) => {
+        if (testSessionRef.current !== currentSession) return;
         const payload = event.payload;
         if (payload.kind === "token") {
           setTestResult((cur) => (cur ?? "") + payload.content);
@@ -88,12 +107,16 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
 
       await invoke("cc_test_settings", { settingsJson: selectedContent });
     } catch (err: any) {
-      setTestError(err?.message || String(err));
+      if (testSessionRef.current === currentSession) {
+        setTestError(err?.message || String(err));
+      }
     } finally {
       if (unlisten) {
         unlisten();
       }
-      setTesting(false);
+      if (testSessionRef.current === currentSession) {
+        setTesting(false);
+      }
     }
   };
 
