@@ -633,11 +633,21 @@ pub async fn cc_test_settings(
         .await;
 
     // Clean up registry
+    let stderr = process.get_stderr().await.trim().to_string();
     {
         let mut registry = state.cc_processes.lock().await;
         if let Some(old) = registry.remove(&thread_id) {
             old.stop().await;
         }
+    }
+
+    if stderr.contains("Settings Error") || stderr.contains("Invalid value") {
+        let msg = format!("Settings validation failed:\n{}", stderr);
+        emit(crate::chat::StreamEventOut::Error {
+            id: "test".to_string(),
+            message: msg.clone(),
+        });
+        return Err(msg);
     }
 
     match events_result {

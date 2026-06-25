@@ -136,6 +136,10 @@ impl CcProcess {
         self.stopped.load(Ordering::SeqCst)
     }
 
+    pub async fn get_stderr(&self) -> String {
+        self.stderr_buf.lock().await.clone()
+    }
+
     /// Send a message and collect all events until Done or Error.
     /// Spawns the process if not already running.
     pub async fn send(&self, message: &str) -> Result<Vec<CcEvent>, String> {

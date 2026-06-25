@@ -31,7 +31,7 @@ const SETTINGS_TEMPLATE = `{
       "Glob",
       "LS"
     ],
-    "defaultMode": "default"
+    "defaultMode": "acceptEdits"
   }
 }`;
 
