@@ -40,6 +40,7 @@ import {
   shouldUseLinuxImeGuard,
   TerminalImeInputGuard,
 } from "../../lib/terminalImeGuard";
+import { shouldSuppressMacImeKeydown } from "../../lib/terminal/macImeKeydown";
 import {
   readText as clipboardReadText,
   writeText as clipboardWriteText,
@@ -1897,6 +1898,20 @@ export function TerminalPanel({
       textarea.addEventListener("compositionstart", onCompositionStart);
       textarea.addEventListener("compositionend", onCompositionEnd);
 
+      // macOS IME first-character fix. macOS IMEs (Sogou/Pinyin…) deliver committed text
+      // via `input` (insertText) events but mark every keydown with keyCode 229, arriving
+      // input → keydown → keyup. xterm's _keyDown sets `_keyDownSeen` for those, and its
+      // _inputEvent then skips a composed character while the flag is set — so the first
+      // char typed with a modifier held (e.g. the `@` from Shift+2) is dropped before it
+      // reaches the PTY. Swallow keyCode-229 keydowns (capture phase, on the container so
+      // it runs before xterm's textarea handler) so the flag is never set; the character
+      // still arrives via `input`. Ctrl/Cmd combos pass through so shortcuts keep working.
+      // (Linux uses its own guard above; see shouldSuppressMacImeKeydown for details.)
+      const onMacImeKeydownCapture = (e: KeyboardEvent) => {
+        if (isMac && shouldSuppressMacImeKeydown(e)) e.stopImmediatePropagation();
+      };
+      el.addEventListener("keydown", onMacImeKeydownCapture, true);
+
       const observer = new MutationObserver(() => {
         if (isComposing) {
           observer.disconnect();
@@ -1915,6 +1930,7 @@ export function TerminalPanel({
       cleanupImePositionLock = () => {
         textarea.removeEventListener("compositionstart", onCompositionStart);
         textarea.removeEventListener("compositionend", onCompositionEnd);
+        el.removeEventListener("keydown", onMacImeKeydownCapture, true);
         observer.disconnect();
         compositionBufferRef.current = [];
       };
