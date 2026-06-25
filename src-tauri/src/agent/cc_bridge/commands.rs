@@ -587,6 +587,8 @@ pub async fn cc_test_settings(
         &cc_token,
     )?;
 
+    eprintln!("[cc test settings] Temporary settings.json path: {}", files.settings_path.to_string_lossy());
+
     let extra_args = vec![
         "--model".into(),
         config.cc_bridge.default_model.clone(),
