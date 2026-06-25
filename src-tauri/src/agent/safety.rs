@@ -85,10 +85,12 @@ pub fn path_is_sensitive(path: &str) -> bool {
 /// without touching the filesystem — the target file need not exist, and we
 /// must not follow symlinks for a deny check.
 fn path_is_denied(path: &str, deny_dirs: &[PathBuf], home: Option<&Path>) -> bool {
-    let expanded = expand_tilde(path, home);
+    let path = path.replace('\\', "/");
+    let expanded = expand_tilde(&path, home);
     let normalized = normalize_lexical(&expanded);
     deny_dirs.iter().any(|d| {
-        let dn = normalize_lexical(&d.to_string_lossy());
+        let d_str = d.to_string_lossy().replace('\\', "/");
+        let dn = normalize_lexical(&d_str);
         if dn.is_empty() {
             return false;
         }
@@ -100,11 +102,12 @@ fn path_is_denied(path: &str, deny_dirs: &[PathBuf], home: Option<&Path>) -> boo
 /// (e.g. `~user`) are left untouched.
 fn expand_tilde(path: &str, home: Option<&Path>) -> String {
     if let Some(home) = home {
+        let home_str = home.to_string_lossy().replace('\\', "/");
         if path == "~" {
-            return home.to_string_lossy().to_string();
+            return home_str;
         }
         if let Some(rest) = path.strip_prefix("~/") {
-            return home.join(rest).to_string_lossy().to_string();
+            return format!("{}/{}", home_str, rest);
         }
     }
     path.to_string()
@@ -114,7 +117,9 @@ fn expand_tilde(path: &str, home: Option<&Path>) -> String {
 /// redundant separators. Preserves a leading `/` (absolute) marker. Does not
 /// touch the filesystem.
 fn normalize_lexical(path: &str) -> String {
-    let absolute = path.starts_with('/');
+    let path = path.replace('\\', "/");
+    let absolute = path.starts_with('/') || (path.len() >= 3 && path.chars().nth(1) == Some(':') && path.chars().nth(2) == Some('/'));
+    let is_windows_drive = path.len() >= 2 && path.chars().nth(1) == Some(':');
     let mut out: Vec<&str> = Vec::new();
     for comp in path.split('/') {
         match comp {
@@ -131,7 +136,11 @@ fn normalize_lexical(path: &str) -> String {
     }
     let joined = out.join("/");
     if absolute {
-        format!("/{}", joined)
+        if is_windows_drive {
+            joined
+        } else {
+            format!("/{}", joined)
+        }
     } else {
         joined
     }

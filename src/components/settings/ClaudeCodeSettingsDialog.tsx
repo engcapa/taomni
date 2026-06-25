@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Sliders, Loader2, X, Plus, Trash2, Shield, AlertTriangle } from "lucide-react";
 import { useAiStore, CcCustomSettingsProfile } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import {
   ccGetProfileSettings,
   vaultPut,
@@ -29,7 +31,7 @@ const SETTINGS_TEMPLATE = `{
       "Glob",
       "LS"
     ],
-    "defaultMode": "default"
+    "defaultMode": "acceptEdits"
   }
 }`;
 
@@ -53,6 +55,70 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  const testSessionRef = useRef(0);
+
+  // Reset test state on profile change
+  useEffect(() => {
+    testSessionRef.current += 1;
+    setTestResult(null);
+    setTestError(null);
+    setTesting(false);
+
+    // Kill the previous test process immediately when switching profiles
+    void invoke("cc_stop_session", { threadId: "cc_test_settings_thread" }).catch(() => {});
+  }, [selectedProfileId]);
+
+  // Clean up test process on dialog unmount
+  useEffect(() => {
+    return () => {
+      testSessionRef.current += 1;
+      void invoke("cc_stop_session", { threadId: "cc_test_settings_thread" }).catch(() => {});
+    };
+  }, []);
+
+  const handleTestSettings = async () => {
+    if (!selectedContent) return;
+
+    testSessionRef.current += 1;
+    const currentSession = testSessionRef.current;
+
+    setTesting(true);
+    setTestResult("");
+    setTestError(null);
+
+    let unlisten: UnlistenFn | null = null;
+    try {
+      unlisten = await listen<any>("cc-test-settings-stream", (event) => {
+        if (testSessionRef.current !== currentSession) return;
+        const payload = event.payload;
+        if (payload.kind === "token") {
+          setTestResult((cur) => (cur ?? "") + payload.content);
+        } else if (payload.kind === "end") {
+          setTestResult(payload.content);
+        } else if (payload.kind === "error") {
+          setTestError(payload.message);
+        }
+      });
+
+      await invoke("cc_test_settings", { settingsJson: selectedContent });
+    } catch (err: any) {
+      if (testSessionRef.current === currentSession) {
+        setTestError(err?.message || String(err));
+      }
+    } finally {
+      if (unlisten) {
+        unlisten();
+      }
+      if (testSessionRef.current === currentSession) {
+        setTesting(false);
+      }
+    }
+  };
 
   // Close on Escape key
   useEffect(() => {
@@ -463,6 +529,55 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                       onChange={(e) => handleUpdateContent(e.target.value)}
                       placeholder={t("aiSettings.ccCustomPlaceholder")}
                     />
+                  )}
+                </div>
+
+                {/* Test Section */}
+                <div className="border border-[var(--taomni-divider)] rounded p-2 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-1.5 shrink-0 mt-1">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-semibold text-[var(--taomni-text)]">
+                      {t("aiSettings.ccTestTitle") || "Test Configuration"}
+                    </div>
+                    <button
+                      type="button"
+                      className="taomni-btn h-6 px-2 text-[10px]"
+                      onClick={handleTestSettings}
+                      disabled={testing || isSelectedLoading}
+                    >
+                      {testing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin mr-1 inline" />
+                          {t("aiSettings.ccTesting") || "Testing..."}
+                        </>
+                      ) : (
+                        t("aiSettings.ccTestBtn") || "Run Test"
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* Test Output Console */}
+                  {(testResult !== null || testError !== null || testing) && (
+                    <div className="bg-[var(--taomni-bg)] border border-[var(--taomni-input-border)] rounded p-1.5 text-[10px] font-mono max-h-[100px] overflow-y-auto leading-relaxed relative">
+                      <div className="text-[9px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] pb-0.5 mb-1">
+                        Prompt: "Hello, My name is Taomni, Can you help me?"
+                      </div>
+                      {testing && !testResult && (
+                        <div className="text-[var(--taomni-text-muted)] flex items-center gap-1">
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          <span>Spawning Claude Code process and running test turn...</span>
+                        </div>
+                      )}
+                      {testResult && (
+                        <div className="whitespace-pre-wrap text-[var(--taomni-text)]">
+                          {testResult}
+                        </div>
+                      )}
+                      {testError && (
+                        <div className="text-red-400 whitespace-pre-wrap">
+                          Error: {testError}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 

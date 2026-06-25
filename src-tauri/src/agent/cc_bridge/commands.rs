@@ -539,3 +539,142 @@ pub async fn cc_stream_message(
         session_id,
     })
 }
+
+#[tauri::command]
+pub async fn cc_test_settings(
+    settings_json: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let config = AiConfig::load(&default_ai_config_path());
+    let binary = if config.cc_bridge.binary == "auto" {
+        crate::agent::cc_bridge::find_claude_binary().ok_or("Claude Code CLI not found")?
+    } else {
+        config.cc_bridge.binary.clone()
+    };
+
+    let thread_id = "cc_test_settings_thread".to_string();
+    let event_name = "cc-test-settings-stream".to_string();
+
+    let emit = |evt: crate::chat::StreamEventOut| {
+        let _ = app.emit(&event_name, evt);
+    };
+
+    // Kill any existing test process first to clean up
+    {
+        let mut registry = state.cc_processes.lock().await;
+        if let Some(old) = registry.remove(&thread_id) {
+            old.stop().await;
+        }
+    }
+
+    let flavor = crate::agent::cc_bridge::mcp_http::Flavor::Shell;
+    let (cc_server_url, cc_token) =
+        crate::agent::cc_bridge::mcp_http::provision_for_thread(
+            &app,
+            &thread_id,
+            None,
+            None,
+            flavor,
+            config.cc_bridge.confirm_readonly,
+        )
+        .await?;
+
+    let files = crate::agent::cc_bridge::config::create_session_files(
+        Some(&settings_json),
+        flavor.server_name(),
+        &cc_server_url,
+        &cc_token,
+    )?;
+
+    eprintln!("[cc test settings] Temporary settings.json path: {}", files.settings_path.to_string_lossy());
+
+    let extra_args = vec![
+        "--model".into(),
+        config.cc_bridge.default_model.clone(),
+        "--max-turns".into(),
+        "3".into(),
+        "--settings".into(),
+        files.settings_path.to_string_lossy().to_string(),
+        "--mcp-config".into(),
+        files.mcp_path.to_string_lossy().to_string(),
+        "--strict-mcp-config".into(),
+        "--permission-prompt-tool".into(),
+        flavor.permission_prompt_tool().into(),
+        "--bare".into(),
+    ];
+
+    let process = Arc::new(
+        crate::agent::cc_bridge::process::CcProcess::new(&binary, extra_args, Some(files.dir))
+            .with_token(cc_token.clone()),
+    );
+
+    {
+        let mut registry = state.cc_processes.lock().await;
+        registry.insert(thread_id.clone(), process.clone());
+    }
+
+    let app_clone = app.clone();
+    let event_name_clone = event_name.clone();
+    let prompt = "Hello, My name is Taomni, Can you help me?".to_string();
+
+    let events_result = process
+        .send_with_callback(&prompt, move |evt| {
+            use crate::agent::cc_bridge::protocol::CcEvent;
+            if let CcEvent::Partial { content } = evt {
+                let _ = app_clone.emit(
+                    &event_name_clone,
+                    crate::chat::StreamEventOut::Token {
+                        id: "test".to_string(),
+                        content: content.clone(),
+                    },
+                );
+            }
+        })
+        .await;
+
+    // Clean up registry
+    let stderr = process.get_stderr().await.trim().to_string();
+    {
+        let mut registry = state.cc_processes.lock().await;
+        if let Some(old) = registry.remove(&thread_id) {
+            old.stop().await;
+        }
+    }
+
+    if stderr.contains("Settings Error") || stderr.contains("Invalid value") {
+        let msg = format!("Settings validation failed:\n{}", stderr);
+        emit(crate::chat::StreamEventOut::Error {
+            id: "test".to_string(),
+            message: msg.clone(),
+        });
+        return Err(msg);
+    }
+
+    match events_result {
+        Ok(events) => {
+            let mut final_content = String::new();
+            for event in &events {
+                use crate::agent::cc_bridge::protocol::CcEvent;
+                if let CcEvent::AssistantMessage { content } = event {
+                    final_content.push_str(content);
+                }
+            }
+            emit(crate::chat::StreamEventOut::End {
+                id: "test".to_string(),
+                thread_id,
+                content: final_content,
+                redacted_count: 0,
+            });
+            Ok(())
+        }
+        Err(e) => {
+            emit(crate::chat::StreamEventOut::Error {
+                id: "test".to_string(),
+                message: e.clone(),
+            });
+            Err(e)
+        }
+    }
+}
+

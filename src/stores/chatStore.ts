@@ -115,6 +115,7 @@ interface ChatStore {
   setActiveThread: (threadId: string | null) => void;
   loadMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
+  stopSending: (threadId: string) => Promise<void>;
   /// Open the drawer (creating a thread if needed) and stage `text` in the
   /// composer. Used by the Selection toolbar's "Send to AI" action.
   attachToComposer: (text: string, scope?: ComposerAttachScope) => Promise<void>;
@@ -514,17 +515,38 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  toggleDrawer: () => set((s) => {
+  stopSending: async (threadId: string) => {
+    try {
+      await invoke("chat_stop_stream", { threadId });
+    } catch (e) {
+      console.error("chat_stop_stream failed:", e);
+    }
+    set({ sending: false });
+  },
+
+  toggleDrawer: () => {
+    const s = get();
     const closing = s.drawerOpen;
     const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
-    return {
+    if (closing && s.activeThreadId) {
+      void get().stopSending(s.activeThreadId);
+    }
+    set({
       drawerOpen: !s.drawerOpen,
       ...(closing && tabId
         ? { tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false } }
         : {}),
-    };
-  }),
-  setDrawerOpen: (open) => set({ drawerOpen: open }),
+    });
+  },
+  setDrawerOpen: (open) => {
+    if (!open) {
+      const s = get();
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
+    }
+    set({ drawerOpen: open });
+  },
   setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
 
   openGlobalChat: async () => {
@@ -547,6 +569,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   toggleGlobalChat: async () => {
     const s = get();
     if (s.drawerOpen && s.drawerScope === "global") {
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
       set({ drawerOpen: false });
       return;
     }
@@ -576,6 +601,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!tabId) return;
     const s = get();
     if (s.drawerOpen && s.drawerScope === "tab" && s.drawerTabId === tabId) {
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
       set({
         drawerOpen: false,
         tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false },
@@ -591,6 +619,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     if (!tabId) {
       if (s.drawerScope === "tab" && s.drawerOpen) {
+        if (s.activeThreadId) {
+          void get().stopSending(s.activeThreadId);
+        }
         set({ drawerOpen: false, drawerTabId: null });
       }
       return;
@@ -602,6 +633,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     if (s.drawerScope === "tab" && s.drawerOpen) {
+      if (s.activeThreadId) {
+        void get().stopSending(s.activeThreadId);
+      }
       set({ drawerOpen: false, drawerTabId: tabId });
     }
   },

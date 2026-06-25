@@ -92,6 +92,8 @@ pub struct AppState {
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
+    /// Cancel tokens for in-flight chat streams, keyed by thread_id.
+    pub chat_cancel_tokens: Arc<std::sync::Mutex<HashMap<String, tokio_util::sync::CancellationToken>>>,
     /// Pending CC side-effect tool calls awaiting frontend execution, keyed by
     /// per-call id. See [`CcToolResponder`].
     pub cc_pending_tool_calls: Arc<Mutex<HashMap<String, CcToolResponder>>>,
@@ -159,6 +161,7 @@ impl AppState {
             db: Mutex::new(db),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
+            chat_cancel_tokens: Arc::new(std::sync::Mutex::new(HashMap::new())),
             cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
             cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
             captures: Arc::new(crate::agent::capture::CaptureRegistry::new(
