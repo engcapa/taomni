@@ -57,6 +57,7 @@ pub struct CcProcess {
     args: Vec<String>,
     child: Mutex<Option<Child>>,
     stdin: Mutex<Option<tokio::process::ChildStdin>>,
+    stdout: Mutex<Option<BufReader<tokio::process::ChildStdout>>>,
     restart_count: AtomicU32,
     last_failure_at: Mutex<Option<Instant>>,
     /// Set by the watchdog when it observes a dead process between calls.
@@ -105,6 +106,7 @@ impl CcProcess {
             args,
             child: Mutex::new(None),
             stdin: Mutex::new(None),
+            stdout: Mutex::new(None),
             restart_count: AtomicU32::new(0),
             last_failure_at: Mutex::new(None),
             needs_respawn: AtomicBool::new(false),
@@ -238,6 +240,7 @@ impl CcProcess {
         };
 
         let stdin = child.stdin.take().ok_or("Failed to get CC stdin")?;
+        let stdout = child.stdout.take().ok_or("Failed to get CC stdout")?;
 
         // Drain stderr into a rolling buffer so we can report why the CLI
         // exited if it dies without producing usable stdout.
@@ -267,6 +270,7 @@ impl CcProcess {
 
         *child_guard = Some(child);
         *self.stdin.lock().await = Some(stdin);
+        *self.stdout.lock().await = Some(BufReader::new(stdout));
         // Drop the guard so callers (and the watchdog) can lock back in. The
         // watchdog is started by the owner of the `Arc<CcProcess>` (see
         // `start_watchdog`), not here, because it needs a `Weak<Self>`.
@@ -318,6 +322,7 @@ impl CcProcess {
                     }
                     drop(guard);
                     *this.stdin.lock().await = None;
+                    *this.stdout.lock().await = None;
                     this.needs_respawn.store(true, Ordering::SeqCst);
                     this.record_failure().await;
                 }
@@ -333,13 +338,10 @@ impl CcProcess {
     ) -> Result<Vec<CcEvent>, String> {
         let mut events = Vec::new();
         let mut terminal_seen = false;
-        let mut child_guard = self.child.lock().await;
+        let mut stdout_guard = self.stdout.lock().await;
 
-        let child = child_guard.as_mut().ok_or("CC process not running")?;
+        let reader = stdout_guard.as_mut().ok_or("CC stdout not available")?;
 
-        let stdout = child.stdout.as_mut().ok_or("CC stdout not available")?;
-
-        let mut reader = BufReader::new(stdout);
         let mut line = String::new();
 
         // Captures a read error / idle timeout so we can run the shared
@@ -402,11 +404,12 @@ impl CcProcess {
         // surface a real error instead of an empty bubble or a poisoned next
         // turn reading this turn's leftover output.
         if !terminal_seen {
-            drop(child_guard);
+            drop(stdout_guard);
             if let Some(mut c) = self.child.lock().await.take() {
                 let _ = c.kill().await;
             }
             *self.stdin.lock().await = None;
+            *self.stdout.lock().await = None;
             self.needs_respawn.store(true, Ordering::SeqCst);
             self.record_failure().await;
             if let Some(reason) = read_failure {
@@ -431,6 +434,7 @@ impl CcProcess {
             let _ = child.kill().await;
         }
         *self.stdin.lock().await = None;
+        *self.stdout.lock().await = None;
         // Revoke our MCP server token so it can't be reused after the process
         // is gone.
         if let Some(token) = &self.cc_token {
