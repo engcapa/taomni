@@ -29,7 +29,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const {
     threads, activeThreadId, messages, sending, drawerOpen, drawerScope, drawerWidth,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
-    sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads,
+    sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads, stopSending,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -556,17 +556,31 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             </div>
           ))}
           {sending && (
-            <div className="flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-              <div className="flex gap-0.5">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-accent)] animate-bounce"
-                    style={{ animationDelay: `${i * 150}ms` }}
-                  />
-                ))}
+            <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--taomni-text-muted)] p-1.5 border border-[var(--taomni-divider)] rounded bg-[var(--taomni-bg)]/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-accent)] animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms` }}
+                    />
+                  ))}
+                </div>
+                <span>{t("chat.aiThinking")}</span>
               </div>
-              {t("chat.aiThinking")}
+              <button
+                type="button"
+                className="taomni-btn h-5 px-2 text-[10px] flex items-center gap-1 hover:text-red-400 border border-[var(--taomni-divider)] rounded hover:bg-[var(--taomni-hover)] transition-colors"
+                onClick={() => {
+                  if (activeThreadId) {
+                    void stopSending(activeThreadId);
+                  }
+                }}
+              >
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-sm" />
+                <span>{t("common.stop") || "Stop"}</span>
+              </button>
             </div>
           )}
           {error && (

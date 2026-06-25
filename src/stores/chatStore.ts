@@ -115,6 +115,7 @@ interface ChatStore {
   setActiveThread: (threadId: string | null) => void;
   loadMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
+  stopSending: (threadId: string) => Promise<void>;
   /// Open the drawer (creating a thread if needed) and stage `text` in the
   /// composer. Used by the Selection toolbar's "Send to AI" action.
   attachToComposer: (text: string, scope?: ComposerAttachScope) => Promise<void>;
@@ -512,6 +513,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (unlisten) unlisten();
       set({ sending: false });
     }
+  },
+
+  stopSending: async (threadId: string) => {
+    try {
+      await invoke("chat_stop_stream", { threadId });
+    } catch (e) {
+      console.error("chat_stop_stream failed:", e);
+    }
+    set({ sending: false });
   },
 
   toggleDrawer: () => set((s) => {

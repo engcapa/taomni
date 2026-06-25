@@ -466,6 +466,25 @@ fn cc_tool_result_preview(content: &str) -> String {
     }
 }
 
+#[tauri::command]
+pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    // 1. Cancel Claude Code process if running
+    {
+        let mut registry = state.cc_processes.lock().await;
+        if let Some(process) = registry.remove(&thread_id) {
+            process.stop().await;
+        }
+    }
+    // 2. Cancel direct LLM streams
+    {
+        let mut tokens = state.chat_cancel_tokens.lock().unwrap();
+        if let Some(token) = tokens.remove(&thread_id) {
+            token.cancel();
+        }
+    }
+    Ok(())
+}
+
 /// Streaming variant of `chat_send`. Emits events on
 /// `chat-stream:{thread_id}` and resolves once the stream finishes (or errors).
 #[tauri::command]
@@ -862,9 +881,14 @@ pub async fn chat_stream(
         let events = match events {
             Ok(ev) => ev,
             Err(e) => {
+                let msg = if process.is_stopped() {
+                    "Stream stopped by user".to_string()
+                } else {
+                    e
+                };
                 emit(&StreamEventOut::Error {
                     id: assistant_id,
-                    message: e,
+                    message: msg,
                 });
                 return Ok(());
             }
@@ -1018,32 +1042,66 @@ pub async fn chat_stream(
         }
     };
 
+    // Create/get a cancellation token for this thread
+    let cancel_token = {
+        let mut tokens = state.chat_cancel_tokens.lock().unwrap();
+        let token = tokio_util::sync::CancellationToken::new();
+        tokens.insert(req.thread_id.clone(), token.clone());
+        token
+    };
+
     let mut accumulated = String::new();
-    while let Some(evt) = stream.next().await {
-        match evt {
-            Ok(ChatStreamEvent::Token { content }) => {
-                accumulated.push_str(&content);
-                emit(&StreamEventOut::Token {
-                    id: assistant_id.clone(),
-                    content,
-                });
+    let mut is_cancelled = false;
+    loop {
+        tokio::select! {
+            _ = cancel_token.cancelled() => {
+                is_cancelled = true;
+                break;
             }
-            Ok(ChatStreamEvent::End { .. }) => break,
-            Ok(ChatStreamEvent::Error { message }) => {
-                emit(&StreamEventOut::Error {
-                    id: assistant_id,
-                    message,
-                });
-                return Ok(());
-            }
-            Err(e) => {
-                emit(&StreamEventOut::Error {
-                    id: assistant_id,
-                    message: e.to_string(),
-                });
-                return Ok(());
+            evt_opt = stream.next() => {
+                match evt_opt {
+                    Some(evt) => {
+                        match evt {
+                            Ok(ChatStreamEvent::Token { content }) => {
+                                accumulated.push_str(&content);
+                                emit(&StreamEventOut::Token {
+                                    id: assistant_id.clone(),
+                                    content,
+                                });
+                            }
+                            Ok(ChatStreamEvent::End { .. }) => break,
+                            Ok(ChatStreamEvent::Error { message }) => {
+                                emit(&StreamEventOut::Error {
+                                    id: assistant_id,
+                                    message,
+                                });
+                                state.chat_cancel_tokens.lock().unwrap().remove(&req.thread_id);
+                                return Ok(());
+                            }
+                            Err(e) => {
+                                emit(&StreamEventOut::Error {
+                                    id: assistant_id,
+                                    message: e.to_string(),
+                                });
+                                state.chat_cancel_tokens.lock().unwrap().remove(&req.thread_id);
+                                return Ok(());
+                            }
+                        }
+                    }
+                    None => break,
+                }
             }
         }
+    }
+
+    state.chat_cancel_tokens.lock().unwrap().remove(&req.thread_id);
+
+    if is_cancelled {
+        emit(&StreamEventOut::Error {
+            id: assistant_id,
+            message: "Stream stopped by user".into(),
+        });
+        return Ok(());
     }
 
     // Persist the assistant message and auto-title on first turn.

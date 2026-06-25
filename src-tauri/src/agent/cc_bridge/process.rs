@@ -129,6 +129,10 @@ impl CcProcess {
         self
     }
 
+    pub fn is_stopped(&self) -> bool {
+        self.stopped.load(Ordering::SeqCst)
+    }
+
     /// Send a message and collect all events until Done or Error.
     /// Spawns the process if not already running.
     pub async fn send(&self, message: &str) -> Result<Vec<CcEvent>, String> {
