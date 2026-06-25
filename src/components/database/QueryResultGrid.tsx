@@ -477,7 +477,7 @@ function cleanExportText(value: string, options: ExportOptions): string {
 }
 
 function renderTemplate(template: string, value: string): string {
-  return template.replace(/\$\{value\}\$/g, value).replace(/\$\{value\}/g, value);
+  return template.replace(/\$\{value\}\$?/g, () => value);
 }
 
 function quoteSqlIdentifier(name: string, mode: SqlDelimiterMode): string {
@@ -517,9 +517,13 @@ function serializeResult(
   const columnByName = new Map(columns.map((column, index) => [column.name, { column, index }]));
   const rowValues = limitedRows.map((row) =>
     enabledColumns.map((exportColumn) => {
-      const match = columnByName.get(exportColumn.name);
-      const sourceColumn = match?.column ?? { name: exportColumn.name, type: exportColumn.type };
-      const raw = match ? row.values[match.index] : null;
+      let originalIndex = parseInt(exportColumn.id.split('-')[1], 10);
+      if (Number.isNaN(originalIndex) || exportColumn.id.startsWith("export-col")) {
+        const match = columnByName.get(exportColumn.name);
+        originalIndex = match ? match.index : -1;
+      }
+      const sourceColumn = columns[originalIndex] ?? { name: exportColumn.name, type: exportColumn.type };
+      const raw = originalIndex >= 0 && originalIndex < columns.length ? row.values[originalIndex] : null;
       const columnOptions = exportColumn.textFunction === "none" ? options : { ...options, textFunction: exportColumn.textFunction };
       const formatted = formatValue(raw, sourceColumn, columnOptions);
       return cleanExportText(renderTemplate(exportColumn.valueTemplate || "${value}$", formatted), options);

@@ -218,6 +218,26 @@ fn mysql_value_to_string(row: &MySqlRow, i: usize) -> Option<String> {
                 return v.map(|x| x.to_string());
             }
         }
+        "BIT" => {
+            if let Ok(v) = row.try_get::<Option<u64>, _>(i) {
+                return v.map(|x| x.to_string());
+            }
+            if let Ok(v) = row.try_get::<Option<Vec<u8>>, _>(i) {
+                return v.map(|b| {
+                    if b.is_empty() {
+                        "0".to_string()
+                    } else if b.len() == 1 {
+                        b[0].to_string()
+                    } else {
+                        let mut val: u64 = 0;
+                        for &byte in &b {
+                            val = (val << 8) | (byte as u64);
+                        }
+                        val.to_string()
+                    }
+                });
+            }
+        }
         _ => {}
     }
     // Fallback: text, then raw bytes (lossy utf8 for BLOB/VARBINARY).
