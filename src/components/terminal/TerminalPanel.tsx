@@ -40,7 +40,7 @@ import {
   shouldUseLinuxImeGuard,
   TerminalImeInputGuard,
 } from "../../lib/terminalImeGuard";
-import { shouldSuppressMacImeKeydown } from "../../lib/terminal/macImeKeydown";
+import { shouldSuppressMacImeKeydown, clearStaleKeyDownSeen, clearStaleKeyDownSeenIfActive } from "../../lib/terminal/macImeKeydown";
 import {
   readText as clipboardReadText,
   writeText as clipboardWriteText,
@@ -1978,6 +1978,33 @@ export function TerminalPanel({
       };
       el.addEventListener("keydown", onMacImeKeydownCapture, true);
 
+      // Refocus companion (see clearStaleKeyDownSeen): switching app/Space can drop a
+      // modifier/arrow keyup on the other window, leaving xterm's `_keyDownSeen` stuck
+      // true so the first digit/symbol typed on return is swallowed (letters, which go
+      // through IME composition, are unaffected). Clear it whenever the terminal regains
+      // focus — no key is actually held at that point.
+      const onMacImeFocus = () => {
+        if (isMac) clearStaleKeyDownSeen(term as unknown as { _core?: { _keyDownSeen?: boolean } });
+      };
+      textarea.addEventListener("focus", onMacImeFocus);
+
+      // The textarea-focus reset above only fires when element focus actually
+      // changes. A plain app/Space switch (Cmd+Tab, Ctrl+arrow) keeps the textarea
+      // as document.activeElement, so it never re-fires `focus` on return and the
+      // first digit/symbol is still swallowed (the stray gesture keyup was lost to
+      // the window that took focus). The window's `focus` and the document's
+      // `visibilitychange` DO fire for those switches — clear the stale flag from
+      // there too, guarded to this terminal's textarea so other panes are untouched.
+      const onMacImeWindowRefocus = () => {
+        if (!isMac || document.visibilityState === "hidden") return;
+        clearStaleKeyDownSeenIfActive(
+          term as unknown as { textarea?: object | null; _core?: { _keyDownSeen?: boolean } },
+          document.activeElement,
+        );
+      };
+      window.addEventListener("focus", onMacImeWindowRefocus);
+      document.addEventListener("visibilitychange", onMacImeWindowRefocus);
+
       const observer = new MutationObserver(() => {
         if (isComposing) {
           observer.disconnect();
@@ -1997,6 +2024,9 @@ export function TerminalPanel({
         textarea.removeEventListener("compositionstart", onCompositionStart);
         textarea.removeEventListener("compositionend", onCompositionEnd);
         el.removeEventListener("keydown", onMacImeKeydownCapture, true);
+        textarea.removeEventListener("focus", onMacImeFocus);
+        window.removeEventListener("focus", onMacImeWindowRefocus);
+        document.removeEventListener("visibilitychange", onMacImeWindowRefocus);
         observer.disconnect();
         compositionBufferRef.current = [];
       };
