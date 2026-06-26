@@ -1,6 +1,6 @@
 use crate::agent::codex_bridge::process::{CodexAppServer, CodexThreadOptions, CodexTurnOptions};
 use crate::agent::codex_bridge::protocol::CodexEvent;
-use crate::agent::codex_bridge::{detect, CodexStatusResult};
+use crate::agent::codex_bridge::{detect, detect_with_profile_runtime, CodexStatusResult};
 use crate::ai::config::{default_ai_config_path, AiConfig};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
@@ -21,17 +21,20 @@ pub async fn codex_detect(state: State<'_, AppState>) -> Result<CodexStatusResul
             binary_path: None,
         });
     }
-    let binary = if ai_ctx.config.codex_bridge.binary == "auto" {
+    let codex = ai_ctx.config.codex_bridge.clone();
+    let binary = if codex.binary == "auto" {
         None
     } else {
-        Some(ai_ctx.config.codex_bridge.binary.clone())
+        Some(codex.binary.clone())
     };
-    let proxy = crate::agent::codex_bridge::config::resolve_effective_proxy_url(
-        &state,
-        &ai_ctx.config.codex_bridge,
-    )?;
     drop(ai_ctx);
-    Ok(detect(binary.as_deref(), proxy.as_deref()).await)
+    let proxy = crate::agent::codex_bridge::config::resolve_effective_proxy_url(&state, &codex)?;
+    let runtime = crate::agent::codex_bridge::config::resolve_custom_runtime(&codex, &state.vault)?;
+    if runtime.isolated_home {
+        Ok(detect_with_profile_runtime(binary.as_deref(), proxy.as_deref(), runtime).await)
+    } else {
+        Ok(detect(binary.as_deref(), proxy.as_deref()).await)
+    }
 }
 
 #[tauri::command]
@@ -81,12 +84,17 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CodexTestConfigRequest {
-    pub config_json: String,
+    pub config_toml: String,
+}
+
+#[tauri::command]
+pub fn codex_validate_config(config_toml: String) -> Result<(), String> {
+    crate::agent::codex_bridge::config::parse_profile_config(Some(&config_toml)).map(|_| ())
 }
 
 #[tauri::command]
 pub async fn codex_test_config(
-    config_json: String,
+    config_toml: String,
     proxy_mode: Option<String>,
     proxy_session_id: Option<String>,
     proxy_url: Option<String>,
@@ -134,16 +142,18 @@ pub async fn codex_test_config(
         )
         .await?;
 
-    let thread_config = crate::agent::codex_bridge::config::build_thread_config(
-        Some(&config_json),
+    let mut runtime = crate::agent::codex_bridge::config::parse_profile_config(Some(&config_toml))
+        .map_err(|e| {
+            crate::agent::cc_bridge::mcp_http::revoke_token(&token);
+            e
+        })?;
+    runtime.isolated_home = true;
+    let thread_config = crate::agent::codex_bridge::config::build_thread_config_from_config(
+        runtime.config.clone(),
         flavor.server_name(),
         &server_url,
         &token,
-    )
-    .map_err(|e| {
-        crate::agent::cc_bridge::mcp_http::revoke_token(&token);
-        e
-    })?;
+    );
 
     let temp_dir = std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));
     std::fs::create_dir_all(&temp_dir).map_err(|e| {
@@ -157,6 +167,8 @@ pub async fn codex_test_config(
             effective_proxy,
             Some(temp_dir.clone()),
             Some(token.clone()),
+            Some(runtime.env.clone()),
+            runtime.isolated_home,
         )
         .await
         .map_err(|e| {
@@ -166,7 +178,11 @@ pub async fn codex_test_config(
         })?,
     );
 
-    let model = config.codex_bridge.default_model.trim().to_string().into();
+    let model = if runtime.config.contains_key("model") {
+        None
+    } else {
+        Some(config.codex_bridge.default_model.trim().to_string())
+    };
     if let Err(e) = process
         .start_or_resume_thread(CodexThreadOptions {
             resume_thread_id: None,
@@ -210,7 +226,11 @@ pub async fn codex_test_config(
                 approval_policy: config.codex_bridge.approval_policy.clone(),
                 sandbox: config.codex_bridge.sandbox.clone(),
                 network_access: config.codex_bridge.network_access,
-                model: Some(config.codex_bridge.default_model.clone()),
+                model: if runtime.config.contains_key("model") {
+                    None
+                } else {
+                    Some(config.codex_bridge.default_model.clone())
+                },
             },
             move |evt| {
                 if let CodexEvent::Partial { content } = evt {

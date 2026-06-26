@@ -9611,6 +9611,7 @@ dependencies = [
  "tokio-rustls 0.26.4",
  "tokio-tungstenite",
  "tokio-util",
+ "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
  "tungstenite",

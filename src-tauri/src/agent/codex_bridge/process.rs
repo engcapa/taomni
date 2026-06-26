@@ -59,6 +59,8 @@ impl CodexAppServer {
         proxy_url: Option<String>,
         temp_dir: Option<PathBuf>,
         codex_token: Option<String>,
+        extra_env: Option<HashMap<String, String>>,
+        isolated_home: bool,
     ) -> Result<Self, String> {
         let binary = binary.into();
         let mut cmd = Command::new(&binary);
@@ -66,6 +68,23 @@ impl CodexAppServer {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if let Some(env) = extra_env {
+            for (key, value) in env {
+                if !key.trim().is_empty() && !value.trim().is_empty() {
+                    cmd.env(key, value);
+                }
+            }
+        }
+        if isolated_home {
+            let base = temp_dir
+                .as_ref()
+                .ok_or_else(|| "isolated Codex profile requires a temp dir".to_string())?;
+            let codex_home = base.join("codex-home");
+            std::fs::create_dir_all(&codex_home)
+                .map_err(|e| format!("Failed to create isolated CODEX_HOME: {e}"))?;
+            cmd.env("CODEX_HOME", &codex_home)
+                .env("CODEX_SQLITE_HOME", &codex_home);
+        }
         super::apply_proxy_env(&mut cmd, proxy_url.as_deref());
         super::no_console_window(&mut cmd);
 

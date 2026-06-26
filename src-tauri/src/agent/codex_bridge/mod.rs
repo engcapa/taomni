@@ -175,49 +175,10 @@ fn extract_version(out: &str) -> String {
 }
 
 pub async fn detect(binary: Option<&str>, proxy_url: Option<&str>) -> CodexStatusResult {
-    let path = match binary {
-        Some(b) if !b.is_empty() && b != "auto" => Some(b.to_string()),
-        _ => find_codex_binary(),
+    let (bin, version) = match detect_binary_version(binary).await {
+        Ok(v) => v,
+        Err(status) => return status,
     };
-
-    let Some(bin) = path else {
-        return CodexStatusResult {
-            status: CodexStatus::NotFound,
-            message: "Codex CLI not found. Install it to enable this feature.".into(),
-            binary_path: None,
-        };
-    };
-
-    let mut version_cmd = Command::new(&bin);
-    version_cmd.arg("--version");
-    no_console_window(&mut version_cmd);
-    let version_out = timeout(Duration::from_secs(5), version_cmd.output()).await;
-
-    let version_str = match version_out {
-        Ok(Ok(out)) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
-        _ => {
-            return CodexStatusResult {
-                status: CodexStatus::NotFound,
-                message: format!("Failed to run `{} --version`", bin),
-                binary_path: Some(bin),
-            };
-        }
-    };
-
-    let version = extract_version(&version_str);
-    if !version_ok(&version, MIN_VERSION) {
-        return CodexStatusResult {
-            status: CodexStatus::VersionTooLow {
-                found: version.clone(),
-                required: MIN_VERSION.into(),
-            },
-            message: format!(
-                "Codex {} found, but v{} or later is required.",
-                version, MIN_VERSION
-            ),
-            binary_path: Some(bin),
-        };
-    }
 
     if !probe_auth(&bin, proxy_url).await {
         return CodexStatusResult {
@@ -234,6 +195,91 @@ pub async fn detect(binary: Option<&str>, proxy_url: Option<&str>) -> CodexStatu
             version: version.clone(),
         },
         message: format!("Codex {} is ready.", version),
+        binary_path: Some(bin),
+    }
+}
+
+pub async fn detect_with_profile_runtime(
+    binary: Option<&str>,
+    proxy_url: Option<&str>,
+    runtime: config::CodexProfileRuntime,
+) -> CodexStatusResult {
+    let (bin, version) = match detect_binary_version(binary).await {
+        Ok(v) => v,
+        Err(status) => return status,
+    };
+
+    if !probe_auth_with_app_server(&bin, proxy_url, runtime).await {
+        return CodexStatusResult {
+            status: CodexStatus::NotAuthenticated,
+            message: "Codex CLI is installed, but the active Codex profile auth probe failed. Check the profile TOML [env] credentials and provider config.".into(),
+            binary_path: Some(bin),
+        };
+    }
+
+    CodexStatusResult {
+        status: CodexStatus::Ready {
+            version: version.clone(),
+        },
+        message: format!("Codex {} is ready with the active profile.", version),
+        binary_path: Some(bin),
+    }
+}
+
+async fn detect_binary_version(
+    binary: Option<&str>,
+) -> Result<(String, String), CodexStatusResult> {
+    let path = match binary {
+        Some(b) if !b.is_empty() && b != "auto" => Some(b.to_string()),
+        _ => find_codex_binary(),
+    };
+
+    let Some(bin) = path else {
+        return Err(binary_not_found(binary));
+    };
+
+    let mut version_cmd = Command::new(&bin);
+    version_cmd.arg("--version");
+    no_console_window(&mut version_cmd);
+    let version_out = timeout(Duration::from_secs(5), version_cmd.output()).await;
+
+    let version_str = match version_out {
+        Ok(Ok(out)) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
+        _ => return Err(binary_not_found(Some(&bin))),
+    };
+
+    let version = extract_version(&version_str);
+    if !version_ok(&version, MIN_VERSION) {
+        return Err(version_too_low(bin, version));
+    }
+
+    Ok((bin, version))
+}
+
+fn binary_not_found(binary: Option<&str>) -> CodexStatusResult {
+    let binary_path = binary
+        .filter(|b| !b.is_empty() && *b != "auto")
+        .map(str::to_string);
+    CodexStatusResult {
+        status: CodexStatus::NotFound,
+        message: match binary_path.as_deref() {
+            Some(bin) => format!("Failed to run `{bin} --version`"),
+            None => "Codex CLI not found. Install it to enable this feature.".into(),
+        },
+        binary_path,
+    }
+}
+
+fn version_too_low(bin: String, version: String) -> CodexStatusResult {
+    CodexStatusResult {
+        status: CodexStatus::VersionTooLow {
+            found: version.clone(),
+            required: MIN_VERSION.into(),
+        },
+        message: format!(
+            "Codex {} found, but v{} or later is required.",
+            version, MIN_VERSION
+        ),
         binary_path: Some(bin),
     }
 }
@@ -259,4 +305,80 @@ async fn probe_auth(bin: &str, proxy_url: Option<&str>) -> bool {
         }
         _ => false,
     }
+}
+
+async fn probe_auth_with_app_server(
+    bin: &str,
+    proxy_url: Option<&str>,
+    mut runtime: config::CodexProfileRuntime,
+) -> bool {
+    let temp_dir = std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));
+    if std::fs::create_dir_all(&temp_dir).is_err() {
+        return false;
+    }
+    runtime.isolated_home = true;
+
+    let process = match process::CodexAppServer::spawn(
+        bin,
+        proxy_url.map(str::to_string),
+        Some(temp_dir.clone()),
+        None,
+        Some(runtime.env.clone()),
+        runtime.isolated_home,
+    )
+    .await
+    {
+        Ok(process) => process,
+        Err(_) => {
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            return false;
+        }
+    };
+
+    let start = process
+        .start_or_resume_thread(process::CodexThreadOptions {
+            resume_thread_id: None,
+            model: if runtime.config.contains_key("model") {
+                None
+            } else {
+                Some(config::DEFAULT_CODEX_MODEL.into())
+            },
+            cwd: std::env::current_dir()
+                .ok()
+                .map(|p| p.to_string_lossy().to_string()),
+            approval_policy: "never".into(),
+            sandbox: "read-only".into(),
+            network_access: false,
+            config: runtime.config.clone(),
+            base_instructions: Some("Reply exactly with TAOMNI_CODEX_OK and nothing else.".into()),
+            developer_instructions: None,
+            ephemeral: true,
+        })
+        .await;
+    if start.is_err() {
+        process.stop().await;
+        return false;
+    }
+
+    let events = process
+        .send_turn_with_callback(
+            "Reply exactly with TAOMNI_CODEX_OK and nothing else.",
+            process::CodexTurnOptions {
+                cwd: std::env::current_dir()
+                    .ok()
+                    .map(|p| p.to_string_lossy().to_string()),
+                approval_policy: "never".into(),
+                sandbox: "read-only".into(),
+                network_access: false,
+                model: None,
+            },
+            |_| {},
+        )
+        .await;
+    let ok = events
+        .ok()
+        .map(|events| protocol::extract_answer(&events).contains("TAOMNI_CODEX_OK"))
+        .unwrap_or(false);
+    process.stop().await;
+    ok
 }

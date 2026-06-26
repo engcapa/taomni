@@ -458,6 +458,7 @@ pub fn run() {
             agent::codex_bridge::commands::codex_get_profile_config,
             agent::codex_bridge::commands::codex_stop_session,
             agent::codex_bridge::commands::codex_test_config,
+            agent::codex_bridge::commands::codex_validate_config,
             chat::chat_new_thread,
             chat::chat_list_threads,
             chat::chat_list_messages,

@@ -15,11 +15,26 @@ import {
 } from "../../lib/ipc";
 import { CodexProxyFields } from "./CodexProxyFields";
 
-const CONFIG_TEMPLATE = `{
-  "model": "gpt-5",
-  "model_reasoning_effort": "medium",
-  "model_verbosity": "medium"
-}`;
+const CONFIG_TEMPLATE = `model = "gpt-5"
+model_reasoning_effort = "medium"
+model_verbosity = "medium"
+
+# API-key profile example. Taomni reads [env] and injects it into
+# the isolated codex app-server process; [env] is not passed to Codex config.
+# Uncomment model_provider and [model_providers.openai_api_key] when using
+# OPENAI_API_KEY instead of Codex CLI sign-in.
+# model_provider = "openai_api_key"
+#
+# [model_providers.openai_api_key]
+# name = "OpenAI API key"
+# base_url = "https://api.openai.com/v1"
+# wire_api = "responses"
+# env_key = "OPENAI_API_KEY"
+
+[env]
+# OPENAI_API_KEY = "sk-..."
+# CODEX_ACCESS_TOKEN = "..."
+`;
 
 interface Props {
   onClose: () => void;
@@ -160,14 +175,12 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
       for (const id of dirty) {
         if (deleted.has(id)) continue;
         try {
-          const parsed = JSON.parse(contents[id] ?? "{}");
-          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-            throw new Error(t("aiSettings.ccCustomNotObject"));
-          }
-          validated[id] = JSON.stringify(parsed, null, 2);
+          const text = contents[id] ?? "";
+          await invoke("codex_validate_config", { configToml: text });
+          validated[id] = text;
         } catch (e) {
           const prof = profiles.find((p) => p.id === id);
-          setError(`${prof ? `[${prof.name}] ` : ""}${t("aiSettings.ccCustomInvalidJson", { error: (e as Error).message })}`);
+          setError(`${prof ? `[${prof.name}] ` : ""}${t("aiSettings.codexCustomInvalidToml", { error: (e as Error).message })}`);
           return;
         }
       }
@@ -233,7 +246,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
         if (payload.kind === "error") setTestError(payload.message);
       });
       await invoke("codex_test_config", {
-        configJson: selectedContent,
+        configToml: selectedContent,
         proxyMode: selected.proxy_mode ?? "inherit",
         proxySessionId: selected.proxy_session_id ?? null,
         proxyUrl: selected.proxy_url ?? null,
@@ -338,7 +351,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                 </div>
 
                 <div className="flex-1 flex flex-col min-h-[220px] mt-2 relative">
-                  <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">Codex config JSON</label>
+                  <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexCustomTomlLabel")}</label>
                   {selectedLoading ? (
                     <div className="flex-1 flex items-center justify-center border rounded" style={{ borderColor: "var(--taomni-input-border)" }}>
                       <Loader2 className="w-6 h-6 animate-spin text-[var(--taomni-text-muted)]" />

@@ -2,8 +2,16 @@ use crate::state::AppState;
 use crate::vault::Vault;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::collections::HashMap;
 
 pub const DEFAULT_CODEX_MODEL: &str = "auto";
+
+#[derive(Debug, Clone, Default)]
+pub struct CodexProfileRuntime {
+    pub config: Map<String, Value>,
+    pub env: HashMap<String, String>,
+    pub isolated_home: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexCustomConfigProfile {
@@ -202,6 +210,18 @@ pub fn resolve_custom_config(
     resolve_vault_ref(&profile.vault_ref, vault)
 }
 
+pub fn resolve_custom_runtime(
+    cfg: &CodexBridgeConfig,
+    vault: &Vault,
+) -> Result<CodexProfileRuntime, String> {
+    let Some(custom) = resolve_custom_config(cfg, vault)? else {
+        return Ok(CodexProfileRuntime::default());
+    };
+    let mut runtime = parse_profile_config(Some(&custom))?;
+    runtime.isolated_home = true;
+    Ok(runtime)
+}
+
 fn active_enabled_profile(cfg: &CodexBridgeConfig) -> Option<&CodexCustomConfigProfile> {
     let active_id = cfg.active_profile_id.as_ref()?;
     cfg.custom_config_profiles
@@ -299,32 +319,203 @@ pub fn resolve_effective_proxy_url_with_profile_override(
     )
 }
 
-pub fn build_config_value(custom: Option<&str>) -> Result<Map<String, Value>, String> {
+pub fn parse_profile_config(custom: Option<&str>) -> Result<CodexProfileRuntime, String> {
     match custom {
-        Some(s) if !s.trim().is_empty() => {
-            let value: Value = serde_json::from_str(s)
-                .map_err(|e| format!("Invalid custom Codex config JSON: {e}"))?;
-            value
-                .as_object()
-                .cloned()
-                .ok_or_else(|| "Codex config must be a JSON object".to_string())
-        }
-        _ => Ok(Map::new()),
+        Some(s) if !s.trim().is_empty() => parse_profile_config_text(s),
+        _ => Ok(CodexProfileRuntime::default()),
     }
 }
 
-/// Build app-server `thread/start.config` overrides.
-///
-/// Codex accepts JSON config overrides on app-server thread creation. We use
-/// dotted keys here because they match the CLI `-c key=value` surface verified
-/// by the P0 probes and let us force one scoped Taomni MCP server per thread.
-pub fn build_thread_config(
-    custom: Option<&str>,
+fn parse_profile_config_text(text: &str) -> Result<CodexProfileRuntime, String> {
+    let trimmed = text.trim();
+    if trimmed.starts_with('{') {
+        return parse_legacy_json_profile_config(trimmed);
+    }
+    parse_toml_profile_config(trimmed)
+}
+
+fn parse_legacy_json_profile_config(text: &str) -> Result<CodexProfileRuntime, String> {
+    let value: Value =
+        serde_json::from_str(text).map_err(|e| format!("Invalid legacy Codex config JSON: {e}"))?;
+    let mut config = value
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "Codex config must be a JSON object".to_string())?;
+    let env = extract_json_env(&mut config)?;
+    Ok(CodexProfileRuntime {
+        config,
+        env,
+        isolated_home: false,
+    })
+}
+
+fn parse_toml_profile_config(text: &str) -> Result<CodexProfileRuntime, String> {
+    let value: toml::Value =
+        toml::from_str(text).map_err(|e| format!("Invalid Codex profile TOML: {e}"))?;
+    let mut table = match value {
+        toml::Value::Table(table) => table,
+        _ => return Err("Codex profile TOML must be a table".into()),
+    };
+
+    let mut env = HashMap::new();
+    extract_top_level_env_keys(&mut table, &mut env)?;
+    if let Some(env_value) = table.remove("env") {
+        extract_toml_env_table("env", env_value, &mut env)?;
+    }
+    let remove_taomni = match table.get_mut("taomni") {
+        Some(toml::Value::Table(taomni)) => {
+            if let Some(env_value) = taomni.remove("env") {
+                extract_toml_env_table("taomni.env", env_value, &mut env)?;
+            }
+            taomni.is_empty()
+        }
+        Some(_) => false,
+        None => false,
+    };
+    if remove_taomni {
+        table.remove("taomni");
+    }
+
+    let config_value = serde_json::to_value(toml::Value::Table(table))
+        .map_err(|e| format!("Failed to convert Codex profile TOML: {e}"))?;
+    let config = config_value
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "Codex profile TOML must produce a config object".to_string())?;
+    Ok(CodexProfileRuntime {
+        config,
+        env,
+        isolated_home: false,
+    })
+}
+
+fn extract_json_env(config: &mut Map<String, Value>) -> Result<HashMap<String, String>, String> {
+    let mut env = HashMap::new();
+    extract_json_top_level_env_keys(config, &mut env)?;
+    if let Some(value) = config.remove("env") {
+        let obj = value
+            .as_object()
+            .ok_or_else(|| "Codex profile `env` must be an object".to_string())?;
+        for (key, value) in obj {
+            let Some(value) = value.as_str() else {
+                return Err(format!("Codex profile env `{key}` must be a string"));
+            };
+            insert_env_value(&mut env, key, value);
+        }
+    }
+    if let Some(Value::Object(taomni)) = config.get_mut("taomni") {
+        if let Some(value) = taomni.remove("env") {
+            let obj = value
+                .as_object()
+                .ok_or_else(|| "Codex profile `taomni.env` must be an object".to_string())?;
+            for (key, value) in obj {
+                let Some(value) = value.as_str() else {
+                    return Err(format!("Codex profile taomni.env `{key}` must be a string"));
+                };
+                insert_env_value(&mut env, key, value);
+            }
+        }
+        if taomni.is_empty() {
+            config.remove("taomni");
+        }
+    }
+    Ok(env)
+}
+
+fn extract_json_top_level_env_keys(
+    config: &mut Map<String, Value>,
+    env: &mut HashMap<String, String>,
+) -> Result<(), String> {
+    let keys = config
+        .iter()
+        .filter_map(|(key, _)| {
+            if is_env_key(key) {
+                Some(key.clone())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    for key in keys {
+        let value = config.remove(&key).unwrap_or(Value::Null);
+        let Some(value) = value.as_str() else {
+            return Err(format!("Codex profile env `{key}` must be a string"));
+        };
+        insert_env_value(env, &key, value);
+    }
+    Ok(())
+}
+
+fn extract_top_level_env_keys(
+    table: &mut toml::Table,
+    env: &mut HashMap<String, String>,
+) -> Result<(), String> {
+    let keys = table
+        .iter()
+        .filter_map(|(key, _)| {
+            if is_env_key(key) {
+                Some(key.clone())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    for key in keys {
+        let value = table
+            .remove(&key)
+            .unwrap_or_else(|| toml::Value::String(String::new()));
+        let Some(value) = value.as_str() else {
+            return Err(format!("Codex profile env `{key}` must be a string"));
+        };
+        insert_env_value(env, &key, value);
+    }
+    Ok(())
+}
+
+fn extract_toml_env_table(
+    section: &str,
+    value: toml::Value,
+    env: &mut HashMap<String, String>,
+) -> Result<(), String> {
+    let toml::Value::Table(table) = value else {
+        return Err(format!("Codex profile [{section}] must be a table"));
+    };
+    for (key, value) in table {
+        let Some(value) = value.as_str() else {
+            return Err(format!("Codex profile [{section}].{key} must be a string"));
+        };
+        insert_env_value(env, &key, value);
+    }
+    Ok(())
+}
+
+fn insert_env_value(env: &mut HashMap<String, String>, key: &str, value: &str) {
+    let key = key.trim();
+    let value = value.trim();
+    if !key.is_empty() && !value.is_empty() {
+        env.insert(key.to_string(), value.to_string());
+    }
+}
+
+fn is_env_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_ascii_uppercase() || first == '_')
+        && chars.all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+}
+
+pub fn build_config_value(custom: Option<&str>) -> Result<Map<String, Value>, String> {
+    Ok(parse_profile_config(custom)?.config)
+}
+
+pub fn build_thread_config_from_config(
+    mut root: Map<String, Value>,
     server_name: &str,
     server_url: &str,
     token: &str,
-) -> Result<Map<String, Value>, String> {
-    let mut root = build_config_value(custom)?;
+) -> Map<String, Value> {
     let prefix = format!("mcp_servers.{server_name}");
     root.insert(format!("{prefix}.url"), Value::String(server_url.into()));
     root.insert(
@@ -344,7 +535,26 @@ pub fn build_thread_config(
         format!("{prefix}.tool_timeout_sec"),
         Value::Number(600.into()),
     );
-    Ok(root)
+    root
+}
+
+/// Build app-server `thread/start.config` overrides.
+///
+/// Codex accepts JSON config overrides on app-server thread creation. We use
+/// dotted keys here because they match the CLI `-c key=value` surface verified
+/// by the P0 probes and let us force one scoped Taomni MCP server per thread.
+pub fn build_thread_config(
+    custom: Option<&str>,
+    server_name: &str,
+    server_url: &str,
+    token: &str,
+) -> Result<Map<String, Value>, String> {
+    Ok(build_thread_config_from_config(
+        build_config_value(custom)?,
+        server_name,
+        server_url,
+        token,
+    ))
 }
 
 #[cfg(test)]
@@ -387,6 +597,41 @@ mod tests {
     fn custom_config_must_be_object() {
         assert!(build_config_value(Some("[]")).is_err());
         assert!(build_config_value(Some(r#"{"model":"gpt-5"}"#)).is_ok());
+    }
+
+    #[test]
+    fn toml_profile_extracts_env_and_config() {
+        let runtime = parse_profile_config(Some(
+            r#"
+model = "gpt-5"
+model_provider = "openai_api_key"
+OPENAI_API_KEY = "sk-test"
+
+[model_providers.openai_api_key]
+name = "OpenAI API key"
+base_url = "https://api.openai.com/v1"
+wire_api = "responses"
+env_key = "OPENAI_API_KEY"
+
+[env]
+EXAMPLE_FEATURES = "on"
+"#,
+        ))
+        .unwrap();
+        assert_eq!(
+            runtime.config.get("model").and_then(Value::as_str),
+            Some("gpt-5")
+        );
+        assert!(runtime.config.get("OPENAI_API_KEY").is_none());
+        assert!(runtime.config.get("env").is_none());
+        assert_eq!(
+            runtime.env.get("OPENAI_API_KEY").map(String::as_str),
+            Some("sk-test")
+        );
+        assert_eq!(
+            runtime.env.get("EXAMPLE_FEATURES").map(String::as_str),
+            Some("on")
+        );
     }
 
     #[test]

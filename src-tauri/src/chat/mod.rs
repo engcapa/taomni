@@ -993,8 +993,28 @@ pub async fn chat_stream(
             ai_config.codex_bridge.binary.clone()
         };
         let resume_session = thread.cc_session_id.clone();
+        let runtime = match crate::agent::codex_bridge::config::resolve_custom_runtime(
+            &ai_config.codex_bridge,
+            &state.vault,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                emit(&StreamEventOut::Error {
+                    id: assistant_id.clone(),
+                    message: e,
+                });
+                return Ok(());
+            }
+        };
 
-        let existing = { state.codex_processes.lock().await.get(&req.thread_id).cloned() };
+        let existing = {
+            state
+                .codex_processes
+                .lock()
+                .await
+                .get(&req.thread_id)
+                .cloned()
+        };
         let process = match existing {
             Some(p) => p,
             None => {
@@ -1011,20 +1031,6 @@ pub async fn chat_stream(
                         })
                         .map(|sc| sc.session_type);
                     Flavor::for_session_type(session_type.as_ref())
-                };
-
-                let custom = match crate::agent::codex_bridge::config::resolve_custom_config(
-                    &ai_config.codex_bridge,
-                    &state.vault,
-                ) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        emit(&StreamEventOut::Error {
-                            id: assistant_id.clone(),
-                            message: e,
-                        });
-                        return Ok(());
-                    }
                 };
 
                 let (server_url, token) =
@@ -1047,24 +1053,15 @@ pub async fn chat_stream(
                             });
                             return Ok(());
                         }
-                    };
-
-                let thread_config = match crate::agent::codex_bridge::config::build_thread_config(
-                    custom.as_deref(),
-                    flavor.server_name(),
-                    &server_url,
-                    &token,
-                ) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        crate::agent::cc_bridge::mcp_http::revoke_token(&token);
-                        emit(&StreamEventOut::Error {
-                            id: assistant_id.clone(),
-                            message: e,
-                        });
-                        return Ok(());
-                    }
                 };
+
+                let thread_config =
+                    crate::agent::codex_bridge::config::build_thread_config_from_config(
+                        runtime.config.clone(),
+                        flavor.server_name(),
+                        &server_url,
+                        &token,
+                    );
 
                 let output_format = resolve_output_format(&thread, &ai_config);
                 let base_instructions = format!(
@@ -1115,7 +1112,13 @@ pub async fn chat_stream(
                     .cc_model
                     .clone()
                     .filter(|m| !m.trim().is_empty())
-                    .unwrap_or_else(|| ai_config.codex_bridge.default_model.clone());
+                    .or_else(|| {
+                        if runtime.config.contains_key("model") {
+                            None
+                        } else {
+                            Some(ai_config.codex_bridge.default_model.clone())
+                        }
+                    });
                 let effective_proxy =
                     match crate::agent::codex_bridge::config::resolve_effective_proxy_url(
                         state.inner(),
@@ -1137,6 +1140,8 @@ pub async fn chat_stream(
                     effective_proxy,
                     Some(temp_dir.clone()),
                     Some(token.clone()),
+                    Some(runtime.env.clone()),
+                    runtime.isolated_home,
                 )
                 .await
                 {
@@ -1156,7 +1161,7 @@ pub async fn chat_stream(
                     .start_or_resume_thread(
                         crate::agent::codex_bridge::process::CodexThreadOptions {
                             resume_thread_id: resume_session.clone(),
-                            model: Some(model),
+                            model,
                             cwd: req.cwd.clone(),
                             approval_policy: ai_config.codex_bridge.approval_policy.clone(),
                             sandbox: ai_config.codex_bridge.sandbox.clone(),
@@ -1236,7 +1241,13 @@ pub async fn chat_stream(
             .cc_model
             .clone()
             .filter(|m| !m.trim().is_empty())
-            .unwrap_or_else(|| ai_config.codex_bridge.default_model.clone());
+            .or_else(|| {
+                if runtime.config.contains_key("model") {
+                    None
+                } else {
+                    Some(ai_config.codex_bridge.default_model.clone())
+                }
+            });
         let events = process
             .send_turn_with_callback(
                 &codex_message,
@@ -1245,7 +1256,7 @@ pub async fn chat_stream(
                     approval_policy: ai_config.codex_bridge.approval_policy.clone(),
                     sandbox: ai_config.codex_bridge.sandbox.clone(),
                     network_access: ai_config.codex_bridge.network_access,
-                    model: Some(model),
+                    model,
                 },
                 move |evt| {
                     use crate::agent::codex_bridge::protocol::CodexEvent;
