@@ -83,6 +83,9 @@ export interface CodexCustomConfigProfile {
   enabled: boolean;
   vault_ref: string;
   created_at: number;
+  proxy_mode?: "inherit" | "none" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
+  proxy_url?: string | null;
 }
 
 export interface CodexBridgeConfig {
@@ -93,6 +96,8 @@ export interface CodexBridgeConfig {
   sandbox: "read-only" | "workspace-write" | "danger-full-access" | string;
   approval_policy: "never" | "on-request" | "on-failure" | "untrusted" | string;
   network_access?: boolean;
+  proxy_mode?: "none" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
   proxy_url?: string | null;
   confirm_readonly?: boolean;
   terminal_echo_enabled?: boolean;
@@ -218,6 +223,8 @@ const DEFAULT_CONFIG: AiConfig = {
     sandbox: "read-only",
     approval_policy: "never",
     network_access: false,
+    proxy_mode: "none",
+    proxy_session_id: undefined,
     proxy_url: undefined,
     confirm_readonly: false,
     terminal_echo_enabled: true,
@@ -237,6 +244,18 @@ function normalizeCodexModelName(model: string | undefined | null): string {
   return trimmed === "" ? DEFAULT_CODEX_MODEL : trimmed;
 }
 
+function normalizeCodexGlobalProxyMode(mode: string | undefined | null, proxyUrl?: string | null): string {
+  const trimmed = (mode ?? "").trim();
+  if (trimmed === "session" || trimmed === "manual") return trimmed;
+  return proxyUrl?.trim() ? "manual" : "none";
+}
+
+function normalizeCodexProfileProxyMode(mode: string | undefined | null, proxyUrl?: string | null): string {
+  const trimmed = (mode ?? "").trim();
+  if (trimmed === "none" || trimmed === "session" || trimmed === "manual") return trimmed;
+  return proxyUrl?.trim() ? "manual" : "inherit";
+}
+
 function normalizeAiConfig(config: AiConfig): AiConfig {
   return {
     ...config,
@@ -248,7 +267,15 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
       ...DEFAULT_CONFIG.codex_bridge,
       ...config.codex_bridge,
       default_model: normalizeCodexModelName(config.codex_bridge?.default_model),
+      proxy_mode: normalizeCodexGlobalProxyMode(config.codex_bridge?.proxy_mode, config.codex_bridge?.proxy_url),
+      proxy_session_id: config.codex_bridge?.proxy_session_id?.trim() || undefined,
       proxy_url: config.codex_bridge?.proxy_url?.trim() || undefined,
+      custom_config_profiles: (config.codex_bridge?.custom_config_profiles ?? []).map((profile) => ({
+        ...profile,
+        proxy_mode: normalizeCodexProfileProxyMode(profile.proxy_mode, profile.proxy_url),
+        proxy_session_id: profile.proxy_session_id?.trim() || undefined,
+        proxy_url: profile.proxy_url?.trim() || undefined,
+      })),
     },
   };
 }

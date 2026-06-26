@@ -92,6 +92,11 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["claude", "claude code", "bridge", "桥接"],
   },
   {
+    id: "ai-codex",
+    titleKeys: ["aiSettings.codexTitle"],
+    terms: ["codex", "codex app-server", "openai codex", "bridge", "config", "科德", "配置", "桥接"],
+  },
+  {
     id: "ai-chatformat",
     titleKeys: ["settings.chatOutputFormat"],
     terms: ["output format", "markdown", "html", "rendering", "输出格式", "渲染"],

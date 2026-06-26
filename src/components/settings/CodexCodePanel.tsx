@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle, CheckCircle, Copy, Loader2, Sliders, Terminal, XCircle } from "lucide-react";
 import { DEFAULT_CODEX_MODEL, useAiStore } from "../../stores/aiStore";
+import { useT } from "../../lib/i18n";
 import { CodexCodeConfigDialog } from "./CodexCodeConfigDialog";
+import { CodexProxyFields } from "./CodexProxyFields";
 
 interface CodexStatusResult {
   status:
@@ -21,6 +23,7 @@ const INSTALL_COMMANDS = [
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const t = useT();
   return (
     <button
       type="button"
@@ -30,7 +33,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      title="复制"
+      title={t("aiSettings.ccCopy")}
     >
       <Copy className={`w-3 h-3 ${copied ? "text-green-400" : ""}`} />
     </button>
@@ -43,6 +46,7 @@ export function CodexCodePanel() {
   const [detecting, setDetecting] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [modelDraft, setModelDraft] = useState(DEFAULT_CODEX_MODEL);
+  const t = useT();
 
   useEffect(() => {
     if (!config) void loadConfig();
@@ -76,8 +80,9 @@ export function CodexCodePanel() {
     const next = modelDraft.trim() || DEFAULT_CODEX_MODEL;
     setModelDraft(next);
     if (next === codex.default_model) return;
-    void saveConfig({ ...config, codex_bridge: { ...codex, default_model: next } })
-      .catch(() => setModelDraft(codex.default_model?.trim() || DEFAULT_CODEX_MODEL));
+    void saveConfig({ ...config, codex_bridge: { ...codex, default_model: next } }).catch(() =>
+      setModelDraft(codex.default_model?.trim() || DEFAULT_CODEX_MODEL),
+    );
   };
 
   const StatusIcon = () => {
@@ -90,10 +95,8 @@ export function CodexCodePanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">Codex app-server</div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
-          使用本机 Codex CLI 的 app-server 模式，接入 Taomni chat、session 和 MCP 工具。
-        </div>
+        <div className="text-[13px] font-semibold">{t("aiSettings.codexTitle")}</div>
+        <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("aiSettings.codexSubtitle")}</div>
       </div>
 
       <div
@@ -106,9 +109,11 @@ export function CodexCodePanel() {
       >
         <StatusIcon />
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold">Codex {codex.enabled ? "已启用" : ""}</div>
+          <div className="text-[13px] font-semibold">
+            Codex {codex.enabled ? t("aiSettings.ccEnabledSuffix") : ""}
+          </div>
           <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-            {status?.message ?? "检测 Codex CLI、登录状态和代理可用性。"}
+            {status?.message ?? t("aiSettings.codexDefaultMessage")}
           </div>
         </div>
         <div className={`w-9 h-5 rounded-full transition-colors relative ${codex.enabled ? "bg-[var(--taomni-accent)]" : "bg-[var(--taomni-divider)]"}`}>
@@ -118,12 +123,12 @@ export function CodexCodePanel() {
 
       <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" onClick={detect} disabled={detecting}>
         {detecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Terminal className="w-3.5 h-3.5" />}
-        检测 Codex
+        {t("aiSettings.codexDetect")}
       </button>
 
       {notFound && (
         <div className="rounded border border-[var(--taomni-divider)] p-3 space-y-2">
-          <div className="text-[12px] font-semibold">安装 Codex CLI</div>
+          <div className="text-[12px] font-semibold">{t("aiSettings.codexInstallTitle")}</div>
           {INSTALL_COMMANDS.map(({ platform, cmd }) => (
             <div key={platform}>
               <div className="text-[10px] text-[var(--taomni-text-muted)] mb-0.5">{platform}</div>
@@ -134,11 +139,13 @@ export function CodexCodePanel() {
             </div>
           ))}
           <div className="pt-2 mt-1 border-t border-[var(--taomni-divider)]">
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">手动 binary 路径</label>
+            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+              {t("aiSettings.codexManualPathLabel")}
+            </label>
             <input
               type="text"
               className="taomni-input h-7 w-full text-[12px] font-mono"
-              placeholder="/home/me/.local/bin/codex"
+              placeholder={t("aiSettings.codexManualPathPlaceholder")}
               defaultValue={codex.binary === "auto" ? "" : codex.binary}
               onBlur={(e) => {
                 const next = e.target.value.trim() || "auto";
@@ -153,13 +160,13 @@ export function CodexCodePanel() {
 
       {versionLow && status?.status.type === "version_too_low" && (
         <div className="text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
-          当前 {status.status.found}，要求 {status.status.required} 或更新版本。
+          {t("aiSettings.codexVersionLow", { found: status.status.found, required: status.status.required })}
         </div>
       )}
       {notAuth && (
         <div className="flex items-center gap-2 text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          <span>Codex 认证探针失败，请运行 <code>codex login</code> 后重试。</span>
+          <span>{t("aiSettings.codexNotAuthenticated", { cmd: "codex login" })}</span>
         </div>
       )}
 
@@ -167,7 +174,7 @@ export function CodexCodePanel() {
         <div className="space-y-3 pt-2 border-t border-[var(--taomni-divider)]">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">默认模型</label>
+              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
               <input
                 type="text"
                 className="taomni-input h-7 w-full text-[12px] font-mono"
@@ -186,13 +193,12 @@ export function CodexCodePanel() {
               />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">代理服务器</label>
-              <input
-                type="text"
-                className="taomni-input h-7 w-full text-[12px] font-mono"
-                placeholder="http://127.0.0.1:31028"
-                value={codex.proxy_url ?? ""}
-                onChange={(e) => saveConfig({ ...config, codex_bridge: { ...codex, proxy_url: e.target.value.trim() || undefined } })}
+              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
+              <CodexProxyFields
+                mode={codex.proxy_mode}
+                sessionId={codex.proxy_session_id}
+                proxyUrl={codex.proxy_url}
+                onChange={(patch) => saveConfig({ ...config, codex_bridge: { ...codex, ...patch } })}
               />
             </div>
           </div>
@@ -229,7 +235,7 @@ export function CodexCodePanel() {
                 checked={codex.network_access ?? false}
                 onChange={(e) => saveConfig({ ...config, codex_bridge: { ...codex, network_access: e.target.checked } })}
               />
-              Sandbox 允许网络
+              {t("aiSettings.codexNetworkAccess")}
             </label>
           </div>
 
@@ -241,27 +247,31 @@ export function CodexCodePanel() {
               onChange={(e) => saveConfig({ ...config, codex_bridge: { ...codex, confirm_readonly: e.target.checked } })}
             />
             <span>
-              <span className="block">只读命令也要求确认</span>
+              <span className="block">{t("aiSettings.ccConfirmReadonly")}</span>
               <span className="block text-[10px] text-[var(--taomni-text-muted)]">
-                默认只对写入/危险动作弹出 Taomni 权限卡。
+                {t("aiSettings.codexConfirmReadonlyHint")}
               </span>
             </span>
           </label>
 
           <div className="rounded border border-[var(--taomni-divider)] p-3 bg-[var(--taomni-panel-bg)]/50 flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-[12px] font-semibold">个性化 Codex config</div>
+              <div className="text-[12px] font-semibold">{t("aiSettings.codexCustomTitle")}</div>
               <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
                 {profiles.length > 0
-                  ? `${profiles.length} 个 profile${activeProfile ? `，当前：${activeProfile.name}` : ""}`
-                  : "未配置自定义 app-server config"}
+                  ? t("aiSettings.codexCustomProfilesSummary", {
+                      count: profiles.length,
+                      name: activeProfile?.name ?? t("aiSettings.codexCustomNoActive"),
+                    })
+                  : t("aiSettings.codexCustomDisabled")}
               </div>
             </div>
             <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0" onClick={() => setShowDialog(true)}>
               <Sliders className="w-3 h-3" />
-              管理
+              {t("aiSettings.ccCustomManage")}
             </button>
           </div>
+          <div className="text-[10px] text-[var(--taomni-text-muted)]">{t("aiSettings.codexProxyPriorityNote")}</div>
         </div>
       )}
 
@@ -269,4 +279,3 @@ export function CodexCodePanel() {
     </div>
   );
 }
-

@@ -1116,9 +1116,25 @@ pub async fn chat_stream(
                     .clone()
                     .filter(|m| !m.trim().is_empty())
                     .unwrap_or_else(|| ai_config.codex_bridge.default_model.clone());
+                let effective_proxy =
+                    match crate::agent::codex_bridge::config::resolve_effective_proxy_url(
+                        state.inner(),
+                        &ai_config.codex_bridge,
+                    ) {
+                        Ok(proxy) => proxy,
+                        Err(e) => {
+                            crate::agent::cc_bridge::mcp_http::revoke_token(&token);
+                            let _ = std::fs::remove_dir_all(&temp_dir);
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
                 let p = match crate::agent::codex_bridge::process::CodexAppServer::spawn(
                     &binary,
-                    ai_config.codex_bridge.proxy_url.clone(),
+                    effective_proxy,
                     Some(temp_dir.clone()),
                     Some(token.clone()),
                 )

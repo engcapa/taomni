@@ -128,6 +128,19 @@ describe("SettingsPanel", () => {
     ).not.toHaveAttribute("data-search-match");
   });
 
+  it("highlights Codex settings from a codex search query", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SettingsPanel />);
+
+    await user.type(screen.getByTestId("settings-search-input"), "codex");
+
+    const codex = container.querySelector('[data-search-id="ai-codex"]');
+    const claude = container.querySelector('[data-search-id="ai-claude"]');
+    expect(codex).toHaveAttribute("data-search-match", "true");
+    expect(claude).toHaveAttribute("data-search-match", "false");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
+  });
+
   it("shows an empty state when no setting matches", async () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);

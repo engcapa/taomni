@@ -26,7 +26,10 @@ pub async fn codex_detect(state: State<'_, AppState>) -> Result<CodexStatusResul
     } else {
         Some(ai_ctx.config.codex_bridge.binary.clone())
     };
-    let proxy = ai_ctx.config.codex_bridge.proxy_url.clone();
+    let proxy = crate::agent::codex_bridge::config::resolve_effective_proxy_url(
+        &state,
+        &ai_ctx.config.codex_bridge,
+    )?;
     drop(ai_ctx);
     Ok(detect(binary.as_deref(), proxy.as_deref()).await)
 }
@@ -84,6 +87,9 @@ pub struct CodexTestConfigRequest {
 #[tauri::command]
 pub async fn codex_test_config(
     config_json: String,
+    proxy_mode: Option<String>,
+    proxy_session_id: Option<String>,
+    proxy_url: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -93,6 +99,14 @@ pub async fn codex_test_config(
     } else {
         config.codex_bridge.binary.clone()
     };
+    let effective_proxy =
+        crate::agent::codex_bridge::config::resolve_effective_proxy_url_with_profile_override(
+            &state,
+            &config.codex_bridge,
+            proxy_mode.as_deref(),
+            proxy_session_id.as_deref(),
+            proxy_url.as_deref(),
+        )?;
 
     let thread_id = "codex_test_config_thread".to_string();
     let event_name = "codex-test-config-stream".to_string();
@@ -140,7 +154,7 @@ pub async fn codex_test_config(
     let process = Arc::new(
         CodexAppServer::spawn(
             &binary,
-            config.codex_bridge.proxy_url.clone(),
+            effective_proxy,
             Some(temp_dir.clone()),
             Some(token.clone()),
         )
@@ -188,7 +202,7 @@ pub async fn codex_test_config(
     let event_name_clone = event_name.clone();
     let events_result = process
         .send_turn_with_callback(
-            "Reply that the Codex bridge config test is OK.",
+            "Hello, My name is Taomni, Can you help me?",
             CodexTurnOptions {
                 cwd: std::env::current_dir()
                     .ok()
