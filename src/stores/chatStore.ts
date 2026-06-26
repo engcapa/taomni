@@ -90,6 +90,11 @@ interface ChatStore {
   ccToolCards: Record<string, CcToolCard[]>;
   /// Claude Code usage rollup per assistant message id (3.5), for the footer.
   ccUsage: Record<string, CcUsage>;
+  /// In-flight send state by thread. A tab switch can change `activeThreadId`
+  /// while the original turn keeps running, so lifecycle must stay thread-bound.
+  sendingByThreadId: Record<string, boolean>;
+  /// Back-compat aggregate used by older call sites/tests. Prefer
+  /// `sendingByThreadId[threadId]` when a specific drawer/thread is rendered.
   sending: boolean;
   drawerOpen: boolean;
   /// "global" for title/status/shortcut entry points, "tab" for terminal-bound chat.
@@ -128,6 +133,8 @@ interface ChatStore {
   /// Export every thread + message to `outPath` as JSON.
   exportArchive: (outPath: string) => Promise<number>;
   toggleDrawer: () => void;
+  /// Visibility-only primitive. Do not stop in-flight AI work here; callers that
+  /// mean "user explicitly closed the drawer" should use the toggle/close paths.
   setDrawerOpen: (open: boolean) => void;
   openGlobalChat: () => Promise<void>;
   toggleGlobalChat: () => Promise<void>;
@@ -170,6 +177,27 @@ function scopeForThread(thread: ChatThread | undefined | null): {
     : { drawerScope: "global", drawerTabId: null };
 }
 
+function nextSendingAggregate(sendingByThreadId: Record<string, boolean>): boolean {
+  return Object.values(sendingByThreadId).some(Boolean);
+}
+
+function nextThreadSendingState(
+  current: Record<string, boolean>,
+  threadId: string,
+  sending: boolean,
+): Pick<ChatStore, "sendingByThreadId" | "sending"> {
+  const next = { ...current };
+  if (sending) {
+    next[threadId] = true;
+  } else {
+    delete next[threadId];
+  }
+  return {
+    sendingByThreadId: next,
+    sending: nextSendingAggregate(next),
+  };
+}
+
 async function resolveDefaultProviderId(): Promise<string | null> {
   try {
     const { defaultChatProviderId, useAiStore } = await import("./aiStore");
@@ -192,6 +220,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   streamingId: {},
   ccToolCards: {},
   ccUsage: {},
+  sendingByThreadId: {},
   sending: false,
   drawerOpen: false,
   drawerScope: null,
@@ -287,7 +316,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   sendMessage: async (threadId: string, content: string, terminalContext?: string) => {
-    set({ sending: true });
+    set((s) => nextThreadSendingState(s.sendingByThreadId, threadId, true));
 
     // Phase 3.S — resolve the saved SessionConfig.id this thread is bound to so
     // the backend can build Claude Code's session-identity card.
@@ -511,7 +540,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
     } finally {
       if (unlisten) unlisten();
-      set({ sending: false });
+      set((s) => nextThreadSendingState(s.sendingByThreadId, threadId, false));
     }
   },
 
@@ -521,7 +550,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } catch (e) {
       console.error("chat_stop_stream failed:", e);
     }
-    set({ sending: false });
+    set((s) => nextThreadSendingState(s.sendingByThreadId, threadId, false));
   },
 
   toggleDrawer: () => {
@@ -539,12 +568,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     });
   },
   setDrawerOpen: (open) => {
-    if (!open) {
-      const s = get();
-      if (s.activeThreadId) {
-        void get().stopSending(s.activeThreadId);
-      }
-    }
     set({ drawerOpen: open });
   },
   setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
@@ -619,9 +642,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     if (!tabId) {
       if (s.drawerScope === "tab" && s.drawerOpen) {
-        if (s.activeThreadId) {
-          void get().stopSending(s.activeThreadId);
-        }
         set({ drawerOpen: false, drawerTabId: null });
       }
       return;
@@ -633,9 +653,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     if (s.drawerScope === "tab" && s.drawerOpen) {
-      if (s.activeThreadId) {
-        void get().stopSending(s.activeThreadId);
-      }
       set({ drawerOpen: false, drawerTabId: tabId });
     }
   },

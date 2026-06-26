@@ -27,7 +27,7 @@ interface ChatDrawerProps {
 export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const t = useT();
   const {
-    threads, activeThreadId, messages, sending, drawerOpen, drawerScope, drawerWidth,
+    threads, activeThreadId, messages, sendingByThreadId, drawerOpen, drawerScope, drawerWidth,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads, stopSending,
   } = useChatStore();
@@ -69,6 +69,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   }, [activeTabId, activeTabType]);
 
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
+  const sending = activeThreadId ? sendingByThreadId[activeThreadId] === true : false;
   const activeThread = threads.find((t) => t.id === activeThreadId);
   const linkedTabTitle = activeThread?.linked_session_id
     ? (

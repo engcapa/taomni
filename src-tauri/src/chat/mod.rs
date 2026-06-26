@@ -1,5 +1,6 @@
 pub mod inline_qq;
 pub mod redact;
+pub mod run;
 pub mod store;
 
 use crate::ai::config::{default_ai_config_path, AiConfig};
@@ -468,18 +469,18 @@ fn cc_tool_result_preview(content: &str) -> String {
 
 #[tauri::command]
 pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    // 1. Cancel Claude Code process if running
-    {
-        let mut registry = state.cc_processes.lock().await;
-        if let Some(process) = registry.remove(&thread_id) {
-            process.stop().await;
-        }
+    // Stop the in-flight turn regardless of provider/runtime. Claude Code also
+    // has a persistent per-thread process registry for reuse; remove that entry
+    // on explicit stop so the next turn starts from a clean bridge process.
+    let run = { state.chat_runs.lock().await.remove(&thread_id) };
+    let cc_process = { state.cc_processes.lock().await.remove(&thread_id) };
+
+    if let Some(run) = run {
+        run.stop().await;
     }
-    // 2. Cancel direct LLM streams
-    {
-        let mut tokens = state.chat_cancel_tokens.lock().unwrap();
-        if let Some(token) = tokens.remove(&thread_id) {
-            token.cancel();
+    if let Some(process) = cc_process {
+        if !process.is_stopped() {
+            process.stop().await;
         }
     }
     Ok(())
@@ -755,6 +756,10 @@ pub async fn chat_stream(
         // only a Weak<CcProcess>, so it exits cleanly once the registry drops
         // the process (provider switch / model change → recycle_thread_process).
         process.start_watchdog();
+        state.chat_runs.lock().await.insert(
+            req.thread_id.clone(),
+            run::ChatRunHandle::bridge_process("claude-code", process.clone()),
+        );
 
         // 7. Run process with callback to stream
         let assistant_id_clone = assistant_id.clone();
@@ -877,6 +882,7 @@ pub async fn chat_stream(
                 }
             })
             .await;
+        state.chat_runs.lock().await.remove(&req.thread_id);
 
         let events = match events {
             Ok(ev) => ev,
@@ -1042,13 +1048,12 @@ pub async fn chat_stream(
         }
     };
 
-    // Create/get a cancellation token for this thread
-    let cancel_token = {
-        let mut tokens = state.chat_cancel_tokens.lock().unwrap();
-        let token = tokio_util::sync::CancellationToken::new();
-        tokens.insert(req.thread_id.clone(), token.clone());
-        token
-    };
+    // Create a provider-agnostic cancellation handle for this in-flight turn.
+    let cancel_token = tokio_util::sync::CancellationToken::new();
+    state.chat_runs.lock().await.insert(
+        req.thread_id.clone(),
+        run::ChatRunHandle::direct_llm(cancel_token.clone()),
+    );
 
     let mut accumulated = String::new();
     let mut is_cancelled = false;
@@ -1075,7 +1080,7 @@ pub async fn chat_stream(
                                     id: assistant_id,
                                     message,
                                 });
-                                state.chat_cancel_tokens.lock().unwrap().remove(&req.thread_id);
+                                state.chat_runs.lock().await.remove(&req.thread_id);
                                 return Ok(());
                             }
                             Err(e) => {
@@ -1083,7 +1088,7 @@ pub async fn chat_stream(
                                     id: assistant_id,
                                     message: e.to_string(),
                                 });
-                                state.chat_cancel_tokens.lock().unwrap().remove(&req.thread_id);
+                                state.chat_runs.lock().await.remove(&req.thread_id);
                                 return Ok(());
                             }
                         }
@@ -1094,7 +1099,7 @@ pub async fn chat_stream(
         }
     }
 
-    state.chat_cancel_tokens.lock().unwrap().remove(&req.thread_id);
+    state.chat_runs.lock().await.remove(&req.thread_id);
 
     if is_cancelled {
         emit(&StreamEventOut::Error {
