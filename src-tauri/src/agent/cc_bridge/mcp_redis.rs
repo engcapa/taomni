@@ -15,7 +15,10 @@ use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 
-use super::mcp_http::{decide_permission, scope_from_ctx, PermissionParams, TokenMap, TokenScope};
+use super::mcp_http::{
+    decide_permission, enforce_inline_permission, scope_from_ctx, PermissionParams, TokenMap,
+    TokenScope,
+};
 use crate::state::AppState;
 
 #[derive(Clone)]
@@ -184,6 +187,13 @@ impl RedisHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
+        let args = serde_json::json!({
+            "key": p.key.clone(),
+            "kind": p.kind.clone(),
+            "value": p.value.clone(),
+            "ttl": p.ttl,
+        });
+        enforce_inline_permission(&self.app, &scope, "redis_set_key", &args, false).await?;
         crate::database::redis_set_key(self.state(), conn, p.key, p.kind, p.value, p.ttl)
             .await
             .map_err(err)?;
@@ -198,6 +208,8 @@ impl RedisHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
+        let args = serde_json::json!({ "key": p.key.clone() });
+        enforce_inline_permission(&self.app, &scope, "redis_del_key", &args, false).await?;
         crate::database::redis_del_key(self.state(), conn, p.key)
             .await
             .map_err(err)?;
@@ -212,6 +224,9 @@ impl RedisHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
+        let args = serde_json::json!({ "command": p.command.clone() });
+        let is_readonly = !scope.confirm_readonly && redis_command_is_readonly(&p.command);
+        enforce_inline_permission(&self.app, &scope, "redis_exec", &args, is_readonly).await?;
         let out = crate::database::redis_exec(self.state(), conn, p.command)
             .await
             .map_err(err)?;

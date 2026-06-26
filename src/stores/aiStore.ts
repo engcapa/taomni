@@ -7,6 +7,7 @@ import {
 } from "../lib/ipc";
 
 export const DEFAULT_CLAUDE_CODE_MODEL = "claude-sonnet-4-5";
+export const DEFAULT_CODEX_MODEL = "auto";
 
 export interface AsrProviderConfig {
   engine: string;
@@ -46,6 +47,7 @@ export interface AiConfig {
   llm: LlmConfig;
   web_search: WebSearchConfig;
   cc_bridge: CcBridgeConfig;
+  codex_bridge: CodexBridgeConfig;
   full_local_mode?: boolean;
   fully_disabled?: boolean;
   /** Default output format for chat replies: "md" | "html" | "plain". */
@@ -75,6 +77,29 @@ export interface CcBridgeConfig {
   active_profile_id?: string;
 }
 
+export interface CodexCustomConfigProfile {
+  id: string;
+  name: string;
+  enabled: boolean;
+  vault_ref: string;
+  created_at: number;
+}
+
+export interface CodexBridgeConfig {
+  enabled: boolean;
+  binary: string;
+  min_version: string;
+  default_model: string;
+  sandbox: "read-only" | "workspace-write" | "danger-full-access" | string;
+  approval_policy: "never" | "on-request" | "on-failure" | "untrusted" | string;
+  network_access?: boolean;
+  proxy_url?: string | null;
+  confirm_readonly?: boolean;
+  terminal_echo_enabled?: boolean;
+  custom_config_profiles?: CodexCustomConfigProfile[];
+  active_profile_id?: string;
+}
+
 export interface WebSearchConfig {
   client_provider: string;
   client_enabled: boolean;
@@ -97,19 +122,30 @@ export function isClaudeCodeAvailableForChat(config: AiConfig | null | undefined
   );
 }
 
+export function isCodexAvailableForChat(config: AiConfig | null | undefined): boolean {
+  return (
+    config?.codex_bridge.enabled === true &&
+    config.full_local_mode !== true &&
+    config.fully_disabled !== true
+  );
+}
+
 export function defaultChatProviderId(config: AiConfig | null | undefined): string | undefined {
-  return isClaudeCodeAvailableForChat(config) ? "claude-code" : undefined;
+  if (isClaudeCodeAvailableForChat(config)) return "claude-code";
+  if (isCodexAvailableForChat(config)) return "codex";
+  return undefined;
 }
 
 export function chatDrawerProviderIds(config: AiConfig | null | undefined): string[] {
-  const ids = Object.keys(config?.llm.providers ?? {}).filter((id) => id !== "claude-code");
+  const ids = Object.keys(config?.llm.providers ?? {}).filter((id) => id !== "claude-code" && id !== "codex");
   const active = config?.llm.active;
   const orderedLlmIds = active && ids.includes(active)
     ? [active, ...ids.filter((id) => id !== active)]
     : ids;
-  return isClaudeCodeAvailableForChat(config)
-    ? ["claude-code", ...orderedLlmIds]
-    : orderedLlmIds;
+  const localAgentIds: string[] = [];
+  if (isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
+  if (isCodexAvailableForChat(config)) localAgentIds.push("codex");
+  return [...localAgentIds, ...orderedLlmIds];
 }
 
 interface AiStore {
@@ -174,6 +210,18 @@ const DEFAULT_CONFIG: AiConfig = {
     confirm_readonly: false,
     terminal_echo_enabled: true,
   },
+  codex_bridge: {
+    enabled: false,
+    binary: "auto",
+    min_version: "0.100.0",
+    default_model: DEFAULT_CODEX_MODEL,
+    sandbox: "read-only",
+    approval_policy: "never",
+    network_access: false,
+    proxy_url: undefined,
+    confirm_readonly: false,
+    terminal_echo_enabled: true,
+  },
   full_local_mode: false,
   fully_disabled: false,
   chat_output_format: "md",
@@ -184,12 +232,23 @@ function normalizeModelName(model: string | undefined | null): string {
   return trimmed === "" || trimmed === "sonnet" ? DEFAULT_CLAUDE_CODE_MODEL : trimmed;
 }
 
+function normalizeCodexModelName(model: string | undefined | null): string {
+  const trimmed = (model ?? "").trim();
+  return trimmed === "" ? DEFAULT_CODEX_MODEL : trimmed;
+}
+
 function normalizeAiConfig(config: AiConfig): AiConfig {
   return {
     ...config,
     cc_bridge: {
       ...config.cc_bridge,
       default_model: normalizeModelName(config.cc_bridge.default_model),
+    },
+    codex_bridge: {
+      ...DEFAULT_CONFIG.codex_bridge,
+      ...config.codex_bridge,
+      default_model: normalizeCodexModelName(config.codex_bridge?.default_model),
+      proxy_url: config.codex_bridge?.proxy_url?.trim() || undefined,
     },
   };
 }

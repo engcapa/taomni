@@ -121,10 +121,14 @@ pub async fn chat_set_thread_provider(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         store::update_thread_provider(&db, &thread_id, &provider_id).map_err(|e| e.to_string())?;
     }
-    // Switching away from Claude Code orphans its per-thread child; recycle it
-    // so we don't leak the process / MCP token / temp dir. (No-op if none.)
+    // Switching away from a local agent provider orphans its per-thread child;
+    // recycle so we don't leak the process / MCP token / temp dir.
     if provider_id != "claude-code" {
         crate::agent::cc_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
+    }
+    if provider_id != "codex" {
+        crate::agent::codex_bridge::commands::recycle_thread_process(state.inner(), &thread_id)
+            .await;
     }
     Ok(())
 }
@@ -145,6 +149,7 @@ pub async fn chat_set_thread_cc_model(
             .map_err(|e| e.to_string())?;
     }
     crate::agent::cc_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
+    crate::agent::codex_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
     Ok(())
 }
 
@@ -471,6 +476,12 @@ pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> 
     // 1. Cancel Claude Code process if running
     {
         let mut registry = state.cc_processes.lock().await;
+        if let Some(process) = registry.remove(&thread_id) {
+            process.stop().await;
+        }
+    }
+    {
+        let mut registry = state.codex_processes.lock().await;
         if let Some(process) = registry.remove(&thread_id) {
             process.stop().await;
         }
@@ -920,6 +931,402 @@ pub async fn chat_stream(
 
         let session_id =
             crate::agent::cc_bridge::protocol::extract_session_id(&events).or(resume_session);
+        if let Some(sid) = &session_id {
+            if let Ok(db) = state.db.lock() {
+                let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
+            }
+        }
+
+        let assistant_msg = store::ChatMessage {
+            id: assistant_id.clone(),
+            thread_id: req.thread_id.clone(),
+            role: "assistant".into(),
+            content: final_content.clone(),
+            created_at: assistant_ts,
+            redacted: false,
+        };
+
+        let is_first = history.is_empty();
+        {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
+            if is_first {
+                let title = user_msg.content.chars().take(40).collect::<String>();
+                store::update_thread_title(&db, &req.thread_id, &title)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+
+        emit(&StreamEventOut::End {
+            id: assistant_id,
+            thread_id: req.thread_id,
+            content: final_content,
+            redacted_count,
+        });
+
+        return Ok(());
+    }
+
+    if thread.provider_id == "codex" {
+        let assistant_id = Uuid::new_v4().to_string();
+        let assistant_ts = now() + 1;
+        emit(&StreamEventOut::AssistantStart {
+            id: assistant_id.clone(),
+            thread_id: req.thread_id.clone(),
+            created_at: assistant_ts,
+        });
+
+        let ai_config = AiConfig::load(&default_ai_config_path());
+        if !ai_config.codex_bridge.enabled || ai_config.fully_disabled || ai_config.full_local_mode
+        {
+            emit(&StreamEventOut::Error {
+                id: assistant_id,
+                message: "Codex is unavailable in full-local / fully-disabled mode or is disabled."
+                    .into(),
+            });
+            return Ok(());
+        }
+
+        let binary = if ai_config.codex_bridge.binary == "auto" {
+            crate::agent::codex_bridge::find_codex_binary().ok_or("Codex CLI not found")?
+        } else {
+            ai_config.codex_bridge.binary.clone()
+        };
+        let resume_session = thread.cc_session_id.clone();
+
+        let existing = { state.codex_processes.lock().await.get(&req.thread_id).cloned() };
+        let process = match existing {
+            Some(p) => p,
+            None => {
+                let flavor = {
+                    use crate::agent::cc_bridge::mcp_http::Flavor;
+                    let session_type = req
+                        .bound_session_id
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(|sid| {
+                            let db = state.db.lock().ok()?;
+                            crate::session::db::get_session(&db, sid).ok()
+                        })
+                        .map(|sc| sc.session_type);
+                    Flavor::for_session_type(session_type.as_ref())
+                };
+
+                let custom = match crate::agent::codex_bridge::config::resolve_custom_config(
+                    &ai_config.codex_bridge,
+                    &state.vault,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id.clone(),
+                            message: e,
+                        });
+                        return Ok(());
+                    }
+                };
+
+                let (server_url, token) =
+                    match crate::agent::cc_bridge::mcp_http::provision_for_thread_with_inline_permission(
+                        &app,
+                        &req.thread_id,
+                        thread.linked_session_id.clone(),
+                        req.bound_session_id.clone(),
+                        flavor,
+                        ai_config.codex_bridge.confirm_readonly,
+                        true,
+                    )
+                    .await
+                    {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
+
+                let thread_config = match crate::agent::codex_bridge::config::build_thread_config(
+                    custom.as_deref(),
+                    flavor.server_name(),
+                    &server_url,
+                    &token,
+                ) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        crate::agent::cc_bridge::mcp_http::revoke_token(&token);
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id.clone(),
+                            message: e,
+                        });
+                        return Ok(());
+                    }
+                };
+
+                let output_format = resolve_output_format(&thread, &ai_config);
+                let base_instructions = format!(
+                    "{}\n\nYou are connected through Codex app-server inside Taomni. Use Taomni MCP tools only for the bound session described in the developer instructions.",
+                    build_system_prompt(&output_format)
+                );
+                let developer_instructions = {
+                    let db = state.db.lock().map_err(|e| e.to_string())?;
+                    let session = req
+                        .bound_session_id
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(|sid| crate::session::db::get_session(&db, sid).ok());
+                    let recent = session
+                        .as_ref()
+                        .map(|sc| {
+                            crate::history::db_list_recent(
+                                &db,
+                                &crate::agent::cc_bridge::session_card::host_key_for(sc),
+                                crate::agent::cc_bridge::session_card::HISTORY_LIMIT,
+                            )
+                            .unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                    let raw = crate::agent::cc_bridge::session_card::render_card(
+                        session.as_ref(),
+                        &req.thread_id,
+                        thread.linked_session_id.is_some(),
+                        &recent,
+                        req.local_terminal_env.as_ref(),
+                    );
+                    redact::redact(&raw).0
+                };
+
+                let temp_dir =
+                    std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));
+                if let Err(e) = std::fs::create_dir_all(&temp_dir) {
+                    crate::agent::cc_bridge::mcp_http::revoke_token(&token);
+                    emit(&StreamEventOut::Error {
+                        id: assistant_id.clone(),
+                        message: format!("Failed to create Codex temp dir: {e}"),
+                    });
+                    return Ok(());
+                }
+
+                let model = thread
+                    .cc_model
+                    .clone()
+                    .filter(|m| !m.trim().is_empty())
+                    .unwrap_or_else(|| ai_config.codex_bridge.default_model.clone());
+                let p = match crate::agent::codex_bridge::process::CodexAppServer::spawn(
+                    &binary,
+                    ai_config.codex_bridge.proxy_url.clone(),
+                    Some(temp_dir.clone()),
+                    Some(token.clone()),
+                )
+                .await
+                {
+                    Ok(p) => std::sync::Arc::new(p),
+                    Err(e) => {
+                        crate::agent::cc_bridge::mcp_http::revoke_token(&token);
+                        let _ = std::fs::remove_dir_all(&temp_dir);
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id.clone(),
+                            message: e,
+                        });
+                        return Ok(());
+                    }
+                };
+
+                if let Err(e) = p
+                    .start_or_resume_thread(
+                        crate::agent::codex_bridge::process::CodexThreadOptions {
+                            resume_thread_id: resume_session.clone(),
+                            model: Some(model),
+                            cwd: req.cwd.clone(),
+                            approval_policy: ai_config.codex_bridge.approval_policy.clone(),
+                            sandbox: ai_config.codex_bridge.sandbox.clone(),
+                            network_access: ai_config.codex_bridge.network_access,
+                            config: thread_config,
+                            base_instructions: Some(base_instructions),
+                            developer_instructions: Some(developer_instructions),
+                            ephemeral: false,
+                        },
+                    )
+                    .await
+                {
+                    emit(&StreamEventOut::Error {
+                        id: assistant_id.clone(),
+                        message: e,
+                    });
+                    p.stop().await;
+                    return Ok(());
+                }
+
+                let mut registry = state.codex_processes.lock().await;
+                match registry.get(&req.thread_id) {
+                    Some(existing) => existing.clone(),
+                    None => {
+                        registry.insert(req.thread_id.clone(), p.clone());
+                        p
+                    }
+                }
+            }
+        };
+
+        if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            state
+                .cc_thread_cwd
+                .lock()
+                .unwrap()
+                .insert(req.thread_id.clone(), cwd.to_string());
+        }
+        {
+            let conn = req
+                .bound_db_connection_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            let mut bindings = state.cc_db_bindings.write().await;
+            match conn {
+                Some(c) => {
+                    bindings.insert(req.thread_id.clone(), c.to_string());
+                }
+                None => {
+                    bindings.remove(&req.thread_id);
+                }
+            }
+        }
+
+        let codex_message = {
+            let mut prefix = String::new();
+            if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                let (clean_cwd, _) = redact::redact(cwd);
+                prefix.push_str(&format!("当前工作目录：{}\n\n", clean_cwd));
+            }
+            if let Some(ctx) = req
+                .terminal_context
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+            {
+                let (clean_ctx, _) = redact::redact(ctx);
+                prefix.push_str(&format!("[Terminal context]\n```\n{}\n```\n\n", clean_ctx));
+            }
+            format!("{}{}", prefix, clean_content)
+        };
+
+        let assistant_id_clone = assistant_id.clone();
+        let app_clone = app.clone();
+        let event_name_clone = event_name.clone();
+        let model = thread
+            .cc_model
+            .clone()
+            .filter(|m| !m.trim().is_empty())
+            .unwrap_or_else(|| ai_config.codex_bridge.default_model.clone());
+        let events = process
+            .send_turn_with_callback(
+                &codex_message,
+                crate::agent::codex_bridge::process::CodexTurnOptions {
+                    cwd: req.cwd.clone(),
+                    approval_policy: ai_config.codex_bridge.approval_policy.clone(),
+                    sandbox: ai_config.codex_bridge.sandbox.clone(),
+                    network_access: ai_config.codex_bridge.network_access,
+                    model: Some(model),
+                },
+                move |evt| {
+                    use crate::agent::codex_bridge::protocol::CodexEvent;
+                    match evt {
+                        CodexEvent::Partial { content } => {
+                            let _ = app_clone.emit(
+                                &event_name_clone,
+                                StreamEventOut::Token {
+                                    id: assistant_id_clone.clone(),
+                                    content: content.clone(),
+                                },
+                            );
+                        }
+                        CodexEvent::ToolUse { id, name, input } => {
+                            let _ = app_clone.emit(
+                                &event_name_clone,
+                                StreamEventOut::CcToolActivity {
+                                    id: assistant_id_clone.clone(),
+                                    call_id: id.clone(),
+                                    phase: "use".into(),
+                                    tool: name.clone(),
+                                    detail: cc_tool_arg_summary(input).unwrap_or("").to_string(),
+                                },
+                            );
+                        }
+                        CodexEvent::ToolResult {
+                            tool_use_id,
+                            content,
+                        } => {
+                            let _ = app_clone.emit(
+                                &event_name_clone,
+                                StreamEventOut::CcToolActivity {
+                                    id: assistant_id_clone.clone(),
+                                    call_id: tool_use_id.clone(),
+                                    phase: "result".into(),
+                                    tool: String::new(),
+                                    detail: cc_tool_result_preview(content),
+                                },
+                            );
+                        }
+                        CodexEvent::Done { usage: Some(u) } => {
+                            let _ = app_clone.emit(
+                                &event_name_clone,
+                                StreamEventOut::Usage {
+                                    id: assistant_id_clone.clone(),
+                                    input_tokens: u.input_tokens,
+                                    output_tokens: u.output_tokens,
+                                    cost_usd: None,
+                                    duration_ms: u.duration_ms,
+                                },
+                            );
+                        }
+                        _ => {}
+                    }
+                },
+            )
+            .await;
+
+        let events = match events {
+            Ok(ev) => ev,
+            Err(e) => {
+                let msg = if process.is_stopped() {
+                    "Stream stopped by user".to_string()
+                } else {
+                    e
+                };
+                emit(&StreamEventOut::Error {
+                    id: assistant_id,
+                    message: msg,
+                });
+                return Ok(());
+            }
+        };
+
+        let mut final_content = String::new();
+        for event in &events {
+            use crate::agent::codex_bridge::protocol::CodexEvent;
+            match event {
+                CodexEvent::AssistantMessage { content } => {
+                    final_content.push_str(content);
+                }
+                CodexEvent::ToolUse { name, input, .. } => {
+                    final_content.push_str(&format_cc_tool_use(name, input));
+                }
+                CodexEvent::ToolResult { content, .. } => {
+                    let preview = cc_tool_result_preview(content);
+                    if !preview.is_empty() {
+                        final_content.push_str(&format!("> ↳ {}\n", preview));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let session_id = crate::agent::codex_bridge::protocol::extract_session_id(&events)
+            .or_else(|| process.current_thread_id())
+            .or(resume_session);
         if let Some(sid) = &session_id {
             if let Ok(db) = state.db.lock() {
                 let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);

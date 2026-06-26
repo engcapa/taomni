@@ -24,6 +24,7 @@ import { AiMasterSwitch } from "./AiMasterSwitch";
 import { AiShellPanel } from "./AiShellPanel";
 import { WebSearchPanel } from "./WebSearchPanel";
 import { ClaudeCodePanel } from "./ClaudeCodePanel";
+import { CodexCodePanel } from "./CodexCodePanel";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { ChatOutputFormatPanel } from "./ChatOutputFormatPanel";
 import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
@@ -438,6 +439,12 @@ export function SettingsPanel() {
               </div>
             </SettingsAnchor>
 
+            <SettingsAnchor id="ai-codex">
+              <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                <CodexCodePanel />
+              </div>
+            </SettingsAnchor>
+
             <SettingsAnchor id="ai-chatformat">
               <div className="pt-3 border-t border-[var(--taomni-divider)]">
                 <ChatOutputFormatPanel />
@@ -461,4 +468,3 @@ export function SettingsPanel() {
     </SettingsSearchContext.Provider>
   );
 }
-

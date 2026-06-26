@@ -106,6 +106,23 @@ pub fn run() {
                             });
                         }
                     }
+                    drop(registry);
+
+                    let mut codex_registry = state.codex_processes.lock().await;
+                    let mut codex_to_remove = Vec::new();
+                    for (thread_id, proc) in codex_registry.iter() {
+                        let last_active = *proc.last_active_at.lock().unwrap();
+                        if now.duration_since(last_active).as_secs() >= 300 {
+                            codex_to_remove.push(thread_id.clone());
+                        }
+                    }
+                    for tid in codex_to_remove {
+                        if let Some(proc) = codex_registry.remove(&tid) {
+                            tokio::spawn(async move {
+                                proc.stop().await;
+                            });
+                        }
+                    }
                 }
             });
 
@@ -436,6 +453,11 @@ pub fn run() {
             agent::cc_bridge::commands::cc_cancel_capture,
             agent::cc_bridge::commands::cc_track_terminal,
             agent::cc_bridge::commands::cc_untrack_terminal,
+            agent::codex_bridge::commands::codex_detect,
+            agent::codex_bridge::commands::codex_get_custom_config,
+            agent::codex_bridge::commands::codex_get_profile_config,
+            agent::codex_bridge::commands::codex_stop_session,
+            agent::codex_bridge::commands::codex_test_config,
             chat::chat_new_thread,
             chat::chat_list_threads,
             chat::chat_list_messages,

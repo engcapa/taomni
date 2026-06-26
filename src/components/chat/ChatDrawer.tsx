@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, TerminalSquare, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
-import { chatDrawerProviderIds, DEFAULT_CLAUDE_CODE_MODEL, useAiStore } from "../../stores/aiStore";
+import { chatDrawerProviderIds, DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
 import { CcToolCards } from "./CcToolCards";
@@ -89,7 +89,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiConfig = useAiStore((s) => s.config);
   const defaultCcModel = aiConfig?.cc_bridge.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL;
-  const ccTerminalEchoEnabled = aiConfig?.cc_bridge.terminal_echo_enabled ?? true;
+  const defaultCodexModel = aiConfig?.codex_bridge.default_model?.trim() || DEFAULT_CODEX_MODEL;
+  const isLocalAgentProvider = activeThread?.provider_id === "claude-code" || activeThread?.provider_id === "codex";
+  const defaultLocalAgentModel = activeThread?.provider_id === "codex" ? defaultCodexModel : defaultCcModel;
+  const ccTerminalEchoEnabled = activeThread?.provider_id === "codex"
+    ? (aiConfig?.codex_bridge.terminal_echo_enabled ?? true)
+    : (aiConfig?.cc_bridge.terminal_echo_enabled ?? true);
   const globalOutputFormat = aiConfig?.chat_output_format ?? "md";
   const loadAiConfig = useAiStore((s) => s.loadConfig);
   const saveAiConfig = useAiStore((s) => s.saveConfig);
@@ -127,12 +132,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   }, []);
 
   useEffect(() => {
-    if (activeThread?.provider_id !== "claude-code") {
-      setCcModelDraft(defaultCcModel);
+    if (!isLocalAgentProvider) {
+      setCcModelDraft(defaultLocalAgentModel);
       return;
     }
-    setCcModelDraft(activeThread.cc_model?.trim() || defaultCcModel);
-  }, [activeThread?.id, activeThread?.provider_id, activeThread?.cc_model, defaultCcModel]);
+    setCcModelDraft(activeThread.cc_model?.trim() || defaultLocalAgentModel);
+  }, [activeThread?.id, activeThread?.provider_id, activeThread?.cc_model, isLocalAgentProvider, defaultLocalAgentModel]);
 
   // Responsive behaviour (ai-native-plan §10.3):
   //   ≥1280px → expanded (default 380px)
@@ -232,26 +237,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   const setCcTerminalEcho = (enabled: boolean) => {
     if (!aiConfig) return;
-    void saveAiConfig({
-      ...aiConfig,
-      cc_bridge: { ...aiConfig.cc_bridge, terminal_echo_enabled: enabled },
-    }).catch((e) => {
-      console.warn("save CC terminal echo setting failed:", e);
+    const next = activeThread?.provider_id === "codex"
+      ? { ...aiConfig, codex_bridge: { ...aiConfig.codex_bridge, terminal_echo_enabled: enabled } }
+      : { ...aiConfig, cc_bridge: { ...aiConfig.cc_bridge, terminal_echo_enabled: enabled } };
+    void saveAiConfig(next).catch((e) => {
+      console.warn("save local agent terminal echo setting failed:", e);
     });
   };
 
   const commitThreadCcModel = () => {
-    if (!activeThread || activeThread.provider_id !== "claude-code") return;
+    if (!activeThread || !isLocalAgentProvider) return;
     const trimmed = ccModelDraft.trim();
-    const nextModel = trimmed === "" || trimmed === defaultCcModel ? null : trimmed;
+    const nextModel = trimmed === "" || trimmed === defaultLocalAgentModel ? null : trimmed;
     if ((activeThread.cc_model ?? null) === nextModel) {
-      setCcModelDraft(nextModel ?? defaultCcModel);
+      setCcModelDraft(nextModel ?? defaultLocalAgentModel);
       return;
     }
-    setCcModelDraft(nextModel ?? defaultCcModel);
+    setCcModelDraft(nextModel ?? defaultLocalAgentModel);
     void setThreadCcModel(activeThread.id, nextModel).catch((e) => {
-      console.warn("set Claude Code thread model failed:", e);
-      setCcModelDraft(activeThread.cc_model?.trim() || defaultCcModel);
+      console.warn("set local agent thread model failed:", e);
+      setCcModelDraft(activeThread.cc_model?.trim() || defaultLocalAgentModel);
     });
   };
 
@@ -435,14 +440,14 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               >
                 {providerIds.map((id) => (
                   <option key={id} value={id}>
-                    {id === "claude-code" ? t("chat.claudeCodeLocal") : id}
+                    {id === "claude-code" ? t("chat.claudeCodeLocal") : id === "codex" ? "Codex local" : id}
                   </option>
                 ))}
               </select>
             ) : (
               <span className="text-[var(--taomni-accent)]">{activeThread.provider_id}</span>
             )}
-            {activeThread.provider_id === "claude-code" && (
+            {(activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && (
               <input
                 className="taomni-input h-5 w-[150px] min-w-[120px] text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)] font-mono"
                 value={ccModelDraft}
@@ -455,13 +460,13 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                   if (e.key === "Enter") {
                     e.currentTarget.blur();
                   } else if (e.key === "Escape") {
-                    setCcModelDraft(activeThread.cc_model?.trim() || defaultCcModel);
+                    setCcModelDraft(activeThread.cc_model?.trim() || defaultLocalAgentModel);
                     e.currentTarget.blur();
                   }
                 }}
               />
             )}
-            {activeThread.provider_id === "claude-code" && activeThread.linked_session_id && (
+            {(activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && activeThread.linked_session_id && (
               <button
                 type="button"
                 className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${

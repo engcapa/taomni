@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDrawer } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
-import { DEFAULT_CLAUDE_CODE_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
+import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
@@ -60,6 +60,18 @@ function makeConfig(): AiConfig {
       default_model: DEFAULT_CLAUDE_CODE_MODEL,
       permission_mode: "default",
       max_turns: 20,
+      confirm_readonly: false,
+      terminal_echo_enabled: true,
+    },
+    codex_bridge: {
+      enabled: false,
+      binary: "auto",
+      min_version: "0.100.0",
+      default_model: DEFAULT_CODEX_MODEL,
+      sandbox: "read-only",
+      approval_policy: "never",
+      network_access: false,
+      proxy_url: undefined,
       confirm_readonly: false,
       terminal_echo_enabled: true,
     },

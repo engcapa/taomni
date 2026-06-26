@@ -158,6 +158,11 @@ pub struct TokenScope {
     /// confirmation (3.6 noise-reduction disabled by config). Snapshotted from
     /// `CcBridgeConfig.confirm_readonly` at provision time.
     pub confirm_readonly: bool,
+    /// Codex app-server calls MCP tools directly instead of using Claude
+    /// Code's `--permission-prompt-tool` preflight. When this is true, write
+    /// tools run the same permission pipeline inside the handler before
+    /// executing.
+    pub inline_permission: bool,
     /// Tools the user pre-approved for the rest of this session via the
     /// ActionCard's "allow for session" choice.
     pub session_approved: Arc<Mutex<HashSet<String>>>,
@@ -277,6 +282,7 @@ pub fn mint_token(
     trust: TrustLevel,
     flavor: Flavor,
     confirm_readonly: bool,
+    inline_permission: bool,
 ) -> Result<(SocketAddr, String), String> {
     let guard = slot().lock().unwrap();
     let server = guard.as_ref().ok_or("CC MCP server not started")?;
@@ -290,6 +296,7 @@ pub fn mint_token(
             trust,
             flavor,
             confirm_readonly,
+            inline_permission,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         },
     );
@@ -316,6 +323,27 @@ pub async fn provision_for_thread(
     flavor: Flavor,
     confirm_readonly: bool,
 ) -> Result<(String, String), String> {
+    provision_for_thread_with_inline_permission(
+        app,
+        thread_id,
+        linked_session_id,
+        linked_config_id,
+        flavor,
+        confirm_readonly,
+        false,
+    )
+    .await
+}
+
+pub async fn provision_for_thread_with_inline_permission(
+    app: &AppHandle,
+    thread_id: &str,
+    linked_session_id: Option<String>,
+    linked_config_id: Option<String>,
+    flavor: Flavor,
+    confirm_readonly: bool,
+    inline_permission: bool,
+) -> Result<(String, String), String> {
     ensure_started(app).await?;
     let trust = if linked_session_id.is_some() {
         TrustLevel::Strict
@@ -329,6 +357,7 @@ pub async fn provision_for_thread(
         trust,
         flavor,
         confirm_readonly,
+        inline_permission,
     )?;
     Ok((server_url(addr, flavor), token))
 }
@@ -531,6 +560,48 @@ pub(crate) async fn decide_permission(
             allow_result(input)
         }
         CcPermissionDecision::Deny => deny_result("denied by user"),
+    }
+}
+
+/// Handler-side permission gate for clients that do not use the Claude Code
+/// `permission_prompt` preflight. No-op for legacy Claude tokens.
+pub(crate) async fn enforce_inline_permission(
+    app: &AppHandle,
+    scope: &TokenScope,
+    raw_tool_name: &str,
+    input: &serde_json::Value,
+    is_readonly: bool,
+) -> Result<(), ErrorData> {
+    if !scope.inline_permission {
+        return Ok(());
+    }
+    let tool_name = normalize_tool_name(raw_tool_name).to_string();
+    enforce_session_scope(scope, input).map_err(|e| ErrorData::invalid_params(e, None))?;
+    let call = ToolCall {
+        tool: tool_name.clone(),
+        args: input.clone(),
+    };
+    crate::agent::safety::check_tool_call(&call)
+        .map_err(|e| ErrorData::invalid_params(e, None))?;
+    {
+        let state = app.state::<AppState>();
+        crate::agent::safety::check_session_disable(&state, &call)
+            .map_err(|e| ErrorData::invalid_params(e, None))?;
+    }
+
+    let already = scope.session_approved.lock().unwrap().contains(&tool_name);
+    let needs_confirm =
+        crate::agent::safety::requires_confirmation(&tool_name) && !already && !is_readonly;
+    if !needs_confirm {
+        return Ok(());
+    }
+    match await_permission(app, scope, &tool_name, input).await {
+        CcPermissionDecision::Allow => Ok(()),
+        CcPermissionDecision::AllowSession => {
+            scope.session_approved.lock().unwrap().insert(tool_name);
+            Ok(())
+        }
+        CcPermissionDecision::Deny => Err(ErrorData::invalid_params("denied by user", None)),
     }
 }
 
@@ -1237,6 +1308,11 @@ impl CcHandler {
         let mut args = as_value(&p);
         fill_session_id(&mut args, &scope);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
+        let is_readonly = !scope.confirm_readonly
+            && crate::agent::cmd_classify::classify(&p.command)
+                == crate::agent::cmd_classify::CommandClass::ReadOnly;
+        enforce_inline_permission(&self.app, &scope, "run_in_terminal", &args, is_readonly)
+            .await?;
         // Defense in depth: re-run the blacklist even though permission_prompt
         // already did (CC may have an allowlist that skips the prompt).
         let call = ToolCall {
@@ -1277,6 +1353,7 @@ impl CcHandler {
         let scope = self.scope(&ctx)?;
         let args = as_value(&p);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
+        enforce_inline_permission(&self.app, &scope, "sftp_upload", &args, false).await?;
         self.dispatch_side_effect(&scope, "sftp_upload", args).await
     }
 
@@ -1287,7 +1364,9 @@ impl CcHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        self.dispatch_side_effect(&scope, "save_as_runbook", as_value(&p)).await
+        let args = as_value(&p);
+        enforce_inline_permission(&self.app, &scope, "save_as_runbook", &args, false).await?;
+        self.dispatch_side_effect(&scope, "save_as_runbook", args).await
     }
 
     #[tool(
@@ -1303,6 +1382,10 @@ impl CcHandler {
         let mut args = as_value(&p);
         fill_session_id(&mut args, &scope);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
+        let is_readonly = !scope.confirm_readonly
+            && crate::agent::cmd_classify::classify(&p.command)
+                == crate::agent::cmd_classify::CommandClass::ReadOnly;
+        enforce_inline_permission(&self.app, &scope, "run_captured", &args, is_readonly).await?;
         // Defense in depth: re-run the blacklist (permission_prompt already did,
         // but CC may have an allowlist that skips the prompt).
         let call = ToolCall {
@@ -1391,6 +1474,7 @@ mod tests {
             trust: TrustLevel::Strict,
             flavor: Flavor::Shell,
             confirm_readonly: false,
+            inline_permission: false,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         }
     }
@@ -1405,6 +1489,7 @@ mod tests {
             trust: TrustLevel::Strict,
             flavor: Flavor::Shell,
             confirm_readonly: false,
+            inline_permission: false,
             session_approved: Arc::new(Mutex::new(HashSet::new())),
         }
     }
@@ -1691,4 +1776,3 @@ mod tests {
         assert_eq!(good.status(), 200, "valid token must pass");
     }
 }
-
