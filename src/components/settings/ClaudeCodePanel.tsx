@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle, Copy, Loader2, Terminal, XCircle, AlertTriangle } from "lucide-react";
 import { DEFAULT_CLAUDE_CODE_MODEL, useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
+import { useVaultGate } from "../../lib/vaultGate";
 import { ClaudeCodeSettingsDialog } from "./ClaudeCodeSettingsDialog";
 import { Sliders, Shield } from "lucide-react";
 
@@ -46,8 +47,10 @@ export function ClaudeCodePanel() {
   const [status, setStatus] = useState<CcStatusResult | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
+  const [openingCustomDialog, setOpeningCustomDialog] = useState(false);
   const [defaultModelDraft, setDefaultModelDraft] = useState(DEFAULT_CLAUDE_CODE_MODEL);
   const t = useT();
+  const ensureVaultReady = useVaultGate();
 
   useEffect(() => {
     if (!config) loadConfig();
@@ -104,6 +107,19 @@ export function ClaudeCodePanel() {
       console.warn("save Claude Code default model failed:", e);
       setDefaultModelDraft(cc.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL);
     });
+  };
+
+  const openCustomDialog = async () => {
+    if (openingCustomDialog) return;
+    setOpeningCustomDialog(true);
+    try {
+      const ready = await ensureVaultReady(t("aiSettings.ccCustomVaultRequired"));
+      if (ready) {
+        setShowCustomDialog(true);
+      }
+    } finally {
+      setOpeningCustomDialog(false);
+    }
   };
 
   const activeProfileName = (() => {
@@ -294,9 +310,10 @@ export function ClaudeCodePanel() {
               <button
                 type="button"
                 className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
-                onClick={() => setShowCustomDialog(true)}
+                onClick={() => void openCustomDialog()}
+                disabled={openingCustomDialog}
               >
-                <Sliders className="w-3 h-3" />
+                {openingCustomDialog ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sliders className="w-3 h-3" />}
                 {t("aiSettings.ccCustomManage")}
               </button>
             </div>

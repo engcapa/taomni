@@ -120,7 +120,11 @@ impl ResolvedProxy {
     /// `reqwest::Proxy::all` and `tauri-plugin-updater`'s `proxy` option both
     /// accept.
     pub fn to_url(&self) -> String {
-        let scheme = if self.kind == "socks5" { "socks5" } else { "http" };
+        let scheme = if self.kind == "socks5" {
+            "socks5"
+        } else {
+            "http"
+        };
         let auth = if self.username.is_empty() {
             String::new()
         } else {
@@ -174,10 +178,7 @@ pub fn resolve_default(state: &AppState) -> Result<Option<ResolvedProxy>, String
 }
 
 /// Resolve an explicit config (used by [`resolve_default`] and tests).
-pub fn resolve(
-    state: &AppState,
-    config: &AppProxyConfig,
-) -> Result<Option<ResolvedProxy>, String> {
+pub fn resolve(state: &AppState, config: &AppProxyConfig) -> Result<Option<ResolvedProxy>, String> {
     if !config.enabled {
         return Ok(None);
     }
@@ -187,33 +188,7 @@ pub fn resolve(
         if id.is_empty() {
             return Ok(None);
         }
-        let session = {
-            let db = state
-                .db
-                .lock()
-                .map_err(|_| "session database is unavailable".to_string())?;
-            crate::session::db::get_session(&db, id)
-                .map_err(|e| format!("proxy session not found: {e}"))?
-        };
-        let opts: serde_json::Value =
-            serde_json::from_str(&session.options_json).unwrap_or(serde_json::Value::Null);
-        let kind = opts
-            .get("proxyKind")
-            .and_then(|k| k.as_str())
-            .unwrap_or("http")
-            .to_string();
-        let password_ref = opts
-            .get("passwordRef")
-            .and_then(|r| r.as_str())
-            .unwrap_or("")
-            .to_string();
-        return Ok(Some(ResolvedProxy {
-            kind,
-            host: session.host,
-            port: session.port,
-            username: session.username.unwrap_or_default(),
-            password: resolve_password(state, &password_ref),
-        }));
+        return resolve_session_proxy(state, id);
     }
 
     // Manual mode.
@@ -221,11 +196,55 @@ pub fn resolve(
         return Ok(None);
     }
     Ok(Some(ResolvedProxy {
-        kind: if config.kind == "socks5" { "socks5".into() } else { "http".into() },
+        kind: if config.kind == "socks5" {
+            "socks5".into()
+        } else {
+            "http".into()
+        },
         host: config.host.trim().to_string(),
         port: config.port,
         username: config.username.trim().to_string(),
         password: resolve_password(state, &config.password_ref),
+    }))
+}
+
+/// Resolve a saved `SessionType::Proxy` session into a concrete proxy. This is
+/// reused by features such as Codex bridge profiles that need the same proxy
+/// session semantics as the global Application Proxy setting.
+pub fn resolve_session_proxy(
+    state: &AppState,
+    session_id: &str,
+) -> Result<Option<ResolvedProxy>, String> {
+    let id = session_id.trim();
+    if id.is_empty() {
+        return Ok(None);
+    }
+    let session = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::session::db::get_session(&db, id)
+            .map_err(|e| format!("proxy session not found: {e}"))?
+    };
+    let opts: serde_json::Value =
+        serde_json::from_str(&session.options_json).unwrap_or(serde_json::Value::Null);
+    let kind = opts
+        .get("proxyKind")
+        .and_then(|k| k.as_str())
+        .unwrap_or("http")
+        .to_string();
+    let password_ref = opts
+        .get("passwordRef")
+        .and_then(|r| r.as_str())
+        .unwrap_or("")
+        .to_string();
+    Ok(Some(ResolvedProxy {
+        kind,
+        host: session.host,
+        port: session.port,
+        username: session.username.unwrap_or_default(),
+        password: resolve_password(state, &password_ref),
     }))
 }
 
@@ -326,5 +345,3 @@ mod tests {
         assert_eq!(p.to_url(), "http://h:8080");
     }
 }
-
-

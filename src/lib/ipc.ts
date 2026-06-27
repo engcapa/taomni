@@ -752,6 +752,18 @@ export async function ccGetProfileSettings(vaultRef: string): Promise<string | n
   );
 }
 
+export async function codexGetCustomConfig(): Promise<string | null> {
+  return withVaultLockedNotice(() =>
+    invoke<string | null>("codex_get_custom_config"),
+  );
+}
+
+export async function codexGetProfileConfig(vaultRef: string): Promise<string | null> {
+  return withVaultLockedNotice(() =>
+    invoke<string | null>("codex_get_profile_config", { vaultRef }),
+  );
+}
+
 // --- Third-party importer secret recovery ---
 
 export interface KeychainQuery {

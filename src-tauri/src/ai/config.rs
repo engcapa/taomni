@@ -11,6 +11,8 @@ pub struct AiConfig {
     pub web_search: WebSearchConfig,
     #[serde(default)]
     pub cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig,
+    #[serde(default)]
+    pub codex_bridge: crate::agent::codex_bridge::config::CodexBridgeConfig,
     /// Master switch: when true, all non-local network calls are refused
     /// (LLM cloud providers, web_search, web_fetch, Claude Code).
     #[serde(default)]
@@ -37,6 +39,7 @@ impl Default for AiConfig {
             llm: LlmConfig::default(),
             web_search: WebSearchConfig::default(),
             cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig::default(),
+            codex_bridge: crate::agent::codex_bridge::config::CodexBridgeConfig::default(),
             full_local_mode: false,
             fully_disabled: false,
             chat_output_format: default_chat_output_format(),
@@ -56,6 +59,7 @@ impl AiConfig {
 
     pub fn normalize(&mut self) {
         self.cc_bridge.normalize();
+        self.codex_bridge.normalize();
     }
 
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {

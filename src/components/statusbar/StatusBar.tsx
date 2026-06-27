@@ -37,6 +37,7 @@ export function StatusBar() {
   const fullLocal = !!aiConfig?.full_local_mode;
   const fullyDisabled = !!aiConfig?.fully_disabled;
   const ccEnabled = !!aiConfig?.cc_bridge.enabled;
+  const codexEnabled = !!aiConfig?.codex_bridge.enabled;
   const searchEnabled = !!aiConfig?.web_search.client_enabled;
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
@@ -118,6 +119,17 @@ export function StatusBar() {
               <Cpu className="w-3 h-3" />
               {dot("bg-green-400")}
               CC
+            </span>
+          )}
+
+          {codexEnabled && (
+            <span
+              className="flex items-center gap-1 text-[11px]"
+              title="Codex app-server enabled"
+            >
+              <Cpu className="w-3 h-3" />
+              {dot("bg-green-400")}
+              Codex
             </span>
           )}
 

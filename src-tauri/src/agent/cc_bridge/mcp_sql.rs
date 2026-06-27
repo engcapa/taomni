@@ -21,7 +21,10 @@ use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::mcp_http::{decide_permission, scope_from_ctx, PermissionParams, TokenMap, TokenScope};
+use super::mcp_http::{
+    decide_permission, enforce_inline_permission, scope_from_ctx, PermissionParams, TokenMap,
+    TokenScope,
+};
 use crate::agent::capture::reduce::{reduce_file, ReduceOp, ReduceResult};
 use crate::agent::capture::{CaptureSource, CaptureStatus, CaptureWriter};
 use crate::database::{ColumnDescription, DbObject, IndexInfo, QueryResult, SchemaInfo, TableInfo};
@@ -550,6 +553,11 @@ impl SqlHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
+        let args = serde_json::json!({ "sql": p.sql.clone() });
+        let is_readonly = !scope.confirm_readonly
+            && crate::agent::sql_classify::classify(&p.sql)
+                == crate::agent::sql_classify::SqlClass::ReadOnly;
+        enforce_inline_permission(&self.app, &scope, "run_sql", &args, is_readonly).await?;
         let res = crate::database::db_execute(self.state(), conn, p.sql.clone()).await;
         emit_sql_echo(&self.app, &scope.thread_id, &p.sql, &res, false);
         let r = res.map_err(err)?;
@@ -567,6 +575,12 @@ impl SqlHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
+        let args = serde_json::json!({ "sql": p.sql.clone() });
+        let is_readonly = !scope.confirm_readonly
+            && crate::agent::sql_classify::classify(&p.sql)
+                == crate::agent::sql_classify::SqlClass::ReadOnly;
+        enforce_inline_permission(&self.app, &scope, "run_sql_captured", &args, is_readonly)
+            .await?;
         let state = self.state();
         if state.captures.running_count(&scope.thread_id) >= MAX_RUNNING_CAPTURES {
             return Err(ErrorData::internal_error(
@@ -665,6 +679,11 @@ impl SqlHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
+        let args = serde_json::json!({
+            "capture_id": p.capture_id.clone(),
+            "format": p.format.clone(),
+        });
+        enforce_inline_permission(&self.app, &scope, "export_result", &args, false).await?;
         let format = p.format.as_deref().unwrap_or("csv").to_ascii_lowercase();
         if format != "csv" {
             return Err(ErrorData::invalid_params(

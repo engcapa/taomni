@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use tokio::sync::RwLock;
 
 use crate::agent::cc_bridge::process::CcProcess;
+use crate::agent::codex_bridge::process::CodexAppServer;
 use crate::ai::AppAiCtx;
 use crate::chat::run::ChatRunRegistry;
 use crate::database::DbSession;
@@ -93,6 +94,8 @@ pub struct AppState {
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
+    /// Per-thread Codex app-server registry.
+    pub codex_processes: tokio::sync::Mutex<HashMap<String, Arc<CodexAppServer>>>,
     /// Provider-agnostic stop handles for in-flight chat turns, keyed by thread_id.
     pub chat_runs: Arc<ChatRunRegistry>,
     /// Pending CC side-effect tool calls awaiting frontend execution, keyed by
@@ -163,6 +166,7 @@ impl AppState {
             db: Mutex::new(db),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
+            codex_processes: tokio::sync::Mutex::new(HashMap::new()),
             chat_runs: Arc::new(ChatRunRegistry::new(HashMap::new())),
             cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
             cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
