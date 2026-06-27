@@ -2287,13 +2287,14 @@ export function MainLayout() {
 
       <div className="flex-1 flex min-h-0">
         {sidebarCollapsed && (
-          <div data-testid="collapsed-sidebar-rail" className="h-full w-[26px] shrink-0 overflow-hidden">
+          <div data-testid="collapsed-sidebar-rail" className="h-full w-[30px] shrink-0 overflow-visible">
             <Sidebar
               compact
               onNewSession={handleNewSession}
               onNewSftpSession={handleNewSftpSession}
               onEditSession={handleEditSession}
               onConnectSession={handleConnectSession}
+              onOpenSettings={() => handleCommand("settings")}
             />
           </div>
         )}
@@ -2334,6 +2335,7 @@ export function MainLayout() {
                 onNewSftpSession={handleNewSftpSession}
                 onEditSession={handleEditSession}
                 onConnectSession={handleConnectSession}
+                onOpenSettings={() => handleCommand("settings")}
               />
             </div>
           </Panel>

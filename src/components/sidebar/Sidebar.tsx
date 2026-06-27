@@ -8,6 +8,7 @@ import {
   Star,
   Wrench,
   Bot,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import { SessionTree } from "./SessionTree";
@@ -22,10 +23,11 @@ interface SidebarProps {
   onNewSftpSession?: () => void;
   onEditSession?: (session: SessionConfig) => void;
   onConnectSession?: (session: SessionConfig) => void;
+  onOpenSettings?: () => void;
   compact?: boolean;
 }
 
-export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact = false }: SidebarProps) {
+export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenSettings, compact = false }: SidebarProps) {
   const {
     activeSideTab,
     setActiveSideTab,
@@ -84,7 +86,7 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact
     <>
     <div data-testid="sidebar" className="h-full flex">
       <div
-        className="w-[26px] flex flex-col shrink-0"
+        className="w-[30px] flex flex-col shrink-0"
         style={{ background: "var(--taomni-tab-inactive)", borderRight: "1px solid var(--taomni-sidebar-border)" }}
       >
         {(["sessions", "tools", "macros"] as const).map((tab) => {
@@ -104,6 +106,27 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, compact
           );
         })}
         <div className="flex-1" />
+        <button
+          data-testid="ribbon-settings"
+          type="button"
+          aria-label={t("menu.settings")}
+          className="group relative mb-2 h-8 w-full inline-flex items-center justify-center border-t hover:bg-[var(--taomni-hover)] text-[var(--taomni-text)]"
+          style={{ borderColor: "var(--taomni-sidebar-border)" }}
+          onClick={onOpenSettings}
+        >
+          <Settings className="w-[18px] h-[18px]" />
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute left-full bottom-1/2 z-50 ml-2 translate-y-1/2 whitespace-nowrap rounded border px-2 py-1 text-[11px] opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            style={{
+              background: "var(--taomni-card-bg)",
+              borderColor: "var(--taomni-card-border)",
+              color: "var(--taomni-text)",
+            }}
+          >
+            {t("menu.settings")}
+          </span>
+        </button>
       </div>
       {compact && null}
       {!compact && (
