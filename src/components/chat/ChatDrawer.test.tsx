@@ -131,6 +131,9 @@ describe("ChatDrawer provider and echo controls", () => {
       drawerTabId: "term-1",
       tabDrawerOpenByTabId: { "term-1": true },
       drawerWidth: 380,
+      drawerHeight: 420,
+      drawerPosition: "right",
+      drawerPinned: true,
       pendingComposerText: "",
     });
   });

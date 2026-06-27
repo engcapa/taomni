@@ -23,7 +23,7 @@
 export interface TerminalRegistryEntry {
   tabId: string;
   sessionId: string;
-  /** Title shown in the global chat picker ("global chat ↔ terminal X"). */
+  /** Title shown when a tab-bound chat displays its linked terminal. */
   title: string;
   /**
    * Facts about a bound LOCAL terminal. Absent for SSH/remote terminals, where

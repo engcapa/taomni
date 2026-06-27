@@ -16,7 +16,6 @@ import { useEffect, useState } from "react";
 import { useAppTheme } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
@@ -28,9 +27,6 @@ export function StatusBar() {
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const selected = sessions.find((session) => session.id === selectedSessionId);
-  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
-  const drawerOpen = useChatStore((s) => s.drawerOpen);
-  const drawerScope = useChatStore((s) => s.drawerScope);
   const aiConfig = useAiStore((s) => s.config);
   const activeProvider = aiConfig?.llm.active ?? "—";
   const activeAsr = aiConfig?.asr.active ?? "—";
@@ -87,16 +83,14 @@ export function StatusBar() {
           </span>
 
           {/* LLM segment */}
-          <button
-            type="button"
-            className={`flex items-center gap-1 text-[11px] hover:text-[var(--taomni-accent)] transition-colors ${drawerOpen && drawerScope === "global" ? "text-[var(--taomni-accent)]" : ""}`}
-            onClick={() => void toggleGlobalChat()}
-            title={t("statusBar.globalChatTitle")}
+          <span
+            className="flex items-center gap-1 text-[11px]"
+            title={t("statusBar.llmTooltip", { provider: activeProvider })}
           >
             <Bot className="w-3 h-3" />
             {dot(aiConfig ? "bg-green-400" : "bg-gray-400")}
             {t("statusBar.llm", { provider: activeProvider })}
-          </button>
+          </span>
 
           {/* Web search segment */}
           <span

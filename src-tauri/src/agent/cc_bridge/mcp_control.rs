@@ -8,7 +8,7 @@ use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, Content, ServerCapabilities, ServerInfo};
 use rmcp::service::{RequestContext, RoleServer};
-use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
+use rmcp::{ErrorData, ServerHandler, tool, tool_handler, tool_router};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tauri::{AppHandle, Emitter, Manager};
@@ -19,8 +19,8 @@ use crate::session::models::{AuthMethod, SessionConfig, SessionGroup, SessionTyp
 use crate::state::{AppState, CcToolOutcome};
 
 use super::mcp_http::{
-    decide_permission, enforce_inline_permission, normalize_tool_name, scope_from_ctx,
-    PermissionParams, TokenMap, TokenScope, TOOL_TIMEOUT_SECS,
+    PermissionParams, TOOL_TIMEOUT_SECS, TokenMap, TokenScope, decide_permission,
+    enforce_inline_permission, normalize_tool_name, scope_from_ctx,
 };
 
 #[derive(Clone)]
@@ -235,6 +235,10 @@ struct SessionOpenParams {
     session_id: Option<String>,
     #[serde(default)]
     query: Option<String>,
+    /// Optional override for saved LocalShell sessions. Use local_shell.type to
+    /// choose the local terminal kind; non-local saved sessions reject this.
+    #[serde(default)]
+    local_shell: Option<LocalShellParams>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema, Serialize)]
@@ -254,6 +258,27 @@ struct QuickConnectParams {
 
 #[derive(Deserialize, schemars::JsonSchema, Serialize, Default)]
 struct EmptyParams {}
+
+#[derive(Deserialize, schemars::JsonSchema, Serialize, Clone, Debug, Default)]
+struct LocalShellParams {
+    /// Local shell type. Windows accepts: default, cmd/command-prompt,
+    /// powershell/powershell7/pwsh, windows-powershell, git-bash, wsl. Unix
+    /// accepts: default, bash, zsh, sh. Use custom with path for an explicit
+    /// executable.
+    #[serde(rename = "type", alias = "shell", default)]
+    shell_type: Option<String>,
+    /// Explicit executable path, required when type is custom. For WSL, prefer
+    /// type=wsl and pass distro/user options through args.
+    #[serde(default)]
+    path: Option<String>,
+    /// Extra argv passed to the shell. Examples: WSL ["-d","Ubuntu"],
+    /// PowerShell ["-NoLogo"], Git Bash ["--login","-i"].
+    #[serde(default)]
+    args: Option<Vec<String>>,
+    /// Optional display name for the opened terminal tab.
+    #[serde(default)]
+    name: Option<String>,
+}
 
 #[derive(Deserialize, schemars::JsonSchema, Serialize)]
 struct TabIdParams {
@@ -276,6 +301,12 @@ struct TabMoveParams {
 struct OpenLocalTerminalParams {
     #[serde(default)]
     title: Option<String>,
+    /// Select which local shell to launch, for example
+    /// {"type":"cmd"}, {"type":"powershell7"}, {"type":"git-bash"},
+    /// {"type":"wsl","args":["-d","Ubuntu"]}, or
+    /// {"type":"custom","path":"C:\\tools\\nu.exe"}.
+    #[serde(default)]
+    local_shell: Option<LocalShellParams>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema, Serialize)]
@@ -671,6 +702,63 @@ fn resolve_session_query(
                 .join(", ")
         )),
     }
+}
+
+fn normalize_local_shell_type(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .replace(' ', "-")
+}
+
+fn validate_local_shell_params(p: &LocalShellParams) -> Result<(), String> {
+    let kind = p
+        .shell_type
+        .as_deref()
+        .map(normalize_local_shell_type)
+        .filter(|s| !s.is_empty());
+    let has_path = p
+        .path
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|s| !s.is_empty());
+
+    if kind.as_deref() == Some("custom") && !has_path {
+        return Err("local_shell.type=custom requires local_shell.path".into());
+    }
+
+    if let Some(kind) = kind.as_deref() {
+        if !matches!(
+            kind,
+            "default"
+                | "cmd"
+                | "cmd.exe"
+                | "command-prompt"
+                | "powershell"
+                | "powershell7"
+                | "pwsh"
+                | "ps7"
+                | "windows-powershell"
+                | "windows-powershell5"
+                | "powershell5"
+                | "git-bash"
+                | "gitbash"
+                | "wsl"
+                | "wsl.exe"
+                | "bash"
+                | "zsh"
+                | "sh"
+                | "custom"
+        ) {
+            return Err(format!(
+                "unsupported local_shell.type '{}'; supported values: default, cmd, powershell7, windows-powershell, git-bash, wsl, bash, zsh, sh, custom",
+                kind
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[tool_router]
@@ -1095,7 +1183,7 @@ impl ControlHandler {
 
     #[tool(
         name = "session_open",
-        description = "在 Taomni UI 中打开一个已保存 session（不受当前线程绑定终端限制）。支持 session_id 或唯一 query；用户说“打开/切换到某会话”时优先调用。"
+        description = "在 Taomni UI 中打开一个已保存 session（不受当前线程绑定终端限制）。支持 session_id 或唯一 query；打开 LocalShell session 时可传 local_shell.type 覆盖本地 shell：cmd、powershell7、windows-powershell、git-bash、wsl、bash、zsh、sh 或 custom。"
     )]
     async fn session_open(
         &self,
@@ -1103,7 +1191,7 @@ impl ControlHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        let id = {
+        let (id, session_type) = {
             let state = self.app_state();
             let db = state
                 .db
@@ -1111,8 +1199,24 @@ impl ControlHandler {
                 .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             let sessions = crate::session::db::list_sessions(&db, None)
                 .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-            resolve_session_query(&sessions, &p).map_err(|e| ErrorData::invalid_params(e, None))?
+            let id = resolve_session_query(&sessions, &p)
+                .map_err(|e| ErrorData::invalid_params(e, None))?;
+            let session_type = sessions
+                .iter()
+                .find(|session| session.id == id)
+                .map(|session| session.session_type.clone());
+            (id, session_type)
         };
+        if let Some(local_shell) = p.local_shell.as_ref() {
+            validate_local_shell_params(local_shell)
+                .map_err(|e| ErrorData::invalid_params(e, None))?;
+            if session_type.as_ref() != Some(&SessionType::LocalShell) {
+                return Err(ErrorData::invalid_params(
+                    "local_shell only applies to saved LocalShell sessions",
+                    None,
+                ));
+            }
+        }
         p.session_id = Some(id);
         let args = serde_json::to_value(&p).unwrap_or(Value::Null);
         self.require_write(&scope, "session_open", &args).await?;
@@ -1244,13 +1348,20 @@ impl ControlHandler {
         .await
     }
 
-    #[tool(name = "tab_open_local_terminal", description = "打开本地终端 tab。")]
+    #[tool(
+        name = "tab_open_local_terminal",
+        description = "打开本地终端 tab。可传 local_shell.type 选择 shell：Windows 常用 cmd、powershell7、windows-powershell、git-bash、wsl；Unix 常用 bash、zsh、sh；custom 需传 path。"
+    )]
     async fn tab_open_local_terminal(
         &self,
         Parameters(p): Parameters<OpenLocalTerminalParams>,
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
+        if let Some(local_shell) = p.local_shell.as_ref() {
+            validate_local_shell_params(local_shell)
+                .map_err(|e| ErrorData::invalid_params(e, None))?;
+        }
         let args = serde_json::to_value(&p).unwrap_or(Value::Null);
         self.require_write(&scope, "tab_open_local_terminal", &args)
             .await?;
@@ -1356,5 +1467,45 @@ mod tests {
         assert!(validate_quick_connect_secret_free("ssh root:secret@example.com").is_err());
         assert!(validate_quick_connect_secret_free("ssh://root@example.com").is_ok());
         assert!(validate_quick_connect_secret_free("ssh root@example.com:22").is_ok());
+    }
+
+    #[test]
+    fn local_shell_types_are_validated() {
+        assert!(
+            validate_local_shell_params(&LocalShellParams {
+                shell_type: Some("powershell7".into()),
+                ..Default::default()
+            })
+            .is_ok()
+        );
+        assert!(
+            validate_local_shell_params(&LocalShellParams {
+                shell_type: Some("git bash".into()),
+                ..Default::default()
+            })
+            .is_ok()
+        );
+        assert!(
+            validate_local_shell_params(&LocalShellParams {
+                shell_type: Some("custom".into()),
+                path: Some("C:\\tools\\nu.exe".into()),
+                ..Default::default()
+            })
+            .is_ok()
+        );
+        assert!(
+            validate_local_shell_params(&LocalShellParams {
+                shell_type: Some("custom".into()),
+                ..Default::default()
+            })
+            .is_err()
+        );
+        assert!(
+            validate_local_shell_params(&LocalShellParams {
+                shell_type: Some("unknown".into()),
+                ..Default::default()
+            })
+            .is_err()
+        );
     }
 }

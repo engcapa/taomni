@@ -119,6 +119,9 @@ describe("chatStore new thread provider selection", () => {
       drawerTabId: null,
       tabDrawerOpenByTabId: {},
       drawerWidth: 380,
+      drawerHeight: 420,
+      drawerPosition: "right",
+      drawerPinned: true,
       pendingComposerText: "",
     });
     invokeMock.mockImplementation((command: string, args: { providerId?: string | null; linkedSessionId?: string | null }) => {
@@ -153,16 +156,23 @@ describe("chatStore new thread provider selection", () => {
     });
   });
 
-  it("opens a Claude Code thread instead of reusing another provider as the default", async () => {
+  it("opens a Claude Code tab thread instead of reusing another provider as the default", async () => {
     useChatStore.setState({
-      threads: [makeThread({ id: "old-thread", title: "Old chat", provider_id: "deepseek" })],
+      threads: [
+        makeThread({
+          id: "old-thread",
+          title: "Old chat",
+          provider_id: "deepseek",
+          linked_session_id: "term-1",
+        }),
+      ],
     });
 
-    await useChatStore.getState().openGlobalChat();
+    await useChatStore.getState().openTabChat("term-1");
 
     expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", {
       providerId: "claude-code",
-      linkedSessionId: null,
+      linkedSessionId: "term-1",
     });
     expect(useChatStore.getState().activeThreadId).toBe("thread-1");
   });
@@ -198,6 +208,9 @@ describe("chatStore drawer lifecycle", () => {
       drawerTabId: "term-a",
       tabDrawerOpenByTabId: { "term-a": true },
       drawerWidth: 380,
+      drawerHeight: 420,
+      drawerPosition: "right",
+      drawerPinned: true,
       pendingComposerText: "",
     });
   });
@@ -244,35 +257,15 @@ describe("chatStore drawer lifecycle", () => {
     });
   });
 
-  it("stops the active thread when the user explicitly closes a tab drawer", async () => {
+  it("hides the active tab drawer without stopping the running thread", async () => {
     await useChatStore.getState().toggleTabChat("term-a");
 
-    expect(invokeMock).toHaveBeenCalledWith("chat_stop_stream", { threadId: "thread-a" });
+    expect(invokeMock).not.toHaveBeenCalledWith("chat_stop_stream", expect.anything());
     expect(useChatStore.getState()).toMatchObject({
       drawerOpen: false,
-      sending: false,
-      sendingByThreadId: {},
-      tabDrawerOpenByTabId: { "term-a": false },
-    });
-  });
-
-  it("stops the active thread when the user explicitly closes a global drawer", async () => {
-    useChatStore.setState({
-      activeThreadId: "global-thread",
-      drawerOpen: true,
-      drawerScope: "global",
-      drawerTabId: null,
-      sendingByThreadId: { "global-thread": true },
       sending: true,
-    });
-
-    await useChatStore.getState().toggleGlobalChat();
-
-    expect(invokeMock).toHaveBeenCalledWith("chat_stop_stream", { threadId: "global-thread" });
-    expect(useChatStore.getState()).toMatchObject({
-      drawerOpen: false,
-      sending: false,
-      sendingByThreadId: {},
+      sendingByThreadId: { "thread-a": true },
+      tabDrawerOpenByTabId: { "term-a": false },
     });
   });
 });

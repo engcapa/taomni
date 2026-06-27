@@ -93,7 +93,7 @@ import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
-import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { ChatDrawer, ChatDrawerRibbon } from "../components/chat/ChatDrawer";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
@@ -195,6 +195,84 @@ function localShellSelectionFromSession(session: SessionConfig): LocalShellSelec
     name: session.name || path,
     ...(args && args.length > 0 ? { args } : {}),
   };
+}
+
+function controlArgRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function controlString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function controlStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter((item): item is string => typeof item === "string");
+  return items.length > 0 ? items : undefined;
+}
+
+function normalizeControlShellType(value: string): string {
+  return value.trim().toLowerCase().replace(/[_\s]+/g, "-");
+}
+
+function controlLocalShellSelection(args: Record<string, unknown>): {
+  localShell?: LocalShellSelection;
+  error?: string;
+} {
+  const nested = controlArgRecord(args.local_shell) ?? controlArgRecord(args.localShell);
+  const shellType = controlString(nested?.type)
+    ?? controlString(nested?.shell)
+    ?? controlString(args.shell)
+    ?? controlString(args.shell_type);
+  const shellPath = controlString(nested?.path) ?? controlString(args.shell_path);
+  const shellArgs = controlStringArray(nested?.args) ?? controlStringArray(args.shell_args);
+  const shellName = controlString(nested?.name) ?? controlString(args.shell_name);
+
+  if (!shellType && !shellPath && !shellArgs && !shellName) return {};
+  const type = normalizeControlShellType(shellType ?? (shellPath ? "custom" : "default"));
+  const withArgs = (id: string, name: string): LocalShellSelection => ({
+    id,
+    name: shellName ?? name,
+    ...(shellArgs ? { args: shellArgs } : {}),
+  });
+
+  switch (type) {
+    case "default":
+      if (shellArgs) return { error: "local_shell.args requires local_shell.type or local_shell.path" };
+      return {};
+    case "cmd":
+    case "cmd.exe":
+    case "command-prompt":
+      return { localShell: withArgs("command-prompt", "Command Prompt") };
+    case "powershell":
+    case "powershell7":
+    case "pwsh":
+    case "ps7":
+      return { localShell: withArgs("powershell", "PowerShell") };
+    case "windows-powershell":
+    case "windows-powershell5":
+    case "powershell5":
+      return { localShell: withArgs("windows-powershell", "Windows PowerShell") };
+    case "git-bash":
+    case "gitbash":
+      return { localShell: withArgs("git-bash", "Git Bash") };
+    case "wsl":
+    case "wsl.exe":
+      return { localShell: withArgs("wsl.exe", "WSL") };
+    case "bash":
+    case "zsh":
+    case "sh":
+      return { localShell: withArgs(type, type) };
+    case "custom":
+      if (!shellPath) return { error: "local_shell.type=custom requires local_shell.path" };
+      return { localShell: withArgs(shellPath, shellPath) };
+    default:
+      return {
+        error: `unsupported local_shell.type: ${shellType ?? shellPath ?? ""}`,
+      };
+  }
 }
 
 function resolveSessionAuth(session: SessionConfig): { method: string; data: string | null } {
@@ -374,12 +452,14 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
-  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
+  const openTabChat = useChatStore((s) => s.openTabChat);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
   const chatDrawerScope = useChatStore((s) => s.drawerScope);
   const chatDrawerTabId = useChatStore((s) => s.drawerTabId);
+  const chatDrawerPosition = useChatStore((s) => s.drawerPosition);
+  const chatDrawerPinned = useChatStore((s) => s.drawerPinned);
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -936,7 +1016,11 @@ export function MainLayout() {
     setActiveTerminalTab(terminalTabId);
     setActiveQueryTab(activeTab?.type === "database" ? activeTabId : null);
     const chatBoundTabId =
-      activeTab?.type === "terminal" || activeTab?.type === "rdp" || activeTab?.type === "database"
+      activeTab?.type === "welcome" ||
+      activeTab?.type === "terminal" ||
+      activeTab?.type === "rdp" ||
+      activeTab?.type === "database" ||
+      activeTab?.type === "redis"
         ? activeTabId
         : null;
     void syncTabChatWithActiveTab(chatBoundTabId);
@@ -971,26 +1055,28 @@ export function MainLayout() {
       const primary = event.ctrlKey || event.metaKey;
       if (!primary || event.altKey || event.key.toLowerCase() !== "l") return;
 
-      // Ctrl/Cmd+L: global AI Chat Drawer (no-op when fully_disabled).
-      if (!event.shiftKey) {
-        event.preventDefault();
-        const aiOff = useAiStore.getState().config?.fully_disabled === true;
-        if (!aiOff) void toggleGlobalChat();
-        return;
-      }
-
-      // Ctrl/Cmd+Shift+L: current terminal tab's bound chat.
       if (event.shiftKey) {
         event.preventDefault();
         const aiOff = useAiStore.getState().config?.fully_disabled === true;
         const current = useAppStore.getState().tabs.find((tab) => tab.id === useAppStore.getState().activeTabId);
-        if (!aiOff && current?.type === "terminal") void toggleTabChat(current.id);
+        if (
+          !aiOff &&
+          (
+            current?.type === "welcome" ||
+            current?.type === "terminal" ||
+            current?.type === "rdp" ||
+            current?.type === "database" ||
+            current?.type === "redis"
+          )
+        ) {
+          void toggleTabChat(current.id);
+        }
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleGlobalChat, toggleTabChat]);
+  }, [toggleTabChat]);
 
   // Hydrate server configs + statuses once on mount so the servers dialog
   // opens with persisted settings and live run state.
@@ -1367,7 +1453,10 @@ export function MainLayout() {
     return "awaiting-vault";
   }, []);
 
-  const openQueuedSession = useCallback((session: SessionConfig): ConnectQueueOutcome => {
+  const openQueuedSession = useCallback((
+    session: SessionConfig,
+    localShellOverride?: LocalShellSelection,
+  ): ConnectQueueOutcome => {
     if (session.session_type === "SSH") {
       const { method, data } = resolveSessionAuth(session);
       if (method === "Password") {
@@ -1405,7 +1494,7 @@ export function MainLayout() {
         session.name || tr("tabs.localTerminal"),
         session.id,
         getSessionTerminalProfile(session.options_json),
-        localShellSelectionFromSession(session),
+        localShellOverride ?? localShellSelectionFromSession(session),
       );
     } else if (session.session_type === "VNC") {
       const { method, data } = resolveSessionAuth(session);
@@ -1674,7 +1763,16 @@ export function MainLayout() {
             output = "session_open could not resolve a unique session";
             break;
           }
-          const outcome = openQueuedSession(session);
+          const localShell = controlLocalShellSelection(args);
+          if (localShell.error) {
+            output = localShell.error;
+            break;
+          }
+          if (localShell.localShell && session.session_type !== "LocalShell") {
+            output = "local_shell only applies to saved LocalShell sessions";
+            break;
+          }
+          const outcome = openQueuedSession(session, localShell.localShell);
           if (outcome === "opened") {
             ok = true;
             output = `opened session ${session.id}`;
@@ -1797,7 +1895,17 @@ export function MainLayout() {
           break;
         }
         case "tab_open_local_terminal": {
-          openLocalTab(typeof args.title === "string" ? args.title : undefined);
+          const localShell = controlLocalShellSelection(args);
+          if (localShell.error) {
+            output = localShell.error;
+            break;
+          }
+          openLocalTab(
+            typeof args.title === "string" ? args.title : localShell.localShell?.name,
+            undefined,
+            undefined,
+            localShell.localShell,
+          );
           ok = true;
           output = "local terminal opened";
           break;
@@ -2253,6 +2361,11 @@ export function MainLayout() {
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
+  const chatDrawerInline =
+    chatDrawerOpen &&
+    !aiFullyDisabled &&
+    chatDrawerPinned &&
+    (chatDrawerPosition === "left" || chatDrawerPosition === "right");
 
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
@@ -2298,6 +2411,8 @@ export function MainLayout() {
             />
           </div>
         )}
+
+        {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
 
         <PanelGroup
           orientation="horizontal"
@@ -2365,6 +2480,7 @@ export function MainLayout() {
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}
+                    onOpenChatTao={!aiFullyDisabled ? () => void openTabChat("welcome") : undefined}
                   />
                 )}
 
@@ -2457,7 +2573,7 @@ export function MainLayout() {
                                 }
                               }
                             } : undefined}
-                            chatToggle={!terminalSplitVisible ? {
+                            chatToggle={!terminalSplitVisible && !aiFullyDisabled ? {
                               open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
                             } : undefined}
@@ -2891,7 +3007,9 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
-        {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
+        {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
+        {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
+        {!aiFullyDisabled && <ChatDrawerRibbon />}
       </div>
 
       <StatusBar />

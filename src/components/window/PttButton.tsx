@@ -81,7 +81,7 @@ export function PttButton() {
         // Stage the transcript into the chat composer for review.
         // Use a dynamic import so we don't add a hard chain to chatStore here.
         const { useChatStore } = await import("../../stores/chatStore");
-        useChatStore.getState().attachToComposer(text, "global");
+        useChatStore.getState().attachToComposer(text);
       }
       setState("idle");
     } catch (e) {

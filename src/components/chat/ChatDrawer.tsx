@@ -1,19 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Copy, Check, History, Plus, Globe, Link2, RefreshCw, TerminalSquare, X } from "lucide-react";
-import { useChatStore } from "../../stores/chatStore";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Bot,
+  Check,
+  ChevronDown,
+  Copy,
+  History,
+  Link2,
+  PanelBottomOpen,
+  PanelLeftOpen,
+  PanelRightOpen,
+  PanelTopOpen,
+  Pin,
+  PinOff,
+  Plus,
+  RefreshCw,
+  TerminalSquare,
+  X,
+} from "lucide-react";
+import { useChatStore, type ChatDrawerPosition } from "../../stores/chatStore";
 import { chatDrawerProviderIds, DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
 import { CcToolCards } from "./CcToolCards";
 import { Composer } from "./Composer";
 import { ChatThreadList } from "./ChatThreadList";
-import { NewThreadFormatPicker } from "./NewThreadFormatPicker";
 import {
   getTerminal,
 } from "../../lib/terminal/terminalRegistry";
 import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import { useT } from "../../lib/i18n";
+
+const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
+const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
 
 interface ChatDrawerProps {
   /**
@@ -27,14 +46,15 @@ interface ChatDrawerProps {
 export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const t = useT();
   const {
-    threads, activeThreadId, messages, sendingByThreadId, drawerOpen, drawerScope, drawerWidth,
+    threads, activeThreadId, messages, sendingByThreadId, drawerOpen, drawerWidth,
+    drawerHeight, drawerPosition, drawerPinned, drawerTabId,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
-    sendMessage, toggleDrawer, setDrawerWidth, purgeOldThreads, stopSending,
+    sendMessage, hideDrawer, setDrawerWidth, setDrawerHeight, setDrawerPosition,
+    setDrawerPinned, purgeOldThreads, stopSending,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
-  const [showNewThreadPicker, setShowNewThreadPicker] = useState(false);
-  const [pickerInitialScope, setPickerInitialScope] = useState<"terminal" | "global">("terminal");
+  const [showPositionMenu, setShowPositionMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
@@ -47,7 +67,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const [ccModelDraft, setCcModelDraft] = useState(DEFAULT_CLAUDE_CODE_MODEL);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
-  const resizeStartRef = useRef({ x: 0, width: 0 });
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   // Subscribe to the active tab so the drawer re-renders (and the
   // scope/picker logic re-evaluates) whenever the user switches tabs. We
@@ -57,6 +77,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeTabType = useAppStore((s) =>
     s.tabs.find((t) => t.id === s.activeTabId)?.type ?? null,
   );
+  const activeChatTabId = CHAT_CAPABLE_TAB_TYPES.has(activeTabType ?? "")
+    ? activeTabId
+    : null;
   // SQL echo toggle (Phase 6) — appended to the linked query tab when CC runs
   // SQL. Subscribed so the toggle reflects/persists across the app.
   const sqlEcho = useAppStore((s) => s.sqlEcho);
@@ -71,21 +94,29 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
   const sending = activeThreadId ? sendingByThreadId[activeThreadId] === true : false;
   const activeThread = threads.find((t) => t.id === activeThreadId);
+  const linkedTab = useAppStore((s) =>
+    activeThread?.linked_session_id
+      ? s.tabs.find((tab) => tab.id === activeThread.linked_session_id) ?? null
+      : null,
+  );
   const linkedTabTitle = activeThread?.linked_session_id
     ? (
         getTerminal(activeThread.linked_session_id)?.title
         ?? getQueryTab(activeThread.linked_session_id)?.title
+        ?? linkedTab?.title
         ?? activeThread.linked_session_id.slice(0, 8)
       )
     : null;
   // The SQL echo toggle only applies to threads bound to a SQL ("database")
   // tab. Resolved from the tab type so it stays reactive as tabs open/close.
-  const linkedTabType = useAppStore((s) =>
-    activeThread?.linked_session_id
-      ? s.tabs.find((t) => t.id === activeThread.linked_session_id)?.type ?? null
-      : null,
-  );
+  const linkedTabType = linkedTab?.type ?? null;
   const isQueryThread = linkedTabType === "database";
+  const visibleThreads = useMemo(
+    () => drawerTabId
+      ? threads.filter((thread) => thread.linked_session_id === drawerTabId)
+      : threads.filter((thread) => thread.linked_session_id),
+    [drawerTabId, threads],
+  );
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiConfig = useAiStore((s) => s.config);
@@ -140,31 +171,21 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     setCcModelDraft(activeThread.cc_model?.trim() || defaultLocalAgentModel);
   }, [activeThread?.id, activeThread?.provider_id, activeThread?.cc_model, isLocalAgentProvider, defaultLocalAgentModel]);
 
-  // Responsive behaviour (ai-native-plan §10.3):
-  //   ≥1280px → expanded (default 380px)
-  //   960–1280px → collapse to 50px floating handle
-  //   <960px → close + hint
-  const setDrawerOpen = useChatStore((s) => s.setDrawerOpen);
+  // Narrow windows keep the tab usable by hiding to the ribbon; medium widths
+  // float the drawer instead of consuming layout width.
   useEffect(() => {
     const handle = () => {
       const w = window.innerWidth;
-      if (w < 960) {
-        setDrawerOpen(false);
-      } else if (w < 1280) {
-        // Collapse: keep open but shrink to handle width.
-        setDrawerWidth(50);
-      } else if (drawerWidth < 280) {
-        // User just resized larger — restore a sensible default.
-        setDrawerWidth(380);
+      if (w < 760) {
+        hideDrawer();
+      } else if (w < 1120 && (drawerPosition === "left" || drawerPosition === "right") && drawerPinned) {
+        setDrawerPinned(false);
       }
     };
     window.addEventListener("resize", handle);
     handle();
     return () => window.removeEventListener("resize", handle);
-    // We intentionally exclude drawerWidth from deps so the resize callback
-    // only restores defaults on viewport changes, not on user drags.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setDrawerWidth, setDrawerOpen]);
+  }, [drawerPinned, drawerPosition, hideDrawer, setDrawerPinned]);
 
   // Load messages when active thread changes.
   useEffect(() => {
@@ -178,34 +199,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeMessages.length]);
 
-  const openNewThreadPicker = (scope: "terminal" | "global") => {
-    setShowHistory(false);
-    setPickerInitialScope(scope);
-    setShowNewThreadPicker(true);
-  };
-
   const handleNewThread = async () => {
-    // Default to "terminal" when there's an active terminal, otherwise global.
-    openNewThreadPicker(focusedTerminal ? "terminal" : "global");
-  };
-
-  const handleNewGlobalThread = async () => {
-    openNewThreadPicker("global");
-  };
-
-  const createThreadWithFormat = async (
-    format: ChatOutputFormat | null,
-    scope: "terminal" | "global",
-  ) => {
-    setShowNewThreadPicker(false);
-    const linked = scope === "terminal" ? focusedTerminal?.tabId ?? null : null;
-    const thread = await newThread(undefined, linked ?? undefined);
-    if (format) {
-      try {
-        await useChatStore.getState().setThreadOutputFormat(thread.id, format);
-      } catch (e) {
-        console.warn("set initial output_format failed:", e);
-      }
+    const linked = drawerTabId ?? activeChatTabId;
+    if (!linked) {
+      setError(t("chat.noTabBinding"));
+      return;
+    }
+    setShowHistory(false);
+    try {
+      await newThread(undefined, linked);
+      setError(null);
+    } catch (e) {
+      setError(String(e));
     }
   };
 
@@ -283,15 +288,19 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     // types `@terminal:last-N`. The override takes precedence; otherwise we
     // fall back to whatever the host (TerminalPanel) staged.
     const ctx = attachedTerminalCtx ?? terminalContext;
-    if (!activeThreadId) {
-      // No thread selected — open the format picker rather than silently
-      // creating one with the default format.
-      openNewThreadPicker(focusedTerminal ? "terminal" : "global");
-      return;
-    }
     setError(null);
     try {
-      await sendMessage(activeThreadId, content, ctx);
+      let threadId = activeThreadId;
+      if (!threadId) {
+        const linked = drawerTabId ?? activeChatTabId;
+        if (!linked) {
+          setError(t("chat.noTabBinding"));
+          return;
+        }
+        const thread = await newThread(undefined, linked);
+        threadId = thread.id;
+      }
+      await sendMessage(threadId, content, ctx);
     } catch (e) {
       setError(String(e));
     }
@@ -300,11 +309,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   // Drag-to-resize the drawer.
   const handleResizeStart = (e: React.MouseEvent) => {
     resizingRef.current = true;
-    resizeStartRef.current = { x: e.clientX, width: drawerWidth };
+    resizeStartRef.current = { x: e.clientX, y: e.clientY, width: drawerWidth, height: drawerHeight };
     const onMove = (ev: MouseEvent) => {
       if (!resizingRef.current) return;
-      const delta = resizeStartRef.current.x - ev.clientX;
-      setDrawerWidth(resizeStartRef.current.width + delta);
+      if (drawerPosition === "left") {
+        setDrawerWidth(resizeStartRef.current.width + ev.clientX - resizeStartRef.current.x);
+      } else if (drawerPosition === "right") {
+        setDrawerWidth(resizeStartRef.current.width + resizeStartRef.current.x - ev.clientX);
+      } else if (drawerPosition === "top") {
+        setDrawerHeight(resizeStartRef.current.height + ev.clientY - resizeStartRef.current.y);
+      } else {
+        setDrawerHeight(resizeStartRef.current.height + resizeStartRef.current.y - ev.clientY);
+      }
     };
     const onUp = () => {
       resizingRef.current = false;
@@ -317,20 +333,57 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   if (!drawerOpen) return null;
 
+  const isHorizontalDock = drawerPosition === "left" || drawerPosition === "right";
+  const sideBySide = isHorizontalDock && drawerPinned;
+  const floating = !sideBySide;
+  const positionLabel = t(`chat.drawerPosition_${drawerPosition}`);
+  const PositionIcon = positionIcon(drawerPosition);
+  const containerClass = [
+    "ai-z-drawer",
+    sideBySide ? "relative h-full shrink-0" : "absolute shadow-2xl",
+    drawerPosition === "left" ? "order-first" : "",
+    floating ? "rounded-md overflow-hidden" : "",
+  ].filter(Boolean).join(" ");
+  const containerStyle: CSSProperties = sideBySide
+    ? { width: drawerWidth }
+    : isHorizontalDock
+    ? {
+        width: drawerWidth,
+        top: 0,
+        bottom: 0,
+        [drawerPosition]: 0,
+      }
+    : {
+        height: drawerHeight,
+        left: 56,
+        right: 56,
+        [drawerPosition]: 0,
+      };
+  const resizeHandleClass = isHorizontalDock
+    ? `absolute ${drawerPosition === "left" ? "right-0" : "left-0"} top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--taomni-accent)] transition-colors z-10`
+    : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0" : "top-0"} h-1 cursor-row-resize hover:bg-[var(--taomni-accent)] transition-colors z-10`;
+  const panelBorderClass = sideBySide
+    ? drawerPosition === "left"
+      ? "border-r"
+      : "border-l"
+    : "border";
+
   return (
     <div
-      className="flex h-full shrink-0 relative ai-z-drawer"
-      style={{ width: drawerWidth }}
+      className={containerClass}
+      style={containerStyle}
       data-testid="ai-chat-drawer"
+      data-position={drawerPosition}
+      data-pinned={drawerPinned || undefined}
     >
       {/* Resize handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--taomni-accent)] transition-colors z-10"
+        className={resizeHandleClass}
         onMouseDown={handleResizeStart}
       />
 
       <div
-        className="flex flex-col w-full border-l border-[var(--taomni-divider)]"
+        className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)]`}
         style={{ background: "var(--taomni-sidebar-bg)" }}
       >
         {/* Header */}
@@ -342,6 +395,65 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           <span className="text-[13px] font-semibold flex-1 truncate">
             {activeThread?.title ?? t("chat.drawerTitle")}
           </span>
+          <div className="relative">
+            <button
+              type="button"
+              className="taomni-btn h-6 px-1.5 inline-flex items-center gap-1 text-[11px]"
+              onClick={() => setShowPositionMenu((v) => !v)}
+              title={t("chat.drawerPositionTitle", { position: positionLabel })}
+              aria-label={t("chat.drawerPositionAria")}
+              data-testid="ai-chat-drawer-position"
+            >
+              <PositionIcon className="w-3.5 h-3.5" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showPositionMenu && (
+              <div
+                className="absolute right-0 top-7 z-30 min-w-[118px] rounded border border-[var(--taomni-divider)] shadow-lg overflow-hidden"
+                style={{ background: "var(--taomni-panel-bg)" }}
+              >
+                {DRAWER_POSITIONS.map((position) => {
+                  const Icon = positionIcon(position);
+                  return (
+                    <button
+                      key={position}
+                      type="button"
+                      className={`w-full h-7 px-2 text-left text-[11px] flex items-center gap-2 hover:bg-[var(--taomni-hover)] ${
+                        drawerPosition === position ? "text-[var(--taomni-accent)] bg-[var(--taomni-selected)]" : ""
+                      }`}
+                      onClick={() => {
+                        setDrawerPosition(position);
+                        setShowPositionMenu(false);
+                      }}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{t(`chat.drawerPosition_${position}`)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${
+              sideBySide ? "text-[var(--taomni-accent)]" : ""
+            }`}
+            onClick={() => setDrawerPinned(!drawerPinned)}
+            disabled={!isHorizontalDock}
+            title={
+              !isHorizontalDock
+                ? t("chat.drawerPinUnavailable")
+                : drawerPinned
+                ? t("chat.drawerUnpinTitle")
+                : t("chat.drawerPinTitle")
+            }
+            aria-label={drawerPinned ? t("chat.drawerUnpinTitle") : t("chat.drawerPinTitle")}
+            aria-pressed={sideBySide}
+            data-testid="ai-chat-drawer-pin"
+          >
+            {sideBySide ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+          </button>
           <button
             type="button"
             className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
@@ -355,15 +467,6 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             ) : (
               <Copy className="w-3.5 h-3.5" />
             )}
-          </button>
-          <button
-            type="button"
-            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-            onClick={handleNewGlobalThread}
-            title={t("chat.newGlobalTitle")}
-            aria-label={t("chat.newGlobalAria")}
-          >
-            <Globe className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
@@ -385,8 +488,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           <button
             type="button"
             className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-            onClick={toggleDrawer}
-            title={drawerScope === "tab" ? t("chat.closeShortcutTab") : t("chat.closeShortcutGlobal")}
+            onClick={hideDrawer}
+            title={t("chat.drawerHideTitle")}
+            aria-label={t("chat.drawerHideTitle")}
+            data-testid="ai-chat-drawer-hide"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -396,7 +501,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         {showHistory && (
           <div className="h-48 shrink-0 border-b border-[var(--taomni-divider)] overflow-hidden">
             <ChatThreadList
-              threads={threads}
+              threads={visibleThreads}
               activeThreadId={activeThreadId}
               onSelect={(id) => { setActiveThread(id); setShowHistory(false); }}
               onNew={handleNewThread}
@@ -408,9 +513,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         {/* Provider badge / switcher */}
         {activeThread && (
           <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
-            {/* Scope badge: shows whether this thread is bound to a specific
-                terminal or is a global conversation. */}
-            {activeThread.linked_session_id ? (
+            {/* Scope badge: every visible thread is bound to a concrete app tab. */}
+            {activeThread.linked_session_id && (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
                 title={t("chat.boundToTab", { id: activeThread.linked_session_id })}
@@ -419,14 +523,6 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                 <span className="truncate max-w-[100px]">
                   {linkedTabTitle}
                 </span>
-              </span>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-divider)]/30 border border-[var(--taomni-divider)]"
-                title={t("chat.globalScopeTooltip")}
-              >
-                <Globe className="w-2.5 h-2.5" />
-                <span>{t("chat.globalBadge")}</span>
               </span>
             )}
             <span>{t("chat.providerLabel")}</span>
@@ -608,20 +704,68 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           resolveTerminalContext={resolveTerminalText}
         />
       </div>
-
-      {showNewThreadPicker && (
-        <NewThreadFormatPicker
-          defaultFormat={
-            (globalOutputFormat === "html" || globalOutputFormat === "plain")
-              ? globalOutputFormat
-              : "md"
-          }
-          defaultScope={pickerInitialScope}
-          activeTerminalTitle={focusedTerminal?.title ?? null}
-          onCancel={() => setShowNewThreadPicker(false)}
-          onConfirm={createThreadWithFormat}
-        />
-      )}
     </div>
   );
+}
+
+export function ChatDrawerRibbon() {
+  const t = useT();
+  const drawerOpen = useChatStore((s) => s.drawerOpen);
+  const drawerPosition = useChatStore((s) => s.drawerPosition);
+  const openTabChat = useChatStore((s) => s.openTabChat);
+  const activeTab = useAppStore((s) =>
+    s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
+  );
+
+  if (drawerOpen || !activeTab || !CHAT_CAPABLE_TAB_TYPES.has(activeTab.type)) return null;
+
+  const Icon = positionIcon(drawerPosition);
+  const placementClass = ribbonPlacementClass(drawerPosition);
+
+  return (
+    <button
+      type="button"
+      data-testid="ai-chat-drawer-ribbon"
+      data-position={drawerPosition}
+      className={`group absolute ${placementClass} z-40 flex items-center justify-center overflow-hidden border border-[var(--taomni-ribbon-border)] text-[10px] font-semibold text-[var(--taomni-text)] shadow-sm transition-all duration-150`}
+      style={{
+        background: "linear-gradient(to bottom, var(--taomni-ribbon-from), var(--taomni-ribbon-to))",
+      }}
+      title={t("chat.ribbonOpenTitle", { title: activeTab.title })}
+      aria-label={t("chat.ribbonOpenTitle", { title: activeTab.title })}
+      onClick={() => void openTabChat(activeTab.id)}
+    >
+      <span className="absolute h-1.5 w-1.5 rounded-full bg-[var(--taomni-accent)] shadow-[0_0_0_3px_rgba(30,95,168,0.16)] group-hover:opacity-0" />
+      <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Icon className="w-3 h-3" />
+        <span>Tao</span>
+      </span>
+    </button>
+  );
+}
+
+function positionIcon(position: ChatDrawerPosition) {
+  switch (position) {
+    case "left":
+      return PanelLeftOpen;
+    case "right":
+      return PanelRightOpen;
+    case "top":
+      return PanelTopOpen;
+    case "bottom":
+      return PanelBottomOpen;
+  }
+}
+
+function ribbonPlacementClass(position: ChatDrawerPosition): string {
+  switch (position) {
+    case "left":
+      return "left-0 top-1/2 -translate-y-1/2 h-12 w-3.5 rounded-r-full border-l-0 hover:w-14";
+    case "right":
+      return "right-0 top-1/2 -translate-y-1/2 h-12 w-3.5 rounded-l-full border-r-0 hover:w-14";
+    case "top":
+      return "top-0 left-1/2 -translate-x-1/2 h-3.5 w-14 rounded-b-full border-t-0 hover:h-8";
+    case "bottom":
+      return "bottom-0 left-1/2 -translate-x-1/2 h-3.5 w-14 rounded-t-full border-b-0 hover:h-8";
+  }
 }

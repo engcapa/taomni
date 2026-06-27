@@ -80,10 +80,6 @@ controls:
   - id: multiexec-toggle       # toggles MultiExec (lives in title bar tray)
     selector: '[data-testid="tab-multiexec-toggle"]'
     kind: interactive
-  - id: ai-chat-drawer-toggle  # toggles global AI Chat Drawer (hidden when AI fully disabled)
-    selector: '[data-testid="ai-chat-drawer-toggle"]'
-    kind: interactive
-    optional: true             # absent in fully_disabled mode
   # language-switcher control is owned by F-I18n-1; the tray simply hosts the
   # button. Putting it both places would create a duplicate-selector lint
   # error, so this feature only documents that the title bar is its mount
@@ -103,7 +99,7 @@ controls:
 -->
 
 - 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
-- 标题栏托盘 `TitleBarTrayControls`：分组排列 — Voice (PTT) | View (主题循环 + 紧凑模式) | Terminal (Split + MultiExec) | AI (Chat Drawer) | Language (locale 切换)
+- 标题栏托盘 `TitleBarTrayControls`：分组排列 — Voice (PTT) | View (主题循环 + 紧凑模式) | Terminal (Split + MultiExec) | Language (locale 切换)
 - `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
 
@@ -434,7 +430,7 @@ controls:
 - xterm.js + FitAddon + WebglAddon（失败回退 canvas）+ SearchAddon + WebLinksAddon
 - ResizeObserver + debounce 自动 fit
 - 容器卸载时正确 dispose 终端实例与监听器
-- 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；标题栏 AI 入口与 Ctrl+L 仅打开全局 Chat
+- 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；全局 Chat 入口已移除
 - 命令历史持久化：每条 host 维度记录到 SQLite (`command_history` 表)，支持 `history_append / history_match_prefix / history_list_recent / history_clear`
 - Inline ghost-text 自动补全：基于 host 命令历史的前缀匹配，按右箭头 / End / Tab 接受建议（PowerShell 本地终端关闭以避免与 PSReadLine 冲突）
 - Common commands 调色板（`CommonCommandsPalette`）：合并历史 + 用户自定义 + 平台预置命令（Windows / Unix），在本地终端中可调出
@@ -2296,7 +2292,7 @@ controls:
 
 - `AiMasterSwitch`：一键关闭所有 AI 入口（Drawer 按钮、PTT、命令重写等），内存占用与网络调用全部归零
 - `PrivacyToggle`：保持 AI 启用，但强制把请求路由到 loopback / 本地 provider
-- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后标题栏 `ai-chat-drawer-toggle` 与 `ptt-button` 立即从 DOM 中移除
+- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后标题栏 `ptt-button` 与 Chat Tao ribbon / drawer 入口立即从 DOM 中移除
 
 ### 14.2 终端补全与命令重写 ✅
 
@@ -2347,7 +2343,7 @@ controls:
 
 - 标题栏托盘内的麦克风按钮：按下开始录音、释放停止 + 转写
 - 探测 `voice_capture_supported` 失败时按钮置灰并显示 `MicOff` 图标（`data-state="unsupported"`）
-- 转写结果通过 `chatStore.attachToComposer(text, "global")` 暂存到 Chat 输入框，便于检视后再发送
+- 转写结果通过 `chatStore.attachToComposer(text)` 暂存到当前可聊天 tab 的 Chat 输入框，便于检视后再发送
 - AI 全局禁用 (`fully_disabled`) 时整个按钮被卸载
 
 ### 14.4 AI Chat Drawer ✅
@@ -2356,14 +2352,13 @@ controls:
 id: F-AI-2.4
 status: done
 area: ai/chat
-components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, NewThreadFormatPicker, SearchProgressChip, CodeBlockToolbar]
+components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, SearchProgressChip, CodeBlockToolbar]
 files:
   - src/components/chat/ChatDrawer.tsx
   - src/components/chat/ChatThreadList.tsx
   - src/components/chat/Composer.tsx
   - src/components/chat/AttachmentChip.tsx
   - src/components/chat/MessageBubble.tsx
-  - src/components/chat/NewThreadFormatPicker.tsx
   - src/components/chat/SearchProgressChip.tsx
   - src/components/chat/CodeBlockToolbar.tsx
   - src/lib/chat/composerRefs.ts
@@ -2382,10 +2377,6 @@ controls:
     selector: 'button[title="New chat"]'
     kind: interactive
     optional: true
-  - id: ai-chat-new-global
-    selector: 'button[title="New global chat (no terminal binding)"]'
-    kind: interactive
-    optional: true
   - id: ai-chat-history
     selector: 'button[title="History"]'
     kind: interactive
@@ -2395,7 +2386,19 @@ controls:
     kind: interactive
     optional: true
   - id: ai-chat-close
-    selector: '[data-testid="ai-chat-drawer"] button[title^="Close"]'
+    selector: '[data-testid="ai-chat-drawer-hide"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-drawer-ribbon
+    selector: '[data-testid="ai-chat-drawer-ribbon"]'
+    kind: interactive
+    optional: true       # shown when a chat-capable active tab has drawer hidden
+  - id: ai-chat-drawer-position
+    selector: '[data-testid="ai-chat-drawer-position"]'
+    kind: interactive
+    optional: true
+  - id: ai-chat-drawer-pin
+    selector: '[data-testid="ai-chat-drawer-pin"]'
     kind: interactive
     optional: true
   - id: ai-chat-provider-select
@@ -2416,14 +2419,14 @@ controls:
     optional: true       # only when composer text contains a parseable @ref
 -->
 
-- 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope` 控制状态机
-- **打开方式**：标题栏 `ai-chat-drawer-toggle` / 全局快捷键 `Ctrl+L` 打开 global drawer；终端浮动工具条上的 `tab-chat-toggle` / `Ctrl+Shift+L` 打开 tab-bound drawer（绑定当前终端，自动注入终端上下文）
-- **抽屉头部**：复制全部对话 / 新建全局对话 / 新对话 / 历史对话 / 关闭 五个按钮（标题文案随当前 locale 切换 — 默认英文 `New chat / History / Close`，中文为 `新对话 / 历史对话 / 关闭`）
-- **Thread badge 区**：显示 thread 是绑定到具体终端 (`Link2` 图标 + 终端标题) 还是 Global；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
+- 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope/tabId` + `drawerPosition` 控制状态机；线程始终绑定到 tab
+- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或隐藏态 `ai-chat-drawer-ribbon` 打开 tab-bound drawer
+- **抽屉头部**：位置切换 / 固定切换 / 复制全部对话 / 新对话 / 历史对话 / 隐藏到 ribbon
+- **Thread badge 区**：显示 thread 绑定的 tab (`Link2` 图标 + tab 标题)；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
 - **Composer**：`Ctrl+Enter` 发送、`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`（文件/会话目前仅展示，不发送内容）
 - **Format cycling**：右上角按钮按 `md → html → plain` 循环显示格式
 - 历史对话面板可删除 thread；删除当前 thread 时自动落到下一个或新建
-- 抽屉宽度可拖拽调整且持久化
+- 左/右固定时抽屉与原 tab 并列并占用宽度；左/右悬浮以及上/下位置覆盖在 tab 上方；宽度/高度、位置和固定状态持久化
 
 ### 14.5 Web Search Provider 矩阵 ✅
 

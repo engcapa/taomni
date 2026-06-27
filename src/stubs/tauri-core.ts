@@ -46,6 +46,8 @@ import { promptAppDialog } from "../lib/appDialogs";
 const SESSION_STORAGE_KEY = "taomni.sessions.v1";
 const GROUP_STORAGE_KEY = "taomni.groups.v1";
 const TUNNEL_STORAGE_KEY = "taomni.tunnels.v1";
+const CHAT_THREADS_STORAGE_KEY = "taomni.stub.chatThreads.v1";
+const CHAT_MESSAGES_STORAGE_KEY = "taomni.stub.chatMessages.v1";
 
 interface StubTunnelStatus {
   id: string;
@@ -75,6 +77,53 @@ interface StubTunnelConfig {
   description?: string;
   autostart?: boolean;
   sortOrder?: number;
+}
+
+interface StubChatThread {
+  id: string;
+  title: string;
+  provider_id: string;
+  created_at: number;
+  updated_at: number;
+  linked_session_id: string | null;
+  source: string;
+  output_format?: string | null;
+  cc_model?: string | null;
+}
+
+interface StubChatMessage {
+  id: string;
+  thread_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  created_at: number;
+  redacted: boolean;
+}
+
+function loadChatThreads(): StubChatThread[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CHAT_THREADS_STORAGE_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveChatThreads(threads: StubChatThread[]): void {
+  localStorage.setItem(CHAT_THREADS_STORAGE_KEY, JSON.stringify(threads));
+}
+
+function loadChatMessages(): Record<string, StubChatMessage[]> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveChatMessages(messages: Record<string, StubChatMessage[]>): void {
+  localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages));
 }
 
 function loadTunnels(): StubTunnelConfig[] {
@@ -921,6 +970,100 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       for (const t of byId.values()) next.push(t);
       saveTunnels(next);
       return undefined as T;
+    }
+    // ---------- AI chat drawer commands (browser preview stubs) ----------
+    case "chat_list_threads": {
+      const limit = Number((args as InvokeArgs | undefined)?.limit ?? 50);
+      return loadChatThreads()
+        .sort((a, b) => b.updated_at - a.updated_at)
+        .slice(0, Number.isFinite(limit) ? limit : 50) as T;
+    }
+    case "chat_new_thread": {
+      const now = Math.floor(Date.now() / 1000);
+      const thread: StubChatThread = {
+        id: `stub-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title: "New chat",
+        provider_id: ((args as InvokeArgs | undefined)?.providerId as string | null | undefined) ?? "deepseek",
+        created_at: now,
+        updated_at: now,
+        linked_session_id: ((args as InvokeArgs | undefined)?.linkedSessionId as string | null | undefined) ?? null,
+        source: "drawer",
+        output_format: null,
+        cc_model: null,
+      };
+      saveChatThreads([thread, ...loadChatThreads()]);
+      return thread as T;
+    }
+    case "chat_list_messages": {
+      const threadId = (args as InvokeArgs | undefined)?.threadId as string | undefined;
+      const messages = loadChatMessages();
+      return (threadId ? messages[threadId] ?? [] : []) as T;
+    }
+    case "chat_set_thread_provider": {
+      const threadId = (args as InvokeArgs | undefined)?.threadId as string | undefined;
+      const providerId = (args as InvokeArgs | undefined)?.providerId as string | undefined;
+      saveChatThreads(loadChatThreads().map((thread) =>
+        thread.id === threadId && providerId ? { ...thread, provider_id: providerId } : thread,
+      ));
+      return undefined as T;
+    }
+    case "chat_set_thread_cc_model": {
+      const threadId = (args as InvokeArgs | undefined)?.threadId as string | undefined;
+      const model = ((args as InvokeArgs | undefined)?.model as string | null | undefined) ?? null;
+      saveChatThreads(loadChatThreads().map((thread) =>
+        thread.id === threadId ? { ...thread, cc_model: model } : thread,
+      ));
+      return undefined as T;
+    }
+    case "chat_set_thread_output_format": {
+      const threadId = (args as InvokeArgs | undefined)?.threadId as string | undefined;
+      const outputFormat = ((args as InvokeArgs | undefined)?.outputFormat as string | null | undefined) ?? null;
+      saveChatThreads(loadChatThreads().map((thread) =>
+        thread.id === threadId ? { ...thread, output_format: outputFormat } : thread,
+      ));
+      return undefined as T;
+    }
+    case "chat_delete_thread": {
+      const threadId = (args as InvokeArgs | undefined)?.threadId as string | undefined;
+      saveChatThreads(loadChatThreads().filter((thread) => thread.id !== threadId));
+      const messages = loadChatMessages();
+      if (threadId) delete messages[threadId];
+      saveChatMessages(messages);
+      return undefined as T;
+    }
+    case "chat_purge_old": {
+      return 0 as T;
+    }
+    case "chat_stop_stream": {
+      return undefined as T;
+    }
+    case "chat_send": {
+      const req = (args as InvokeArgs | undefined)?.req as { thread_id?: string; content?: string } | undefined;
+      const threadId = req?.thread_id ?? "";
+      const now = Math.floor(Date.now() / 1000);
+      const userMessage: StubChatMessage = {
+        id: `stub-user-${Date.now()}`,
+        thread_id: threadId,
+        role: "user",
+        content: req?.content ?? "",
+        created_at: now,
+        redacted: false,
+      };
+      const assistantMessage: StubChatMessage = {
+        id: `stub-assistant-${Date.now()}`,
+        thread_id: threadId,
+        role: "assistant",
+        content: "Browser preview stub: connect a desktop AI provider to get a real response.",
+        created_at: now,
+        redacted: false,
+      };
+      const messages = loadChatMessages();
+      messages[threadId] = [...(messages[threadId] ?? []), userMessage, assistantMessage];
+      saveChatMessages(messages);
+      saveChatThreads(loadChatThreads().map((thread) =>
+        thread.id === threadId ? { ...thread, updated_at: now } : thread,
+      ));
+      return { user_message: userMessage, assistant_message: assistantMessage } as T;
     }
     // ---------- Database client commands (desktop-only) ----------
     case "db_connect":

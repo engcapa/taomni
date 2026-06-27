@@ -74,8 +74,81 @@ type StreamEvent =
       duration_ms?: number | null;
     };
 
-type DrawerScope = "global" | "tab" | null;
-type ComposerAttachScope = "global" | "tab";
+type DrawerScope = "tab" | null;
+export type ChatDrawerPosition = "left" | "right" | "top" | "bottom";
+
+const CHAT_DRAWER_LAYOUT_STORAGE_KEY = "taomni.chatDrawer.layout.v1";
+
+interface ChatDrawerLayoutPrefs {
+  position: ChatDrawerPosition;
+  pinned: boolean;
+  width: number;
+  height: number;
+}
+
+function isChatCapableTabType(type: string | null | undefined): boolean {
+  return type === "welcome" || type === "terminal" || type === "rdp" || type === "database" || type === "redis";
+}
+
+function clampDrawerWidth(width: number): number {
+  return Math.max(280, Math.min(720, Math.round(width)));
+}
+
+function clampDrawerHeight(height: number): number {
+  return Math.max(260, Math.min(620, Math.round(height)));
+}
+
+function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
+  const fallback: ChatDrawerLayoutPrefs = {
+    position: "right",
+    pinned: true,
+    width: 380,
+    height: 420,
+  };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(CHAT_DRAWER_LAYOUT_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<ChatDrawerLayoutPrefs>;
+    const position: ChatDrawerPosition =
+      parsed.position === "left" || parsed.position === "right" || parsed.position === "top" || parsed.position === "bottom"
+        ? parsed.position
+        : fallback.position;
+    return {
+      position,
+      pinned: position === "left" || position === "right" ? parsed.pinned !== false : false,
+      width: clampDrawerWidth(Number(parsed.width) || fallback.width),
+      height: clampDrawerHeight(Number(parsed.height) || fallback.height),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function writeDrawerLayoutPrefs(prefs: Partial<ChatDrawerLayoutPrefs>) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = readDrawerLayoutPrefs();
+    window.localStorage.setItem(
+      CHAT_DRAWER_LAYOUT_STORAGE_KEY,
+      JSON.stringify({ ...current, ...prefs }),
+    );
+  } catch {
+    // Best-effort UI preference persistence.
+  }
+}
+
+async function resolveActiveChatTabId(): Promise<string | null> {
+  try {
+    const { useAppStore } = await import("./appStore");
+    const state = useAppStore.getState();
+    const active = state.tabs.find((tab) => tab.id === state.activeTabId);
+    if (active && isChatCapableTabType(active.type)) return active.id;
+    return state.tabs.find((tab) => tab.type === "welcome")?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 interface ChatStore {
   threads: ChatThread[];
@@ -97,7 +170,7 @@ interface ChatStore {
   /// `sendingByThreadId[threadId]` when a specific drawer/thread is rendered.
   sending: boolean;
   drawerOpen: boolean;
-  /// "global" for title/status/shortcut entry points, "tab" for terminal-bound chat.
+  /// "tab" when the drawer is bound to a concrete app tab.
   drawerScope: DrawerScope;
   /// The terminal tab currently driving a tab-bound drawer, if any.
   drawerTabId: string | null;
@@ -105,6 +178,9 @@ interface ChatStore {
   /// bound chat drawer should be visible when that tab is active.
   tabDrawerOpenByTabId: Record<string, boolean>;
   drawerWidth: number;
+  drawerHeight: number;
+  drawerPosition: ChatDrawerPosition;
+  drawerPinned: boolean;
   /// Text the Composer should pick up next render (e.g. `@selection ...`).
   /// Cleared by the Composer once consumed.
   pendingComposerText: string;
@@ -123,7 +199,7 @@ interface ChatStore {
   stopSending: (threadId: string) => Promise<void>;
   /// Open the drawer (creating a thread if needed) and stage `text` in the
   /// composer. Used by the Selection toolbar's "Send to AI" action.
-  attachToComposer: (text: string, scope?: ComposerAttachScope) => Promise<void>;
+  attachToComposer: (text: string) => Promise<void>;
   consumePendingComposerText: () => string;
   /// Open the drawer, create a fresh thread, and auto-send "请解释这段输出".
   /// Used by the Selection toolbar's "Explain" action.
@@ -133,26 +209,17 @@ interface ChatStore {
   /// Export every thread + message to `outPath` as JSON.
   exportArchive: (outPath: string) => Promise<number>;
   toggleDrawer: () => void;
-  /// Visibility-only primitive. Do not stop in-flight AI work here; callers that
-  /// mean "user explicitly closed the drawer" should use the toggle/close paths.
+  /// Visibility-only primitive. Hiding the drawer never stops in-flight AI work;
+  /// the streaming footer owns the explicit Stop action.
   setDrawerOpen: (open: boolean) => void;
-  openGlobalChat: () => Promise<void>;
-  toggleGlobalChat: () => Promise<void>;
+  hideDrawer: () => void;
   openTabChat: (tabId: string) => Promise<void>;
   toggleTabChat: (tabId: string) => Promise<void>;
   syncTabChatWithActiveTab: (tabId: string | null) => Promise<void>;
   setDrawerWidth: (w: number) => void;
-}
-
-function latestGlobalThread(
-  threads: ChatThread[],
-  preferredProviderId?: string | null,
-): ChatThread | undefined {
-  const candidates = threads.filter((thread) => !thread.linked_session_id);
-  if (preferredProviderId) {
-    return candidates.find((thread) => thread.provider_id === preferredProviderId);
-  }
-  return candidates[0];
+  setDrawerHeight: (h: number) => void;
+  setDrawerPosition: (position: ChatDrawerPosition) => void;
+  setDrawerPinned: (pinned: boolean) => void;
 }
 
 function latestTabThread(
@@ -174,7 +241,7 @@ function scopeForThread(thread: ChatThread | undefined | null): {
   if (!thread) return { drawerScope: null, drawerTabId: null };
   return thread.linked_session_id
     ? { drawerScope: "tab", drawerTabId: thread.linked_session_id }
-    : { drawerScope: "global", drawerTabId: null };
+    : { drawerScope: null, drawerTabId: null };
 }
 
 function nextSendingAggregate(sendingByThreadId: Record<string, boolean>): boolean {
@@ -212,6 +279,8 @@ async function resolveDefaultProviderId(): Promise<string | null> {
   }
 }
 
+const initialDrawerLayoutPrefs = readDrawerLayoutPrefs();
+
 export const useChatStore = create<ChatStore>((set, get) => ({
   threads: [],
   threadsLoaded: false,
@@ -226,7 +295,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerScope: null,
   drawerTabId: null,
   tabDrawerOpenByTabId: {},
-  drawerWidth: 380,
+  drawerWidth: initialDrawerLayoutPrefs.width,
+  drawerHeight: initialDrawerLayoutPrefs.height,
+  drawerPosition: initialDrawerLayoutPrefs.position,
+  drawerPinned: initialDrawerLayoutPrefs.pinned,
   pendingComposerText: "",
 
   loadThreads: async () => {
@@ -322,12 +394,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // the backend can build Claude Code's session-identity card.
     // `thread.linked_session_id` is a terminal *tab* id; the saved-session id
     // lives on the Tab as `sessionId` (set when the tab was opened from a saved
-    // session). Null for global / local / unsaved-tab threads — the backend
+    // session). Null for unbound / local / unsaved-tab threads — the backend
     // then emits a degraded "local workspace" card.
     let boundSessionId: string | null = null;
     // Phase 3.3 — the bound terminal's live cwd (OSC-7), injected per-turn so
     // CC knows the working directory without re-querying. Volatile, so resolved
-    // fresh each send. Null for global/local/unsaved-tab threads or shells that
+    // fresh each send. Null for unbound/local/unsaved-tab threads or shells that
     // can't report a cwd.
     let cwd: string | null = null;
     // Phase 6 — the live DB connection id for a thread bound to a DB/Redis tab,
@@ -555,14 +627,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   toggleDrawer: () => {
     const s = get();
-    const closing = s.drawerOpen;
     const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
-    if (closing && s.activeThreadId) {
-      void get().stopSending(s.activeThreadId);
-    }
     set({
       drawerOpen: !s.drawerOpen,
-      ...(closing && tabId
+      ...(s.drawerOpen && tabId
         ? { tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false } }
         : {}),
     });
@@ -570,35 +638,38 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setDrawerOpen: (open) => {
     set({ drawerOpen: open });
   },
-  setDrawerWidth: (w) => set({ drawerWidth: Math.max(50, Math.min(720, w)) }),
-
-  openGlobalChat: async () => {
-    if (!get().threadsLoaded) {
-      await get().loadThreads();
-    }
-    const defaultProviderId = await resolveDefaultProviderId();
-    let thread = latestGlobalThread(get().threads, defaultProviderId);
-    if (!thread) {
-      thread = await get().newThread(defaultProviderId ?? undefined, undefined);
-    }
+  hideDrawer: () => {
+    const s = get();
+    const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
     set({
-      activeThreadId: thread.id,
-      drawerOpen: true,
-      drawerScope: "global",
-      drawerTabId: null,
+      drawerOpen: false,
+      ...(tabId
+        ? { tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false } }
+        : {}),
     });
   },
-
-  toggleGlobalChat: async () => {
+  setDrawerWidth: (w) => {
+    const width = clampDrawerWidth(w);
+    writeDrawerLayoutPrefs({ width });
+    set({ drawerWidth: width });
+  },
+  setDrawerHeight: (h) => {
+    const height = clampDrawerHeight(h);
+    writeDrawerLayoutPrefs({ height });
+    set({ drawerHeight: height });
+  },
+  setDrawerPosition: (position) => {
+    const pinned = position === "left" || position === "right";
+    writeDrawerLayoutPrefs({ position, pinned });
+    set({ drawerPosition: position, drawerPinned: pinned });
+  },
+  setDrawerPinned: (pinned) => {
     const s = get();
-    if (s.drawerOpen && s.drawerScope === "global") {
-      if (s.activeThreadId) {
-        void get().stopSending(s.activeThreadId);
-      }
-      set({ drawerOpen: false });
-      return;
-    }
-    await get().openGlobalChat();
+    const nextPinned = s.drawerPosition === "left" || s.drawerPosition === "right"
+      ? pinned
+      : false;
+    writeDrawerLayoutPrefs({ pinned: nextPinned });
+    set({ drawerPinned: nextPinned });
   },
 
   openTabChat: async (tabId: string) => {
@@ -624,9 +695,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!tabId) return;
     const s = get();
     if (s.drawerOpen && s.drawerScope === "tab" && s.drawerTabId === tabId) {
-      if (s.activeThreadId) {
-        void get().stopSending(s.activeThreadId);
-      }
       set({
         drawerOpen: false,
         tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false },
@@ -638,10 +706,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   syncTabChatWithActiveTab: async (tabId: string | null) => {
     const s = get();
-    if (s.drawerScope === "global" && s.drawerOpen) return;
 
     if (!tabId) {
-      if (s.drawerScope === "tab" && s.drawerOpen) {
+      if (s.drawerOpen) {
         set({ drawerOpen: false, drawerTabId: null });
       }
       return;
@@ -657,20 +724,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  attachToComposer: async (text: string, scope: ComposerAttachScope = "tab") => {
-    if (scope === "global") {
-      await get().openGlobalChat();
-    } else {
-      // Selection-toolbar and `??` sends come from a terminal surface, so
-      // prefer the active terminal's bound chat over whichever global thread
-      // was last open.
-      const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
-      const tabId = getActiveTerminalTabId();
-      if (tabId) {
-        await get().openTabChat(tabId);
-      } else if (!get().activeThreadId) {
-        await get().openGlobalChat();
-      }
+  attachToComposer: async (text: string) => {
+    const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
+    const tabId = getActiveTerminalTabId() ?? (await resolveActiveChatTabId());
+    if (tabId) {
+      await get().openTabChat(tabId);
     }
     set({
       drawerOpen: true,
@@ -688,7 +746,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // Bind the new thread to the current terminal so the user can keep
     // chatting about the same pty without re-staging context.
     const { getActiveTerminalTabId } = await import("../lib/terminal/terminalRegistry");
-    const tabId = getActiveTerminalTabId();
+    const tabId = getActiveTerminalTabId() ?? (await resolveActiveChatTabId());
     const thread = await get().newThread(undefined, tabId ?? undefined);
     set((s) => ({
       drawerOpen: true,
