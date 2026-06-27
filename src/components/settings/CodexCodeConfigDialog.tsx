@@ -16,11 +16,11 @@ import {
 import { CodexProxyFields } from "./CodexProxyFields";
 
 const CONFIG_TEMPLATE = `model = "gpt-5.4"
-model_provider = "openai_api_key"
+model_provider = "my-provider"
 model_reasoning_effort = "medium"
 model_verbosity = "medium"
 
-[model_providers.openai_api_key]
+[model_providers.my-provider]
 name = "OpenAI API key"
 base_url = "https://api.openai.com/v1"
 wire_api = "responses"

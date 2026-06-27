@@ -7,7 +7,7 @@ import {
 } from "../lib/ipc";
 
 export const DEFAULT_CLAUDE_CODE_MODEL = "claude-sonnet-4-5";
-export const DEFAULT_CODEX_MODEL = "auto";
+export const DEFAULT_CODEX_MODEL = "gpt-5.4";
 
 export interface AsrProviderConfig {
   engine: string;

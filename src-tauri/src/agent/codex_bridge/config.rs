@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
-pub const DEFAULT_CODEX_MODEL: &str = "auto";
+pub const DEFAULT_CODEX_MODEL: &str = "gpt-5.4";
 
 #[derive(Debug, Clone, Default)]
 pub struct CodexProfileRuntime {
@@ -36,7 +36,7 @@ pub struct CodexBridgeConfig {
     /// "auto" = locate via PATH; or absolute path to binary.
     pub binary: String,
     pub min_version: String,
-    /// "auto" lets the Codex CLI choose its configured default.
+    /// Default model sent to Codex when a chat thread does not override it.
     pub default_model: String,
     /// Codex app-server `SandboxMode`: read-only | workspace-write | danger-full-access.
     pub sandbox: String,
@@ -562,8 +562,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_model_auto_when_empty() {
-        assert_eq!(normalize_model_name(""), "auto");
+    fn default_model_used_when_empty() {
+        assert_eq!(normalize_model_name(""), DEFAULT_CODEX_MODEL);
         assert_eq!(normalize_model_name(" gpt-5 "), "gpt-5");
     }
 
@@ -604,10 +604,10 @@ mod tests {
         let runtime = parse_profile_config(Some(
             r#"
 model = "gpt-5.4"
-model_provider = "openai_api_key"
+model_provider = "my-provider"
 OPENAI_API_KEY = "sk-test"
 
-[model_providers.openai_api_key]
+[model_providers.my-provider]
 name = "OpenAI API key"
 base_url = "https://api.openai.com/v1"
 wire_api = "responses"
