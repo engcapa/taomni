@@ -200,6 +200,7 @@ export function ControlBar({
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
         <BarButton testId="sidebar-toggle" title={t("sidebar.headerTitle")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebar} />
+        <BarButton testId="ribbon-settings" title={t("menu.settings")} icon={<Settings className="w-4 h-4" />} onClick={() => onCommand("settings")} />
       </div>
       <div className="min-w-0 flex-1 self-stretch">
         <TabBar
