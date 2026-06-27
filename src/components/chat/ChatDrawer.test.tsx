@@ -112,6 +112,7 @@ describe("ChatDrawer provider and echo controls", () => {
       streamingId: {},
       ccToolCards: {},
       ccUsage: {},
+      sendingByThreadId: {},
       sending: false,
       drawerOpen: true,
       drawerScope: "tab",

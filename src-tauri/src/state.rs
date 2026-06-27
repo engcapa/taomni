@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::agent::cc_bridge::process::CcProcess;
 use crate::ai::AppAiCtx;
+use crate::chat::run::ChatRunRegistry;
 use crate::database::DbSession;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
@@ -92,8 +93,8 @@ pub struct AppState {
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
-    /// Cancel tokens for in-flight chat streams, keyed by thread_id.
-    pub chat_cancel_tokens: Arc<std::sync::Mutex<HashMap<String, tokio_util::sync::CancellationToken>>>,
+    /// Provider-agnostic stop handles for in-flight chat turns, keyed by thread_id.
+    pub chat_runs: Arc<ChatRunRegistry>,
     /// Pending CC side-effect tool calls awaiting frontend execution, keyed by
     /// per-call id. See [`CcToolResponder`].
     pub cc_pending_tool_calls: Arc<Mutex<HashMap<String, CcToolResponder>>>,
@@ -126,7 +127,8 @@ pub struct AppState {
     /// turn via `ChatSendRequest.bound_db_connection_id`. The SQL/Redis MCP
     /// handlers resolve their bound connection from here (CC never names a
     /// connection id, so this is the only target — scope-safe by construction).
-    pub cc_db_bindings: Arc<RwLock<HashMap<String, String>>>,    /// Top-level AI context — holds AsrManager + LlmRouter.
+    pub cc_db_bindings: Arc<RwLock<HashMap<String, String>>>,
+    /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
     /// Decentralized LAN messenger (LanChat) runtime state. Distinct from the
@@ -161,7 +163,7 @@ impl AppState {
             db: Mutex::new(db),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
-            chat_cancel_tokens: Arc::new(std::sync::Mutex::new(HashMap::new())),
+            chat_runs: Arc::new(ChatRunRegistry::new(HashMap::new())),
             cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
             cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
             captures: Arc::new(crate::agent::capture::CaptureRegistry::new(
@@ -170,7 +172,8 @@ impl AppState {
             cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
             cc_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
             cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
-            cc_db_bindings: Arc::new(RwLock::new(HashMap::new())),            ai_ctx: Arc::new(RwLock::new(ai_ctx)),
+            cc_db_bindings: Arc::new(RwLock::new(HashMap::new())),
+            ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }
     }
