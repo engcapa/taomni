@@ -458,22 +458,11 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
-  const openTabChat = useChatStore((s) => s.openTabChat);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
-  const chatDrawerScope = useChatStore((s) => s.drawerScope);
-  const chatDrawerTabId = useChatStore((s) => s.drawerTabId);
   const chatDrawerPosition = useChatStore((s) => s.drawerPosition);
   const chatDrawerPinned = useChatStore((s) => s.drawerPinned);
-  const activeChatTabId = chatBindingIdForTab(activeTab);
-  const sidebarChatToggle =
-    !aiFullyDisabled && activeChatTabId
-      ? {
-          open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === activeChatTabId,
-          onToggle: () => void toggleTabChat(activeChatTabId),
-        }
-      : undefined;
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -2415,7 +2404,6 @@ export function MainLayout() {
               onEditSession={handleEditSession}
               onConnectSession={handleConnectSession}
               onOpenSettings={() => handleCommand("settings")}
-              chatToggle={sidebarChatToggle}
             />
           </div>
         )}
@@ -2456,7 +2444,6 @@ export function MainLayout() {
                 onEditSession={handleEditSession}
                 onConnectSession={handleConnectSession}
                 onOpenSettings={() => handleCommand("settings")}
-                chatToggle={sidebarChatToggle}
               />
             </div>
           </Panel>
@@ -2488,7 +2475,6 @@ export function MainLayout() {
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}
-                    onOpenChatTao={!aiFullyDisabled ? () => void openTabChat("welcome") : undefined}
                   />
                 )}
 

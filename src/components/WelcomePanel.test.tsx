@@ -72,6 +72,8 @@ describe("WelcomePanel", () => {
 
     expect(screen.getByTestId("welcome-version")).toHaveTextContent(`Version ${__APP_VERSION__}`);
     expect(screen.getByTestId("welcome-version-footer")).toHaveTextContent(`v${__APP_VERSION__}`);
+    expect(screen.queryByTestId("welcome-activity-pane")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("welcome-open-chat-tao")).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();

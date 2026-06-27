@@ -82,7 +82,7 @@ describe("ControlBar settings button", () => {
     vi.clearAllMocks();
   });
 
-  it("keeps only app menu and sidebar controls in the left button group", () => {
+  it("keeps only the app menu in the left button group", () => {
     const onCommand = vi.fn();
     renderControlBar(onCommand);
 
@@ -91,8 +91,8 @@ describe("ControlBar settings button", () => {
     expect(leftGroup).toBeTruthy();
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
       "app-main-menu",
-      "sidebar-toggle",
     ]);
+    expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();
     expect(onCommand).not.toHaveBeenCalled();
   });

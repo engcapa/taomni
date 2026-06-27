@@ -372,7 +372,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     render(<MainLayout />);
 
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-chat-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId("ai-chat-drawer-ribbon")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 

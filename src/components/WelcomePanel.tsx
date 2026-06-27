@@ -2,14 +2,10 @@ import {
   Terminal as TerminalIcon,
   Plus,
   Shield,
-  Activity,
-  ScrollText,
   FolderOpen,
-  ChevronLeft,
-  ChevronRight,
   MessageCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listLocalShells,
   listWslDistros,
@@ -20,7 +16,6 @@ import {
 import { getAppPlatform } from "../lib/runtime";
 import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
-import { useSessionStore } from "../stores/sessionStore";
 import type { LocalShellSelection } from "../types";
 import { useT, type TranslateFn } from "../lib/i18n";
 
@@ -29,53 +24,17 @@ interface WelcomePanelProps {
   onNewSession: () => void;
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
   onOpenLanChat?: () => void;
-  onOpenChatTao?: () => void;
 }
 
-export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath, onOpenLanChat, onOpenChatTao }: WelcomePanelProps) {
+export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath, onOpenLanChat }: WelcomePanelProps) {
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
   const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
   const [selectedDistro, setSelectedDistro] = useState("");
   const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">("loading");
-  const { tabs, setStatusMessage } = useAppStore();
-  const { sessions } = useSessionStore();
+  const { setStatusMessage } = useAppStore();
   const t = useT();
-  const activeConnections = tabs.filter((tab) => tab.type === "terminal" && tab.closable);
-  const recentEvents = sessions
-    .slice()
-    .sort((a, b) => Math.max(b.updated_at, b.last_connected_at ?? 0) - Math.max(a.updated_at, a.last_connected_at ?? 0))
-    .slice(0, 5);
-  const [activityPaneWidth, setActivityPaneWidth] = useState(280);
-  const [activityPaneCollapsed, setActivityPaneCollapsed] = useState(false);
-
-  const startActivityPaneResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = activityPaneWidth;
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      setActivityPaneWidth(clampNumber(startWidth + startX - moveEvent.clientX, 180, 420));
-    };
-
-    const stop = () => {
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-  }, [activityPaneWidth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,217 +116,123 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   };
 
   return (
-    <div data-testid="welcome-panel" className="w-full h-full flex min-w-0 overflow-hidden" style={{ background: "var(--taomni-bg)" }}>
-      <div className="flex-1 min-w-0 overflow-auto">
-        <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
-          <div className="flex items-center gap-3 mb-5">
-            <div
-              data-testid="welcome-brand-mark"
-              className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
-              style={{ background: "linear-gradient(135deg, #1e5fa8, #62d36f)" }}
-            >
-              T
+    <div data-testid="welcome-panel" className="w-full h-full min-w-0 overflow-auto" style={{ background: "var(--taomni-bg)" }}>
+      <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
+        <div className="flex items-center gap-3 mb-5">
+          <div
+            data-testid="welcome-brand-mark"
+            className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
+            style={{ background: "linear-gradient(135deg, #1e5fa8, #62d36f)" }}
+          >
+            T
+          </div>
+          <div>
+            <div className="text-xl font-semibold">{t("app.welcomeTitle")}</div>
+            <div className="text-[12px] text-[var(--taomni-text-muted)]">
+              {t("app.tagline")}
             </div>
-            <div>
-              <div className="text-xl font-semibold">{t("app.welcomeTitle")}</div>
-              <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                {t("app.tagline")}
-              </div>
-              <div
-                data-testid="welcome-version"
-                className="text-[11px] mt-0.5 taomni-mono"
-                style={{ color: "var(--taomni-text-muted)" }}
-              >
-                {t("welcome.versionLabel", { version: __APP_VERSION__ })}
-              </div>
+            <div
+              data-testid="welcome-version"
+              className="text-[11px] mt-0.5 taomni-mono"
+              style={{ color: "var(--taomni-text-muted)" }}
+            >
+              {t("welcome.versionLabel", { version: __APP_VERSION__ })}
             </div>
           </div>
+        </div>
 
-          <div
-            className="grid gap-4 items-stretch"
-            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
-          >
-            <LocalTerminalCard
+        <div
+          className="grid gap-4 items-stretch"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
+        >
+          <LocalTerminalCard
+            translate={t}
+            shells={mergedShells}
+            selectedShell={selectedShell}
+            selectedShellId={selectedShellId}
+            shellStatus={shellStatus}
+            onSelectShell={setSelectedShellId}
+            kbd="Ctrl+Shift+T"
+            onStart={() => {
+              if (!selectedShell) {
+                onStartLocalTerminal();
+                return;
+              }
+              onStartLocalTerminal({
+                // Real shells have id === path; virtual WSL entries map id="wsl:<distro>"
+                // to path="wsl.exe" — pass the executable path so the backend can resolve it.
+                id: selectedShell.path,
+                name: selectedShell.name,
+                ...(selectedShell.args && selectedShell.args.length > 0
+                  ? { args: selectedShell.args }
+                  : {}),
+              });
+            }}
+            onStartAsAdministrator={handleStartAsAdministrator}
+            onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
+          />
+          {wslStatus === "ready" && wslDistros.length > 0 && (
+            <WslCard
               translate={t}
-              shells={mergedShells}
-              selectedShell={selectedShell}
-              selectedShellId={selectedShellId}
-              shellStatus={shellStatus}
-              onSelectShell={setSelectedShellId}
-              kbd="Ctrl+Shift+T"
+              distros={wslDistros}
+              selectedDistro={selectedDistro}
+              onSelectDistro={setSelectedDistro}
               onStart={() => {
-                if (!selectedShell) {
-                  onStartLocalTerminal();
-                  return;
-                }
+                if (!selectedDistro) return;
                 onStartLocalTerminal({
-                  // Real shells have id === path; virtual WSL entries map id="wsl:<distro>"
-                  // to path="wsl.exe" — pass the executable path so the backend can resolve it.
-                  id: selectedShell.path,
-                  name: selectedShell.name,
-                  ...(selectedShell.args && selectedShell.args.length > 0
-                    ? { args: selectedShell.args }
-                    : {}),
+                  id: "wsl.exe",
+                  name: `WSL: ${selectedDistro}`,
+                  args: ["-d", selectedDistro],
                 });
               }}
-              onStartAsAdministrator={handleStartAsAdministrator}
-              onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
             />
-            {wslStatus === "ready" && wslDistros.length > 0 && (
-              <WslCard
-                translate={t}
-                distros={wslDistros}
-                selectedDistro={selectedDistro}
-                onSelectDistro={setSelectedDistro}
-                onStart={() => {
-                  if (!selectedDistro) return;
-                  onStartLocalTerminal({
-                    id: "wsl.exe",
-                    name: `WSL: ${selectedDistro}`,
-                    args: ["-d", selectedDistro],
-                  });
-                }}
-              />
-            )}
+          )}
+          <ActionCard
+            icon={<Plus className="w-5 h-5" />}
+            title={t("welcome.newSessionTitle")}
+            desc={t("welcome.newSessionDesc")}
+            kbd="Ctrl+Shift+N"
+            onClick={() => onNewSession()}
+          />
+          {onOpenLanChat ? (
             <ActionCard
-              icon={<Plus className="w-5 h-5" />}
-              title={t("welcome.newSessionTitle")}
-              desc={t("welcome.newSessionDesc")}
-              kbd="Ctrl+Shift+N"
-              onClick={() => onNewSession()}
+              testId="welcome-open-lanchat"
+              icon={<MessageCircle className="w-5 h-5" />}
+              title={t("welcome.lanChatTitle")}
+              desc={t("welcome.lanChatDesc")}
+              kbd=""
+              onClick={onOpenLanChat}
             />
-            {onOpenChatTao ? (
-              <ActionCard
-                testId="welcome-open-chat-tao"
-                icon={<MessageCircle className="w-5 h-5" />}
-                title={t("welcome.chatTaoTitle")}
-                desc={t("welcome.chatTaoDesc")}
-                kbd="Ctrl+Shift+L"
-                onClick={onOpenChatTao}
-              />
-            ) : null}
-            {onOpenLanChat ? (
-              <ActionCard
-                testId="welcome-open-lanchat"
-                icon={<MessageCircle className="w-5 h-5" />}
-                title={t("welcome.lanChatTitle")}
-                desc={t("welcome.lanChatDesc")}
-                kbd=""
-                onClick={onOpenLanChat}
-              />
-            ) : null}
-          </div>
+          ) : null}
+        </div>
 
-          <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
-            <div className="font-semibold text-[var(--taomni-text)] mb-1">{t("welcome.tipsHeading")}</div>
-            <ul className="list-disc pl-5 space-y-0.5">
-              <li
-                dangerouslySetInnerHTML={{
-                  __html: t("welcome.tipQuickConnect", {
-                    example: '<span class="taomni-mono px-1 border rounded" style="background: var(--taomni-input-bg); border-color: var(--taomni-divider);">ssh user@host:22</span>',
-                  }),
-                }}
-              />
-              <li>{t("welcome.tipRightClick")}</li>
-              <li>{t("welcome.tipDrag")}</li>
-            </ul>
-          </div>
+        <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="font-semibold text-[var(--taomni-text)] mb-1">{t("welcome.tipsHeading")}</div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            <li
+              dangerouslySetInnerHTML={{
+                __html: t("welcome.tipQuickConnect", {
+                  example: '<span class="taomni-mono px-1 border rounded" style="background: var(--taomni-input-bg); border-color: var(--taomni-divider);">ssh user@host:22</span>',
+                }),
+              }}
+            />
+            <li>{t("welcome.tipRightClick")}</li>
+            <li>{t("welcome.tipDrag")}</li>
+          </ul>
+        </div>
 
-          <div
-            data-testid="welcome-version-footer"
-            className="mt-7 pt-3 flex items-center justify-between text-[11px] taomni-mono"
-            style={{
-              borderTop: "1px solid var(--taomni-divider)",
-              color: "var(--taomni-text-muted)",
-            }}
-          >
-            <span>{t("app.name")}</span>
-            <span>v{__APP_VERSION__}</span>
-          </div>
+        <div
+          data-testid="welcome-version-footer"
+          className="mt-7 pt-3 flex items-center justify-between text-[11px] taomni-mono"
+          style={{
+            borderTop: "1px solid var(--taomni-divider)",
+            color: "var(--taomni-text-muted)",
+          }}
+        >
+          <span>{t("app.name")}</span>
+          <span>v{__APP_VERSION__}</span>
         </div>
       </div>
-
-      {activityPaneCollapsed ? (
-        <div
-          className="w-8 shrink-0 border-l flex items-start justify-center py-2"
-          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
-        >
-          <button
-            type="button"
-            data-testid="welcome-activity-pane-expand"
-            aria-label={t("welcome.expandActivityPane")}
-            title={t("welcome.expandActivityPane")}
-            className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-            onClick={() => setActivityPaneCollapsed(false)}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ) : (
-        <>
-          <div
-            data-testid="welcome-activity-pane-resize-handle"
-            className="w-1.5 shrink-0 cursor-col-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)]/70"
-            role="separator"
-            aria-orientation="vertical"
-            onPointerDown={startActivityPaneResize}
-          />
-          <div
-            data-testid="welcome-activity-pane"
-            className="shrink-0 border-l p-3 text-[12px] taomni-scroll-y"
-            style={{
-              width: activityPaneWidth,
-              borderColor: "var(--taomni-divider)",
-              background: "var(--taomni-panel-bg)",
-            }}
-          >
-            <div className="font-semibold mb-2 flex items-center gap-1">
-              <Activity className="w-3.5 h-3.5" />
-              <span className="flex-1 truncate">{t("welcome.activeConnections")}</span>
-              <button
-                type="button"
-                data-testid="welcome-activity-pane-collapse"
-                aria-label={t("welcome.collapseActivityPane")}
-                title={t("welcome.collapseActivityPane")}
-                className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-                onClick={() => setActivityPaneCollapsed(true)}
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {activeConnections.length === 0 ? (
-              <EmptyText>{t("welcome.noActiveConnections")}</EmptyText>
-            ) : (
-              activeConnections.slice(0, 8).map((tab) => (
-                <ConnRow
-                  key={tab.id}
-                  color={tab.ssh ? "#2b5d8b" : "#2f8a3e"}
-                  name={tab.title}
-                  meta={tab.ssh ? `ssh - ${tab.ssh.username}@${tab.ssh.host}` : tab.localShell?.name ?? "local shell"}
-                />
-              ))
-            )}
-            <div className="mt-4 font-semibold mb-2 flex items-center gap-1">
-              <ScrollText className="w-3.5 h-3.5" />
-              {t("welcome.lastEvents")}
-            </div>
-            {recentEvents.length === 0 ? (
-              <EmptyText>{t("welcome.noEvents")}</EmptyText>
-            ) : (
-              recentEvents.map((session) => (
-                <EventRow
-                  key={session.id}
-                  icon={session.last_connected_at ? ">" : "+"}
-                  text={session.last_connected_at
-                    ? t("welcome.eventConnected", { name: session.name })
-                    : t("welcome.eventSaved", { name: session.name })}
-                  tone={session.last_connected_at ? "ok" : "info"}
-                />
-              ))
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -590,34 +455,4 @@ function ActionCard({
       <div className="text-[12px] text-[var(--taomni-text-muted)]">{desc}</div>
     </button>
   );
-}
-
-function ConnRow({ color, name, meta }: { color: string; name: string; meta: string }) {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <span className="w-2 h-2 rounded-full" style={{ background: color }} />
-      <div className="flex-1 min-w-0">
-        <div className="truncate">{name}</div>
-        <div className="text-[10px] text-[var(--taomni-text-muted)] taomni-mono">{meta}</div>
-      </div>
-    </div>
-  );
-}
-
-function EventRow({ icon, text, tone }: { icon: string; text: string; tone: "ok" | "info" | "warn" }) {
-  const colors = { ok: "#2f8a3e", info: "#1e5fa8", warn: "#a86b16" }[tone];
-  return (
-    <div className="flex items-start gap-2 py-0.5 text-[11px]">
-      <span style={{ color: colors }} className="taomni-mono w-3">{icon}</span>
-      <span className="text-[var(--taomni-text-muted)]">{text}</span>
-    </div>
-  );
-}
-
-function EmptyText({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] text-[var(--taomni-text-muted)] py-1">{children}</div>;
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
