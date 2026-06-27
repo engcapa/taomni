@@ -1,6 +1,7 @@
-import { Terminal as TerminalIcon, FileText, Server, X } from "lucide-react";
+import { Terminal as TerminalIcon, FileText, Image as ImageIcon, Server, X } from "lucide-react";
 import type { ReactElement } from "react";
 import type { AttachmentRef } from "../../lib/chat/composerRefs";
+import { formatAttachmentBytes, type ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface AttachmentChipProps {
@@ -9,7 +10,7 @@ interface AttachmentChipProps {
    * is a reserved React prop — React 18 strips it before the component
    * receives it, leaving the body to crash on `ref.kind`.
    */
-  attachment: AttachmentRef;
+  attachment: AttachmentRef | ChatAttachment;
   onRemove?: () => void;
 }
 
@@ -43,11 +44,17 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   );
 }
 
-function describe(attachment: AttachmentRef, t: TranslateFn): { icon: ReactElement; label: string } {
+function describe(attachment: AttachmentRef | ChatAttachment, t: TranslateFn): { icon: ReactElement; label: string } {
   if (attachment.kind === "terminal") {
     return {
       icon: <TerminalIcon className="w-2.5 h-2.5" />,
       label: t("attachment.terminalLabel", { lines: attachment.lines }),
+    };
+  }
+  if ("size" in attachment) {
+    return {
+      icon: attachment.kind === "image" ? <ImageIcon className="w-2.5 h-2.5" /> : <FileText className="w-2.5 h-2.5" />,
+      label: `${attachment.name} (${formatAttachmentBytes(attachment.size)})`,
     };
   }
   if (attachment.kind === "file") {

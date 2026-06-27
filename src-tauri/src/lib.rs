@@ -493,6 +493,7 @@ pub fn run() {
             chat::chat_set_thread_output_format,
             chat::chat_purge_old,
             chat::chat_export_archive,
+            chat::chat_stat_attachment_paths,
             chat::chat_send,
             chat::chat_stream,
             chat::chat_stop_stream,

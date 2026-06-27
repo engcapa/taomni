@@ -21,6 +21,7 @@ import {
   getQueryTab,
   type QueryRegistryEntry,
 } from "../../lib/queryRegistry";
+import { AttachmentChip } from "./AttachmentChip";
 import { useT } from "../../lib/i18n";
 
 interface MessageBubbleProps {
@@ -358,6 +359,13 @@ export function MessageBubble({
               ? <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
               : stripped}
         </div>
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {message.attachments.map((attachment) => (
+              <AttachmentChip key={attachment.id} attachment={attachment} />
+            ))}
+          </div>
+        )}
       </div>
       {toolCalls.map((call, i) => (
         <div key={i} className="max-w-[90%] mt-1">

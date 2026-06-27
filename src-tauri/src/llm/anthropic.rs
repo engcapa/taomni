@@ -1,4 +1,7 @@
-use super::{ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError, LlmResult, TokenUsage};
+use super::{
+    ChatContent, ChatContentPart, ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError,
+    LlmResult, TokenUsage,
+};
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
@@ -59,20 +62,49 @@ impl AnthropicProvider {
                 "system" => {
                     if let Some(existing) = system.as_mut() {
                         existing.push_str("\n\n");
-                        existing.push_str(&m.content);
+                        existing.push_str(&m.content.as_text_lossy());
                     } else {
-                        system = Some(m.content.clone());
+                        system = Some(m.content.as_text_lossy());
                     }
                 }
                 role => {
                     convo.push(json!({
                         "role": role,
-                        "content": m.content,
+                        "content": anthropic_content(&m.content),
                     }));
                 }
             }
         }
         (system, convo)
+    }
+}
+
+fn anthropic_content(content: &ChatContent) -> Value {
+    match content {
+        ChatContent::Text(text) => Value::String(text.clone()),
+        ChatContent::Parts(parts) => Value::Array(
+            parts
+                .iter()
+                .map(|part| match part {
+                    ChatContentPart::Text { text } => {
+                        json!({ "type": "text", "text": text })
+                    }
+                    ChatContentPart::Image {
+                        mime_type,
+                        data_base64,
+                    } => {
+                        json!({
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": mime_type,
+                                "data": data_base64
+                            }
+                        })
+                    }
+                })
+                .collect(),
+        ),
     }
 }
 

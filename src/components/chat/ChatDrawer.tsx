@@ -29,6 +29,7 @@ import {
 } from "../../lib/terminal/terminalRegistry";
 import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
+import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT } from "../../lib/i18n";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
@@ -291,7 +292,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     return undefined;
   };
 
-  const handleSend = async (content: string, attachedTerminalCtx?: string) => {
+  const handleSend = async (content: string, attachedTerminalCtx?: string, attachments?: ChatAttachment[]) => {
     // Composer can override the prop's `terminalContext` when the user
     // types `@terminal:last-N`. The override takes precedence; otherwise we
     // fall back to whatever the host (TerminalPanel) staged.
@@ -308,7 +309,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         const thread = await newThread(undefined, linked);
         threadId = thread.id;
       }
-      await sendMessage(threadId, content, ctx);
+      await sendMessage(threadId, content, ctx, attachments);
     } catch (e) {
       setError(String(e));
     }

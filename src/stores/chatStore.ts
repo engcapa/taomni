@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
+import type { ChatAttachment } from "../lib/chat/attachments";
 
 export interface ChatThread {
   id: string;
@@ -49,6 +50,7 @@ export interface ChatMessage {
   content: string;
   created_at: number;
   redacted: boolean;
+  attachments?: ChatAttachment[];
 }
 
 type StreamEvent =
@@ -203,7 +205,7 @@ interface ChatStore {
   setThreadOutputFormat: (threadId: string, format: string | null) => Promise<void>;
   setActiveThread: (threadId: string | null) => void;
   loadMessages: (threadId: string) => Promise<void>;
-  sendMessage: (threadId: string, content: string, terminalContext?: string) => Promise<void>;
+  sendMessage: (threadId: string, content: string, terminalContext?: string, attachments?: ChatAttachment[]) => Promise<void>;
   stopSending: (threadId: string) => Promise<void>;
   /// Open the drawer (creating a thread if needed) and stage `text` in the
   /// composer. Used by the Selection toolbar's "Send to AI" action.
@@ -395,7 +397,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  sendMessage: async (threadId: string, content: string, terminalContext?: string) => {
+  sendMessage: async (threadId: string, content: string, terminalContext?: string, attachments?: ChatAttachment[]) => {
     set((s) => nextThreadSendingState(s.sendingByThreadId, threadId, true));
 
     // Phase 3.S — resolve the saved SessionConfig.id this thread is bound to so
@@ -464,6 +466,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               content: "",
               created_at: e.created_at,
               redacted: false,
+              attachments: [],
             });
             set((s) => ({ streamingId: { ...s.streamingId, [threadId]: e.id } }));
             break;
@@ -562,6 +565,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         req: {
           thread_id: threadId,
           content,
+          attachments: attachments ?? [],
           terminal_context: terminalContext ?? null,
           bound_session_id: boundSessionId,
           cwd,
@@ -594,6 +598,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           req: {
             thread_id: threadId,
             content,
+            attachments: attachments ?? [],
             terminal_context: terminalContext ?? null,
             bound_session_id: boundSessionId,
             cwd,
