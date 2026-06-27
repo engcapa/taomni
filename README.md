@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://github.com/engcapa/taomni">
+    <img src=".github/assets/taomni-primary-logo.png" alt="Taomni" width="720">
+  </a>
+</p>
+
 # Taomni
 
 Taomni 是一款为开发者打造的 AI 原生远程工作台，基于 Tauri 2 + React 19 + TypeScript 构建，跨 Linux / macOS / Windows 运行。功能齐全却小巧精致：本地终端、SSH、SFTP、RDP/VNC、隧道、数据库客户端一应俱全，并将 AI 能力贯穿日常工作流。
