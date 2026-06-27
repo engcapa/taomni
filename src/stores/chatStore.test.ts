@@ -79,6 +79,21 @@ function makeConfig(overrides: Partial<AiConfig> = {}): AiConfig {
   };
 }
 
+function makeThread(overrides: Partial<ChatThread> = {}): ChatThread {
+  return {
+    id: "thread-1",
+    title: "New chat",
+    provider_id: "claude-code",
+    created_at: 1,
+    updated_at: 1,
+    linked_session_id: null,
+    source: "drawer",
+    output_format: null,
+    cc_model: null,
+    ...overrides,
+  };
+}
+
 describe("chatStore new thread provider selection", () => {
   beforeEach(() => {
     invokeMock.mockReset();
@@ -97,6 +112,7 @@ describe("chatStore new thread provider selection", () => {
       streamingId: {},
       ccToolCards: {},
       ccUsage: {},
+      sendingByThreadId: {},
       sending: false,
       drawerOpen: false,
       drawerScope: null,
@@ -107,17 +123,10 @@ describe("chatStore new thread provider selection", () => {
     });
     invokeMock.mockImplementation((command: string, args: { providerId?: string | null; linkedSessionId?: string | null }) => {
       if (command !== "chat_new_thread") throw new Error(`unexpected command: ${command}`);
-      const thread: ChatThread = {
-        id: "thread-1",
-        title: "New chat",
+      const thread = makeThread({
         provider_id: args.providerId ?? "deepseek",
-        created_at: 1,
-        updated_at: 1,
         linked_session_id: args.linkedSessionId ?? null,
-        source: "drawer",
-        output_format: null,
-        cc_model: null,
-      };
+      });
       return Promise.resolve(thread);
     });
   });
@@ -146,17 +155,7 @@ describe("chatStore new thread provider selection", () => {
 
   it("opens a Claude Code thread instead of reusing another provider as the default", async () => {
     useChatStore.setState({
-      threads: [{
-        id: "old-thread",
-        title: "Old chat",
-        provider_id: "deepseek",
-        created_at: 1,
-        updated_at: 1,
-        linked_session_id: null,
-        source: "drawer",
-        output_format: null,
-        cc_model: null,
-      }],
+      threads: [makeThread({ id: "old-thread", title: "Old chat", provider_id: "deepseek" })],
     });
 
     await useChatStore.getState().openGlobalChat();
@@ -166,5 +165,114 @@ describe("chatStore new thread provider selection", () => {
       linkedSessionId: null,
     });
     expect(useChatStore.getState().activeThreadId).toBe("thread-1");
+  });
+});
+
+describe("chatStore drawer lifecycle", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue(null);
+    useAiStore.setState({
+      config: makeConfig(),
+      loading: false,
+      saving: false,
+      testResults: {},
+      voiceShellEnabled: false,
+    });
+    useChatStore.setState({
+      threads: [
+        makeThread({ id: "thread-a", linked_session_id: "term-a" }),
+        makeThread({ id: "thread-b", linked_session_id: "term-b" }),
+        makeThread({ id: "global-thread", linked_session_id: null }),
+      ],
+      threadsLoaded: true,
+      activeThreadId: "thread-a",
+      messages: {},
+      streamingId: {},
+      ccToolCards: {},
+      ccUsage: {},
+      sendingByThreadId: { "thread-a": true },
+      sending: true,
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: "term-a",
+      tabDrawerOpenByTabId: { "term-a": true },
+      drawerWidth: 380,
+      pendingComposerText: "",
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("hides a tab-bound drawer on active-tab sync without stopping the running thread", async () => {
+    await useChatStore.getState().syncTabChatWithActiveTab("term-b");
+
+    expect(invokeMock).not.toHaveBeenCalledWith("chat_stop_stream", expect.anything());
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      drawerScope: "tab",
+      drawerTabId: "term-b",
+      sending: true,
+      sendingByThreadId: { "thread-a": true },
+      tabDrawerOpenByTabId: { "term-a": true },
+    });
+  });
+
+  it("hides a tab-bound drawer when switching to a non-chat tab without stopping", async () => {
+    await useChatStore.getState().syncTabChatWithActiveTab(null);
+
+    expect(invokeMock).not.toHaveBeenCalledWith("chat_stop_stream", expect.anything());
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      drawerTabId: null,
+      sending: true,
+      sendingByThreadId: { "thread-a": true },
+      tabDrawerOpenByTabId: { "term-a": true },
+    });
+  });
+
+  it("lets automatic visibility changes hide the drawer without stopping", () => {
+    useChatStore.getState().setDrawerOpen(false);
+
+    expect(invokeMock).not.toHaveBeenCalledWith("chat_stop_stream", expect.anything());
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      sending: true,
+      sendingByThreadId: { "thread-a": true },
+    });
+  });
+
+  it("stops the active thread when the user explicitly closes a tab drawer", async () => {
+    await useChatStore.getState().toggleTabChat("term-a");
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_stop_stream", { threadId: "thread-a" });
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      sending: false,
+      sendingByThreadId: {},
+      tabDrawerOpenByTabId: { "term-a": false },
+    });
+  });
+
+  it("stops the active thread when the user explicitly closes a global drawer", async () => {
+    useChatStore.setState({
+      activeThreadId: "global-thread",
+      drawerOpen: true,
+      drawerScope: "global",
+      drawerTabId: null,
+      sendingByThreadId: { "global-thread": true },
+      sending: true,
+    });
+
+    await useChatStore.getState().toggleGlobalChat();
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_stop_stream", { threadId: "global-thread" });
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      sending: false,
+      sendingByThreadId: {},
+    });
   });
 });
