@@ -6,10 +6,25 @@ import { getTerminal } from "../../lib/terminal/terminalRegistry";
 import { formatCcTerminalEcho, type CcTerminalEcho } from "../../lib/terminal/ccEcho";
 import { buildInteractiveCommandInput } from "../../lib/terminal/commandInput";
 import { getQueryTab } from "../../lib/queryRegistry";
+import {
+  basename,
+  joinPath,
+  listenSftpComplete,
+  listenSftpPaused,
+  listenSftpProgress,
+  sftpDownload,
+  sftpDownloadDir,
+  sftpStat,
+  type FileEntry,
+  type TransferCompletePayload,
+} from "../../lib/sftp";
+import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
 import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useSftpStore } from "../../stores/sftpStore";
+import { newTransferId, useTransferStore } from "../../stores/transferStore";
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
  *
@@ -103,6 +118,8 @@ function describe(tool: string, rawArgs: Record<string, unknown> | null | undefi
       return `修改文件: ${String(args.file_path ?? args.notebook_path ?? "")}`;
     case "sftp_upload":
       return `上传文件到 ${String(args.remote_path ?? "")}`;
+    case "sftp_download":
+      return `下载远端文件到 ${String(args.local_dir ?? "")}`;
     case "save_as_runbook":
       return `保存 Runbook: ${String(args.name ?? "")}`;
     case "run_sql":
@@ -129,6 +146,250 @@ function preview(rawArgs: Record<string, unknown> | null | undefined): string | 
   if (typeof args.file_path === "string") return args.file_path;
   if (typeof args.remote_path === "string") return args.remote_path;
   return null;
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function sftpSessionCandidates(sessionId: string): string[] {
+  if (!sessionId) return [];
+  const candidates = [sessionId];
+  if (!sessionId.startsWith("attached-")) {
+    candidates.push(`attached-${sessionId}`);
+  }
+  return candidates;
+}
+
+async function ensureSftpSession(rawSessionId: string): Promise<string> {
+  const sftpStore = useSftpStore.getState();
+  for (const id of sftpSessionCandidates(rawSessionId)) {
+    if (sftpStore.sessions[id]?.attached) return id;
+  }
+
+  const appState = useAppStore.getState();
+  const tabId = rawSessionId.startsWith("attached-")
+    ? rawSessionId.slice("attached-".length)
+    : rawSessionId;
+  const tab = appState.tabs.find((t) =>
+    t.id === tabId ||
+    t.sftp?.sessionId === rawSessionId ||
+    t.sftp?.sessionId === `attached-${tabId}`
+  );
+
+  if (tab?.sftp) {
+    await sftpStore.attach({
+      sessionId: tab.sftp.sessionId,
+      host: tab.sftp.host,
+      port: tab.sftp.port,
+      username: tab.sftp.username,
+      authMethod: tab.sftp.authMethod,
+      authData: tab.sftp.authData,
+      networkSettingsJson: tab.sftp.networkSettingsJson ?? null,
+    });
+    return tab.sftp.sessionId;
+  }
+
+  if (tab?.ssh) {
+    const sessionId = `attached-${tab.id}`;
+    await sftpStore.attach({
+      sessionId,
+      host: tab.ssh.host,
+      port: tab.ssh.port,
+      username: tab.ssh.username,
+      authMethod: tab.ssh.authMethod,
+      authData: tab.ssh.authData,
+      networkSettingsJson: JSON.stringify(
+        toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+      ),
+    });
+    return sessionId;
+  }
+
+  throw new Error(`SFTP session is not attached for ${rawSessionId}`);
+}
+
+function isDirectory(entry: FileEntry): boolean {
+  return entry.fileType === "dir" || entry.targetFileType === "dir";
+}
+
+function splitNameForSuffix(name: string, isDir: boolean): { stem: string; ext: string } {
+  if (isDir) return { stem: name || "download", ext: "" };
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0 || dot === name.length - 1) return { stem: name || "download", ext: "" };
+  return { stem: name.slice(0, dot), ext: name.slice(dot) };
+}
+
+async function localPathExists(sessionId: string, path: string): Promise<boolean> {
+  try {
+    await sftpStat(sessionId, path, "local");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function uniqueLocalPath(
+  sessionId: string,
+  localDir: string,
+  name: string,
+  isDir: boolean,
+): Promise<string> {
+  const first = joinPath(localDir, name || "download");
+  if (!(await localPathExists(sessionId, first))) return first;
+
+  const { stem, ext } = splitNameForSuffix(name, isDir);
+  for (let i = 1; i < 1000; i += 1) {
+    const candidate = joinPath(localDir, `${stem} (${i})${ext}`);
+    if (!(await localPathExists(sessionId, candidate))) return candidate;
+  }
+  throw new Error(`Could not find a free local filename in ${localDir}`);
+}
+
+function showSftpDownloadNotification(finalPath: string): void {
+  const title = "SFTP download complete";
+  const body = finalPath;
+  useAppStore.getState().setStatusMessage(`${title}: ${body}`);
+  void import("@tauri-apps/plugin-notification")
+    .then(async (mod) => {
+      if (await mod.isPermissionGranted()) {
+        mod.sendNotification({ title, body });
+      }
+    })
+    .catch(() => {
+      /* best-effort only */
+    });
+}
+
+async function runTrackedSftpDownload(opts: {
+  sessionId: string;
+  transferId: string;
+  remotePath: string;
+  localPath: string;
+  isDir: boolean;
+}): Promise<TransferCompletePayload | null> {
+  const transferStore = useTransferStore.getState();
+  let completePayload: TransferCompletePayload | null = null;
+  let unlistenProgress: (() => void) | null = null;
+  let unlistenPaused: (() => void) | null = null;
+  let unlistenComplete: (() => void) | null = null;
+  let resolveComplete: (payload: TransferCompletePayload) => void = () => {};
+  const completePromise = new Promise<TransferCompletePayload>((resolve) => {
+    resolveComplete = resolve;
+  });
+
+  try {
+    const [progress, paused, complete] = await Promise.all([
+      listenSftpProgress(opts.transferId, (payload) => {
+        transferStore.patch(opts.transferId, {
+          bytes: payload.bytes,
+          size: payload.total || undefined,
+          rate: payload.rate,
+          eta: payload.eta,
+          state: "running",
+        });
+      }),
+      listenSftpPaused(opts.transferId, (payload) => {
+        transferStore.patch(opts.transferId, {
+          bytes: payload.bytes,
+          rate: 0,
+          eta: 0,
+          state: "paused",
+        });
+      }),
+      listenSftpComplete(opts.transferId, (payload) => {
+        completePayload = payload;
+        if (payload.success) {
+          transferStore.setState(opts.transferId, "done");
+        } else {
+          transferStore.setState(opts.transferId, "error", payload.error ?? "download failed");
+        }
+        resolveComplete(payload);
+      }),
+    ]);
+    unlistenProgress = progress;
+    unlistenPaused = paused;
+    unlistenComplete = complete;
+
+    if (opts.isDir) {
+      await sftpDownloadDir(opts.sessionId, opts.transferId, opts.remotePath, opts.localPath);
+    } else {
+      await sftpDownload(opts.sessionId, opts.transferId, opts.remotePath, opts.localPath, false);
+    }
+
+    return completePayload ?? await Promise.race([
+      completePromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+    ]);
+  } finally {
+    unlistenProgress?.();
+    unlistenPaused?.();
+    unlistenComplete?.();
+  }
+}
+
+async function executeSftpDownloadTool(args: Record<string, unknown>): Promise<string> {
+  const rawSessionId = asString(args.session_id);
+  const remotePath = asString(args.remote_path);
+  const localDir = asString(args.local_dir ?? args.local_path ?? args.target_dir);
+  if (!rawSessionId) throw new Error("sftp_download requires session_id");
+  if (!remotePath) throw new Error("sftp_download requires remote_path");
+  if (!localDir) throw new Error("sftp_download requires local_dir");
+
+  const sessionId = await ensureSftpSession(rawSessionId);
+  const localDirEntry = await sftpStat(sessionId, localDir, "local")
+    .catch((err) => {
+      throw new Error(`Local download directory does not exist: ${localDir} (${err})`);
+    });
+  if (!isDirectory(localDirEntry)) {
+    throw new Error(`Local download target is not a directory: ${localDir}`);
+  }
+
+  const remoteEntry = await sftpStat(sessionId, remotePath, "remote");
+  const isDir = isDirectory(remoteEntry);
+  const localName = remoteEntry.name || basename(remotePath) || "download";
+  const localPath = await uniqueLocalPath(sessionId, localDir, localName, isDir);
+  const transferId = newTransferId();
+
+  useTransferStore.getState().add({
+    id: transferId,
+    sessionId,
+    direction: "download",
+    kind: isDir ? "dir" : "file",
+    localPath,
+    remotePath,
+    size: isDir ? 0 : remoteEntry.size,
+    bytes: 0,
+    rate: 0,
+    eta: 0,
+    state: "queued",
+    startedAt: Date.now(),
+    openAfter: false,
+  });
+
+  try {
+    const payload = await runTrackedSftpDownload({
+      sessionId,
+      transferId,
+      remotePath,
+      localPath,
+      isDir,
+    });
+    if (payload && !payload.success) {
+      throw new Error(payload.error ?? "download failed");
+    }
+    const finalPath = payload?.finalPath || localPath;
+    void useSftpStore.getState().refreshPane(sessionId, "local").catch(() => undefined);
+    showSftpDownloadNotification(finalPath);
+    return `downloaded ${remotePath} -> ${finalPath}`;
+  } catch (err) {
+    useTransferStore.getState().setState(
+      transferId,
+      "error",
+      err instanceof Error ? err.message : String(err),
+    );
+    throw err;
+  }
 }
 
 export function CcAgentBridge() {
@@ -398,6 +659,11 @@ async function executeTool(dispatch: ToolDispatch): Promise<void> {
         }
         const n = Number(args.lines ?? 50);
         output = term.getLastLines(Number.isFinite(n) && n > 0 ? n : 50);
+        ok = true;
+        break;
+      }
+      case "sftp_download": {
+        output = await executeSftpDownloadTool(args);
         ok = true;
         break;
       }

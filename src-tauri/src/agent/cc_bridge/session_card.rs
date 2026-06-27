@@ -56,7 +56,7 @@ pub fn host_key_for(session: &SessionConfig) -> String {
 }
 
 /// Session types whose real work happens on a remote host, where CC should
-/// prefer `run_in_terminal` / `sftp_upload` over its built-in local Bash.
+/// prefer `run_in_terminal` / SFTP tools over its built-in local Bash.
 fn is_remote(t: &SessionType) -> bool {
     matches!(
         t,
@@ -152,7 +152,8 @@ fn push_control_plane_guidance(s: &mut String) {
 ///
 /// ① Routing: steer execution through the bound terminal's MCP tools
 ///    (`run_in_terminal` / `read_terminal_tail`) instead of CC's built-in local
-///    Bash / file tools. `remote` adds the remote-only extra (`sftp_upload`).
+///    Bash / file tools. `remote` adds the remote-only extras
+///    (`sftp_upload` / `sftp_download`).
 /// ② Env demotion: CC's native `<env>` (cwd / git / OS) only ever describes the
 ///    local host process that runs Taomni, never the bound session. Without this
 ///    note an un-anchored turn slides back to that local `<env>` + built-in Bash
@@ -173,7 +174,8 @@ fn push_terminal_routing(s: &mut String, remote: bool) {
     if remote {
         s.push_str(
             "统一用 MCP 工具操作它:执行命令用 run_in_terminal、读回显用 read_terminal_tail、\
-             传文件用 sftp_upload(危险动作会停下等用户确认);它们作用于这个绑定终端、\
+             上传文件用 sftp_upload(危险动作会停下等用户确认),下载文件用 sftp_download;\
+             它们作用于这个绑定终端、\
              继承其真实当前目录。\n",
         );
     } else {

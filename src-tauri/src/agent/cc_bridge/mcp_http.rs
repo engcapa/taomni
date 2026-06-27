@@ -8,7 +8,7 @@
 //! Execution model (D2 hybrid):
 //!   - read-only tools (`list_sessions`, `search_history`) run synchronously
 //!     against `AppState.db` — no second connection, no round-trip.
-//!   - side-effect tools (`run_in_terminal`, `sftp_upload`, `switch_tab`,
+//!   - side-effect tools (`run_in_terminal`, `sftp_upload`, `sftp_download`, `switch_tab`,
 //!     `open_session_editor`, `save_as_runbook`) and `read_terminal_tail`
 //!     (whose data lives in the frontend) emit an `agent-cc-tool` event and
 //!     block on a oneshot until the frontend performs the effect and calls
@@ -1250,6 +1250,13 @@ struct SftpUploadParams {
 }
 
 #[derive(Deserialize, schemars::JsonSchema, serde::Serialize)]
+struct SftpDownloadParams {
+    session_id: Option<String>,
+    remote_path: String,
+    local_dir: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema, serde::Serialize)]
 struct SaveAsRunbookParams {
     name: String,
     commands: Vec<String>,
@@ -1577,6 +1584,23 @@ impl CcHandler {
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
         enforce_inline_permission(&self.app, &scope, "sftp_upload", &args, false).await?;
         self.dispatch_side_effect(&scope, "sftp_upload", args).await
+    }
+
+    #[tool(
+        name = "sftp_download",
+        description = "从绑定的 SFTP 会话下载远程文件/目录到本地目录；若目标已存在，界面会自动加序号避免覆盖。"
+    )]
+    async fn sftp_download(
+        &self,
+        Parameters(p): Parameters<SftpDownloadParams>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let scope = self.scope(&ctx)?;
+        let mut args = as_value(&p);
+        fill_session_id(&mut args, &scope);
+        enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
+        self.dispatch_side_effect(&scope, "sftp_download", args)
+            .await
     }
 
     #[tool(
