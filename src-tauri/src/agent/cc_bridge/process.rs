@@ -80,12 +80,19 @@ pub struct CcProcess {
     /// Bearer token this process uses to authenticate to the in-app rmcp MCP
     /// server. Revoked on stop/drop so a dead thread's token can't be reused.
     cc_token: Option<String>,
-    /// Last activity time of this process (for reaping idle processes)
+    /// Number of turns currently using this process. The app-wide idle reaper
+    /// must not stop a process until all turns have finished.
+    active_turns: AtomicU32,
+    /// Last completed turn activity time of this process (for reaping idle processes)
     pub last_active_at: std::sync::Mutex<std::time::Instant>,
 }
 
 impl CcProcess {
-    pub fn new(binary: impl Into<String>, extra_args: Vec<String>, temp_dir: Option<PathBuf>) -> Self {
+    pub fn new(
+        binary: impl Into<String>,
+        extra_args: Vec<String>,
+        temp_dir: Option<PathBuf>,
+    ) -> Self {
         let mut args = vec![
             "--print".into(),
             "--output-format".into(),
@@ -116,6 +123,7 @@ impl CcProcess {
             temp_dir,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
             cc_token: None,
+            active_turns: AtomicU32::new(0),
             last_active_at: std::sync::Mutex::new(std::time::Instant::now()),
         }
     }
@@ -142,6 +150,24 @@ impl CcProcess {
         self.stderr_buf.lock().await.clone()
     }
 
+    pub fn is_turn_active(&self) -> bool {
+        self.active_turns.load(Ordering::SeqCst) > 0
+    }
+
+    fn mark_turn_started(&self) {
+        self.active_turns.fetch_add(1, Ordering::SeqCst);
+        *self.last_active_at.lock().unwrap() = std::time::Instant::now();
+    }
+
+    fn mark_turn_finished(&self) {
+        let _ = self
+            .active_turns
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+                Some(n.saturating_sub(1))
+            });
+        *self.last_active_at.lock().unwrap() = std::time::Instant::now();
+    }
+
     /// Send a message and collect all events until Done or Error.
     /// Spawns the process if not already running.
     pub async fn send(&self, message: &str) -> Result<Vec<CcEvent>, String> {
@@ -155,35 +181,40 @@ impl CcProcess {
         message: &str,
         mut on_event: F,
     ) -> Result<Vec<CcEvent>, String> {
-        *self.last_active_at.lock().unwrap() = std::time::Instant::now();
-        self.ensure_running().await?;
+        self.mark_turn_started();
+        let result = async {
+            self.ensure_running().await?;
 
-        // Write the message as a JSON line to stdin. CC's stream-json input
-        // format expects `message` to be a full Anthropic message object
-        // ({"role":"user","content":"..."}), not a bare string.
-        let input = format!(
-            "{}\n",
-            serde_json::json!({
-                "type": "user",
-                "message": { "role": "user", "content": message }
-            })
-        );
-        {
-            let mut stdin_guard = self.stdin.lock().await;
-            if let Some(stdin) = stdin_guard.as_mut() {
-                stdin
-                    .write_all(input.as_bytes())
-                    .await
-                    .map_err(|e| format!("Failed to write to CC stdin: {}", e))?;
-                stdin
-                    .flush()
-                    .await
-                    .map_err(|e| format!("Failed to flush CC stdin: {}", e))?;
+            // Write the message as a JSON line to stdin. CC's stream-json input
+            // format expects `message` to be a full Anthropic message object
+            // ({"role":"user","content":"..."}), not a bare string.
+            let input = format!(
+                "{}\n",
+                serde_json::json!({
+                    "type": "user",
+                    "message": { "role": "user", "content": message }
+                })
+            );
+            {
+                let mut stdin_guard = self.stdin.lock().await;
+                if let Some(stdin) = stdin_guard.as_mut() {
+                    stdin
+                        .write_all(input.as_bytes())
+                        .await
+                        .map_err(|e| format!("Failed to write to CC stdin: {}", e))?;
+                    stdin
+                        .flush()
+                        .await
+                        .map_err(|e| format!("Failed to flush CC stdin: {}", e))?;
+                }
             }
-        }
 
-        // Read events from stdout until Done or Error.
-        self.collect_events(&mut on_event).await
+            // Read events from stdout until Done or Error.
+            self.collect_events(&mut on_event).await
+        }
+        .await;
+        self.mark_turn_finished();
+        result
     }
 
     async fn ensure_running(self: &Self) -> Result<(), String> {

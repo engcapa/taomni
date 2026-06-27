@@ -32,8 +32,20 @@ mod windowing;
 mod wsl;
 
 use state::AppState;
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, WebviewWindowBuilder};
+
+const AI_PROCESS_REAPER_INTERVAL_SECS: u64 = 30;
+const AI_PROCESS_IDLE_REAP_SECS: u64 = 300;
+
+fn should_reap_ai_process(
+    chat_turn_active: bool,
+    process_turn_active: bool,
+    idle_secs: u64,
+) -> bool {
+    !chat_turn_active && !process_turn_active && idle_secs >= AI_PROCESS_IDLE_REAP_SECS
+}
 
 #[tauri::command]
 fn exit_app(app_handle: AppHandle) {
@@ -88,14 +100,23 @@ pub fn run() {
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        AI_PROCESS_REAPER_INTERVAL_SECS,
+                    ))
+                    .await;
                     let state = handle_for_reaper.state::<AppState>();
+                    let active_chat_threads: HashSet<String> =
+                        state.chat_runs.lock().await.keys().cloned().collect();
                     let mut registry = state.cc_processes.lock().await;
                     let now = std::time::Instant::now();
                     let mut to_remove = Vec::new();
                     for (thread_id, proc) in registry.iter() {
                         let last_active = *proc.last_active_at.lock().unwrap();
-                        if now.duration_since(last_active).as_secs() >= 300 {
+                        if should_reap_ai_process(
+                            active_chat_threads.contains(thread_id),
+                            proc.is_turn_active(),
+                            now.duration_since(last_active).as_secs(),
+                        ) {
                             to_remove.push(thread_id.clone());
                         }
                     }
@@ -112,7 +133,11 @@ pub fn run() {
                     let mut codex_to_remove = Vec::new();
                     for (thread_id, proc) in codex_registry.iter() {
                         let last_active = *proc.last_active_at.lock().unwrap();
-                        if now.duration_since(last_active).as_secs() >= 300 {
+                        if should_reap_ai_process(
+                            active_chat_threads.contains(thread_id),
+                            proc.is_turn_active(),
+                            now.duration_since(last_active).as_secs(),
+                        ) {
                             codex_to_remove.push(thread_id.clone());
                         }
                     }
@@ -541,4 +566,42 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ai_process_reaper_waits_for_completed_turn_idle_window() {
+        assert!(!should_reap_ai_process(
+            false,
+            false,
+            AI_PROCESS_IDLE_REAP_SECS - 1
+        ));
+        assert!(should_reap_ai_process(
+            false,
+            false,
+            AI_PROCESS_IDLE_REAP_SECS
+        ));
+    }
+
+    #[test]
+    fn ai_process_reaper_skips_active_chat_or_process_turn() {
+        assert!(!should_reap_ai_process(
+            true,
+            false,
+            AI_PROCESS_IDLE_REAP_SECS
+        ));
+        assert!(!should_reap_ai_process(
+            false,
+            true,
+            AI_PROCESS_IDLE_REAP_SECS
+        ));
+        assert!(!should_reap_ai_process(
+            true,
+            true,
+            AI_PROCESS_IDLE_REAP_SECS
+        ));
+    }
 }
