@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forwardRef, useEffect, useImperativeHandle } from "react";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { MainLayout } from "./MainLayout";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -52,6 +54,12 @@ vi.mock("@tauri-apps/api/window", () => ({
     onCloseRequested: vi.fn(async () => vi.fn()),
   }),
 }));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(async () => undefined),
+}));
+
+vi.mock("@tauri-apps/api/event", () => import("../stubs/tauri-event"));
 
 vi.mock("react-resizable-panels", () => {
   const Group = ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -305,6 +313,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
     vi.mocked(exitApp).mockClear();
+    vi.mocked(tauriInvoke).mockClear();
     vi.mocked(listSessions).mockResolvedValue([]);
     useSessionStore.setState({
       sessions: [],
@@ -439,6 +448,53 @@ describe("MainLayout attached SFTP sidebar", () => {
       expect(
         useAppStore.getState().tabs.some((tab) => tab.type === "terminal" && tab.id.startsWith("local-")),
       ).toBe(true);
+    });
+  });
+
+  it("opens saved local shell sessions with the MCP requested shell type", async () => {
+    const session: SessionConfig = {
+      id: "local-shell-1",
+      name: "Local Work",
+      session_type: "LocalShell",
+      group_path: null,
+      host: "",
+      port: 0,
+      username: null,
+      auth_method: "None",
+      options_json: "{}",
+      created_at: 0,
+      updated_at: 0,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    useSessionStore.setState({ sessions: [session] });
+
+    render(<MainLayout />);
+
+    await act(async () => {
+      await emit("agent-cc-control-tool", {
+        callId: "call-local-session",
+        threadId: "thread-1",
+        tool: "session_open",
+        args: {
+          session_id: "local-shell-1",
+          local_shell: { type: "cmd" },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((item) => item.sessionId === "local-shell-1");
+      expect(tab?.type).toBe("terminal");
+      expect(tab?.localShell).toEqual({
+        id: "command-prompt",
+        name: "Command Prompt",
+      });
+    });
+    expect(tauriInvoke).toHaveBeenCalledWith("cc_resolve_tool_call", {
+      callId: "call-local-session",
+      ok: true,
+      output: "opened session local-shell-1",
     });
   });
 
