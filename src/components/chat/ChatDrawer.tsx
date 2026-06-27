@@ -33,6 +33,8 @@ import { useT } from "../../lib/i18n";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
+const SIDE_RIBBON_HOVER_OPEN_DELAY_MS = 260;
+const TOP_BOTTOM_RIBBON_HOVER_OPEN_DELAY_MS = 650;
 
 interface ChatDrawerProps {
   /**
@@ -338,7 +340,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   // Drag-to-resize the drawer.
   const handleResizeStart = (
-    e: React.MouseEvent,
+    e: ReactPointerEvent<HTMLDivElement>,
     axis: "width" | "height",
     edge?: "left" | "right",
   ) => {
@@ -346,7 +348,16 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     e.stopPropagation();
     resizingRef.current = true;
     resizeStartRef.current = { x: e.clientX, y: e.clientY, width: drawerWidth, height: drawerHeight };
-    const onMove = (ev: MouseEvent) => {
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = axis === "width" ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
+    const onMove = (ev: PointerEvent) => {
       if (!resizingRef.current) return;
       if (axis === "width") {
         if (drawerPosition === "left") {
@@ -366,11 +377,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     };
     const onUp = () => {
       resizingRef.current = false;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   if (!drawerOpen) return null;
@@ -381,7 +396,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     "ai-z-drawer",
     sideBySide ? "relative h-full shrink-0" : "absolute shadow-2xl",
     drawerPosition === "left" ? "order-first" : "",
-    floating ? "rounded-md overflow-hidden" : "",
+    floating ? "rounded-md" : "",
   ].filter(Boolean).join(" ");
   const containerStyle: CSSProperties = sideBySide
     ? { width: drawerWidth }
@@ -401,10 +416,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         [drawerPosition]: 0,
       };
   const resizeHandleClass = isHorizontalDock
-    ? `absolute ${drawerPosition === "left" ? "right-0" : "left-0"} top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--taomni-accent)] transition-colors z-10`
-    : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0" : "top-0"} h-1 cursor-row-resize hover:bg-[var(--taomni-accent)] transition-colors z-10`;
+    ? `absolute ${drawerPosition === "left" ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"} top-0 bottom-0 w-2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`
+    : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0 translate-y-1/2" : "top-0 -translate-y-1/2"} h-2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`;
   const widthResizeHandleClass =
-    "absolute top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--taomni-accent)] transition-colors z-10";
+    "absolute top-0 bottom-0 w-2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20";
   const panelBorderClass = sideBySide
     ? drawerPosition === "left"
       ? "border-r"
@@ -422,23 +437,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       {/* Resize handle */}
       <div
         className={resizeHandleClass}
-        onMouseDown={(event) => handleResizeStart(event, isHorizontalDock ? "width" : "height")}
+        data-testid={isHorizontalDock ? "ai-chat-drawer-width-resize" : "ai-chat-drawer-height-resize"}
+        onPointerDown={(event) => handleResizeStart(event, isHorizontalDock ? "width" : "height")}
       />
       {!isHorizontalDock && (
         <>
           <div
-            className={`${widthResizeHandleClass} left-0`}
-            onMouseDown={(event) => handleResizeStart(event, "width", "left")}
+            className={`${widthResizeHandleClass} left-0 -translate-x-1/2`}
+            data-testid="ai-chat-drawer-width-resize-left"
+            onPointerDown={(event) => handleResizeStart(event, "width", "left")}
           />
           <div
-            className={`${widthResizeHandleClass} right-0`}
-            onMouseDown={(event) => handleResizeStart(event, "width", "right")}
+            className={`${widthResizeHandleClass} right-0 translate-x-1/2`}
+            data-testid="ai-chat-drawer-width-resize-right"
+            onPointerDown={(event) => handleResizeStart(event, "width", "right")}
           />
         </>
       )}
 
       <div
-        className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)]`}
+        className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)] ${floating ? "rounded-md overflow-hidden" : ""}`}
         style={{ background: "var(--taomni-sidebar-bg)" }}
       >
         {/* Header */}
@@ -776,6 +794,7 @@ export function ChatDrawerRibbon() {
   const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const suppressClickRef = useRef(false);
   const hoverOpenTimerRef = useRef<number | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -790,6 +809,24 @@ export function ChatDrawerRibbon() {
   const chatTabId = activeTab.chatTabId ?? activeTab.id;
   const placementClass = ribbonPlacementClass(drawerPosition);
   const textClass = ribbonTextClass(drawerPosition);
+  const dragging = dragPreview !== null;
+  const ribbonClass = dragging
+    ? "fixed h-9 w-9 rounded-full border"
+    : `absolute ${placementClass} border`;
+  const ribbonStyle: CSSProperties = {
+    background: "var(--taomni-tao-ribbon-bg)",
+    borderColor: "var(--taomni-tao-ribbon-border)",
+    boxShadow: "var(--taomni-tao-ribbon-shadow)",
+    color: "var(--taomni-tao-ribbon-text)",
+    touchAction: "none",
+    ...(dragPreview
+      ? {
+          left: dragPreview.x,
+          top: dragPreview.y,
+          transform: "translate(-50%, -50%)",
+        }
+      : {}),
+  };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
@@ -810,12 +847,19 @@ export function ChatDrawerRibbon() {
     if (!drag) return;
     if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 6) {
       drag.dragging = true;
+      setDragPreview({ x: event.clientX, y: event.clientY });
     }
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current;
     dragRef.current = null;
+    setDragPreview(null);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
     if (!drag?.dragging) return;
     event.preventDefault();
     event.stopPropagation();
@@ -826,12 +870,25 @@ export function ChatDrawerRibbon() {
     }, 0);
   };
 
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    dragRef.current = null;
+    setDragPreview(null);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
+  };
+
   const scheduleHoverOpen = () => {
-    if (drawerPinned || hoverOpenTimerRef.current !== null) return;
+    if (drawerPinned || hoverOpenTimerRef.current !== null || dragRef.current) return;
+    const delay = drawerPosition === "top" || drawerPosition === "bottom"
+      ? TOP_BOTTOM_RIBBON_HOVER_OPEN_DELAY_MS
+      : SIDE_RIBBON_HOVER_OPEN_DELAY_MS;
     hoverOpenTimerRef.current = window.setTimeout(() => {
       hoverOpenTimerRef.current = null;
       if (!dragRef.current) void openTabChat(chatTabId);
-    }, 180);
+    }, delay);
   };
 
   const clearHoverOpen = () => {
@@ -845,18 +902,15 @@ export function ChatDrawerRibbon() {
       type="button"
       data-testid="ai-chat-drawer-ribbon"
       data-position={drawerPosition}
-      className={`absolute ${placementClass} z-40 flex items-center justify-center overflow-hidden border text-[11px] font-bold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing`}
-      style={{
-        background: "var(--taomni-tao-ribbon-bg)",
-        borderColor: "var(--taomni-tao-ribbon-border)",
-        boxShadow: "var(--taomni-tao-ribbon-shadow)",
-        color: "var(--taomni-tao-ribbon-text)",
-      }}
+      data-dragging={dragging || undefined}
+      className={`${ribbonClass} z-40 flex items-center justify-center overflow-hidden text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing`}
+      style={ribbonStyle}
       title={t("chat.ribbonOpenTitle", { title: activeTab.title })}
       aria-label={t("chat.ribbonOpenTitle", { title: activeTab.title })}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onMouseEnter={scheduleHoverOpen}
       onMouseLeave={clearHoverOpen}
       onClick={(event) => {
@@ -889,13 +943,13 @@ function positionIcon(position: ChatDrawerPosition) {
 function ribbonPlacementClass(position: ChatDrawerPosition): string {
   switch (position) {
     case "left":
-      return "left-0 top-1/2 -translate-y-1/2 h-14 w-8 rounded-r-md border-l-0";
+      return "left-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-r-full border-l-0";
     case "right":
-      return "right-0 top-1/2 -translate-y-1/2 h-14 w-8 rounded-l-md border-r-0";
+      return "right-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-l-full border-r-0";
     case "top":
-      return "top-0 left-1/2 -translate-x-1/2 h-8 w-16 rounded-b-md border-t-0";
+      return "top-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-b-full border-t-0";
     case "bottom":
-      return "bottom-0 left-1/2 -translate-x-1/2 h-8 w-16 rounded-t-md border-b-0";
+      return "bottom-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-t-full border-b-0";
   }
 }
 

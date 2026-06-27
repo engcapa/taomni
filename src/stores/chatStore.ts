@@ -99,7 +99,11 @@ function clampDrawerWidth(width: number): number {
 }
 
 function clampDrawerHeight(height: number): number {
-  return Math.max(260, Math.min(620, Math.round(height)));
+  const viewportMax =
+    typeof window === "undefined"
+      ? 720
+      : Math.max(260, Math.min(900, window.innerHeight - 32));
+  return Math.max(220, Math.min(viewportMax, Math.round(height)));
 }
 
 function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
