@@ -4,15 +4,271 @@ pub mod run;
 pub mod store;
 
 use crate::ai::config::{default_ai_config_path, AiConfig};
-use crate::llm::{ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, TaskKind};
+use crate::llm::{
+    ChatContentPart, ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, TaskKind,
+};
 use crate::state::AppState;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::io::Read;
+use std::path::Path;
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 fn now() -> i64 {
     chrono::Utc::now().timestamp()
+}
+
+const CHAT_MAX_ATTACHMENTS: usize = 10;
+const CHAT_MAX_ATTACHMENT_BYTES: u64 = 100 * 1024 * 1024;
+const TEXT_ATTACHMENT_PREVIEW_BYTES: u64 = 64 * 1024;
+
+#[tauri::command]
+pub async fn chat_stat_attachment_paths(
+    paths: Vec<String>,
+) -> Result<Vec<store::ChatAttachment>, String> {
+    stat_attachment_paths(paths)
+}
+
+fn stat_attachment_paths(paths: Vec<String>) -> Result<Vec<store::ChatAttachment>, String> {
+    if paths.len() > CHAT_MAX_ATTACHMENTS {
+        return Err(format!("Attach up to {CHAT_MAX_ATTACHMENTS} files."));
+    }
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for path in paths {
+        let clean = path.trim();
+        if clean.is_empty() {
+            continue;
+        }
+        let attachment = stat_attachment_path(clean, None)?;
+        if seen.insert(attachment.path.clone()) {
+            out.push(attachment);
+        }
+    }
+    validate_attachment_limits(&out)?;
+    Ok(out)
+}
+
+fn validate_chat_attachments(
+    input: &[store::ChatAttachment],
+) -> Result<Vec<store::ChatAttachment>, String> {
+    if input.len() > CHAT_MAX_ATTACHMENTS {
+        return Err(format!("Attach up to {CHAT_MAX_ATTACHMENTS} files."));
+    }
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for att in input {
+        let clean = att.path.trim();
+        if clean.is_empty() {
+            continue;
+        }
+        let id = att
+            .id
+            .trim()
+            .is_empty()
+            .then(|| Uuid::new_v4().to_string())
+            .unwrap_or_else(|| att.id.clone());
+        let attachment = stat_attachment_path(clean, Some(id))?;
+        if seen.insert(attachment.path.clone()) {
+            out.push(attachment);
+        }
+    }
+    validate_attachment_limits(&out)?;
+    Ok(out)
+}
+
+fn validate_attachment_limits(attachments: &[store::ChatAttachment]) -> Result<(), String> {
+    if attachments.len() > CHAT_MAX_ATTACHMENTS {
+        return Err(format!("Attach up to {CHAT_MAX_ATTACHMENTS} files."));
+    }
+    let total = attachments
+        .iter()
+        .try_fold(0_u64, |sum, att| sum.checked_add(att.size))
+        .ok_or_else(|| "Attached files are too large.".to_string())?;
+    if total > CHAT_MAX_ATTACHMENT_BYTES {
+        return Err(format!(
+            "Attached files can total at most {} MiB.",
+            CHAT_MAX_ATTACHMENT_BYTES / 1024 / 1024
+        ));
+    }
+    Ok(())
+}
+
+fn stat_attachment_path(path: &str, id: Option<String>) -> Result<store::ChatAttachment, String> {
+    let original = Path::new(path);
+    let metadata = std::fs::metadata(original)
+        .map_err(|e| format!("Cannot read attachment metadata for '{path}': {e}"))?;
+    if !metadata.is_file() {
+        return Err(format!("Attachment is not a file: {path}"));
+    }
+    let canonical = std::fs::canonicalize(original)
+        .map_err(|e| format!("Cannot resolve attachment path '{path}': {e}"))?;
+    let display_path = normalize_path_for_display(canonical.to_string_lossy().to_string());
+    let name = canonical
+        .file_name()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            original
+                .file_name()
+                .and_then(|s| s.to_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| display_path.clone());
+    let mime = infer_mime(&name);
+    let kind = if is_supported_image_mime(&mime) {
+        "image"
+    } else {
+        "file"
+    };
+    Ok(store::ChatAttachment {
+        id: id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+        kind: kind.into(),
+        path: display_path,
+        name,
+        size: metadata.len(),
+        mime: Some(mime),
+    })
+}
+
+fn normalize_path_for_display(path: String) -> String {
+    #[cfg(windows)]
+    {
+        if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{rest}");
+        }
+        if let Some(rest) = path.strip_prefix(r"\\?\") {
+            return rest.to_string();
+        }
+    }
+    path
+}
+
+fn infer_mime(name: &str) -> String {
+    let ext = Path::new(name)
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "txt" | "log" => "text/plain",
+        "md" | "markdown" => "text/markdown",
+        "json" => "application/json",
+        "yaml" | "yml" => "application/yaml",
+        "csv" => "text/csv",
+        "xml" => "application/xml",
+        "html" | "htm" => "text/html",
+        "rs" | "ts" | "tsx" | "js" | "jsx" | "css" | "toml" | "sql" | "sh" | "ps1"
+        | "py" | "go" | "java" | "kt" | "c" | "cc" | "cpp" | "h" | "hpp" => "text/plain",
+        _ => "application/octet-stream",
+    }
+    .to_string()
+}
+
+fn is_supported_image_mime(mime: &str) -> bool {
+    matches!(mime, "image/png" | "image/jpeg" | "image/gif" | "image/webp")
+}
+
+fn is_text_mime(mime: &str) -> bool {
+    mime.starts_with("text/")
+        || matches!(
+            mime,
+            "application/json" | "application/xml" | "application/yaml"
+        )
+}
+
+fn render_agent_attachment_prefix(attachments: &[store::ChatAttachment]) -> String {
+    if attachments.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        "[Attached files]\nThese files are local to this Taomni machine. Read them from the listed paths when relevant.\n",
+    );
+    for (idx, att) in attachments.iter().enumerate() {
+        out.push_str(&format!(
+            "{}. {} ({}, {} bytes)\n   path: {}\n",
+            idx + 1,
+            att.name,
+            att.mime.as_deref().unwrap_or("application/octet-stream"),
+            att.size,
+            att.path
+        ));
+    }
+    out.push('\n');
+    out
+}
+
+fn build_llm_attachment_message(
+    attachments: &[store::ChatAttachment],
+) -> Result<Option<LlmMessage>, String> {
+    if attachments.is_empty() {
+        return Ok(None);
+    }
+
+    let mut text = String::from(
+        "[Attached files]\nLocal filesystem paths are intentionally omitted for privacy. Use the attached contents below.\n",
+    );
+    let mut parts = Vec::new();
+    for (idx, att) in attachments.iter().enumerate() {
+        let mime = att
+            .mime
+            .as_deref()
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        text.push_str(&format!(
+            "\n{}. {} ({}, {} bytes)",
+            idx + 1,
+            att.name,
+            mime,
+            att.size
+        ));
+        if att.kind == "image" && is_supported_image_mime(&mime) {
+            let bytes = std::fs::read(&att.path)
+                .map_err(|e| format!("Cannot read image attachment '{}': {e}", att.name))?;
+            let data_base64 = BASE64_STANDARD.encode(bytes);
+            parts.push(ChatContentPart::Image {
+                mime_type: mime,
+                data_base64,
+            });
+            text.push_str("\n   image data is attached as a multimodal input.");
+        } else if is_text_mime(&mime) {
+            let (preview, truncated) = read_text_attachment_preview(&att.path)?;
+            let (clean, _) = redact::redact(&preview);
+            text.push_str("\n```text\n");
+            text.push_str(&clean);
+            if truncated {
+                text.push_str("\n[truncated]");
+            }
+            text.push_str("\n```");
+        } else {
+            text.push_str("\n   binary contents were not sent to this cloud/local LLM provider.");
+        }
+    }
+    parts.insert(0, ChatContentPart::Text { text });
+    Ok(Some(LlmMessage::user_parts(parts)))
+}
+
+fn read_text_attachment_preview(path: &str) -> Result<(String, bool), String> {
+    let file = std::fs::File::open(path)
+        .map_err(|e| format!("Cannot read text attachment '{path}': {e}"))?;
+    let mut limited = file.take(TEXT_ATTACHMENT_PREVIEW_BYTES + 1);
+    let mut bytes = Vec::new();
+    limited
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("Cannot read text attachment '{path}': {e}"))?;
+    let truncated = bytes.len() as u64 > TEXT_ATTACHMENT_PREVIEW_BYTES;
+    if truncated {
+        bytes.truncate(TEXT_ATTACHMENT_PREVIEW_BYTES as usize);
+    }
+    Ok((String::from_utf8_lossy(&bytes).to_string(), truncated))
 }
 
 /// Resolve the effective output format for a thread, falling back to the
@@ -217,6 +473,10 @@ pub async fn chat_export_archive(
 pub struct ChatSendRequest {
     pub thread_id: String,
     pub content: String,
+    /// Local files/images attached to this turn. The backend re-stats and
+    /// canonicalizes paths before persisting or sending to providers.
+    #[serde(default)]
+    pub attachments: Vec<store::ChatAttachment>,
     /// Optional terminal content to attach as @terminal context.
     pub terminal_context: Option<String>,
     /// Phase 3.S — the `SessionConfig.id` of the saved session this CC thread
@@ -270,6 +530,7 @@ pub async fn chat_send(
             return Err("AI is fully disabled.".into());
         }
     }
+    let attachments = validate_chat_attachments(&req.attachments)?;
 
     // Load thread to get provider.
     let (thread, history) = {
@@ -310,8 +571,11 @@ pub async fn chat_send(
     for msg in &history {
         llm_messages.push(LlmMessage {
             role: msg.role.clone(),
-            content: msg.content.clone(),
+            content: crate::llm::ChatContent::text(msg.content.clone()),
         });
+    }
+    if let Some(attachment_message) = build_llm_attachment_message(&attachments)? {
+        llm_messages.push(attachment_message);
     }
     llm_messages.push(LlmMessage::user(clean_content.clone()));
 
@@ -359,6 +623,7 @@ pub async fn chat_send(
         content: clean_content,
         created_at: ts,
         redacted: redacted_count > 0,
+        attachments,
     };
     let assistant_msg = store::ChatMessage {
         id: Uuid::new_v4().to_string(),
@@ -367,6 +632,7 @@ pub async fn chat_send(
         content: resp.content,
         created_at: ts + 1,
         redacted: false,
+        attachments: Vec::new(),
     };
 
     // Auto-title thread from first user message.
@@ -515,6 +781,7 @@ pub async fn chat_stream(
     let emit = |evt: &StreamEventOut| {
         let _ = app.emit(&event_name, evt.clone());
     };
+    let attachments = validate_chat_attachments(&req.attachments)?;
 
     // Load thread + history.
     let (thread, history) = {
@@ -539,6 +806,7 @@ pub async fn chat_stream(
         content: clean_content.clone(),
         created_at: ts,
         redacted: redacted_count > 0,
+        attachments: attachments.clone(),
     };
     {
         let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -841,6 +1109,7 @@ pub async fn chat_stream(
                 let (clean_ctx, _) = redact::redact(ctx);
                 prefix.push_str(&format!("[Terminal context]\n```\n{}\n```\n\n", clean_ctx));
             }
+            prefix.push_str(&render_agent_attachment_prefix(&attachments));
             format!("{}{}", prefix, clean_content)
         };
         let events = process
@@ -961,6 +1230,7 @@ pub async fn chat_stream(
             content: final_content.clone(),
             created_at: assistant_ts,
             redacted: false,
+            attachments: Vec::new(),
         };
 
         let is_first = history.is_empty();
@@ -1260,6 +1530,7 @@ pub async fn chat_stream(
                 let (clean_ctx, _) = redact::redact(ctx);
                 prefix.push_str(&format!("[Terminal context]\n```\n{}\n```\n\n", clean_ctx));
             }
+            prefix.push_str(&render_agent_attachment_prefix(&attachments));
             format!("{}{}", prefix, clean_content)
         };
 
@@ -1396,6 +1667,7 @@ pub async fn chat_stream(
             content: final_content.clone(),
             created_at: assistant_ts,
             redacted: false,
+            attachments: Vec::new(),
         };
 
         let is_first = history.is_empty();
@@ -1437,8 +1709,11 @@ pub async fn chat_stream(
     for msg in &history {
         llm_messages.push(LlmMessage {
             role: msg.role.clone(),
-            content: msg.content.clone(),
+            content: crate::llm::ChatContent::text(msg.content.clone()),
         });
+    }
+    if let Some(attachment_message) = build_llm_attachment_message(&attachments)? {
+        llm_messages.push(attachment_message);
     }
     llm_messages.push(LlmMessage::user(clean_content));
 
@@ -1574,6 +1849,7 @@ pub async fn chat_stream(
         content: accumulated.clone(),
         created_at: assistant_ts,
         redacted: false,
+        attachments: Vec::new(),
     };
 
     let is_first = history.is_empty();
@@ -1598,8 +1874,9 @@ pub async fn chat_stream(
 
 #[cfg(test)]
 mod cc_tool_use_tests {
-    use super::format_cc_tool_use;
+    use super::*;
     use serde_json::json;
+    use std::io::Write;
 
     #[test]
     fn renders_command_without_tool_call_marker() {
@@ -1618,5 +1895,85 @@ mod cc_tool_use_tests {
         let bare = format_cc_tool_use("list_sessions", &json!({}));
         assert!(bare.contains("list_sessions"));
         assert!(!bare.contains("[TOOL_CALL]"));
+    }
+
+    #[test]
+    fn cloud_attachment_message_omits_local_path_but_includes_text_preview() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("notes.txt");
+        std::fs::write(&path, "hello from attachment").unwrap();
+        let att = stat_attachment_path(path.to_str().unwrap(), None).unwrap();
+
+        let message = build_llm_attachment_message(&[att.clone()]).unwrap().unwrap();
+        let text = message.content.as_text_lossy();
+
+        assert!(text.contains("notes.txt"));
+        assert!(text.contains("hello from attachment"));
+        assert!(!text.contains(&att.path));
+    }
+
+    #[test]
+    fn agent_attachment_prefix_includes_readable_path() {
+        let att = store::ChatAttachment {
+            id: "a1".into(),
+            kind: "file".into(),
+            path: "/tmp/notes.txt".into(),
+            name: "notes.txt".into(),
+            size: 12,
+            mime: Some("text/plain".into()),
+        };
+
+        let prefix = render_agent_attachment_prefix(&[att]);
+
+        assert!(prefix.contains("notes.txt"));
+        assert!(prefix.contains("path: /tmp/notes.txt"));
+    }
+
+    #[test]
+    fn validates_attachment_count_and_total_size() {
+        let oversized = store::ChatAttachment {
+            id: "a1".into(),
+            kind: "file".into(),
+            path: "/tmp/large.bin".into(),
+            name: "large.bin".into(),
+            size: CHAT_MAX_ATTACHMENT_BYTES + 1,
+            mime: Some("application/octet-stream".into()),
+        };
+        assert!(validate_attachment_limits(&[oversized]).is_err());
+
+        let many: Vec<_> = (0..=CHAT_MAX_ATTACHMENTS)
+            .map(|i| store::ChatAttachment {
+                id: format!("a{i}"),
+                kind: "file".into(),
+                path: format!("/tmp/{i}.txt"),
+                name: format!("{i}.txt"),
+                size: 1,
+                mime: Some("text/plain".into()),
+            })
+            .collect();
+        assert!(validate_attachment_limits(&many).is_err());
+    }
+
+    #[test]
+    fn image_attachment_message_contains_multimodal_part() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pixel.png");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(&[137, 80, 78, 71]).unwrap();
+        let att = stat_attachment_path(path.to_str().unwrap(), None).unwrap();
+
+        let message = build_llm_attachment_message(&[att]).unwrap().unwrap();
+        match message.content {
+            crate::llm::ChatContent::Parts(parts) => {
+                assert!(parts.iter().any(|part| matches!(
+                    part,
+                    ChatContentPart::Image {
+                        mime_type,
+                        data_base64
+                    } if mime_type == "image/png" && !data_base64.is_empty()
+                )));
+            }
+            _ => panic!("expected multimodal content parts"),
+        }
     }
 }

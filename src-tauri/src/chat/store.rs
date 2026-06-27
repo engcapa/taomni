@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatThread {
@@ -32,6 +33,19 @@ pub struct ChatMessage {
     pub content: String,
     pub created_at: i64,
     pub redacted: bool,
+    #[serde(default)]
+    pub attachments: Vec<ChatAttachment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatAttachment {
+    pub id: String,
+    pub kind: String,
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    #[serde(default)]
+    pub mime: Option<String>,
 }
 
 pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
@@ -56,10 +70,26 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
             FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS ai_chat_message_attachments (
+            id TEXT PRIMARY KEY,
+            message_id TEXT NOT NULL,
+            thread_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            path TEXT NOT NULL,
+            name TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            mime TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (message_id) REFERENCES ai_chat_messages(id) ON DELETE CASCADE,
+            FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+        );
+
         CREATE INDEX IF NOT EXISTS idx_chat_messages_thread
             ON ai_chat_messages(thread_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_chat_threads_updated
-            ON ai_chat_threads(updated_at DESC);",
+            ON ai_chat_threads(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_chat_attachments_message
+            ON ai_chat_message_attachments(message_id);",
     )?;
 
     // Idempotent column add for older installs that pre-date the v2.6 CC bridge.
@@ -125,6 +155,10 @@ pub fn set_cc_session_id(conn: &Connection, thread_id: &str, session_id: &str) -
 }
 
 pub fn delete_thread(conn: &Connection, id: &str) -> SqlResult<()> {
+    conn.execute(
+        "DELETE FROM ai_chat_message_attachments WHERE thread_id = ?1",
+        params![id],
+    )?;
     conn.execute("DELETE FROM ai_chat_threads WHERE id = ?1", params![id])?;
     Ok(())
 }
@@ -142,6 +176,24 @@ pub fn insert_message(conn: &Connection, msg: &ChatMessage) -> SqlResult<()> {
             msg.redacted as i64
         ],
     )?;
+    for att in &msg.attachments {
+        conn.execute(
+            "INSERT OR REPLACE INTO ai_chat_message_attachments
+             (id, message_id, thread_id, kind, path, name, size, mime, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                &att.id,
+                &msg.id,
+                &msg.thread_id,
+                &att.kind,
+                &att.path,
+                &att.name,
+                att.size as i64,
+                att.mime.as_deref(),
+                msg.created_at,
+            ],
+        )?;
+    }
     // Update thread updated_at.
     conn.execute(
         "UPDATE ai_chat_threads SET updated_at = ?1 WHERE id = ?2",
@@ -163,9 +215,42 @@ pub fn list_messages(conn: &Connection, thread_id: &str) -> SqlResult<Vec<ChatMe
             content: row.get(3)?,
             created_at: row.get(4)?,
             redacted: row.get::<_, i64>(5)? != 0,
+            attachments: Vec::new(),
         })
     })?;
-    rows.collect()
+    let mut messages: Vec<ChatMessage> = rows.collect::<SqlResult<Vec<_>>>()?;
+    if messages.is_empty() {
+        return Ok(messages);
+    }
+
+    let mut att_stmt = conn.prepare(
+        "SELECT message_id, id, kind, path, name, size, mime
+         FROM ai_chat_message_attachments WHERE thread_id = ?1 ORDER BY created_at ASC",
+    )?;
+    let att_rows = att_stmt.query_map(params![thread_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            ChatAttachment {
+                id: row.get(1)?,
+                kind: row.get(2)?,
+                path: row.get(3)?,
+                name: row.get(4)?,
+                size: row.get::<_, i64>(5)?.max(0) as u64,
+                mime: row.get(6).ok(),
+            },
+        ))
+    })?;
+    let mut by_message: HashMap<String, Vec<ChatAttachment>> = HashMap::new();
+    for row in att_rows {
+        let (message_id, att) = row?;
+        by_message.entry(message_id).or_default().push(att);
+    }
+    for message in &mut messages {
+        if let Some(attachments) = by_message.remove(&message.id) {
+            message.attachments = attachments;
+        }
+    }
+    Ok(messages)
 }
 
 pub fn update_thread_title(conn: &Connection, id: &str, title: &str) -> SqlResult<()> {
@@ -219,9 +304,62 @@ pub fn update_thread_output_format(
 /// seconds). Returns the number of threads deleted; messages are removed via
 /// the FK cascade. Used by the retention sweeper.
 pub fn delete_threads_older_than(conn: &Connection, cutoff_ts: i64) -> SqlResult<usize> {
+    conn.execute(
+        "DELETE FROM ai_chat_message_attachments WHERE thread_id IN (
+            SELECT id FROM ai_chat_threads WHERE updated_at < ?1
+        )",
+        params![cutoff_ts],
+    )?;
     let count = conn.execute(
         "DELETE FROM ai_chat_threads WHERE updated_at < ?1",
         params![cutoff_ts],
     )?;
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn message_attachments_round_trip() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_chat_tables(&conn).unwrap();
+        let thread = ChatThread {
+            id: "thread-1".into(),
+            title: "New chat".into(),
+            provider_id: "deepseek".into(),
+            created_at: 1,
+            updated_at: 1,
+            linked_session_id: None,
+            source: "drawer".into(),
+            cc_session_id: None,
+            cc_model: None,
+            output_format: None,
+        };
+        create_thread(&conn, &thread).unwrap();
+        let message = ChatMessage {
+            id: "msg-1".into(),
+            thread_id: "thread-1".into(),
+            role: "user".into(),
+            content: "Please review the attached files.".into(),
+            created_at: 2,
+            redacted: false,
+            attachments: vec![ChatAttachment {
+                id: "att-1".into(),
+                kind: "image".into(),
+                path: "C:\\tmp\\diagram.png".into(),
+                name: "diagram.png".into(),
+                size: 2048,
+                mime: Some("image/png".into()),
+            }],
+        };
+        insert_message(&conn, &message).unwrap();
+
+        let messages = list_messages(&conn, "thread-1").unwrap();
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].attachments.len(), 1);
+        assert_eq!(messages[0].attachments[0].name, "diagram.png");
+    }
 }

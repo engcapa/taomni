@@ -98,6 +98,16 @@ interface StubChatMessage {
   content: string;
   created_at: number;
   redacted: boolean;
+  attachments?: StubChatAttachment[];
+}
+
+interface StubChatAttachment {
+  id: string;
+  kind: "image" | "file";
+  path: string;
+  name: string;
+  size: number;
+  mime?: string | null;
 }
 
 function loadChatThreads(): StubChatThread[] {
@@ -218,8 +228,34 @@ const writeStreams = new Map<string, { path: string; chunks: Uint8Array[] }>();
 const readStreams = new Map<string, { bytes: Uint8Array; offset: number }>();
 
 function basename(path: string): string {
-  const idx = path.lastIndexOf("/");
+  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   return idx < 0 ? path : path.slice(idx + 1);
+}
+
+function mimeFromName(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  switch (ext) {
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "svg":
+      return "image/svg+xml";
+    case "json":
+      return "application/json";
+    case "md":
+      return "text/markdown";
+    case "txt":
+    case "log":
+      return "text/plain";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 function bytesB64ToArrayBuffer(b64: string): ArrayBuffer {
@@ -1037,8 +1073,23 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "chat_stop_stream": {
       return undefined as T;
     }
+    case "chat_stat_attachment_paths": {
+      const paths = ((args as InvokeArgs | undefined)?.paths as string[] | undefined) ?? [];
+      return paths.map((path, index) => {
+        const name = basename(path);
+        const mime = mimeFromName(name);
+        return {
+          id: `stub-att-${Date.now()}-${index}`,
+          kind: mime.startsWith("image/") ? "image" : "file",
+          path,
+          name,
+          size: 0,
+          mime,
+        } satisfies StubChatAttachment;
+      }) as T;
+    }
     case "chat_send": {
-      const req = (args as InvokeArgs | undefined)?.req as { thread_id?: string; content?: string } | undefined;
+      const req = (args as InvokeArgs | undefined)?.req as { thread_id?: string; content?: string; attachments?: StubChatAttachment[] } | undefined;
       const threadId = req?.thread_id ?? "";
       const now = Math.floor(Date.now() / 1000);
       const userMessage: StubChatMessage = {
@@ -1048,6 +1099,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         content: req?.content ?? "",
         created_at: now,
         redacted: false,
+        attachments: req?.attachments ?? [],
       };
       const assistantMessage: StubChatMessage = {
         id: `stub-assistant-${Date.now()}`,
