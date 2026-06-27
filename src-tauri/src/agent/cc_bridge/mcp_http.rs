@@ -22,7 +22,9 @@
 //!     Bearer <token>` matching a minted per-thread token (401 otherwise).
 //!   - Each token carries a scope `{thread_id, allowed_session_id, trust}`; a
 //!     tool call naming a `session_id` outside that scope is rejected, so one
-//!     thread's CC can never drive another thread's SSH session.
+//!     thread's CC can never drive another thread's SSH session. Control-plane
+//!     tools are the exception: their `session_id` values name saved Taomni
+//!     session configs or UI targets, not the current terminal execution scope.
 
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -451,6 +453,47 @@ pub(crate) fn normalize_tool_name(name: &str) -> &str {
         .unwrap_or(name)
 }
 
+/// Returns true for tools whose `session_id` argument identifies the current
+/// execution target bound to this thread. Taomni control/UI tools use ids for
+/// saved session configs or tabs instead, so applying the terminal scope check
+/// to them would incorrectly reject valid actions like opening `pi-1` from a
+/// local PowerShell chat.
+pub(crate) fn tool_uses_bound_session_scope(tool: &str) -> bool {
+    !matches!(
+        normalize_tool_name(tool),
+        // Shared control MCP: saved session config management.
+        "session_list"
+            | "session_get"
+            | "session_create"
+            | "session_update"
+            | "session_duplicate"
+            | "session_delete"
+            | "session_move_group"
+            // Shared control MCP: groups.
+            | "group_list"
+            | "group_create"
+            | "group_rename"
+            | "group_delete"
+            // Shared control MCP: UI/session opening.
+            | "session_open"
+            | "session_open_editor"
+            | "quick_connect"
+            // Shared control MCP: tabs and app UI.
+            | "tab_list"
+            | "tab_switch"
+            | "tab_duplicate"
+            | "tab_rename"
+            | "tab_close"
+            | "tab_move"
+            | "tab_open_settings"
+            | "tab_open_local_terminal"
+            | "tab_open_file_browser"
+            // Legacy shell UI tools kept for compatibility.
+            | "switch_tab"
+            | "open_session_editor"
+    )
+}
+
 /// Resolve a caller-named `session_id` against the token's bound terminal. CC
 /// may name the bound session either by its terminal *tab id* (the canonical
 /// scope id) or by the saved `SessionConfig.id` the identity card advertises;
@@ -563,10 +606,13 @@ pub(crate) async fn decide_permission(
     is_readonly: bool,
 ) -> CallToolResult {
     let tool_name = normalize_tool_name(raw_tool_name).to_string();
+    let uses_bound_session_scope = tool_uses_bound_session_scope(&tool_name);
 
     // 1. Session/thread scope.
-    if let Err(reason) = enforce_session_scope(scope, input) {
-        return deny_result(reason);
+    if uses_bound_session_scope {
+        if let Err(reason) = enforce_session_scope(scope, input) {
+            return deny_result(reason);
+        }
     }
     // 2. Blacklist / sensitive-path deny-list.
     let call = ToolCall {
@@ -577,7 +623,7 @@ pub(crate) async fn decide_permission(
         return deny_result(reason);
     }
     // 3. Per-session "AI 写动作禁用".
-    {
+    if uses_bound_session_scope {
         let state = app.state::<AppState>();
         if let Err(reason) = crate::agent::safety::check_session_disable(&state, &call) {
             return deny_result(reason);
@@ -614,13 +660,16 @@ pub(crate) async fn enforce_inline_permission(
         return Ok(());
     }
     let tool_name = normalize_tool_name(raw_tool_name).to_string();
-    enforce_session_scope(scope, input).map_err(|e| ErrorData::invalid_params(e, None))?;
+    let uses_bound_session_scope = tool_uses_bound_session_scope(&tool_name);
+    if uses_bound_session_scope {
+        enforce_session_scope(scope, input).map_err(|e| ErrorData::invalid_params(e, None))?;
+    }
     let call = ToolCall {
         tool: tool_name.clone(),
         args: input.clone(),
     };
     crate::agent::safety::check_tool_call(&call).map_err(|e| ErrorData::invalid_params(e, None))?;
-    {
+    if uses_bound_session_scope {
         let state = app.state::<AppState>();
         crate::agent::safety::check_session_disable(&state, &call)
             .map_err(|e| ErrorData::invalid_params(e, None))?;
@@ -1731,6 +1780,34 @@ mod tests {
     fn normalize_leaves_builtin_tools_untouched() {
         assert_eq!(normalize_tool_name("Bash"), "Bash");
         assert_eq!(normalize_tool_name("Edit"), "Edit");
+    }
+
+    #[test]
+    fn control_tools_do_not_use_bound_terminal_scope() {
+        assert!(!tool_uses_bound_session_scope("session_open"));
+        assert!(!tool_uses_bound_session_scope(
+            "mcp__taomni_control__session_open"
+        ));
+        assert!(!tool_uses_bound_session_scope("session_get"));
+        assert!(!tool_uses_bound_session_scope("tab_duplicate"));
+        assert!(!tool_uses_bound_session_scope("switch_tab"));
+
+        assert!(tool_uses_bound_session_scope("run_in_terminal"));
+        assert!(tool_uses_bound_session_scope(
+            "mcp__taomni__run_in_terminal"
+        ));
+        assert!(tool_uses_bound_session_scope("run_sql"));
+        assert!(tool_uses_bound_session_scope("redis_exec"));
+    }
+
+    #[test]
+    fn control_session_ids_are_not_execution_scope_ids() {
+        let s = scope("t1", Some("current-tab"));
+        let args = json!({ "session_id": "pi-1" });
+
+        assert!(enforce_session_scope(&s, &args).is_err());
+        assert!(!tool_uses_bound_session_scope("session_open"));
+        assert!(tool_uses_bound_session_scope("run_in_terminal"));
     }
 
     #[test]
