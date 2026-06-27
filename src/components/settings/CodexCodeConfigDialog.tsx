@@ -97,12 +97,27 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
 
     setLoading((cur) => ({ ...cur, [selectedProfileId]: true }));
     setError(null);
+    let cancelled = false;
     codexGetProfileConfig(profile.vault_ref)
-      .then((text) => setContents((cur) => ({ ...cur, [selectedProfileId]: text ?? CONFIG_TEMPLATE })))
-      .catch((e) => {
-        if (!isVaultLockedError(e)) setError(String(e));
+      .then((text) => {
+        if (cancelled) return;
+        setContents((cur) => ({ ...cur, [selectedProfileId]: text ?? CONFIG_TEMPLATE }));
       })
-      .finally(() => setLoading((cur) => ({ ...cur, [selectedProfileId]: false })));
+      .catch((e) => {
+        if (cancelled) return;
+        if (isVaultLockedError(e)) {
+          onClose();
+        } else {
+          setError(String(e));
+        }
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading((cur) => ({ ...cur, [selectedProfileId]: false }));
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedProfileId, contents, profiles]);
 
   const sortedProfiles = useMemo(
@@ -264,8 +279,19 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="w-[860px] max-w-[96%] max-h-[85vh] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
+        className="flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
+        style={{
+          width: "min(860px, 96vw)",
+          height: "min(640px, 85vh)",
+          minWidth: "min(640px, 96vw)",
+          minHeight: "min(420px, 85vh)",
+          maxWidth: "96vw",
+          maxHeight: "85vh",
+          resize: "both",
+          background: "var(--taomni-panel-bg)",
+          borderColor: "var(--taomni-chrome-border)",
+          color: "var(--taomni-text)",
+        }}
       >
         <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
           <Sliders className="w-3.5 h-3.5 mr-1.5" />

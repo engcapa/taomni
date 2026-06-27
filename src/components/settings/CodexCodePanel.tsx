@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle, CheckCircle, Copy, Loader2, Sliders, Terminal, XCircle } from "lucide-react";
 import { DEFAULT_CODEX_MODEL, useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
+import { useVaultGate } from "../../lib/vaultGate";
 import { CodexCodeConfigDialog } from "./CodexCodeConfigDialog";
 import { CodexProxyFields } from "./CodexProxyFields";
 
@@ -45,8 +46,10 @@ export function CodexCodePanel() {
   const [status, setStatus] = useState<CodexStatusResult | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
+  const [openingDialog, setOpeningDialog] = useState(false);
   const [modelDraft, setModelDraft] = useState(DEFAULT_CODEX_MODEL);
   const t = useT();
+  const ensureVaultReady = useVaultGate();
 
   useEffect(() => {
     if (!config) void loadConfig();
@@ -83,6 +86,19 @@ export function CodexCodePanel() {
     void saveConfig({ ...config, codex_bridge: { ...codex, default_model: next } }).catch(() =>
       setModelDraft(codex.default_model?.trim() || DEFAULT_CODEX_MODEL),
     );
+  };
+
+  const openConfigDialog = async () => {
+    if (openingDialog) return;
+    setOpeningDialog(true);
+    try {
+      const ready = await ensureVaultReady(t("aiSettings.codexCustomVaultRequired"));
+      if (ready) {
+        setShowDialog(true);
+      }
+    } finally {
+      setOpeningDialog(false);
+    }
   };
 
   const StatusIcon = () => {
@@ -266,8 +282,13 @@ export function CodexCodePanel() {
                   : t("aiSettings.codexCustomDisabled")}
               </div>
             </div>
-            <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0" onClick={() => setShowDialog(true)}>
-              <Sliders className="w-3 h-3" />
+            <button
+              type="button"
+              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
+              onClick={() => void openConfigDialog()}
+              disabled={openingDialog}
+            >
+              {openingDialog ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sliders className="w-3 h-3" />}
               {t("aiSettings.ccCustomManage")}
             </button>
           </div>
