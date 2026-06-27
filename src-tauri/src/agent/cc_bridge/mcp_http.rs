@@ -1486,7 +1486,10 @@ impl CcHandler {
             .await
     }
 
-    #[tool(name = "switch_tab", description = "切换到指定会话/标签")]
+    #[tool(
+        name = "switch_tab",
+        description = "旧版兼容工具；打开/切换 Taomni 会话请优先使用 taomni_control.session_open，切换已打开标签请用 taomni_control.tab_switch。"
+    )]
     async fn switch_tab(
         &self,
         Parameters(p): Parameters<SwitchTabParams>,
@@ -1499,7 +1502,7 @@ impl CcHandler {
 
     #[tool(
         name = "open_session_editor",
-        description = "打开新会话编辑器，可预填 name/host/username"
+        description = "旧版兼容工具；打开 Taomni 会话编辑器请优先使用 taomni_control.session_open_editor。"
     )]
     async fn open_session_editor(
         &self,

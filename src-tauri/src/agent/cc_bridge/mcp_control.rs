@@ -84,15 +84,34 @@ impl ControlHandler {
                 .unwrap()
                 .insert(call_id.clone(), tx);
         }
-        let _ = self.app.emit(
-            "agent-cc-control-tool",
-            serde_json::json!({
-                "callId": call_id,
-                "threadId": scope.thread_id,
-                "tool": tool,
-                "args": args,
-            }),
-        );
+        let payload = serde_json::json!({
+            "callId": call_id,
+            "threadId": scope.thread_id,
+            "tool": tool,
+            "args": args,
+        });
+        let _ = self.app.emit("agent-cc-control-tool", payload.clone());
+        {
+            let app = self.app.clone();
+            let call_id = call_id.clone();
+            tokio::spawn(async move {
+                for _ in 0..20 {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    let still_pending = {
+                        let state = app.state::<AppState>();
+                        state
+                            .cc_pending_tool_calls
+                            .lock()
+                            .map(|calls| calls.contains_key(&call_id))
+                            .unwrap_or(false)
+                    };
+                    if !still_pending {
+                        break;
+                    }
+                    let _ = app.emit("agent-cc-control-tool", payload.clone());
+                }
+            });
+        }
 
         match tokio::time::timeout(Duration::from_secs(TOOL_TIMEOUT_SECS), rx).await {
             Ok(Ok(outcome)) if outcome.ok => {
@@ -1076,7 +1095,7 @@ impl ControlHandler {
 
     #[tool(
         name = "session_open",
-        description = "在 Taomni UI 中打开一个已保存 session。支持 session_id 或唯一 query。"
+        description = "在 Taomni UI 中打开一个已保存 session（不受当前线程绑定终端限制）。支持 session_id 或唯一 query；用户说“打开/切换到某会话”时优先调用。"
     )]
     async fn session_open(
         &self,
@@ -1103,7 +1122,7 @@ impl ControlHandler {
 
     #[tool(
         name = "session_open_editor",
-        description = "打开新建/编辑 session 对话框。可传 session_id 编辑；或传 session_type/group_path 新建。"
+        description = "打开 Taomni 新建/编辑 session 对话框（UI 控制动作）。可传 session_id 编辑；或传 session_type/group_path 新建。"
     )]
     async fn session_open_editor(
         &self,

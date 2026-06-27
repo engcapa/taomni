@@ -403,6 +403,12 @@ async function executeTool(dispatch: ToolDispatch): Promise<void> {
         ok = true;
         break;
       }
+      case "switch_tab":
+        output = "switch_tab is deprecated in this bridge; call taomni_control.session_open for saved sessions or taomni_control.tab_switch for already-open tabs.";
+        break;
+      case "open_session_editor":
+        output = "open_session_editor is deprecated in this bridge; call taomni_control.session_open_editor instead.";
+        break;
       default:
         output = `工具 "${dispatch.tool}" 暂不支持从界面执行`;
     }

@@ -1094,7 +1094,7 @@ pub async fn chat_stream(
 
                 let output_format = resolve_output_format(&thread, &ai_config);
                 let base_instructions = format!(
-                    "{}\n\nYou are connected through Codex app-server inside Taomni. Use Taomni MCP tools only for the bound session described in the developer instructions.",
+                    "{}\n\nYou are connected through Codex app-server inside Taomni. Use the domain Taomni MCP tools only for the bound terminal/database session described in the developer instructions. The separate taomni_control MCP server is the UI/session/tab control plane: when the user asks to open or switch to a saved Taomni session, open the session editor, or manage tabs, call taomni_control tools instead of telling the user to do it manually.",
                     build_system_prompt(&output_format)
                 );
                 let developer_instructions = {

@@ -120,6 +120,8 @@ interface ControlToolDispatch {
   args: Record<string, unknown>;
 }
 
+type ControlToolExecutor = (dispatch: ControlToolDispatch) => Promise<void>;
+
 type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
 const MIN_SPLIT_WEIGHT = 0.35;
@@ -332,6 +334,8 @@ export function MainLayout() {
     return profiles;
   }, [sessions]);
   const tabsRef = useRef(tabs);
+  const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
+  const seenControlToolCallsRef = useRef<Set<string>>(new Set());
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const lastSidebarSizeRef = useRef(22);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
@@ -1840,10 +1844,21 @@ export function MainLayout() {
   ]);
 
   useEffect(() => {
+    executeControlToolRef.current = executeControlTool;
+  }, [executeControlTool]);
+
+  useEffect(() => {
     let unlisten: UnlistenFn | null = null;
     let disposed = false;
     void listen<ControlToolDispatch>("agent-cc-control-tool", (event) => {
-      void executeControlTool(event.payload);
+      const executor = executeControlToolRef.current;
+      if (!executor) return;
+      const callId = event.payload.callId;
+      const seen = seenControlToolCallsRef.current;
+      if (seen.has(callId)) return;
+      if (seen.size > 5000) seen.clear();
+      seen.add(callId);
+      void executor(event.payload);
     }).then((fn) => {
       if (disposed) void fn();
       else unlisten = fn;
@@ -1852,7 +1867,7 @@ export function MainLayout() {
       disposed = true;
       unlisten?.();
     };
-  }, [executeControlTool]);
+  }, []);
 
   const openLanChatTab = useCallback(() => {
     // If LanChat is currently docked as an edge drawer, undock it; the
