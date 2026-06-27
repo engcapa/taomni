@@ -118,7 +118,10 @@ fn expand_tilde(path: &str, home: Option<&Path>) -> String {
 /// touch the filesystem.
 fn normalize_lexical(path: &str) -> String {
     let path = path.replace('\\', "/");
-    let absolute = path.starts_with('/') || (path.len() >= 3 && path.chars().nth(1) == Some(':') && path.chars().nth(2) == Some('/'));
+    let absolute = path.starts_with('/')
+        || (path.len() >= 3
+            && path.chars().nth(1) == Some(':')
+            && path.chars().nth(2) == Some('/'));
     let is_windows_drive = path.len() >= 2 && path.chars().nth(1) == Some(':');
     let mut out: Vec<&str> = Vec::new();
     for comp in path.split('/') {
@@ -194,6 +197,24 @@ pub fn is_write_tool(tool: &str) -> bool {
             | "redis_set_key"
             | "redis_del_key"
             | "redis_exec"
+            // Taomni control-plane MCP tools.
+            | "session_create"
+            | "session_update"
+            | "session_duplicate"
+            | "session_delete"
+            | "session_move_group"
+            | "group_create"
+            | "group_rename"
+            | "group_delete"
+            | "session_open"
+            | "session_open_editor"
+            | "quick_connect"
+            | "tab_duplicate"
+            | "tab_rename"
+            | "tab_close"
+            | "tab_move"
+            | "tab_open_local_terminal"
+            | "tab_open_file_browser"
     )
 }
 
@@ -317,7 +338,10 @@ mod tests {
         assert!(is_write_tool("run_captured"));
         assert!(!is_write_tool("read_capture"));
         let blocked = call("run_captured", json!({ "command": "rm -rf /" }));
-        assert!(check_tool_call(&blocked).is_err(), "rm -rf / must be blocked");
+        assert!(
+            check_tool_call(&blocked).is_err(),
+            "rm -rf / must be blocked"
+        );
         let ok = call("run_captured", json!({ "command": "journalctl -n 100000" }));
         assert!(check_tool_call(&ok).is_ok());
     }

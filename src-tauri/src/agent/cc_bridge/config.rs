@@ -114,7 +114,11 @@ pub fn resolve_custom_settings(
         Some(id) => id,
         None => return Ok(None),
     };
-    let profile = match cfg.custom_settings_profiles.iter().find(|p| &p.id == active_id) {
+    let profile = match cfg
+        .custom_settings_profiles
+        .iter()
+        .find(|p| &p.id == active_id)
+    {
         Some(p) => p,
         None => return Ok(None),
     };
@@ -203,6 +207,7 @@ pub fn create_session_files(
     server_name: &str,
     server_url: &str,
     token: &str,
+    control_server_url: &str,
 ) -> Result<CcSessionFiles, String> {
     let dir = std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));
     let settings_path = dir.join(format!("{}.json", uuid::Uuid::new_v4().simple()));
@@ -211,8 +216,14 @@ pub fn create_session_files(
     let value = build_settings_value(custom, &sensitive_deny_dirs())?;
     write_settings_file(&value, &settings_path)
         .map_err(|e| format!("Failed to write CC settings: {e}"))?;
-    write_temp_mcp_config(&mcp_path, server_name, server_url, token)
-        .map_err(|e| format!("Failed to write CC MCP config: {e}"))?;
+    write_temp_mcp_config(
+        &mcp_path,
+        server_name,
+        server_url,
+        token,
+        control_server_url,
+    )
+    .map_err(|e| format!("Failed to write CC MCP config: {e}"))?;
 
     Ok(CcSessionFiles {
         dir,
@@ -234,12 +245,18 @@ pub fn write_temp_mcp_config(
     server_name: &str,
     server_url: &str,
     token: &str,
+    control_server_url: &str,
 ) -> std::io::Result<()> {
     let mcp = serde_json::json!({
         "mcpServers": {
             server_name: {
                 "type": "http",
                 "url": server_url,
+                "headers": { "Authorization": format!("Bearer {token}") }
+            },
+            "taomni_control": {
+                "type": "http",
+                "url": control_server_url,
                 "headers": { "Authorization": format!("Bearer {token}") }
             }
         }
@@ -273,7 +290,10 @@ mod tests {
     use super::*;
 
     fn deny_dirs() -> Vec<PathBuf> {
-        vec![PathBuf::from("/home/u/.ssh"), PathBuf::from("/home/u/.config/taomni")]
+        vec![
+            PathBuf::from("/home/u/.ssh"),
+            PathBuf::from("/home/u/.config/taomni"),
+        ]
     }
 
     fn deny_list(value: &serde_json::Value) -> Vec<String> {
@@ -378,7 +398,14 @@ mod tests {
     fn mcp_config_is_http_with_bearer() {
         let dir = std::env::temp_dir().join(format!(".cfgtest-{}", uuid::Uuid::new_v4().simple()));
         let path = dir.join(".mcp.json");
-        write_temp_mcp_config(&path, "taomni", "http://127.0.0.1:5555/mcp", "tok-123").unwrap();
+        write_temp_mcp_config(
+            &path,
+            "taomni",
+            "http://127.0.0.1:5555/mcp",
+            "tok-123",
+            "http://127.0.0.1:5555/mcp/control",
+        )
+        .unwrap();
         let raw = std::fs::read_to_string(&path).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
         let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
@@ -386,6 +413,14 @@ mod tests {
         assert_eq!(entry["type"], "http");
         assert_eq!(entry["url"], "http://127.0.0.1:5555/mcp");
         assert_eq!(entry["headers"]["Authorization"], "Bearer tok-123");
+        assert_eq!(
+            v["mcpServers"]["taomni_control"]["url"],
+            "http://127.0.0.1:5555/mcp/control"
+        );
+        assert_eq!(
+            v["mcpServers"]["taomni_control"]["headers"]["Authorization"],
+            "Bearer tok-123"
+        );
         // The permission-prompt tool name must match the registered server.
         assert_eq!(PERMISSION_PROMPT_TOOL, "mcp__taomni__permission_prompt");
     }
@@ -396,14 +431,26 @@ mod tests {
         // (and its `--permission-prompt-tool` resolves to that server).
         let dir = std::env::temp_dir().join(format!(".cfgtest-{}", uuid::Uuid::new_v4().simple()));
         let path = dir.join(".mcp.json");
-        write_temp_mcp_config(&path, "taomni_sql", "http://127.0.0.1:5555/mcp/sql", "tok-9").unwrap();
+        write_temp_mcp_config(
+            &path,
+            "taomni_sql",
+            "http://127.0.0.1:5555/mcp/sql",
+            "tok-9",
+            "http://127.0.0.1:5555/mcp/control",
+        )
+        .unwrap();
         let raw = std::fs::read_to_string(&path).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
         let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
-        // Only the one flavor server is present — no shell `taomni` entry.
+        // Only the selected domain server plus shared control server are present.
         let servers = v["mcpServers"].as_object().unwrap();
-        assert_eq!(servers.len(), 1);
+        assert_eq!(servers.len(), 2);
         assert!(servers.contains_key("taomni_sql"));
-        assert_eq!(v["mcpServers"]["taomni_sql"]["url"], "http://127.0.0.1:5555/mcp/sql");
+        assert!(servers.contains_key("taomni_control"));
+        assert!(!servers.contains_key("taomni"));
+        assert_eq!(
+            v["mcpServers"]["taomni_sql"]["url"],
+            "http://127.0.0.1:5555/mcp/sql"
+        );
     }
 }

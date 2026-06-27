@@ -40,9 +40,7 @@ pub async fn cc_detect(state: State<'_, AppState>) -> Result<CcStatusResult, Str
 /// - `Ok(Some(json))` the stored settings JSON.
 /// - `Err("VAULT_LOCKED: …")` when a reference is set but the vault is locked.
 #[tauri::command]
-pub async fn cc_get_custom_settings(
-    state: State<'_, AppState>,
-) -> Result<Option<String>, String> {
+pub async fn cc_get_custom_settings(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let config = AiConfig::load(&default_ai_config_path());
     crate::agent::cc_bridge::config::resolve_custom_settings(&config.cc_bridge, &state.vault)
 }
@@ -157,6 +155,7 @@ pub async fn cc_send_message(
                     config.cc_bridge.confirm_readonly,
                 )
                 .await?;
+            let control_server_url = crate::agent::cc_bridge::mcp_http::control_server_url()?;
             // Resolve the user's custom settings.json from the vault (when set).
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
                 &config.cc_bridge,
@@ -167,6 +166,7 @@ pub async fn cc_send_message(
                 flavor.server_name(),
                 &cc_server_url,
                 &cc_token,
+                &control_server_url,
             )?;
 
             // Build extra args.
@@ -286,7 +286,9 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
                 .ok()
                 .and_then(|m| m.get(&session_id).cloned())
                 .unwrap_or(session_id);
-            if let Some(crate::terminal::ActiveTerminal::Ssh { handle, .. }) = terms.get(&backend_sid) {
+            if let Some(crate::terminal::ActiveTerminal::Ssh { handle, .. }) =
+                terms.get(&backend_sid)
+            {
                 crate::agent::capture::exec_c::cleanup_remote(handle, &path).await;
             }
         }
@@ -455,6 +457,7 @@ pub async fn cc_stream_message(
                     config.cc_bridge.confirm_readonly,
                 )
                 .await?;
+            let control_server_url = crate::agent::cc_bridge::mcp_http::control_server_url()?;
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
                 &config.cc_bridge,
                 &state.vault,
@@ -464,6 +467,7 @@ pub async fn cc_stream_message(
                 flavor.server_name(),
                 &cc_server_url,
                 &cc_token,
+                &control_server_url,
             )?;
 
             let mut extra_args = vec![
@@ -569,25 +573,29 @@ pub async fn cc_test_settings(
     }
 
     let flavor = crate::agent::cc_bridge::mcp_http::Flavor::Shell;
-    let (cc_server_url, cc_token) =
-        crate::agent::cc_bridge::mcp_http::provision_for_thread(
-            &app,
-            &thread_id,
-            None,
-            None,
-            flavor,
-            config.cc_bridge.confirm_readonly,
-        )
-        .await?;
+    let (cc_server_url, cc_token) = crate::agent::cc_bridge::mcp_http::provision_for_thread(
+        &app,
+        &thread_id,
+        None,
+        None,
+        flavor,
+        config.cc_bridge.confirm_readonly,
+    )
+    .await?;
+    let control_server_url = crate::agent::cc_bridge::mcp_http::control_server_url()?;
 
     let files = crate::agent::cc_bridge::config::create_session_files(
         Some(&settings_json),
         flavor.server_name(),
         &cc_server_url,
         &cc_token,
+        &control_server_url,
     )?;
 
-    eprintln!("[cc test settings] Temporary settings.json path: {}", files.settings_path.to_string_lossy());
+    eprintln!(
+        "[cc test settings] Temporary settings.json path: {}",
+        files.settings_path.to_string_lossy()
+    );
 
     let extra_args = vec![
         "--model".into(),
@@ -677,4 +685,3 @@ pub async fn cc_test_settings(
         }
     }
 }
-

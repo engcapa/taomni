@@ -131,6 +131,18 @@ fn push_redis_routing(s: &mut String) {
     );
 }
 
+fn push_control_plane_guidance(s: &mut String) {
+    s.push_str(
+        "Taomni 还提供独立的 taomni_control MCP 控制面,用于操作 Taomni UI、已保存会话和标签页。\
+         它不受当前终端/数据库绑定限制;绑定限制只适用于终端、SQL、Redis 等领域工具。\n",
+    );
+    s.push_str(
+        "当用户要求打开/切换到某个已保存会话、打开会话编辑器、复制/关闭/重命名/切换标签页时,\
+         你必须调用 taomni_control 的 session_open / session_open_editor / tab_* 工具完成,\
+         不要只告诉用户去侧边栏双击或手动操作。找不到唯一目标时先用 session_list 查询并让用户澄清。\n",
+    );
+}
+
 /// Shared guidance for any thread bound to a terminal — saved-remote,
 /// saved-local, or a live tab with no saved session. It states one *uniform*
 /// operating principle (not a per-field hint): every operation in this thread
@@ -297,6 +309,7 @@ pub fn render_card(
     local_env: Option<&LocalTerminalEnv>,
 ) -> String {
     let mut s = String::from("[Taomni 会话绑定 / session binding]\n");
+    push_control_plane_guidance(&mut s);
     match session {
         Some(sc) => {
             let user = sc.username.as_deref().unwrap_or("");

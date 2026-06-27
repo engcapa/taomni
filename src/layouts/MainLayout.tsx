@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   Group as PanelGroup,
   Panel,
@@ -110,6 +112,15 @@ const ProxyTestTab = lazy(() => import("../components/proxy/ProxyTestTab"));
 interface PendingAuth {
   session: SessionConfig;
 }
+
+interface ControlToolDispatch {
+  callId: string;
+  threadId: string;
+  tool: string;
+  args: Record<string, unknown>;
+}
+
+type ControlToolExecutor = (dispatch: ControlToolDispatch) => Promise<void>;
 
 type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
@@ -292,7 +303,9 @@ export function MainLayout() {
     addTab,
     removeTab,
     duplicateTab,
+    updateTabTitle,
     setActiveTab,
+    moveTabToIndex,
     toggleSidebar,
     setSidebarCollapsed,
     toggleXServer,
@@ -321,6 +334,8 @@ export function MainLayout() {
     return profiles;
   }, [sessions]);
   const tabsRef = useRef(tabs);
+  const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
+  const seenControlToolCallsRef = useRef<Set<string>>(new Set());
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const lastSidebarSizeRef = useRef(22);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
@@ -1616,6 +1631,243 @@ export function MainLayout() {
       closable: true,
     });
   }, [addTab, setActiveTab]);
+
+  const executeControlTool = useCallback(async (dispatch: ControlToolDispatch) => {
+    let ok = false;
+    let output = "";
+    const args = dispatch.args ?? {};
+    const resolveTab = (raw: unknown): Tab | undefined => {
+      const id = String(raw ?? "").trim();
+      if (!id) return undefined;
+      return tabsRef.current.find((tab) => tab.id === id);
+    };
+    const resolveSession = async (): Promise<SessionConfig | null> => {
+      const sessionId = String(args.session_id ?? "").trim();
+      if (sessionId) {
+        let found = useSessionStore.getState().sessions.find((s) => s.id === sessionId) ?? null;
+        if (!found) {
+          await loadSessions();
+          found = useSessionStore.getState().sessions.find((s) => s.id === sessionId) ?? null;
+        }
+        return found;
+      }
+      const query = String(args.query ?? "").trim().toLowerCase();
+      if (!query) return null;
+      let all = useSessionStore.getState().sessions;
+      if (all.length === 0) {
+        await loadSessions();
+        all = useSessionStore.getState().sessions;
+      }
+      const matches = all.filter((s) =>
+        s.id.toLowerCase() === query ||
+        s.name.toLowerCase().includes(query) ||
+        s.host.toLowerCase().includes(query)
+      );
+      return matches.length === 1 ? matches[0] : null;
+    };
+
+    try {
+      switch (dispatch.tool) {
+        case "session_open": {
+          const session = await resolveSession();
+          if (!session) {
+            output = "session_open could not resolve a unique session";
+            break;
+          }
+          const outcome = openQueuedSession(session);
+          if (outcome === "opened") {
+            ok = true;
+            output = `opened session ${session.id}`;
+          } else {
+            ok = true;
+            output = `session ${session.id} queued: ${outcome}`;
+          }
+          break;
+        }
+        case "session_open_editor": {
+          const sessionId = String(args.session_id ?? "").trim();
+          if (sessionId) {
+            const session = await resolveSession();
+            if (!session) {
+              output = `session not found: ${sessionId}`;
+              break;
+            }
+            setEditingSession(session);
+            setNewSessionGroupPath(null);
+            setNewSessionInitialProto(undefined);
+          } else {
+            setEditingSession(undefined);
+            setNewSessionGroupPath(typeof args.group_path === "string" ? args.group_path : null);
+            setNewSessionInitialProto(typeof args.session_type === "string" ? args.session_type : undefined);
+          }
+          setShowSessionEditor(true);
+          ok = true;
+          output = "session editor opened";
+          break;
+        }
+        case "quick_connect": {
+          const input = String(args.input ?? "").trim();
+          if (!input) {
+            output = "quick_connect requires input";
+            break;
+          }
+          handleQuickConnect(input);
+          ok = true;
+          output = "quick connect submitted";
+          break;
+        }
+        case "tab_list": {
+          const tabs = useAppStore.getState().tabs.map((tab, index) => ({
+            id: tab.id,
+            title: tab.title,
+            type: tab.type,
+            sessionId: tab.sessionId ?? null,
+            active: tab.id === useAppStore.getState().activeTabId,
+            index,
+          }));
+          ok = true;
+          output = JSON.stringify(tabs, null, 2);
+          break;
+        }
+        case "tab_switch": {
+          const tab = resolveTab(args.tab_id);
+          if (!tab) {
+            output = `tab not found: ${String(args.tab_id ?? "")}`;
+            break;
+          }
+          setActiveTab(tab.id);
+          ok = true;
+          output = `switched to tab ${tab.id}`;
+          break;
+        }
+        case "tab_duplicate": {
+          const tab = resolveTab(args.tab_id);
+          if (!tab) {
+            output = `tab not found: ${String(args.tab_id ?? "")}`;
+            break;
+          }
+          await handleDuplicateTab(tab.id);
+          ok = true;
+          output = `duplicated tab ${tab.id}`;
+          break;
+        }
+        case "tab_rename": {
+          const tab = resolveTab(args.tab_id);
+          const title = String(args.title ?? "").trim();
+          if (!tab || !title) {
+            output = "tab_rename requires a valid tab_id and title";
+            break;
+          }
+          updateTabTitle(tab.id, title);
+          ok = true;
+          output = `renamed tab ${tab.id}`;
+          break;
+        }
+        case "tab_close": {
+          const tab = resolveTab(args.tab_id);
+          if (!tab) {
+            output = `tab not found: ${String(args.tab_id ?? "")}`;
+            break;
+          }
+          if (!tab.closable) {
+            output = `tab is not closable: ${tab.id}`;
+            break;
+          }
+          removeTab(tab.id);
+          ok = true;
+          output = `closed tab ${tab.id}`;
+          break;
+        }
+        case "tab_move": {
+          const tab = resolveTab(args.tab_id);
+          const toIndex = Number(args.to_index);
+          if (!tab || !Number.isInteger(toIndex)) {
+            output = "tab_move requires a valid tab_id and integer to_index";
+            break;
+          }
+          moveTabToIndex(tab.id, toIndex);
+          ok = true;
+          output = `moved tab ${tab.id} to index ${toIndex}`;
+          break;
+        }
+        case "tab_open_settings": {
+          openSettingsTab();
+          ok = true;
+          output = "settings tab opened";
+          break;
+        }
+        case "tab_open_local_terminal": {
+          openLocalTab(typeof args.title === "string" ? args.title : undefined);
+          ok = true;
+          output = "local terminal opened";
+          break;
+        }
+        case "tab_open_file_browser": {
+          const path = String(args.path ?? "").trim();
+          if (!path) {
+            output = "tab_open_file_browser requires path";
+            break;
+          }
+          openFileBrowserTab(typeof args.title === "string" ? args.title : path, path);
+          ok = true;
+          output = `file browser opened: ${path}`;
+          break;
+        }
+        default:
+          output = `unsupported control tool: ${dispatch.tool}`;
+      }
+    } catch (err) {
+      output = err instanceof Error ? err.message : String(err);
+    }
+
+    try {
+      await invoke("cc_resolve_tool_call", {
+        callId: dispatch.callId,
+        ok,
+        output,
+      });
+    } catch (err) {
+      console.error("cc_resolve_tool_call failed:", err);
+    }
+  }, [
+    handleDuplicateTab,
+    handleQuickConnect,
+    loadSessions,
+    moveTabToIndex,
+    openFileBrowserTab,
+    openLocalTab,
+    openQueuedSession,
+    openSettingsTab,
+    removeTab,
+    setActiveTab,
+    updateTabTitle,
+  ]);
+
+  useEffect(() => {
+    executeControlToolRef.current = executeControlTool;
+  }, [executeControlTool]);
+
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let disposed = false;
+    void listen<ControlToolDispatch>("agent-cc-control-tool", (event) => {
+      const executor = executeControlToolRef.current;
+      if (!executor) return;
+      const callId = event.payload.callId;
+      const seen = seenControlToolCallsRef.current;
+      if (seen.has(callId)) return;
+      if (seen.size > 5000) seen.clear();
+      seen.add(callId);
+      void executor(event.payload);
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   const openLanChatTab = useCallback(() => {
     // If LanChat is currently docked as an edge drawer, undock it; the

@@ -631,6 +631,17 @@ pub async fn chat_stream(
                             return Ok(());
                         }
                     };
+                let control_server_url =
+                    match crate::agent::cc_bridge::mcp_http::control_server_url() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
                 // Resolve the user's custom settings.json from the vault (when
                 // configured). A locked vault means we can't read the token, so
                 // surface it as a stream error and let the UI prompt to unlock.
@@ -652,6 +663,7 @@ pub async fn chat_stream(
                     flavor.server_name(),
                     &cc_server_url,
                     &cc_token,
+                    &control_server_url,
                 ) {
                     Ok(f) => f,
                     Err(e) => {
@@ -1059,6 +1071,17 @@ pub async fn chat_stream(
                             return Ok(());
                         }
                 };
+                let control_server_url =
+                    match crate::agent::cc_bridge::mcp_http::control_server_url() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
 
                 let thread_config =
                     crate::agent::codex_bridge::config::build_thread_config_from_config(
@@ -1066,11 +1089,12 @@ pub async fn chat_stream(
                         flavor.server_name(),
                         &server_url,
                         &token,
+                        &control_server_url,
                     );
 
                 let output_format = resolve_output_format(&thread, &ai_config);
                 let base_instructions = format!(
-                    "{}\n\nYou are connected through Codex app-server inside Taomni. Use Taomni MCP tools only for the bound session described in the developer instructions.",
+                    "{}\n\nYou are connected through Codex app-server inside Taomni. Use the domain Taomni MCP tools only for the bound terminal/database session described in the developer instructions. The separate taomni_control MCP server is the UI/session/tab control plane: when the user asks to open or switch to a saved Taomni session, open the session editor, or manage tabs, call taomni_control tools instead of telling the user to do it manually.",
                     build_system_prompt(&output_format)
                 );
                 let developer_instructions = {
