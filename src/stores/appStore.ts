@@ -11,6 +11,7 @@ const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
 const SQL_ECHO_KEY = "taomni.sqlEcho";
+const SIDEBAR_COLLAPSED_KEY = "taomni.sidebarCollapsed";
 
 interface AppState {
   tabs: Tab[];
@@ -197,6 +198,25 @@ function writeSqlEcho(enabled: boolean) {
   }
 }
 
+function readSidebarCollapsed(): boolean {
+  try {
+    const value = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (value === "false") return false;
+    if (value === "true") return true;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function writeSidebarCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "true" : "false");
+  } catch {
+    // Ignore storage failures; the current session still reflects the change.
+  }
+}
+
 function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
   const next = new Set<string>();
   for (const id of ids) {
@@ -249,7 +269,7 @@ export const useAppStore = create<AppState>((set) => ({
     },
   ],
   activeTabId: "welcome",
-  sidebarCollapsed: false,
+  sidebarCollapsed: readSidebarCollapsed(),
   activeSideTab: "sessions",
   cwdByTab: {},
   dbConnByTab: {},
@@ -287,6 +307,7 @@ export const useAppStore = create<AppState>((set) => ({
       const copy: Tab = {
         ...source,
         id: `dup-${crypto.randomUUID()}`,
+        chatTabId: undefined,
         title: computeDuplicateTitle(source.title, s.tabs.map((t) => t.title)),
         closable: true,
         hasNewOutput: false,
@@ -389,9 +410,20 @@ export const useAppStore = create<AppState>((set) => ({
       return { tabs: next };
     }),
 
-  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-  setActiveSideTab: (tab) => set({ activeSideTab: tab, sidebarCollapsed: false }),
+  toggleSidebar: () =>
+    set((s) => {
+      const sidebarCollapsed = !s.sidebarCollapsed;
+      writeSidebarCollapsed(sidebarCollapsed);
+      return { sidebarCollapsed };
+    }),
+  setSidebarCollapsed: (collapsed) => {
+    writeSidebarCollapsed(collapsed);
+    set({ sidebarCollapsed: collapsed });
+  },
+  setActiveSideTab: (tab) => {
+    writeSidebarCollapsed(false);
+    set({ activeSideTab: tab, sidebarCollapsed: false });
+  },
 
   refreshXServer: async () => {
     const status = await detectXServer();

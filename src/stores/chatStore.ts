@@ -91,11 +91,19 @@ function isChatCapableTabType(type: string | null | undefined): boolean {
 }
 
 function clampDrawerWidth(width: number): number {
-  return Math.max(280, Math.min(720, Math.round(width)));
+  const viewportMax =
+    typeof window === "undefined"
+      ? 960
+      : Math.max(320, Math.min(1120, window.innerWidth - 32));
+  return Math.max(280, Math.min(viewportMax, Math.round(width)));
 }
 
 function clampDrawerHeight(height: number): number {
-  return Math.max(260, Math.min(620, Math.round(height)));
+  const viewportMax =
+    typeof window === "undefined"
+      ? 720
+      : Math.max(260, Math.min(900, window.innerHeight - 32));
+  return Math.max(220, Math.min(viewportMax, Math.round(height)));
 }
 
 function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
@@ -143,7 +151,7 @@ async function resolveActiveChatTabId(): Promise<string | null> {
     const { useAppStore } = await import("./appStore");
     const state = useAppStore.getState();
     const active = state.tabs.find((tab) => tab.id === state.activeTabId);
-    if (active && isChatCapableTabType(active.type)) return active.id;
+    if (active && isChatCapableTabType(active.type)) return active.chatTabId ?? active.id;
     return state.tabs.find((tab) => tab.type === "welcome")?.id ?? null;
   } catch {
     return null;
@@ -416,10 +424,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           const { useAppStore } = await import("./appStore");
           const { getTerminal } = await import("../lib/terminal/terminalRegistry");
           const appState = useAppStore.getState();
-          boundSessionId = appState.tabs.find((t) => t.id === tabId)?.sessionId ?? null;
-          cwd = appState.cwdByTab[tabId] ?? null;
-          boundDbConnectionId = appState.dbConnByTab[tabId] ?? null;
-          const localEnv = getTerminal(tabId)?.localEnvironment ?? null;
+          const boundTab = appState.tabs.find((t) => t.id === tabId || t.chatTabId === tabId) ?? null;
+          const runtimeTabId = boundTab?.id ?? tabId;
+          boundSessionId = boundTab?.sessionId ?? null;
+          cwd = appState.cwdByTab[tabId] ?? appState.cwdByTab[runtimeTabId] ?? null;
+          boundDbConnectionId = appState.dbConnByTab[tabId] ?? appState.dbConnByTab[runtimeTabId] ?? null;
+          const localEnv = getTerminal(tabId)?.localEnvironment ?? getTerminal(runtimeTabId)?.localEnvironment ?? null;
           if (localEnv) {
             localTerminalEnv = { ...localEnv, cwd };
           }

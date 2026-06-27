@@ -177,6 +177,29 @@ describe("appStore.uiAppearance", () => {
   });
 });
 
+describe("appStore.sidebar", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useAppStore.setState({ sidebarCollapsed: true });
+  });
+
+  it("persists explicit sidebar collapsed changes", () => {
+    useAppStore.getState().setSidebarCollapsed(false);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
+
+    useAppStore.getState().setSidebarCollapsed(true);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+  });
+
+  it("persists sidebar toggle changes", () => {
+    useAppStore.getState().toggleSidebar();
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
+  });
+});
+
 describe("appStore.terminalSplit", () => {
   beforeEach(() => {
     window.localStorage.clear();

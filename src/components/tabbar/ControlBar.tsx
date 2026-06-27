@@ -199,7 +199,6 @@ export function ControlBar({
         {!nativeMenu && (
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
-        <BarButton testId="sidebar-toggle" title={t("sidebar.headerTitle")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebar} />
       </div>
       <div className="min-w-0 flex-1 self-stretch">
         <TabBar

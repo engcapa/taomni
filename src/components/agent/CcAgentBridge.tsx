@@ -377,8 +377,7 @@ async function executeTool(dispatch: ToolDispatch): Promise<void> {
         }
         const term = getTerminal(tabId);
         if (!term) {
-          output = `no live terminal for session ${tabId}`;
-          break;
+          return;
         }
         term.writeInput(buildInteractiveCommandInput(command));
         ok = true;
@@ -395,8 +394,7 @@ async function executeTool(dispatch: ToolDispatch): Promise<void> {
         }
         const term = getTerminal(tabId);
         if (!term) {
-          output = `no live terminal for session ${tabId}`;
-          break;
+          return;
         }
         const n = Number(args.lines ?? 50);
         output = term.getLastLines(Number.isFinite(n) && n > 0 ? n : 50);

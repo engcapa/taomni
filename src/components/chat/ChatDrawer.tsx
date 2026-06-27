@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
   Bot,
   Check,
@@ -33,6 +33,8 @@ import { useT } from "../../lib/i18n";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
+const SIDE_RIBBON_HOVER_OPEN_DELAY_MS = 260;
+const TOP_BOTTOM_RIBBON_HOVER_OPEN_DELAY_MS = 650;
 
 interface ChatDrawerProps {
   /**
@@ -50,7 +52,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     drawerHeight, drawerPosition, drawerPinned, drawerTabId,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     sendMessage, hideDrawer, setDrawerWidth, setDrawerHeight, setDrawerPosition,
-    setDrawerPinned, purgeOldThreads, stopSending,
+    setDrawerPinned, setDrawerOpen, purgeOldThreads, stopSending,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -73,12 +75,13 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   // scope/picker logic re-evaluates) whenever the user switches tabs. We
   // can't read this from terminalRegistry alone because the registry is a
   // plain global and isn't reactive.
-  const activeTabId = useAppStore((s) => s.activeTabId);
-  const activeTabType = useAppStore((s) =>
-    s.tabs.find((t) => t.id === s.activeTabId)?.type ?? null,
+  const activeTab = useAppStore((s) =>
+    s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
+  const activeTabId = activeTab?.id ?? null;
+  const activeTabType = activeTab?.type ?? null;
   const activeChatTabId = CHAT_CAPABLE_TAB_TYPES.has(activeTabType ?? "")
-    ? activeTabId
+    ? activeTab?.chatTabId ?? activeTabId
     : null;
   // SQL echo toggle (Phase 6) — appended to the linked query tab when CC runs
   // SQL. Subscribed so the toggle reflects/persists across the app.
@@ -96,13 +99,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeThread = threads.find((t) => t.id === activeThreadId);
   const linkedTab = useAppStore((s) =>
     activeThread?.linked_session_id
-      ? s.tabs.find((tab) => tab.id === activeThread.linked_session_id) ?? null
+      ? s.tabs.find((tab) =>
+          tab.id === activeThread.linked_session_id ||
+          tab.chatTabId === activeThread.linked_session_id
+        ) ?? null
       : null,
   );
   const linkedTabTitle = activeThread?.linked_session_id
     ? (
         getTerminal(activeThread.linked_session_id)?.title
+        ?? (linkedTab ? getTerminal(linkedTab.id)?.title : undefined)
         ?? getQueryTab(activeThread.linked_session_id)?.title
+        ?? (linkedTab ? getQueryTab(linkedTab.id)?.title : undefined)
         ?? linkedTab?.title
         ?? activeThread.linked_session_id.slice(0, 8)
       )
@@ -271,7 +279,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     // currently focused terminal tab; final fallback is the legacy prop the
     // caller passed (kept for tests / programmatic use).
     const linked = activeThread?.linked_session_id ?? null;
-    const entry = getTerminal(linked) ?? focusedTerminal;
+    const entry = getTerminal(linked) ?? (linkedTab ? getTerminal(linkedTab.id) : null) ?? focusedTerminal;
     if (entry) {
       return entry.getLastLines(lines);
     }
@@ -306,16 +314,61 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     }
   };
 
+  const isHorizontalDock = drawerPosition === "left" || drawerPosition === "right";
+  const sideBySide = isHorizontalDock && drawerPinned;
+  const floating = !sideBySide;
+
+  useEffect(() => {
+    if (!drawerOpen || !floating) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        target.closest('[data-testid="ai-chat-drawer"]') ||
+        target.closest('[data-testid="ai-chat-drawer-ribbon"]')
+      ) {
+        return;
+      }
+      setShowPositionMenu(false);
+      setDrawerOpen(false);
+    };
+
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [drawerOpen, floating, setDrawerOpen]);
+
   // Drag-to-resize the drawer.
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleResizeStart = (
+    e: ReactPointerEvent<HTMLDivElement>,
+    axis: "width" | "height",
+    edge?: "left" | "right",
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
     resizingRef.current = true;
     resizeStartRef.current = { x: e.clientX, y: e.clientY, width: drawerWidth, height: drawerHeight };
-    const onMove = (ev: MouseEvent) => {
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = axis === "width" ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
+    const onMove = (ev: PointerEvent) => {
       if (!resizingRef.current) return;
-      if (drawerPosition === "left") {
-        setDrawerWidth(resizeStartRef.current.width + ev.clientX - resizeStartRef.current.x);
-      } else if (drawerPosition === "right") {
-        setDrawerWidth(resizeStartRef.current.width + resizeStartRef.current.x - ev.clientX);
+      if (axis === "width") {
+        if (drawerPosition === "left") {
+          setDrawerWidth(resizeStartRef.current.width + ev.clientX - resizeStartRef.current.x);
+        } else if (drawerPosition === "right") {
+          setDrawerWidth(resizeStartRef.current.width + resizeStartRef.current.x - ev.clientX);
+        } else if (edge === "left") {
+          setDrawerWidth(resizeStartRef.current.width + (resizeStartRef.current.x - ev.clientX) * 2);
+        } else {
+          setDrawerWidth(resizeStartRef.current.width + (ev.clientX - resizeStartRef.current.x) * 2);
+        }
       } else if (drawerPosition === "top") {
         setDrawerHeight(resizeStartRef.current.height + ev.clientY - resizeStartRef.current.y);
       } else {
@@ -324,25 +377,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     };
     const onUp = () => {
       resizingRef.current = false;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   if (!drawerOpen) return null;
 
-  const isHorizontalDock = drawerPosition === "left" || drawerPosition === "right";
-  const sideBySide = isHorizontalDock && drawerPinned;
-  const floating = !sideBySide;
   const positionLabel = t(`chat.drawerPosition_${drawerPosition}`);
   const PositionIcon = positionIcon(drawerPosition);
   const containerClass = [
     "ai-z-drawer",
     sideBySide ? "relative h-full shrink-0" : "absolute shadow-2xl",
     drawerPosition === "left" ? "order-first" : "",
-    floating ? "rounded-md overflow-hidden" : "",
+    floating ? "rounded-md" : "",
   ].filter(Boolean).join(" ");
   const containerStyle: CSSProperties = sideBySide
     ? { width: drawerWidth }
@@ -354,14 +408,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         [drawerPosition]: 0,
       }
     : {
+        width: drawerWidth,
+        maxWidth: "calc(100% - 32px)",
         height: drawerHeight,
-        left: 56,
-        right: 56,
+        left: "50%",
+        transform: "translateX(-50%)",
         [drawerPosition]: 0,
       };
   const resizeHandleClass = isHorizontalDock
-    ? `absolute ${drawerPosition === "left" ? "right-0" : "left-0"} top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--taomni-accent)] transition-colors z-10`
-    : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0" : "top-0"} h-1 cursor-row-resize hover:bg-[var(--taomni-accent)] transition-colors z-10`;
+    ? `absolute ${drawerPosition === "left" ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"} top-0 bottom-0 w-2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`
+    : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0 translate-y-1/2" : "top-0 -translate-y-1/2"} h-2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`;
+  const widthResizeHandleClass =
+    "absolute top-0 bottom-0 w-2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20";
   const panelBorderClass = sideBySide
     ? drawerPosition === "left"
       ? "border-r"
@@ -379,11 +437,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       {/* Resize handle */}
       <div
         className={resizeHandleClass}
-        onMouseDown={handleResizeStart}
+        data-testid={isHorizontalDock ? "ai-chat-drawer-width-resize" : "ai-chat-drawer-height-resize"}
+        onPointerDown={(event) => handleResizeStart(event, isHorizontalDock ? "width" : "height")}
       />
+      {!isHorizontalDock && (
+        <>
+          <div
+            className={`${widthResizeHandleClass} left-0 -translate-x-1/2`}
+            data-testid="ai-chat-drawer-width-resize-left"
+            onPointerDown={(event) => handleResizeStart(event, "width", "left")}
+          />
+          <div
+            className={`${widthResizeHandleClass} right-0 translate-x-1/2`}
+            data-testid="ai-chat-drawer-width-resize-right"
+            onPointerDown={(event) => handleResizeStart(event, "width", "right")}
+          />
+        </>
+      )}
 
       <div
-        className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)]`}
+        className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)] ${floating ? "rounded-md overflow-hidden" : ""}`}
         style={{ background: "var(--taomni-sidebar-bg)" }}
       >
         {/* Header */}
@@ -712,34 +785,144 @@ export function ChatDrawerRibbon() {
   const t = useT();
   const drawerOpen = useChatStore((s) => s.drawerOpen);
   const drawerPosition = useChatStore((s) => s.drawerPosition);
+  const drawerPinned = useChatStore((s) => s.drawerPinned);
   const openTabChat = useChatStore((s) => s.openTabChat);
+  const setDrawerPosition = useChatStore((s) => s.setDrawerPosition);
   const activeTab = useAppStore((s) =>
     s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
+  const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+  const hoverOpenTimerRef = useRef<number | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverOpenTimerRef.current !== null) {
+        window.clearTimeout(hoverOpenTimerRef.current);
+      }
+    };
+  }, []);
 
   if (drawerOpen || !activeTab || !CHAT_CAPABLE_TAB_TYPES.has(activeTab.type)) return null;
 
-  const Icon = positionIcon(drawerPosition);
+  const chatTabId = activeTab.chatTabId ?? activeTab.id;
   const placementClass = ribbonPlacementClass(drawerPosition);
+  const textClass = ribbonTextClass(drawerPosition);
+  const dragging = dragPreview !== null;
+  const ribbonClass = dragging
+    ? "fixed h-9 w-9 rounded-full border"
+    : `absolute ${placementClass} border`;
+  const ribbonStyle: CSSProperties = {
+    background: "var(--taomni-tao-ribbon-bg)",
+    borderColor: "var(--taomni-tao-ribbon-border)",
+    boxShadow: "var(--taomni-tao-ribbon-shadow)",
+    color: "var(--taomni-tao-ribbon-text)",
+    touchAction: "none",
+    ...(dragPreview
+      ? {
+          left: dragPreview.x,
+          top: dragPreview.y,
+          transform: "translate(-50%, -50%)",
+        }
+      : {}),
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    if (hoverOpenTimerRef.current !== null) {
+      window.clearTimeout(hoverOpenTimerRef.current);
+      hoverOpenTimerRef.current = null;
+    }
+    dragRef.current = { x: event.clientX, y: event.clientY, dragging: false };
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 6) {
+      drag.dragging = true;
+      setDragPreview({ x: event.clientX, y: event.clientY });
+    }
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    setDragPreview(null);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
+    if (!drag?.dragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClickRef.current = true;
+    setDrawerPosition(nearestRibbonPosition(event.clientX, event.clientY));
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  };
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    dragRef.current = null;
+    setDragPreview(null);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Browser preview fallback.
+    }
+  };
+
+  const scheduleHoverOpen = () => {
+    if (drawerPinned || hoverOpenTimerRef.current !== null || dragRef.current) return;
+    const delay = drawerPosition === "top" || drawerPosition === "bottom"
+      ? TOP_BOTTOM_RIBBON_HOVER_OPEN_DELAY_MS
+      : SIDE_RIBBON_HOVER_OPEN_DELAY_MS;
+    hoverOpenTimerRef.current = window.setTimeout(() => {
+      hoverOpenTimerRef.current = null;
+      if (!dragRef.current) void openTabChat(chatTabId);
+    }, delay);
+  };
+
+  const clearHoverOpen = () => {
+    if (hoverOpenTimerRef.current === null) return;
+    window.clearTimeout(hoverOpenTimerRef.current);
+    hoverOpenTimerRef.current = null;
+  };
 
   return (
     <button
       type="button"
       data-testid="ai-chat-drawer-ribbon"
       data-position={drawerPosition}
-      className={`group absolute ${placementClass} z-40 flex items-center justify-center overflow-hidden border border-[var(--taomni-ribbon-border)] text-[10px] font-semibold text-[var(--taomni-text)] shadow-sm transition-all duration-150`}
-      style={{
-        background: "linear-gradient(to bottom, var(--taomni-ribbon-from), var(--taomni-ribbon-to))",
-      }}
+      data-dragging={dragging || undefined}
+      className={`${ribbonClass} z-40 flex items-center justify-center overflow-hidden text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing`}
+      style={ribbonStyle}
       title={t("chat.ribbonOpenTitle", { title: activeTab.title })}
       aria-label={t("chat.ribbonOpenTitle", { title: activeTab.title })}
-      onClick={() => void openTabChat(activeTab.id)}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onMouseEnter={scheduleHoverOpen}
+      onMouseLeave={clearHoverOpen}
+      onClick={(event) => {
+        if (suppressClickRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        void openTabChat(chatTabId);
+      }}
     >
-      <span className="absolute h-1.5 w-1.5 rounded-full bg-[var(--taomni-accent)] shadow-[0_0_0_3px_rgba(30,95,168,0.16)] group-hover:opacity-0" />
-      <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Icon className="w-3 h-3" />
-        <span>Tao</span>
-      </span>
+      <span className={textClass}>Tao</span>
     </button>
   );
 }
@@ -760,12 +943,37 @@ function positionIcon(position: ChatDrawerPosition) {
 function ribbonPlacementClass(position: ChatDrawerPosition): string {
   switch (position) {
     case "left":
-      return "left-0 top-1/2 -translate-y-1/2 h-12 w-3.5 rounded-r-full border-l-0 hover:w-14";
+      return "left-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-r-full border-l-0";
     case "right":
-      return "right-0 top-1/2 -translate-y-1/2 h-12 w-3.5 rounded-l-full border-r-0 hover:w-14";
+      return "right-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-l-full border-r-0";
     case "top":
-      return "top-0 left-1/2 -translate-x-1/2 h-3.5 w-14 rounded-b-full border-t-0 hover:h-8";
+      return "top-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-b-full border-t-0";
     case "bottom":
-      return "bottom-0 left-1/2 -translate-x-1/2 h-3.5 w-14 rounded-t-full border-b-0 hover:h-8";
+      return "bottom-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-t-full border-b-0";
   }
+}
+
+function ribbonTextClass(position: ChatDrawerPosition): string {
+  switch (position) {
+    case "left":
+      return "-rotate-90 leading-none";
+    case "right":
+      return "rotate-90 leading-none";
+    case "top":
+    case "bottom":
+      return "leading-none";
+  }
+}
+
+function nearestRibbonPosition(clientX: number, clientY: number): ChatDrawerPosition {
+  const width = window.innerWidth || 1;
+  const height = window.innerHeight || 1;
+  const distances: Array<[ChatDrawerPosition, number]> = [
+    ["left", clientX],
+    ["right", width - clientX],
+    ["top", clientY],
+    ["bottom", height - clientY],
+  ];
+  distances.sort((a, b) => a[1] - b[1]);
+  return distances[0][0];
 }
