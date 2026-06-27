@@ -29,9 +29,10 @@ interface WelcomePanelProps {
   onNewSession: () => void;
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
   onOpenLanChat?: () => void;
+  onOpenChatTao?: () => void;
 }
 
-export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath, onOpenLanChat }: WelcomePanelProps) {
+export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath, onOpenLanChat, onOpenChatTao }: WelcomePanelProps) {
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -82,8 +83,9 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
     listLocalShells()
       .then((shells) => {
         if (cancelled) return;
-        setLocalShells(shells);
-        setSelectedShellId(shells.find((shell) => shell.isDefault)?.id ?? shells[0]?.id ?? "");
+        const list = Array.isArray(shells) ? shells : [];
+        setLocalShells(list);
+        setSelectedShellId(list.find((shell) => shell.isDefault)?.id ?? list[0]?.id ?? "");
         setShellStatus("ready");
       })
       .catch((error) => {
@@ -96,8 +98,9 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
       listWslDistros()
         .then((distros) => {
           if (cancelled) return;
-          setWslDistros(distros);
-          setSelectedDistro(distros.find((d) => d.isDefault)?.name ?? distros[0]?.name ?? "");
+          const list = Array.isArray(distros) ? distros : [];
+          setWslDistros(list);
+          setSelectedDistro(list.find((d) => d.isDefault)?.name ?? list[0]?.name ?? "");
           setWslStatus("ready");
         })
         .catch((error) => {
@@ -233,6 +236,16 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
               kbd="Ctrl+Shift+N"
               onClick={() => onNewSession()}
             />
+            {onOpenChatTao ? (
+              <ActionCard
+                testId="welcome-open-chat-tao"
+                icon={<MessageCircle className="w-5 h-5" />}
+                title={t("welcome.chatTaoTitle")}
+                desc={t("welcome.chatTaoDesc")}
+                kbd="Ctrl+Shift+L"
+                onClick={onOpenChatTao}
+              />
+            ) : null}
             {onOpenLanChat ? (
               <ActionCard
                 testId="welcome-open-lanchat"

@@ -1,11 +1,11 @@
 id: TC-AI-001
 title: AI Chat Drawer opens, lists threads, and shows attachment chips
 description: |
-  Verifies the AI Chat Drawer surface (F-AI-2.4): the title-bar AI button is
-  mounted (and hidden when AI is fully disabled), Ctrl+L opens the global
-  drawer, the header exposes the New / History / Close buttons, the composer
-  placeholder advertises the @reference syntax, typing `@terminal:last-30`
-  raises an attachment chip, and Ctrl+L toggles the drawer closed again.
+  Verifies the AI Chat Drawer surface (F-AI-2.4): Welcome exposes Chat Tao,
+  opening it creates a tab-bound drawer, the header exposes New / History /
+  position / pin / hide controls, the composer placeholder advertises the
+  @reference syntax, typing `@terminal:last-30` raises an attachment chip,
+  and hiding the drawer leaves a Tao ribbon that can reopen it.
   Does not exercise streaming or send (those need a real LLM key);
   the assertion target is UI plumbing only.
 covers: [F-AI-2.4]
@@ -18,16 +18,16 @@ steps:
   - wait_for: '[data-testid="status-bar"]'
   # PTT button mounted in title bar
   - assert_visible: '[data-testid="ptt-button"]'
-  # AI Chat tray button is present (AI mode is not "fully_disabled" by default)
-  - assert_visible: '[data-testid="ai-chat-drawer-toggle"]'
-  # Open drawer via Ctrl+L
-  - press: 'Control+l'
+  - assert_visible: '[data-testid="welcome-open-chat-tao"]'
+  - click: '[data-testid="welcome-open-chat-tao"]'
   - wait_for: '[data-testid="ai-chat-drawer"]'
-  # Drawer header shows New / History / Close buttons (English defaults
+  # Drawer header shows New / History / layout / hide buttons (English defaults
   # — locale switcher can change them, see F-i18n-1).
   - assert_visible: 'button[title="New chat"]'
   - assert_visible: 'button[title="History"]'
-  - assert_visible: '[data-testid="ai-chat-drawer"] button[title^="Close"]'
+  - assert_visible: '[data-testid="ai-chat-drawer-position"]'
+  - assert_visible: '[data-testid="ai-chat-drawer-pin"]'
+  - assert_visible: '[data-testid="ai-chat-drawer-hide"]'
   # Composer placeholder advertises @reference syntax
   - assert_attribute:
       selector: '[data-testid="ai-chat-drawer"] textarea'
@@ -40,6 +40,9 @@ steps:
   - wait_for: '[data-testid="attachment-chip"]'
   - assert_visible: '[data-testid="attachment-chip"]'
   - screenshot: ai-001-drawer.png
-  # Closing via Ctrl+L should hide drawer
-  - press: 'Control+l'
+  # Hiding should collapse to the current edge ribbon.
+  - click: '[data-testid="ai-chat-drawer-hide"]'
   - assert_not_visible: '[data-testid="ai-chat-drawer"]'
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - click: '[data-testid="ai-chat-drawer-ribbon"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'

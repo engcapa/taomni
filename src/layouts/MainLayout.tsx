@@ -93,7 +93,7 @@ import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
-import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { ChatDrawer, ChatDrawerRibbon } from "../components/chat/ChatDrawer";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
@@ -452,12 +452,14 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
-  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
+  const openTabChat = useChatStore((s) => s.openTabChat);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
   const chatDrawerScope = useChatStore((s) => s.drawerScope);
   const chatDrawerTabId = useChatStore((s) => s.drawerTabId);
+  const chatDrawerPosition = useChatStore((s) => s.drawerPosition);
+  const chatDrawerPinned = useChatStore((s) => s.drawerPinned);
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -1014,7 +1016,11 @@ export function MainLayout() {
     setActiveTerminalTab(terminalTabId);
     setActiveQueryTab(activeTab?.type === "database" ? activeTabId : null);
     const chatBoundTabId =
-      activeTab?.type === "terminal" || activeTab?.type === "rdp" || activeTab?.type === "database"
+      activeTab?.type === "welcome" ||
+      activeTab?.type === "terminal" ||
+      activeTab?.type === "rdp" ||
+      activeTab?.type === "database" ||
+      activeTab?.type === "redis"
         ? activeTabId
         : null;
     void syncTabChatWithActiveTab(chatBoundTabId);
@@ -1049,26 +1055,28 @@ export function MainLayout() {
       const primary = event.ctrlKey || event.metaKey;
       if (!primary || event.altKey || event.key.toLowerCase() !== "l") return;
 
-      // Ctrl/Cmd+L: global AI Chat Drawer (no-op when fully_disabled).
-      if (!event.shiftKey) {
-        event.preventDefault();
-        const aiOff = useAiStore.getState().config?.fully_disabled === true;
-        if (!aiOff) void toggleGlobalChat();
-        return;
-      }
-
-      // Ctrl/Cmd+Shift+L: current terminal tab's bound chat.
       if (event.shiftKey) {
         event.preventDefault();
         const aiOff = useAiStore.getState().config?.fully_disabled === true;
         const current = useAppStore.getState().tabs.find((tab) => tab.id === useAppStore.getState().activeTabId);
-        if (!aiOff && current?.type === "terminal") void toggleTabChat(current.id);
+        if (
+          !aiOff &&
+          (
+            current?.type === "welcome" ||
+            current?.type === "terminal" ||
+            current?.type === "rdp" ||
+            current?.type === "database" ||
+            current?.type === "redis"
+          )
+        ) {
+          void toggleTabChat(current.id);
+        }
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleGlobalChat, toggleTabChat]);
+  }, [toggleTabChat]);
 
   // Hydrate server configs + statuses once on mount so the servers dialog
   // opens with persisted settings and live run state.
@@ -2353,6 +2361,11 @@ export function MainLayout() {
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
+  const chatDrawerInline =
+    chatDrawerOpen &&
+    !aiFullyDisabled &&
+    chatDrawerPinned &&
+    (chatDrawerPosition === "left" || chatDrawerPosition === "right");
 
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
@@ -2397,6 +2410,8 @@ export function MainLayout() {
             />
           </div>
         )}
+
+        {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
 
         <PanelGroup
           orientation="horizontal"
@@ -2463,6 +2478,7 @@ export function MainLayout() {
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}
+                    onOpenChatTao={!aiFullyDisabled ? () => void openTabChat("welcome") : undefined}
                   />
                 )}
 
@@ -2555,7 +2571,7 @@ export function MainLayout() {
                                 }
                               }
                             } : undefined}
-                            chatToggle={!terminalSplitVisible ? {
+                            chatToggle={!terminalSplitVisible && !aiFullyDisabled ? {
                               open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
                             } : undefined}
@@ -2989,7 +3005,9 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
-        {chatDrawerOpen && !aiFullyDisabled && <ChatDrawer />}
+        {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
+        {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
+        {!aiFullyDisabled && <ChatDrawerRibbon />}
       </div>
 
       <StatusBar />

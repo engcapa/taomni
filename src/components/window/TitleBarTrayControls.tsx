@@ -1,7 +1,6 @@
-import { Monitor, Moon, Sun, SplitSquareVertical, Users, Bot } from "lucide-react";
+import { Monitor, Moon, Sun, SplitSquareVertical, Users } from "lucide-react";
 import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
-import { useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
@@ -20,9 +19,6 @@ export function TitleBarTrayControls() {
   const multiExecActive = useAppStore((s) => s.multiExecActive);
   const toggleTerminalSplit = useAppStore((s) => s.toggleTerminalSplit);
   const toggleMultiExec = useAppStore((s) => s.toggleMultiExec);
-  const drawerOpen = useChatStore((s) => s.drawerOpen);
-  const drawerScope = useChatStore((s) => s.drawerScope);
-  const toggleGlobalChat = useChatStore((s) => s.toggleGlobalChat);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
@@ -33,9 +29,6 @@ export function TitleBarTrayControls() {
 
   const splitTitle = terminalSplitActive ? t("titlebar.disableSplit") : t("titlebar.enableSplit");
   const multiExecTitle = multiExecActive ? t("titlebar.disableMultiExec") : t("titlebar.enableMultiExec");
-  const chatOpenForGlobal = drawerOpen && drawerScope === "global";
-  const chatTitle = chatOpenForGlobal ? t("titlebar.closeGlobalChat") : t("titlebar.openGlobalChat");
-  const chatAria = chatOpenForGlobal ? t("titlebar.closeGlobalChatAria") : t("titlebar.openGlobalChatAria");
 
   return (
     <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
@@ -61,23 +54,14 @@ export function TitleBarTrayControls() {
         </TrayButton>
       </div>
 
-      <TrayGroupSeparator />
-
-      {/* AI chat + voice group (voice sits to the right of global chat). */}
-      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-        {!aiFullyDisabled && (
-          <TrayButton
-            testId="ai-chat-drawer-toggle"
-            title={chatTitle}
-            ariaLabel={chatAria}
-            active={chatOpenForGlobal}
-            onClick={() => void toggleGlobalChat()}
-          >
-            <Bot className="w-[16px] h-[16px]" />
-          </TrayButton>
-        )}
-        <PttButton />
-      </div>
+      {!aiFullyDisabled && (
+        <>
+          <TrayGroupSeparator />
+          <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
+            <PttButton />
+          </div>
+        </>
+      )}
 
       <TrayGroupSeparator />
 
