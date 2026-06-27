@@ -13,7 +13,10 @@ const terminalLifecycle = vi.hoisted(() => ({
 }));
 
 const sidebarMock = vi.hoisted(() => ({
-  props: [] as Array<{ onConnectSession?: (session: SessionConfig) => void }>,
+  props: [] as Array<{
+    onConnectSession?: (session: SessionConfig) => void;
+    onOpenSettings?: () => void;
+  }>,
 }));
 
 const quickConnectMock = vi.hoisted(() => ({
@@ -116,10 +119,20 @@ vi.mock("../components/quickconnect/QuickConnect", () => ({
 }));
 
 vi.mock("../components/sidebar/Sidebar", () => ({
-  Sidebar: (props: { onConnectSession?: (session: SessionConfig) => void }) => {
+  Sidebar: (props: { onConnectSession?: (session: SessionConfig) => void; onOpenSettings?: () => void }) => {
     sidebarMock.props.push(props);
-    return <div data-testid="sidebar" />;
+    return (
+      <div data-testid="sidebar">
+        <button type="button" data-testid="ribbon-settings" onClick={props.onOpenSettings}>
+          Settings
+        </button>
+      </div>
+    );
   },
+}));
+
+vi.mock("../components/settings/SettingsPanel", () => ({
+  SettingsPanel: () => <div data-testid="settings-panel" />,
 }));
 
 vi.mock("../components/statusbar/StatusBar", () => ({
@@ -400,6 +413,15 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+  });
+
+  it("opens settings from the lower-left sidebar rail button", () => {
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByTestId("ribbon-settings"));
+
+    expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+    expect(useAppStore.getState().activeTabId).toBe("settings");
   });
 
   it("routes titlebar close through the app exit command", async () => {
@@ -1061,7 +1083,10 @@ function makePasswordSession(id: string, host: string, passwordRef?: string): Se
   };
 }
 
-function latestSidebarProps(): { onConnectSession?: (session: SessionConfig) => void } {
+function latestSidebarProps(): {
+  onConnectSession?: (session: SessionConfig) => void;
+  onOpenSettings?: () => void;
+} {
   const props = sidebarMock.props.at(-1);
   if (!props) throw new Error("Sidebar props were not captured");
   return props;

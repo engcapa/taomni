@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
@@ -82,7 +82,7 @@ describe("ControlBar settings button", () => {
     vi.clearAllMocks();
   });
 
-  it("shows settings as a left-side button and opens it without expanding the menu", () => {
+  it("keeps only app menu and sidebar controls in the left button group", () => {
     const onCommand = vi.fn();
     renderControlBar(onCommand);
 
@@ -92,13 +92,8 @@ describe("ControlBar settings button", () => {
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
       "app-main-menu",
       "sidebar-toggle",
-      "ribbon-settings",
     ]);
-
-    fireEvent.click(screen.getByTestId("ribbon-settings"));
-
-    expect(onCommand).toHaveBeenCalledTimes(1);
-    expect(onCommand).toHaveBeenCalledWith("settings");
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();
+    expect(onCommand).not.toHaveBeenCalled();
   });
 });
