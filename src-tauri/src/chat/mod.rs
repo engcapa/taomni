@@ -631,6 +631,17 @@ pub async fn chat_stream(
                             return Ok(());
                         }
                     };
+                let control_server_url =
+                    match crate::agent::cc_bridge::mcp_http::control_server_url() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
                 // Resolve the user's custom settings.json from the vault (when
                 // configured). A locked vault means we can't read the token, so
                 // surface it as a stream error and let the UI prompt to unlock.
@@ -652,6 +663,7 @@ pub async fn chat_stream(
                     flavor.server_name(),
                     &cc_server_url,
                     &cc_token,
+                    &control_server_url,
                 ) {
                     Ok(f) => f,
                     Err(e) => {
@@ -1059,6 +1071,17 @@ pub async fn chat_stream(
                             return Ok(());
                         }
                 };
+                let control_server_url =
+                    match crate::agent::cc_bridge::mcp_http::control_server_url() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
 
                 let thread_config =
                     crate::agent::codex_bridge::config::build_thread_config_from_config(
@@ -1066,6 +1089,7 @@ pub async fn chat_stream(
                         flavor.server_name(),
                         &server_url,
                         &token,
+                        &control_server_url,
                     );
 
                 let output_format = resolve_output_format(&thread, &ai_config);

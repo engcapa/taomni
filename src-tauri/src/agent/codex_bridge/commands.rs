@@ -136,6 +136,7 @@ pub async fn codex_test_config(
             true,
         )
         .await?;
+    let control_server_url = crate::agent::cc_bridge::mcp_http::control_server_url()?;
 
     let mut runtime = crate::agent::codex_bridge::config::parse_profile_config(Some(&config_toml))
         .map_err(|e| {
@@ -148,6 +149,7 @@ pub async fn codex_test_config(
         flavor.server_name(),
         &server_url,
         &token,
+        &control_server_url,
     );
 
     let temp_dir = std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));

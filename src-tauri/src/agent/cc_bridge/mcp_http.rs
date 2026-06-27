@@ -52,7 +52,7 @@ use crate::state::{AppState, CcPermissionDecision, CcToolOutcome};
 /// to deny.
 const PERMISSION_TIMEOUT_SECS: u64 = 300;
 /// How long a side-effect tool waits for the frontend to perform the effect.
-const TOOL_TIMEOUT_SECS: u64 = 600;
+pub(crate) const TOOL_TIMEOUT_SECS: u64 = 600;
 /// Hard wall-clock cap on a single captured run (方案4). Kept below the CC
 /// idle-reaper's in-flight ceiling (`process::TOOL_WAIT_CEILING_SECS` = 960) so
 /// the capture's own timeout fires first and the CC process is never reaped
@@ -70,6 +70,7 @@ pub enum Flavor {
     Shell,
     Sql,
     Redis,
+    Control,
 }
 
 impl Flavor {
@@ -81,6 +82,7 @@ impl Flavor {
             Flavor::Shell => "/mcp",
             Flavor::Sql => "/mcp/sql",
             Flavor::Redis => "/mcp/redis",
+            Flavor::Control => "/mcp/control",
         }
     }
 
@@ -90,6 +92,7 @@ impl Flavor {
             Flavor::Shell => "taomni",
             Flavor::Sql => "taomni_sql",
             Flavor::Redis => "taomni_redis",
+            Flavor::Control => "taomni_control",
         }
     }
 
@@ -99,6 +102,7 @@ impl Flavor {
             Flavor::Shell => "mcp__taomni__permission_prompt",
             Flavor::Sql => "mcp__taomni_sql__permission_prompt",
             Flavor::Redis => "mcp__taomni_redis__permission_prompt",
+            Flavor::Control => "mcp__taomni_control__permission_prompt",
         }
     }
 
@@ -186,6 +190,12 @@ pub fn server_url(addr: SocketAddr, flavor: Flavor) -> String {
     format!("http://{addr}{}", flavor.path())
 }
 
+pub fn control_server_url() -> Result<String, String> {
+    let guard = slot().lock().unwrap();
+    let server = guard.as_ref().ok_or("CC MCP server not started")?;
+    Ok(server_url(server.addr, Flavor::Control))
+}
+
 fn generate_token() -> String {
     let mut buf = [0u8; 24];
     rand::fill(&mut buf);
@@ -235,7 +245,27 @@ pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
         let app = app.clone();
         let toks = tokens.clone();
         StreamableHttpService::new(
-            move || Ok(super::mcp_redis::RedisHandler::new(app.clone(), toks.clone())),
+            move || {
+                Ok(super::mcp_redis::RedisHandler::new(
+                    app.clone(),
+                    toks.clone(),
+                ))
+            },
+            Arc::new(LocalSessionManager::default()),
+            Default::default(),
+        )
+    };
+    // Control flavor (`/mcp/control`) — Taomni sessions, tabs, and app config.
+    let control_service = {
+        let app = app.clone();
+        let toks = tokens.clone();
+        StreamableHttpService::new(
+            move || {
+                Ok(super::mcp_control::ControlHandler::new(
+                    app.clone(),
+                    toks.clone(),
+                ))
+            },
             Arc::new(LocalSessionManager::default()),
             Default::default(),
         )
@@ -245,13 +275,17 @@ pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
     let router = axum::Router::new()
         .nest_service(Flavor::Sql.path(), sql_service)
         .nest_service(Flavor::Redis.path(), redis_service)
+        .nest_service(Flavor::Control.path(), control_service)
         // Shell at `/mcp` is mounted last so the more specific `/mcp/sql` and
-        // `/mcp/redis` nests take precedence over the `/mcp` prefix.
+        // `/mcp/redis`/`/mcp/control` nests take precedence over the `/mcp`
+        // prefix.
         .nest_service(Flavor::Shell.path(), shell_service)
-        .layer(axum::middleware::from_fn(move |req: Request, next: Next| {
-            let toks = auth_tokens.clone();
-            async move { auth_mw(toks, req, next).await }
-        }));
+        .layer(axum::middleware::from_fn(
+            move |req: Request, next: Next| {
+                let toks = auth_tokens.clone();
+                async move { auth_mw(toks, req, next).await }
+            },
+        ));
 
     {
         let mut guard = slot().lock().unwrap();
@@ -506,7 +540,11 @@ pub(crate) async fn await_permission(
         Ok(Ok(decision)) => decision,
         _ => {
             let state = app.state::<AppState>();
-            state.cc_pending_permissions.lock().unwrap().remove(&call_id);
+            state
+                .cc_pending_permissions
+                .lock()
+                .unwrap()
+                .remove(&call_id);
             CcPermissionDecision::Deny
         }
     }
@@ -581,8 +619,7 @@ pub(crate) async fn enforce_inline_permission(
         tool: tool_name.clone(),
         args: input.clone(),
     };
-    crate::agent::safety::check_tool_call(&call)
-        .map_err(|e| ErrorData::invalid_params(e, None))?;
+    crate::agent::safety::check_tool_call(&call).map_err(|e| ErrorData::invalid_params(e, None))?;
     {
         let state = app.state::<AppState>();
         crate::agent::safety::check_session_disable(&state, &call)
@@ -722,9 +759,9 @@ impl CcHandler {
             let backend_sid = resolve_backend_session_id(&state, &sid);
             let terms = state.terminals.read().await;
             match terms.get(&backend_sid) {
-                Some(ActiveTerminal::Ssh { handle, channel, .. }) => {
-                    Target::Ssh(handle.clone(), channel.clone())
-                }
+                Some(ActiveTerminal::Ssh {
+                    handle, channel, ..
+                }) => Target::Ssh(handle.clone(), channel.clone()),
                 Some(ActiveTerminal::Local { .. }) => Target::Local,
                 None => {
                     return Err(ErrorData::invalid_params(
@@ -735,7 +772,12 @@ impl CcHandler {
             }
         };
 
-        let cwd = state.cc_thread_cwd.lock().unwrap().get(&scope.thread_id).cloned();
+        let cwd = state
+            .cc_thread_cwd
+            .lock()
+            .unwrap()
+            .get(&scope.thread_id)
+            .cloned();
 
         // Shared live counts (C reads these for the final tally; B reads the
         // writer). The progress closure also emits to the UI.
@@ -785,12 +827,18 @@ impl CcHandler {
             let (family, path) = exec_c::start_c_ssh(&handle, &write_half, command, &meta.id)
                 .await
                 .map_err(|e| {
-                    state.captures.finish(&meta.id, CaptureStatus::Failed, None, 0, 0, false);
+                    state
+                        .captures
+                        .finish(&meta.id, CaptureStatus::Failed, None, 0, 0, false);
                     ErrorData::invalid_params(e, None)
                 })?;
             state.captures.set_source(
                 &meta.id,
-                CaptureSource::RemoteFile { session_id: sid.clone(), path: path.clone(), family },
+                CaptureSource::RemoteFile {
+                    session_id: sid.clone(),
+                    path: path.clone(),
+                    family,
+                },
             );
             state
                 .cc_capture_cancels
@@ -800,7 +848,14 @@ impl CcHandler {
 
             let progress = make_progress(meta.id.clone());
             let marker = format!("__TAOMNI_END_{}", meta.id);
-            let poll = exec_c::poll_c_ssh(&handle, &write_half, &path, &marker, cancel.clone(), progress);
+            let poll = exec_c::poll_c_ssh(
+                &handle,
+                &write_half,
+                &path,
+                &marker,
+                cancel.clone(),
+                progress,
+            );
             let (status, rc) =
                 match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), poll).await {
                     Ok(r) => r,
@@ -811,18 +866,38 @@ impl CcHandler {
                 };
             state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
             let (lines, bytes) = *counts.lock().unwrap();
-            state.captures.finish(&meta.id, status, rc, lines, bytes, false);
+            state
+                .captures
+                .finish(&meta.id, status, rc, lines, bytes, false);
             self.emit_capture_end(&meta.id, &scope.thread_id, status, lines, bytes, rc, false);
 
-            let head = exec_c::reduce_remote(&handle, family, &path, &meta.id,
-                &crate::agent::capture::reduce::ReduceOp::Head { n: crate::agent::capture::SUMMARY_HEAD })
-                .await.map(|r| r.text).unwrap_or_default();
-            let tail = exec_c::reduce_remote(&handle, family, &path, &meta.id,
-                &crate::agent::capture::reduce::ReduceOp::Tail { n: crate::agent::capture::SUMMARY_TAIL })
-                .await.map(|r| r.text).unwrap_or_default();
-            return Ok(CallToolResult::success(vec![Content::text(capture_summary(
-                &meta.id, status, rc, lines, bytes, false, &head, &tail,
-            ))]));
+            let head = exec_c::reduce_remote(
+                &handle,
+                family,
+                &path,
+                &meta.id,
+                &crate::agent::capture::reduce::ReduceOp::Head {
+                    n: crate::agent::capture::SUMMARY_HEAD,
+                },
+            )
+            .await
+            .map(|r| r.text)
+            .unwrap_or_default();
+            let tail = exec_c::reduce_remote(
+                &handle,
+                family,
+                &path,
+                &meta.id,
+                &crate::agent::capture::reduce::ReduceOp::Tail {
+                    n: crate::agent::capture::SUMMARY_TAIL,
+                },
+            )
+            .await
+            .map(|r| r.text)
+            .unwrap_or_default();
+            return Ok(CallToolResult::success(vec![Content::text(
+                capture_summary(&meta.id, status, rc, lines, bytes, false, &head, &tail),
+            )]));
         }
 
         // ---- B path: independent channel / local child, Taomni-local file --
@@ -847,49 +922,110 @@ impl CcHandler {
         let run = async {
             match target {
                 Target::Ssh(handle, _) => {
-                    exec_b::run_ssh(&handle, command, cwd.as_deref(), &writer, cancel.clone(), progress).await
+                    exec_b::run_ssh(
+                        &handle,
+                        command,
+                        cwd.as_deref(),
+                        &writer,
+                        cancel.clone(),
+                        progress,
+                    )
+                    .await
                 }
                 Target::Local => {
-                    exec_b::run_local(command, cwd.as_deref(), &writer, cancel.clone(), progress).await
+                    exec_b::run_local(command, cwd.as_deref(), &writer, cancel.clone(), progress)
+                        .await
                 }
             }
         };
-        let outcome = match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), run).await {
-            Ok(Ok(o)) => o,
-            Ok(Err(e)) => {
-                state.captures.finish(&meta.id, CaptureStatus::Failed, None,
-                    writer.lines(), writer.bytes(), writer.truncated());
-                state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
-                return Err(ErrorData::internal_error(e, None));
-            }
-            Err(_) => {
-                cancel.notify_waiters();
-                exec_b::ExecOutcome { status: CaptureStatus::TimedOut, exit_code: None }
-            }
-        };
+        let outcome =
+            match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), run).await {
+                Ok(Ok(o)) => o,
+                Ok(Err(e)) => {
+                    state.captures.finish(
+                        &meta.id,
+                        CaptureStatus::Failed,
+                        None,
+                        writer.lines(),
+                        writer.bytes(),
+                        writer.truncated(),
+                    );
+                    state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+                    return Err(ErrorData::internal_error(e, None));
+                }
+                Err(_) => {
+                    cancel.notify_waiters();
+                    exec_b::ExecOutcome {
+                        status: CaptureStatus::TimedOut,
+                        exit_code: None,
+                    }
+                }
+            };
 
         state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
         let truncated = writer.truncated();
-        state.captures.finish(&meta.id, outcome.status, outcome.exit_code,
-            writer.lines(), writer.bytes(), truncated);
-        self.emit_capture_end(&meta.id, &scope.thread_id, outcome.status,
-            writer.lines(), writer.bytes(), outcome.exit_code, truncated);
+        state.captures.finish(
+            &meta.id,
+            outcome.status,
+            outcome.exit_code,
+            writer.lines(),
+            writer.bytes(),
+            truncated,
+        );
+        self.emit_capture_end(
+            &meta.id,
+            &scope.thread_id,
+            outcome.status,
+            writer.lines(),
+            writer.bytes(),
+            outcome.exit_code,
+            truncated,
+        );
 
         let path = writer.path();
-        let head = crate::agent::capture::reduce::reduce_file(&path,
-            &crate::agent::capture::reduce::ReduceOp::Head { n: crate::agent::capture::SUMMARY_HEAD })
-            .map(|r| r.text).unwrap_or_default();
-        let tail = crate::agent::capture::reduce::reduce_file(&path,
-            &crate::agent::capture::reduce::ReduceOp::Tail { n: crate::agent::capture::SUMMARY_TAIL })
-            .map(|r| r.text).unwrap_or_default();
+        let head = crate::agent::capture::reduce::reduce_file(
+            &path,
+            &crate::agent::capture::reduce::ReduceOp::Head {
+                n: crate::agent::capture::SUMMARY_HEAD,
+            },
+        )
+        .map(|r| r.text)
+        .unwrap_or_default();
+        let tail = crate::agent::capture::reduce::reduce_file(
+            &path,
+            &crate::agent::capture::reduce::ReduceOp::Tail {
+                n: crate::agent::capture::SUMMARY_TAIL,
+            },
+        )
+        .map(|r| r.text)
+        .unwrap_or_default();
         // Mirror this run into the bound terminal as a read-only trace (the B
         // path is otherwise invisible there). `sid` is the terminal tab id.
-        self.emit_terminal_echo(&sid, &scope.thread_id, &meta.id, command, &head, Some(&path),
-            outcome.status, writer.lines(), writer.bytes(), outcome.exit_code, truncated);
-        Ok(CallToolResult::success(vec![Content::text(capture_summary(
-            &meta.id, outcome.status, outcome.exit_code,
-            writer.lines(), writer.bytes(), truncated, &head, &tail,
-        ))]))
+        self.emit_terminal_echo(
+            &sid,
+            &scope.thread_id,
+            &meta.id,
+            command,
+            &head,
+            Some(&path),
+            outcome.status,
+            writer.lines(),
+            writer.bytes(),
+            outcome.exit_code,
+            truncated,
+        );
+        Ok(CallToolResult::success(vec![Content::text(
+            capture_summary(
+                &meta.id,
+                outcome.status,
+                outcome.exit_code,
+                writer.lines(),
+                writer.bytes(),
+                truncated,
+                &head,
+                &tail,
+            ),
+        )]))
     }
 
     /// Emit the capture-end event so the UI progress card clears.
@@ -970,9 +1106,15 @@ impl CcHandler {
             CaptureSource::LocalFile(path) => {
                 let r = crate::agent::capture::reduce::reduce_file(path, &op)
                     .map_err(|e| ErrorData::internal_error(e, None))?;
-                Ok(CallToolResult::success(vec![Content::text(annotate_reduce(r))]))
+                Ok(CallToolResult::success(vec![Content::text(
+                    annotate_reduce(r),
+                )]))
             }
-            CaptureSource::RemoteFile { session_id, path, family } => {
+            CaptureSource::RemoteFile {
+                session_id,
+                path,
+                family,
+            } => {
                 use crate::terminal::ActiveTerminal;
                 // Re-resolve the SSH handle (the run may have been turns ago).
                 // `session_id` is the tab id stored at capture time; translate to
@@ -986,7 +1128,8 @@ impl CcHandler {
                         Some(ActiveTerminal::Ssh { handle, .. }) => handle.clone(),
                         _ => {
                             return Err(ErrorData::internal_error(
-                                "the session backing this capture is no longer connected".to_string(),
+                                "the session backing this capture is no longer connected"
+                                    .to_string(),
                                 None,
                             ))
                         }
@@ -997,7 +1140,9 @@ impl CcHandler {
                 )
                 .await
                 .map_err(|e| ErrorData::internal_error(e, None))?;
-                Ok(CallToolResult::success(vec![Content::text(annotate_reduce(r))]))
+                Ok(CallToolResult::success(vec![Content::text(
+                    annotate_reduce(r),
+                )]))
             }
         }
     }
@@ -1113,8 +1258,12 @@ fn parse_reduce_op(
 ) -> Result<crate::agent::capture::reduce::ReduceOp, String> {
     use crate::agent::capture::reduce::ReduceOp;
     match p.op.as_str() {
-        "head" => Ok(ReduceOp::Head { n: p.n.unwrap_or(50) as usize }),
-        "tail" => Ok(ReduceOp::Tail { n: p.n.unwrap_or(50) as usize }),
+        "head" => Ok(ReduceOp::Head {
+            n: p.n.unwrap_or(50) as usize,
+        }),
+        "tail" => Ok(ReduceOp::Tail {
+            n: p.n.unwrap_or(50) as usize,
+        }),
         "range" => {
             let start = p.start.ok_or("range requires `start`")? as usize;
             let end = p.end.ok_or("range requires `end`")? as usize;
@@ -1228,7 +1377,10 @@ fn resolve_backend_session_id(state: &AppState, sid: &str) -> String {
 
 #[tool_router]
 impl CcHandler {
-    #[tool(name = "list_sessions", description = "列出所有已保存的 SSH/终端会话（可按名称/主机过滤）")]
+    #[tool(
+        name = "list_sessions",
+        description = "列出所有已保存的 SSH/终端会话（可按名称/主机过滤）"
+    )]
     async fn list_sessions(
         &self,
         Parameters(p): Parameters<ListSessionsParams>,
@@ -1266,7 +1418,10 @@ impl CcHandler {
         )]))
     }
 
-    #[tool(name = "search_history", description = "搜索命令历史记录并返回匹配的命令列表")]
+    #[tool(
+        name = "search_history",
+        description = "搜索命令历史记录并返回匹配的命令列表"
+    )]
     async fn search_history(
         &self,
         Parameters(p): Parameters<SearchHistoryParams>,
@@ -1285,7 +1440,10 @@ impl CcHandler {
         )]))
     }
 
-    #[tool(name = "read_terminal_tail", description = "读取当前活跃终端最近 N 行输出（需 user_invoked=true）")]
+    #[tool(
+        name = "read_terminal_tail",
+        description = "读取当前活跃终端最近 N 行输出（需 user_invoked=true）"
+    )]
     async fn read_terminal_tail(
         &self,
         Parameters(p): Parameters<ReadTerminalTailParams>,
@@ -1295,10 +1453,14 @@ impl CcHandler {
         let mut args = as_value(&p);
         fill_session_id(&mut args, &scope);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
-        self.dispatch_side_effect(&scope, "read_terminal_tail", args).await
+        self.dispatch_side_effect(&scope, "read_terminal_tail", args)
+            .await
     }
 
-    #[tool(name = "run_in_terminal", description = "在指定会话的终端中执行命令（危险动作，需用户确认）")]
+    #[tool(
+        name = "run_in_terminal",
+        description = "在指定会话的终端中执行命令（危险动作，需用户确认）"
+    )]
     async fn run_in_terminal(
         &self,
         Parameters(p): Parameters<RunInTerminalParams>,
@@ -1311,8 +1473,7 @@ impl CcHandler {
         let is_readonly = !scope.confirm_readonly
             && crate::agent::cmd_classify::classify(&p.command)
                 == crate::agent::cmd_classify::CommandClass::ReadOnly;
-        enforce_inline_permission(&self.app, &scope, "run_in_terminal", &args, is_readonly)
-            .await?;
+        enforce_inline_permission(&self.app, &scope, "run_in_terminal", &args, is_readonly).await?;
         // Defense in depth: re-run the blacklist even though permission_prompt
         // already did (CC may have an allowlist that skips the prompt).
         let call = ToolCall {
@@ -1321,7 +1482,8 @@ impl CcHandler {
         };
         crate::agent::safety::check_tool_call(&call)
             .map_err(|e| ErrorData::invalid_params(e, None))?;
-        self.dispatch_side_effect(&scope, "run_in_terminal", args).await
+        self.dispatch_side_effect(&scope, "run_in_terminal", args)
+            .await
     }
 
     #[tool(name = "switch_tab", description = "切换到指定会话/标签")]
@@ -1331,20 +1493,28 @@ impl CcHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        self.dispatch_side_effect(&scope, "switch_tab", as_value(&p)).await
+        self.dispatch_side_effect(&scope, "switch_tab", as_value(&p))
+            .await
     }
 
-    #[tool(name = "open_session_editor", description = "打开新会话编辑器，可预填 name/host/username")]
+    #[tool(
+        name = "open_session_editor",
+        description = "打开新会话编辑器，可预填 name/host/username"
+    )]
     async fn open_session_editor(
         &self,
         Parameters(p): Parameters<OpenSessionEditorParams>,
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        self.dispatch_side_effect(&scope, "open_session_editor", as_value(&p)).await
+        self.dispatch_side_effect(&scope, "open_session_editor", as_value(&p))
+            .await
     }
 
-    #[tool(name = "sftp_upload", description = "在 SFTP 会话中上传本地文件（危险动作，需用户确认）")]
+    #[tool(
+        name = "sftp_upload",
+        description = "在 SFTP 会话中上传本地文件（危险动作，需用户确认）"
+    )]
     async fn sftp_upload(
         &self,
         Parameters(p): Parameters<SftpUploadParams>,
@@ -1357,7 +1527,10 @@ impl CcHandler {
         self.dispatch_side_effect(&scope, "sftp_upload", args).await
     }
 
-    #[tool(name = "save_as_runbook", description = "把一组命令打包成 Runbook（写动作，需用户确认）")]
+    #[tool(
+        name = "save_as_runbook",
+        description = "把一组命令打包成 Runbook（写动作，需用户确认）"
+    )]
     async fn save_as_runbook(
         &self,
         Parameters(p): Parameters<SaveAsRunbookParams>,
@@ -1366,7 +1539,8 @@ impl CcHandler {
         let scope = self.scope(&ctx)?;
         let args = as_value(&p);
         enforce_inline_permission(&self.app, &scope, "save_as_runbook", &args, false).await?;
-        self.dispatch_side_effect(&scope, "save_as_runbook", args).await
+        self.dispatch_side_effect(&scope, "save_as_runbook", args)
+            .await
     }
 
     #[tool(
@@ -1435,7 +1609,10 @@ impl CcHandler {
         // confirms. The safety checks inside `decide_permission` always run, so
         // this only ever waives confirmation, never safety.
         let is_readonly = !scope.confirm_readonly
-            && matches!(tool_name.as_str(), "Bash" | "run_in_terminal" | "run_captured")
+            && matches!(
+                tool_name.as_str(),
+                "Bash" | "run_in_terminal" | "run_captured"
+            )
             && p.tool_input
                 .get("command")
                 .and_then(|v| v.as_str())
@@ -1454,9 +1631,8 @@ impl ServerHandler for CcHandler {
     fn get_info(&self) -> ServerInfo {
         let mut info = ServerInfo::default();
         info.capabilities = ServerCapabilities::builder().enable_tools().build();
-        info.instructions = Some(
-            "Taomni in-app tools. Side-effect tools route through human confirmation.".into(),
-        );
+        info.instructions =
+            Some("Taomni in-app tools. Side-effect tools route through human confirmation.".into());
         info
     }
 }
@@ -1543,9 +1719,9 @@ mod tests {
             normalize_tool_name("mcp__taomni__run_in_terminal"),
             "run_in_terminal"
         );
-        assert!(crate::agent::safety::requires_confirmation(normalize_tool_name(
-            "mcp__taomni__run_in_terminal"
-        )));
+        assert!(crate::agent::safety::requires_confirmation(
+            normalize_tool_name("mcp__taomni__run_in_terminal")
+        ));
     }
 
     #[test]
@@ -1565,12 +1741,25 @@ mod tests {
             SessionType::Presto,
         ];
         for t in sql {
-            assert_eq!(Flavor::for_session_type(Some(&t)), Flavor::Sql, "{t:?} → Sql");
+            assert_eq!(
+                Flavor::for_session_type(Some(&t)),
+                Flavor::Sql,
+                "{t:?} → Sql"
+            );
         }
-        assert_eq!(Flavor::for_session_type(Some(&SessionType::Redis)), Flavor::Redis);
+        assert_eq!(
+            Flavor::for_session_type(Some(&SessionType::Redis)),
+            Flavor::Redis
+        );
         // Terminal / object-storage / unbound all fall back to Shell.
-        assert_eq!(Flavor::for_session_type(Some(&SessionType::SSH)), Flavor::Shell);
-        assert_eq!(Flavor::for_session_type(Some(&SessionType::HBaseShell)), Flavor::Shell);
+        assert_eq!(
+            Flavor::for_session_type(Some(&SessionType::SSH)),
+            Flavor::Shell
+        );
+        assert_eq!(
+            Flavor::for_session_type(Some(&SessionType::HBaseShell)),
+            Flavor::Shell
+        );
         assert_eq!(Flavor::for_session_type(None), Flavor::Shell);
     }
 
@@ -1579,12 +1768,14 @@ mod tests {
         // Each flavor mounts a distinct path + names a distinct server, so a
         // thread's .mcp.json (one server) can't accidentally expose another
         // flavor's tools.
-        for f in [Flavor::Shell, Flavor::Sql, Flavor::Redis] {
+        for f in [Flavor::Shell, Flavor::Sql, Flavor::Redis, Flavor::Control] {
             assert!(f.permission_prompt_tool().contains(f.server_name()));
         }
         assert_ne!(Flavor::Sql.path(), Flavor::Redis.path());
         assert_ne!(Flavor::Sql.path(), Flavor::Shell.path());
+        assert_ne!(Flavor::Control.path(), Flavor::Shell.path());
         assert_ne!(Flavor::Sql.server_name(), Flavor::Shell.server_name());
+        assert_eq!(Flavor::Control.server_name(), "taomni_control");
     }
 
     #[test]
@@ -1601,7 +1792,11 @@ mod tests {
             filter: None,
         };
         assert_eq!(
-            parse_reduce_op(&ReadCaptureParams { n: Some(10), ..base("head") }).unwrap(),
+            parse_reduce_op(&ReadCaptureParams {
+                n: Some(10),
+                ..base("head")
+            })
+            .unwrap(),
             ReduceOp::Head { n: 10 }
         );
         assert_eq!(
@@ -1609,8 +1804,12 @@ mod tests {
             ReduceOp::Tail { n: 50 } // default
         );
         assert_eq!(
-            parse_reduce_op(&ReadCaptureParams { start: Some(2), end: Some(5), ..base("range") })
-                .unwrap(),
+            parse_reduce_op(&ReadCaptureParams {
+                start: Some(2),
+                end: Some(5),
+                ..base("range")
+            })
+            .unwrap(),
             ReduceOp::Range { start: 2, end: 5 }
         );
         assert_eq!(
@@ -1620,11 +1819,20 @@ mod tests {
                 ..base("grep")
             })
             .unwrap(),
-            ReduceOp::Grep { pattern: "ERR".into(), context: 2 }
+            ReduceOp::Grep {
+                pattern: "ERR".into(),
+                context: 2
+            }
         );
         assert_eq!(
-            parse_reduce_op(&ReadCaptureParams { filter: Some(".a".into()), ..base("jq") }).unwrap(),
-            ReduceOp::Jq { filter: ".a".into() }
+            parse_reduce_op(&ReadCaptureParams {
+                filter: Some(".a".into()),
+                ..base("jq")
+            })
+            .unwrap(),
+            ReduceOp::Jq {
+                filter: ".a".into()
+            }
         );
         assert_eq!(parse_reduce_op(&base("stats")).unwrap(), ReduceOp::Stats);
     }
@@ -1641,10 +1849,22 @@ mod tests {
             context: None,
             filter: None,
         };
-        assert!(parse_reduce_op(&p).is_err(), "range without start/end must error");
-        let p2 = ReadCaptureParams { op: "grep".into(), ..p.clone() };
-        assert!(parse_reduce_op(&p2).is_err(), "grep without pattern must error");
-        let p3 = ReadCaptureParams { op: "bogus".into(), ..p };
+        assert!(
+            parse_reduce_op(&p).is_err(),
+            "range without start/end must error"
+        );
+        let p2 = ReadCaptureParams {
+            op: "grep".into(),
+            ..p.clone()
+        };
+        assert!(
+            parse_reduce_op(&p2).is_err(),
+            "grep without pattern must error"
+        );
+        let p3 = ReadCaptureParams {
+            op: "bogus".into(),
+            ..p
+        };
         assert!(parse_reduce_op(&p3).is_err(), "unknown op must error");
     }
 
@@ -1732,10 +1952,10 @@ mod tests {
         use axum::routing::get;
 
         let tokens: TokenMap = Arc::new(Mutex::new(HashMap::new()));
-        tokens.lock().unwrap().insert(
-            "good-token".to_string(),
-            scope("t1", None),
-        );
+        tokens
+            .lock()
+            .unwrap()
+            .insert("good-token".to_string(), scope("t1", None));
 
         let mw_tokens = tokens.clone();
         let app = axum::Router::new()

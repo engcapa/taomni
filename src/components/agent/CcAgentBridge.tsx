@@ -9,6 +9,7 @@ import { getQueryTab } from "../../lib/queryRegistry";
 import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useAppStore } from "../../stores/appStore";
+import { useSessionStore } from "../../stores/sessionStore";
 /**
  * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
  *
@@ -154,6 +155,21 @@ export function CcAgentBridge() {
       // `listen` can reject outside Tauri (e.g. jsdom tests); ignore — the
       // bridge is simply inert there.
     });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let disposed = false;
+    void listen("taomni-sessions-changed", () => {
+      void useSessionStore.getState().loadSessions();
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlisten = fn;
+    }).catch(() => {});
     return () => {
       disposed = true;
       unlisten?.();

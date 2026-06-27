@@ -3,6 +3,7 @@
 
 pub mod commands;
 pub mod config;
+pub mod mcp_control;
 pub mod mcp_http;
 pub mod mcp_redis;
 pub mod mcp_sql;
@@ -143,8 +144,7 @@ fn login_shell_path() -> Option<String> {
             // banners/prompts to stdout.
             const START: &str = "<<TAOMNI_PATH>>";
             const END: &str = "<</TAOMNI_PATH>>";
-            const CMD: &str =
-                "command printf '<<TAOMNI_PATH>>%s<</TAOMNI_PATH>>' \"$PATH\"";
+            const CMD: &str = "command printf '<<TAOMNI_PATH>>%s<</TAOMNI_PATH>>' \"$PATH\"";
 
             let (tx, rx) = mpsc::channel();
             std::thread::spawn(move || {

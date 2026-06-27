@@ -522,7 +522,19 @@ pub fn build_thread_config_from_config(
     server_name: &str,
     server_url: &str,
     token: &str,
+    control_server_url: &str,
 ) -> Map<String, Value> {
+    insert_mcp_server(&mut root, server_name, server_url, token);
+    insert_mcp_server(&mut root, "taomni_control", control_server_url, token);
+    root
+}
+
+fn insert_mcp_server(
+    root: &mut Map<String, Value>,
+    server_name: &str,
+    server_url: &str,
+    token: &str,
+) {
     let prefix = format!("mcp_servers.{server_name}");
     root.insert(format!("{prefix}.url"), Value::String(server_url.into()));
     root.insert(
@@ -542,7 +554,6 @@ pub fn build_thread_config_from_config(
         format!("{prefix}.tool_timeout_sec"),
         Value::Number(600.into()),
     );
-    root
 }
 
 /// Build app-server `thread/start.config` overrides.
@@ -555,12 +566,14 @@ pub fn build_thread_config(
     server_name: &str,
     server_url: &str,
     token: &str,
+    control_server_url: &str,
 ) -> Result<Map<String, Value>, String> {
     Ok(build_thread_config_from_config(
         build_config_value(custom)?,
         server_name,
         server_url,
         token,
+        control_server_url,
     ))
 }
 
@@ -648,6 +661,7 @@ EXAMPLE_FEATURES = "on"
             "taomni",
             "http://127.0.0.1:1/mcp",
             "tok",
+            "http://127.0.0.1:1/mcp/control",
         )
         .unwrap();
         assert_eq!(cfg.get("model").and_then(Value::as_str), Some("gpt-5"));
@@ -657,6 +671,16 @@ EXAMPLE_FEATURES = "on"
         );
         assert_eq!(
             cfg.get("mcp_servers.taomni.default_tools_approval_mode")
+                .and_then(Value::as_str),
+            Some("approve")
+        );
+        assert_eq!(
+            cfg.get("mcp_servers.taomni_control.url")
+                .and_then(Value::as_str),
+            Some("http://127.0.0.1:1/mcp/control")
+        );
+        assert_eq!(
+            cfg.get("mcp_servers.taomni_control.default_tools_approval_mode")
                 .and_then(Value::as_str),
             Some("approve")
         );
