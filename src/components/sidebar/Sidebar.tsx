@@ -24,10 +24,14 @@ interface SidebarProps {
   onEditSession?: (session: SessionConfig) => void;
   onConnectSession?: (session: SessionConfig) => void;
   onOpenSettings?: () => void;
+  chatToggle?: {
+    open: boolean;
+    onToggle: () => void;
+  };
   compact?: boolean;
 }
 
-export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenSettings, compact = false }: SidebarProps) {
+export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenSettings, chatToggle, compact = false }: SidebarProps) {
   const {
     activeSideTab,
     setActiveSideTab,
@@ -106,6 +110,35 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenS
           );
         })}
         <div className="flex-1" />
+        {chatToggle && (
+          <button
+            data-testid="ribbon-chat-toggle"
+            type="button"
+            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
+            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
+            data-active={chatToggle.open || undefined}
+            className="group relative h-8 w-full inline-flex items-center justify-center border-t hover:bg-[var(--taomni-hover)]"
+            style={{
+              borderColor: "var(--taomni-sidebar-border)",
+              color: chatToggle.open ? "var(--taomni-accent)" : "var(--taomni-text)",
+              background: chatToggle.open ? "var(--taomni-selected)" : undefined,
+            }}
+            onClick={chatToggle.onToggle}
+          >
+            <Bot className="w-[18px] h-[18px]" />
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute left-full bottom-1/2 z-50 ml-2 translate-y-1/2 whitespace-nowrap rounded border px-2 py-1 text-[11px] opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              style={{
+                background: "var(--taomni-card-bg)",
+                borderColor: "var(--taomni-card-border)",
+                color: "var(--taomni-text)",
+              }}
+            >
+              {chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
+            </span>
+          </button>
+        )}
         <button
           data-testid="ribbon-settings"
           type="button"

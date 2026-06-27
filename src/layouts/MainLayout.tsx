@@ -127,6 +127,12 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
+const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>(["welcome", "terminal", "rdp", "database", "redis"]);
+
+function chatBindingIdForTab(tab: Tab | null | undefined): string | null {
+  if (!tab || !CHAT_CAPABLE_TAB_TYPES.has(tab.type)) return null;
+  return tab.chatTabId ?? tab.id;
+}
 
 function macCommandDigitIndex(event: KeyboardEvent): number | null {
   if (
@@ -460,6 +466,14 @@ export function MainLayout() {
   const chatDrawerTabId = useChatStore((s) => s.drawerTabId);
   const chatDrawerPosition = useChatStore((s) => s.drawerPosition);
   const chatDrawerPinned = useChatStore((s) => s.drawerPinned);
+  const activeChatTabId = chatBindingIdForTab(activeTab);
+  const sidebarChatToggle =
+    !aiFullyDisabled && activeChatTabId
+      ? {
+          open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === activeChatTabId,
+          onToggle: () => void toggleTabChat(activeChatTabId),
+        }
+      : undefined;
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -751,6 +765,7 @@ export function MainLayout() {
     (tabId: string, info: NonNullable<Tab["rdp"]>, title: string) => {
       const detachedId = `${tabId}__detached`;
       const payload: DetachedRdpParams = {
+        tabId,
         sessionId: info.sessionId,
         host: info.host,
         port: info.port,
@@ -769,6 +784,7 @@ export function MainLayout() {
     (tabId: string, info: NonNullable<Tab["vnc"]>, title: string) => {
       const detachedId = `${tabId}__detached`;
       const payload: DetachedVncParams = {
+        tabId,
         sessionId: info.sessionId,
         host: info.host,
         port: info.port,
@@ -800,6 +816,7 @@ export function MainLayout() {
         ? { terminalSessionId: liveSessionId, snapshotText }
         : undefined;
       const payload: DetachedTerminalParams = {
+        tabId,
         title,
         ssh: tab.ssh ?? null,
         localShell: tab.localShell ?? null,
@@ -823,6 +840,7 @@ export function MainLayout() {
     (tabId: string, info: NonNullable<Tab["db"]>, title: string) => {
       const detachedId = `${tabId}__detached`;
       const payload: DetachedDbParams = {
+        tabId,
         title,
         // Give the detached window its own connection handle so the source
         // tab's unmount disconnect cannot race and close the detached query
@@ -886,10 +904,14 @@ export function MainLayout() {
         clearReattachHandoff(msg.kind, msg.id);
         return;
       }
-      // Idempotent tab identity: derive the tab id from the detachedId so
-      // the same window can never materialize two tabs. If a tab already
-      // exists for this detachedId, just focus it.
-      const reattachTabId = `${msg.kind}-reattach-${msg.id}`;
+      // Idempotent tab identity: use the original source tab id when the
+      // payload has it so chat threads stay bound across detach/reattach.
+      // Older handoffs fall back to the detached id-derived shape.
+      const payloadTabId =
+        typeof (msg.payload as { tabId?: unknown } | undefined)?.tabId === "string"
+          ? ((msg.payload as { tabId: string }).tabId.trim() || null)
+          : null;
+      const reattachTabId = payloadTabId ?? `${msg.kind}-reattach-${msg.id}`;
       if (tabsRef.current.some((t) => t.id === reattachTabId)) {
         setActiveTab(reattachTabId);
         clearReattachHandoff(msg.kind, msg.id);
@@ -1015,16 +1037,9 @@ export function MainLayout() {
     const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
     setActiveTerminalTab(terminalTabId);
     setActiveQueryTab(activeTab?.type === "database" ? activeTabId : null);
-    const chatBoundTabId =
-      activeTab?.type === "welcome" ||
-      activeTab?.type === "terminal" ||
-      activeTab?.type === "rdp" ||
-      activeTab?.type === "database" ||
-      activeTab?.type === "redis"
-        ? activeTabId
-        : null;
+    const chatBoundTabId = chatBindingIdForTab(activeTab);
     void syncTabChatWithActiveTab(chatBoundTabId);
-  }, [activeTabId, activeTab?.type, syncTabChatWithActiveTab]);
+  }, [activeTab, activeTabId, syncTabChatWithActiveTab]);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -1059,17 +1074,9 @@ export function MainLayout() {
         event.preventDefault();
         const aiOff = useAiStore.getState().config?.fully_disabled === true;
         const current = useAppStore.getState().tabs.find((tab) => tab.id === useAppStore.getState().activeTabId);
-        if (
-          !aiOff &&
-          (
-            current?.type === "welcome" ||
-            current?.type === "terminal" ||
-            current?.type === "rdp" ||
-            current?.type === "database" ||
-            current?.type === "redis"
-          )
-        ) {
-          void toggleTabChat(current.id);
+        const chatTabId = chatBindingIdForTab(current);
+        if (!aiOff && chatTabId) {
+          void toggleTabChat(chatTabId);
         }
       }
     };
@@ -2408,12 +2415,10 @@ export function MainLayout() {
               onEditSession={handleEditSession}
               onConnectSession={handleConnectSession}
               onOpenSettings={() => handleCommand("settings")}
+              chatToggle={sidebarChatToggle}
             />
           </div>
         )}
-
-        {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
-
         <PanelGroup
           orientation="horizontal"
           id="main-layout"
@@ -2451,6 +2456,7 @@ export function MainLayout() {
                 onEditSession={handleEditSession}
                 onConnectSession={handleConnectSession}
                 onOpenSettings={() => handleCommand("settings")}
+                chatToggle={sidebarChatToggle}
               />
             </div>
           </Panel>
@@ -2461,7 +2467,9 @@ export function MainLayout() {
           />
 
           <Panel id="content">
-            <div className="h-full flex flex-col min-w-0">
+            <div className="h-full flex min-w-0">
+              {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
+              <div className="h-full flex flex-col min-w-0 flex-1">
               {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
@@ -2572,10 +2580,6 @@ export function MainLayout() {
                                   toggleAttachedSidebar(tab.id);
                                 }
                               }
-                            } : undefined}
-                            chatToggle={!terminalSplitVisible && !aiFullyDisabled ? {
-                              open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
-                              onToggle: () => void toggleTabChat(tab.id),
                             } : undefined}
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
@@ -2855,10 +2859,6 @@ export function MainLayout() {
                           networkSettingsJson={tab.rdp.networkSettingsJson}
                           visible={isActive}
                           onDetach={() => openDetachedRdp(tab.id, tab.rdp!, tab.title)}
-                          chatToggle={!aiFullyDisabled ? {
-                            open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
-                            onToggle: () => void toggleTabChat(tab.id),
-                          } : undefined}
                         />
                       </Suspense>
                     </div>
@@ -2920,10 +2920,6 @@ export function MainLayout() {
                           info={tab.db}
                           visible={isActive}
                           onDetach={() => openDetachedDatabase(tab.id, tab.db!, tab.title)}
-                          chatToggle={!aiFullyDisabled ? {
-                            open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
-                            onToggle: () => void toggleTabChat(tab.id),
-                          } : undefined}
                         />
                       </Suspense>
                     </div>
@@ -2945,10 +2941,6 @@ export function MainLayout() {
                           tabId={tab.id}
                           info={tab.db}
                           visible={isActive}
-                          chatToggle={!aiFullyDisabled ? {
-                            open: chatDrawerOpen && chatDrawerScope === "tab" && chatDrawerTabId === tab.id,
-                            onToggle: () => void toggleTabChat(tab.id),
-                          } : undefined}
                         />
                       </Suspense>
                     </div>
@@ -3004,10 +2996,11 @@ export function MainLayout() {
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
               </div>
+              </div>
+              {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
             </div>
           </Panel>
         </PanelGroup>
-        {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
         {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
         {!aiFullyDisabled && <ChatDrawerRibbon />}
       </div>

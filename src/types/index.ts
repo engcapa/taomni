@@ -245,6 +245,11 @@ export interface ObjectStorageTabInfo {
 
 export interface Tab {
   id: string;
+  /**
+   * Stable id used for AI chat thread binding when it should outlive a visual
+   * tab id change, e.g. detach -> reattach. Defaults to `id`.
+   */
+  chatTabId?: string;
   type: TabKind;
   title: string;
   sessionId?: string;

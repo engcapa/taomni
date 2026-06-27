@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatDrawer } from "./ChatDrawer";
+import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
@@ -161,5 +161,43 @@ describe("ChatDrawer provider and echo controls", () => {
     expect(echo).toHaveClass("taomni-btn");
     expect(echo).toHaveAttribute("aria-pressed", "true");
     expect(echo).toHaveTextContent("Terminal echo: on");
+  });
+});
+
+describe("ChatDrawerRibbon", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("shows only Tao and opens the stable chat tab id", () => {
+    const openTabChat = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({
+      tabs: [{
+        id: "visual-tab",
+        chatTabId: "stable-chat-tab",
+        type: "terminal",
+        title: "Terminal",
+        closable: true,
+      }],
+      activeTabId: "visual-tab",
+    });
+    useChatStore.setState({
+      drawerOpen: false,
+      drawerPosition: "left",
+      drawerPinned: true,
+      openTabChat,
+    });
+
+    render(
+      <div className="relative h-32 w-32">
+        <ChatDrawerRibbon />
+      </div>,
+    );
+
+    const ribbon = screen.getByTestId("ai-chat-drawer-ribbon");
+    expect(ribbon).toHaveTextContent(/^Tao$/);
+    fireEvent.click(ribbon);
+    expect(openTabChat).toHaveBeenCalledWith("stable-chat-tab");
   });
 });

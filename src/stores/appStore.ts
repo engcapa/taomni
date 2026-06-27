@@ -287,6 +287,7 @@ export const useAppStore = create<AppState>((set) => ({
       const copy: Tab = {
         ...source,
         id: `dup-${crypto.randomUUID()}`,
+        chatTabId: undefined,
         title: computeDuplicateTitle(source.title, s.tabs.map((t) => t.title)),
         closable: true,
         hasNewOutput: false,

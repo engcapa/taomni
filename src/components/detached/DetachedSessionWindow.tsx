@@ -36,7 +36,7 @@ import {
 } from "../../lib/detachedSession";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import type { RdpOptions } from "../../types/rdp";
-import type { DbConnectInfo } from "../../types";
+import type { DbConnectInfo, TabKind } from "../../types";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
@@ -48,7 +48,11 @@ import {
   type TerminalReattachState,
 } from "../terminal/TerminalPanel";
 import { useAppStore } from "../../stores/appStore";
+import { useAiStore } from "../../stores/aiStore";
+import { useChatStore } from "../../stores/chatStore";
 import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
+import { ChatDrawer, ChatDrawerRibbon } from "../chat/ChatDrawer";
+import { CcAgentBridge } from "../agent/CcAgentBridge";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
 const VncPanel = lazy(() => import("../vnc/VncPanel"));
@@ -57,6 +61,7 @@ const DbClientTab = lazy(() => import("../database/DbClientTab"));
 /* ── Handoff payload shapes ──────────────────────────────────────────── */
 
 export interface DetachedRdpParams {
+  tabId?: string;
   sessionId: string;
   host: string;
   port: number;
@@ -68,6 +73,7 @@ export interface DetachedRdpParams {
 }
 
 export interface DetachedVncParams {
+  tabId?: string;
   sessionId: string;
   host: string;
   port: number;
@@ -77,6 +83,7 @@ export interface DetachedVncParams {
 }
 
 export interface DetachedTerminalParams {
+  tabId?: string;
   title?: string;
   ssh?: SshConnectInfo | null;
   localShell?: LocalShellSelection | null;
@@ -85,8 +92,16 @@ export interface DetachedTerminalParams {
 }
 
 export interface DetachedDbParams {
+  tabId?: string;
   title?: string;
   info: DbConnectInfo;
+}
+
+interface DetachedChatTab {
+  id: string;
+  type: Extract<TabKind, "terminal" | "rdp" | "database">;
+  title: string;
+  sessionId?: string;
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
@@ -104,6 +119,13 @@ export default function DetachedSessionWindow({
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
+  const addTab = useAppStore((s) => s.addTab);
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const tabs = useAppStore((s) => s.tabs);
+  const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
+  const chatDrawerPosition = useChatStore((s) => s.drawerPosition);
+  const chatDrawerPinned = useChatStore((s) => s.drawerPinned);
   const tauri = isTauriRuntime();
 
   // The handoff payload races the page load. We poll briefly until it
@@ -154,6 +176,27 @@ export default function DetachedSessionWindow({
   useEffect(() => {
     document.title = title;
   }, [title]);
+
+  const detachedChatTab = useMemo(
+    () => params ? chatTabForDetached(kind, id, params, title) : null,
+    [kind, id, params, title],
+  );
+
+  useEffect(() => {
+    if (!detachedChatTab) return;
+    const current = useAppStore.getState();
+    if (current.tabs.some((tab) => tab.id === detachedChatTab.id)) {
+      setActiveTab(detachedChatTab.id);
+      return;
+    }
+    addTab({
+      id: detachedChatTab.id,
+      type: detachedChatTab.type,
+      title: detachedChatTab.title,
+      sessionId: detachedChatTab.sessionId,
+      closable: false,
+    });
+  }, [addTab, detachedChatTab, setActiveTab, tabs.length]);
 
   // OS fullscreen toggle. Backed by the Tauri WebviewWindow API on
   // native, falls back to the document.fullscreen API in browser dev
@@ -369,6 +412,12 @@ export default function DetachedSessionWindow({
       };
     },
   );
+  const chatDrawerInline =
+    !!detachedChatTab &&
+    chatDrawerOpen &&
+    !aiFullyDisabled &&
+    chatDrawerPinned &&
+    (chatDrawerPosition === "left" || chatDrawerPosition === "right");
 
   return (
     <TabActionSlotProvider slot={actionSlot}>
@@ -385,10 +434,57 @@ export default function DetachedSessionWindow({
         >
           <div ref={setActionSlot} data-testid="tab-action-slot" className="flex items-center gap-0.5" />
         </div>
-        <div className="flex-1 relative min-h-0">{inner}</div>
+        <div className="flex-1 min-h-0 flex relative">
+          {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
+          <div className="flex-1 relative min-h-0">
+            {inner}
+            {detachedChatTab && chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
+            {detachedChatTab && !aiFullyDisabled && <ChatDrawerRibbon />}
+          </div>
+          {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
+        </div>
+        {detachedChatTab && !aiFullyDisabled && <CcAgentBridge />}
       </div>
     </TabActionSlotProvider>
   );
+}
+
+function chatTabForDetached(
+  kind: Exclude<DetachedKind, "sftp">,
+  id: string,
+  params: unknown,
+  title: string,
+): DetachedChatTab | null {
+  switch (kind) {
+    case "terminal": {
+      const p = params as DetachedTerminalParams;
+      return {
+        id: p.tabId ?? `detached-term-${id}`,
+        type: "terminal",
+        title: p.title ?? title,
+      };
+    }
+    case "rdp": {
+      const p = params as DetachedRdpParams;
+      return {
+        id: p.tabId ?? `detached-rdp-${id}`,
+        type: "rdp",
+        title: p.title ?? title,
+        sessionId: p.sessionId,
+      };
+    }
+    case "database": {
+      const p = params as DetachedDbParams;
+      return {
+        id: p.tabId ?? `detached-db-${id}`,
+        type: "database",
+        title: p.title ?? title,
+        sessionId: p.info.sessionId,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 function renderInner(
@@ -408,7 +504,7 @@ function renderInner(
       return (
         <Suspense fallback={<LoadingScreen label={tr("rdp.loading")} />}>
           <RdpPanel
-            tabId={`detached-rdp-${id}`}
+            tabId={p.tabId ?? `detached-rdp-${id}`}
             host={p.host}
             port={p.port}
             username={p.username ?? undefined}
@@ -426,7 +522,7 @@ function renderInner(
       return (
         <Suspense fallback={<LoadingScreen label={tr("vnc.loading")} />}>
           <VncPanel
-            tabId={`detached-vnc-${id}`}
+            tabId={p.tabId ?? `detached-vnc-${id}`}
             host={p.host}
             port={p.port}
             username={p.username ?? undefined}
@@ -447,7 +543,7 @@ function renderInner(
         : undefined;
       return (
         <TerminalPanel
-          tabId={`detached-term-${id}`}
+          tabId={p.tabId ?? `detached-term-${id}`}
           tabTitle={p.title}
           ssh={p.ssh ?? undefined}
           localShell={p.localShell ?? undefined}
@@ -465,7 +561,7 @@ function renderInner(
       return (
         <Suspense fallback={<LoadingScreen label={tr("rdp.status.connecting")} />}>
           <DbClientTab
-            tabId={`detached-db-${id}`}
+            tabId={p.tabId ?? `detached-db-${id}`}
             info={p.info}
             visible
             detachedWindowControls={detachedWindowControls}
