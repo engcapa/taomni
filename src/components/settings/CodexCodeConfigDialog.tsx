@@ -15,25 +15,25 @@ import {
 } from "../../lib/ipc";
 import { CodexProxyFields } from "./CodexProxyFields";
 
-const CONFIG_TEMPLATE = `model = "gpt-5"
+const CONFIG_TEMPLATE = `model = "gpt-5.4"
+model_provider = "openai_api_key"
 model_reasoning_effort = "medium"
 model_verbosity = "medium"
 
-# API-key profile example. Taomni reads [env] and injects it into
-# the isolated codex app-server process; [env] is not passed to Codex config.
-# Uncomment model_provider and [model_providers.openai_api_key] when using
-# OPENAI_API_KEY instead of Codex CLI sign-in.
-# model_provider = "openai_api_key"
-#
-# [model_providers.openai_api_key]
-# name = "OpenAI API key"
-# base_url = "https://api.openai.com/v1"
-# wire_api = "responses"
-# env_key = "OPENAI_API_KEY"
+[model_providers.openai_api_key]
+name = "OpenAI API key"
+base_url = "https://api.openai.com/v1"
+wire_api = "responses"
+env_key = "OPENAI_API_KEY"
 
 [env]
-# OPENAI_API_KEY = "sk-..."
-# CODEX_ACCESS_TOKEN = "..."
+# Required: replace this with the API key for this Codex profile.
+# Taomni injects [env] into the isolated app-server process and does
+# not pass [env] itself to Codex config.
+OPENAI_API_KEY = "REPLACE_ME_OPENAI_API_KEY"
+
+# Optional: add other profile-only environment values here.
+# EXAMPLE_FEATURES = "on"
 `;
 
 interface Props {

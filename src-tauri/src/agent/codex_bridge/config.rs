@@ -603,7 +603,7 @@ mod tests {
     fn toml_profile_extracts_env_and_config() {
         let runtime = parse_profile_config(Some(
             r#"
-model = "gpt-5"
+model = "gpt-5.4"
 model_provider = "openai_api_key"
 OPENAI_API_KEY = "sk-test"
 
@@ -620,7 +620,7 @@ EXAMPLE_FEATURES = "on"
         .unwrap();
         assert_eq!(
             runtime.config.get("model").and_then(Value::as_str),
-            Some("gpt-5")
+            Some("gpt-5.4")
         );
         assert!(runtime.config.get("OPENAI_API_KEY").is_none());
         assert!(runtime.config.get("env").is_none());
