@@ -1244,8 +1244,16 @@ struct OpenSessionEditorParams {
 
 #[derive(Deserialize, schemars::JsonSchema, serde::Serialize)]
 struct SftpUploadParams {
-    session_id: String,
-    local_path: String,
+    /// Optional; omitted calls target the thread's bound terminal/SFTP session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    session_id: Option<String>,
+    /// Single local file or directory to upload. Use `local_paths` for batches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    local_path: Option<String>,
+    /// Multiple local files/directories uploaded into `remote_path`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    local_paths: Vec<String>,
+    /// Remote directory, or a full destination path when uploading one item.
     remote_path: String,
 }
 
@@ -1572,7 +1580,7 @@ impl CcHandler {
 
     #[tool(
         name = "sftp_upload",
-        description = "在 SFTP 会话中上传本地文件（危险动作，需用户确认）"
+        description = "上传一个或多个本地文件/目录到绑定的 SFTP 会话；local_path 传单个，local_paths 传多个；remote_path 可为远端目录，单文件时也可为完整目标路径。超过 60 MiB 时界面会提示耗时和进度。危险动作需用户确认。"
     )]
     async fn sftp_upload(
         &self,
@@ -1580,7 +1588,8 @@ impl CcHandler {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
-        let args = as_value(&p);
+        let mut args = as_value(&p);
+        fill_session_id(&mut args, &scope);
         enforce_session_scope(&scope, &args).map_err(|e| ErrorData::invalid_params(e, None))?;
         enforce_inline_permission(&self.app, &scope, "sftp_upload", &args, false).await?;
         self.dispatch_side_effect(&scope, "sftp_upload", args).await
@@ -2002,6 +2011,19 @@ mod tests {
         fill_session_id(&mut args, &s);
         assert_eq!(args["session_id"], "sess-a");
         // And the scope check now passes for the injected id.
+        assert!(enforce_session_scope(&s, &args).is_ok());
+    }
+
+    #[test]
+    fn fill_session_id_replaces_null_session_id() {
+        let s = scope("t1", Some("sess-a"));
+        let mut args = json!({
+            "session_id": null,
+            "local_path": "d:\\temp\\a.txt",
+            "remote_path": "/tmp"
+        });
+        fill_session_id(&mut args, &s);
+        assert_eq!(args["session_id"], "sess-a");
         assert!(enforce_session_scope(&s, &args).is_ok());
     }
 

@@ -14,9 +14,13 @@ import {
   listenSftpProgress,
   sftpDownload,
   sftpDownloadDir,
+  sftpListLocal,
   sftpStat,
+  sftpUpload,
+  sftpUploadDir,
   type FileEntry,
   type TransferCompletePayload,
+  type TransferProgressPayload,
 } from "../../lib/sftp";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
 import { useAiStore } from "../../stores/aiStore";
@@ -104,6 +108,8 @@ function fmtBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const LARGE_UPLOAD_THRESHOLD_BYTES = 60 * 1024 * 1024;
+
 /** Short human description of what a tool call will do, for the ActionCard. */
 function describe(tool: string, rawArgs: Record<string, unknown> | null | undefined): string {
   const args = rawArgs ?? {};
@@ -116,8 +122,12 @@ function describe(tool: string, rawArgs: Record<string, unknown> | null | undefi
     case "MultiEdit":
     case "NotebookEdit":
       return `修改文件: ${String(args.file_path ?? args.notebook_path ?? "")}`;
-    case "sftp_upload":
-      return `上传文件到 ${String(args.remote_path ?? "")}`;
+    case "sftp_upload": {
+      const localPaths = uploadLocalPaths(args);
+      const remote = String(args.remote_path ?? args.remote_dir ?? "");
+      if (localPaths.length > 1) return `上传 ${localPaths.length} 个本地文件到 ${remote}`;
+      return `上传 ${localPaths[0] ?? String(args.local_path ?? "")} 到 ${remote}`;
+    }
     case "sftp_download":
       return `下载远端文件到 ${String(args.local_dir ?? "")}`;
     case "save_as_runbook":
@@ -144,12 +154,76 @@ function preview(rawArgs: Record<string, unknown> | null | undefined): string | 
   if (typeof args.command === "string") return args.command;
   if (typeof args.sql === "string") return args.sql;
   if (typeof args.file_path === "string") return args.file_path;
+  const uploadPaths = uploadLocalPaths(args);
+  if (uploadPaths.length > 0) return uploadPaths.join(", ");
   if (typeof args.remote_path === "string") return args.remote_path;
   return null;
 }
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function asStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(asString).filter((item) => item.length > 0);
+  }
+  const single = asString(value);
+  return single ? [single] : [];
+}
+
+function uploadLocalPaths(args: Record<string, unknown>): string[] {
+  const paths = [
+    ...asStringList(args.local_path),
+    ...asStringList(args.local_paths),
+  ];
+  return paths.filter((path, index) => paths.indexOf(path) === index);
+}
+
+interface AgentToolContext {
+  threadId: string;
+  callId: string;
+  tool: string;
+}
+
+const agentToolCardTargets = new Map<string, string>();
+
+function updateAgentToolCardResult(ctx: AgentToolContext, result: string): void {
+  const messageId = useChatStore.getState().streamingId[ctx.threadId];
+  if (!messageId) return;
+
+  useChatStore.setState((state) => {
+    const cards = [...(state.ccToolCards[messageId] ?? [])];
+    const targetCallId = agentToolCardTargets.get(ctx.callId) ?? ctx.callId;
+    let idx = cards.findIndex((card) => card.call_id === targetCallId);
+    if (idx < 0) {
+      for (let i = cards.length - 1; i >= 0; i -= 1) {
+        const cardTool = cards[i]?.tool ?? "";
+        if (
+          cardTool === ctx.tool ||
+          cardTool.endsWith(`__${ctx.tool}`) ||
+          cardTool.includes(ctx.tool)
+        ) {
+          idx = i;
+          agentToolCardTargets.set(ctx.callId, cards[i].call_id);
+          break;
+        }
+      }
+    }
+
+    if (idx >= 0) {
+      cards[idx] = { ...cards[idx], result };
+    } else {
+      cards.push({ call_id: ctx.callId, tool: ctx.tool, detail: "", result });
+      agentToolCardTargets.set(ctx.callId, ctx.callId);
+    }
+    return { ccToolCards: { ...state.ccToolCards, [messageId]: cards } };
+  });
+}
+
+function reportAgentToolStatus(ctx: AgentToolContext | null | undefined, message: string): void {
+  useAppStore.getState().setStatusMessage(message);
+  if (ctx) updateAgentToolCardResult(ctx, message);
 }
 
 function sftpSessionCandidates(sessionId: string): string[] {
@@ -246,9 +320,7 @@ async function uniqueLocalPath(
   throw new Error(`Could not find a free local filename in ${localDir}`);
 }
 
-function showSftpDownloadNotification(finalPath: string): void {
-  const title = "SFTP download complete";
-  const body = finalPath;
+function showSftpNotification(title: string, body: string): void {
   useAppStore.getState().setStatusMessage(`${title}: ${body}`);
   void import("@tauri-apps/plugin-notification")
     .then(async (mod) => {
@@ -261,12 +333,19 @@ function showSftpDownloadNotification(finalPath: string): void {
     });
 }
 
-async function runTrackedSftpDownload(opts: {
-  sessionId: string;
+function showSftpDownloadNotification(finalPath: string): void {
+  showSftpNotification("SFTP download complete", finalPath);
+}
+
+function showSftpUploadNotification(finalPath: string): void {
+  showSftpNotification("SFTP upload complete", finalPath);
+}
+
+async function runTrackedSftpTransfer(opts: {
   transferId: string;
-  remotePath: string;
-  localPath: string;
-  isDir: boolean;
+  failureLabel: string;
+  run: () => Promise<void>;
+  onProgress?: (payload: TransferProgressPayload) => void;
 }): Promise<TransferCompletePayload | null> {
   const transferStore = useTransferStore.getState();
   let completePayload: TransferCompletePayload | null = null;
@@ -281,6 +360,7 @@ async function runTrackedSftpDownload(opts: {
   try {
     const [progress, paused, complete] = await Promise.all([
       listenSftpProgress(opts.transferId, (payload) => {
+        opts.onProgress?.(payload);
         transferStore.patch(opts.transferId, {
           bytes: payload.bytes,
           size: payload.total || undefined,
@@ -302,7 +382,7 @@ async function runTrackedSftpDownload(opts: {
         if (payload.success) {
           transferStore.setState(opts.transferId, "done");
         } else {
-          transferStore.setState(opts.transferId, "error", payload.error ?? "download failed");
+          transferStore.setState(opts.transferId, "error", payload.error ?? opts.failureLabel);
         }
         resolveComplete(payload);
       }),
@@ -311,11 +391,7 @@ async function runTrackedSftpDownload(opts: {
     unlistenPaused = paused;
     unlistenComplete = complete;
 
-    if (opts.isDir) {
-      await sftpDownloadDir(opts.sessionId, opts.transferId, opts.remotePath, opts.localPath);
-    } else {
-      await sftpDownload(opts.sessionId, opts.transferId, opts.remotePath, opts.localPath, false);
-    }
+    await opts.run();
 
     return completePayload ?? await Promise.race([
       completePromise,
@@ -328,7 +404,226 @@ async function runTrackedSftpDownload(opts: {
   }
 }
 
-async function executeSftpDownloadTool(args: Record<string, unknown>): Promise<string> {
+async function runTrackedSftpDownload(opts: {
+  sessionId: string;
+  transferId: string;
+  remotePath: string;
+  localPath: string;
+  isDir: boolean;
+  onProgress?: (payload: TransferProgressPayload) => void;
+}): Promise<TransferCompletePayload | null> {
+  return runTrackedSftpTransfer({
+    transferId: opts.transferId,
+    failureLabel: "download failed",
+    onProgress: opts.onProgress,
+    run: async () => {
+      if (opts.isDir) {
+        await sftpDownloadDir(opts.sessionId, opts.transferId, opts.remotePath, opts.localPath);
+      } else {
+        await sftpDownload(opts.sessionId, opts.transferId, opts.remotePath, opts.localPath, false);
+      }
+    },
+  });
+}
+
+async function runTrackedSftpUpload(opts: {
+  sessionId: string;
+  transferId: string;
+  localPath: string;
+  remotePath: string;
+  isDir: boolean;
+  onProgress?: (payload: TransferProgressPayload) => void;
+}): Promise<TransferCompletePayload | null> {
+  return runTrackedSftpTransfer({
+    transferId: opts.transferId,
+    failureLabel: "upload failed",
+    onProgress: opts.onProgress,
+    run: async () => {
+      if (opts.isDir) {
+        await sftpUploadDir(opts.sessionId, opts.transferId, opts.localPath, opts.remotePath);
+      } else {
+        await sftpUpload(opts.sessionId, opts.transferId, opts.localPath, opts.remotePath, false);
+      }
+    },
+  });
+}
+
+function makeTransferProgressReporter(
+  ctx: AgentToolContext | null | undefined,
+  prefix: string,
+): (payload: TransferProgressPayload) => void {
+  let lastReport = 0;
+  return (payload) => {
+    const now = Date.now();
+    if (now - lastReport < 1000 && payload.bytes < payload.total) return;
+    lastReport = now;
+    const total = payload.total > 0 ? ` / ${fmtBytes(payload.total)}` : "";
+    const rate = payload.rate > 0 ? ` @ ${fmtBytes(payload.rate)}/s` : "";
+    reportAgentToolStatus(ctx, `${prefix}: ${fmtBytes(payload.bytes)}${total}${rate}`);
+  };
+}
+
+interface SftpUploadPlan {
+  name: string;
+  localPath: string;
+  remotePath: string;
+  kind: "file" | "dir";
+  size: number;
+}
+
+async function localEntryTransferSize(entry: FileEntry): Promise<number> {
+  if (entry.fileType !== "dir") return entry.size || 0;
+  const children = await sftpListLocal(entry.path);
+  let total = 0;
+  for (const child of children) {
+    total += await localEntryTransferSize(child);
+  }
+  return total;
+}
+
+async function resolveUploadRemotePath(
+  sessionId: string,
+  remotePath: string,
+  localName: string,
+  totalCount: number,
+): Promise<string> {
+  if (remotePath.endsWith("/") || remotePath.endsWith("\\")) {
+    return joinPath(remotePath, localName);
+  }
+
+  try {
+    const remoteEntry = await sftpStat(sessionId, remotePath, "remote");
+    if (isDirectory(remoteEntry)) return joinPath(remotePath, localName);
+  } catch {
+    // Missing remote paths are valid for a single-file upload, where the path
+    // names the desired destination file. Multiple files need a directory.
+  }
+
+  if (totalCount > 1) {
+    throw new Error(
+      "sftp_upload with multiple local paths requires remote_path to be an existing remote directory or end with /",
+    );
+  }
+  return remotePath;
+}
+
+async function buildSftpUploadPlans(
+  sessionId: string,
+  localPaths: string[],
+  remotePath: string,
+): Promise<SftpUploadPlan[]> {
+  const plans: SftpUploadPlan[] = [];
+  for (const localPath of localPaths) {
+    const entry = await sftpStat(sessionId, localPath, "local")
+      .catch((err) => {
+        throw new Error(`Local upload path does not exist: ${localPath} (${err})`);
+      });
+    const name = entry.name || basename(localPath) || "upload";
+    const kind = entry.fileType === "dir" ? "dir" : "file";
+    const size = await localEntryTransferSize(entry);
+    plans.push({
+      name,
+      kind,
+      size,
+      localPath: entry.path || localPath,
+      remotePath: await resolveUploadRemotePath(sessionId, remotePath, name, localPaths.length),
+    });
+  }
+  return plans;
+}
+
+function formatUploadSummary(results: Array<{ localPath: string; remotePath: string }>): string {
+  const lines = results.slice(0, 8).map((item) => `${item.localPath} -> ${item.remotePath}`);
+  if (results.length > lines.length) {
+    lines.push(`... ${results.length - lines.length} more`);
+  }
+  return lines.join("\n");
+}
+
+async function executeSftpUploadTool(
+  args: Record<string, unknown>,
+  ctx?: AgentToolContext,
+): Promise<string> {
+  const rawSessionId = asString(args.session_id);
+  const localPaths = uploadLocalPaths(args);
+  const remotePath = asString(args.remote_path ?? args.remote_dir);
+  if (!rawSessionId) throw new Error("sftp_upload requires session_id");
+  if (localPaths.length === 0) throw new Error("sftp_upload requires local_path or local_paths");
+  if (!remotePath) throw new Error("sftp_upload requires remote_path");
+
+  const sessionId = await ensureSftpSession(rawSessionId);
+  reportAgentToolStatus(ctx, `Preparing SFTP upload to ${remotePath}`);
+  const plans = await buildSftpUploadPlans(sessionId, localPaths, remotePath);
+  const totalBytes = plans.reduce((sum, plan) => sum + plan.size, 0);
+  if (totalBytes > LARGE_UPLOAD_THRESHOLD_BYTES) {
+    reportAgentToolStatus(
+      ctx,
+      `Large SFTP upload: ${fmtBytes(totalBytes)}; this may take a while`,
+    );
+  }
+
+  const completed: Array<{ localPath: string; remotePath: string }> = [];
+  for (let index = 0; index < plans.length; index += 1) {
+    const plan = plans[index];
+    const transferId = newTransferId();
+    const ordinal = plans.length > 1 ? `${index + 1}/${plans.length} ` : "";
+    useTransferStore.getState().add({
+      id: transferId,
+      sessionId,
+      direction: "upload",
+      kind: plan.kind,
+      localPath: plan.localPath,
+      remotePath: plan.remotePath,
+      size: plan.size,
+      bytes: 0,
+      rate: 0,
+      eta: 0,
+      state: "queued",
+      startedAt: Date.now(),
+      openAfter: false,
+    });
+
+    reportAgentToolStatus(ctx, `Uploading ${ordinal}${plan.name} -> ${plan.remotePath}`);
+    try {
+      const payload = await runTrackedSftpUpload({
+        sessionId,
+        transferId,
+        localPath: plan.localPath,
+        remotePath: plan.remotePath,
+        isDir: plan.kind === "dir",
+        onProgress: makeTransferProgressReporter(ctx, `Uploading ${ordinal}${plan.name}`),
+      });
+      if (payload && !payload.success) {
+        throw new Error(payload.error ?? "upload failed");
+      }
+      const finalPath = payload?.finalPath || plan.remotePath;
+      completed.push({ localPath: plan.localPath, remotePath: finalPath });
+      void useSftpStore.getState().refreshPane(sessionId, "remote").catch(() => undefined);
+      showSftpUploadNotification(finalPath);
+      reportAgentToolStatus(ctx, `Completed upload ${ordinal}${plan.name} -> ${finalPath}`);
+    } catch (err) {
+      useTransferStore.getState().setState(
+        transferId,
+        "error",
+        err instanceof Error ? err.message : String(err),
+      );
+      const prefix = completed.length > 0
+        ? `Upload failed after ${completed.length}/${plans.length} completed`
+        : "Upload failed";
+      throw new Error(`${prefix}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const largeNote = totalBytes > LARGE_UPLOAD_THRESHOLD_BYTES
+    ? `large upload ${fmtBytes(totalBytes)}; `
+    : "";
+  return `${largeNote}uploaded ${completed.length} item(s):\n${formatUploadSummary(completed)}`;
+}
+
+async function executeSftpDownloadTool(
+  args: Record<string, unknown>,
+  ctx?: AgentToolContext,
+): Promise<string> {
   const rawSessionId = asString(args.session_id);
   const remotePath = asString(args.remote_path);
   const localDir = asString(args.local_dir ?? args.local_path ?? args.target_dir);
@@ -350,6 +645,7 @@ async function executeSftpDownloadTool(args: Record<string, unknown>): Promise<s
   const localName = remoteEntry.name || basename(remotePath) || "download";
   const localPath = await uniqueLocalPath(sessionId, localDir, localName, isDir);
   const transferId = newTransferId();
+  reportAgentToolStatus(ctx, `Preparing SFTP download: ${remotePath} -> ${localPath}`);
 
   useTransferStore.getState().add({
     id: transferId,
@@ -374,6 +670,7 @@ async function executeSftpDownloadTool(args: Record<string, unknown>): Promise<s
       remotePath,
       localPath,
       isDir,
+      onProgress: makeTransferProgressReporter(ctx, `Downloading ${localName}`),
     });
     if (payload && !payload.success) {
       throw new Error(payload.error ?? "download failed");
@@ -381,6 +678,7 @@ async function executeSftpDownloadTool(args: Record<string, unknown>): Promise<s
     const finalPath = payload?.finalPath || localPath;
     void useSftpStore.getState().refreshPane(sessionId, "local").catch(() => undefined);
     showSftpDownloadNotification(finalPath);
+    reportAgentToolStatus(ctx, `Downloaded ${remotePath} -> ${finalPath}`);
     return `downloaded ${remotePath} -> ${finalPath}`;
   } catch (err) {
     useTransferStore.getState().setState(
@@ -662,8 +960,21 @@ async function executeTool(dispatch: ToolDispatch): Promise<void> {
         ok = true;
         break;
       }
+      case "sftp_upload": {
+        output = await executeSftpUploadTool(args, {
+          threadId: dispatch.threadId,
+          callId: dispatch.callId,
+          tool: "sftp_upload",
+        });
+        ok = true;
+        break;
+      }
       case "sftp_download": {
-        output = await executeSftpDownloadTool(args);
+        output = await executeSftpDownloadTool(args, {
+          threadId: dispatch.threadId,
+          callId: dispatch.callId,
+          tool: "sftp_download",
+        });
         ok = true;
         break;
       }

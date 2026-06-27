@@ -174,7 +174,7 @@ fn push_terminal_routing(s: &mut String, remote: bool) {
     if remote {
         s.push_str(
             "统一用 MCP 工具操作它:执行命令用 run_in_terminal、读回显用 read_terminal_tail、\
-             上传文件用 sftp_upload(危险动作会停下等用户确认),下载文件用 sftp_download;\
+             上传文件用 sftp_upload(单个用 local_path,多个用 local_paths;危险动作会停下等用户确认),下载文件用 sftp_download;\
              它们作用于这个绑定终端、\
              继承其真实当前目录。\n",
         );
