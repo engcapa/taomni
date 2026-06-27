@@ -3,7 +3,7 @@ use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -50,6 +50,7 @@ pub struct CodexAppServer {
     temp_dir: Option<PathBuf>,
     codex_token: Option<String>,
     thread_id: StdMutex<Option<String>>,
+    active_turns: AtomicU32,
     pub last_active_at: StdMutex<Instant>,
 }
 
@@ -139,6 +140,7 @@ impl CodexAppServer {
             temp_dir,
             codex_token,
             thread_id: StdMutex::new(None),
+            active_turns: AtomicU32::new(0),
             last_active_at: StdMutex::new(Instant::now()),
         };
         server.initialize().await?;
@@ -211,7 +213,6 @@ impl CodexAppServer {
         opts: CodexTurnOptions,
         mut on_event: F,
     ) -> Result<Vec<CodexEvent>, String> {
-        *self.last_active_at.lock().unwrap() = Instant::now();
         let thread_id = self
             .current_thread_id()
             .ok_or("Codex thread has not been started")?;
@@ -225,150 +226,174 @@ impl CodexAppServer {
             *active = Some(tx);
         }
 
-        let mut events = vec![CodexEvent::SessionInit {
-            session_id: thread_id.clone(),
-        }];
-        let mut latest_usage: Option<CodexUsage> = None;
-        let mut completed = false;
+        self.mark_turn_started();
+        let result = async {
+            let mut events = vec![CodexEvent::SessionInit {
+                session_id: thread_id.clone(),
+            }];
+            let mut latest_usage: Option<CodexUsage> = None;
+            let mut completed = false;
 
-        let start_result = self
-            .send_request("turn/start", build_turn_params(&thread_id, message, &opts))
-            .await;
-        if let Err(e) = start_result {
-            *self.active_events.lock().unwrap() = None;
-            return Err(e);
-        }
+            let start_result = self
+                .send_request("turn/start", build_turn_params(&thread_id, message, &opts))
+                .await;
+            if let Err(e) = start_result {
+                return Err(e);
+            }
 
-        while !completed {
-            let Some(value) =
-                tokio::time::timeout(Duration::from_secs(TURN_IDLE_TIMEOUT_SECS), rx.recv())
-                    .await
-                    .map_err(|_| {
-                        "Codex turn timed out waiting for app-server output".to_string()
-                    })?
-            else {
-                break;
-            };
+            while !completed {
+                let Some(value) =
+                    tokio::time::timeout(Duration::from_secs(TURN_IDLE_TIMEOUT_SECS), rx.recv())
+                        .await
+                        .map_err(|_| {
+                            "Codex turn timed out waiting for app-server output".to_string()
+                        })?
+                else {
+                    break;
+                };
 
-            let method = value.get("method").and_then(|v| v.as_str()).unwrap_or("");
-            match method {
-                "item/agentMessage/delta" => {
-                    let content = value
-                        .get("params")
-                        .and_then(|p| p.get("delta"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    if !content.is_empty() {
-                        let evt = CodexEvent::Partial { content };
-                        on_event(&evt);
-                        events.push(evt);
-                    }
-                }
-                "item/started" => {
-                    if let Some(item) = value.get("params").and_then(|p| p.get("item")) {
-                        if let Some(name) = protocol::item_tool_name(item) {
-                            let evt = CodexEvent::ToolUse {
-                                id: item
-                                    .get("id")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                name,
-                                input: protocol::item_tool_input(item),
-                            };
+                let method = value.get("method").and_then(|v| v.as_str()).unwrap_or("");
+                match method {
+                    "item/agentMessage/delta" => {
+                        let content = value
+                            .get("params")
+                            .and_then(|p| p.get("delta"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if !content.is_empty() {
+                            let evt = CodexEvent::Partial { content };
                             on_event(&evt);
                             events.push(evt);
                         }
                     }
-                }
-                "item/completed" => {
-                    if let Some(item) = value.get("params").and_then(|p| p.get("item")) {
-                        match item.get("type").and_then(|v| v.as_str()) {
-                            Some("agentMessage") => {
-                                let content = item
-                                    .get("text")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                if !content.is_empty() {
-                                    let evt = CodexEvent::AssistantMessage { content };
-                                    on_event(&evt);
-                                    events.push(evt);
-                                }
-                            }
-                            Some("mcpToolCall" | "commandExecution" | "dynamicToolCall") => {
-                                let content = protocol::tool_result_text(item);
-                                let evt = CodexEvent::ToolResult {
-                                    tool_use_id: item
+                    "item/started" => {
+                        if let Some(item) = value.get("params").and_then(|p| p.get("item")) {
+                            if let Some(name) = protocol::item_tool_name(item) {
+                                let evt = CodexEvent::ToolUse {
+                                    id: item
                                         .get("id")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("")
                                         .to_string(),
-                                    content,
+                                    name,
+                                    input: protocol::item_tool_input(item),
                                 };
                                 on_event(&evt);
                                 events.push(evt);
                             }
-                            _ => {}
                         }
                     }
-                }
-                "thread/tokenUsage/updated" => {
-                    latest_usage = Some(protocol::parse_token_usage(&value));
-                }
-                "turn/completed" => {
-                    if let Some(duration) = value
-                        .get("params")
-                        .and_then(|p| p.get("turn"))
-                        .and_then(|t| t.get("durationMs"))
-                        .and_then(|v| v.as_u64())
-                    {
-                        latest_usage
-                            .get_or_insert_with(CodexUsage::default)
-                            .duration_ms = Some(duration);
+                    "item/completed" => {
+                        if let Some(item) = value.get("params").and_then(|p| p.get("item")) {
+                            match item.get("type").and_then(|v| v.as_str()) {
+                                Some("agentMessage") => {
+                                    let content = item
+                                        .get("text")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    if !content.is_empty() {
+                                        let evt = CodexEvent::AssistantMessage { content };
+                                        on_event(&evt);
+                                        events.push(evt);
+                                    }
+                                }
+                                Some("mcpToolCall" | "commandExecution" | "dynamicToolCall") => {
+                                    let content = protocol::tool_result_text(item);
+                                    let evt = CodexEvent::ToolResult {
+                                        tool_use_id: item
+                                            .get("id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("")
+                                            .to_string(),
+                                        content,
+                                    };
+                                    on_event(&evt);
+                                    events.push(evt);
+                                }
+                                _ => {}
+                            }
+                        }
                     }
-                    if let Some(error) = value
-                        .get("params")
-                        .and_then(|p| p.get("turn"))
-                        .and_then(|t| t.get("error"))
-                        .and_then(|e| e.get("message"))
-                        .and_then(|v| v.as_str())
-                    {
-                        let evt = CodexEvent::Error {
-                            message: error.to_string(),
+                    "thread/tokenUsage/updated" => {
+                        latest_usage = Some(protocol::parse_token_usage(&value));
+                    }
+                    "turn/completed" => {
+                        if let Some(duration) = value
+                            .get("params")
+                            .and_then(|p| p.get("turn"))
+                            .and_then(|t| t.get("durationMs"))
+                            .and_then(|v| v.as_u64())
+                        {
+                            latest_usage
+                                .get_or_insert_with(CodexUsage::default)
+                                .duration_ms = Some(duration);
+                        }
+                        if let Some(error) = value
+                            .get("params")
+                            .and_then(|p| p.get("turn"))
+                            .and_then(|t| t.get("error"))
+                            .and_then(|e| e.get("message"))
+                            .and_then(|v| v.as_str())
+                        {
+                            let evt = CodexEvent::Error {
+                                message: error.to_string(),
+                            };
+                            on_event(&evt);
+                            events.push(evt);
+                        }
+                        let evt = CodexEvent::Done {
+                            usage: latest_usage.clone(),
                         };
                         on_event(&evt);
                         events.push(evt);
+                        completed = true;
                     }
-                    let evt = CodexEvent::Done {
-                        usage: latest_usage.clone(),
-                    };
-                    on_event(&evt);
-                    events.push(evt);
-                    completed = true;
+                    "error" => {
+                        let msg = value
+                            .get("params")
+                            .and_then(|p| p.get("message"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Codex app-server reported an error")
+                            .to_string();
+                        let evt = CodexEvent::Error { message: msg };
+                        on_event(&evt);
+                        events.push(evt);
+                    }
+                    _ => {}
                 }
-                "error" => {
-                    let msg = value
-                        .get("params")
-                        .and_then(|p| p.get("message"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("Codex app-server reported an error")
-                        .to_string();
-                    let evt = CodexEvent::Error { message: msg };
-                    on_event(&evt);
-                    events.push(evt);
-                }
-                _ => {}
             }
+
+            Ok(events)
         }
+        .await;
 
         *self.active_events.lock().unwrap() = None;
-        Ok(events)
+        self.mark_turn_finished();
+        result
     }
 
     pub async fn get_stderr(&self) -> String {
         self.stderr_buf.lock().await.clone()
+    }
+
+    pub fn is_turn_active(&self) -> bool {
+        self.active_turns.load(Ordering::SeqCst) > 0
+    }
+
+    fn mark_turn_started(&self) {
+        self.active_turns.fetch_add(1, Ordering::SeqCst);
+        *self.last_active_at.lock().unwrap() = Instant::now();
+    }
+
+    fn mark_turn_finished(&self) {
+        let _ = self
+            .active_turns
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+                Some(n.saturating_sub(1))
+            });
+        *self.last_active_at.lock().unwrap() = Instant::now();
     }
 
     pub fn is_stopped(&self) -> bool {
