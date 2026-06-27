@@ -25,6 +25,7 @@ import {
 import { historyClear } from "../../lib/ipc";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { confirmAppDialog } from "../../lib/appDialogs";
+import { getAppPlatform } from "../../lib/runtime";
 
 interface TerminalAppearanceSettingsProps {
   profile: TerminalProfile;
@@ -64,6 +65,7 @@ export function TerminalAppearanceSettings({
   const cursorOptions = useMemo(() => buildCursorOptions(t), [t]);
   const rightClickOptions = useMemo(() => buildRightClickOptions(t), [t]);
   const fontState = useSystemFonts();
+  const isWindows = getAppPlatform() === "windows";
   const fontOptions = useTerminalFontOptions(fontState.fonts);
   const partitionedFonts = useMemo(() => {
     const mono: string[] = [];
@@ -375,6 +377,13 @@ export function TerminalAppearanceSettings({
               checked={profile.showScrollbar}
               onChange={(checked) => updateProfile({ showScrollbar: checked })}
             />
+            {isWindows && (
+              <CheckControl
+                label={t("terminalAppearance.webglRenderer")}
+                checked={profile.webglRenderer}
+                onChange={(checked) => updateProfile({ webglRenderer: checked })}
+              />
+            )}
             <CheckControl
               label={t("terminalAppearance.copyOnSelect")}
               checked={profile.copyOnSelect}

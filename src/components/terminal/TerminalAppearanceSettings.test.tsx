@@ -9,8 +9,16 @@ const ipcMocks = vi.hoisted(() => ({
   historyClear: vi.fn(async () => undefined),
 }));
 
+const runtimeMocks = vi.hoisted(() => ({
+  getAppPlatform: vi.fn(() => "linux"),
+}));
+
 vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
+}));
+
+vi.mock("../../lib/runtime", () => ({
+  getAppPlatform: runtimeMocks.getAppPlatform,
 }));
 
 function renderAppearance(profile: TerminalProfile = DEFAULT_TERMINAL_PROFILE) {
@@ -23,6 +31,8 @@ describe("TerminalAppearanceSettings", () => {
   beforeEach(() => {
     ipcMocks.listSystemFonts.mockReset();
     ipcMocks.listSystemFonts.mockResolvedValue(["Arial", "Source Code Pro", "JetBrains Mono"]);
+    runtimeMocks.getAppPlatform.mockReset();
+    runtimeMocks.getAppPlatform.mockReturnValue("linux");
   });
 
   afterEach(() => {
@@ -105,6 +115,27 @@ describe("TerminalAppearanceSettings", () => {
 
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
       allowRemoteOsc52Clipboard: true,
+    }));
+  });
+
+  it("hides the WebGL renderer setting outside Windows", () => {
+    renderAppearance();
+
+    expect(screen.queryByRole("checkbox", { name: "Use WebGL renderer" })).not.toBeInTheDocument();
+  });
+
+  it("updates the Windows WebGL renderer setting", async () => {
+    runtimeMocks.getAppPlatform.mockReturnValue("windows");
+    const user = userEvent.setup();
+    const { onProfileChange } = renderAppearance();
+
+    const checkbox = screen.getByRole("checkbox", { name: "Use WebGL renderer" });
+    expect(checkbox).toBeChecked();
+
+    await user.click(checkbox);
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      webglRenderer: false,
     }));
   });
 });
