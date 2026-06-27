@@ -68,11 +68,30 @@ const fitMocks = vi.hoisted(() => ({
   fit: vi.fn(),
 }));
 
-const webglMocks = vi.hoisted(() => ({
-  ctor: vi.fn().mockImplementation(function () {
-    return {};
-  }),
-}));
+const webglMocks = vi.hoisted(() => {
+  const instances: Array<{
+    contextLossDispose: ReturnType<typeof vi.fn>;
+    contextLossHandler: (() => void) | null;
+    dispose: ReturnType<typeof vi.fn>;
+    onContextLoss: ReturnType<typeof vi.fn>;
+  }> = [];
+
+  const ctor = vi.fn().mockImplementation(function () {
+    const instance = {
+      contextLossDispose: vi.fn(),
+      contextLossHandler: null as (() => void) | null,
+      dispose: vi.fn(),
+      onContextLoss: vi.fn((handler: () => void) => {
+        instance.contextLossHandler = handler;
+        return { dispose: instance.contextLossDispose };
+      }),
+    };
+    instances.push(instance);
+    return instance;
+  });
+
+  return { ctor, instances };
+});
 
 const ipcMocks = vi.hoisted(() => {
   const terminalExitHandlers = new Map<string, () => void>();
@@ -212,6 +231,7 @@ describe("TerminalPanel focus behavior", () => {
       ipcMocks.terminalExitHandlers.set(sessionId, callback);
       return vi.fn(() => ipcMocks.terminalExitHandlers.delete(sessionId));
     });
+    webglMocks.instances.length = 0;
     webglMocks.ctor.mockClear();
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -257,6 +277,39 @@ describe("TerminalPanel focus behavior", () => {
         value: originalPlatform,
       });
     }
+  });
+
+  it("does not load the WebGL renderer when disabled in the terminal profile", async () => {
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          webglRenderer: false,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+    expect(webglMocks.ctor).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the default renderer when the WebGL context is lost", async () => {
+    render(<TerminalPanel visible terminalProfile={DEFAULT_TERMINAL_PROFILE} />);
+
+    await waitFor(() => {
+      expect(webglMocks.ctor).toHaveBeenCalledTimes(1);
+    });
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const webgl = webglMocks.instances[0];
+    webgl.contextLossHandler?.();
+
+    expect(webgl.contextLossDispose).toHaveBeenCalledTimes(1);
+    expect(webgl.dispose).toHaveBeenCalledTimes(1);
+    expect(term.refresh).toHaveBeenCalledWith(0, 23);
   });
 
   it("focuses the terminal when a hidden tab becomes active", async () => {

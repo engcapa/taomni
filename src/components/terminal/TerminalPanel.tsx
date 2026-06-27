@@ -346,6 +346,7 @@ export function TerminalPanel({
   const [fontSize, setFontSize] = useState(initialProfile.fontSize);
   const [fontLigatures, setFontLigatures] = useState(initialProfile.fontLigatures);
   const [showScrollbar, setShowScrollbar] = useState(initialProfile.showScrollbar);
+  const [webglRenderer, setWebglRenderer] = useState(initialProfile.webglRenderer);
   const [readOnly, setReadOnly] = useState(initialProfile.readOnly);
   const [themeName, setThemeName] = useState(initialProfile.theme || theme);
   const [cursorStyle, setCursorStyle] = useState(initialProfile.cursorStyle);
@@ -398,6 +399,7 @@ export function TerminalPanel({
   const outputLogRef = useRef("");
   const loggingActiveRef = useRef(loggingActive);
   const copyOnSelectRef = useRef(copyOnSelect);
+  const webglRendererRef = useRef(webglRenderer);
   const allowRemoteOsc52ClipboardRef = useRef(allowRemoteOsc52Clipboard);
   const macroRecordingRef = useRef(macroRecording);
   const macroBufferRef = useRef("");
@@ -408,6 +410,10 @@ export function TerminalPanel({
   const isComposingRef = useRef(false);
   const compositionBufferRef = useRef<Uint8Array[]>([]);
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
+  const webglAddonRef = useRef<{
+    addon: WebglAddon;
+    contextLossDisposable: { dispose: () => void } | null;
+  } | null>(null);
   const suppressNativePasteUntilRef = useRef(0);
   const middleClickSelectionRef = useRef("");
   const blockSelectionRef = useRef<TerminalBlockSelection | null>(null);
@@ -473,6 +479,47 @@ export function TerminalPanel({
   const focusTerminal = useCallback(() => {
     termRef.current?.focus();
   }, []);
+
+  const disposeTerminalWebgl = useCallback((term: Terminal | null) => {
+    const record = webglAddonRef.current;
+    if (!record) return;
+
+    webglAddonRef.current = null;
+    record.contextLossDisposable?.dispose();
+    try {
+      record.addon.dispose();
+    } catch {
+      /* WebGL addon disposal is best-effort during renderer fallback. */
+    }
+    if (term) {
+      term.refresh(0, Math.max(0, term.rows - 1));
+    }
+  }, []);
+
+  const installTerminalWebgl = useCallback((term: Terminal) => {
+    if (!shouldUseTerminalWebgl(webglRendererRef.current) || webglAddonRef.current) return;
+
+    let addon: WebglAddon | null = null;
+    let contextLossDisposable: { dispose: () => void } | null = null;
+    try {
+      addon = new WebglAddon();
+      const currentAddon = addon;
+      contextLossDisposable = currentAddon.onContextLoss(() => {
+        if (webglAddonRef.current?.addon !== currentAddon) return;
+        disposeTerminalWebgl(term);
+        setStatusMessage("Terminal WebGL renderer lost; using stable renderer");
+      });
+      term.loadAddon(currentAddon);
+      webglAddonRef.current = { addon: currentAddon, contextLossDisposable };
+    } catch {
+      contextLossDisposable?.dispose();
+      try {
+        addon?.dispose();
+      } catch {
+        /* WebGL not available. */
+      }
+    }
+  }, [disposeTerminalWebgl, setStatusMessage]);
 
   const collectReattachState = useCallback((): TerminalReattachState => {
     const term = termRef.current;
@@ -1791,6 +1838,7 @@ export function TerminalPanel({
     setFontSize(terminalProfile.fontSize);
     setFontLigatures(terminalProfile.fontLigatures);
     setShowScrollbar(terminalProfile.showScrollbar);
+    setWebglRenderer(terminalProfile.webglRenderer);
     setReadOnly(terminalProfile.readOnly);
     setThemeName(terminalProfile.theme || theme);
     setCursorStyle(terminalProfile.cursorStyle);
@@ -1979,11 +2027,7 @@ export function TerminalPanel({
       detachImeGuard = attachTerminalImeGuard(el, guard);
     }
 
-    if (shouldUseTerminalWebgl()) {
-      try {
-        term.loadAddon(new WebglAddon());
-      } catch { /* WebGL not available */ }
-    }
+    installTerminalWebgl(term);
 
     fitVisibleTerminal();
 
@@ -2464,6 +2508,7 @@ export function TerminalPanel({
         }
       }
       term.dispose();
+      webglAddonRef.current = null;
       termRef.current = null;
       fitAddonRef.current = null;
       searchAddonRef.current = null;
@@ -2476,6 +2521,18 @@ export function TerminalPanel({
       initializedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    webglRendererRef.current = webglRenderer;
+    const term = termRef.current;
+    if (!term) return;
+
+    if (!shouldUseTerminalWebgl(webglRenderer)) {
+      disposeTerminalWebgl(term);
+      return;
+    }
+    installTerminalWebgl(term);
+  }, [disposeTerminalWebgl, installTerminalWebgl, webglRenderer]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -3729,7 +3786,8 @@ function terminalProfileSignature(profile: TerminalProfile): string {
   return JSON.stringify(profile);
 }
 
-function shouldUseTerminalWebgl(): boolean {
+function shouldUseTerminalWebgl(enabled: boolean): boolean {
+  if (!enabled) return false;
   // Tauri uses WKWebView on macOS. On Intel/older macOS builds the WebGL
   // renderer can flash, lose context, or leave the terminal blank, while
   // xterm's default renderer stays stable for PTY/SSH output.

@@ -21,6 +21,7 @@ export interface TerminalProfile {
   cursorStyle: TerminalCursorStyle;
   cursorBlink: boolean;
   showScrollbar: boolean;
+  webglRenderer: boolean;
   copyOnSelect: boolean;
   allowRemoteOsc52Clipboard: boolean;
   rightClickBehavior: TerminalRightClickBehavior;
@@ -52,6 +53,7 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   cursorStyle: "block",
   cursorBlink: true,
   showScrollbar: true,
+  webglRenderer: true,
   copyOnSelect: false,
   allowRemoteOsc52Clipboard: false,
   rightClickBehavior: "menu",
@@ -140,6 +142,7 @@ export function normalizeTerminalProfile(input: unknown): TerminalProfile {
     ),
     cursorBlink: readBoolean(source.cursorBlink, DEFAULT_TERMINAL_PROFILE.cursorBlink),
     showScrollbar: readBoolean(source.showScrollbar, DEFAULT_TERMINAL_PROFILE.showScrollbar),
+    webglRenderer: readBoolean(source.webglRenderer, DEFAULT_TERMINAL_PROFILE.webglRenderer),
     copyOnSelect: readBoolean(source.copyOnSelect, DEFAULT_TERMINAL_PROFILE.copyOnSelect),
     allowRemoteOsc52Clipboard: readBoolean(
       source.allowRemoteOsc52Clipboard,

@@ -1599,6 +1599,7 @@ export const zhCN: DeepPartial<typeof en> = {
     rightClickPaste: "粘贴剪贴板",
     rightClickCopyOrPaste: "有选区则复制，否则粘贴",
     showScrollbar: "显示终端滚动条",
+    webglRenderer: "启用 WebGL 渲染器",
     copyOnSelect: "选中即复制",
     allowOsc52: "允许 SSH OSC 52 剪贴板",
     readOnly: "终端只读",

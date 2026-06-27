@@ -1603,6 +1603,7 @@ const dict = {
     rightClickPaste: "Paste clipboard",
     rightClickCopyOrPaste: "Copy selection or paste",
     showScrollbar: "Show terminal scrollbar",
+    webglRenderer: "Use WebGL renderer",
     copyOnSelect: "Copy on select",
     allowOsc52: "Allow SSH OSC 52 clipboard",
     readOnly: "Read-only terminal",
