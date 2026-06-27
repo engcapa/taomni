@@ -1,6 +1,6 @@
 use crate::agent::codex_bridge::process::{CodexAppServer, CodexThreadOptions, CodexTurnOptions};
 use crate::agent::codex_bridge::protocol::CodexEvent;
-use crate::agent::codex_bridge::{detect, detect_with_profile_runtime, CodexStatusResult};
+use crate::agent::codex_bridge::{detect, CodexStatusResult};
 use crate::ai::config::{default_ai_config_path, AiConfig};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
@@ -28,13 +28,8 @@ pub async fn codex_detect(state: State<'_, AppState>) -> Result<CodexStatusResul
         Some(codex.binary.clone())
     };
     drop(ai_ctx);
-    let proxy = crate::agent::codex_bridge::config::resolve_effective_proxy_url(&state, &codex)?;
-    let runtime = crate::agent::codex_bridge::config::resolve_custom_runtime(&codex, &state.vault)?;
-    if runtime.isolated_home {
-        Ok(detect_with_profile_runtime(binary.as_deref(), proxy.as_deref(), runtime).await)
-    } else {
-        Ok(detect(binary.as_deref(), proxy.as_deref()).await)
-    }
+    let proxy = crate::agent::codex_bridge::config::resolve_global_proxy_url(&state, &codex)?;
+    Ok(detect(binary.as_deref(), proxy.as_deref()).await)
 }
 
 #[tauri::command]

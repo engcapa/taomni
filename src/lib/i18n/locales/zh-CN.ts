@@ -2210,7 +2210,7 @@ export const zhCN: DeepPartial<typeof en> = {
     ccCustomProfilesSummary: "已配置多套方案（共 {count} 个）",
     codexTitle: "Codex app-server 集成",
     codexSubtitle: "使用本机 Codex CLI 的 app-server 模式，接入 Taomni chat、session 和 MCP 工具。",
-    codexDefaultMessage: "检测 Codex CLI、登录状态和有效代理。",
+    codexDefaultMessage: "检测 Codex CLI、全局登录状态和全局代理。",
     codexDetect: "检测 Codex",
     codexInstallTitle: "安装 Codex CLI",
     codexManualPathLabel: "或手动指定 codex 可执行文件路径",

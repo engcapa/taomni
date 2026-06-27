@@ -2214,7 +2214,7 @@ const dict = {
     ccCustomProfilesSummary: "Multiple profiles configured ({count} profiles)",
     codexTitle: "Codex app-server Integration",
     codexSubtitle: "Use the local Codex CLI app-server mode for Taomni chat, sessions, and MCP tools.",
-    codexDefaultMessage: "Detect the Codex CLI, login status, and effective proxy.",
+    codexDefaultMessage: "Detect the Codex CLI, global login status, and global proxy.",
     codexDetect: "Detect Codex",
     codexInstallTitle: "Install Codex CLI",
     codexManualPathLabel: "Or set the path to the codex binary manually",

@@ -275,6 +275,18 @@ fn resolve_global_proxy_source(
     }
 }
 
+pub fn resolve_global_proxy_url(
+    state: &AppState,
+    cfg: &CodexBridgeConfig,
+) -> Result<Option<String>, String> {
+    resolve_global_proxy_source(
+        state,
+        &cfg.proxy_mode,
+        cfg.proxy_session_id.as_deref(),
+        cfg.proxy_url.as_deref(),
+    )
+}
+
 pub fn resolve_effective_proxy_url(
     state: &AppState,
     cfg: &CodexBridgeConfig,
@@ -289,12 +301,7 @@ pub fn resolve_effective_proxy_url(
             return Ok(profile_choice);
         }
     }
-    resolve_global_proxy_source(
-        state,
-        &cfg.proxy_mode,
-        cfg.proxy_session_id.as_deref(),
-        cfg.proxy_url.as_deref(),
-    )
+    resolve_global_proxy_url(state, cfg)
 }
 
 pub fn resolve_effective_proxy_url_with_profile_override(
