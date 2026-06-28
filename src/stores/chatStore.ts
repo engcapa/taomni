@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
 import type { ChatAttachment } from "../lib/chat/attachments";
+import type { LlmProviderCapability } from "./aiStore";
+
+export type ChatThreadMode = "chat" | "image" | "video";
 
 export interface ChatThread {
   id: string;
@@ -12,6 +15,7 @@ export interface ChatThread {
   updated_at: number;
   linked_session_id: string | null;
   source: string;
+  mode?: ChatThreadMode | string | null;
   /** Per-thread output format override ("md" | "html" | "plain"). null = inherit AiConfig. */
   output_format?: string | null;
   /** Per-thread Claude Code model override. null = inherit the Claude Code default model. */
@@ -53,6 +57,16 @@ export interface ChatMessage {
   attachments?: ChatAttachment[];
 }
 
+interface ChatGenerateMediaResponse {
+  user_message: ChatMessage;
+  assistant_message: ChatMessage;
+  redacted_count: number;
+  saved_path: string;
+  remote_url?: string | null;
+  video_id?: string | null;
+  model: string;
+}
+
 type StreamEvent =
   | { kind: "user_message"; message: ChatMessage }
   | { kind: "assistant_start"; id: string; thread_id: string; created_at: number }
@@ -90,6 +104,16 @@ interface ChatDrawerLayoutPrefs {
 
 function isChatCapableTabType(type: string | null | undefined): boolean {
   return type === "welcome" || type === "terminal" || type === "rdp" || type === "database" || type === "redis";
+}
+
+export function normalizeChatThreadMode(mode: string | null | undefined): ChatThreadMode {
+  return mode === "image" || mode === "video" ? mode : "chat";
+}
+
+function capabilityForThreadMode(mode: ChatThreadMode): LlmProviderCapability {
+  if (mode === "image") return "image_generation";
+  if (mode === "video") return "video_generation";
+  return "chat";
 }
 
 function clampDrawerWidth(width: number): number {
@@ -196,7 +220,7 @@ interface ChatStore {
   pendingComposerText: string;
 
   loadThreads: () => Promise<void>;
-  newThread: (providerId?: string, linkedSessionId?: string) => Promise<ChatThread>;
+  newThread: (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode) => Promise<ChatThread>;
   deleteThread: (threadId: string) => Promise<void>;
   setThreadProvider: (threadId: string, providerId: string) => Promise<void>;
   setThreadCcModel: (threadId: string, model: string | null) => Promise<void>;
@@ -278,14 +302,18 @@ function nextThreadSendingState(
   };
 }
 
-async function resolveDefaultProviderId(): Promise<string | null> {
+async function resolveDefaultProviderId(capability: LlmProviderCapability = "chat"): Promise<string | null> {
   try {
-    const { defaultChatProviderId, useAiStore } = await import("./aiStore");
+    const { chatDrawerProviderIds, defaultChatProviderId, useAiStore } = await import("./aiStore");
     const aiStore = useAiStore.getState();
     if (!aiStore.config) {
       await aiStore.loadConfig();
     }
-    return defaultChatProviderId(useAiStore.getState().config) ?? null;
+    const config = useAiStore.getState().config;
+    if (capability !== "chat") {
+      return chatDrawerProviderIds(config, capability)[0] ?? null;
+    }
+    return defaultChatProviderId(config) ?? null;
   } catch (e) {
     console.warn("resolve default chat provider failed:", e);
     return null;
@@ -324,11 +352,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  newThread: async (providerId?: string, linkedSessionId?: string) => {
-    const resolvedProviderId = providerId ?? (await resolveDefaultProviderId());
+  newThread: async (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode) => {
+    const threadMode = mode ?? "chat";
+    const resolvedProviderId = providerId ?? (await resolveDefaultProviderId(capabilityForThreadMode(threadMode)));
     const thread = await invoke<ChatThread>("chat_new_thread", {
       providerId: resolvedProviderId,
       linkedSessionId: linkedSessionId ?? null,
+      mode: threadMode,
     });
     const scope = scopeForThread(thread);
     set((s) => ({
@@ -402,6 +432,55 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   sendMessage: async (threadId: string, content: string, terminalContext?: string, attachments?: ChatAttachment[]) => {
     set((s) => nextThreadSendingState(s.sendingByThreadId, threadId, true));
+
+    const thread = get().threads.find((t) => t.id === threadId) ?? null;
+    const threadMode = normalizeChatThreadMode(thread?.mode);
+    if (threadMode !== "chat") {
+      try {
+        const hadMessages = (get().messages[threadId]?.length ?? 0) > 0;
+        const resp = await invoke<ChatGenerateMediaResponse>("chat_generate_media", {
+          req: {
+            thread_id: threadId,
+            prompt: content,
+            kind: threadMode,
+          },
+        });
+        set((s) => ({
+          messages: {
+            ...s.messages,
+            [threadId]: [
+              ...(s.messages[threadId] ?? []),
+              resp.user_message,
+              resp.assistant_message,
+            ],
+          },
+          threads: s.threads.map((t) =>
+            t.id === threadId
+              ? {
+                  ...t,
+                  updated_at: Date.now() / 1000,
+                  title: hadMessages ? t.title : resp.user_message.content.slice(0, 40) || t.title,
+                }
+              : t
+          ),
+        }));
+      } catch (e) {
+        if (isVaultLockedError(e)) {
+          window.dispatchEvent(
+            new CustomEvent(VAULT_LOCKED_EVENT, {
+              detail: {
+                reason:
+                  "This AI provider's API key is in the credential vault — unlock it to continue.",
+              },
+            }),
+          );
+        }
+        throw e;
+      } finally {
+        set((s) => nextThreadSendingState(s.sendingByThreadId, threadId, false));
+      }
+      return;
+    }
 
     // Phase 3.S — resolve the saved SessionConfig.id this thread is bound to so
     // the backend can build Claude Code's session-identity card.

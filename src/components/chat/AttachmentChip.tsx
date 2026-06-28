@@ -1,4 +1,4 @@
-import { Terminal as TerminalIcon, FileText, Image as ImageIcon, Server, X } from "lucide-react";
+import { Terminal as TerminalIcon, FileText, FileVideo, Image as ImageIcon, Server, X } from "lucide-react";
 import type { ReactElement } from "react";
 import type { AttachmentRef } from "../../lib/chat/composerRefs";
 import { formatAttachmentBytes, type ChatAttachment } from "../../lib/chat/attachments";
@@ -52,8 +52,13 @@ function describe(attachment: AttachmentRef | ChatAttachment, t: TranslateFn): {
     };
   }
   if ("size" in attachment) {
+    const icon = attachment.kind === "image"
+      ? <ImageIcon className="w-2.5 h-2.5" />
+      : attachment.kind === "video"
+        ? <FileVideo className="w-2.5 h-2.5" />
+        : <FileText className="w-2.5 h-2.5" />;
     return {
-      icon: attachment.kind === "image" ? <ImageIcon className="w-2.5 h-2.5" /> : <FileText className="w-2.5 h-2.5" />,
+      icon,
       label: `${attachment.name} (${formatAttachmentBytes(attachment.size)})`,
     };
   }

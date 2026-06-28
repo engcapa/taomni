@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 export const CHAT_MAX_ATTACHMENTS = 10;
 export const CHAT_MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
-export type ChatAttachmentKind = "image" | "file";
+export type ChatAttachmentKind = "image" | "file" | "video";
 
 export interface ChatAttachment {
   id: string;

@@ -101,6 +101,7 @@ describe("ChatDrawer provider and echo controls", () => {
       updated_at: 1,
       linked_session_id: "term-1",
       source: "drawer",
+      mode: "chat",
       output_format: null,
       cc_model: null,
     };
@@ -162,6 +163,43 @@ describe("ChatDrawer provider and echo controls", () => {
     expect(echo).toHaveAttribute("aria-pressed", "true");
     expect(echo).toHaveTextContent("Terminal echo: on");
   });
+
+  it("filters provider options by the active media mode capability", () => {
+    const config = makeConfig();
+    config.llm.providers.agnes = {
+      base_url: "https://apihub.agnes-ai.com/v1",
+      api_key: "",
+      model: "agnes-2.0-flash",
+      runtime: "openai-compat",
+      capabilities: { chat: true, image_generation: true, video_generation: true },
+      image_model: "agnes-image-2.1-flash",
+      video_model: "agnes-video-v2.0",
+    };
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "chat_list_threads") return Promise.resolve([]);
+      if (command === "chat_purge_old") return Promise.resolve(0);
+      if (command === "get_ai_config") return Promise.resolve(config);
+      if (command === "save_ai_config") return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+    const imageThread: ChatThread = {
+      ...useChatStore.getState().threads[0],
+      provider_id: "agnes",
+      mode: "image",
+    };
+    useAiStore.setState({ config });
+    useChatStore.setState({
+      threads: [imageThread],
+      activeThreadId: imageThread.id,
+      messages: { [imageThread.id]: [] },
+    });
+
+    render(<ChatDrawer />);
+
+    const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
+    expect(Array.from(provider.options).map((option) => option.value)).toEqual(["agnes"]);
+    expect(screen.getByTestId("chat-mode-image")).toHaveAttribute("aria-pressed", "true");
+  });
 });
 
 describe("ChatDrawer layout resizing", () => {
@@ -184,6 +222,7 @@ describe("ChatDrawer layout resizing", () => {
       updated_at: 1,
       linked_session_id: "term-1",
       source: "drawer",
+      mode: "chat",
       output_format: null,
       cc_model: null,
     };

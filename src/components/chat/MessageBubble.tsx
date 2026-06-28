@@ -23,6 +23,7 @@ import {
 } from "../../lib/queryRegistry";
 import { AttachmentChip } from "./AttachmentChip";
 import { useT } from "../../lib/i18n";
+import type { ChatAttachment } from "../../lib/chat/attachments";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -231,6 +232,10 @@ export function MessageBubble({
       .filter((s) => s.kind === "code")
       .map((s) => s.value);
   }, [isUser, stripped]);
+  const mediaAttachments = useMemo(
+    () => (message.attachments ?? []).filter(isMediaAttachment),
+    [message.attachments],
+  );
 
   const commitSendAll = (entry: TerminalRegistryEntry, payload: PreparedTerminalInput) => {
     entry.writeInput(payload.text);
@@ -359,6 +364,13 @@ export function MessageBubble({
               ? <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
               : stripped}
         </div>
+        {mediaAttachments.length > 0 && (
+          <div className="mt-2 flex flex-col gap-2">
+            {mediaAttachments.map((attachment) => (
+              <MediaAttachmentPreview key={attachment.id} attachment={attachment} />
+            ))}
+          </div>
+        )}
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {message.attachments.map((attachment) => (
@@ -421,4 +433,70 @@ export function MessageBubble({
 interface PendingMessageTerminalSend {
   entry: TerminalRegistryEntry;
   payload: PreparedTerminalInput;
+}
+
+function isMediaAttachment(attachment: ChatAttachment): attachment is ChatAttachment {
+  return attachment.kind === "image" || attachment.kind === "video";
+}
+
+function isDirectMediaSrc(path: string): boolean {
+  return /^(data:|blob:|https?:|asset:)/i.test(path);
+}
+
+function MediaAttachmentPreview({ attachment }: { attachment: ChatAttachment }) {
+  const [src, setSrc] = useState<string | null>(() =>
+    isDirectMediaSrc(attachment.path) ? attachment.path : null,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isDirectMediaSrc(attachment.path)) {
+      setSrc(attachment.path);
+      return () => {
+        cancelled = true;
+      };
+    }
+    import("@tauri-apps/api/core")
+      .then((core) => {
+        const convertFileSrc = (core as { convertFileSrc?: (path: string) => string }).convertFileSrc;
+        if (!cancelled) {
+          setSrc(typeof convertFileSrc === "function" ? convertFileSrc(attachment.path) : attachment.path);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(attachment.path);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.path]);
+
+  if (!src) {
+    return (
+      <div className="min-h-16 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]/60 px-2 py-3 text-[11px] text-[var(--taomni-text-muted)]">
+        {attachment.name}
+      </div>
+    );
+  }
+
+  if (attachment.kind === "video") {
+    return (
+      <video
+        controls
+        preload="metadata"
+        className="max-h-72 w-full rounded-md border border-[var(--taomni-divider)] bg-black"
+        src={src}
+        title={attachment.name}
+      />
+    );
+  }
+
+  return (
+    <img
+      className="max-h-72 w-full rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] object-contain"
+      src={src}
+      alt={attachment.name}
+      loading="lazy"
+    />
+  );
 }
