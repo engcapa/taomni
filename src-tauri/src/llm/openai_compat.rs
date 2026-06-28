@@ -1,6 +1,6 @@
 use super::{
-    ChatContent, ChatContentPart, ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError,
-    LlmResult, TokenUsage,
+    ChatContent, ChatContentPart, ChatMessage, ChatRequest, ChatResponse, ChatStreamEvent,
+    ChatTool, ChatToolCall, Llm, LlmError, LlmResult, TokenUsage,
 };
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
@@ -146,6 +146,20 @@ struct Choice {
 #[derive(Deserialize)]
 struct ApiMessage {
     content: Option<String>,
+    #[serde(default)]
+    tool_calls: Vec<ApiToolCall>,
+}
+
+#[derive(Deserialize)]
+struct ApiToolCall {
+    id: String,
+    function: ApiFunctionCall,
+}
+
+#[derive(Deserialize)]
+struct ApiFunctionCall {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Deserialize)]
@@ -168,83 +182,26 @@ struct ApiErrorBody {
 #[async_trait]
 impl Llm for OpenAiCompatProvider {
     async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse> {
-        let messages: Vec<Value> = req
-            .messages
-            .iter()
-            .map(|m| json!({ "role": m.role, "content": openai_content(&m.content) }))
-            .collect();
+        self.chat_once(req, &[]).await
+    }
 
-        let mut body = json!({
-            "model": self.model,
-            "messages": messages,
-            "stream": false,
-        });
+    async fn chat_with_tools(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+    ) -> LlmResult<ChatResponse> {
+        self.chat_once(req, &tools).await
+    }
 
-        if let Some(max_tokens) = req.max_tokens {
-            body["max_tokens"] = json!(max_tokens);
-        }
-        if let Some(temp) = req.temperature {
-            body["temperature"] = json!(temp);
-        }
-
-        let url = format!("{}/chat/completions", self.base_url);
-        let resp = self
-            .client
-            .post(&url)
-            .bearer_auth(&self.api_key)
-            .json(&body)
-            .send()
-            .await?;
-
-        let status = resp.status().as_u16();
-        if !resp.status().is_success() {
-            let text = resp.text().await.unwrap_or_default();
-            let message = serde_json::from_str::<ApiError>(&text)
-                .map(|e| e.error.message)
-                .unwrap_or(text);
-            return Err(LlmError::Provider { status, message });
-        }
-
-        let api_resp: ApiResponse = resp.json().await?;
-        let content = api_resp
-            .choices
-            .into_iter()
-            .next()
-            .and_then(|c| c.message.content)
-            .unwrap_or_default();
-
-        Ok(ChatResponse {
-            content,
-            model: api_resp.model,
-            usage: api_resp.usage.map(|u| TokenUsage {
-                prompt_tokens: u.prompt_tokens,
-                completion_tokens: u.completion_tokens,
-                total_tokens: u.total_tokens,
-            }),
-        })
+    fn supports_tools(&self) -> bool {
+        true
     }
 
     async fn chat_stream(
         &self,
         req: ChatRequest,
     ) -> LlmResult<BoxStream<'static, LlmResult<ChatStreamEvent>>> {
-        let messages: Vec<Value> = req
-            .messages
-            .iter()
-            .map(|m| json!({ "role": m.role, "content": openai_content(&m.content) }))
-            .collect();
-
-        let mut body = json!({
-            "model": self.model,
-            "messages": messages,
-            "stream": true,
-        });
-        if let Some(max_tokens) = req.max_tokens {
-            body["max_tokens"] = json!(max_tokens);
-        }
-        if let Some(temp) = req.temperature {
-            body["temperature"] = json!(temp);
-        }
+        let body = openai_request_body(&self.model, &req, true, &[]);
 
         let url = format!("{}/chat/completions", self.base_url);
         let resp = self
@@ -330,30 +287,214 @@ impl Llm for OpenAiCompatProvider {
     }
 }
 
+impl OpenAiCompatProvider {
+    async fn chat_once(&self, req: ChatRequest, tools: &[ChatTool]) -> LlmResult<ChatResponse> {
+        let body = openai_request_body(&self.model, &req, false, tools);
+        let url = format!("{}/chat/completions", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .bearer_auth(&self.api_key)
+            .json(&body)
+            .send()
+            .await?;
+
+        let status = resp.status().as_u16();
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            let message = serde_json::from_str::<ApiError>(&text)
+                .map(|e| e.error.message)
+                .unwrap_or(text);
+            return Err(LlmError::Provider { status, message });
+        }
+
+        let api_resp: ApiResponse = resp.json().await?;
+        let message = api_resp.choices.into_iter().next().map(|c| c.message);
+        let (content, tool_calls) = match message {
+            Some(message) => (
+                message.content.unwrap_or_default(),
+                parse_openai_tool_calls(message.tool_calls),
+            ),
+            None => (String::new(), Vec::new()),
+        };
+
+        Ok(ChatResponse {
+            content,
+            model: api_resp.model,
+            usage: api_resp.usage.map(|u| TokenUsage {
+                prompt_tokens: u.prompt_tokens,
+                completion_tokens: u.completion_tokens,
+                total_tokens: u.total_tokens,
+            }),
+            tool_calls,
+        })
+    }
+}
+
+fn openai_request_body(model: &str, req: &ChatRequest, stream: bool, tools: &[ChatTool]) -> Value {
+    let messages: Vec<Value> = req.messages.iter().map(openai_message).collect();
+    let mut body = json!({
+        "model": model,
+        "messages": messages,
+        "stream": stream,
+    });
+    if let Some(max_tokens) = req.max_tokens {
+        body["max_tokens"] = json!(max_tokens);
+    }
+    if let Some(temp) = req.temperature {
+        body["temperature"] = json!(temp);
+    }
+    if !tools.is_empty() {
+        body["tools"] = Value::Array(tools.iter().map(openai_tool).collect());
+        body["tool_choice"] = json!("auto");
+    }
+    body
+}
+
+fn openai_message(message: &ChatMessage) -> Value {
+    if let Some(result) = first_tool_result(&message.content) {
+        return json!({
+            "role": "tool",
+            "tool_call_id": result.tool_call_id,
+            "content": result.content,
+        });
+    }
+
+    let tool_calls = tool_use_parts(&message.content);
+    if message.role == "assistant" && !tool_calls.is_empty() {
+        let text = text_parts(&message.content);
+        return json!({
+            "role": "assistant",
+            "content": if text.is_empty() { Value::Null } else { Value::String(text) },
+            "tool_calls": tool_calls
+                .into_iter()
+                .map(|call| json!({
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": call.name,
+                        "arguments": call.arguments.to_string(),
+                    },
+                }))
+                .collect::<Vec<_>>(),
+        });
+    }
+
+    json!({ "role": &message.role, "content": openai_content(&message.content) })
+}
+
 fn openai_content(content: &ChatContent) -> Value {
     match content {
         ChatContent::Text(text) => Value::String(text.clone()),
         ChatContent::Parts(parts) => Value::Array(
             parts
                 .iter()
-                .map(|part| match part {
-                    ChatContentPart::Text { text } => {
-                        json!({ "type": "text", "text": text })
-                    }
+                .filter_map(|part| match part {
+                    ChatContentPart::Text { text } => Some(json!({ "type": "text", "text": text })),
                     ChatContentPart::Image {
                         mime_type,
                         data_base64,
-                    } => {
-                        json!({
+                    } => Some(json!({
                             "type": "image_url",
                             "image_url": {
                                 "url": format!("data:{};base64,{}", mime_type, data_base64)
                             }
-                        })
-                    }
+                    })),
+                    ChatContentPart::ToolUse { .. } | ChatContentPart::ToolResult { .. } => None,
                 })
                 .collect(),
         ),
+    }
+}
+
+fn openai_tool(tool: &ChatTool) -> Value {
+    let mut function = json!({
+        "name": &tool.name,
+        "parameters": tool.input_schema.clone(),
+    });
+    if let Some(description) = tool.description.as_ref() {
+        function["description"] = json!(description);
+    }
+    json!({
+        "type": "function",
+        "function": function,
+    })
+}
+
+fn parse_openai_tool_calls(calls: Vec<ApiToolCall>) -> Vec<ChatToolCall> {
+    calls
+        .into_iter()
+        .enumerate()
+        .map(|(idx, call)| {
+            let arguments = serde_json::from_str(&call.function.arguments)
+                .unwrap_or_else(|_| Value::String(call.function.arguments));
+            ChatToolCall {
+                id: if call.id.is_empty() {
+                    format!("call_{idx}")
+                } else {
+                    call.id
+                },
+                name: call.function.name,
+                arguments,
+            }
+        })
+        .collect()
+}
+
+struct ToolResultPart<'a> {
+    tool_call_id: &'a str,
+    content: &'a str,
+}
+
+fn first_tool_result(content: &ChatContent) -> Option<ToolResultPart<'_>> {
+    match content {
+        ChatContent::Text(_) => None,
+        ChatContent::Parts(parts) => parts.iter().find_map(|part| match part {
+            ChatContentPart::ToolResult {
+                tool_call_id,
+                content,
+                ..
+            } => Some(ToolResultPart {
+                tool_call_id,
+                content,
+            }),
+            _ => None,
+        }),
+    }
+}
+
+fn tool_use_parts(content: &ChatContent) -> Vec<ChatToolCall> {
+    match content {
+        ChatContent::Text(_) => Vec::new(),
+        ChatContent::Parts(parts) => parts
+            .iter()
+            .filter_map(|part| match part {
+                ChatContentPart::ToolUse {
+                    id,
+                    name,
+                    arguments,
+                } => Some(ChatToolCall {
+                    id: id.clone(),
+                    name: name.clone(),
+                    arguments: arguments.clone(),
+                }),
+                _ => None,
+            })
+            .collect(),
+    }
+}
+
+fn text_parts(content: &ChatContent) -> String {
+    match content {
+        ChatContent::Text(text) => text.clone(),
+        ChatContent::Parts(parts) => parts
+            .iter()
+            .filter_map(|part| match part {
+                ChatContentPart::Text { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n"),
     }
 }
 
