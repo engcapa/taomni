@@ -41,7 +41,9 @@ import {
   isVaultReference,
   isVaultLockedError,
   listWslDistros,
+  listLocalShells,
   type WslDistro,
+  type LocalShellOption,
 } from "../../lib/ipc";
 import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
 import { getAppPlatform } from "../../lib/runtime";
@@ -81,6 +83,11 @@ import {
   serializeRdpOptions,
   type RdpOptions,
 } from "../../types/rdp";
+import {
+  parseLocalShellOptions,
+  serializeLocalShellOptions,
+  type LocalShellOptions,
+} from "../../types/localShell";
 import { RdpOptionsForm } from "./forms/RdpOptionsForm";
 import {
   ObjectStorageSettings,
@@ -89,6 +96,7 @@ import {
 } from "./ObjectStorageSettings";
 import { engineForProvider } from "../../types/objectStorage";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
+import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import {
@@ -203,6 +211,18 @@ function stripDeprecatedCwdOptions(options: Record<string, unknown>): Record<str
   const next = { ...options };
   delete next.followPath;
   delete next.osc7AutoInject;
+  return next;
+}
+
+function stripLocalShellLaunchOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...options };
+  delete next.localShellPath;
+  delete next.localShellArgs;
+  delete next.wslDistro;
+  delete next.wslUser;
+  delete next.wslCwd;
+  delete next.wslInitialCommand;
+  delete next.wslAsAdministrator;
   return next;
 }
 
@@ -1798,6 +1818,32 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
   );
 
+  /* --- local shell options --- */
+  const [localShellOptions, setLocalShellOptions] = useState<LocalShellOptions>(() =>
+    parseLocalShellOptions(session?.options_json),
+  );
+  const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
+  const [localShellStatus, setLocalShellStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    if (proto !== "Shell") return;
+    let cancelled = false;
+    setLocalShellStatus("loading");
+    listLocalShells()
+      .then((shells) => {
+        if (cancelled) return;
+        setLocalShells(shells);
+        setLocalShellStatus("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLocalShellStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [proto]);
+
   /* --- WSL options --- */
   const [wslOptions, setWslOptions] = useState<WslOptions>(() =>
     parseWslOptions(session?.options_json),
@@ -1941,7 +1987,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
      *  refs by handleSave). Falls back to current form state when omitted. */
     ossConfigValue?: Record<string, unknown>;
   } = {}): string => {
-    const previousOptions = stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json));
+    const previousOptions = stripLocalShellLaunchOptions(
+      stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
+    );
+    const localShellOverrides: Record<string, unknown> =
+      proto === "Shell" ? serializeLocalShellOptions(localShellOptions) : {};
     const wslOverrides: Record<string, unknown> =
       proto === "WSL"
         ? {
@@ -2040,12 +2090,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...proxyOverrides,
       ...hbaseOverrides,
       ...ossOverrides,
+      ...localShellOverrides,
     });
   };
 
   const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
     const now = Math.floor(Date.now() / 1000);
-    let auth: AuthMethod = "Password";
+    let auth: AuthMethod = proto === "Shell" || proto === "WSL" || proto === "File" ? "None" : "Password";
     if (authMethod === "PrivateKey")
       auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
     else if (authMethod === "Agent") auth = "Agent";
@@ -2369,6 +2420,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
+    setLocalShellOptions(parseLocalShellOptions(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
     setRdpOptions(parseRdpOptions(session?.options_json));
     setPathMappings(parsePathMappingsFromOptions(session?.options_json));
@@ -3039,6 +3091,28 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 {t("sessionEditor2.fileTargetHint")}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Basic Shell settings - appears for the local Shell protocol only */}
+        {proto === "Shell" && (
+          <div
+            className="px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+          >
+            <div
+              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              style={{ color: "var(--taomni-accent)" }}
+            >
+              <TerminalIcon className="w-3.5 h-3.5" />
+              {t("sessionEditor2.localShellTitle")}
+            </div>
+            <LocalShellOptionsForm
+              options={localShellOptions}
+              shells={localShells}
+              status={localShellStatus}
+              onChange={setLocalShellOptions}
+            />
           </div>
         )}
 
