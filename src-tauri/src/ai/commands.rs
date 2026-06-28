@@ -41,7 +41,10 @@ pub async fn get_ai_config() -> Result<AiConfig, String> {
 /// Save the AI configuration. Rebuilds the LlmRouter so changes take
 /// effect immediately without an app restart.
 #[tauri::command]
-pub async fn save_ai_config(mut config: AiConfig, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn save_ai_config(
+    mut config: AiConfig,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let path = default_ai_config_path();
     config.normalize();
     config.save(&path).map_err(|e| e.to_string())?;
@@ -73,14 +76,20 @@ pub async fn test_llm_connection(
     provider: LlmProviderConfig,
     state: State<'_, AppState>,
 ) -> Result<TestConnectionResult, String> {
+    let test_api_key = provider
+        .effective_api_keys()
+        .into_iter()
+        .next()
+        .unwrap_or(provider.api_key.as_str())
+        .to_string();
     // Resolve `vault:<id>` references into plaintext for the test call.
     // If the vault is locked we surface VAULT_LOCKED so the frontend can
     // prompt for unlock instead of sending the literal `vault:<uuid>` as the
     // bearer token (which would always 401).
-    let api_key = if provider.api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
-        match state.vault.resolve(&provider.api_key) {
+    let api_key = if test_api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
+        match state.vault.resolve(&test_api_key) {
             Ok(Some(plaintext)) => plaintext.to_string(),
-            Ok(None) => provider.api_key.clone(),
+            Ok(None) => test_api_key.clone(),
             Err(e) => {
                 if e.contains(crate::vault::ERR_VAULT_LOCKED) {
                     return Err(format!("VAULT_LOCKED: {e}"));
@@ -89,7 +98,7 @@ pub async fn test_llm_connection(
             }
         }
     } else {
-        provider.api_key.clone()
+        test_api_key
     };
 
     let llm: Arc<dyn Llm> = match provider.runtime.as_str() {

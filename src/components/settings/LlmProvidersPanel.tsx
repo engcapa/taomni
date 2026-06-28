@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import { useAiStore, type AiConfig, type LlmProviderConfig } from "../../stores/aiStore";
+import { AlertTriangle, CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { useAiStore, type AiConfig, type LlmProviderConfig, type LlmProviderGroupConfig } from "../../stores/aiStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { isVaultLockedError } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
@@ -26,6 +26,30 @@ const PROVIDER_NOTES: Record<string, string> = {
   anthropic:   "claude-sonnet-4-5, pay-as-you-go",
 };
 
+function providerApiKeys(provider: LlmProviderConfig): string[] {
+  const keys = (provider.api_keys ?? []).map((key) => key ?? "");
+  return keys.length > 0 ? keys : [provider.api_key ?? ""];
+}
+
+function withProviderApiKeys(provider: LlmProviderConfig, apiKeys: string[]): LlmProviderConfig {
+  const keys = apiKeys.length > 0 ? apiKeys : [""];
+  return {
+    ...provider,
+    api_key: keys[0] ?? "",
+    api_keys: keys,
+  };
+}
+
+function hasPlaintextVaultableKey(provider: LlmProviderConfig): boolean {
+  return providerApiKeys(provider).some(
+    (key) =>
+      key.length > 0 &&
+      !key.startsWith("vault:") &&
+      provider.runtime !== "llama-server" &&
+      key !== "local",
+  );
+}
+
 interface ProviderRowProps {
   id: string;
   provider: LlmProviderConfig;
@@ -40,6 +64,7 @@ interface ProviderRowProps {
 
 function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const apiKeys = providerApiKeys(provider);
   const capabilities = {
     chat: provider.capabilities?.chat !== false,
     image_generation: provider.capabilities?.image_generation === true,
@@ -101,13 +126,44 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
           {id !== "local" && (
             <div>
               <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
-              <input
-                type="password"
-                className="taomni-input h-7 w-full text-[12px]"
-                placeholder={t("aiSettings.llmApiKeyPlaceholder")}
-                value={provider.api_key}
-                onChange={(e) => onChange({ ...provider, api_key: e.target.value })}
-              />
+              <div className="space-y-1.5">
+                {apiKeys.map((key, index) => (
+                  <div key={index} className="flex items-center gap-1.5">
+                    <input
+                      type="password"
+                      className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
+                      placeholder={`${t("aiSettings.llmApiKeyPlaceholder")} #${index + 1}`}
+                      value={key}
+                      onChange={(e) => {
+                        const next = [...apiKeys];
+                        next[index] = e.target.value;
+                        onChange(withProviderApiKeys(provider, next));
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
+                      title="Remove API key"
+                      aria-label="Remove API key"
+                      disabled={apiKeys.length <= 1}
+                      onClick={() => {
+                        const next = apiKeys.filter((_, i) => i !== index);
+                        onChange(withProviderApiKeys(provider, next));
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1.5"
+                  onClick={() => onChange(withProviderApiKeys(provider, [...apiKeys, ""]))}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add key
+                </button>
+              </div>
             </div>
           )}
           <div>
@@ -208,8 +264,71 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
   );
 }
 
+interface ProviderGroupRowProps {
+  id: string;
+  group: LlmProviderGroupConfig;
+  providers: Record<string, LlmProviderConfig>;
+  onChange: (group: LlmProviderGroupConfig) => void;
+  onRemove: () => void;
+}
+
+function ProviderGroupRow({ id, group, providers, onChange, onRemove }: ProviderGroupRowProps) {
+  const providerEntries = Object.entries(providers).filter(([providerId]) => providerId !== "claude-code" && providerId !== "codex");
+  const selected = new Set(group.provider_ids);
+
+  const toggleProvider = (providerId: string, checked: boolean) => {
+    const next = new Set(group.provider_ids);
+    if (checked) {
+      next.add(providerId);
+    } else {
+      next.delete(providerId);
+    }
+    onChange({ ...group, provider_ids: Array.from(next) });
+  };
+
+  return (
+    <div className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-3 py-2 space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={group.enabled !== false}
+          onChange={(e) => onChange({ ...group, enabled: e.target.checked })}
+        />
+        <input
+          type="text"
+          className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
+          value={group.label}
+          onChange={(e) => onChange({ ...group, label: e.target.value })}
+        />
+        <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0">group:{id}</span>
+        <button
+          type="button"
+          className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
+          title="Remove provider group"
+          aria-label="Remove provider group"
+          onClick={onRemove}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 text-[11px] text-[var(--taomni-text-muted)]">
+        {providerEntries.map(([providerId]) => (
+          <label key={providerId} className="inline-flex min-w-0 items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={selected.has(providerId)}
+              onChange={(e) => toggleProvider(providerId, e.target.checked)}
+            />
+            <span className="truncate">{PROVIDER_LABELS[providerId] ?? providerId}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LlmProvidersPanel() {
-  const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, setActiveLlmProvider, testConnection } = useAiStore();
+  const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, updateLlmProviderGroup, removeLlmProviderGroup, setActiveLlmProvider, testConnection } = useAiStore();
   const vaultState = useVaultStore((s) => s.state);
   const t = useT();
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -295,12 +414,7 @@ export function LlmProvidersPanel() {
     // `vault:<id>` reference, the local sidecar's literal "local", and
     // llama-server runtimes need no vault.)
     const hasPlaintextKey = Object.values(config.llm.providers).some(
-      (p) =>
-        p.api_key &&
-        p.api_key.length > 0 &&
-        !p.api_key.startsWith("vault:") &&
-        p.runtime !== "llama-server" &&
-        p.api_key !== "local",
+      (provider) => hasPlaintextVaultableKey(provider),
     );
 
     // If we have a plaintext key to encrypt but the vault isn't unlocked, pop
@@ -316,6 +430,22 @@ export function LlmProvidersPanel() {
       }
     }
     void runSave(config);
+  };
+
+  const providerGroups = config.llm.provider_groups ?? {};
+
+  const handleAddGroup = () => {
+    let index = Object.keys(providerGroups).length + 1;
+    let id = `group_${index}`;
+    while (providerGroups[id]) {
+      index += 1;
+      id = `group_${index}`;
+    }
+    updateLlmProviderGroup(id, {
+      label: `Provider group ${index}`,
+      provider_ids: [],
+      enabled: true,
+    });
   };
 
   return (
@@ -392,6 +522,36 @@ export function LlmProvidersPanel() {
           t={t}
         />
       ))}
+
+      <div className="pt-2 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-[13px] font-semibold">Provider groups</div>
+          <button
+            type="button"
+            className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1.5"
+            onClick={handleAddGroup}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add group
+          </button>
+        </div>
+        {Object.entries(providerGroups).length === 0 ? (
+          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+            No provider groups configured.
+          </div>
+        ) : (
+          Object.entries(providerGroups).map(([id, group]) => (
+            <ProviderGroupRow
+              key={id}
+              id={id}
+              group={group}
+              providers={config.llm.providers}
+              onChange={(next) => updateLlmProviderGroup(id, next)}
+              onRemove={() => removeLlmProviderGroup(id)}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
