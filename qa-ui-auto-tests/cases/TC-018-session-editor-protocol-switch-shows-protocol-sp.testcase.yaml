@@ -20,6 +20,39 @@ steps:
   - click: "[data-testid=\"session-proto-vnc\"]"
   - wait: 1
   - assert_visible: "[data-testid=\"session-host\"]"
+  - click: "[data-testid=\"session-proto-browser\"]"
+  - wait: 1
+  - assert_visible: "[data-testid=\"session-host\"]"
+  - fill:
+      selector: "[data-testid=\"session-host\"]"
+      value: "https://docs.example.test"
+  - click: "[data-testid=\"session-proto-ftp\"]"
+  - wait: 1
+  - assert_visible: "[data-testid=\"session-host\"]"
+  - assert_visible: "[data-testid=\"session-port\"]"
+  - click: "[data-testid=\"session-proto-telnet\"]"
+  - wait: 1
+  - assert_visible: "[data-testid=\"session-host\"]"
+  - click: "[data-testid=\"session-proto-rlogin\"]"
+  - wait: 1
+  - assert_visible: "[data-testid=\"session-host\"]"
+  - click: "[data-testid=\"session-proto-mosh\"]"
+  - wait: 1
+  - assert_visible: "[data-testid=\"session-host\"]"
+  - click: "[data-testid=\"session-proto-serial\"]"
+  - wait_for: "[data-testid=\"session-serial-section\"]"
+  - assert_visible: "[data-testid=\"session-serial-device\"]"
+  - assert_visible: "[data-testid=\"session-serial-baud\"]"
+  - fill:
+      selector: "[data-testid=\"session-serial-device\"]"
+      value: "/dev/ttyUSB0"
+  - fill:
+      selector: "[data-testid=\"session-serial-baud\"]"
+      value: "115200"
+  - click: "[data-testid=\"session-proto-shell\"]"
+  - wait_for: "[data-testid=\"session-local-shell-section\"]"
+  - assert_visible: "[data-testid=\"local-shell-preview\"]"
+  - assert_not_visible: "[data-testid=\"session-planned-client-note\"]"
   - click: "[data-testid=\"session-proto-ssh\"]"
   - assert_visible: "[data-testid=\"advanced-ssh-settings\"]"
   - screenshot: 018-session-protocol-switch.png

@@ -1129,20 +1129,29 @@ controls:
   - id: proto-vnc
     selector: '[data-testid="session-proto-vnc"]'
     kind: interactive
+  - id: proto-ftp
+    selector: '[data-testid="session-proto-ftp"]'
+    kind: interactive
   - id: proto-telnet
     selector: '[data-testid="session-proto-telnet"]'
     kind: interactive
-    optional: true        # placeholder protocols may be hidden in some builds
+  - id: proto-rlogin
+    selector: '[data-testid="session-proto-rlogin"]'
+    kind: interactive
   - id: proto-mosh
     selector: '[data-testid="session-proto-mosh"]'
     kind: interactive
-    optional: true
-  - id: proto-localshell
-    selector: '[data-testid="session-proto-localshell"]'
+  - id: proto-serial
+    selector: '[data-testid="session-proto-serial"]'
     kind: interactive
-    optional: true
-  - id: proto-file-browser
-    selector: '[data-testid="session-proto-file-browser"]'
+  - id: proto-browser
+    selector: '[data-testid="session-proto-browser"]'
+    kind: interactive
+  - id: proto-shell
+    selector: '[data-testid="session-proto-shell"]'
+    kind: interactive
+  - id: proto-file
+    selector: '[data-testid="session-proto-file"]'
     kind: interactive
     optional: true
   - id: proto-wsl
@@ -1182,6 +1191,34 @@ controls:
     selector: '[data-testid="session-file-target"]'
     kind: interactive
     optional: true        # only visible for file-browser proto
+  - id: planned-client-note
+    selector: '[data-testid="session-planned-client-note"]'
+    kind: display
+    optional: true        # only visible when a future protocol is explicitly marked planned
+  - id: serial-section
+    selector: '[data-testid="session-serial-section"]'
+    kind: display
+    optional: true        # only visible for Serial proto
+  - id: serial-device
+    selector: '[data-testid="session-serial-device"]'
+    kind: interactive
+    optional: true        # only visible for Serial proto
+  - id: serial-baud
+    selector: '[data-testid="session-serial-baud"]'
+    kind: interactive
+    optional: true        # only visible for Serial proto
+  - id: local-shell-section
+    selector: '[data-testid="session-local-shell-section"]'
+    kind: display
+    optional: true        # only visible for Shell proto
+  - id: local-shell-select
+    selector: '[data-testid="local-shell-select"]'
+    kind: interactive
+    optional: true        # only visible for Shell proto
+  - id: local-shell-preview
+    selector: '[data-testid="local-shell-preview"]'
+    kind: display
+    optional: true        # only visible for Shell proto
   # Section tabs (dynamic: session-section-${t.id})
   - id: section-bookmark
     selector: '[data-testid="session-section-bookmark"]'
@@ -1290,14 +1327,14 @@ controls:
     kind: interactive
 -->
 
-- 协议选择：SSH、SFTP、RDP、VNC（SSH/SFTP 已实装；VNC 与 RDP 均已接入基础 client）
+- 协议选择：SSH、SFTP、RDP、VNC、Browser、FTP、Telnet、Rlogin、Mosh、Serial、Shell（SSH/SFTP 原生；VNC/RDP 接入基础 client；Browser 打开系统浏览器；FTP/Telnet/Rlogin/Mosh/Serial 启动本地命令行 client；Shell 启动本地终端）
 - 基础设置：host、port、username、auth method
 - Advanced SSH：SSH-browser type、Auto-inject OSC 7、Execute command、跳板机/代理
 - Terminal：复用 `TerminalAppearanceSettings` 全套外观控件
 - Network：Keep-alive、proxy 配置、隧道转发列表（local/remote/dynamic 添加）
 - Bookmark：name、group、tags、描述备注
 - 顶部主题快速切换条
-- Session 类型 LocalShell：在编辑器中设置启动参数
+- Session 类型 Shell/LocalShell：在编辑器中设置启动参数
 
 ### 6.4 快速连接栏 `QuickConnect` ✅
 
@@ -1337,8 +1374,8 @@ controls:
     kind: interactive
 -->
 
-- 地址栏式输入：`ssh://user@host:port`、`ssh user@host:port`
-- 自动解析协议/用户/主机/端口
+- 地址栏式输入：`ssh://user@host:port`、`ssh user@host:port`、`browser://host`、`ftp://user@host:port`、`serial /dev/ttyUSB0:115200`
+- 自动解析协议/用户/主机/端口，本地 Shell/Browser/FTP/Telnet/Rlogin/Mosh/Serial 分流到对应 client 打开路径
 - Enter 提交后弹出认证弹窗（密码场景）
 
 ### 6.5 认证弹窗 `AuthPrompt` ✅

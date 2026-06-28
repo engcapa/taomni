@@ -12,11 +12,17 @@
 
 - `[data-testid="ai-chat-drawer"]` — display [optional] — F-AI-2.4.ai-chat-drawer
 - `[data-testid="ai-chat-drawer"] textarea` — interactive [optional] — F-AI-2.4.ai-chat-drawer-textarea
+- `[data-testid="ai-chat-composer"]` — interactive [optional] — F-AI-2.4.ai-chat-composer
+- `[data-testid="ai-chat-attach-button"]` — interactive [optional] — F-AI-2.4.ai-chat-attach-button
+- `[data-testid="ai-chat-composer-resize"]` — interactive [optional] — F-AI-2.4.ai-chat-composer-resize
+- `[data-testid="ai-chat-attachment-error"]` — display [optional] — F-AI-2.4.ai-chat-attachment-error
 - `button[title="New chat"]` — interactive [optional] — F-AI-2.4.ai-chat-new
-- `button[title="New global chat (no terminal binding)"]` — interactive [optional] — F-AI-2.4.ai-chat-new-global
 - `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
-- `[data-testid="ai-chat-drawer"] button[title^="Close"]` — interactive [optional] — F-AI-2.4.ai-chat-close
+- `[data-testid="ai-chat-drawer-hide"]` — interactive [optional] — F-AI-2.4.ai-chat-close
+- `[data-testid="ai-chat-drawer-ribbon"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-ribbon
+- `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
+- `[data-testid="ai-chat-drawer-pin"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-pin
 - `select[aria-label="Thread LLM provider"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select
 - `select[aria-label="Thread output format"]` — interactive [optional] — F-AI-2.4.ai-chat-output-format
 - `button[aria-label="Convert visible transcript to another format"]` — interactive [optional] — F-AI-2.4.ai-chat-format-cycle
@@ -123,13 +129,15 @@
 - `[data-testid="menu-terminal"]` — interactive — F1.8.menu-terminal
 - `[data-testid="menu-sessions"]` — interactive — F1.8.menu-sessions
 - `[data-testid="menu-view"]` — interactive — F1.8.menu-view
+- `[data-testid="context-menu-item-toggle-ribbon"]` — interactive [optional] — F1.8.menu-toggle-ribbon
+- `[data-testid="context-menu-item-toggle-quick-connect"]` — interactive [optional] — F1.8.menu-toggle-quick-connect
 - `[data-testid="menu-help"]` — interactive — F1.8.menu-help
 - `[data-testid="menu-import-sessions"]` — interactive [optional] — F1.8.menu-import-sessions
 - `[data-testid="menu-export-sessions"]` — interactive [optional] — F1.8.menu-export-sessions
 
 ## main/ribbon (F1.9)
 
-- `[data-testid="ribbon"]` — display — F1.9.ribbon
+- `[data-testid="ribbon"]` — display [optional] — F1.9.ribbon
 - `[data-testid="ribbon-session"]` — interactive — F1.9.ribbon-session
 - `[data-testid="ribbon-sftp"]` — interactive — F1.9.ribbon-sftp
 - `[data-testid="ribbon-servers"]` — interactive — F1.9.ribbon-servers
@@ -175,11 +183,11 @@
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
 - `text="New session…"` — interactive — F1.6.new-session-card
-- `text="Import OpenSSH config"` — interactive — F1.6.import-openssh-card
-- `text="Refresh sessions"` — interactive — F1.6.refresh-sessions-card
 - `text="Tips"` — display — F1.6.tips-section
 - `text="Active connections"` — display — F1.6.active-connections-list
   ↳ `text="No active terminal tabs."` — alias
+- `[data-testid="welcome-activity-pane-resize-handle"]` — interactive — F1.6.activity-pane-resize
+- `[data-testid="welcome-activity-pane-collapse"]` — interactive — F1.6.activity-pane-collapse
 - `text="Last events"` — display — F1.6.last-events-list
 - `[data-testid="welcome-version"]` — display — F1.6.version-header
 - `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
@@ -192,7 +200,6 @@
 - `[data-testid="compact-toggle"]` — interactive — F1.3.compact-toggle
 - `[data-testid="tab-split-view"]` — interactive — F1.3.split-view
 - `[data-testid="tab-multiexec-toggle"]` — interactive — F1.3.multiexec-toggle
-- `[data-testid="ai-chat-drawer-toggle"]` — interactive [optional] — F1.3.ai-chat-drawer-toggle
 - `[data-testid="window-controls"]` — display — F1.3.window-controls
 - `[data-testid="window-min"]` — display — F1.3.window-min
 - `[data-testid="window-max"]` — display — F1.3.window-max
@@ -253,10 +260,14 @@
 - `[data-testid="session-proto-sftp"]` — interactive — F6.3.proto-sftp
 - `[data-testid="session-proto-rdp"]` — interactive — F6.3.proto-rdp
 - `[data-testid="session-proto-vnc"]` — interactive — F6.3.proto-vnc
-- `[data-testid="session-proto-telnet"]` — interactive [optional] — F6.3.proto-telnet
-- `[data-testid="session-proto-mosh"]` — interactive [optional] — F6.3.proto-mosh
-- `[data-testid="session-proto-localshell"]` — interactive [optional] — F6.3.proto-localshell
-- `[data-testid="session-proto-file-browser"]` — interactive [optional] — F6.3.proto-file-browser
+- `[data-testid="session-proto-ftp"]` — interactive — F6.3.proto-ftp
+- `[data-testid="session-proto-telnet"]` — interactive — F6.3.proto-telnet
+- `[data-testid="session-proto-rlogin"]` — interactive — F6.3.proto-rlogin
+- `[data-testid="session-proto-mosh"]` — interactive — F6.3.proto-mosh
+- `[data-testid="session-proto-serial"]` — interactive — F6.3.proto-serial
+- `[data-testid="session-proto-browser"]` — interactive — F6.3.proto-browser
+- `[data-testid="session-proto-shell"]` — interactive — F6.3.proto-shell
+- `[data-testid="session-proto-file"]` — interactive [optional] — F6.3.proto-file
 - `[data-testid="session-proto-wsl"]` — interactive [optional] — F6.3.proto-wsl
 - `[data-testid="session-proto-mysql"]` — interactive [optional] — F6.3.proto-mysql
 - `[data-testid="session-proto-postgresql"]` — interactive [optional] — F6.3.proto-postgresql
@@ -267,6 +278,13 @@
 - `[data-testid="session-port"]` — interactive — F6.3.port
 - `[data-testid="session-name"]` — interactive — F6.3.name
 - `[data-testid="session-file-target"]` — interactive [optional] — F6.3.file-target
+- `[data-testid="session-planned-client-note"]` — display [optional] — F6.3.planned-client-note
+- `[data-testid="session-serial-section"]` — display [optional] — F6.3.serial-section
+- `[data-testid="session-serial-device"]` — interactive [optional] — F6.3.serial-device
+- `[data-testid="session-serial-baud"]` — interactive [optional] — F6.3.serial-baud
+- `[data-testid="session-local-shell-section"]` — display [optional] — F6.3.local-shell-section
+- `[data-testid="local-shell-select"]` — interactive [optional] — F6.3.local-shell-select
+- `[data-testid="local-shell-preview"]` — display [optional] — F6.3.local-shell-preview
 - `[data-testid="session-section-bookmark"]` — interactive — F6.3.section-bookmark
 - `[data-testid="session-section-advanced"]` — interactive — F6.3.section-advanced
 - `[data-testid="session-section-terminal"]` — interactive — F6.3.section-terminal
@@ -301,7 +319,7 @@
 
 ## sessions (F6.4)
 
-- `[data-testid="quick-connect"]` — display — F6.4.bar-root
+- `[data-testid="quick-connect"]` — display [optional] — F6.4.bar-root
 - `[data-testid="qc-input"]` — interactive — F6.4.input
 - `[data-testid="qc-submit"]` — interactive — F6.4.submit
 - `[data-testid="qc-back"]` — interactive — F6.4.back
