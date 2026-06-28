@@ -30,6 +30,9 @@ export interface LlmProviderConfig {
   capabilities?: LlmProviderCapabilities;
   image_model?: string | null;
   video_model?: string | null;
+  proxy_mode?: "none" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
+  proxy_url?: string | null;
 }
 
 export interface LlmProviderCapabilities {
@@ -77,6 +80,9 @@ export interface CcCustomSettingsProfile {
   enabled: boolean;
   vault_ref: string;
   created_at: number;
+  proxy_mode?: "inherit" | "none" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
+  proxy_url?: string | null;
 }
 
 export interface CcBridgeConfig {
@@ -90,6 +96,9 @@ export interface CcBridgeConfig {
   confirm_readonly?: boolean;
   /** Mirror finished captured runs into the bound terminal as display-only traces. */
   terminal_echo_enabled?: boolean;
+  proxy_mode?: "none" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
+  proxy_url?: string | null;
   custom_settings_profiles?: CcCustomSettingsProfile[];
   active_profile_id?: string;
 }
@@ -268,6 +277,9 @@ const DEFAULT_CONFIG: AiConfig = {
     max_turns: 20,
     confirm_readonly: false,
     terminal_echo_enabled: true,
+    proxy_mode: "none",
+    proxy_session_id: undefined,
+    proxy_url: undefined,
   },
   codex_bridge: {
     enabled: false,
@@ -310,6 +322,18 @@ function normalizeCodexProfileProxyMode(mode: string | undefined | null, proxyUr
   return proxyUrl?.trim() ? "manual" : "inherit";
 }
 
+function normalizeNoProxyMode(mode: string | undefined | null, proxyUrl?: string | null): string {
+  const trimmed = (mode ?? "").trim();
+  if (trimmed === "session" || trimmed === "manual") return trimmed;
+  return proxyUrl?.trim() ? "manual" : "none";
+}
+
+function normalizeCcProfileProxyMode(mode: string | undefined | null, proxyUrl?: string | null): string {
+  const trimmed = (mode ?? "").trim();
+  if (trimmed === "inherit" || trimmed === "session" || trimmed === "manual") return trimmed;
+  return proxyUrl?.trim() ? "manual" : "none";
+}
+
 function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
   const configuredKeys = (provider.api_keys ?? [])
     .map((key) => key ?? "")
@@ -326,6 +350,9 @@ function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
     },
     image_model: provider.image_model ?? null,
     video_model: provider.video_model ?? null,
+    proxy_mode: normalizeNoProxyMode(provider.proxy_mode, provider.proxy_url),
+    proxy_session_id: provider.proxy_session_id?.trim() || undefined,
+    proxy_url: provider.proxy_url?.trim() || undefined,
   };
 }
 
@@ -380,8 +407,18 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
       provider_groups: providerGroups,
     },
     cc_bridge: {
+      ...DEFAULT_CONFIG.cc_bridge,
       ...config.cc_bridge,
       default_model: normalizeModelName(config.cc_bridge.default_model),
+      proxy_mode: normalizeNoProxyMode(config.cc_bridge?.proxy_mode, config.cc_bridge?.proxy_url),
+      proxy_session_id: config.cc_bridge?.proxy_session_id?.trim() || undefined,
+      proxy_url: config.cc_bridge?.proxy_url?.trim() || undefined,
+      custom_settings_profiles: (config.cc_bridge?.custom_settings_profiles ?? []).map((profile) => ({
+        ...profile,
+        proxy_mode: normalizeCcProfileProxyMode(profile.proxy_mode, profile.proxy_url),
+        proxy_session_id: profile.proxy_session_id?.trim() || undefined,
+        proxy_url: profile.proxy_url?.trim() || undefined,
+      })),
     },
     codex_bridge: {
       ...DEFAULT_CONFIG.codex_bridge,

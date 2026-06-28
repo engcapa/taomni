@@ -60,7 +60,7 @@ impl AiConfig {
     pub fn normalize(&mut self) {
         self.cc_bridge.normalize();
         self.codex_bridge.normalize();
-        self.llm.ensure_default_providers();
+        self.llm.normalize();
     }
 
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
@@ -144,6 +144,9 @@ impl Default for LlmConfig {
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
                 video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
         providers.insert(
@@ -161,6 +164,9 @@ impl Default for LlmConfig {
                 },
                 image_model: Some("agnes-image-2.1-flash".into()),
                 video_model: Some("agnes-video-v2.0".into()),
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
         providers.insert(
@@ -174,6 +180,9 @@ impl Default for LlmConfig {
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
                 video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
         providers.insert(
@@ -187,6 +196,9 @@ impl Default for LlmConfig {
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
                 video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
         providers.insert(
@@ -200,6 +212,9 @@ impl Default for LlmConfig {
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
                 video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
         providers.insert(
@@ -213,6 +228,9 @@ impl Default for LlmConfig {
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
                 video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
         providers.insert(
@@ -226,6 +244,9 @@ impl Default for LlmConfig {
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
                 video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
             },
         );
 
@@ -254,6 +275,13 @@ impl Default for LlmConfig {
 }
 
 impl LlmConfig {
+    fn normalize(&mut self) {
+        self.ensure_default_providers();
+        for provider in self.providers.values_mut() {
+            provider.normalize();
+        }
+    }
+
     fn ensure_default_providers(&mut self) {
         self.providers
             .entry("agnes".into())
@@ -275,6 +303,9 @@ fn default_agnes_provider() -> LlmProviderConfig {
         },
         image_model: Some("agnes-image-2.1-flash".into()),
         video_model: Some("agnes-video-v2.0".into()),
+        proxy_mode: default_provider_proxy_mode(),
+        proxy_session_id: None,
+        proxy_url: None,
     }
 }
 
@@ -292,9 +323,33 @@ pub struct LlmProviderConfig {
     pub image_model: Option<String>,
     #[serde(default)]
     pub video_model: Option<String>,
+    /// none | session | manual. Default is direct/no-proxy.
+    #[serde(default = "default_provider_proxy_mode")]
+    pub proxy_mode: String,
+    #[serde(default)]
+    pub proxy_session_id: Option<String>,
+    #[serde(default)]
+    pub proxy_url: Option<String>,
 }
 
 impl LlmProviderConfig {
+    pub fn normalize(&mut self) {
+        self.proxy_url = self
+            .proxy_url
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        self.proxy_session_id = self
+            .proxy_session_id
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        self.proxy_mode = normalize_provider_proxy_mode(&self.proxy_mode);
+        if self.proxy_url.is_some() && self.proxy_mode == "none" {
+            self.proxy_mode = "manual".into();
+        }
+    }
+
     pub fn effective_api_keys(&self) -> Vec<&str> {
         let api_keys = self
             .api_keys
@@ -307,6 +362,47 @@ impl LlmProviderConfig {
         } else {
             api_keys
         }
+    }
+}
+
+fn default_provider_proxy_mode() -> String {
+    "none".into()
+}
+
+pub fn normalize_provider_proxy_mode(mode: &str) -> String {
+    match mode.trim() {
+        "session" | "manual" => mode.trim().into(),
+        _ => "none".into(),
+    }
+}
+
+pub fn resolve_provider_proxy_url(
+    provider: &LlmProviderConfig,
+    db: Option<&rusqlite::Connection>,
+    vault: Option<&crate::vault::Vault>,
+) -> Result<Option<String>, String> {
+    match normalize_provider_proxy_mode(&provider.proxy_mode).as_str() {
+        "session" => {
+            let Some(id) = provider
+                .proxy_session_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            else {
+                return Ok(None);
+            };
+            let (Some(db), Some(vault)) = (db, vault) else {
+                return Ok(None);
+            };
+            Ok(crate::proxy::resolve_session_proxy_with_db(db, vault, id)?.map(|p| p.to_url()))
+        }
+        "manual" => Ok(provider
+            .proxy_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)),
+        _ => Ok(None),
     }
 }
 

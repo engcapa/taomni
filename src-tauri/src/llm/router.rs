@@ -548,7 +548,7 @@ impl LlmRouter {
 
 use super::anthropic::AnthropicProvider;
 use super::openai_compat::OpenAiCompatProvider;
-use crate::ai::config::{AiConfig, LlmConfig};
+use crate::ai::config::{resolve_provider_proxy_url, AiConfig, LlmConfig};
 
 fn task_kind_from_str(s: &str) -> Option<TaskKind> {
     Some(match s {
@@ -610,6 +610,15 @@ pub fn build_router(
     vault: Option<&crate::vault::Vault>,
     full_local_mode: bool,
 ) -> LlmRouter {
+    build_router_with_proxy_db(cfg, vault, full_local_mode, None)
+}
+
+pub fn build_router_with_proxy_db(
+    cfg: &LlmConfig,
+    vault: Option<&crate::vault::Vault>,
+    full_local_mode: bool,
+    proxy_db: Option<&rusqlite::Connection>,
+) -> LlmRouter {
     let mut router = LlmRouter::new(&cfg.active);
 
     for (id, p) in &cfg.providers {
@@ -630,6 +639,18 @@ pub fn build_router(
             continue;
         }
 
+        let proxy_url = match resolve_provider_proxy_url(p, proxy_db, vault) {
+            Ok(proxy_url) => proxy_url,
+            Err(e) => {
+                tracing::warn!(
+                    provider = %id,
+                    error = %e,
+                    "provider proxy could not be resolved; using direct connection"
+                );
+                None
+            }
+        };
+
         let mut variants: Vec<Arc<dyn Llm>> = Vec::new();
         let mut unresolved_key = false;
         for api_key in p.effective_api_keys() {
@@ -646,23 +667,27 @@ pub fn build_router(
             };
 
             let provider: Arc<dyn Llm> = match p.runtime.as_str() {
-                "openai-compat" | "llama-server" | "ollama" => Arc::new(OpenAiCompatProvider::new(
-                    id.as_str(),
-                    p.base_url.clone(),
-                    resolved_key,
-                    p.model.clone(),
-                )),
+                "openai-compat" | "llama-server" | "ollama" => {
+                    Arc::new(OpenAiCompatProvider::new_with_proxy_url(
+                        id.as_str(),
+                        p.base_url.clone(),
+                        resolved_key,
+                        p.model.clone(),
+                        proxy_url.clone(),
+                    ))
+                }
                 "anthropic" => {
                     let base_url = if p.base_url.is_empty() {
                         "https://api.anthropic.com/v1".to_string()
                     } else {
                         p.base_url.clone()
                     };
-                    Arc::new(AnthropicProvider::new(
+                    Arc::new(AnthropicProvider::new_with_proxy_url(
                         id.as_str(),
                         base_url,
                         resolved_key,
                         p.model.clone(),
+                        proxy_url.clone(),
                     ))
                 }
                 _ => unreachable!("runtime was checked above"),
@@ -726,4 +751,12 @@ pub fn build_router(
 /// Build a router from a full AiConfig (currently only forwards llm).
 pub fn build_router_from_ai(cfg: &AiConfig, vault: Option<&crate::vault::Vault>) -> LlmRouter {
     build_router(&cfg.llm, vault, cfg.full_local_mode)
+}
+
+pub fn build_router_from_ai_with_proxy_db(
+    cfg: &AiConfig,
+    vault: Option<&crate::vault::Vault>,
+    proxy_db: Option<&rusqlite::Connection>,
+) -> LlmRouter {
+    build_router_with_proxy_db(&cfg.llm, vault, cfg.full_local_mode, proxy_db)
 }

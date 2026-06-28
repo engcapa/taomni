@@ -36,6 +36,16 @@ pub(crate) fn no_console_window(cmd: &mut Command) {
     }
 }
 
+pub(crate) fn apply_proxy_env(cmd: &mut Command, proxy_url: Option<&str>) {
+    let Some(proxy) = proxy_url.map(str::trim).filter(|s| !s.is_empty()) else {
+        return;
+    };
+    cmd.env("HTTP_PROXY", proxy)
+        .env("HTTPS_PROXY", proxy)
+        .env("ALL_PROXY", proxy)
+        .env("NO_PROXY", "127.0.0.1,localhost");
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CcStatus {
@@ -195,7 +205,7 @@ fn version_ok(found: &str, required: &str) -> bool {
 }
 
 /// Detect Claude Code CLI status.
-pub async fn detect(binary: Option<&str>) -> CcStatusResult {
+pub async fn detect(binary: Option<&str>, proxy_url: Option<&str>) -> CcStatusResult {
     let path = match binary {
         Some(b) if !b.is_empty() && b != "auto" => Some(b.to_string()),
         _ => find_claude_binary(),
@@ -257,7 +267,7 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
     }
 
     // Probe authentication with a minimal non-interactive call.
-    let auth_ok = probe_auth(&bin).await;
+    let auth_ok = probe_auth(&bin, proxy_url).await;
 
     if !auth_ok {
         return CcStatusResult {
@@ -279,9 +289,10 @@ pub async fn detect(binary: Option<&str>) -> CcStatusResult {
 }
 
 /// Run a minimal probe to check authentication.
-async fn probe_auth(binary: &str) -> bool {
+async fn probe_auth(binary: &str, proxy_url: Option<&str>) -> bool {
     let mut cmd = Command::new(binary);
     cmd.args(["--print", "ping", "--output-format", "json"]);
+    apply_proxy_env(&mut cmd, proxy_url);
     no_console_window(&mut cmd);
     let result = timeout(Duration::from_secs(10), cmd.output()).await;
 

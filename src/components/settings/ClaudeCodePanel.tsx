@@ -6,6 +6,7 @@ import { useT } from "../../lib/i18n";
 import { useVaultGate } from "../../lib/vaultGate";
 import { ClaudeCodeSettingsDialog } from "./ClaudeCodeSettingsDialog";
 import { Sliders, Shield } from "lucide-react";
+import { CodexProxyFields } from "./CodexProxyFields";
 
 interface CcStatusResult {
   status:
@@ -264,6 +265,15 @@ export function ClaudeCodePanel() {
                 onChange={(e) => saveConfig({ ...config, cc_bridge: { ...cc, max_turns: parseInt(e.target.value) || 20 } })}
               />
             </div>
+          </div>
+          <div>
+            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
+            <CodexProxyFields
+              mode={cc.proxy_mode}
+              sessionId={cc.proxy_session_id}
+              proxyUrl={cc.proxy_url}
+              onChange={(patch) => saveConfig({ ...config, cc_bridge: { ...cc, ...patch } })}
+            />
           </div>
           <div className="text-[10px] text-[var(--taomni-text-muted)]">
             {t("aiSettings.ccLocalModeNote")}

@@ -33,6 +33,9 @@ fn make_config(api_key: String) -> AiConfig {
             capabilities: LlmProviderCapabilities::default(),
             image_model: None,
             video_model: None,
+            proxy_mode: "none".into(),
+            proxy_session_id: None,
+            proxy_url: None,
         },
     );
     providers.insert(
@@ -46,6 +49,9 @@ fn make_config(api_key: String) -> AiConfig {
             capabilities: LlmProviderCapabilities::default(),
             image_model: None,
             video_model: None,
+            proxy_mode: "none".into(),
+            proxy_session_id: None,
+            proxy_url: None,
         },
     );
 

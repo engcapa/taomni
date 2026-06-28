@@ -49,8 +49,19 @@ pub async fn save_ai_config(
     config.normalize();
     config.save(&path).map_err(|e| e.to_string())?;
 
+    let llm = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::llm::router::build_router_from_ai_with_proxy_db(
+            &config,
+            Some(state.vault.as_ref()),
+            Some(&db),
+        )
+    };
     let mut ai_ctx = state.ai_ctx.write().await;
-    ai_ctx.reload(config);
+    ai_ctx.reload_with_router(config, llm);
     Ok(())
 }
 
@@ -101,6 +112,14 @@ pub async fn test_llm_connection(
         test_api_key
     };
 
+    let proxy_url = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::ai::config::resolve_provider_proxy_url(&provider, Some(&db), Some(&state.vault))?
+    };
+
     let llm: Arc<dyn Llm> = match provider.runtime.as_str() {
         "anthropic" => {
             let base_url = if provider.base_url.is_empty() {
@@ -108,18 +127,20 @@ pub async fn test_llm_connection(
             } else {
                 provider.base_url.clone()
             };
-            Arc::new(AnthropicProvider::new(
+            Arc::new(AnthropicProvider::new_with_proxy_url(
                 "test",
                 base_url,
                 &api_key,
                 &provider.model,
+                proxy_url,
             ))
         }
-        _ => Arc::new(OpenAiCompatProvider::new(
+        _ => Arc::new(OpenAiCompatProvider::new_with_proxy_url(
             "test",
             &provider.base_url,
             &api_key,
             &provider.model,
+            proxy_url,
         )),
     };
 
