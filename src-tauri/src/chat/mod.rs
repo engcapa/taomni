@@ -11,21 +11,47 @@ use crate::llm::{
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use futures::StreamExt;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
+use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 fn now() -> i64 {
     chrono::Utc::now().timestamp()
 }
 
+fn normalize_thread_mode(mode: Option<String>) -> Result<String, String> {
+    let mode = mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("chat");
+    match mode {
+        "chat" | "image" | "video" => Ok(mode.to_string()),
+        _ => Err(format!(
+            "Invalid chat thread mode '{mode}': expected 'chat', 'image', or 'video'."
+        )),
+    }
+}
+
 const CHAT_MAX_ATTACHMENTS: usize = 10;
 const CHAT_MAX_ATTACHMENT_BYTES: u64 = 100 * 1024 * 1024;
 const TEXT_ATTACHMENT_PREVIEW_BYTES: u64 = 64 * 1024;
+const AGNES_DEFAULT_IMAGE_MODEL: &str = "agnes-image-2.1-flash";
+const AGNES_DEFAULT_VIDEO_MODEL: &str = "agnes-video-v2.0";
+const DEFAULT_IMAGE_SIZE: &str = "1024x768";
+const DEFAULT_VIDEO_WIDTH: u32 = 1152;
+const DEFAULT_VIDEO_HEIGHT: u32 = 768;
+const DEFAULT_VIDEO_NUM_FRAMES: u32 = 121;
+const DEFAULT_VIDEO_FRAME_RATE: u32 = 24;
+const VIDEO_POLL_ATTEMPTS: usize = 90;
+const VIDEO_POLL_INTERVAL_SECS: u64 = 4;
 const DIRECT_LLM_TOOL_MAX_ROUNDS: usize = 8;
 
 #[tauri::command]
@@ -135,6 +161,7 @@ fn stat_attachment_path(path: &str, id: Option<String>) -> Result<store::ChatAtt
         name,
         size: metadata.len(),
         mime: Some(mime),
+        preview_url: None,
     })
 }
 
@@ -169,15 +196,18 @@ fn infer_mime(name: &str) -> String {
         "csv" => "text/csv",
         "xml" => "application/xml",
         "html" | "htm" => "text/html",
-        "rs" | "ts" | "tsx" | "js" | "jsx" | "css" | "toml" | "sql" | "sh" | "ps1"
-        | "py" | "go" | "java" | "kt" | "c" | "cc" | "cpp" | "h" | "hpp" => "text/plain",
+        "rs" | "ts" | "tsx" | "js" | "jsx" | "css" | "toml" | "sql" | "sh" | "ps1" | "py"
+        | "go" | "java" | "kt" | "c" | "cc" | "cpp" | "h" | "hpp" => "text/plain",
         _ => "application/octet-stream",
     }
     .to_string()
 }
 
 fn is_supported_image_mime(mime: &str) -> bool {
-    matches!(mime, "image/png" | "image/jpeg" | "image/gif" | "image/webp")
+    matches!(
+        mime,
+        "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+    )
 }
 
 fn is_text_mime(mime: &str) -> bool {
@@ -317,10 +347,12 @@ fn build_system_prompt(format: &str) -> String {
 pub async fn chat_new_thread(
     provider_id: Option<String>,
     linked_session_id: Option<String>,
+    mode: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<store::ChatThread, String> {
     let config = AiConfig::load(&default_ai_config_path());
     let pid = provider_id.unwrap_or_else(|| config.llm.active.clone());
+    let mode = normalize_thread_mode(mode)?;
     let thread = store::ChatThread {
         id: Uuid::new_v4().to_string(),
         title: "New chat".into(),
@@ -329,6 +361,7 @@ pub async fn chat_new_thread(
         updated_at: now(),
         linked_session_id,
         source: "drawer".into(),
+        mode,
         cc_session_id: None,
         // New threads inherit the global default; the user can override per-thread later.
         output_format: None,
@@ -521,6 +554,618 @@ pub struct ChatSendResponse {
     pub redacted_count: usize,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ChatGenerateMediaRequest {
+    pub thread_id: String,
+    pub prompt: String,
+    /// "image" or "video". Must match the thread mode.
+    pub kind: String,
+    #[serde(default)]
+    pub size: Option<String>,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub num_frames: Option<u32>,
+    #[serde(default)]
+    pub frame_rate: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ChatGenerateMediaResponse {
+    pub user_message: store::ChatMessage,
+    pub assistant_message: store::ChatMessage,
+    pub redacted_count: usize,
+    pub saved_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_id: Option<String>,
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MediaGenerationKind {
+    Image,
+    Video,
+}
+
+impl MediaGenerationKind {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value.trim() {
+            "image" => Ok(Self::Image),
+            "video" => Ok(Self::Video),
+            other => Err(format!(
+                "Invalid media generation kind '{other}': expected 'image' or 'video'."
+            )),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Image => "image",
+            Self::Video => "video",
+        }
+    }
+}
+
+struct GeneratedMediaFile {
+    path: PathBuf,
+    name: String,
+    size: u64,
+    mime: String,
+    remote_url: Option<String>,
+    video_id: Option<String>,
+    model: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AgnesImageResponse {
+    data: Vec<AgnesImageData>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AgnesImageData {
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    b64_json: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AgnesVideoCreateResponse {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    task_id: Option<String>,
+    #[serde(default)]
+    video_id: Option<String>,
+    #[serde(default)]
+    status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AgnesVideoResultResponse {
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    progress: Option<u32>,
+    #[serde(default)]
+    remixed_from_video_id: Option<String>,
+    #[serde(default)]
+    video_url: Option<String>,
+    #[serde(default)]
+    error: Option<Value>,
+}
+
+fn resolve_ai_api_key(
+    provider_id: &str,
+    api_key: &str,
+    state: &AppState,
+) -> Result<String, String> {
+    if !api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
+        if api_key.trim().is_empty() {
+            return Err(format!("Provider '{provider_id}' is missing an API key."));
+        }
+        return Ok(api_key.to_string());
+    }
+    match state.vault.resolve(api_key) {
+        Ok(Some(plaintext)) => Ok(plaintext.to_string()),
+        Ok(None) => Ok(api_key.to_string()),
+        Err(e) => {
+            if e.contains(crate::vault::ERR_VAULT_LOCKED) {
+                Err(format!(
+                    "VAULT_LOCKED: provider '{provider_id}' needs the vault unlocked to load its API key"
+                ))
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+fn provider_api_url(provider_base_url: &str, path: &str) -> String {
+    format!(
+        "{}/{}",
+        provider_base_url.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    )
+}
+
+fn provider_gateway_root(provider_base_url: &str) -> String {
+    provider_base_url
+        .trim_end_matches('/')
+        .strip_suffix("/v1")
+        .unwrap_or_else(|| provider_base_url.trim_end_matches('/'))
+        .to_string()
+}
+
+fn provider_error(status: u16, body: String) -> String {
+    let parsed: Result<Value, _> = serde_json::from_str(&body);
+    let message = parsed
+        .ok()
+        .and_then(|value| {
+            value
+                .get("error")
+                .and_then(|error| {
+                    error
+                        .get("message")
+                        .and_then(Value::as_str)
+                        .or_else(|| error.as_str())
+                })
+                .map(str::to_string)
+        })
+        .unwrap_or(body);
+    format!("Provider error {status}: {message}")
+}
+
+fn decode_base64_image(value: &str) -> Result<(Vec<u8>, String), String> {
+    let trimmed = value.trim();
+    let (mime, data) = if let Some(rest) = trimmed.strip_prefix("data:") {
+        let Some((mime, b64)) = rest.split_once(";base64,") else {
+            return Err("Invalid Data URI image response.".into());
+        };
+        (mime.to_string(), b64)
+    } else {
+        ("image/png".to_string(), trimmed)
+    };
+    let bytes = BASE64_STANDARD
+        .decode(data)
+        .map_err(|e| format!("Decode generated image: {e}"))?;
+    let inferred = infer_image_mime(&bytes).unwrap_or(mime);
+    Ok((bytes, inferred))
+}
+
+fn infer_image_mime(bytes: &[u8]) -> Option<String> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("image/png".into())
+    } else if bytes.starts_with(b"\xFF\xD8\xFF") {
+        Some("image/jpeg".into())
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        Some("image/webp".into())
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("image/gif".into())
+    } else {
+        None
+    }
+}
+
+fn extension_for_mime(mime: &str, fallback: &str) -> &'static str {
+    match mime {
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/webp" => "webp",
+        "image/gif" => "gif",
+        "video/mp4" => "mp4",
+        "video/webm" => "webm",
+        _ => match fallback {
+            "image" => "png",
+            "video" => "mp4",
+            _ => "bin",
+        },
+    }
+}
+
+fn generation_output_path(app: &AppHandle, kind: &str, ext: &str) -> Result<PathBuf, String> {
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Resolve app data dir: {e}"))?
+        .join("ai-generations")
+        .join(chrono::Local::now().format("%Y-%m-%d").to_string());
+    std::fs::create_dir_all(&base).map_err(|e| format!("Create generation output dir: {e}"))?;
+    Ok(base.join(format!(
+        "{}-{}-{}.{}",
+        kind,
+        chrono::Local::now().format("%H%M%S"),
+        Uuid::new_v4().simple(),
+        ext
+    )))
+}
+
+async fn save_generated_bytes(
+    app: &AppHandle,
+    kind: &str,
+    bytes: &[u8],
+    mime: &str,
+) -> Result<PathBuf, String> {
+    let ext = extension_for_mime(mime, kind);
+    let path = generation_output_path(app, kind, ext)?;
+    tokio::fs::write(&path, bytes)
+        .await
+        .map_err(|e| format!("Save generated {kind}: {e}"))?;
+    Ok(path)
+}
+
+async fn download_url_to_file(
+    client: &Client,
+    app: &AppHandle,
+    kind: &str,
+    url: &str,
+    default_mime: &str,
+) -> Result<(PathBuf, String, u64), String> {
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("Download generated {kind}: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(provider_error(status.as_u16(), body));
+    }
+    let mime = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(default_mime)
+        .to_string();
+    let ext = extension_for_mime(&mime, kind);
+    let path = generation_output_path(app, kind, ext)?;
+    let mut file = tokio::fs::File::create(&path)
+        .await
+        .map_err(|e| format!("Create generated {kind} file: {e}"))?;
+    let mut total = 0_u64;
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Download generated {kind}: {e}"))?;
+        total = total
+            .checked_add(chunk.len() as u64)
+            .ok_or_else(|| format!("Generated {kind} is too large."))?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Write generated {kind}: {e}"))?;
+    }
+    file.flush()
+        .await
+        .map_err(|e| format!("Flush generated {kind}: {e}"))?;
+    Ok((path, mime, total))
+}
+
+async fn generate_image_file(
+    client: &Client,
+    app: &AppHandle,
+    provider: &crate::ai::config::LlmProviderConfig,
+    api_key: &str,
+    prompt: &str,
+    size: &str,
+) -> Result<GeneratedMediaFile, String> {
+    let model = provider
+        .image_model
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(AGNES_DEFAULT_IMAGE_MODEL)
+        .to_string();
+    let body = json!({
+        "model": model,
+        "prompt": prompt,
+        "size": size,
+        "return_base64": true,
+    });
+    let resp = client
+        .post(provider_api_url(&provider.base_url, "images/generations"))
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Generate image: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(provider_error(status.as_u16(), body));
+    }
+    let api_resp: AgnesImageResponse = resp
+        .json()
+        .await
+        .map_err(|e| format!("Parse image response: {e}"))?;
+    let first = api_resp
+        .data
+        .into_iter()
+        .next()
+        .ok_or_else(|| "Image generation returned no data.".to_string())?;
+    let remote_url = first.url.clone();
+    let (path, mime, size) = if let Some(b64) = first.b64_json {
+        let (bytes, mime) = decode_base64_image(&b64)?;
+        let path = save_generated_bytes(app, "image", &bytes, &mime).await?;
+        let size = bytes.len() as u64;
+        (path, mime, size)
+    } else if let Some(url) = &first.url {
+        download_url_to_file(client, app, "image", url, "image/png").await?
+    } else {
+        return Err("Image generation response contained neither b64_json nor url.".into());
+    };
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("generated-image.png")
+        .to_string();
+    Ok(GeneratedMediaFile {
+        path,
+        name,
+        size,
+        mime,
+        remote_url,
+        video_id: None,
+        model,
+    })
+}
+
+fn validate_video_num_frames(num_frames: u32) -> Result<u32, String> {
+    if num_frames == 0 || num_frames > 441 {
+        return Err("num_frames must be between 1 and 441.".into());
+    }
+    if (num_frames + 7) % 8 != 0 {
+        return Err("num_frames must follow the 8n + 1 rule, for example 81 or 121.".into());
+    }
+    Ok(num_frames)
+}
+
+async fn generate_video_file(
+    client: &Client,
+    app: &AppHandle,
+    provider: &crate::ai::config::LlmProviderConfig,
+    api_key: &str,
+    req: &ChatGenerateMediaRequest,
+    prompt: &str,
+) -> Result<GeneratedMediaFile, String> {
+    let model = provider
+        .video_model
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(AGNES_DEFAULT_VIDEO_MODEL)
+        .to_string();
+    let num_frames = validate_video_num_frames(req.num_frames.unwrap_or(DEFAULT_VIDEO_NUM_FRAMES))?;
+    let frame_rate = req
+        .frame_rate
+        .unwrap_or(DEFAULT_VIDEO_FRAME_RATE)
+        .clamp(1, 60);
+    let body = json!({
+        "model": model,
+        "prompt": prompt,
+        "height": req.height.unwrap_or(DEFAULT_VIDEO_HEIGHT),
+        "width": req.width.unwrap_or(DEFAULT_VIDEO_WIDTH),
+        "num_frames": num_frames,
+        "frame_rate": frame_rate,
+    });
+    let resp = client
+        .post(provider_api_url(&provider.base_url, "videos"))
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Create video task: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(provider_error(status.as_u16(), body));
+    }
+    let create_resp: AgnesVideoCreateResponse = resp
+        .json()
+        .await
+        .map_err(|e| format!("Parse video task response: {e}"))?;
+    let video_id = create_resp
+        .video_id
+        .clone()
+        .or(create_resp.id.clone())
+        .or(create_resp.task_id.clone())
+        .ok_or_else(|| "Video task response did not include video_id or task_id.".to_string())?;
+    let gateway_root = provider_gateway_root(&provider.base_url);
+    let mut last_status = create_resp.status.unwrap_or_else(|| "queued".into());
+    let mut last_progress = 0_u32;
+    let mut final_url: Option<String> = None;
+    for _ in 0..VIDEO_POLL_ATTEMPTS {
+        let resp = client
+            .get(format!("{gateway_root}/agnesapi"))
+            .bearer_auth(api_key)
+            .query(&[
+                ("video_id", video_id.as_str()),
+                ("model_name", model.as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|e| format!("Poll video task: {e}"))?;
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(provider_error(status.as_u16(), body));
+        }
+        let result: AgnesVideoResultResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse video result response: {e}"))?;
+        last_status = result.status.unwrap_or(last_status);
+        last_progress = result.progress.unwrap_or(last_progress);
+        if last_status == "completed" {
+            final_url = result.remixed_from_video_id.or(result.video_url);
+            break;
+        }
+        if last_status == "failed" {
+            return Err(format!(
+                "Video generation failed: {}",
+                result
+                    .error
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "unknown error".into())
+            ));
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(VIDEO_POLL_INTERVAL_SECS)).await;
+    }
+    let Some(remote_url) = final_url else {
+        return Err(format!(
+            "Video generation timed out while status was '{last_status}' ({last_progress}%)."
+        ));
+    };
+    let (path, mime, size) =
+        download_url_to_file(client, app, "video", &remote_url, "video/mp4").await?;
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("generated-video.mp4")
+        .to_string();
+    Ok(GeneratedMediaFile {
+        path,
+        name,
+        size,
+        mime,
+        remote_url: Some(remote_url),
+        video_id: Some(video_id),
+        model,
+    })
+}
+
+#[tauri::command]
+pub async fn chat_generate_media(
+    req: ChatGenerateMediaRequest,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ChatGenerateMediaResponse, String> {
+    {
+        let ai_ctx = state.ai_ctx.read().await;
+        if ai_ctx.config.fully_disabled {
+            return Err("AI is fully disabled.".into());
+        }
+    }
+    let kind = MediaGenerationKind::parse(&req.kind)?;
+    let (thread, history) = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let thread = store::get_thread(&db, &req.thread_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
+        let history = store::list_messages(&db, &req.thread_id).map_err(|e| e.to_string())?;
+        (thread, history)
+    };
+    if thread.mode != kind.as_str() {
+        return Err(format!(
+            "Thread '{}' is a {} thread, not a {} generation thread.",
+            thread.id,
+            thread.mode,
+            kind.as_str()
+        ));
+    }
+
+    let ai_config = AiConfig::load(&default_ai_config_path());
+    let provider = ai_config
+        .llm
+        .providers
+        .get(&thread.provider_id)
+        .cloned()
+        .ok_or_else(|| format!("Provider '{}' is not configured.", thread.provider_id))?;
+    let has_capability = match kind {
+        MediaGenerationKind::Image => provider.capabilities.image_generation,
+        MediaGenerationKind::Video => provider.capabilities.video_generation,
+    };
+    if !has_capability {
+        return Err(format!(
+            "Provider '{}' does not support {} generation.",
+            thread.provider_id,
+            kind.as_str()
+        ));
+    }
+    let api_key = resolve_ai_api_key(&thread.provider_id, &provider.api_key, state.inner())?;
+    let (clean_prompt, redacted_count) = redact::redact(&req.prompt);
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(360))
+        .build()
+        .map_err(|e| format!("Create generation HTTP client: {e}"))?;
+    let generated = match kind {
+        MediaGenerationKind::Image => {
+            let size = req
+                .size
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(DEFAULT_IMAGE_SIZE);
+            generate_image_file(&client, &app, &provider, &api_key, &clean_prompt, size).await?
+        }
+        MediaGenerationKind::Video => {
+            generate_video_file(&client, &app, &provider, &api_key, &req, &clean_prompt).await?
+        }
+    };
+    let display_path = normalize_path_for_display(generated.path.to_string_lossy().to_string());
+    let mut assistant_content = match kind {
+        MediaGenerationKind::Image => format!("Generated image saved to:\n{display_path}"),
+        MediaGenerationKind::Video => format!("Generated video saved to:\n{display_path}"),
+    };
+    if let Some(remote_url) = &generated.remote_url {
+        assistant_content.push_str("\n\nRemote URL:\n");
+        assistant_content.push_str(remote_url);
+    }
+    if let Some(video_id) = &generated.video_id {
+        assistant_content.push_str("\n\nVideo ID: ");
+        assistant_content.push_str(video_id);
+    }
+    let ts = now();
+    let user_msg = store::ChatMessage {
+        id: Uuid::new_v4().to_string(),
+        thread_id: req.thread_id.clone(),
+        role: "user".into(),
+        content: clean_prompt,
+        created_at: ts,
+        redacted: redacted_count > 0,
+        attachments: Vec::new(),
+    };
+    let assistant_msg = store::ChatMessage {
+        id: Uuid::new_v4().to_string(),
+        thread_id: req.thread_id.clone(),
+        role: "assistant".into(),
+        content: assistant_content,
+        created_at: ts + 1,
+        redacted: false,
+        attachments: vec![store::ChatAttachment {
+            id: Uuid::new_v4().to_string(),
+            kind: kind.as_str().into(),
+            path: display_path.clone(),
+            name: generated.name,
+            size: generated.size,
+            mime: Some(generated.mime),
+            preview_url: generated.remote_url.clone(),
+        }],
+    };
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        store::insert_message(&db, &user_msg).map_err(|e| e.to_string())?;
+        store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
+        if history.is_empty() {
+            let title = user_msg.content.chars().take(40).collect::<String>();
+            store::update_thread_title(&db, &req.thread_id, &title).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(ChatGenerateMediaResponse {
+        user_message: user_msg,
+        assistant_message: assistant_msg,
+        redacted_count,
+        saved_path: display_path,
+        remote_url: generated.remote_url,
+        video_id: generated.video_id,
+        model: generated.model,
+    })
+}
+
 /// Send a message and get a response (non-streaming for v2.4 static shell).
 #[tauri::command]
 pub async fn chat_send(
@@ -538,14 +1183,18 @@ pub async fn chat_send(
     // Load thread to get provider.
     let (thread, history) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
-        let threads = store::list_threads(&db, 200).map_err(|e| e.to_string())?;
-        let thread = threads
-            .into_iter()
-            .find(|t| t.id == req.thread_id)
+        let thread = store::get_thread(&db, &req.thread_id)
+            .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
         let history = store::list_messages(&db, &req.thread_id).map_err(|e| e.to_string())?;
         (thread, history)
     };
+    if thread.mode != "chat" {
+        return Err(format!(
+            "Thread '{}' is a {} generation thread; use media generation.",
+            thread.id, thread.mode
+        ));
+    }
 
     // Redact user content.
     let (clean_content, redacted_count) = redact::redact(&req.content);
@@ -847,14 +1496,18 @@ pub async fn chat_stream(
     // Load thread + history.
     let (thread, history) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
-        let threads = store::list_threads(&db, 200).map_err(|e| e.to_string())?;
-        let thread = threads
-            .into_iter()
-            .find(|t| t.id == req.thread_id)
+        let thread = store::get_thread(&db, &req.thread_id)
+            .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
         let history = store::list_messages(&db, &req.thread_id).map_err(|e| e.to_string())?;
         (thread, history)
     };
+    if thread.mode != "chat" {
+        return Err(format!(
+            "Thread '{}' is a {} generation thread; use media generation.",
+            thread.id, thread.mode
+        ));
+    }
 
     let (clean_content, redacted_count) = redact::redact(&req.content);
 
@@ -2034,7 +2687,9 @@ mod cc_tool_use_tests {
         std::fs::write(&path, "hello from attachment").unwrap();
         let att = stat_attachment_path(path.to_str().unwrap(), None).unwrap();
 
-        let message = build_llm_attachment_message(&[att.clone()]).unwrap().unwrap();
+        let message = build_llm_attachment_message(&[att.clone()])
+            .unwrap()
+            .unwrap();
         let text = message.content.as_text_lossy();
 
         assert!(text.contains("notes.txt"));
@@ -2051,6 +2706,7 @@ mod cc_tool_use_tests {
             name: "notes.txt".into(),
             size: 12,
             mime: Some("text/plain".into()),
+            preview_url: None,
         };
 
         let prefix = render_agent_attachment_prefix(&[att]);
@@ -2068,6 +2724,7 @@ mod cc_tool_use_tests {
             name: "large.bin".into(),
             size: CHAT_MAX_ATTACHMENT_BYTES + 1,
             mime: Some("application/octet-stream".into()),
+            preview_url: None,
         };
         assert!(validate_attachment_limits(&[oversized]).is_err());
 
@@ -2079,6 +2736,7 @@ mod cc_tool_use_tests {
                 name: format!("{i}.txt"),
                 size: 1,
                 mime: Some("text/plain".into()),
+                preview_url: None,
             })
             .collect();
         assert!(validate_attachment_limits(&many).is_err());
@@ -2105,5 +2763,21 @@ mod cc_tool_use_tests {
             }
             _ => panic!("expected multimodal content parts"),
         }
+    }
+
+    #[test]
+    fn decodes_base64_image_data_uri() {
+        let data = "data:image/png;base64,iVBORw0KGgo=";
+        let (bytes, mime) = decode_base64_image(data).unwrap();
+
+        assert_eq!(mime, "image/png");
+        assert_eq!(bytes, vec![137, 80, 78, 71, 13, 10, 26, 10]);
+    }
+
+    #[test]
+    fn validates_video_num_frames_rule() {
+        assert_eq!(validate_video_num_frames(121).unwrap(), 121);
+        assert!(validate_video_num_frames(120).is_err());
+        assert!(validate_video_num_frames(442).is_err());
     }
 }

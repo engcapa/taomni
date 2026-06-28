@@ -497,6 +497,7 @@ pub fn run() {
             chat::chat_export_archive,
             chat::chat_stat_attachment_paths,
             chat::chat_send,
+            chat::chat_generate_media,
             chat::chat_stream,
             chat::chat_stop_stream,
             chat::inline_qq::inline_qq_stream,

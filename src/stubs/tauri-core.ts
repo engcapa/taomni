@@ -87,6 +87,7 @@ interface StubChatThread {
   updated_at: number;
   linked_session_id: string | null;
   source: string;
+  mode?: string | null;
   output_format?: string | null;
   cc_model?: string | null;
 }
@@ -103,17 +104,23 @@ interface StubChatMessage {
 
 interface StubChatAttachment {
   id: string;
-  kind: "image" | "file";
+  kind: "image" | "file" | "video";
   path: string;
   name: string;
   size: number;
   mime?: string | null;
+  preview_url?: string | null;
 }
 
 function loadChatThreads(): StubChatThread[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(CHAT_THREADS_STORAGE_KEY) ?? "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.map((thread) => ({
+          ...thread,
+          mode: thread?.mode === "image" || thread?.mode === "video" ? thread.mode : "chat",
+        }))
+      : [];
   } catch {
     return [];
   }
@@ -134,6 +141,24 @@ function loadChatMessages(): Record<string, StubChatMessage[]> {
 
 function saveChatMessages(messages: Record<string, StubChatMessage[]>): void {
   localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages));
+}
+
+function normalizeStubChatMode(mode: unknown): "chat" | "image" | "video" {
+  return mode === "image" || mode === "video" ? mode : "chat";
+}
+
+function escapeSvgText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function stubGeneratedImageDataUri(prompt: string): string {
+  const label = escapeSvgText((prompt || "Generated image").slice(0, 48));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768"><rect width="1024" height="768" fill="#111827"/><rect x="72" y="72" width="880" height="624" rx="32" fill="#1f2937"/><circle cx="512" cy="306" r="156" fill="#38bdf8"/><path d="M336 594h352l-112-142-82 92-54-62z" fill="#a7f3d0"/><text x="512" y="658" fill="#f8fafc" font-size="38" font-family="Arial, sans-serif" text-anchor="middle">${label}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 function loadTunnels(): StubTunnelConfig[] {
@@ -224,6 +249,10 @@ export async function addPluginListener(
   return new PluginListener(plugin, event, 0);
 }
 
+export function convertFileSrc(path: string): string {
+  return path;
+}
+
 const writeStreams = new Map<string, { path: string; chunks: Uint8Array[] }>();
 const readStreams = new Map<string, { bytes: Uint8Array; offset: number }>();
 
@@ -244,6 +273,12 @@ function mimeFromName(name: string): string {
       return "image/gif";
     case "webp":
       return "image/webp";
+    case "mp4":
+      return "video/mp4";
+    case "webm":
+      return "video/webm";
+    case "mov":
+      return "video/quicktime";
     case "svg":
       return "image/svg+xml";
     case "json":
@@ -1016,6 +1051,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "chat_new_thread": {
       const now = Math.floor(Date.now() / 1000);
+      const mode = normalizeStubChatMode((args as InvokeArgs | undefined)?.mode);
       const thread: StubChatThread = {
         id: `stub-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         title: "New chat",
@@ -1024,6 +1060,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         updated_at: now,
         linked_session_id: ((args as InvokeArgs | undefined)?.linkedSessionId as string | null | undefined) ?? null,
         source: "drawer",
+        mode,
         output_format: null,
         cc_model: null,
       };
@@ -1078,9 +1115,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return paths.map((path, index) => {
         const name = basename(path);
         const mime = mimeFromName(name);
+        const kind = mime.startsWith("image/")
+          ? "image"
+          : mime.startsWith("video/")
+            ? "video"
+            : "file";
         return {
           id: `stub-att-${Date.now()}-${index}`,
-          kind: mime.startsWith("image/") ? "image" : "file",
+          kind,
           path,
           name,
           size: 0,
@@ -1116,6 +1158,67 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         thread.id === threadId ? { ...thread, updated_at: now } : thread,
       ));
       return { user_message: userMessage, assistant_message: assistantMessage } as T;
+    }
+    case "chat_generate_media": {
+      const req = (args as InvokeArgs | undefined)?.req as { thread_id?: string; prompt?: string; kind?: string } | undefined;
+      const threadId = req?.thread_id ?? "";
+      const kind = req?.kind === "video" ? "video" : "image";
+      const now = Math.floor(Date.now() / 1000);
+      const prompt = req?.prompt ?? "";
+      const ext = kind === "video" ? "mp4" : "png";
+      const mime = kind === "video" ? "video/mp4" : "image/svg+xml";
+      const model = kind === "video" ? "agnes-video-v2.0" : "agnes-image-2.1-flash";
+      const savedPath = `/browser-preview/ai-generations/${kind}-${Date.now()}.${ext}`;
+      const attachmentPath = kind === "image" ? stubGeneratedImageDataUri(prompt) : savedPath;
+      const userMessage: StubChatMessage = {
+        id: `stub-user-${Date.now()}`,
+        thread_id: threadId,
+        role: "user",
+        content: prompt,
+        created_at: now,
+        redacted: false,
+        attachments: [],
+      };
+      const assistantMessage: StubChatMessage = {
+        id: `stub-assistant-${Date.now()}`,
+        thread_id: threadId,
+        role: "assistant",
+        content: `${kind === "video" ? "Generated video" : "Generated image"} saved to:\n${savedPath}`,
+        created_at: now + 1,
+        redacted: false,
+        attachments: [{
+          id: `stub-media-${Date.now()}`,
+          kind,
+          path: attachmentPath,
+          name: `generated-${kind}.${ext}`,
+          size: kind === "video" ? 0 : attachmentPath.length,
+          mime,
+          preview_url: kind === "image" ? attachmentPath : null,
+        }],
+      };
+      const messages = loadChatMessages();
+      const hadMessages = (messages[threadId] ?? []).length > 0;
+      messages[threadId] = [...(messages[threadId] ?? []), userMessage, assistantMessage];
+      saveChatMessages(messages);
+      saveChatThreads(loadChatThreads().map((thread) =>
+        thread.id === threadId
+          ? {
+              ...thread,
+              updated_at: now,
+              title: hadMessages ? thread.title : prompt.slice(0, 40) || thread.title,
+              mode: kind,
+            }
+          : thread,
+      ));
+      return {
+        user_message: userMessage,
+        assistant_message: assistantMessage,
+        redacted_count: 0,
+        saved_path: savedPath,
+        remote_url: null,
+        video_id: kind === "video" ? `stub-video-${Date.now()}` : null,
+        model,
+      } as T;
     }
     // ---------- Database client commands (desktop-only) ----------
     case "db_connect":

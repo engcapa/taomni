@@ -2,7 +2,7 @@ import type { ChatMessage } from "../../stores/chatStore";
 import { Check, Copy, Database, Send, ShieldAlert } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "../agent/ActionCard";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderFormatted, type ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import {
@@ -23,6 +23,7 @@ import {
 } from "../../lib/queryRegistry";
 import { AttachmentChip } from "./AttachmentChip";
 import { useT } from "../../lib/i18n";
+import type { ChatAttachment } from "../../lib/chat/attachments";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -231,6 +232,14 @@ export function MessageBubble({
       .filter((s) => s.kind === "code")
       .map((s) => s.value);
   }, [isUser, stripped]);
+  const mediaAttachments = useMemo(
+    () => (message.attachments ?? []).filter(isMediaAttachment),
+    [message.attachments],
+  );
+  const remoteMediaPreviewUrl = useMemo(
+    () => (!isUser ? extractRemoteMediaUrl(stripped) : null),
+    [isUser, stripped],
+  );
 
   const commitSendAll = (entry: TerminalRegistryEntry, payload: PreparedTerminalInput) => {
     entry.writeInput(payload.text);
@@ -359,6 +368,17 @@ export function MessageBubble({
               ? <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
               : stripped}
         </div>
+        {mediaAttachments.length > 0 && (
+          <div className="mt-2 flex flex-col gap-2">
+            {mediaAttachments.map((attachment, index) => (
+              <MediaAttachmentPreview
+                key={attachment.id}
+                attachment={attachment}
+                fallbackSrc={index === 0 ? remoteMediaPreviewUrl : null}
+              />
+            ))}
+          </div>
+        )}
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {message.attachments.map((attachment) => (
@@ -421,4 +441,56 @@ export function MessageBubble({
 interface PendingMessageTerminalSend {
   entry: TerminalRegistryEntry;
   payload: PreparedTerminalInput;
+}
+
+function isMediaAttachment(attachment: ChatAttachment): attachment is ChatAttachment {
+  return attachment.kind === "image" || attachment.kind === "video";
+}
+
+function isDirectMediaSrc(path: string): boolean {
+  return /^(data:|blob:|https?:|asset:)/i.test(path);
+}
+
+function extractRemoteMediaUrl(text: string): string | null {
+  const match = text.match(/Remote URL:\s*(https?:\/\/[^\s<>"')]+)/i);
+  return match?.[1] ?? null;
+}
+
+function mediaPreviewSrc(attachment: ChatAttachment, fallbackSrc?: string | null): string {
+  const previewUrl = attachment.preview_url?.trim();
+  if (previewUrl && isDirectMediaSrc(previewUrl)) return previewUrl;
+  const fallbackUrl = fallbackSrc?.trim();
+  if (fallbackUrl && isDirectMediaSrc(fallbackUrl)) return fallbackUrl;
+  return isDirectMediaSrc(attachment.path) ? attachment.path : convertFileSrc(attachment.path);
+}
+
+function MediaAttachmentPreview({
+  attachment,
+  fallbackSrc,
+}: {
+  attachment: ChatAttachment;
+  fallbackSrc?: string | null;
+}) {
+  const src = mediaPreviewSrc(attachment, fallbackSrc);
+
+  if (attachment.kind === "video") {
+    return (
+      <video
+        controls
+        preload="metadata"
+        className="max-h-72 w-full rounded-md border border-[var(--taomni-divider)] bg-black"
+        src={src}
+        title={attachment.name}
+      />
+    );
+  }
+
+  return (
+    <img
+      className="max-h-72 w-full rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] object-contain"
+      src={src}
+      alt={attachment.name}
+      loading="lazy"
+    />
+  );
 }

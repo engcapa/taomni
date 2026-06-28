@@ -5,7 +5,9 @@ import {
   ChevronDown,
   Copy,
   History,
+  Image as ImageIcon,
   Link2,
+  MessageSquare,
   PanelBottomOpen,
   PanelLeftOpen,
   PanelRightOpen,
@@ -15,10 +17,22 @@ import {
   Plus,
   RefreshCw,
   TerminalSquare,
+  Video,
   X,
 } from "lucide-react";
-import { useChatStore, type ChatDrawerPosition } from "../../stores/chatStore";
-import { chatDrawerProviderIds, DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore } from "../../stores/aiStore";
+import {
+  normalizeChatThreadMode,
+  useChatStore,
+  type ChatDrawerPosition,
+  type ChatThreadMode,
+} from "../../stores/chatStore";
+import {
+  chatDrawerProviderIds,
+  DEFAULT_CLAUDE_CODE_MODEL,
+  DEFAULT_CODEX_MODEL,
+  useAiStore,
+  type LlmProviderCapability,
+} from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
 import { MessageBubble } from "./MessageBubble";
 import { CcToolCards } from "./CcToolCards";
@@ -30,10 +44,11 @@ import {
 import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import type { ChatAttachment } from "../../lib/chat/attachments";
-import { useT } from "../../lib/i18n";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
+const CHAT_THREAD_MODES: ChatThreadMode[] = ["chat", "image", "video"];
 const SIDE_RIBBON_HOVER_OPEN_DELAY_MS = 260;
 const TOP_BOTTOM_RIBBON_HOVER_OPEN_DELAY_MS = 650;
 
@@ -68,6 +83,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     useState<Record<string, ChatOutputFormat>>({});
   const [copiedAll, setCopiedAll] = useState(false);
   const [ccModelDraft, setCcModelDraft] = useState(DEFAULT_CLAUDE_CODE_MODEL);
+  const [newThreadMode, setNewThreadMode] = useState<ChatThreadMode>("chat");
+  const [draftProviderId, setDraftProviderId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
@@ -139,7 +156,22 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const globalOutputFormat = aiConfig?.chat_output_format ?? "md";
   const loadAiConfig = useAiStore((s) => s.loadConfig);
   const saveAiConfig = useAiStore((s) => s.saveConfig);
-  const providerIds = useMemo(() => chatDrawerProviderIds(aiConfig), [aiConfig]);
+  const activeThreadMode = normalizeChatThreadMode(activeThread?.mode);
+  const currentMode = activeThread ? activeThreadMode : newThreadMode;
+  const activeProviderIds = useMemo(
+    () => chatDrawerProviderIds(aiConfig, capabilityForMode(activeThreadMode)),
+    [aiConfig, activeThreadMode],
+  );
+  const draftProviderIds = useMemo(
+    () => chatDrawerProviderIds(aiConfig, capabilityForMode(newThreadMode)),
+    [aiConfig, newThreadMode],
+  );
+  const availableModes = useMemo(
+    () => new Set(CHAT_THREAD_MODES.filter((mode) =>
+      chatDrawerProviderIds(aiConfig, capabilityForMode(mode)).length > 0
+    )),
+    [aiConfig],
+  );
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
   const setThreadCcModel = useChatStore((s) => s.setThreadCcModel);
   const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
@@ -171,6 +203,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     void purgeOldThreads(30);
     void loadAiConfig().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (activeThread) {
+      setNewThreadMode(normalizeChatThreadMode(activeThread.mode));
+    }
+  }, [activeThread?.id, activeThread?.mode]);
+
+  useEffect(() => {
+    setDraftProviderId((current) =>
+      current && draftProviderIds.includes(current) ? current : draftProviderIds[0] ?? null
+    );
+  }, [draftProviderIds]);
 
   useEffect(() => {
     if (!isLocalAgentProvider) {
@@ -208,16 +252,63 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeMessages.length]);
 
+  const pickProviderForMode = (mode: ChatThreadMode, preferredProviderId?: string | null): string | null => {
+    const ids = chatDrawerProviderIds(aiConfig, capabilityForMode(mode));
+    if (preferredProviderId && ids.includes(preferredProviderId)) return preferredProviderId;
+    return ids[0] ?? null;
+  };
+
   const handleNewThread = async () => {
     const linked = drawerTabId ?? activeChatTabId;
     if (!linked) {
       setError(t("chat.noTabBinding"));
       return;
     }
+    const providerId = draftProviderId && draftProviderIds.includes(draftProviderId)
+      ? draftProviderId
+      : draftProviderIds[0] ?? null;
+    if (!providerId) {
+      setError(t("chat.noProviderForMode", { mode: t(`chat.mode_${newThreadMode}`) }));
+      return;
+    }
     setShowHistory(false);
     try {
-      await newThread(undefined, linked);
+      await newThread(providerId, linked, newThreadMode);
       setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleModeSelect = async (mode: ChatThreadMode) => {
+    setNewThreadMode(mode);
+    setError(null);
+    if (!availableModes.has(mode)) {
+      setError(t("chat.noProviderForMode", { mode: t(`chat.mode_${mode}`) }));
+      return;
+    }
+    const providerId = pickProviderForMode(mode, activeThread?.provider_id ?? draftProviderId);
+    setDraftProviderId(providerId);
+    if (!activeThread) return;
+    if (activeThreadMode === mode) return;
+    const linked = activeThread.linked_session_id ?? drawerTabId ?? activeChatTabId;
+    if (!linked) {
+      setError(t("chat.noTabBinding"));
+      return;
+    }
+    if (!providerId) {
+      setError(t("chat.noProviderForMode", { mode: t(`chat.mode_${mode}`) }));
+      return;
+    }
+    setShowHistory(false);
+    try {
+      const loadedMessages = messages[activeThread.id];
+      const replaceEmptyActiveThread = loadedMessages !== undefined && loadedMessages.length === 0;
+      const oldThreadId = activeThread.id;
+      await newThread(providerId, linked, mode);
+      if (replaceEmptyActiveThread) {
+        await deleteThread(oldThreadId);
+      }
     } catch (e) {
       setError(String(e));
     }
@@ -306,7 +397,14 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           setError(t("chat.noTabBinding"));
           return;
         }
-        const thread = await newThread(undefined, linked);
+        const providerId = draftProviderId && draftProviderIds.includes(draftProviderId)
+          ? draftProviderId
+          : draftProviderIds[0] ?? null;
+        if (!providerId) {
+          setError(t("chat.noProviderForMode", { mode: t(`chat.mode_${newThreadMode}`) }));
+          return;
+        }
+        const thread = await newThread(providerId, linked, newThreadMode);
         threadId = thread.id;
       }
       await sendMessage(threadId, content, ctx, attachments);
@@ -426,6 +524,25 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       ? "border-r"
       : "border-l"
     : "border";
+  const providerIds = activeThread ? activeProviderIds : draftProviderIds;
+  const selectedProviderId = activeThread
+    ? (providerIds.includes(activeThread.provider_id) ? activeThread.provider_id : "")
+    : draftProviderId ?? providerIds[0] ?? "";
+  const emptyHint = currentMode === "image"
+    ? t("chat.emptyImageHint")
+    : currentMode === "video"
+      ? t("chat.emptyVideoHint")
+      : t("chat.emptyHint");
+  const composerPlaceholder = currentMode === "image"
+    ? t("chat.imagePromptPlaceholder")
+    : currentMode === "video"
+      ? t("chat.videoPromptPlaceholder")
+      : undefined;
+  const sendingLabel = currentMode === "image"
+    ? t("chat.imageGenerating")
+    : currentMode === "video"
+      ? t("chat.videoGenerating")
+      : t("chat.aiThinking");
 
   return (
     <div
@@ -584,140 +701,180 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </div>
         )}
 
-        {/* Provider badge / switcher */}
-        {activeThread && (
-          <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
-            {/* Scope badge: every visible thread is bound to a concrete app tab. */}
-            {activeThread.linked_session_id && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
-                title={t("chat.boundToTab", { id: activeThread.linked_session_id })}
-              >
-                <Link2 className="w-2.5 h-2.5" />
-                <span className="truncate max-w-[100px]">
-                  {linkedTabTitle}
-                </span>
+        {/* Mode + provider switcher */}
+        <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
+          {/* Scope badge: every visible thread is bound to a concrete app tab. */}
+          {activeThread?.linked_session_id && (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
+              title={t("chat.boundToTab", { id: activeThread.linked_session_id })}
+            >
+              <Link2 className="w-2.5 h-2.5" />
+              <span className="truncate max-w-[100px]">
+                {linkedTabTitle}
               </span>
-            )}
-            <span>{t("chat.providerLabel")}</span>
-            {providerIds.length > 0 ? (
-              <select
-                className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
-                value={activeThread.provider_id}
-                aria-label={t("chat.threadProviderAria")}
-                onChange={(e) => {
+            </span>
+          )}
+          <span>{t("chat.modeLabel")}</span>
+          <div className="inline-flex h-5 overflow-hidden rounded border border-[var(--taomni-divider)]">
+            {CHAT_THREAD_MODES.map((mode) => {
+              const selected = currentMode === mode;
+              const ModeIcon = modeIcon(mode);
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`h-full px-1.5 inline-flex items-center gap-1 border-r last:border-r-0 border-[var(--taomni-divider)] ${
+                    selected
+                      ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]"
+                      : "hover:bg-[var(--taomni-hover)]"
+                  } disabled:opacity-40 disabled:hover:bg-transparent`}
+                  onClick={() => void handleModeSelect(mode)}
+                  disabled={!availableModes.has(mode)}
+                  aria-pressed={selected}
+                  aria-label={t("chat.threadModeAria", { mode: t(`chat.mode_${mode}`) })}
+                  title={t(`chat.mode_${mode}`)}
+                  data-testid={`chat-mode-${mode}`}
+                >
+                  <ModeIcon className="w-2.5 h-2.5" />
+                  <span>{t(`chat.mode_${mode}`)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <span>{t("chat.providerLabel")}</span>
+          {providerIds.length > 0 ? (
+            <select
+              className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
+              value={selectedProviderId}
+              aria-label={t("chat.threadProviderAria")}
+              onChange={(e) => {
+                if (activeThread) {
                   void setThreadProvider(activeThread.id, e.target.value);
-                }}
-              >
-                {providerIds.map((id) => (
-                  <option key={id} value={id}>
-                    {id === "claude-code" ? t("chat.claudeCodeLocal") : id === "codex" ? "Codex local" : id}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-[var(--taomni-accent)]">{activeThread.provider_id}</span>
-            )}
-            {(activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && (
-              <input
-                className="taomni-input h-5 w-[150px] min-w-[120px] text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)] font-mono"
-                value={ccModelDraft}
-                aria-label={t("chat.threadModelAria")}
-                title={t("chat.threadModelTitle")}
-                spellCheck={false}
-                onChange={(e) => setCcModelDraft(e.target.value)}
-                onBlur={commitThreadCcModel}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.currentTarget.blur();
-                  } else if (e.key === "Escape") {
-                    setCcModelDraft(activeThread.cc_model?.trim() || defaultLocalAgentModel);
-                    e.currentTarget.blur();
-                  }
-                }}
-              />
-            )}
-            {(activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && activeThread.linked_session_id && (
-              <button
-                type="button"
-                className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${
-                  ccTerminalEchoEnabled
-                    ? "text-[var(--taomni-accent)]"
-                    : "text-[var(--taomni-text-muted)]"
-                }`}
-                onClick={() => setCcTerminalEcho(!ccTerminalEchoEnabled)}
-                disabled={!aiConfig}
-                title={t("chat.ccTerminalEchoTitle")}
-                aria-pressed={ccTerminalEchoEnabled}
-                aria-label={t("chat.ccTerminalEchoAria")}
-                data-testid="chat-cc-terminal-echo-toggle"
-              >
-                <TerminalSquare className="w-2.5 h-2.5" />
-                <span>{ccTerminalEchoEnabled ? t("chat.ccTerminalEchoOn") : t("chat.ccTerminalEchoOff")}</span>
-              </button>
-            )}
-            <span className="ml-2">{t("chat.formatLabel")}</span>
-            {formatLocked ? (
-              // Locked once the thread has any messages — issue #3.
-              <span
-                className="text-[var(--taomni-accent)] px-1"
-                title={t("chat.formatLockedTooltip")}
-              >
-                {activeThread.output_format ?? t("chat.inheritFormat", { format: globalOutputFormat })}
-              </span>
-            ) : (
-              <select
-                className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
-                value={activeThread.output_format ?? ""}
-                aria-label={t("chat.formatAria")}
-                title={t("chat.formatEffectiveTooltip", { format: effectiveFormat, global: globalOutputFormat })}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  void setThreadOutputFormat(activeThread.id, v === "" ? null : v);
-                }}
-              >
-                <option value="">{t("chat.inheritFormat", { format: globalOutputFormat })}</option>
-                <option value="md">{t("chat.formatMd")}</option>
-                <option value="html">{t("chat.formatHtml")}</option>
-                <option value="plain">{t("chat.formatPlainOption")}</option>
-              </select>
-            )}
+                } else {
+                  setDraftProviderId(e.target.value);
+                }
+              }}
+            >
+              {activeThread && selectedProviderId === "" && (
+                <option value="" disabled>
+                  {activeThread.provider_id}
+                </option>
+              )}
+              {providerIds.map((id) => (
+                <option key={id} value={id}>
+                  {providerLabel(id, t)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-[var(--taomni-accent)]">
+              {activeThread?.provider_id ?? t("chat.noProvider")}
+            </span>
+          )}
+          {activeThread && (activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && (
+            <input
+              className="taomni-input h-5 w-[150px] min-w-[120px] text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)] font-mono"
+              value={ccModelDraft}
+              aria-label={t("chat.threadModelAria")}
+              title={t("chat.threadModelTitle")}
+              spellCheck={false}
+              onChange={(e) => setCcModelDraft(e.target.value)}
+              onBlur={commitThreadCcModel}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape") {
+                  setCcModelDraft(activeThread.cc_model?.trim() || defaultLocalAgentModel);
+                  e.currentTarget.blur();
+                }
+              }}
+            />
+          )}
+          {activeThread && (activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && activeThread.linked_session_id && (
             <button
               type="button"
-              className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
-              onClick={cycleRenderFormat}
-              title={t("chat.convertCycleTitle", { format: effectiveFormat })}
-              aria-label={t("chat.convertVisibleAria")}
+              className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${
+                ccTerminalEchoEnabled
+                  ? "text-[var(--taomni-accent)]"
+                  : "text-[var(--taomni-text-muted)]"
+              }`}
+              onClick={() => setCcTerminalEcho(!ccTerminalEchoEnabled)}
+              disabled={!aiConfig}
+              title={t("chat.ccTerminalEchoTitle")}
+              aria-pressed={ccTerminalEchoEnabled}
+              aria-label={t("chat.ccTerminalEchoAria")}
+              data-testid="chat-cc-terminal-echo-toggle"
             >
-              <RefreshCw className="w-2.5 h-2.5" />
-              <span>{t("chat.convertLabel", { format: effectiveFormat })}</span>
+              <TerminalSquare className="w-2.5 h-2.5" />
+              <span>{ccTerminalEchoEnabled ? t("chat.ccTerminalEchoOn") : t("chat.ccTerminalEchoOff")}</span>
             </button>
-            {isQueryThread && (
+          )}
+          {activeThread && activeThreadMode === "chat" && (
+            <>
+              <span className="ml-2">{t("chat.formatLabel")}</span>
+              {formatLocked ? (
+                // Locked once the thread has any messages — issue #3.
+                <span
+                  className="text-[var(--taomni-accent)] px-1"
+                  title={t("chat.formatLockedTooltip")}
+                >
+                  {activeThread.output_format ?? t("chat.inheritFormat", { format: globalOutputFormat })}
+                </span>
+              ) : (
+                <select
+                  className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
+                  value={activeThread.output_format ?? ""}
+                  aria-label={t("chat.formatAria")}
+                  title={t("chat.formatEffectiveTooltip", { format: effectiveFormat, global: globalOutputFormat })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    void setThreadOutputFormat(activeThread.id, v === "" ? null : v);
+                  }}
+                >
+                  <option value="">{t("chat.inheritFormat", { format: globalOutputFormat })}</option>
+                  <option value="md">{t("chat.formatMd")}</option>
+                  <option value="html">{t("chat.formatHtml")}</option>
+                  <option value="plain">{t("chat.formatPlainOption")}</option>
+                </select>
+              )}
               <button
                 type="button"
-                className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${
-                  sqlEcho
-                    ? "text-[var(--taomni-accent)]"
-                    : "text-[var(--taomni-text-muted)]"
-                }`}
-                onClick={() => setSqlEcho(!sqlEcho)}
-                title={t("chat.sqlEchoTitle")}
-                aria-pressed={sqlEcho}
-                data-testid="chat-sql-echo-toggle"
+                className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
+                onClick={cycleRenderFormat}
+                title={t("chat.convertCycleTitle", { format: effectiveFormat })}
+                aria-label={t("chat.convertVisibleAria")}
               >
-                <TerminalSquare className="w-2.5 h-2.5" />
-                <span>{sqlEcho ? t("chat.sqlEchoOn") : t("chat.sqlEchoOff")}</span>
+                <RefreshCw className="w-2.5 h-2.5" />
+                <span>{t("chat.convertLabel", { format: effectiveFormat })}</span>
               </button>
-            )}
-          </div>
-        )}
+            </>
+          )}
+          {activeThread && activeThreadMode === "chat" && isQueryThread && (
+            <button
+              type="button"
+              className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${
+                sqlEcho
+                  ? "text-[var(--taomni-accent)]"
+                  : "text-[var(--taomni-text-muted)]"
+              }`}
+              onClick={() => setSqlEcho(!sqlEcho)}
+              title={t("chat.sqlEchoTitle")}
+              aria-pressed={sqlEcho}
+              data-testid="chat-sql-echo-toggle"
+            >
+              <TerminalSquare className="w-2.5 h-2.5" />
+              <span>{sqlEcho ? t("chat.sqlEchoOn") : t("chat.sqlEchoOff")}</span>
+            </button>
+          )}
+        </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
           {activeMessages.length === 0 && !sending && (
             <div className="text-[11px] text-[var(--taomni-text-muted)] text-center py-8">
               <Bot className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              {t("chat.emptyHint")}
+              {emptyHint}
             </div>
           )}
           {activeMessages.map((msg) => (
@@ -743,7 +900,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
                     />
                   ))}
                 </div>
-                <span>{t("chat.aiThinking")}</span>
+                <span>{sendingLabel}</span>
               </div>
               <button
                 type="button"
@@ -772,10 +929,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           onSend={handleSend}
           sending={sending}
           disabled={false}
+          attachmentsEnabled={currentMode === "chat"}
+          placeholder={composerPlaceholder}
           // Use the active terminal registry when available — that's what
           // makes `@terminal:last-N` work even when the drawer is rendered
           // without a `terminalContext` prop (the production case).
-          resolveTerminalContext={resolveTerminalText}
+          resolveTerminalContext={currentMode === "chat" ? resolveTerminalText : undefined}
         />
       </div>
     </div>
@@ -926,6 +1085,24 @@ export function ChatDrawerRibbon() {
       <span className={textClass}>Tao</span>
     </button>
   );
+}
+
+function capabilityForMode(mode: ChatThreadMode): LlmProviderCapability {
+  if (mode === "image") return "image_generation";
+  if (mode === "video") return "video_generation";
+  return "chat";
+}
+
+function modeIcon(mode: ChatThreadMode) {
+  if (mode === "image") return ImageIcon;
+  if (mode === "video") return Video;
+  return MessageSquare;
+}
+
+function providerLabel(id: string, t: TranslateFn): string {
+  if (id === "claude-code") return t("chat.claudeCodeLocal");
+  if (id === "codex") return "Codex local";
+  return id;
 }
 
 function positionIcon(position: ChatDrawerPosition) {

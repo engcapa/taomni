@@ -88,6 +88,7 @@ function makeThread(overrides: Partial<ChatThread> = {}): ChatThread {
     updated_at: 1,
     linked_session_id: null,
     source: "drawer",
+    mode: "chat",
     output_format: null,
     cc_model: null,
     ...overrides,
@@ -125,11 +126,12 @@ describe("chatStore new thread provider selection", () => {
       drawerPinned: true,
       pendingComposerText: "",
     });
-    invokeMock.mockImplementation((command: string, args: { providerId?: string | null; linkedSessionId?: string | null }) => {
+    invokeMock.mockImplementation((command: string, args: { providerId?: string | null; linkedSessionId?: string | null; mode?: string | null }) => {
       if (command !== "chat_new_thread") throw new Error(`unexpected command: ${command}`);
       const thread = makeThread({
         provider_id: args.providerId ?? "deepseek",
         linked_session_id: args.linkedSessionId ?? null,
+        mode: args.mode ?? "chat",
       });
       return Promise.resolve(thread);
     });
@@ -145,6 +147,7 @@ describe("chatStore new thread provider selection", () => {
     expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", {
       providerId: "claude-code",
       linkedSessionId: "term-1",
+      mode: "chat",
     });
   });
 
@@ -154,6 +157,7 @@ describe("chatStore new thread provider selection", () => {
     expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", {
       providerId: "local",
       linkedSessionId: null,
+      mode: "chat",
     });
   });
 
@@ -179,6 +183,95 @@ describe("chatStore new thread provider selection", () => {
       drawerTabId: "term-1",
       activeThreadIdByTabId: { "term-1": "old-thread" },
     });
+  });
+});
+
+describe("chatStore media generation", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    const thread = makeThread({
+      id: "image-thread",
+      provider_id: "agnes",
+      mode: "image",
+    });
+    useChatStore.setState({
+      threads: [thread],
+      threadsLoaded: true,
+      activeThreadId: thread.id,
+      messages: { [thread.id]: [] },
+      streamingId: {},
+      ccToolCards: {},
+      ccUsage: {},
+      sendingByThreadId: {},
+      sending: false,
+      drawerOpen: true,
+      drawerScope: null,
+      drawerTabId: null,
+      tabDrawerOpenByTabId: {},
+      activeThreadIdByTabId: {},
+      drawerWidth: 380,
+      drawerHeight: 420,
+      drawerPosition: "right",
+      drawerPinned: true,
+      pendingComposerText: "",
+    });
+    invokeMock.mockImplementation((command: string) => {
+      if (command !== "chat_generate_media") throw new Error(`unexpected command: ${command}`);
+      return Promise.resolve({
+        user_message: {
+          id: "user-1",
+          thread_id: "image-thread",
+          role: "user",
+          content: "a blue terminal window",
+          created_at: 1,
+          redacted: false,
+          attachments: [],
+        },
+        assistant_message: {
+          id: "assistant-1",
+          thread_id: "image-thread",
+          role: "assistant",
+          content: "Generated image saved to:\n/tmp/image.png",
+          created_at: 2,
+          redacted: false,
+          attachments: [{
+            id: "media-1",
+            kind: "image",
+            path: "/tmp/image.png",
+            name: "image.png",
+            size: 123,
+            mime: "image/png",
+          }],
+        },
+        redacted_count: 0,
+        saved_path: "/tmp/image.png",
+        remote_url: null,
+        video_id: null,
+        model: "agnes-image-2.1-flash",
+      });
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("routes image threads to the media generation command", async () => {
+    await useChatStore.getState().sendMessage("image-thread", "a blue terminal window");
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_generate_media", {
+      req: {
+        thread_id: "image-thread",
+        prompt: "a blue terminal window",
+        kind: "image",
+      },
+    });
+    expect(useChatStore.getState().messages["image-thread"]).toHaveLength(2);
+    expect(useChatStore.getState().messages["image-thread"][1].attachments?.[0]).toMatchObject({
+      kind: "image",
+      path: "/tmp/image.png",
+    });
+    expect(useChatStore.getState().sending).toBe(false);
   });
 });
 

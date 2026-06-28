@@ -33,6 +33,8 @@ interface ComposerProps {
   onSend: (content: string, terminalContext?: string, attachments?: ChatAttachment[]) => Promise<void>;
   sending: boolean;
   disabled?: boolean;
+  attachmentsEnabled?: boolean;
+  placeholder?: string;
   /**
    * Optional resolver: turns AttachmentRefs into LLM-ready text before send.
    * Currently only `terminal` refs surface to the existing terminal_context
@@ -46,7 +48,14 @@ const COMPOSER_HEIGHT_STORAGE_KEY = "taomni.chatComposer.height.v1";
 const MIN_COMPOSER_HEIGHT = 56;
 const MAX_COMPOSER_HEIGHT = 280;
 
-export function Composer({ onSend, sending, disabled, resolveTerminalContext }: ComposerProps) {
+export function Composer({
+  onSend,
+  sending,
+  disabled,
+  attachmentsEnabled = true,
+  placeholder,
+  resolveTerminalContext,
+}: ComposerProps) {
   const t = useT();
   const [text, setText] = useState("");
   const [selectedAttachments, setSelectedAttachments] = useState<ChatAttachment[]>([]);
@@ -69,7 +78,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
 
   // Live parse @-references so we can show chips and remove them.
   const parsed = useMemo(() => parseComposerInput(text), [text]);
-  const referenceAttachments: AttachmentRef[] = parsed.attachments;
+  const referenceAttachments: AttachmentRef[] = attachmentsEnabled ? parsed.attachments : [];
   const sessionRefText = useMemo(
     () => referenceAttachments.filter((att) => att.kind === "session").map(refToToken).join(" "),
     [referenceAttachments],
@@ -92,15 +101,17 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
   }, [t]);
 
   const addResolvedAttachments = useCallback((incoming: ChatAttachment[]) => {
+    if (!attachmentsEnabled) return;
     if (incoming.length === 0) return;
     setSelectedAttachments((current) => {
       const result = mergeChatAttachments(current, incoming);
       showMergeError(result.error);
       return result.attachments;
     });
-  }, [showMergeError]);
+  }, [attachmentsEnabled, showMergeError]);
 
   const addAttachmentPaths = useCallback(async (paths: string[]) => {
+    if (!attachmentsEnabled) return;
     if (paths.length === 0) return;
     try {
       const incoming = await statChatAttachmentPaths(paths);
@@ -108,10 +119,18 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
     } catch (e) {
       setAttachmentError(String(e));
     }
-  }, [addResolvedAttachments]);
+  }, [addResolvedAttachments, attachmentsEnabled]);
+
+  useEffect(() => {
+    if (attachmentsEnabled) return;
+    setSelectedAttachments([]);
+    setAttachmentError(null);
+    setDraggingFiles(false);
+  }, [attachmentsEnabled]);
 
   useEffect(() => {
     const handleNativeFileDrop = (event: Event) => {
+      if (!attachmentsEnabled) return;
       const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
       if (!detail?.paths?.length) return;
       const root = rootRef.current;
@@ -124,7 +143,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
 
     window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
     return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-  }, [addAttachmentPaths]);
+  }, [addAttachmentPaths, attachmentsEnabled]);
 
   const handleRemove = (index: number) => {
     // Reconstruct text by stripping the n-th @-token. Simple: re-build from
@@ -146,7 +165,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
     // Resolve terminal references to terminal_context. Multiple @terminal
     // refs are merged; we take the largest line count.
     let terminalCtx: string | undefined;
-    if (resolveTerminalContext) {
+    if (attachmentsEnabled && resolveTerminalContext) {
       const maxLines = referenceAttachments
         .filter((a) => a.kind === "terminal")
         .reduce((m, a) => (a.kind === "terminal" ? Math.max(m, a.lines) : m), 0);
@@ -155,10 +174,12 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
       }
     }
 
-    const fileRefs = referenceAttachments
-      .filter((att): att is Extract<AttachmentRef, { kind: "file" }> => att.kind === "file")
-      .map((att) => att.path);
-    let sendAttachments = selectedAttachments;
+    const fileRefs = attachmentsEnabled
+      ? referenceAttachments
+          .filter((att): att is Extract<AttachmentRef, { kind: "file" }> => att.kind === "file")
+          .map((att) => att.path)
+      : [];
+    let sendAttachments = attachmentsEnabled ? selectedAttachments : [];
     if (fileRefs.length > 0) {
       try {
         const refs = await statChatAttachmentPaths(fileRefs);
@@ -187,12 +208,14 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
   };
 
   const handlePickFiles = async () => {
+    if (!attachmentsEnabled) return;
     const paths = await pickChatAttachmentPaths();
     await addAttachmentPaths(paths);
     textareaRef.current?.focus();
   };
 
   const handleDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!attachmentsEnabled) return;
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
@@ -200,6 +223,7 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
   };
 
   const handleDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!attachmentsEnabled) return;
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
     setDraggingFiles(false);
@@ -245,8 +269,8 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
   };
 
   const canSend = visibleMessage.length > 0
-    || selectedAttachments.length > 0
-    || referenceAttachments.some((att) => att.kind === "file" || att.kind === "terminal");
+    || (attachmentsEnabled && selectedAttachments.length > 0)
+    || (attachmentsEnabled && referenceAttachments.some((att) => att.kind === "file" || att.kind === "terminal"));
 
   return (
     <div
@@ -282,21 +306,23 @@ export function Composer({ onSend, sending, disabled, resolveTerminalContext }: 
         </div>
       )}
       <div className="flex gap-2 items-end">
-        <button
-          type="button"
-          className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
-          onClick={() => void handlePickFiles()}
-          disabled={disabled || sending}
-          title={t("attachment.addFiles")}
-          aria-label={t("attachment.addFiles")}
-          data-testid="ai-chat-attach-button"
-        >
-          <Paperclip className="w-3.5 h-3.5" />
-        </button>
+        {attachmentsEnabled && (
+          <button
+            type="button"
+            className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
+            onClick={() => void handlePickFiles()}
+            disabled={disabled || sending}
+            title={t("attachment.addFiles")}
+            aria-label={t("attachment.addFiles")}
+            data-testid="ai-chat-attach-button"
+          >
+            <Paperclip className="w-3.5 h-3.5" />
+          </button>
+        )}
         <textarea
           ref={textareaRef}
           className="taomni-input flex-1 text-[12px] resize-none py-1.5"
-          placeholder={t("chat.inputPlaceholder")}
+          placeholder={placeholder ?? t("chat.inputPlaceholder")}
           value={text}
           disabled={disabled || sending}
           style={{ height: composerHeight, minHeight: MIN_COMPOSER_HEIGHT, maxHeight: MAX_COMPOSER_HEIGHT }}

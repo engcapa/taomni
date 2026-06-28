@@ -26,6 +26,15 @@ export interface LlmProviderConfig {
   api_key: string;
   model: string;
   runtime: string;
+  capabilities?: LlmProviderCapabilities;
+  image_model?: string | null;
+  video_model?: string | null;
+}
+
+export interface LlmProviderCapabilities {
+  chat?: boolean;
+  image_generation?: boolean;
+  video_generation?: boolean;
 }
 
 export interface FallbackConfig {
@@ -141,15 +150,28 @@ export function defaultChatProviderId(config: AiConfig | null | undefined): stri
   return undefined;
 }
 
-export function chatDrawerProviderIds(config: AiConfig | null | undefined): string[] {
-  const ids = Object.keys(config?.llm.providers ?? {}).filter((id) => id !== "claude-code" && id !== "codex");
+export type LlmProviderCapability = "chat" | "image_generation" | "video_generation";
+
+export function llmProviderSupports(provider: LlmProviderConfig | null | undefined, capability: LlmProviderCapability): boolean {
+  if (!provider) return false;
+  if (capability === "chat") return provider.capabilities?.chat !== false;
+  return provider.capabilities?.[capability] === true;
+}
+
+export function chatDrawerProviderIds(
+  config: AiConfig | null | undefined,
+  capability: LlmProviderCapability = "chat",
+): string[] {
+  const ids = Object.entries(config?.llm.providers ?? {})
+    .filter(([id, provider]) => id !== "claude-code" && id !== "codex" && llmProviderSupports(provider, capability))
+    .map(([id]) => id);
   const active = config?.llm.active;
   const orderedLlmIds = active && ids.includes(active)
     ? [active, ...ids.filter((id) => id !== active)]
     : ids;
   const localAgentIds: string[] = [];
-  if (isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
-  if (isCodexAvailableForChat(config)) localAgentIds.push("codex");
+  if (capability === "chat" && isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
+  if (capability === "chat" && isCodexAvailableForChat(config)) localAgentIds.push("codex");
   return [...localAgentIds, ...orderedLlmIds];
 }
 
@@ -181,11 +203,12 @@ const DEFAULT_CONFIG: AiConfig = {
   llm: {
     active: "deepseek",
     providers: {
-      deepseek:    { base_url: "https://api.deepseek.com/v1",                    api_key: "", model: "deepseek-chat",                        runtime: "openai-compat" },
-      glm:         { base_url: "https://open.bigmodel.cn/api/paas/v4",           api_key: "", model: "glm-4-flash",                          runtime: "openai-compat" },
-      siliconflow: { base_url: "https://api.siliconflow.cn/v1",                  api_key: "", model: "Qwen/Qwen2.5-Coder-7B-Instruct",       runtime: "openai-compat" },
-      groq:        { base_url: "https://api.groq.com/openai/v1",                 api_key: "", model: "llama-3.3-70b-versatile",              runtime: "openai-compat" },
-      local:       { base_url: "http://127.0.0.1:8080/v1",                       api_key: "local", model: "qwen3-1.7b-q4_k_m",             runtime: "llama-server" },
+      deepseek:    { base_url: "https://api.deepseek.com/v1",                    api_key: "", model: "deepseek-chat",                        runtime: "openai-compat", capabilities: { chat: true } },
+      agnes:       { base_url: "https://apihub.agnes-ai.com/v1",                 api_key: "", model: "agnes-2.0-flash",                     runtime: "openai-compat", capabilities: { chat: true, image_generation: true, video_generation: true }, image_model: "agnes-image-2.1-flash", video_model: "agnes-video-v2.0" },
+      glm:         { base_url: "https://open.bigmodel.cn/api/paas/v4",           api_key: "", model: "glm-4-flash",                          runtime: "openai-compat", capabilities: { chat: true } },
+      siliconflow: { base_url: "https://api.siliconflow.cn/v1",                  api_key: "", model: "Qwen/Qwen2.5-Coder-7B-Instruct",       runtime: "openai-compat", capabilities: { chat: true } },
+      groq:        { base_url: "https://api.groq.com/openai/v1",                 api_key: "", model: "llama-3.3-70b-versatile",              runtime: "openai-compat", capabilities: { chat: true } },
+      local:       { base_url: "http://127.0.0.1:8080/v1",                       api_key: "local", model: "qwen3-1.7b-q4_k_m",             runtime: "llama-server", capabilities: { chat: true } },
     },
     fallback: { enabled: true, primary: "deepseek", secondary: "local", timeout_ms: 8000 },
     task_routing: {
@@ -256,9 +279,31 @@ function normalizeCodexProfileProxyMode(mode: string | undefined | null, proxyUr
   return proxyUrl?.trim() ? "manual" : "inherit";
 }
 
+function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
+  return {
+    ...provider,
+    capabilities: {
+      chat: provider.capabilities?.chat !== false,
+      image_generation: provider.capabilities?.image_generation === true,
+      video_generation: provider.capabilities?.video_generation === true,
+    },
+    image_model: provider.image_model ?? null,
+    video_model: provider.video_model ?? null,
+  };
+}
+
 function normalizeAiConfig(config: AiConfig): AiConfig {
+  const providers = config.llm.providers.agnes
+    ? config.llm.providers
+    : { ...config.llm.providers, agnes: DEFAULT_CONFIG.llm.providers.agnes };
   return {
     ...config,
+    llm: {
+      ...config.llm,
+      providers: Object.fromEntries(
+        Object.entries(providers).map(([id, provider]) => [id, normalizeLlmProvider(provider)]),
+      ),
+    },
     cc_bridge: {
       ...config.cc_bridge,
       default_model: normalizeModelName(config.cc_bridge.default_model),

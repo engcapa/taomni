@@ -11,6 +11,8 @@ pub struct ChatThread {
     pub updated_at: i64,
     pub linked_session_id: Option<String>,
     pub source: String,
+    #[serde(default = "default_thread_mode")]
+    pub mode: String,
     /// Claude Code session ID for --resume (v2.6).
     #[serde(default)]
     pub cc_session_id: Option<String>,
@@ -23,6 +25,10 @@ pub struct ChatThread {
     /// `None` means "inherit AiConfig.chat_output_format".
     #[serde(default)]
     pub output_format: Option<String>,
+}
+
+fn default_thread_mode() -> String {
+    "chat".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +52,8 @@ pub struct ChatAttachment {
     pub size: u64,
     #[serde(default)]
     pub mime: Option<String>,
+    #[serde(default)]
+    pub preview_url: Option<String>,
 }
 
 pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
@@ -79,6 +87,7 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
             name TEXT NOT NULL,
             size INTEGER NOT NULL,
             mime TEXT,
+            preview_url TEXT,
             created_at INTEGER NOT NULL,
             FOREIGN KEY (message_id) REFERENCES ai_chat_messages(id) ON DELETE CASCADE,
             FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
@@ -103,8 +112,14 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
         [],
     );
     // Idempotent column add for the per-thread Claude Code model override.
+    let _ = conn.execute("ALTER TABLE ai_chat_threads ADD COLUMN cc_model TEXT", []);
+    // Idempotent column add for media-generation chat drawer modes.
     let _ = conn.execute(
-        "ALTER TABLE ai_chat_threads ADD COLUMN cc_model TEXT",
+        "ALTER TABLE ai_chat_threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat'",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_message_attachments ADD COLUMN preview_url TEXT",
         [],
     );
     Ok(())
@@ -112,21 +127,47 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
-            thread.output_format, thread.cc_model,
+            thread.output_format, thread.cc_model, thread.mode,
         ],
     )?;
     Ok(())
 }
 
+pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode
+         FROM ai_chat_threads WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query(params![id])?;
+    let Some(row) = rows.next()? else {
+        return Ok(None);
+    };
+    Ok(Some(ChatThread {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        provider_id: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+        linked_session_id: row.get(5)?,
+        source: row.get(6)?,
+        cc_session_id: row.get(7).ok(),
+        output_format: row.get(8).ok(),
+        cc_model: row.get(9).ok(),
+        mode: row
+            .get::<_, Option<String>>(10)?
+            .unwrap_or_else(default_thread_mode),
+    }))
+}
+
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -141,6 +182,9 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             cc_session_id: row.get(7).ok(),
             output_format: row.get(8).ok(),
             cc_model: row.get(9).ok(),
+            mode: row
+                .get::<_, Option<String>>(10)?
+                .unwrap_or_else(default_thread_mode),
         })
     })?;
     rows.collect()
@@ -179,8 +223,8 @@ pub fn insert_message(conn: &Connection, msg: &ChatMessage) -> SqlResult<()> {
     for att in &msg.attachments {
         conn.execute(
             "INSERT OR REPLACE INTO ai_chat_message_attachments
-             (id, message_id, thread_id, kind, path, name, size, mime, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             (id, message_id, thread_id, kind, path, name, size, mime, preview_url, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 &att.id,
                 &msg.id,
@@ -190,6 +234,7 @@ pub fn insert_message(conn: &Connection, msg: &ChatMessage) -> SqlResult<()> {
                 &att.name,
                 att.size as i64,
                 att.mime.as_deref(),
+                att.preview_url.as_deref(),
                 msg.created_at,
             ],
         )?;
@@ -224,7 +269,7 @@ pub fn list_messages(conn: &Connection, thread_id: &str) -> SqlResult<Vec<ChatMe
     }
 
     let mut att_stmt = conn.prepare(
-        "SELECT message_id, id, kind, path, name, size, mime
+        "SELECT message_id, id, kind, path, name, size, mime, preview_url
          FROM ai_chat_message_attachments WHERE thread_id = ?1 ORDER BY created_at ASC",
     )?;
     let att_rows = att_stmt.query_map(params![thread_id], |row| {
@@ -237,6 +282,7 @@ pub fn list_messages(conn: &Connection, thread_id: &str) -> SqlResult<Vec<ChatMe
                 name: row.get(4)?,
                 size: row.get::<_, i64>(5)?.max(0) as u64,
                 mime: row.get(6).ok(),
+                preview_url: row.get(7).ok(),
             },
         ))
     })?;
@@ -272,11 +318,7 @@ pub fn update_thread_provider(conn: &Connection, id: &str, provider_id: &str) ->
 /// Set or clear the per-thread Claude Code model override.
 /// `None` (or `Some("")`) clears it so the thread inherits the configured
 /// `cc_bridge.default_model`.
-pub fn update_thread_cc_model(
-    conn: &Connection,
-    id: &str,
-    model: Option<&str>,
-) -> SqlResult<()> {
+pub fn update_thread_cc_model(conn: &Connection, id: &str, model: Option<&str>) -> SqlResult<()> {
     let normalized = model.filter(|s| !s.trim().is_empty());
     conn.execute(
         "UPDATE ai_chat_threads SET cc_model = ?1 WHERE id = ?2",
@@ -333,6 +375,7 @@ mod tests {
             updated_at: 1,
             linked_session_id: None,
             source: "drawer".into(),
+            mode: "chat".into(),
             cc_session_id: None,
             cc_model: None,
             output_format: None,
@@ -352,6 +395,7 @@ mod tests {
                 name: "diagram.png".into(),
                 size: 2048,
                 mime: Some("image/png".into()),
+                preview_url: Some("https://example.test/diagram.png".into()),
             }],
         };
         insert_message(&conn, &message).unwrap();
@@ -361,5 +405,11 @@ mod tests {
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].attachments.len(), 1);
         assert_eq!(messages[0].attachments[0].name, "diagram.png");
+        assert_eq!(
+            messages[0].attachments[0].preview_url.as_deref(),
+            Some("https://example.test/diagram.png")
+        );
+        let loaded_thread = get_thread(&conn, "thread-1").unwrap().unwrap();
+        assert_eq!(loaded_thread.mode, "chat");
     }
 }
