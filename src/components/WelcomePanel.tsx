@@ -3,7 +3,20 @@ import {
   Plus,
   Shield,
   FolderOpen,
+  Folder,
   MessageCircle,
+  History,
+  Search,
+  X,
+  Server,
+  Play,
+  Edit3,
+  Copy,
+  Trash2,
+  CheckSquare,
+  Square,
+  Settings2,
+  ListTree,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -11,28 +24,58 @@ import {
   listWslDistros,
   openLocalShellAsAdministrator,
   type LocalShellOption,
+  type SessionConfig,
   type WslDistro,
 } from "../lib/ipc";
 import { getAppPlatform } from "../lib/runtime";
 import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
+import { useSessionStore } from "../stores/sessionStore";
 import type { LocalShellSelection } from "../types";
 import { useT, type TranslateFn } from "../lib/i18n";
+import { sessionTypeLabel } from "../lib/terminalProfile";
+import { SESSION_ROOT_LABEL, collectFolderPaths, folderOptionLabel } from "../lib/sessionPaths";
+import { useContextMenu, type MenuItem } from "./ContextMenu";
+import { useConfirmDialog } from "./sidebar/ConfirmDialog";
 
 interface WelcomePanelProps {
   onStartLocalTerminal: (shell?: LocalShellSelection) => void;
   onNewSession: () => void;
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
   onOpenLanChat?: () => void;
+  recentSessions?: SessionConfig[];
+  onOpenRecentSession?: (session: SessionConfig) => void;
+  onOpenRecentSessions?: (sessions: SessionConfig[]) => void;
+  onEditRecentSession?: (session: SessionConfig) => void;
+  onRevealRecentSession?: (session: SessionConfig) => void;
+  onOpenSettings?: () => void;
 }
 
-export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPath, onOpenLanChat }: WelcomePanelProps) {
+const EMPTY_RECENT_SESSIONS: SessionConfig[] = [];
+type RecentSessionSort = "last-desc" | "last-asc" | "name-asc" | "type-asc" | "host-asc";
+
+export function WelcomePanel({
+  onStartLocalTerminal,
+  onNewSession,
+  onOpenLocalPath,
+  onOpenLanChat,
+  recentSessions = EMPTY_RECENT_SESSIONS,
+  onOpenRecentSession,
+  onOpenRecentSessions,
+  onEditRecentSession,
+  onRevealRecentSession,
+  onOpenSettings,
+}: WelcomePanelProps) {
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
   const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
   const [selectedDistro, setSelectedDistro] = useState("");
   const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">("loading");
+  const [recentQuery, setRecentQuery] = useState("");
+  const [recentType, setRecentType] = useState("all");
+  const [recentSort, setRecentSort] = useState<RecentSessionSort>("last-desc");
+  const [selectedRecentIds, setSelectedRecentIds] = useState<string[]>([]);
   const { setStatusMessage } = useAppStore();
   const t = useT();
 
@@ -92,6 +135,58 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
   const selectedShell = useMemo(
     () => mergedShells.find((shell) => shell.id === selectedShellId),
     [mergedShells, selectedShellId],
+  );
+
+  const recentTypeOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const session of recentSessions) {
+      const label = sessionTypeLabel(session.session_type, session.options_json);
+      if (!seen.has(label)) seen.set(label, label);
+    }
+    return [...seen.entries()].map(([value, label]) => ({ value, label }));
+  }, [recentSessions]);
+
+  const filteredRecentSessions = useMemo(() => {
+    const q = recentQuery.trim().toLowerCase();
+    const filtered = recentSessions.filter((session) => {
+      const label = sessionTypeLabel(session.session_type, session.options_json);
+      if (recentType !== "all" && label !== recentType) return false;
+      if (!q) return true;
+      return [
+        session.name,
+        session.host,
+        session.username ?? "",
+        session.group_path ?? "",
+        session.session_type,
+        label,
+        String(session.port ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+    return filtered.sort((a, b) => compareRecentSessions(a, b, recentSort));
+  }, [recentQuery, recentSessions, recentSort, recentType]);
+
+  useEffect(() => {
+    const known = new Set(recentSessions.map((session) => session.id));
+    setSelectedRecentIds((ids) => {
+      const next = ids.filter((id) => known.has(id));
+      return next.length === ids.length ? ids : next;
+    });
+  }, [recentSessions]);
+
+  useEffect(() => {
+    if (recentType === "all") return;
+    if (!recentTypeOptions.some((option) => option.value === recentType)) {
+      setRecentType("all");
+    }
+  }, [recentType, recentTypeOptions]);
+
+  const selectedRecentSet = useMemo(() => new Set(selectedRecentIds), [selectedRecentIds]);
+  const selectedRecentSessions = useMemo(
+    () => recentSessions.filter((session) => selectedRecentSet.has(session.id)),
+    [recentSessions, selectedRecentSet],
   );
 
   const handleStartAsAdministrator = async () => {
@@ -206,6 +301,39 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
           ) : null}
         </div>
 
+        <RecentSessionsPanel
+          translate={t}
+          sessions={recentSessions}
+          filteredSessions={filteredRecentSessions}
+          typeOptions={recentTypeOptions}
+          query={recentQuery}
+          typeFilter={recentType}
+          sort={recentSort}
+          selectedIds={selectedRecentSet}
+          selectedCount={selectedRecentIds.length}
+          onQueryChange={setRecentQuery}
+          onTypeFilterChange={setRecentType}
+          onSortChange={setRecentSort}
+          onToggleSession={(id) => {
+            setSelectedRecentIds((ids) =>
+              ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+            );
+          }}
+          onClearFilter={() => {
+            setRecentQuery("");
+            setRecentType("all");
+          }}
+          onSelectFiltered={() => setSelectedRecentIds(filteredRecentSessions.map((session) => session.id))}
+          onClearSelection={() => setSelectedRecentIds([])}
+          onOpenSession={onOpenRecentSession}
+          onOpenSessions={onOpenRecentSessions}
+          onEditSession={onEditRecentSession}
+          onRevealSession={onRevealRecentSession}
+          selectedSessions={selectedRecentSessions}
+          onSetSelectedSessions={setSelectedRecentIds}
+          onOpenSettings={onOpenSettings}
+        />
+
         <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
           <div className="font-semibold text-[var(--taomni-text)] mb-1">{t("welcome.tipsHeading")}</div>
           <ul className="list-disc pl-5 space-y-0.5">
@@ -235,6 +363,484 @@ export function WelcomePanel({ onStartLocalTerminal, onNewSession, onOpenLocalPa
       </div>
     </div>
   );
+}
+
+function RecentSessionsPanel({
+  translate: t,
+  sessions,
+  filteredSessions,
+  typeOptions,
+  query,
+  typeFilter,
+  sort,
+  selectedIds,
+  selectedCount,
+  selectedSessions,
+  onQueryChange,
+  onTypeFilterChange,
+  onSortChange,
+  onToggleSession,
+  onClearFilter,
+  onSelectFiltered,
+  onClearSelection,
+  onOpenSession,
+  onOpenSessions,
+  onEditSession,
+  onRevealSession,
+  onSetSelectedSessions,
+  onOpenSettings,
+}: {
+  translate: TranslateFn;
+  sessions: SessionConfig[];
+  filteredSessions: SessionConfig[];
+  typeOptions: Array<{ value: string; label: string }>;
+  query: string;
+  typeFilter: string;
+  sort: RecentSessionSort;
+  selectedIds: Set<string>;
+  selectedCount: number;
+  selectedSessions: SessionConfig[];
+  onQueryChange: (value: string) => void;
+  onTypeFilterChange: (value: string) => void;
+  onSortChange: (value: RecentSessionSort) => void;
+  onToggleSession: (id: string) => void;
+  onClearFilter: () => void;
+  onSelectFiltered: () => void;
+  onClearSelection: () => void;
+  onOpenSession?: (session: SessionConfig) => void;
+  onOpenSessions?: (sessions: SessionConfig[]) => void;
+  onEditSession?: (session: SessionConfig) => void;
+  onRevealSession?: (session: SessionConfig) => void;
+  onSetSelectedSessions: (ids: string[]) => void;
+  onOpenSettings?: () => void;
+}) {
+  const hasFilter = query.trim().length > 0 || typeFilter !== "all";
+  const canOpen = Boolean(onOpenSessions);
+  const ctx = useContextMenu();
+  const deleteConfirm = useConfirmDialog();
+  const {
+    sessions: allSessions,
+    groups,
+    duplicateSessions,
+    moveSessionsToGroup,
+    removeSessions,
+  } = useSessionStore();
+  const { setStatusMessage } = useAppStore();
+  const folderPaths = useMemo(
+    () => collectFolderPaths(allSessions, groups),
+    [allSessions, groups],
+  );
+
+  const connectMenuSessions = (targetSessions: readonly SessionConfig[], sourceLabel: string) => {
+    const uniqueSessions = uniqueRecentSessionsById(targetSessions);
+    if (uniqueSessions.length === 0) return;
+    onOpenSessions?.(uniqueSessions);
+    setStatusMessage(t("sessionTree.sessionsStarted", {
+      count: uniqueSessions.length,
+      plural: uniqueSessions.length === 1 ? "" : "s",
+      source: sourceLabel,
+    }));
+  };
+
+  const confirmDeleteSessions = async (targetSessions: readonly SessionConfig[]) => {
+    const uniqueSessions = uniqueRecentSessionsById(targetSessions);
+    if (uniqueSessions.length === 0) return;
+    const confirmed = await deleteConfirm.confirm(
+      uniqueSessions.length > 1
+        ? {
+          title: t("sessionTree.confirmDeleteSelectedTitle"),
+          message: t("sessionTree.confirmDeleteSelected", { count: uniqueSessions.length }),
+          confirmLabel: t("sessionTree.deleteAction"),
+          danger: true,
+        }
+        : {
+          title: t("sessionTree.confirmDeleteTitle"),
+          message: t("sessionTree.confirmDelete", { name: uniqueSessions[0].name }),
+          confirmLabel: t("sessionTree.deleteAction"),
+          danger: true,
+        },
+    );
+    if (!confirmed) return;
+    await removeSessions(uniqueSessions.map((session) => session.id));
+  };
+
+  return (
+    <section
+      data-testid="welcome-recent-sessions"
+      className="mt-6 border-y py-4"
+      style={{ borderColor: "var(--taomni-divider)" }}
+    >
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-[var(--taomni-accent)]" />
+            <div className="font-semibold">{t("welcome.recentSessionsHeading")}</div>
+            <span className="text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+              {t("welcome.recentSessionsCount", { count: filteredSessions.length })}
+            </span>
+          </div>
+          <div className="mt-0.5 text-[12px] text-[var(--taomni-text-muted)]">
+            {t("welcome.recentSessionsSubtitle")}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            data-testid="welcome-recent-open-all"
+            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
+            type="button"
+            disabled={!canOpen || sessions.length === 0}
+            onClick={() => onOpenSessions?.(sessions)}
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>{t("welcome.recentSessionsOpenAll")}</span>
+          </button>
+          <button
+            data-testid="welcome-recent-open-filtered"
+            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
+            type="button"
+            disabled={!canOpen || filteredSessions.length === 0}
+            onClick={() => onOpenSessions?.(filteredSessions)}
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>{t("welcome.recentSessionsOpenFiltered")}</span>
+          </button>
+          <button
+            data-testid="welcome-recent-open-selected"
+            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
+            type="button"
+            disabled={!canOpen || selectedSessions.length === 0}
+            onClick={() => onOpenSessions?.(selectedSessions)}
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>{t("welcome.recentSessionsOpenSelected")}</span>
+          </button>
+          {onOpenSettings ? (
+            <button
+              data-testid="welcome-recent-settings"
+              className="taomni-btn h-8 w-8 inline-flex items-center justify-center"
+              type="button"
+              title={t("welcome.recentSessionsSettings")}
+              aria-label={t("welcome.recentSessionsSettings")}
+              onClick={onOpenSettings}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_auto_auto]">
+        <div className="relative min-w-0">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
+          <input
+            data-testid="welcome-recent-filter"
+            className="taomni-input h-8 w-full"
+            style={{ paddingLeft: "2rem" }}
+            type="search"
+            aria-label={t("welcome.recentSessionsSearch")}
+            placeholder={t("welcome.recentSessionsSearch")}
+            value={query}
+            disabled={sessions.length === 0}
+            onChange={(event) => onQueryChange(event.target.value)}
+          />
+        </div>
+        <select
+          data-testid="welcome-recent-type-filter"
+          className="taomni-input h-8 w-full"
+          aria-label={t("welcome.recentSessionsType")}
+          value={typeFilter}
+          disabled={sessions.length === 0}
+          onChange={(event) => onTypeFilterChange(event.target.value)}
+        >
+          <option value="all">{t("welcome.recentSessionsAllTypes")}</option>
+          {typeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          data-testid="welcome-recent-sort"
+          className="taomni-input h-8 w-full"
+          aria-label={t("welcome.recentSessionsSort")}
+          value={sort}
+          disabled={sessions.length === 0}
+          onChange={(event) => onSortChange(event.target.value as RecentSessionSort)}
+        >
+          <option value="last-desc">{t("welcome.recentSessionsSortLastDesc")}</option>
+          <option value="last-asc">{t("welcome.recentSessionsSortLastAsc")}</option>
+          <option value="name-asc">{t("welcome.recentSessionsSortName")}</option>
+          <option value="type-asc">{t("welcome.recentSessionsSortType")}</option>
+          <option value="host-asc">{t("welcome.recentSessionsSortHost")}</option>
+        </select>
+        <button
+          data-testid="welcome-recent-select-filtered"
+          className="taomni-btn h-8 px-3 inline-flex items-center justify-center gap-1.5"
+          type="button"
+          disabled={filteredSessions.length === 0}
+          onClick={onSelectFiltered}
+        >
+          <CheckSquare className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentSessionsSelectFiltered")}</span>
+        </button>
+        <button
+          data-testid="welcome-recent-clear-filter"
+          className="taomni-btn h-8 px-3 inline-flex items-center justify-center gap-1.5"
+          type="button"
+          disabled={!hasFilter}
+          onClick={onClearFilter}
+        >
+          <X className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentSessionsClearFilter")}</span>
+        </button>
+      </div>
+
+      <div className="mt-2 min-h-[26px] flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+        <span>{t("welcome.recentSessionsSelectedCount", { count: selectedCount })}</span>
+        {selectedCount > 0 ? (
+          <button
+            data-testid="welcome-recent-clear-selection"
+            className="taomni-btn h-6 px-2"
+            type="button"
+            onClick={onClearSelection}
+          >
+            {t("welcome.recentSessionsClearSelection")}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-2 max-h-[260px] overflow-auto">
+        {sessions.length === 0 ? (
+          <div
+            data-testid="welcome-recent-empty"
+            className="py-4 text-[12px] text-[var(--taomni-text-muted)]"
+          >
+            {t("welcome.recentSessionsEmpty")}
+          </div>
+        ) : filteredSessions.length === 0 ? (
+          <div
+            data-testid="welcome-recent-no-matches"
+            className="py-4 text-[12px] text-[var(--taomni-text-muted)]"
+          >
+            {t("welcome.recentSessionsNoMatches")}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {filteredSessions.map((session) => {
+              const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
+              const title = session.name || session.host || typeLabel;
+              const selected = selectedIds.has(session.id);
+              return (
+                <div
+                  key={session.id}
+                  data-testid="welcome-recent-session-row"
+                  data-session-id={session.id}
+                  data-session-name={title}
+                  data-session-type={typeLabel}
+                  className="grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2 rounded border px-2 py-1.5"
+                  style={{
+                    borderColor: selected ? "var(--taomni-accent)" : "var(--taomni-divider)",
+                    background: selected ? "var(--taomni-selected)" : "var(--taomni-input-bg)",
+                  }}
+                  onContextMenu={(event) => {
+                    const targetSessions = selected ? selectedSessions : [session];
+                    if (!selected) onSetSelectedSessions([session.id]);
+                    ctx.show(event, recentSessionMenuItems({
+                      t,
+                      session,
+                      targetSessions,
+                      folderPaths,
+                      onOpenSession,
+                      onOpenSessions,
+                      onEditSession,
+                      onDuplicateSessions: duplicateSessions,
+                      onMoveSessionsToGroup: moveSessionsToGroup,
+                      onDeleteSessions: confirmDeleteSessions,
+                      onConnectMenuSessions: connectMenuSessions,
+                    }));
+                  }}
+                >
+                  <button
+                    data-testid="welcome-recent-select"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]"
+                    type="button"
+                    aria-label={t("welcome.recentSessionsSelectAria", { name: title })}
+                    onClick={() => onToggleSession(session.id)}
+                  >
+                    {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                  </button>
+                  <button
+                    data-testid="welcome-recent-open"
+                    className="min-w-0 text-left group"
+                    type="button"
+                    aria-label={t("welcome.recentSessionsOpenAria", { name: title })}
+                    onClick={() => onOpenSession?.(session)}
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <Server className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+                      <span className="truncate text-[12px] font-medium text-[var(--taomni-accent)] group-hover:underline">{title}</span>
+                      <span className="shrink-0 text-[10px] taomni-mono px-1.5 py-0.5 rounded border text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+                        {typeLabel}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 truncate text-[11px] text-[var(--taomni-text-muted)]">
+                      {recentSessionTarget(session)} · {t("welcome.recentSessionsUpdated", { time: formatRecentSessionTime(session.last_connected_at, t) })}
+                    </div>
+                  </button>
+                  <button
+                    data-testid="welcome-recent-reveal"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]"
+                    type="button"
+                    disabled={!onRevealSession}
+                    title={t("welcome.recentSessionsReveal")}
+                    aria-label={t("welcome.recentSessionsRevealAria", { name: title })}
+                    onClick={() => onRevealSession?.(session)}
+                  >
+                    <ListTree className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {ctx.render}
+      {deleteConfirm.render}
+    </section>
+  );
+}
+
+function recentSessionMenuItems({
+  t,
+  session,
+  targetSessions,
+  folderPaths,
+  onOpenSession,
+  onOpenSessions,
+  onEditSession,
+  onDuplicateSessions,
+  onMoveSessionsToGroup,
+  onDeleteSessions,
+  onConnectMenuSessions,
+}: {
+  t: TranslateFn;
+  session: SessionConfig;
+  targetSessions: readonly SessionConfig[];
+  folderPaths: string[];
+  onOpenSession?: (session: SessionConfig) => void;
+  onOpenSessions?: (sessions: SessionConfig[]) => void;
+  onEditSession?: (session: SessionConfig) => void;
+  onDuplicateSessions: (ids: string[]) => Promise<void>;
+  onMoveSessionsToGroup: (ids: string[], groupPath: string | null) => Promise<void>;
+  onDeleteSessions: (sessions: readonly SessionConfig[]) => Promise<void>;
+  onConnectMenuSessions: (sessions: readonly SessionConfig[], sourceLabel: string) => void;
+}): MenuItem[] {
+  const uniqueSessions = uniqueRecentSessionsById(targetSessions);
+  const targetIds = uniqueSessions.map((candidate) => candidate.id);
+  const hasMultiSelection = uniqueSessions.length > 1;
+  const moveChildren: MenuItem[] = [
+    {
+      label: SESSION_ROOT_LABEL,
+      icon: <FolderOpen className="w-3 h-3" />,
+      onClick: () => void onMoveSessionsToGroup(targetIds, null),
+    },
+    ...folderPaths.map((path) => ({
+      label: folderOptionLabel(path),
+      icon: <Folder className="w-3 h-3" />,
+      onClick: () => void onMoveSessionsToGroup(targetIds, path),
+    })),
+  ];
+
+  return [
+    ...(hasMultiSelection ? [
+      {
+        label: t("sessionTree.contextConnectSelected", { count: uniqueSessions.length }),
+        testId: `context-menu-item-connect-selected-sessions-${uniqueSessions.length}`,
+        icon: <Play className="w-3 h-3" />,
+        onClick: () => onConnectMenuSessions(uniqueSessions, t("sessionTree.fromSelected")),
+        disabled: !onOpenSessions,
+      },
+      { label: "", separator: true },
+    ] satisfies MenuItem[] : []),
+    {
+      label: t("sessionTree.contextConnect"),
+      icon: <Play className="w-3 h-3" />,
+      disabled: !onOpenSession,
+      onClick: () => onOpenSession?.(session),
+    },
+    {
+      label: t("sessionTree.contextEdit"),
+      icon: <Edit3 className="w-3 h-3" />,
+      disabled: !onEditSession,
+      onClick: () => onEditSession?.(session),
+    },
+    {
+      label: hasMultiSelection
+        ? t("sessionTree.contextDuplicateCount", { count: targetIds.length })
+        : t("sessionTree.contextDuplicate"),
+      testId: hasMultiSelection ? `context-menu-item-duplicate-selected-sessions-${targetIds.length}` : undefined,
+      icon: <Copy className="w-3 h-3" />,
+      onClick: () => void onDuplicateSessions(targetIds),
+    },
+    {
+      label: t("sessionTree.contextMoveToFolder"),
+      icon: <Folder className="w-3 h-3" />,
+      children: moveChildren,
+    },
+    { label: "", separator: true },
+    {
+      label: hasMultiSelection
+        ? t("sessionTree.contextDeleteCount", { count: targetIds.length })
+        : t("sessionTree.contextDelete"),
+      testId: hasMultiSelection ? `context-menu-item-delete-selected-sessions-${targetIds.length}` : undefined,
+      icon: <Trash2 className="w-3 h-3" />,
+      danger: true,
+      onClick: () => void onDeleteSessions(uniqueSessions),
+    },
+  ];
+}
+
+function uniqueRecentSessionsById(sessions: readonly SessionConfig[]): SessionConfig[] {
+  const seen = new Set<string>();
+  const unique: SessionConfig[] = [];
+  for (const session of sessions) {
+    if (seen.has(session.id)) continue;
+    seen.add(session.id);
+    unique.push(session);
+  }
+  return unique;
+}
+
+function compareRecentSessions(a: SessionConfig, b: SessionConfig, sort: RecentSessionSort): number {
+  const labelA = sessionTypeLabel(a.session_type, a.options_json);
+  const labelB = sessionTypeLabel(b.session_type, b.options_json);
+  const nameA = (a.name || a.host || labelA).toLowerCase();
+  const nameB = (b.name || b.host || labelB).toLowerCase();
+  if (sort === "last-asc") return (a.last_connected_at ?? 0) - (b.last_connected_at ?? 0);
+  if (sort === "name-asc") return nameA.localeCompare(nameB);
+  if (sort === "type-asc") return labelA.localeCompare(labelB) || nameA.localeCompare(nameB);
+  if (sort === "host-asc") return (a.host || "").localeCompare(b.host || "") || nameA.localeCompare(nameB);
+  return (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0);
+}
+
+function recentSessionTarget(session: SessionConfig): string {
+  const host = session.host?.trim();
+  if (session.session_type === "File") return host || session.name || "File";
+  if (session.session_type === "LocalShell") return host || session.name || "Local shell";
+  if (!host) return session.group_path || session.session_type;
+  const user = session.username ? `${session.username}@` : "";
+  const port = session.port ? `:${session.port}` : "";
+  return `${user}${host}${port}`;
+}
+
+function formatRecentSessionTime(value: number | null | undefined, t: TranslateFn): string {
+  if (!value) return t("welcome.recentSessionsNever");
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value * 1000));
 }
 
 function LocalTerminalCard({

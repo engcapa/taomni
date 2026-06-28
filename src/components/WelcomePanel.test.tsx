@@ -1,8 +1,9 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WelcomePanel } from "./WelcomePanel";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
+import type { SessionConfig } from "../lib/ipc";
 
 const ipcMocks = vi.hoisted(() => ({
   listLocalShells: vi.fn(),
@@ -79,4 +80,95 @@ describe("WelcomePanel", () => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
   });
+
+  it("shows recent sessions with filter, select, bulk open, and single open actions", async () => {
+    const recentSessions: SessionConfig[] = [
+      session("ssh-prod", "Prod SSH", "SSH", "prod.example.com", 22, 300),
+      session("sftp-prod", "Prod SFTP", "SFTP", "files.example.com", 22, 200),
+      session("redis-dev", "Redis Dev", "Redis", "redis.local", 6379, 100),
+    ];
+    const openSession = vi.fn();
+    const openSessions = vi.fn();
+    const editSession = vi.fn();
+
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={vi.fn()}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+        recentSessions={recentSessions}
+        onOpenRecentSession={openSession}
+        onOpenRecentSessions={openSessions}
+        onEditRecentSession={editSession}
+        onRevealRecentSession={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
+    expect(screen.getAllByTestId("welcome-recent-session-row")).toHaveLength(3);
+
+    fireEvent.change(screen.getByTestId("welcome-recent-filter"), {
+      target: { value: "prod" },
+    });
+    expect(screen.getAllByTestId("welcome-recent-session-row")).toHaveLength(2);
+
+    fireEvent.change(screen.getByTestId("welcome-recent-sort"), {
+      target: { value: "name-asc" },
+    });
+    expect(screen.getAllByTestId("welcome-recent-session-row")[0]).toHaveAttribute("data-session-name", "Prod SFTP");
+
+    fireEvent.click(screen.getByTestId("welcome-recent-open-filtered"));
+    expect(openSessions).toHaveBeenLastCalledWith([recentSessions[1], recentSessions[0]]);
+
+    fireEvent.click(screen.getByTestId("welcome-recent-select-filtered"));
+    fireEvent.click(screen.getByTestId("welcome-recent-open-selected"));
+    expect(openSessions).toHaveBeenLastCalledWith(recentSessions.slice(0, 2));
+
+    const firstRow = screen.getAllByTestId("welcome-recent-session-row")[0];
+    fireEvent.click(within(firstRow).getByTestId("welcome-recent-open"));
+    expect(openSession).toHaveBeenCalledWith(recentSessions[1]);
+
+    fireEvent.contextMenu(firstRow);
+    expect(screen.getByTestId("context-menu-item-connect-selected-sessions-2")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-connect")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-edit")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-duplicate-selected-sessions-2")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-move-to-folder")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-delete-selected-sessions-2")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("context-menu-item-connect"));
+    expect(openSession).toHaveBeenLastCalledWith(recentSessions[1]);
+
+    fireEvent.contextMenu(firstRow);
+    fireEvent.click(screen.getByTestId("context-menu-item-edit"));
+    expect(editSession).toHaveBeenCalledWith(recentSessions[1]);
+  });
 });
+
+function session(
+  id: string,
+  name: string,
+  sessionType: string,
+  host: string,
+  port: number,
+  lastConnectedAt: number,
+): SessionConfig {
+  return {
+    id,
+    name,
+    session_type: sessionType,
+    group_path: null,
+    host,
+    port,
+    username: "root",
+    auth_method: "None",
+    options_json: "{}",
+    created_at: 0,
+    updated_at: 0,
+    last_connected_at: lastConnectedAt,
+    sort_order: 0,
+  };
+}
