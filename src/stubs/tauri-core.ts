@@ -248,6 +248,10 @@ export async function addPluginListener(
   return new PluginListener(plugin, event, 0);
 }
 
+export function convertFileSrc(path: string): string {
+  return path;
+}
+
 const writeStreams = new Map<string, { path: string; chunks: Uint8Array[] }>();
 const readStreams = new Map<string, { bytes: Uint8Array; offset: number }>();
 

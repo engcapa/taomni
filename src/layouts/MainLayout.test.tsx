@@ -59,6 +59,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => path,
   invoke: vi.fn(async () => undefined),
 }));
 

@@ -8,6 +8,7 @@ import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConf
 const invokeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => path,
   invoke: invokeMock,
 }));
 

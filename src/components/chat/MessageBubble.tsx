@@ -2,7 +2,7 @@ import type { ChatMessage } from "../../stores/chatStore";
 import { Check, Copy, Database, Send, ShieldAlert } from "lucide-react";
 import { ActionCard, type ActionCardDecision } from "../agent/ActionCard";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderFormatted, type ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import {
@@ -443,41 +443,12 @@ function isDirectMediaSrc(path: string): boolean {
   return /^(data:|blob:|https?:|asset:)/i.test(path);
 }
 
+function mediaPreviewSrc(path: string): string {
+  return isDirectMediaSrc(path) ? path : convertFileSrc(path);
+}
+
 function MediaAttachmentPreview({ attachment }: { attachment: ChatAttachment }) {
-  const [src, setSrc] = useState<string | null>(() =>
-    isDirectMediaSrc(attachment.path) ? attachment.path : null,
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    if (isDirectMediaSrc(attachment.path)) {
-      setSrc(attachment.path);
-      return () => {
-        cancelled = true;
-      };
-    }
-    import("@tauri-apps/api/core")
-      .then((core) => {
-        const convertFileSrc = (core as { convertFileSrc?: (path: string) => string }).convertFileSrc;
-        if (!cancelled) {
-          setSrc(typeof convertFileSrc === "function" ? convertFileSrc(attachment.path) : attachment.path);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(attachment.path);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [attachment.path]);
-
-  if (!src) {
-    return (
-      <div className="min-h-16 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]/60 px-2 py-3 text-[11px] text-[var(--taomni-text-muted)]">
-        {attachment.name}
-      </div>
-    );
-  }
+  const src = mediaPreviewSrc(attachment.path);
 
   if (attachment.kind === "video") {
     return (
