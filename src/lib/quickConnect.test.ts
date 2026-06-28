@@ -28,7 +28,6 @@ describe("parseQuickConnectInput", () => {
   it.each([
     ["rlogin://bob@legacy.example.test", "Rlogin", "legacy.example.test", 513, "bob"],
     ["mosh alice@edge.example.test", "Mosh", "edge.example.test", 60001, "alice"],
-    ["browser://docs.example.test", "Browser", "docs.example.test", 0, null],
   ])("preserves planned client protocol %s", (input, sessionType, host, port, username) => {
     const parsed = parseQuickConnectInput(input);
 
@@ -37,6 +36,23 @@ describe("parseQuickConnectInput", () => {
       host,
       port,
       username,
+      auth_method: "None",
+    });
+  });
+
+  it.each([
+    ["browser://docs.example.test", "https://docs.example.test"],
+    ["browser https://docs.example.test/path?q=1", "https://docs.example.test/path?q=1"],
+    ["https://docs.example.test/path?q=1", "https://docs.example.test/path?q=1"],
+  ])("parses Browser targets as URL sessions", (input, url) => {
+    const parsed = parseQuickConnectInput(input);
+
+    expect(parsed.config).toMatchObject({
+      name: url,
+      session_type: "Browser",
+      host: url,
+      port: 0,
+      username: null,
       auth_method: "None",
     });
   });

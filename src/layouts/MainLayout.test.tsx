@@ -6,7 +6,7 @@ import { emit } from "@tauri-apps/api/event";
 import { MainLayout } from "./MainLayout";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { exitApp, listSessions, writeTerminal, type SessionConfig } from "../lib/ipc";
+import { exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
 const terminalLifecycle = vi.hoisted(() => ({
@@ -326,6 +326,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     vaultMock.refresh.mockClear();
     vaultMock.unlock.mockClear();
     vi.mocked(exitApp).mockClear();
+    vi.mocked(markSessionConnected).mockClear();
     vi.mocked(tauriInvoke).mockClear();
     vi.mocked(listSessions).mockResolvedValue([]);
     useSessionStore.setState({
@@ -925,6 +926,39 @@ describe("MainLayout attached SFTP sidebar", () => {
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-font-size", "19");
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-theme", "termius-dark");
     });
+  });
+
+  it("opens Browser saved sessions with the system browser", async () => {
+    render(<MainLayout />);
+
+    const browserSession: SessionConfig = {
+      id: "browser-1",
+      name: "Docs",
+      session_type: "Browser",
+      group_path: null,
+      host: "docs.example.test",
+      port: 8443,
+      username: null,
+      auth_method: "None",
+      options_json: "{}",
+      created_at: 0,
+      updated_at: 0,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    useSessionStore.setState({ sessions: [browserSession], groups: [] });
+
+    await act(async () => {
+      sidebarMock.props.at(-1)?.onConnectSession?.(browserSession);
+    });
+
+    await waitFor(() => {
+      expect(tauriInvoke).toHaveBeenCalledWith("open_external_url", {
+        url: "https://docs.example.test:8443",
+      });
+    });
+    await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith("browser-1"));
+    expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
   });
 
   it("unlocks the vault once before opening queued saved-password sessions", async () => {

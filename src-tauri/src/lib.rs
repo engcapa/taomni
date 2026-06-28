@@ -318,6 +318,7 @@ pub fn run() {
             filebrowser::sftp_chmod,
             filebrowser::sftp_realpath,
             filebrowser::sftp_open_path,
+            filebrowser::open_external_url,
             filebrowser::sftp_read_file_text,
             filebrowser::sftp_write_file_text,
             filebrowser::sftp_upload,

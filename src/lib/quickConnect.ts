@@ -25,6 +25,8 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   vnc: "VNC",
   serial: "Serial",
   browser: "Browser",
+  http: "Browser",
+  https: "Browser",
   shell: "LocalShell",
   local: "LocalShell",
   bash: "LocalShell",
@@ -56,6 +58,32 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
         session_type: "LocalShell",
         group_path: null,
         host: "",
+        port: 0,
+        username: null,
+        auth_method: "None",
+        options_json: "{}",
+        created_at: now,
+        updated_at: now,
+        last_connected_at: null,
+        sort_order: 0,
+      },
+    };
+  }
+
+  if (sessionType === "Browser") {
+    const url = normalizeBrowserTarget(target);
+    if (!url) {
+      throw new Error("Browser URL or host is required.");
+    }
+    return {
+      transient: true,
+      authData: null,
+      config: {
+        id: `quick-browser-${Date.now()}`,
+        name: url,
+        session_type: "Browser",
+        group_path: null,
+        host: url,
         port: 0,
         username: null,
         auth_method: "None",
@@ -179,6 +207,16 @@ function splitProtocol(raw: string): { sessionType: string; target: string } {
   }
 
   return { sessionType: "SSH", target: raw };
+}
+
+function normalizeBrowserTarget(target: string): string {
+  const trimmed = target.trim();
+  if (!trimmed) return "";
+  if (/^browser:\/\//i.test(trimmed)) {
+    return `https://${trimmed.replace(/^browser:\/\//i, "")}`;
+  }
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/+/, "")}`;
 }
 
 function parseTarget(target: string): { username?: string; host: string; port?: number } {

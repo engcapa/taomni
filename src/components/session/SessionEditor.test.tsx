@@ -437,7 +437,6 @@ describe("SessionEditor SSH settings tabs", () => {
   it.each([
     ["Rlogin", 513],
     ["Mosh", 60001],
-    ["Browser", 0],
   ])("persists %s as its own planned client type", async (initialProto, expectedPort) => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto });
@@ -454,6 +453,25 @@ describe("SessionEditor SSH settings tabs", () => {
       session_type: initialProto,
       host: `${initialProto.toLowerCase()}.example.com`,
       port: expectedPort,
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists Browser sessions as URL clients without a planned-client warning", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Browser" });
+
+    expect(screen.queryByTestId("session-planned-client-note")).not.toBeInTheDocument();
+
+    await user.type(screen.getByTestId("session-host"), "https://docs.example.test/path");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.saveSession.mock.calls[0][0]).toMatchObject({
+      session_type: "Browser",
+      host: "https://docs.example.test/path",
+      port: 0,
+      auth_method: "None",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });

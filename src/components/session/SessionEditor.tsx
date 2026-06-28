@@ -151,7 +151,7 @@ const DEFAULT_PORTS: Record<string, number> = {
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis"];
-const PLANNED_CLIENT_PROTOS = new Set<Proto>(["Telnet", "Rlogin", "FTP", "Serial", "Browser", "Mosh"]);
+const PLANNED_CLIENT_PROTOS = new Set<Proto>(["Telnet", "Rlogin", "FTP", "Serial", "Mosh"]);
 
 /** Map UI proto to the backend session_type string. Object storage ("S3"
  * proto) is resolved to "S3" vs "AzureBlob" by the caller based on the
@@ -2096,7 +2096,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
     const now = Math.floor(Date.now() / 1000);
-    let auth: AuthMethod = proto === "Shell" || proto === "WSL" || proto === "File" ? "None" : "Password";
+    let auth: AuthMethod =
+      proto === "Shell" || proto === "WSL" || proto === "File" || proto === "Browser" ? "None" : "Password";
     if (authMethod === "PrivateKey")
       auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
     else if (authMethod === "Agent") auth = "Agent";
@@ -2923,7 +2924,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
               <label className="col-span-2 text-[12px] text-right">
-                {t("sessionEditor2.remoteHost")}
+                {proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHost")}
               </label>
               <div className="col-span-5 flex items-center gap-1">
                 <input
@@ -2931,9 +2932,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   className="taomni-input flex-1"
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
-                  onBlur={handleHostLookup}
-                  aria-label={t("sessionEditor2.remoteHostAria")}
-                  placeholder={t("sessionEditor2.remoteHostPlaceholder")}
+                  onBlur={proto === "Browser" ? undefined : handleHostLookup}
+                  aria-label={proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHostAria")}
+                  placeholder={proto === "Browser" ? t("sessionEditor2.browserUrlPlaceholder") : t("sessionEditor2.remoteHostPlaceholder")}
                 />
                 <button
                   title={t("sessionEditor2.lookup")}

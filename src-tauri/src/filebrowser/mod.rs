@@ -243,6 +243,11 @@ pub fn sftp_open_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    local::open_url(&url)
+}
+
+#[tauri::command]
 pub async fn sftp_read_file_text(
     session_id: String,
     path: String,
