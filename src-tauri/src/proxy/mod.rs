@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use tauri::State;
 
 use crate::state::AppState;
+use crate::vault::Vault;
 
 fn default_mode() -> String {
     "manual".into()
@@ -153,11 +154,11 @@ impl ResolvedProxy {
 /// entry is missing we degrade to an empty password (and log) rather than
 /// failing the whole resolution — a startup updater check must not hard-fail
 /// just because the vault hasn't been unlocked yet.
-fn resolve_password(state: &AppState, password_ref: &str) -> String {
+fn resolve_password_with_vault(vault: &Vault, password_ref: &str) -> String {
     if password_ref.is_empty() {
         return String::new();
     }
-    match state.vault.resolve(password_ref) {
+    match vault.resolve(password_ref) {
         Ok(Some(plain)) => (*plain).clone(),
         // Not a vault ref (shouldn't happen — we only store refs — but treat
         // the raw value as the password for robustness).
@@ -167,6 +168,10 @@ fn resolve_password(state: &AppState, password_ref: &str) -> String {
             String::new()
         }
     }
+}
+
+fn resolve_password(state: &AppState, password_ref: &str) -> String {
+    resolve_password_with_vault(&state.vault, password_ref)
 }
 
 /// Load the persisted config and resolve it into a concrete [`ResolvedProxy`],
@@ -219,14 +224,27 @@ pub fn resolve_session_proxy(
     if id.is_empty() {
         return Ok(None);
     }
-    let session = {
-        let db = state
-            .db
-            .lock()
-            .map_err(|_| "session database is unavailable".to_string())?;
-        crate::session::db::get_session(&db, id)
-            .map_err(|e| format!("proxy session not found: {e}"))?
-    };
+    let db = state
+        .db
+        .lock()
+        .map_err(|_| "session database is unavailable".to_string())?;
+    resolve_session_proxy_with_db(&db, &state.vault, id)
+}
+
+/// Resolve a saved `SessionType::Proxy` using explicit database/vault handles.
+/// This lets startup-time components build outbound clients before `AppState`
+/// itself exists.
+pub fn resolve_session_proxy_with_db(
+    db: &rusqlite::Connection,
+    vault: &Vault,
+    session_id: &str,
+) -> Result<Option<ResolvedProxy>, String> {
+    let id = session_id.trim();
+    if id.is_empty() {
+        return Ok(None);
+    }
+    let session = crate::session::db::get_session(db, id)
+        .map_err(|e| format!("proxy session not found: {e}"))?;
     let opts: serde_json::Value =
         serde_json::from_str(&session.options_json).unwrap_or(serde_json::Value::Null);
     let kind = opts
@@ -244,7 +262,7 @@ pub fn resolve_session_proxy(
         host: session.host,
         port: session.port,
         username: session.username.unwrap_or_default(),
-        password: resolve_password(state, &password_ref),
+        password: resolve_password_with_vault(vault, &password_ref),
     }))
 }
 

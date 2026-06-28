@@ -447,8 +447,23 @@ pub async fn vault_unlock(
     // Vault transitioned to unlocked — rebuild the LLM router so providers
     // whose api_key is `vault:<id>` start working immediately. Without this
     // the user has to click Save in AI Settings to trigger a rebuild.
+    let cfg = {
+        let ai_ctx = state.ai_ctx.read().await;
+        ai_ctx.config.clone()
+    };
+    let llm = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::llm::router::build_router_from_ai_with_proxy_db(
+            &cfg,
+            Some(state.vault.as_ref()),
+            Some(&db),
+        )
+    };
     let mut ai_ctx = state.ai_ctx.write().await;
-    ai_ctx.rebuild_router();
+    ai_ctx.replace_router(llm);
     Ok(())
 }
 
@@ -458,8 +473,23 @@ pub async fn vault_lock(state: State<'_, AppState>) -> Result<(), String> {
     // After lock, providers backed by vault refs can no longer authenticate;
     // rebuild so calls fail closed with VAULT_LOCKED instead of using stale
     // plaintext that was decrypted earlier.
+    let cfg = {
+        let ai_ctx = state.ai_ctx.read().await;
+        ai_ctx.config.clone()
+    };
+    let llm = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::llm::router::build_router_from_ai_with_proxy_db(
+            &cfg,
+            Some(state.vault.as_ref()),
+            Some(&db),
+        )
+    };
     let mut ai_ctx = state.ai_ctx.write().await;
-    ai_ctx.rebuild_router();
+    ai_ctx.replace_router(llm);
     Ok(())
 }
 
@@ -470,8 +500,23 @@ pub async fn vault_change_master(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state.vault.change_master(&old_password, &new_password)?;
+    let cfg = {
+        let ai_ctx = state.ai_ctx.read().await;
+        ai_ctx.config.clone()
+    };
+    let llm = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::llm::router::build_router_from_ai_with_proxy_db(
+            &cfg,
+            Some(state.vault.as_ref()),
+            Some(&db),
+        )
+    };
     let mut ai_ctx = state.ai_ctx.write().await;
-    ai_ctx.rebuild_router();
+    ai_ctx.replace_router(llm);
     Ok(())
 }
 

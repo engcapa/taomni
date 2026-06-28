@@ -32,11 +32,24 @@ impl AnthropicProvider {
         api_key: impl Into<String>,
         model: impl Into<String>,
     ) -> Self {
+        Self::new_with_proxy_url(provider_id, base_url, api_key, model, None)
+    }
+
+    pub fn new_with_proxy_url(
+        provider_id: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+        model: impl Into<String>,
+        proxy_url: Option<String>,
+    ) -> Self {
+        let mut builder = Client::builder().timeout(std::time::Duration::from_secs(60));
+        if let Some(proxy_url) = proxy_url.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
+                builder = builder.proxy(proxy);
+            }
+        }
         Self {
-            client: Client::builder()
-                .timeout(std::time::Duration::from_secs(60))
-                .build()
-                .expect("failed to build reqwest client"),
+            client: builder.build().expect("failed to build reqwest client"),
             base_url: base_url.into().trim_end_matches('/').to_string(),
             api_key: api_key.into(),
             model: model.into(),

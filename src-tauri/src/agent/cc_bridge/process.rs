@@ -80,6 +80,9 @@ pub struct CcProcess {
     /// Bearer token this process uses to authenticate to the in-app rmcp MCP
     /// server. Revoked on stop/drop so a dead thread's token can't be reused.
     cc_token: Option<String>,
+    /// Optional outbound proxy URL applied to the Claude CLI child process via
+    /// standard proxy environment variables.
+    proxy_url: Option<String>,
     /// Number of turns currently using this process. The app-wide idle reaper
     /// must not stop a process until all turns have finished.
     active_turns: AtomicU32,
@@ -123,6 +126,7 @@ impl CcProcess {
             temp_dir,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
             cc_token: None,
+            proxy_url: None,
             active_turns: AtomicU32::new(0),
             last_active_at: std::sync::Mutex::new(std::time::Instant::now()),
         }
@@ -139,6 +143,13 @@ impl CcProcess {
     /// it is revoked when the process stops (builder style).
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.cc_token = Some(token.into());
+        self
+    }
+
+    pub fn with_proxy_url(mut self, proxy_url: Option<String>) -> Self {
+        self.proxy_url = proxy_url
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
         self
     }
 
@@ -259,6 +270,7 @@ impl CcProcess {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        super::apply_proxy_env(&mut cmd, self.proxy_url.as_deref());
         // Windows: don't pop a console window for the claude .cmd/.ps1 shim.
         super::no_console_window(&mut cmd);
 

@@ -13,6 +13,7 @@ import {
   isVaultLockedError,
   VAULT_LOCKED_EVENT,
 } from "../../lib/ipc";
+import { CodexProxyFields } from "./CodexProxyFields";
 
 // Starter template for new profiles
 const SETTINGS_TEMPLATE = `{
@@ -105,7 +106,12 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
         }
       });
 
-      await invoke("cc_test_settings", { settingsJson: selectedContent });
+      await invoke("cc_test_settings", {
+        settingsJson: selectedContent,
+        proxyMode: selectedProfile?.proxy_mode ?? "none",
+        proxySessionId: selectedProfile?.proxy_session_id ?? null,
+        proxyUrl: selectedProfile?.proxy_url ?? null,
+      });
     } catch (err: any) {
       if (testSessionRef.current === currentSession) {
         setTestError(err?.message || String(err));
@@ -208,6 +214,9 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
       enabled: true,
       vault_ref: "", // will be generated upon save
       created_at: Date.now(),
+      proxy_mode: "none",
+      proxy_session_id: null,
+      proxy_url: null,
     };
 
     setProfiles(prev => [...prev, newProfile]);
@@ -264,6 +273,11 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
   const handleUpdateName = (name: string) => {
     if (!selectedProfileId) return;
     setProfiles(prev => prev.map(p => p.id === selectedProfileId ? { ...p, name } : p));
+  };
+
+  const handleUpdateProfile = (patch: Partial<CcCustomSettingsProfile>) => {
+    if (!selectedProfileId) return;
+    setProfiles(prev => prev.map(p => p.id === selectedProfileId ? { ...p, ...patch } : p));
   };
 
   const handleToggleEnabled = (enabled: boolean) => {
@@ -348,6 +362,8 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
         updatedProfiles.push({
           ...p,
           vault_ref: vaultRef,
+          proxy_session_id: p.proxy_session_id?.trim() || null,
+          proxy_url: p.proxy_url?.trim() || null,
         });
       }
 
@@ -525,6 +541,18 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                       />
                       <span>{t("aiSettings.ccCustomToggleEnable")}</span>
                     </label>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+                      {t("aiSettings.codexProxyTitle")}
+                    </label>
+                    <CodexProxyFields
+                      includeInherit
+                      mode={selectedProfile.proxy_mode ?? "none"}
+                      sessionId={selectedProfile.proxy_session_id}
+                      proxyUrl={selectedProfile.proxy_url}
+                      onChange={(patch) => handleUpdateProfile(patch)}
+                    />
                   </div>
                 </div>
 

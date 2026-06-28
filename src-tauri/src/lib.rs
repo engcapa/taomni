@@ -90,7 +90,8 @@ pub fn run() {
             // transparently resolved by the LLM router.
             let ai_config_path = ai::config::default_ai_config_path();
             let ai_config = ai::config::AiConfig::load(&ai_config_path);
-            let ai_ctx = ai::AppAiCtx::from_config(ai_config, vault_arc.clone());
+            let ai_ctx =
+                ai::AppAiCtx::from_config_with_proxy_db(ai_config, vault_arc.clone(), Some(&conn));
 
             // Decentralized LAN messenger state (separate lanchat.sqlite).
             let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));

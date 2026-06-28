@@ -1073,9 +1073,31 @@ async fn generate_media_with_provider_key(
     }
 }
 
+fn build_provider_http_client(
+    state: &AppState,
+    provider: &crate::ai::config::LlmProviderConfig,
+    timeout: std::time::Duration,
+) -> Result<Client, String> {
+    let proxy_url = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|_| "session database is unavailable".to_string())?;
+        crate::ai::config::resolve_provider_proxy_url(provider, Some(&db), Some(&state.vault))?
+    };
+    let mut builder = Client::builder().timeout(timeout);
+    if let Some(proxy_url) = proxy_url.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
+            builder = builder.proxy(proxy);
+        }
+    }
+    builder
+        .build()
+        .map_err(|e| format!("Create provider HTTP client: {e}"))
+}
+
 async fn generate_media_with_provider_keys(
     state: &AppState,
-    client: &Client,
     app: &AppHandle,
     provider_id: &str,
     provider: &crate::ai::config::LlmProviderConfig,
@@ -1086,6 +1108,8 @@ async fn generate_media_with_provider_keys(
     let api_keys = provider.effective_api_keys();
     let key_count = api_keys.len();
     let mut last_err: Option<String> = None;
+    let client =
+        build_provider_http_client(state, provider, std::time::Duration::from_secs(360))?;
 
     for _ in 0..key_count {
         let key_index = {
@@ -1102,7 +1126,7 @@ async fn generate_media_with_provider_keys(
                 continue;
             }
         };
-        match generate_media_with_provider_key(client, app, provider, &api_key, req, kind, prompt)
+        match generate_media_with_provider_key(&client, app, provider, &api_key, req, kind, prompt)
             .await
         {
             Ok(file) => return Ok(file),
@@ -1153,10 +1177,6 @@ pub async fn chat_generate_media(
 
     let (clean_prompt, redacted_count) = redact::redact(&req.prompt);
     let ai_config = AiConfig::load(&default_ai_config_path());
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(360))
-        .build()
-        .map_err(|e| format!("Create generation HTTP client: {e}"))?;
 
     let generated = if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
         let route_id = thread.provider_id.clone();
@@ -1190,7 +1210,6 @@ pub async fn chat_generate_media(
             saw_supported_provider = true;
             match generate_media_with_provider_keys(
                 state.inner(),
-                &client,
                 &app,
                 &provider_id,
                 &provider,
@@ -1247,7 +1266,6 @@ pub async fn chat_generate_media(
         }
         generate_media_with_provider_keys(
             state.inner(),
-            &client,
             &app,
             &thread.provider_id,
             &provider,
@@ -1738,6 +1756,20 @@ pub async fn chat_stream(
         let process = match existing {
             Some(p) => p,
             None => {
+                let effective_proxy =
+                    match crate::agent::cc_bridge::config::resolve_effective_proxy_url(
+                        state.inner(),
+                        &ai_config.cc_bridge,
+                    ) {
+                        Ok(proxy) => proxy,
+                        Err(e) => {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id.clone(),
+                                message: e,
+                            });
+                            return Ok(());
+                        }
+                    };
                 // Phase 6 — pick the MCP flavor from the shared agent context so
                 // the thread loads only the right tool surface: SQL, Redis, or shell.
                 let flavor = agent_ctx.flavor;
@@ -1865,6 +1897,7 @@ pub async fn chat_stream(
                         extra_args,
                         Some(files.dir),
                     )
+                    .with_proxy_url(effective_proxy)
                     .with_token(cc_token.clone()),
                 );
                 // Re-check under the lock in case a concurrent send for the

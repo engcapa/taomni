@@ -25,13 +25,15 @@ pub async fn cc_detect(state: State<'_, AppState>) -> Result<CcStatusResult, Str
             binary_path: None,
         });
     }
-    let binary = if ai_ctx.config.cc_bridge.binary == "auto" {
+    let cc_bridge = ai_ctx.config.cc_bridge.clone();
+    let binary = if cc_bridge.binary == "auto" {
         None
     } else {
-        Some(ai_ctx.config.cc_bridge.binary.clone())
+        Some(cc_bridge.binary.clone())
     };
     drop(ai_ctx);
-    Ok(detect(binary.as_deref()).await)
+    let proxy = crate::agent::cc_bridge::config::resolve_global_proxy_url(&state, &cc_bridge)?;
+    Ok(detect(binary.as_deref(), proxy.as_deref()).await)
 }
 
 /// Return the raw user-supplied Claude Code `settings.json` (decrypted from the
@@ -138,6 +140,11 @@ pub async fn cc_send_message(
     let process = match existing {
         Some(p) => p,
         None => {
+            let effective_proxy =
+                crate::agent::cc_bridge::config::resolve_effective_proxy_url(
+                    &state,
+                    &config.cc_bridge,
+                )?;
             // Provision the in-app rmcp MCP server + a per-thread scoped token.
             // This alternate path is shell-only (DB flavor selection lives in
             // the active `chat_stream` path), so it uses the Shell flavor.
@@ -200,7 +207,9 @@ pub async fn cc_send_message(
             }
 
             let p = Arc::new(
-                CcProcess::new(&binary, extra_args, Some(files.dir)).with_token(cc_token.clone()),
+                CcProcess::new(&binary, extra_args, Some(files.dir))
+                    .with_proxy_url(effective_proxy)
+                    .with_token(cc_token.clone()),
             );
             let mut registry = state.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
@@ -442,6 +451,11 @@ pub async fn cc_stream_message(
     let process = match existing {
         Some(p) => p,
         None => {
+            let effective_proxy =
+                crate::agent::cc_bridge::config::resolve_effective_proxy_url(
+                    &state,
+                    &config.cc_bridge,
+                )?;
             // Shell-only alternate path (see the streaming variant above).
             let flavor = crate::agent::cc_bridge::mcp_http::Flavor::Shell;
             let (cc_server_url, cc_token) =
@@ -496,7 +510,9 @@ pub async fn cc_stream_message(
             }
 
             let p = Arc::new(
-                CcProcess::new(&binary, extra_args, Some(files.dir)).with_token(cc_token.clone()),
+                CcProcess::new(&binary, extra_args, Some(files.dir))
+                    .with_proxy_url(effective_proxy)
+                    .with_token(cc_token.clone()),
             );
             let mut registry = state.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
@@ -547,6 +563,9 @@ pub async fn cc_stream_message(
 #[tauri::command]
 pub async fn cc_test_settings(
     settings_json: String,
+    proxy_mode: Option<String>,
+    proxy_session_id: Option<String>,
+    proxy_url: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -556,6 +575,14 @@ pub async fn cc_test_settings(
     } else {
         config.cc_bridge.binary.clone()
     };
+    let effective_proxy =
+        crate::agent::cc_bridge::config::resolve_effective_proxy_url_with_profile_override(
+            &state,
+            &config.cc_bridge,
+            proxy_mode.as_deref(),
+            proxy_session_id.as_deref(),
+            proxy_url.as_deref(),
+        )?;
 
     let thread_id = "cc_test_settings_thread".to_string();
     let event_name = "cc-test-settings-stream".to_string();
@@ -614,6 +641,7 @@ pub async fn cc_test_settings(
 
     let process = Arc::new(
         crate::agent::cc_bridge::process::CcProcess::new(&binary, extra_args, Some(files.dir))
+            .with_proxy_url(effective_proxy)
             .with_token(cc_token.clone()),
     );
 
