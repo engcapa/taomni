@@ -150,6 +150,7 @@ vi.mock("../components/statusbar/StatusBar", () => ({
 vi.mock("../components/terminal/TerminalPanel", () => ({
   TerminalPanel: ({
     tabId,
+    commandTerminal,
     terminalProfile,
     sftpToggle,
     chatToggle,
@@ -159,6 +160,13 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     onSessionReady,
   }: {
     tabId?: string;
+    commandTerminal?: {
+      kind: string;
+      host: string;
+      port: number;
+      username?: string | null;
+      optionsJson?: string | null;
+    };
     terminalProfile?: TerminalProfile;
     sftpToggle?: { open: boolean; onToggle: () => void };
     chatToggle?: { open: boolean; onToggle: () => void };
@@ -179,6 +187,10 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
         data-visible={visible ? "true" : "false"}
         data-active-shortcuts={activeForShortcuts ? "true" : "false"}
         data-input-locked={inputLocked ? "true" : "false"}
+        data-command-kind={commandTerminal?.kind ?? ""}
+        data-command-host={commandTerminal?.host ?? ""}
+        data-command-port={commandTerminal?.port ?? ""}
+        data-command-username={commandTerminal?.username ?? ""}
         data-terminal-font-size={terminalProfile?.fontSize ?? ""}
         data-terminal-theme={terminalProfile?.theme ?? ""}
       >
@@ -958,6 +970,47 @@ describe("MainLayout attached SFTP sidebar", () => {
       });
     });
     await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith("browser-1"));
+    expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
+  });
+
+  it("opens terminal client saved sessions in a terminal tab", async () => {
+    render(<MainLayout />);
+
+    const telnetSession: SessionConfig = {
+      id: "telnet-1",
+      name: "Legacy shell",
+      session_type: "Telnet",
+      group_path: null,
+      host: "legacy.example.test",
+      port: 23,
+      username: "ops",
+      auth_method: "None",
+      options_json: "{}",
+      created_at: 0,
+      updated_at: 0,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    useSessionStore.setState({ sessions: [telnetSession], groups: [] });
+
+    await act(async () => {
+      sidebarMock.props.at(-1)?.onConnectSession?.(telnetSession);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId("terminal-panel").some((node) =>
+          node.getAttribute("data-command-kind") === "Telnet"),
+      ).toBe(true);
+    });
+    const terminal = screen.getAllByTestId("terminal-panel").find((node) =>
+      node.getAttribute("data-command-kind") === "Telnet");
+    if (!terminal) throw new Error("Telnet terminal panel not found");
+    expect(terminal).toHaveAttribute("data-command-kind", "Telnet");
+    expect(terminal).toHaveAttribute("data-command-host", "legacy.example.test");
+    expect(terminal).toHaveAttribute("data-command-port", "23");
+    expect(terminal).toHaveAttribute("data-command-username", "ops");
+    await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith("telnet-1"));
     expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
   });
 

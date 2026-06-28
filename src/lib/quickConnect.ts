@@ -98,14 +98,16 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
 
   const parsed = parseTarget(target);
   if (!parsed.host) {
-    throw new Error("Remote host is required.");
+    throw new Error(sessionType === "Serial" ? "Serial device path is required." : "Remote host is required.");
   }
 
-  const port = parsed.port ?? DEFAULT_PORTS[sessionType] ?? 22;
+  const serialBaud = sessionType === "Serial" && parsed.port ? parsed.port : null;
+  const port = sessionType === "Serial" ? 0 : (parsed.port ?? DEFAULT_PORTS[sessionType] ?? 22);
   const username = parsed.username ?? (sessionType === "SSH" || sessionType === "SFTP" ? "root" : null);
   const authMethod: AuthMethod =
     sessionType === "SSH" || sessionType === "RDP" ? "Password" : "None";
   const titlePrefix = username ? `${username}@` : "";
+  const optionsJson = serialBaud ? JSON.stringify({ serialBaud: String(serialBaud) }) : "{}";
 
   return {
     transient: true,
@@ -119,7 +121,7 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
       port,
       username,
       auth_method: authMethod,
-      options_json: "{}",
+      options_json: optionsJson,
       created_at: now,
       updated_at: now,
       last_connected_at: null,

@@ -28,7 +28,7 @@ describe("parseQuickConnectInput", () => {
   it.each([
     ["rlogin://bob@legacy.example.test", "Rlogin", "legacy.example.test", 513, "bob"],
     ["mosh alice@edge.example.test", "Mosh", "edge.example.test", 60001, "alice"],
-  ])("preserves planned client protocol %s", (input, sessionType, host, port, username) => {
+  ])("parses terminal client protocol %s", (input, sessionType, host, port, username) => {
     const parsed = parseQuickConnectInput(input);
 
     expect(parsed.config).toMatchObject({
@@ -38,6 +38,18 @@ describe("parseQuickConnectInput", () => {
       username,
       auth_method: "None",
     });
+  });
+
+  it("parses Serial targets without storing baud in the session port", () => {
+    const parsed = parseQuickConnectInput("serial /dev/ttyUSB0:115200");
+
+    expect(parsed.config).toMatchObject({
+      session_type: "Serial",
+      host: "/dev/ttyUSB0",
+      port: 0,
+      auth_method: "None",
+    });
+    expect(JSON.parse(parsed.config.options_json)).toMatchObject({ serialBaud: "115200" });
   });
 
   it.each([

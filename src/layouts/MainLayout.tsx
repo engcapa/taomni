@@ -211,6 +211,22 @@ function browserUrlFromSession(session: SessionConfig): string | null {
   return `https://${withoutSlashes}${port}`;
 }
 
+const COMMAND_TERMINAL_SESSION_TYPES = new Set(["Telnet", "Rlogin", "Serial", "Mosh"]);
+
+function commandTerminalFromSession(session: SessionConfig): NonNullable<Tab["commandTerminal"]> | null {
+  if (!COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) return null;
+  const host = session.host.trim();
+  if (!host) return null;
+  return {
+    sessionId: session.id,
+    kind: session.session_type as NonNullable<Tab["commandTerminal"]>["kind"],
+    host,
+    port: session.port,
+    username: session.username,
+    optionsJson: session.options_json,
+  };
+}
+
 function controlArgRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -626,7 +642,7 @@ export function MainLayout() {
         const tracked = terminalCwdsRef.current[tabId];
         if (tracked) {
           initialCwd = tracked;
-        } else if (!source.ssh && localShellSupportsCwdProbe(source.localShell)) {
+        } else if (!source.ssh && !source.commandTerminal && localShellSupportsCwdProbe(source.localShell)) {
           const cwd = await queryTerminalCwd(tabId);
           initialCwd = cwd ?? undefined;
         }
@@ -816,6 +832,7 @@ export function MainLayout() {
         tabId,
         title,
         ssh: tab.ssh ?? null,
+        commandTerminal: tab.commandTerminal ?? null,
         localShell: tab.localShell ?? null,
         terminalProfile: tab.terminalProfile ?? null,
         reattach,
@@ -972,6 +989,7 @@ export function MainLayout() {
             title: p.title || tr("tabs.localTerminal"),
             closable: true,
             ssh: p.ssh ?? undefined,
+            commandTerminal: p.commandTerminal ?? undefined,
             localShell: p.localShell ?? undefined,
             terminalProfile: p.terminalProfile ?? undefined,
             adoptedTerminal: adopted,
@@ -1452,6 +1470,34 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [addTab, markConnected]);
 
+  const openCommandTerminalTab = useCallback((session: SessionConfig) => {
+    const commandTerminal = commandTerminalFromSession(session);
+    if (!commandTerminal) {
+      setStatusMessage(
+        session.session_type === "Serial"
+          ? tr("status.serialSessionMissing")
+          : tr("status.remoteSessionMissing"),
+      );
+      return;
+    }
+    const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
+    const title = session.name || (
+      session.session_type === "Serial"
+        ? commandTerminal.host
+        : `${session.session_type} ${commandTerminal.username ? `${commandTerminal.username}@` : ""}${commandTerminal.host}`
+    );
+    addTab({
+      id,
+      type: "terminal",
+      title,
+      sessionId: session.id,
+      closable: true,
+      commandTerminal,
+      terminalProfile: getSessionTerminalProfile(session.options_json),
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected, setStatusMessage]);
+
   const openUnsupportedTab = useCallback((session: SessionConfig) => {
     const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
     const kind = ["SFTP", "VNC"].includes(session.session_type)
@@ -1557,6 +1603,8 @@ export function MainLayout() {
       openFileSession(session);
     } else if (session.session_type === "Browser") {
       openBrowserSession(session);
+    } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
+      openCommandTerminalTab(session);
     } else if (
       session.session_type === "MySQL" ||
       session.session_type === "PostgreSQL" ||
@@ -1604,6 +1652,7 @@ export function MainLayout() {
   }, [
     markConnected,
     openBrowserSession,
+    openCommandTerminalTab,
     openFileSession,
     openLocalTab,
     openSftpTab,
@@ -1700,6 +1749,8 @@ export function MainLayout() {
         openLocalTab(session.name);
       } else if (session.session_type === "Browser") {
         openBrowserSession(session);
+      } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
+        openCommandTerminalTab(session);
       } else if (
         session.session_type === "SSH"
         || session.session_type === "SFTP"
@@ -1724,7 +1775,7 @@ export function MainLayout() {
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : String(err));
     }
-  }, [openBrowserSession, openLocalTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
+  }, [openBrowserSession, openCommandTerminalTab, openLocalTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
 
   const openPlaceholderTab = useCallback((title: string, message: string) => {
     addTab({
@@ -2554,6 +2605,7 @@ export function MainLayout() {
                             tabId={tab.id}
                             tabTitle={tab.title}
                             ssh={tab.ssh}
+                            commandTerminal={tab.commandTerminal}
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
                             adoptedTerminal={tab.adoptedTerminal}

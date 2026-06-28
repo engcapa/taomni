@@ -279,6 +279,7 @@ pub fn run() {
             wsl::list_wsl_distros,
             terminal::open_local_shell_as_administrator,
             terminal::create_local_terminal,
+            terminal::create_command_terminal,
             terminal::create_ssh_terminal,
             terminal::submit_ssh_auth_response,
             terminal::attach_terminal_output,

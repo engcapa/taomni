@@ -84,6 +84,30 @@ export async function createLocalTerminal(
   });
 }
 
+export async function createCommandTerminal(
+  sessionId: string,
+  kind: string,
+  host: string,
+  port: number,
+  username: string | null | undefined,
+  optionsJson: string | null | undefined,
+  cols: number,
+  rows: number,
+  onOutput?: (data: Uint8Array) => void,
+): Promise<string> {
+  return invoke<string>("create_command_terminal", {
+    sessionId,
+    kind,
+    host,
+    port,
+    username,
+    optionsJson,
+    cols,
+    rows,
+    onOutput: createBinaryOutputChannel(onOutput ?? (() => undefined)),
+  });
+}
+
 export async function createSshTerminal(
   sessionId: string,
   host: string,

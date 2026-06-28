@@ -71,6 +71,7 @@ import { makeHostKey, useCommandHistory } from "../../lib/history";
 import {
   createTerminalSessionId,
   attachTerminalOutput,
+  createCommandTerminal,
   createLocalTerminal,
   createSshTerminal,
   listenSshAuthPrompt,
@@ -147,6 +148,15 @@ export interface SshConnectInfo {
   optionsJson?: string;
 }
 
+export interface CommandTerminalConnectInfo {
+  sessionId?: string;
+  kind: "Telnet" | "Rlogin" | "Serial" | "Mosh";
+  host: string;
+  port: number;
+  username?: string | null;
+  optionsJson?: string | null;
+}
+
 export interface TerminalReattachState {
   terminalSessionId?: string;
   snapshotText?: string;
@@ -168,6 +178,7 @@ interface TerminalPanelProps {
   tabTitle?: string;
   theme?: string;
   ssh?: SshConnectInfo;
+  commandTerminal?: CommandTerminalConnectInfo;
   localShell?: {
     id: string;
     name: string;
@@ -264,6 +275,7 @@ export function TerminalPanel({
   tabTitle = "Terminal",
   theme = "classic",
   ssh,
+  commandTerminal,
   localShell,
   terminalProfile,
   adoptedTerminal,
@@ -542,8 +554,13 @@ export function TerminalPanel({
 
 
   // Per-host command history for inline ghost-text suggestions.
-  const historyHostKey = useMemo(() => makeHostKey(ssh), [ssh]);
-  const isLocal = !ssh;
+  const historyHostKey = useMemo(
+    () => commandTerminal
+      ? `client:${commandTerminal.kind}:${commandTerminal.host.toLowerCase()}:${commandTerminal.port}:${commandTerminal.username ?? ""}`
+      : makeHostKey(ssh),
+    [commandTerminal, ssh],
+  );
+  const isLocal = !ssh && !commandTerminal;
   // Tracks which local shell the backend actually launched. Lets us suppress
   // inline history suggestions on shells that already provide their own
   // (PSReadLine on PowerShell). Resolved on connect — the prop only carries
@@ -573,6 +590,7 @@ export function TerminalPanel({
     [isLocal, resolvedLocalShellId, localShell?.id, localShell?.name],
   );
   const cwdProbeCommand = useMemo<string | null>(() => {
+    if (commandTerminal) return null;
     if (!isLocal) return CWD_QUERY_COMMAND; // SSH → remote POSIX shell.
     if (isLocalCmd) return null;
     if (isLocalPowerShell) return PS_CWD_QUERY_COMMAND;
@@ -2438,6 +2456,41 @@ export function TerminalPanel({
         .catch((err) => handleConnectFailure(err, mode));
     };
 
+    const startCommandTerminal = (targetSid: string) => {
+      if (!commandTerminal || adopted || destroyed) return;
+
+      clearConnectionListeners();
+      connectionStateRef.current = "connecting";
+      sessionIdRef.current = null;
+      setRegisteredSessionId(null);
+      zmodemRef.current = null;
+
+      const endpoint = commandTerminal.kind === "Serial"
+        ? commandTerminal.host
+        : `${commandTerminal.username ? `${commandTerminal.username}@` : ""}${commandTerminal.host}${
+            commandTerminal.port > 0 ? `:${commandTerminal.port}` : ""
+          }`;
+      appendEvent("connection", `Starting ${commandTerminal.kind} client for ${endpoint}`);
+      term.write(`\x1b[33mStarting ${commandTerminal.kind} client for ${endpoint}...\x1b[0m\r\n`);
+
+      fitVisibleTerminal();
+      const { cols, rows } = currentTerminalSize(term);
+
+      createCommandTerminal(
+        targetSid,
+        commandTerminal.kind,
+        commandTerminal.host,
+        commandTerminal.port,
+        commandTerminal.username,
+        commandTerminal.optionsJson ?? null,
+        cols,
+        rows,
+        handleRawOutput,
+      )
+        .then((sessionId) => handleConnected({ sessionId, shellId: null }, "initial"))
+        .catch((err) => handleConnectFailure(err, "initial"));
+    };
+
     reconnectSshRef.current = () => {
       if (!ssh || adopted || destroyed) return;
       if (connectionStateRef.current !== "disconnected") return;
@@ -2452,6 +2505,8 @@ export function TerminalPanel({
         .catch((err) => handleConnectFailure(err, "initial"));
     } else if (ssh) {
       startSshConnection(sid, "initial");
+    } else if (commandTerminal) {
+      startCommandTerminal(sid);
     } else {
       connectionStateRef.current = "connecting";
       appendEvent("connection", `Starting ${localShell?.name ?? "local terminal"}`);

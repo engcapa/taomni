@@ -435,15 +435,14 @@ describe("SessionEditor SSH settings tabs", () => {
   });
 
   it.each([
+    ["Telnet", 23],
     ["Rlogin", 513],
     ["Mosh", 60001],
-  ])("persists %s as its own planned client type", async (initialProto, expectedPort) => {
+  ])("persists %s as an implemented command terminal client type", async (initialProto, expectedPort) => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto });
 
-    expect(screen.getByTestId("session-planned-client-note")).toHaveTextContent(
-      `${initialProto} sessions can be saved and edited`,
-    );
+    expect(screen.queryByTestId("session-planned-client-note")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Remote host"), `${initialProto.toLowerCase()}.example.com`);
     await user.click(screen.getByRole("button", { name: "OK" }));
@@ -453,6 +452,33 @@ describe("SessionEditor SSH settings tabs", () => {
       session_type: initialProto,
       host: `${initialProto.toLowerCase()}.example.com`,
       port: expectedPort,
+      auth_method: "None",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists Serial device settings as a command terminal client", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Serial" });
+
+    expect(screen.queryByTestId("session-planned-client-note")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Device *"), "/dev/ttyUSB0");
+    await user.clear(screen.getByLabelText("Baud"));
+    await user.type(screen.getByLabelText("Baud"), "57600");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    expect(savedConfig).toMatchObject({
+      session_type: "Serial",
+      host: "/dev/ttyUSB0",
+      port: 0,
+      auth_method: "None",
+    });
+    expect(JSON.parse(savedConfig.options_json)).toMatchObject({
+      serialDevice: "/dev/ttyUSB0",
+      serialBaud: "57600",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
