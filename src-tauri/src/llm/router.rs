@@ -1,13 +1,306 @@
-use super::{ChatRequest, ChatResponse, Llm, LlmError, LlmResult, TaskKind};
+use super::{
+    ChatRequest, ChatResponse, ChatStreamEvent, ChatTool, Llm, LlmError, LlmResult, TaskKind,
+};
+use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
+
+pub const PROVIDER_GROUP_PREFIX: &str = "group:";
+
+pub fn provider_group_route_id(group_id: &str) -> String {
+    if group_id.starts_with(PROVIDER_GROUP_PREFIX) {
+        group_id.to_string()
+    } else {
+        format!("{PROVIDER_GROUP_PREFIX}{group_id}")
+    }
+}
+
+pub fn provider_group_id_from_route(route_id: &str) -> Option<&str> {
+    route_id.strip_prefix(PROVIDER_GROUP_PREFIX)
+}
+
+struct KeyRotatingLlm {
+    provider_id: String,
+    model: String,
+    variants: Vec<Arc<dyn Llm>>,
+    next_key: AtomicUsize,
+}
+
+impl KeyRotatingLlm {
+    fn new(provider_id: impl Into<String>, variants: Vec<Arc<dyn Llm>>) -> Self {
+        let model = variants
+            .first()
+            .map(|provider| provider.model().to_string())
+            .unwrap_or_default();
+        Self {
+            provider_id: provider_id.into(),
+            model,
+            variants,
+            next_key: AtomicUsize::new(0),
+        }
+    }
+
+    fn next_variant(&self) -> Option<Arc<dyn Llm>> {
+        if self.variants.is_empty() {
+            return None;
+        }
+        let idx = self.next_key.fetch_add(1, Ordering::Relaxed) % self.variants.len();
+        self.variants.get(idx).cloned()
+    }
+}
+
+#[async_trait]
+impl Llm for KeyRotatingLlm {
+    async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse> {
+        let mut last_err = None;
+        for _ in 0..self.variants.len() {
+            let Some(provider) = self.next_variant() else {
+                break;
+            };
+            match provider.chat(req.clone()).await {
+                Ok(resp) => return Ok(resp),
+                Err(err) => {
+                    tracing::warn!(
+                        provider = %self.provider_id,
+                        key_model = %provider.model(),
+                        error = %err,
+                        "LLM provider key failed, trying next key"
+                    );
+                    last_err = Some(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
+    }
+
+    async fn chat_with_tools(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+    ) -> LlmResult<ChatResponse> {
+        let mut last_err = None;
+        for _ in 0..self.variants.len() {
+            let Some(provider) = self.next_variant() else {
+                break;
+            };
+            match provider.chat_with_tools(req.clone(), tools.clone()).await {
+                Ok(resp) => return Ok(resp),
+                Err(err) => {
+                    tracing::warn!(
+                        provider = %self.provider_id,
+                        key_model = %provider.model(),
+                        error = %err,
+                        "LLM provider key failed during tool call, trying next key"
+                    );
+                    last_err = Some(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
+    }
+
+    fn supports_tools(&self) -> bool {
+        self.variants
+            .iter()
+            .any(|provider| provider.supports_tools())
+    }
+
+    async fn chat_stream(
+        &self,
+        req: ChatRequest,
+    ) -> LlmResult<futures::stream::BoxStream<'static, LlmResult<ChatStreamEvent>>> {
+        let mut last_err = None;
+        for _ in 0..self.variants.len() {
+            let Some(provider) = self.next_variant() else {
+                break;
+            };
+            match provider.chat_stream(req.clone()).await {
+                Ok(stream) => return Ok(stream),
+                Err(err) => {
+                    tracing::warn!(
+                        provider = %self.provider_id,
+                        key_model = %provider.model(),
+                        error = %err,
+                        "LLM provider key failed before stream started, trying next key"
+                    );
+                    last_err = Some(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
+    }
+
+    fn provider_id(&self) -> &str {
+        &self.provider_id
+    }
+
+    fn model(&self) -> &str {
+        &self.model
+    }
+}
+
+struct ProviderGroupState {
+    provider_ids: Vec<String>,
+    next_provider: AtomicUsize,
+}
+
+impl ProviderGroupState {
+    fn new(provider_ids: Vec<String>) -> Self {
+        Self {
+            provider_ids,
+            next_provider: AtomicUsize::new(0),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.provider_ids.len()
+    }
+
+    fn next_provider_id(&self) -> Option<String> {
+        if self.provider_ids.is_empty() {
+            return None;
+        }
+        let idx = self.next_provider.fetch_add(1, Ordering::Relaxed) % self.provider_ids.len();
+        self.provider_ids.get(idx).cloned()
+    }
+}
+
+struct ProviderGroupLlm {
+    route_id: String,
+    state: Arc<ProviderGroupState>,
+    providers: HashMap<String, Arc<dyn Llm>>,
+}
+
+impl ProviderGroupLlm {
+    fn new(
+        route_id: impl Into<String>,
+        state: Arc<ProviderGroupState>,
+        providers: HashMap<String, Arc<dyn Llm>>,
+    ) -> Self {
+        Self {
+            route_id: route_id.into(),
+            state,
+            providers,
+        }
+    }
+}
+
+#[async_trait]
+impl Llm for ProviderGroupLlm {
+    async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse> {
+        let mut last_err = None;
+        for _ in 0..self.state.len() {
+            let Some(provider_id) = self.state.next_provider_id() else {
+                break;
+            };
+            let Some(provider) = self.providers.get(&provider_id).cloned() else {
+                continue;
+            };
+            match provider.chat(req.clone()).await {
+                Ok(resp) => return Ok(resp),
+                Err(err) => {
+                    tracing::warn!(
+                        group = %self.route_id,
+                        provider = %provider_id,
+                        error = %err,
+                        "LLM provider group member failed, trying next provider"
+                    );
+                    last_err = Some(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
+    }
+
+    async fn chat_with_tools(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+    ) -> LlmResult<ChatResponse> {
+        let mut last_err = None;
+        for _ in 0..self.state.len() {
+            let Some(provider_id) = self.state.next_provider_id() else {
+                break;
+            };
+            let Some(provider) = self.providers.get(&provider_id).cloned() else {
+                continue;
+            };
+            if !provider.supports_tools() {
+                continue;
+            }
+            match provider.chat_with_tools(req.clone(), tools.clone()).await {
+                Ok(resp) => return Ok(resp),
+                Err(err) => {
+                    tracing::warn!(
+                        group = %self.route_id,
+                        provider = %provider_id,
+                        error = %err,
+                        "LLM provider group member failed during tool call, trying next provider"
+                    );
+                    last_err = Some(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::Provider {
+            status: 400,
+            message: format!(
+                "provider group '{}' has no tool-capable providers",
+                self.route_id
+            ),
+        }))
+    }
+
+    fn supports_tools(&self) -> bool {
+        self.providers
+            .values()
+            .any(|provider| provider.supports_tools())
+    }
+
+    async fn chat_stream(
+        &self,
+        req: ChatRequest,
+    ) -> LlmResult<futures::stream::BoxStream<'static, LlmResult<ChatStreamEvent>>> {
+        let mut last_err = None;
+        for _ in 0..self.state.len() {
+            let Some(provider_id) = self.state.next_provider_id() else {
+                break;
+            };
+            let Some(provider) = self.providers.get(&provider_id).cloned() else {
+                continue;
+            };
+            match provider.chat_stream(req.clone()).await {
+                Ok(stream) => return Ok(stream),
+                Err(err) => {
+                    tracing::warn!(
+                        group = %self.route_id,
+                        provider = %provider_id,
+                        error = %err,
+                        "LLM provider group member failed before stream started, trying next provider"
+                    );
+                    last_err = Some(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
+    }
+
+    fn provider_id(&self) -> &str {
+        &self.route_id
+    }
+
+    fn model(&self) -> &str {
+        "provider-group"
+    }
+}
 
 /// Routes a chat request to the appropriate provider based on task kind,
 /// with optional timeout + fallback to a secondary provider.
 pub struct LlmRouter {
     providers: HashMap<String, Arc<dyn Llm>>,
+    provider_groups: HashMap<String, Arc<ProviderGroupState>>,
     task_routing: HashMap<TaskKind, String>,
     active: String,
     fallback: Option<FallbackConfig>,
@@ -29,6 +322,7 @@ impl LlmRouter {
     pub fn new(active: impl Into<String>) -> Self {
         Self {
             providers: HashMap::new(),
+            provider_groups: HashMap::new(),
             task_routing: HashMap::new(),
             active: active.into(),
             fallback: None,
@@ -38,6 +332,65 @@ impl LlmRouter {
 
     pub fn add_provider(&mut self, id: impl Into<String>, provider: Arc<dyn Llm>) {
         self.providers.insert(id.into(), provider);
+    }
+
+    pub fn add_provider_variants(&mut self, id: impl Into<String>, variants: Vec<Arc<dyn Llm>>) {
+        let id = id.into();
+        match variants.len() {
+            0 => {}
+            1 => {
+                let provider = variants.into_iter().next().expect("checked len");
+                self.add_provider(id, provider);
+            }
+            _ => {
+                self.providers
+                    .insert(id.clone(), Arc::new(KeyRotatingLlm::new(id, variants)));
+            }
+        }
+    }
+
+    pub fn add_provider_group(&mut self, group_id: impl Into<String>, provider_ids: Vec<String>) {
+        let route_id = provider_group_route_id(&group_id.into());
+        let provider_ids = provider_ids
+            .into_iter()
+            .map(|id| id.trim().to_string())
+            .filter(|id| !id.is_empty())
+            .collect::<Vec<_>>();
+        if provider_ids.is_empty() {
+            return;
+        }
+
+        let state = Arc::new(ProviderGroupState::new(provider_ids.clone()));
+        let providers = provider_ids
+            .iter()
+            .filter_map(|id| {
+                self.providers
+                    .get(id)
+                    .cloned()
+                    .map(|provider| (id.clone(), provider))
+            })
+            .collect::<HashMap<_, _>>();
+        if !providers.is_empty() {
+            self.providers.insert(
+                route_id.clone(),
+                Arc::new(ProviderGroupLlm::new(
+                    route_id.clone(),
+                    state.clone(),
+                    providers,
+                )),
+            );
+        }
+        self.provider_groups.insert(route_id, state);
+    }
+
+    pub fn provider_group_len(&self, route_id: &str) -> Option<usize> {
+        self.provider_groups.get(route_id).map(|group| group.len())
+    }
+
+    pub fn next_provider_in_group(&self, route_id: &str) -> Option<String> {
+        self.provider_groups
+            .get(route_id)
+            .and_then(|group| group.next_provider_id())
     }
 
     /// Mark a provider id as blocked on a locked vault. The frontend can call
@@ -228,55 +581,81 @@ pub fn build_router(
             tracing::info!(provider = %id, runtime = %p.runtime, "skipping cloud provider in full-local mode");
             continue;
         }
-        match p.runtime.as_str() {
-            "openai-compat" | "llama-server" | "ollama" => {
-                let resolved_key = match resolve_api_key(&p.api_key, vault) {
-                    Ok(k) => k,
-                    Err(()) => {
-                        tracing::warn!(
-                            provider = %id,
-                            "api key vault reference could not be resolved (vault locked?) — provider not registered"
-                        );
-                        router.mark_unresolved(id);
-                        continue;
-                    }
-                };
-                let provider = Arc::new(OpenAiCompatProvider::new(
+
+        if !matches!(
+            p.runtime.as_str(),
+            "openai-compat" | "llama-server" | "ollama" | "anthropic"
+        ) {
+            tracing::info!(provider = %id, runtime = %p.runtime, "skipping non-openai-compat provider in router");
+            continue;
+        }
+
+        let mut variants: Vec<Arc<dyn Llm>> = Vec::new();
+        let mut unresolved_key = false;
+        for api_key in p.effective_api_keys() {
+            let resolved_key = match resolve_api_key(api_key, vault) {
+                Ok(k) => k,
+                Err(()) => {
+                    unresolved_key = true;
+                    tracing::warn!(
+                        provider = %id,
+                        "api key vault reference could not be resolved (vault locked?) — key skipped"
+                    );
+                    continue;
+                }
+            };
+
+            let provider: Arc<dyn Llm> = match p.runtime.as_str() {
+                "openai-compat" | "llama-server" | "ollama" => Arc::new(OpenAiCompatProvider::new(
                     id.as_str(),
                     p.base_url.clone(),
                     resolved_key,
                     p.model.clone(),
-                ));
-                router.add_provider(id, provider);
+                )),
+                "anthropic" => {
+                    let base_url = if p.base_url.is_empty() {
+                        "https://api.anthropic.com/v1".to_string()
+                    } else {
+                        p.base_url.clone()
+                    };
+                    Arc::new(AnthropicProvider::new(
+                        id.as_str(),
+                        base_url,
+                        resolved_key,
+                        p.model.clone(),
+                    ))
+                }
+                _ => unreachable!("runtime was checked above"),
+            };
+            variants.push(provider);
+        }
+
+        if variants.is_empty() {
+            if unresolved_key {
+                tracing::warn!(
+                    provider = %id,
+                    "all api keys were unresolved — provider not registered"
+                );
+                router.mark_unresolved(id);
             }
-            "anthropic" => {
-                let resolved_key = match resolve_api_key(&p.api_key, vault) {
-                    Ok(k) => k,
-                    Err(()) => {
-                        tracing::warn!(
-                            provider = %id,
-                            "api key vault reference could not be resolved (vault locked?) — provider not registered"
-                        );
-                        router.mark_unresolved(id);
-                        continue;
-                    }
-                };
-                let base_url = if p.base_url.is_empty() {
-                    "https://api.anthropic.com/v1".to_string()
-                } else {
-                    p.base_url.clone()
-                };
-                let provider = Arc::new(AnthropicProvider::new(
-                    id.as_str(),
-                    base_url,
-                    resolved_key,
-                    p.model.clone(),
-                ));
-                router.add_provider(id, provider);
-            }
-            _ => {
-                tracing::info!(provider = %id, runtime = %p.runtime, "skipping non-openai-compat provider in router");
-            }
+        } else {
+            router.add_provider_variants(id.clone(), variants);
+        }
+    }
+
+    for (group_id, group) in &cfg.provider_groups {
+        if !group.enabled {
+            continue;
+        }
+        router.add_provider_group(group_id.clone(), group.provider_ids.clone());
+        let route_id = provider_group_route_id(group_id);
+        if !router.has_provider(&route_id)
+            && group
+                .provider_ids
+                .iter()
+                .any(|provider_id| router.needs_vault_unlock(provider_id))
+        {
+            router.mark_unresolved(route_id);
         }
     }
 
