@@ -235,22 +235,66 @@ controls:
   - id: new-session-card
     selector: 'text="New session…"'
     kind: interactive
+  - id: recent-sessions-panel
+    selector: '[data-testid="welcome-recent-sessions"]'
+    kind: display
+  - id: recent-filter
+    selector: '[data-testid="welcome-recent-filter"]'
+    kind: interactive
+  - id: recent-type-filter
+    selector: '[data-testid="welcome-recent-type-filter"]'
+    kind: interactive
+  - id: recent-sort
+    selector: '[data-testid="welcome-recent-sort"]'
+    kind: interactive
+  - id: recent-open-all
+    selector: '[data-testid="welcome-recent-open-all"]'
+    kind: interactive
+  - id: recent-open-filtered
+    selector: '[data-testid="welcome-recent-open-filtered"]'
+    kind: interactive
+  - id: recent-open-selected
+    selector: '[data-testid="welcome-recent-open-selected"]'
+    kind: interactive
+  - id: recent-select-filtered
+    selector: '[data-testid="welcome-recent-select-filtered"]'
+    kind: interactive
+  - id: recent-clear-filter
+    selector: '[data-testid="welcome-recent-clear-filter"]'
+    kind: interactive
+  - id: recent-clear-selection
+    selector: '[data-testid="welcome-recent-clear-selection"]'
+    kind: interactive
+    optional: true       # rendered only after at least one recent row is selected
+  - id: recent-settings
+    selector: '[data-testid="welcome-recent-settings"]'
+    kind: interactive
+  - id: recent-session-row
+    selector: '[data-testid="welcome-recent-session-row"]'
+    kind: display
+    optional: true       # only rendered when saved sessions have last_connected_at
+  - id: recent-session-select
+    selector: '[data-testid="welcome-recent-select"]'
+    kind: interactive
+    optional: true
+  - id: recent-session-open
+    selector: '[data-testid="welcome-recent-open"]'
+    kind: interactive
+    optional: true
+  - id: recent-session-reveal
+    selector: '[data-testid="welcome-recent-reveal"]'
+    kind: interactive
+    optional: true
+  - id: recent-empty
+    selector: '[data-testid="welcome-recent-empty"]'
+    kind: display
+    optional: true
+  - id: recent-no-matches
+    selector: '[data-testid="welcome-recent-no-matches"]'
+    kind: display
+    optional: true
   - id: tips-section
     selector: 'text="Tips"'
-    kind: display
-  - id: active-connections-list
-    selector: 'text="Active connections"'
-    kind: display
-    aliases:
-      - 'text="No active terminal tabs."'   # empty-state copy used by tests as a proxy for the list
-  - id: activity-pane-resize
-    selector: '[data-testid="welcome-activity-pane-resize-handle"]'
-    kind: interactive
-  - id: activity-pane-collapse
-    selector: '[data-testid="welcome-activity-pane-collapse"]'
-    kind: interactive
-  - id: last-events-list
-    selector: 'text="Last events"'
     kind: display
   - id: version-header
     selector: '[data-testid="welcome-version"]'
@@ -261,7 +305,7 @@ controls:
 -->
 
 - 启动入口：开始本地终端、新建会话、导入 OpenSSH config
-- 显示活跃连接列表
+- 最近会话历史：显示最近打开过的已保存 session，支持过滤、类型筛选、排序、打开全部/过滤结果/所选/单条、定位到 session 树；行右键菜单与 session 树会话项保持一致（连接、编辑、复制、移动到文件夹、删除），并可跳转设置历史数量（默认 20）
 
 ### 1.7 状态栏 ✅
 
@@ -2130,10 +2174,14 @@ controls:
   - id: reset-terminal-profile
     selector: '[data-testid="settings-reset-terminal-profile"]'
     kind: interactive
+  - id: welcome-recent-session-limit
+    selector: '[data-testid="settings-welcome-recent-session-limit"]'
+    kind: interactive
 -->
 
 - Application Theme 切换（Light / Dark / Follow system）
 - Terminal Appearance 区块（与会话编辑器 Terminal 段一致的完整外观与行为控件）
+- Welcome 最近会话历史数量设置（默认 20）
 - 终端预览
 - 设置项即时持久化
 

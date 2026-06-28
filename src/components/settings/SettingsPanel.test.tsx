@@ -1,7 +1,8 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setAppThemeMode } from "../../lib/appTheme";
+import { useAppStore } from "../../stores/appStore";
 import { SettingsPanel } from "./SettingsPanel";
 
 const ipcMocks = vi.hoisted(() => ({
@@ -35,6 +36,7 @@ describe("SettingsPanel", () => {
     ipcMocks.listSessions.mockReset();
     ipcMocks.listSessions.mockResolvedValue([]);
     window.localStorage.clear();
+    useAppStore.setState({ welcomeRecentSessionLimit: 20 });
     setAppThemeMode("system");
     // jsdom has no layout engine; search scroll-to-match calls this.
     Element.prototype.scrollIntoView = vi.fn();
@@ -103,6 +105,16 @@ describe("SettingsPanel", () => {
     await user.click(resetButton);
     expect(window.localStorage.getItem("taomni.uiFontFamily")).toContain("Inter");
     expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("12");
+  });
+
+  it("persists the welcome recent session history limit", () => {
+    render(<SettingsPanel />);
+
+    const input = screen.getByLabelText("Recent session history limit");
+    fireEvent.change(input, { target: { value: "35" } });
+
+    expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(35);
+    expect(window.localStorage.getItem("taomni.welcomeRecentSessionLimit")).toBe("35");
   });
 
   it("highlights settings matching the search query", async () => {

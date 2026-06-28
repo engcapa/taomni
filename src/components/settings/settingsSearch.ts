@@ -28,6 +28,11 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["theme", "appearance", "dark", "light", "system", "color scheme", "主题", "外观", "深色", "浅色", "暗色", "亮色", "跟随系统"],
   },
   {
+    id: "welcome-history",
+    titleKeys: ["settings.welcomeHistoryTitle"],
+    terms: ["welcome", "startup", "recent sessions", "session history", "restore sessions", "history limit", "欢迎页", "启动", "最近会话", "会话历史", "恢复会话", "历史数量"],
+  },
+  {
     id: "global-ui",
     titleKeys: ["settings.globalUiTitle"],
     terms: ["ui font", "font family", "font size", "typography", "interface font", "界面字体", "字体", "字号", "排版"],

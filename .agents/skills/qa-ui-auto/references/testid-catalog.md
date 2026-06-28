@@ -183,12 +183,24 @@
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
 - `text="New session…"` — interactive — F1.6.new-session-card
+- `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
+- `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
+- `[data-testid="welcome-recent-type-filter"]` — interactive — F1.6.recent-type-filter
+- `[data-testid="welcome-recent-sort"]` — interactive — F1.6.recent-sort
+- `[data-testid="welcome-recent-open-all"]` — interactive — F1.6.recent-open-all
+- `[data-testid="welcome-recent-open-filtered"]` — interactive — F1.6.recent-open-filtered
+- `[data-testid="welcome-recent-open-selected"]` — interactive — F1.6.recent-open-selected
+- `[data-testid="welcome-recent-select-filtered"]` — interactive — F1.6.recent-select-filtered
+- `[data-testid="welcome-recent-clear-filter"]` — interactive — F1.6.recent-clear-filter
+- `[data-testid="welcome-recent-clear-selection"]` — interactive [optional] — F1.6.recent-clear-selection
+- `[data-testid="welcome-recent-settings"]` — interactive — F1.6.recent-settings
+- `[data-testid="welcome-recent-session-row"]` — display [optional] — F1.6.recent-session-row
+- `[data-testid="welcome-recent-select"]` — interactive [optional] — F1.6.recent-session-select
+- `[data-testid="welcome-recent-open"]` — interactive [optional] — F1.6.recent-session-open
+- `[data-testid="welcome-recent-reveal"]` — interactive [optional] — F1.6.recent-session-reveal
+- `[data-testid="welcome-recent-empty"]` — display [optional] — F1.6.recent-empty
+- `[data-testid="welcome-recent-no-matches"]` — display [optional] — F1.6.recent-no-matches
 - `text="Tips"` — display — F1.6.tips-section
-- `text="Active connections"` — display — F1.6.active-connections-list
-  ↳ `text="No active terminal tabs."` — alias
-- `[data-testid="welcome-activity-pane-resize-handle"]` — interactive — F1.6.activity-pane-resize
-- `[data-testid="welcome-activity-pane-collapse"]` — interactive — F1.6.activity-pane-collapse
-- `text="Last events"` — display — F1.6.last-events-list
 - `[data-testid="welcome-version"]` — display — F1.6.version-header
 - `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
 
@@ -375,6 +387,7 @@
 
 - `[data-testid="settings-panel"]` — display — F11.1.panel-root
 - `[data-testid="settings-reset-terminal-profile"]` — interactive — F11.1.reset-terminal-profile
+- `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
 
 ## sftp (F7.2)
 

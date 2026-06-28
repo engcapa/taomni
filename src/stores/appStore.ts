@@ -12,6 +12,11 @@ const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
 const SQL_ECHO_KEY = "taomni.sqlEcho";
 const SIDEBAR_COLLAPSED_KEY = "taomni.sidebarCollapsed";
+const WELCOME_RECENT_SESSION_LIMIT_KEY = "taomni.welcomeRecentSessionLimit";
+
+const DEFAULT_WELCOME_RECENT_SESSION_LIMIT = 20;
+const MIN_WELCOME_RECENT_SESSION_LIMIT = 1;
+const MAX_WELCOME_RECENT_SESSION_LIMIT = 100;
 
 interface AppState {
   tabs: Tab[];
@@ -35,6 +40,7 @@ interface AppState {
   terminalSplitInputLockedTabIds: Set<string>;
   uiFontFamily: string;
   uiFontSize: number;
+  welcomeRecentSessionLimit: number;
   /**
    * Transient focus filter for the open-tab strip (issue #121). When set, the
    * strip only renders tabs matching the filter; the rest are hidden, not
@@ -109,6 +115,7 @@ interface AppState {
   setTabHasNewOutput: (tabId: string, hasNewOutput: boolean) => void;
   setUiFontFamily: (font: string) => void;
   setUiFontSize: (size: number) => void;
+  setWelcomeRecentSessionLimit: (limit: number) => void;
   setTabFilter: (filter: TabFilter | null) => void;
   clearTabFilter: () => void;
   /** Record a terminal tab's latest OSC-7 cwd (see {@link cwdByTab}). */
@@ -217,6 +224,35 @@ function writeSidebarCollapsed(collapsed: boolean) {
   }
 }
 
+function clampWelcomeRecentSessionLimit(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_WELCOME_RECENT_SESSION_LIMIT;
+  return Math.max(
+    MIN_WELCOME_RECENT_SESSION_LIMIT,
+    Math.min(MAX_WELCOME_RECENT_SESSION_LIMIT, Math.round(value)),
+  );
+}
+
+function readWelcomeRecentSessionLimit(): number {
+  try {
+    const value = window.localStorage.getItem(WELCOME_RECENT_SESSION_LIMIT_KEY);
+    if (!value) return DEFAULT_WELCOME_RECENT_SESSION_LIMIT;
+    return clampWelcomeRecentSessionLimit(parseInt(value, 10));
+  } catch {
+    return DEFAULT_WELCOME_RECENT_SESSION_LIMIT;
+  }
+}
+
+function writeWelcomeRecentSessionLimit(limit: number) {
+  try {
+    window.localStorage.setItem(
+      WELCOME_RECENT_SESSION_LIMIT_KEY,
+      String(clampWelcomeRecentSessionLimit(limit)),
+    );
+  } catch {
+    // Ignore storage failures; the in-memory setting still applies.
+  }
+}
+
 function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
   const next = new Set<string>();
   for (const id of ids) {
@@ -304,6 +340,7 @@ export const useAppStore = create<AppState>((set) => ({
   terminalSplitInputLockedTabIds: new Set(),
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
+  welcomeRecentSessionLimit: readWelcomeRecentSessionLimit(),
   tabFilter: null,
 
   addTab: (tab) =>
@@ -600,6 +637,13 @@ export const useAppStore = create<AppState>((set) => ({
     set(() => {
       writeUiFontSize(size);
       return { uiFontSize: size };
+    }),
+
+  setWelcomeRecentSessionLimit: (limit) =>
+    set(() => {
+      const next = clampWelcomeRecentSessionLimit(limit);
+      writeWelcomeRecentSessionLimit(next);
+      return { welcomeRecentSessionLimit: next };
     }),
 
   setTabFilter: (filter) => set({ tabFilter: filter }),

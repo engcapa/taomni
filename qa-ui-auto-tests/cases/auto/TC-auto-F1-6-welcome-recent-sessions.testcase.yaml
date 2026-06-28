@@ -1,0 +1,89 @@
+id: TC-auto-F1-6-welcome-recent-sessions
+title: Welcome recent sessions restore and filter controls
+description: |
+  Creates a saved LocalShell session, opens it once so last_connected_at is set,
+  then verifies the Welcome recent-session history supports filtering, type
+  filtering, sorting, selecting filtered rows, opening selected/filtered rows,
+  session-tree reveal, session-tree-equivalent row context actions, and the
+  history settings shortcut.
+covers: [F1.6, F11.1]
+tags: [auto-generated, smoke, p1, welcome, needs-review]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - assert_visible: '[data-testid="welcome-recent-sessions"]'
+  - assert_visible: '[data-testid="welcome-recent-empty"]'
+
+  # Create a saved local shell session without external network credentials.
+  - click: text="New session…"
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-shell"]'
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill: {selector: '[data-testid="session-name"]', value: qa-ui-auto-welcome-recent}
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+
+  # Opening the saved session marks it connected and promotes it into history.
+  - open_session: {name: qa-ui-auto-welcome-recent, double_click: true}
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 10
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+
+  - fill: {selector: '[data-testid="welcome-recent-filter"]', value: welcome-recent}
+  - select_option: {selector: '[data-testid="welcome-recent-type-filter"]', value: LocalShell}
+  - select_option: {selector: '[data-testid="welcome-recent-sort"]', value: name-asc}
+  - assert_visible: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+  - click: '[data-testid="welcome-recent-select-filtered"]'
+  - assert_visible: '[data-testid="welcome-recent-clear-selection"]'
+  - click: '[data-testid="welcome-recent-clear-selection"]'
+  - click: '[data-testid="welcome-recent-select"]'
+  - click: '[data-testid="welcome-recent-open-selected"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 10
+
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+  - click: '[data-testid="welcome-recent-reveal"]'
+  - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+  - assert_attribute: {selector: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]', name: data-selected, equals: 'true'}
+  - right_click: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+  - assert_menu_items: [Connect, Edit..., Duplicate, Move to folder, Delete]
+  - click_menu: Connect
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 10
+
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - click: '[data-testid="welcome-recent-open-filtered"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 10
+
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - click: '[data-testid="welcome-recent-clear-filter"]'
+  - fill: {selector: '[data-testid="welcome-recent-filter"]', value: no-such-session}
+  - assert_visible: '[data-testid="welcome-recent-no-matches"]'
+  - click: '[data-testid="welcome-recent-clear-filter"]'
+  - click: '[data-testid="welcome-recent-open-all"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 10
+
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - click: '[data-testid="welcome-recent-open"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"]'
+      timeout_sec: 10
+
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - click: '[data-testid="welcome-recent-settings"]'
+  - wait_for: '[data-testid="settings-welcome-recent-session-limit"]'
+  - fill: {selector: '[data-testid="settings-welcome-recent-session-limit"]', value: '20'}
+  - screenshot: F1.6-welcome-recent-sessions.png

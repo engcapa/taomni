@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, ChevronDown, ChevronUp, RotateCcw, Search, Type, Undo, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Type, Undo, X } from "lucide-react";
 import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
@@ -98,8 +98,10 @@ export function SettingsPanel() {
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
+  const welcomeRecentSessionLimit = useAppStore((s) => s.welcomeRecentSessionLimit);
   const setUiFontFamily = useAppStore((s) => s.setUiFontFamily);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
+  const setWelcomeRecentSessionLimit = useAppStore((s) => s.setWelcomeRecentSessionLimit);
   const systemFonts = useSystemFonts();
   const voiceShellEnabled = useAiStore((s) => s.voiceShellEnabled);
   const toggleVoiceShell = useAiStore((s) => s.toggleVoiceShell);
@@ -270,6 +272,42 @@ export function SettingsPanel() {
                 </div>
               </div>
               <AppThemeSwitcher />
+            </section>
+          </SettingsAnchor>
+
+          <SettingsAnchor id="welcome-history">
+            <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+              <div className="mb-3 flex items-center gap-3">
+                <History className="w-4 h-4 text-[var(--taomni-accent)]" />
+                <div>
+                  <div className="text-[14px] font-semibold">{t("settings.welcomeHistoryTitle")}</div>
+                  <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                    {t("settings.welcomeHistorySubtitle")}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="welcome-recent-session-limit" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                    {t("settings.welcomeHistoryLimitLabel")}
+                  </label>
+                  <input
+                    id="welcome-recent-session-limit"
+                    data-testid="settings-welcome-recent-session-limit"
+                    className="taomni-input h-8 w-full"
+                    type="number"
+                    min={1}
+                    max={100}
+                    step={1}
+                    aria-label={t("settings.welcomeHistoryLimitAria")}
+                    value={welcomeRecentSessionLimit}
+                    onChange={(e) => setWelcomeRecentSessionLimit(parseInt(e.target.value, 10))}
+                  />
+                </div>
+                <div className="text-[12px] text-[var(--taomni-text-muted)] flex items-center">
+                  {t("settings.welcomeHistoryLimitHint")}
+                </div>
+              </div>
             </section>
           </SettingsAnchor>
 

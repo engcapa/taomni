@@ -416,6 +416,7 @@ export function MainLayout() {
     moveTabToIndex,
     toggleSidebar,
     setSidebarCollapsed,
+    setActiveSideTab,
     toggleXServer,
     setStatusMessage,
     multiExecActive,
@@ -423,6 +424,7 @@ export function MainLayout() {
     terminalSplitActive,
     terminalSplitLayout,
     terminalSplitInputLockedTabIds,
+    welcomeRecentSessionLimit,
     toggleMultiExec,
     selectAllTerminalTabs,
     clearMultiExecSelection,
@@ -432,7 +434,7 @@ export function MainLayout() {
     clearTerminalSplitInputLocks,
     setTabHasNewOutput,
   } = useAppStore();
-  const { loadSessions, markConnected, sessions, updateSession } = useSessionStore();
+  const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
@@ -441,6 +443,15 @@ export function MainLayout() {
     }
     return profiles;
   }, [sessions]);
+  const welcomeRecentSessions = useMemo(
+    () =>
+      sessions
+        .filter((session) => session.last_connected_at)
+        .slice()
+        .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
+        .slice(0, welcomeRecentSessionLimit),
+    [sessions, welcomeRecentSessionLimit],
+  );
   const tabsRef = useRef(tabs);
   const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
   const seenControlToolCallsRef = useRef<Set<string>>(new Set());
@@ -1691,6 +1702,26 @@ export function MainLayout() {
     continueConnectQueue();
   }, [continueConnectQueue]);
 
+  const handleConnectSessions = useCallback((targets: SessionConfig[]) => {
+    const seen = new Set<string>();
+    const unique = targets.filter((session) => {
+      if (seen.has(session.id)) return false;
+      seen.add(session.id);
+      return true;
+    });
+    if (unique.length === 0) return;
+    connectQueueRef.current.push(...unique);
+    continueConnectQueue();
+  }, [continueConnectQueue]);
+
+  const handleRevealRecentSession = useCallback((session: SessionConfig) => {
+    setActiveSideTab("sessions");
+    setSidebarCollapsed(false);
+    setSelectedSession(session.id);
+    setSearchQuery("");
+    setStatusMessage(tr("status.revealedSession", { name: session.name || session.host || session.session_type }));
+  }, [setActiveSideTab, setSearchQuery, setSelectedSession, setSidebarCollapsed, setStatusMessage, tr]);
+
   const handleAuthSubmit = useCallback(async (password: string, saveToVault: boolean) => {
     if (!pendingAuth) return;
     const session = pendingAuth.session;
@@ -2560,6 +2591,12 @@ export function MainLayout() {
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}
+                    recentSessions={welcomeRecentSessions}
+                    onOpenRecentSession={handleConnectSession}
+                    onOpenRecentSessions={handleConnectSessions}
+                    onEditRecentSession={handleEditSession}
+                    onRevealRecentSession={handleRevealRecentSession}
+                    onOpenSettings={openSettingsTab}
                   />
                 )}
 

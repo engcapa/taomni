@@ -191,6 +191,18 @@ describe("appStore.uiAppearance", () => {
     expect(useAppStore.getState().uiFontSize).toBe(size);
     expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("14");
   });
+
+  it("allows setting and persisting the welcome recent session limit", () => {
+    useAppStore.getState().setWelcomeRecentSessionLimit(35);
+    expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(35);
+    expect(window.localStorage.getItem("taomni.welcomeRecentSessionLimit")).toBe("35");
+
+    useAppStore.getState().setWelcomeRecentSessionLimit(250);
+    expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(100);
+
+    useAppStore.getState().setWelcomeRecentSessionLimit(-5);
+    expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(1);
+  });
 });
 
 describe("appStore.sidebar", () => {
