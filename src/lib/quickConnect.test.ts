@@ -26,6 +26,7 @@ describe("parseQuickConnectInput", () => {
   });
 
   it.each([
+    ["ftp://ops@files.example.test:2121", "FTP", "files.example.test", 2121, "ops"],
     ["rlogin://bob@legacy.example.test", "Rlogin", "legacy.example.test", 513, "bob"],
     ["mosh alice@edge.example.test", "Mosh", "edge.example.test", 60001, "alice"],
   ])("parses terminal client protocol %s", (input, sessionType, host, port, username) => {

@@ -29,11 +29,24 @@ pub fn build_client_terminal_launch(
 
     let username = username.map(str::trim).filter(|value| !value.is_empty());
     match kind {
+        "FTP" => Ok(build_ftp_launch(host, port)),
         "Telnet" => Ok(build_telnet_launch(host, port, username)),
         "Rlogin" => Ok(build_rlogin_launch(host, port, username)),
         "Mosh" => Ok(build_mosh_launch(host, port, username)),
         "Serial" => Ok(build_serial_launch(host, options_json)),
         other => Err(format!("Unsupported terminal client type {}", other)),
+    }
+}
+
+fn build_ftp_launch(host: &str, port: u16) -> ClientTerminalLaunch {
+    let mut args = vec![host.to_string()];
+    if port > 0 {
+        args.push(port.to_string());
+    }
+
+    ClientTerminalLaunch {
+        program: "ftp".to_string(),
+        args,
     }
 }
 
@@ -146,6 +159,16 @@ mod tests {
         assert_eq!(launch.args, ["-l", "alice", "legacy.example.test", "2323"]);
         #[cfg(not(unix))]
         assert_eq!(launch.args, ["legacy.example.test", "2323"]);
+    }
+
+    #[test]
+    fn ftp_launch_uses_host_and_port() {
+        let launch =
+            build_client_terminal_launch("FTP", "ftp.example.test", 2121, Some("ops"), None)
+                .expect("ftp launch should build");
+
+        assert_eq!(launch.program, "ftp");
+        assert_eq!(launch.args, ["ftp.example.test", "2121"]);
     }
 
     #[test]

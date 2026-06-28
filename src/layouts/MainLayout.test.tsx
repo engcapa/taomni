@@ -973,17 +973,20 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
   });
 
-  it("opens terminal client saved sessions in a terminal tab", async () => {
+  it.each<[string, string, string, string, number, string]>([
+    ["Telnet", "telnet-1", "Legacy shell", "legacy.example.test", 23, "ops"],
+    ["FTP", "ftp-1", "Files", "files.example.test", 21, "deploy"],
+  ])("opens %s saved sessions in a terminal tab", async (sessionType, id, name, host, port, username) => {
     render(<MainLayout />);
 
-    const telnetSession: SessionConfig = {
-      id: "telnet-1",
-      name: "Legacy shell",
-      session_type: "Telnet",
+    const session: SessionConfig = {
+      id,
+      name,
+      session_type: sessionType,
       group_path: null,
-      host: "legacy.example.test",
-      port: 23,
-      username: "ops",
+      host,
+      port,
+      username,
       auth_method: "None",
       options_json: "{}",
       created_at: 0,
@@ -991,26 +994,26 @@ describe("MainLayout attached SFTP sidebar", () => {
       last_connected_at: null,
       sort_order: 0,
     };
-    useSessionStore.setState({ sessions: [telnetSession], groups: [] });
+    useSessionStore.setState({ sessions: [session], groups: [] });
 
     await act(async () => {
-      sidebarMock.props.at(-1)?.onConnectSession?.(telnetSession);
+      sidebarMock.props.at(-1)?.onConnectSession?.(session);
     });
 
     await waitFor(() => {
       expect(
         screen.getAllByTestId("terminal-panel").some((node) =>
-          node.getAttribute("data-command-kind") === "Telnet"),
+          node.getAttribute("data-command-kind") === sessionType),
       ).toBe(true);
     });
     const terminal = screen.getAllByTestId("terminal-panel").find((node) =>
-      node.getAttribute("data-command-kind") === "Telnet");
-    if (!terminal) throw new Error("Telnet terminal panel not found");
-    expect(terminal).toHaveAttribute("data-command-kind", "Telnet");
-    expect(terminal).toHaveAttribute("data-command-host", "legacy.example.test");
-    expect(terminal).toHaveAttribute("data-command-port", "23");
-    expect(terminal).toHaveAttribute("data-command-username", "ops");
-    await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith("telnet-1"));
+      node.getAttribute("data-command-kind") === sessionType);
+    if (!terminal) throw new Error(`${sessionType} terminal panel not found`);
+    expect(terminal).toHaveAttribute("data-command-kind", sessionType);
+    expect(terminal).toHaveAttribute("data-command-host", host);
+    expect(terminal).toHaveAttribute("data-command-port", String(port));
+    expect(terminal).toHaveAttribute("data-command-username", username);
+    await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith(id));
     expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
   });
 

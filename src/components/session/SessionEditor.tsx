@@ -151,7 +151,7 @@ const DEFAULT_PORTS: Record<string, number> = {
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis"];
-const PLANNED_CLIENT_PROTOS = new Set<Proto>(["FTP"]);
+const PLANNED_CLIENT_PROTOS = new Set<Proto>();
 
 /** Map UI proto to the backend session_type string. Object storage ("S3"
  * proto) is resolved to "S3" vs "AzureBlob" by the caller based on the
@@ -2126,6 +2126,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       proto === "WSL" ||
       proto === "File" ||
       proto === "Browser" ||
+      proto === "FTP" ||
       proto === "Telnet" ||
       proto === "Rlogin" ||
       proto === "Serial" ||

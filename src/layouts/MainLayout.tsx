@@ -211,7 +211,7 @@ function browserUrlFromSession(session: SessionConfig): string | null {
   return `https://${withoutSlashes}${port}`;
 }
 
-const COMMAND_TERMINAL_SESSION_TYPES = new Set(["Telnet", "Rlogin", "Serial", "Mosh"]);
+const COMMAND_TERMINAL_SESSION_TYPES = new Set(["FTP", "Telnet", "Rlogin", "Serial", "Mosh"]);
 
 function commandTerminalFromSession(session: SessionConfig): NonNullable<Tab["commandTerminal"]> | null {
   if (!COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) return null;

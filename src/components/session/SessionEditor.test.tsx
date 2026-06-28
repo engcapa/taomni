@@ -435,6 +435,7 @@ describe("SessionEditor SSH settings tabs", () => {
   });
 
   it.each([
+    ["FTP", 21],
     ["Telnet", 23],
     ["Rlogin", 513],
     ["Mosh", 60001],

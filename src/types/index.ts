@@ -308,7 +308,7 @@ export interface LocalShellSelection {
 
 export interface CommandTerminalConnectInfo {
   sessionId?: string;
-  kind: "Telnet" | "Rlogin" | "Serial" | "Mosh";
+  kind: "FTP" | "Telnet" | "Rlogin" | "Serial" | "Mosh";
   host: string;
   port: number;
   username?: string | null;
