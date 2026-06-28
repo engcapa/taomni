@@ -532,13 +532,13 @@ function RecentSessionsPanel({
           {onOpenSettings ? (
             <button
               data-testid="welcome-recent-settings"
-              className="taomni-btn h-8 w-8 inline-flex items-center justify-center"
+              className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
               type="button"
               title={t("welcome.recentSessionsSettings")}
               aria-label={t("welcome.recentSessionsSettings")}
               onClick={onOpenSettings}
             >
-              <Settings className="w-4 h-4 text-[var(--taomni-text)]" aria-hidden="true" />
+              <Settings className="w-[18px] h-[18px]" aria-hidden="true" />
             </button>
           ) : null}
         </div>
