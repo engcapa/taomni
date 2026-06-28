@@ -46,7 +46,7 @@ async-stream = "0.3"
 # `.mcp.json` `type:"http"` entry. axum hosts the rmcp tower service + a Bearer
 # auth layer; schemars derives the tool input/output JSON schemas. Versions are
 # already in the tree (tower 0.5 / http 1 / hyper 1 / schemars 1) — additive.
-rmcp = { version = "1", features = ["server", "transport-streamable-http-server", "macros"] }
+rmcp = { version = "1", features = ["server", "client", "transport-streamable-http-server", "transport-streamable-http-client-reqwest", "reqwest", "macros"] }
 axum = "0.8"
 schemars = "1"
 thiserror = "2"
