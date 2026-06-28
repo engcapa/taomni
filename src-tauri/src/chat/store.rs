@@ -11,6 +11,8 @@ pub struct ChatThread {
     pub updated_at: i64,
     pub linked_session_id: Option<String>,
     pub source: String,
+    #[serde(default = "default_thread_mode")]
+    pub mode: String,
     /// Claude Code session ID for --resume (v2.6).
     #[serde(default)]
     pub cc_session_id: Option<String>,
@@ -23,6 +25,10 @@ pub struct ChatThread {
     /// `None` means "inherit AiConfig.chat_output_format".
     #[serde(default)]
     pub output_format: Option<String>,
+}
+
+fn default_thread_mode() -> String {
+    "chat".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,8 +109,10 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
         [],
     );
     // Idempotent column add for the per-thread Claude Code model override.
+    let _ = conn.execute("ALTER TABLE ai_chat_threads ADD COLUMN cc_model TEXT", []);
+    // Idempotent column add for media-generation chat drawer modes.
     let _ = conn.execute(
-        "ALTER TABLE ai_chat_threads ADD COLUMN cc_model TEXT",
+        "ALTER TABLE ai_chat_threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat'",
         [],
     );
     Ok(())
@@ -112,21 +120,47 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
-            thread.output_format, thread.cc_model,
+            thread.output_format, thread.cc_model, thread.mode,
         ],
     )?;
     Ok(())
 }
 
+pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode
+         FROM ai_chat_threads WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query(params![id])?;
+    let Some(row) = rows.next()? else {
+        return Ok(None);
+    };
+    Ok(Some(ChatThread {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        provider_id: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+        linked_session_id: row.get(5)?,
+        source: row.get(6)?,
+        cc_session_id: row.get(7).ok(),
+        output_format: row.get(8).ok(),
+        cc_model: row.get(9).ok(),
+        mode: row
+            .get::<_, Option<String>>(10)?
+            .unwrap_or_else(default_thread_mode),
+    }))
+}
+
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -141,6 +175,9 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             cc_session_id: row.get(7).ok(),
             output_format: row.get(8).ok(),
             cc_model: row.get(9).ok(),
+            mode: row
+                .get::<_, Option<String>>(10)?
+                .unwrap_or_else(default_thread_mode),
         })
     })?;
     rows.collect()
@@ -272,11 +309,7 @@ pub fn update_thread_provider(conn: &Connection, id: &str, provider_id: &str) ->
 /// Set or clear the per-thread Claude Code model override.
 /// `None` (or `Some("")`) clears it so the thread inherits the configured
 /// `cc_bridge.default_model`.
-pub fn update_thread_cc_model(
-    conn: &Connection,
-    id: &str,
-    model: Option<&str>,
-) -> SqlResult<()> {
+pub fn update_thread_cc_model(conn: &Connection, id: &str, model: Option<&str>) -> SqlResult<()> {
     let normalized = model.filter(|s| !s.trim().is_empty());
     conn.execute(
         "UPDATE ai_chat_threads SET cc_model = ?1 WHERE id = ?2",
@@ -333,6 +366,7 @@ mod tests {
             updated_at: 1,
             linked_session_id: None,
             source: "drawer".into(),
+            mode: "chat".into(),
             cc_session_id: None,
             cc_model: None,
             output_format: None,
@@ -361,5 +395,7 @@ mod tests {
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].attachments.len(), 1);
         assert_eq!(messages[0].attachments[0].name, "diagram.png");
+        let loaded_thread = get_thread(&conn, "thread-1").unwrap().unwrap();
+        assert_eq!(loaded_thread.mode, "chat");
     }
 }
