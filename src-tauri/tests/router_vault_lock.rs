@@ -27,6 +27,7 @@ fn make_config(api_key: String) -> AiConfig {
         LlmProviderConfig {
             base_url: "https://api.anthropic.com/v1".into(),
             api_key,
+            api_keys: Vec::new(),
             model: "claude-sonnet-4-5".into(),
             runtime: "anthropic".into(),
             capabilities: LlmProviderCapabilities::default(),
@@ -39,6 +40,7 @@ fn make_config(api_key: String) -> AiConfig {
         LlmProviderConfig {
             base_url: "http://127.0.0.1:8080/v1".into(),
             api_key: "local".into(),
+            api_keys: Vec::new(),
             model: "qwen3-1.7b-q4_k_m".into(),
             runtime: "llama-server".into(),
             capabilities: LlmProviderCapabilities::default(),
@@ -52,6 +54,7 @@ fn make_config(api_key: String) -> AiConfig {
         llm: LlmConfig {
             active: "anthropic".into(),
             providers,
+            provider_groups: HashMap::new(),
             fallback: FallbackConfig {
                 enabled: false,
                 primary: "anthropic".into(),

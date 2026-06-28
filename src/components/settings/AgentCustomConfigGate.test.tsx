@@ -48,6 +48,7 @@ function makeConfig(): AiConfig {
           runtime: "openai-compat",
         },
       },
+      provider_groups: {},
       fallback: { enabled: true, primary: "deepseek", secondary: "deepseek", timeout_ms: 8000 },
       task_routing: { chat_drawer: "deepseek" },
     },

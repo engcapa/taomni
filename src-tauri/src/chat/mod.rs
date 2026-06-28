@@ -4,6 +4,7 @@ pub mod run;
 pub mod store;
 
 use crate::ai::config::{default_ai_config_path, AiConfig};
+use crate::llm::router::provider_group_id_from_route;
 use crate::llm::{
     ChatContentPart, ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, ChatTool,
     ChatToolCall, Llm, TaskKind,
@@ -1037,6 +1038,89 @@ async fn generate_video_file(
     })
 }
 
+fn provider_supports_media_generation(
+    provider: &crate::ai::config::LlmProviderConfig,
+    kind: MediaGenerationKind,
+) -> bool {
+    match kind {
+        MediaGenerationKind::Image => provider.capabilities.image_generation,
+        MediaGenerationKind::Video => provider.capabilities.video_generation,
+    }
+}
+
+async fn generate_media_with_provider_key(
+    client: &Client,
+    app: &AppHandle,
+    provider: &crate::ai::config::LlmProviderConfig,
+    api_key: &str,
+    req: &ChatGenerateMediaRequest,
+    kind: MediaGenerationKind,
+    prompt: &str,
+) -> Result<GeneratedMediaFile, String> {
+    match kind {
+        MediaGenerationKind::Image => {
+            let size = req
+                .size
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(DEFAULT_IMAGE_SIZE);
+            generate_image_file(client, app, provider, api_key, prompt, size).await
+        }
+        MediaGenerationKind::Video => {
+            generate_video_file(client, app, provider, api_key, req, prompt).await
+        }
+    }
+}
+
+async fn generate_media_with_provider_keys(
+    state: &AppState,
+    client: &Client,
+    app: &AppHandle,
+    provider_id: &str,
+    provider: &crate::ai::config::LlmProviderConfig,
+    req: &ChatGenerateMediaRequest,
+    kind: MediaGenerationKind,
+    prompt: &str,
+) -> Result<GeneratedMediaFile, String> {
+    let api_keys = provider.effective_api_keys();
+    let key_count = api_keys.len();
+    let mut last_err: Option<String> = None;
+
+    for _ in 0..key_count {
+        let key_index = {
+            let ai_ctx = state.ai_ctx.read().await;
+            ai_ctx.llm.next_key_index(provider_id, key_count)
+        };
+        let Some(api_key_ref) = api_keys.get(key_index).copied() else {
+            continue;
+        };
+        let api_key = match resolve_ai_api_key(provider_id, api_key_ref, state) {
+            Ok(api_key) => api_key,
+            Err(err) => {
+                last_err = Some(err);
+                continue;
+            }
+        };
+        match generate_media_with_provider_key(client, app, provider, &api_key, req, kind, prompt)
+            .await
+        {
+            Ok(file) => return Ok(file),
+            Err(err) => {
+                tracing::warn!(
+                    provider = %provider_id,
+                    kind = kind.as_str(),
+                    error = %err,
+                    "media generation key failed, trying next key"
+                );
+                last_err = Some(err);
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| format!("Provider '{provider_id}' has no API keys.")))
+}
+
 #[tauri::command]
 pub async fn chat_generate_media(
     req: ChatGenerateMediaRequest,
@@ -1067,43 +1151,111 @@ pub async fn chat_generate_media(
         ));
     }
 
-    let ai_config = AiConfig::load(&default_ai_config_path());
-    let provider = ai_config
-        .llm
-        .providers
-        .get(&thread.provider_id)
-        .cloned()
-        .ok_or_else(|| format!("Provider '{}' is not configured.", thread.provider_id))?;
-    let has_capability = match kind {
-        MediaGenerationKind::Image => provider.capabilities.image_generation,
-        MediaGenerationKind::Video => provider.capabilities.video_generation,
-    };
-    if !has_capability {
-        return Err(format!(
-            "Provider '{}' does not support {} generation.",
-            thread.provider_id,
-            kind.as_str()
-        ));
-    }
-    let api_key = resolve_ai_api_key(&thread.provider_id, &provider.api_key, state.inner())?;
     let (clean_prompt, redacted_count) = redact::redact(&req.prompt);
+    let ai_config = AiConfig::load(&default_ai_config_path());
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(360))
         .build()
         .map_err(|e| format!("Create generation HTTP client: {e}"))?;
-    let generated = match kind {
-        MediaGenerationKind::Image => {
-            let size = req
-                .size
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .unwrap_or(DEFAULT_IMAGE_SIZE);
-            generate_image_file(&client, &app, &provider, &api_key, &clean_prompt, size).await?
+
+    let generated = if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
+        let route_id = thread.provider_id.clone();
+        let attempt_count = {
+            let ai_ctx = state.ai_ctx.read().await;
+            ai_ctx.llm.provider_group_len(&route_id).unwrap_or(0)
+        };
+        if attempt_count == 0 {
+            return Err(format!(
+                "Provider group '{group_id}' is not configured or has no providers."
+            ));
         }
-        MediaGenerationKind::Video => {
-            generate_video_file(&client, &app, &provider, &api_key, &req, &clean_prompt).await?
+
+        let mut saw_supported_provider = false;
+        let mut last_err: Option<String> = None;
+        let mut generated: Option<GeneratedMediaFile> = None;
+        for _ in 0..attempt_count {
+            let provider_id = {
+                let ai_ctx = state.ai_ctx.read().await;
+                ai_ctx.llm.next_provider_in_group(&route_id)
+            };
+            let Some(provider_id) = provider_id else {
+                continue;
+            };
+            let Some(provider) = ai_config.llm.providers.get(&provider_id).cloned() else {
+                continue;
+            };
+            if !provider_supports_media_generation(&provider, kind) {
+                continue;
+            }
+            saw_supported_provider = true;
+            match generate_media_with_provider_keys(
+                state.inner(),
+                &client,
+                &app,
+                &provider_id,
+                &provider,
+                &req,
+                kind,
+                &clean_prompt,
+            )
+            .await
+            {
+                Ok(file) => {
+                    generated = Some(file);
+                    break;
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        group = %route_id,
+                        provider = %provider_id,
+                        kind = kind.as_str(),
+                        error = %err,
+                        "media generation provider failed, trying next group provider"
+                    );
+                    last_err = Some(err);
+                }
+            }
         }
+        if let Some(file) = generated {
+            file
+        } else if !saw_supported_provider {
+            return Err(format!(
+                "Provider group '{group_id}' does not support {} generation.",
+                kind.as_str()
+            ));
+        } else {
+            return Err(last_err.unwrap_or_else(|| {
+                format!(
+                    "Provider group '{group_id}' failed to generate {}.",
+                    kind.as_str()
+                )
+            }));
+        }
+    } else {
+        let provider = ai_config
+            .llm
+            .providers
+            .get(&thread.provider_id)
+            .cloned()
+            .ok_or_else(|| format!("Provider '{}' is not configured.", thread.provider_id))?;
+        if !provider_supports_media_generation(&provider, kind) {
+            return Err(format!(
+                "Provider '{}' does not support {} generation.",
+                thread.provider_id,
+                kind.as_str()
+            ));
+        }
+        generate_media_with_provider_keys(
+            state.inner(),
+            &client,
+            &app,
+            &thread.provider_id,
+            &provider,
+            &req,
+            kind,
+            &clean_prompt,
+        )
+        .await?
     };
     let display_path = normalize_path_for_display(generated.path.to_string_lossy().to_string());
     let mut assistant_content = match kind {
@@ -1255,6 +1407,10 @@ pub async fn chat_send(
             return Err(format!(
                 "VAULT_LOCKED: provider '{}' needs the vault unlocked to load its API key",
                 thread.provider_id
+            ));
+        } else if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
+            return Err(format!(
+                "Provider group '{group_id}' has no available chat providers."
             ));
         } else {
             // Fall back to the task-routed provider with timeout/fallback.
@@ -2350,6 +2506,13 @@ pub async fn chat_stream(
                 if pinned_blocked {
                     Err(crate::llm::LlmError::VaultLocked {
                         provider: thread.provider_id.clone(),
+                    })
+                } else if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
+                    Err(crate::llm::LlmError::Provider {
+                        status: 0,
+                        message: format!(
+                            "Provider group '{group_id}' has no available chat providers."
+                        ),
                     })
                 } else {
                     Err(crate::llm::LlmError::Provider {

@@ -123,6 +123,8 @@ pub struct AsrProviderConfig {
 pub struct LlmConfig {
     pub active: String,
     pub providers: HashMap<String, LlmProviderConfig>,
+    #[serde(default)]
+    pub provider_groups: HashMap<String, LlmProviderGroupConfig>,
     pub fallback: FallbackConfig,
     pub task_routing: HashMap<String, String>,
 }
@@ -136,6 +138,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "https://api.deepseek.com/v1".into(),
                 api_key: String::new(),
+                api_keys: Vec::new(),
                 model: "deepseek-chat".into(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
@@ -148,6 +151,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "https://apihub.agnes-ai.com/v1".into(),
                 api_key: String::new(),
+                api_keys: Vec::new(),
                 model: "agnes-2.0-flash".into(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities {
@@ -164,6 +168,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "https://open.bigmodel.cn/api/paas/v4".into(),
                 api_key: String::new(),
+                api_keys: Vec::new(),
                 model: "glm-4-flash".into(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
@@ -176,6 +181,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "https://api.siliconflow.cn/v1".into(),
                 api_key: String::new(),
+                api_keys: Vec::new(),
                 model: "Qwen/Qwen2.5-Coder-7B-Instruct".into(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
@@ -188,6 +194,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "https://api.groq.com/openai/v1".into(),
                 api_key: String::new(),
+                api_keys: Vec::new(),
                 model: "llama-3.3-70b-versatile".into(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
@@ -200,6 +207,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "http://127.0.0.1:8080/v1".into(),
                 api_key: "local".into(),
+                api_keys: Vec::new(),
                 model: "qwen3-1.7b-q4_k_m".into(),
                 runtime: "llama-server".into(),
                 capabilities: LlmProviderCapabilities::default(),
@@ -212,6 +220,7 @@ impl Default for LlmConfig {
             LlmProviderConfig {
                 base_url: "https://api.anthropic.com/v1".into(),
                 api_key: String::new(),
+                api_keys: Vec::new(),
                 model: "claude-sonnet-4-5".into(),
                 runtime: "anthropic".into(),
                 capabilities: LlmProviderCapabilities::default(),
@@ -232,6 +241,7 @@ impl Default for LlmConfig {
         Self {
             active: "deepseek".into(),
             providers,
+            provider_groups: HashMap::new(),
             fallback: FallbackConfig {
                 enabled: true,
                 primary: "deepseek".into(),
@@ -255,6 +265,7 @@ fn default_agnes_provider() -> LlmProviderConfig {
     LlmProviderConfig {
         base_url: "https://apihub.agnes-ai.com/v1".into(),
         api_key: String::new(),
+        api_keys: Vec::new(),
         model: "agnes-2.0-flash".into(),
         runtime: "openai-compat".into(),
         capabilities: LlmProviderCapabilities {
@@ -271,6 +282,8 @@ fn default_agnes_provider() -> LlmProviderConfig {
 pub struct LlmProviderConfig {
     pub base_url: String,
     pub api_key: String,
+    #[serde(default)]
+    pub api_keys: Vec<String>,
     pub model: String,
     pub runtime: String,
     #[serde(default = "default_llm_provider_capabilities")]
@@ -279,6 +292,30 @@ pub struct LlmProviderConfig {
     pub image_model: Option<String>,
     #[serde(default)]
     pub video_model: Option<String>,
+}
+
+impl LlmProviderConfig {
+    pub fn effective_api_keys(&self) -> Vec<&str> {
+        let api_keys = self
+            .api_keys
+            .iter()
+            .map(|key| key.trim())
+            .filter(|key| !key.is_empty())
+            .collect::<Vec<_>>();
+        if api_keys.is_empty() {
+            vec![self.api_key.as_str()]
+        } else {
+            api_keys
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmProviderGroupConfig {
+    pub label: String,
+    pub provider_ids: Vec<String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

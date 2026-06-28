@@ -6,7 +6,7 @@ mod support;
 use std::sync::Arc;
 use std::time::Duration;
 use support::mock_provider::{MockEvent, MockLlm};
-use taomni_lib::llm::router::{FallbackConfig, LlmRouter};
+use taomni_lib::llm::router::{provider_group_route_id, FallbackConfig, LlmRouter};
 use taomni_lib::llm::{ChatRequest, TaskKind};
 
 fn req() -> ChatRequest {
@@ -85,6 +85,91 @@ async fn fallback_kicks_in_on_provider_error() {
 
     let resp = r.complete(req(), TaskKind::ChatDrawer).await.unwrap();
     assert_eq!(resp.content, "FALLBACK");
+}
+
+#[tokio::test]
+async fn provider_variants_rotate_keys_globally() {
+    let mut r = LlmRouter::new("multi-key");
+    r.add_provider_variants(
+        "multi-key",
+        vec![
+            Arc::new(MockLlm::new(vec![MockEvent::Token("KEY-1".into())])),
+            Arc::new(MockLlm::new(vec![MockEvent::Token("KEY-2".into())])),
+        ],
+    );
+
+    let provider = r.provider("multi-key").unwrap();
+
+    let first = provider.chat(req()).await.unwrap();
+    let second = provider.chat(req()).await.unwrap();
+    let third = provider.chat(req()).await.unwrap();
+
+    assert_eq!(first.content, "KEY-1");
+    assert_eq!(second.content, "KEY-2");
+    assert_eq!(third.content, "KEY-1");
+}
+
+#[tokio::test]
+async fn provider_variants_try_next_key_on_error() {
+    let mut r = LlmRouter::new("multi-key");
+    r.add_provider_variants(
+        "multi-key",
+        vec![
+            Arc::new(MockLlm::new(vec![MockEvent::Error("bad key".into())])),
+            Arc::new(MockLlm::new(vec![MockEvent::Token("KEY-2".into())])),
+        ],
+    );
+
+    let resp = r.provider("multi-key").unwrap().chat(req()).await.unwrap();
+
+    assert_eq!(resp.content, "KEY-2");
+}
+
+#[tokio::test]
+async fn provider_group_rotates_members_globally() {
+    let mut r = LlmRouter::new("group:main");
+    r.add_provider(
+        "p1",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("P1".into())])),
+    );
+    r.add_provider(
+        "p2",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("P2".into())])),
+    );
+    r.add_provider_group("main", vec!["p1".into(), "p2".into()]);
+
+    let group = r.provider(&provider_group_route_id("main")).unwrap();
+
+    let first = group.chat(req()).await.unwrap();
+    let second = group.chat(req()).await.unwrap();
+    let third = group.chat(req()).await.unwrap();
+
+    assert_eq!(first.content, "P1");
+    assert_eq!(second.content, "P2");
+    assert_eq!(third.content, "P1");
+}
+
+#[tokio::test]
+async fn provider_group_tries_next_provider_on_error() {
+    let mut r = LlmRouter::new("group:main");
+    r.add_provider(
+        "p1",
+        Arc::new(MockLlm::new(vec![MockEvent::Error("provider down".into())])),
+    );
+    r.add_provider(
+        "p2",
+        Arc::new(MockLlm::new(vec![MockEvent::Token("P2".into())])),
+    );
+    r.add_provider_group("main", vec!["p1".into(), "p2".into()]);
+
+    let resp = r
+        .provider(&provider_group_route_id("main"))
+        .unwrap()
+        .chat(req())
+        .await
+        .unwrap();
+
+    assert_eq!(resp.content, "P2");
 }
 
 #[tokio::test]

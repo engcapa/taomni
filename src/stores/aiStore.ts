@@ -24,6 +24,7 @@ export interface AsrConfig {
 export interface LlmProviderConfig {
   base_url: string;
   api_key: string;
+  api_keys?: string[];
   model: string;
   runtime: string;
   capabilities?: LlmProviderCapabilities;
@@ -44,9 +45,16 @@ export interface FallbackConfig {
   timeout_ms: number;
 }
 
+export interface LlmProviderGroupConfig {
+  label: string;
+  provider_ids: string[];
+  enabled?: boolean;
+}
+
 export interface LlmConfig {
   active: string;
   providers: Record<string, LlmProviderConfig>;
+  provider_groups: Record<string, LlmProviderGroupConfig>;
   fallback: FallbackConfig;
   task_routing: Record<string, string>;
 }
@@ -150,6 +158,18 @@ export function defaultChatProviderId(config: AiConfig | null | undefined): stri
   return undefined;
 }
 
+export const PROVIDER_GROUP_PREFIX = "group:";
+
+export function providerGroupRouteId(groupId: string): string {
+  return groupId.startsWith(PROVIDER_GROUP_PREFIX) ? groupId : `${PROVIDER_GROUP_PREFIX}${groupId}`;
+}
+
+export function providerGroupIdFromRoute(routeId: string): string | null {
+  return routeId.startsWith(PROVIDER_GROUP_PREFIX)
+    ? routeId.slice(PROVIDER_GROUP_PREFIX.length)
+    : null;
+}
+
 export type LlmProviderCapability = "chat" | "image_generation" | "video_generation";
 
 export function llmProviderSupports(provider: LlmProviderConfig | null | undefined, capability: LlmProviderCapability): boolean {
@@ -162,6 +182,14 @@ export function chatDrawerProviderIds(
   config: AiConfig | null | undefined,
   capability: LlmProviderCapability = "chat",
 ): string[] {
+  const groups = Object.entries(config?.llm.provider_groups ?? {})
+    .filter(([, group]) => group.enabled !== false)
+    .filter(([, group]) =>
+      group.provider_ids.some((providerId) =>
+        llmProviderSupports(config?.llm.providers[providerId], capability),
+      ),
+    )
+    .map(([groupId]) => providerGroupRouteId(groupId));
   const ids = Object.entries(config?.llm.providers ?? {})
     .filter(([id, provider]) => id !== "claude-code" && id !== "codex" && llmProviderSupports(provider, capability))
     .map(([id]) => id);
@@ -172,7 +200,7 @@ export function chatDrawerProviderIds(
   const localAgentIds: string[] = [];
   if (capability === "chat" && isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
   if (capability === "chat" && isCodexAvailableForChat(config)) localAgentIds.push("codex");
-  return [...localAgentIds, ...orderedLlmIds];
+  return [...localAgentIds, ...groups, ...orderedLlmIds];
 }
 
 interface AiStore {
@@ -185,6 +213,8 @@ interface AiStore {
   loadConfig: () => Promise<void>;
   saveConfig: (config: AiConfig) => Promise<void>;
   updateLlmProvider: (id: string, provider: LlmProviderConfig) => void;
+  updateLlmProviderGroup: (id: string, group: LlmProviderGroupConfig) => void;
+  removeLlmProviderGroup: (id: string) => void;
   setActiveLlmProvider: (id: string) => void;
   testConnection: (providerId: string, provider: LlmProviderConfig) => Promise<void>;
   toggleVoiceShell: () => void;
@@ -210,6 +240,7 @@ const DEFAULT_CONFIG: AiConfig = {
       groq:        { base_url: "https://api.groq.com/openai/v1",                 api_key: "", model: "llama-3.3-70b-versatile",              runtime: "openai-compat", capabilities: { chat: true } },
       local:       { base_url: "http://127.0.0.1:8080/v1",                       api_key: "local", model: "qwen3-1.7b-q4_k_m",             runtime: "llama-server", capabilities: { chat: true } },
     },
+    provider_groups: {},
     fallback: { enabled: true, primary: "deepseek", secondary: "local", timeout_ms: 8000 },
     task_routing: {
       voice_intent: "deepseek",
@@ -280,8 +311,14 @@ function normalizeCodexProfileProxyMode(mode: string | undefined | null, proxyUr
 }
 
 function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
+  const configuredKeys = (provider.api_keys ?? [])
+    .map((key) => key ?? "")
+    .filter((key) => key.trim() !== "");
+  const apiKeys = configuredKeys.length > 0 ? configuredKeys : [provider.api_key ?? ""];
   return {
     ...provider,
+    api_key: apiKeys[0] ?? "",
+    api_keys: apiKeys,
     capabilities: {
       chat: provider.capabilities?.chat !== false,
       image_generation: provider.capabilities?.image_generation === true,
@@ -292,10 +329,47 @@ function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
   };
 }
 
+function normalizeProviderGroup(id: string, group: LlmProviderGroupConfig): LlmProviderGroupConfig {
+  const providerIds = Array.from(
+    new Set(
+      (group.provider_ids ?? [])
+        .map((providerId) => providerId.trim())
+        .filter(Boolean),
+    ),
+  );
+  return {
+    label: group.label?.trim() || id,
+    provider_ids: providerIds,
+    enabled: group.enabled !== false,
+  };
+}
+
+function configuredProviderApiKeys(provider: LlmProviderConfig): string[] {
+  const keys = (provider.api_keys ?? [])
+    .map((key) => key ?? "")
+    .filter((key) => key.trim() !== "");
+  return keys.length > 0 ? keys : [provider.api_key ?? ""];
+}
+
+function isPlaintextVaultableKey(provider: LlmProviderConfig, key: string): boolean {
+  return (
+    key.length > 0 &&
+    !key.startsWith("vault:") &&
+    provider.runtime !== "llama-server" &&
+    key !== "local"
+  );
+}
+
 function normalizeAiConfig(config: AiConfig): AiConfig {
   const providers = config.llm.providers.agnes
     ? config.llm.providers
     : { ...config.llm.providers, agnes: DEFAULT_CONFIG.llm.providers.agnes };
+  const providerGroups = Object.fromEntries(
+    Object.entries(config.llm.provider_groups ?? {}).map(([id, group]) => [
+      id,
+      normalizeProviderGroup(id, group),
+    ]),
+  );
   return {
     ...config,
     llm: {
@@ -303,6 +377,7 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
       providers: Object.fromEntries(
         Object.entries(providers).map(([id, provider]) => [id, normalizeLlmProvider(provider)]),
       ),
+      provider_groups: providerGroups,
     },
     cc_bridge: {
       ...config.cc_bridge,
@@ -348,16 +423,11 @@ export const useAiStore = create<AiStore>((set, get) => ({
     config = normalizeAiConfig(config);
     set({ saving: true });
     try {
-      // Identify providers carrying a fresh plaintext API key — those are the
-      // ones we want to push into the vault. (Providers with an existing
-      // `vault:<id>` ref or the local sidecar's literal "local" are skipped.)
+      // Identify providers carrying fresh plaintext API keys — those are the
+      // ones we want to push into the vault. (Providers with existing
+      // `vault:<id>` refs or the local sidecar's literal "local" are skipped.)
       const providersNeedingVault = Object.entries(config.llm.providers).filter(
-        ([, p]) =>
-          p.api_key &&
-          p.api_key.length > 0 &&
-          !p.api_key.startsWith("vault:") &&
-          p.runtime !== "llama-server" &&
-          p.api_key !== "local",
+        ([, p]) => configuredProviderApiKeys(p).some((key) => isPlaintextVaultableKey(p, key)),
       );
 
       // If we have plaintext keys to encrypt but the vault is locked or
@@ -383,25 +453,25 @@ export const useAiStore = create<AiStore>((set, get) => ({
         }
       }
 
-      // For each provider whose api_key is plaintext (not already a vault: ref),
-      // store it in the vault and replace the field with the returned `vault:<id>`
-      // reference.
+      // For each provider key whose value is plaintext (not already a vault: ref),
+      // store it in the vault and replace it with the returned `vault:<id>` reference.
       const providers: Record<string, LlmProviderConfig> = {};
       for (const [id, p] of Object.entries(config.llm.providers)) {
-        if (
-          p.api_key &&
-          p.api_key.length > 0 &&
-          !p.api_key.startsWith("vault:") &&
-          p.runtime !== "llama-server" &&
-          p.api_key !== "local"
-        ) {
+        const apiKeys = configuredProviderApiKeys(p);
+        const storedKeys: string[] = [];
+        for (let index = 0; index < apiKeys.length; index += 1) {
+          const key = apiKeys[index];
+          if (!isPlaintextVaultableKey(p, key)) {
+            storedKeys.push(key);
+            continue;
+          }
           try {
             const ref = await invoke<string>("save_ai_api_key", {
-              kind: `ai_api_key:${id}`,
-              label: `LLM Provider: ${id}`,
-              plaintext: p.api_key,
+              kind: index === 0 ? `ai_api_key:${id}` : `ai_api_key:${id}:${index + 1}`,
+              label: index === 0 ? `LLM Provider: ${id}` : `LLM Provider: ${id} #${index + 1}`,
+              plaintext: key,
             });
-            providers[id] = { ...p, api_key: ref };
+            storedKeys.push(ref);
           } catch (err) {
             // Should be unreachable — we guarded above. But if the vault
             // got re-locked between the check and the put, surface it.
@@ -418,11 +488,14 @@ export const useAiStore = create<AiStore>((set, get) => ({
               );
               throw err;
             }
-            providers[id] = p;
+            storedKeys.push(key);
           }
-        } else {
-          providers[id] = p;
         }
+        providers[id] = {
+          ...p,
+          api_key: storedKeys[0] ?? "",
+          api_keys: storedKeys,
+        };
       }
 
       const safeConfig: AiConfig = {
@@ -452,6 +525,39 @@ export const useAiStore = create<AiStore>((set, get) => ({
     });
   },
 
+  updateLlmProviderGroup: (id: string, group: LlmProviderGroupConfig) => {
+    const config = get().config;
+    if (!config) return;
+    set({
+      config: {
+        ...config,
+        llm: {
+          ...config.llm,
+          provider_groups: {
+            ...config.llm.provider_groups,
+            [id]: normalizeProviderGroup(id, group),
+          },
+        },
+      },
+    });
+  },
+
+  removeLlmProviderGroup: (id: string) => {
+    const config = get().config;
+    if (!config) return;
+    const providerGroups = { ...config.llm.provider_groups };
+    delete providerGroups[id];
+    set({
+      config: {
+        ...config,
+        llm: {
+          ...config.llm,
+          provider_groups: providerGroups,
+        },
+      },
+    });
+  },
+
   setActiveLlmProvider: (id: string) => {
     const config = get().config;
     if (!config) return;
@@ -461,7 +567,14 @@ export const useAiStore = create<AiStore>((set, get) => ({
   testConnection: async (providerId: string, provider: LlmProviderConfig) => {
     set((s) => ({ testResults: { ...s.testResults, [providerId]: null } }));
     try {
-      const result = await invoke<TestConnectionResult>("test_llm_connection", { provider });
+      const firstKey = configuredProviderApiKeys(provider)[0] ?? "";
+      const result = await invoke<TestConnectionResult>("test_llm_connection", {
+        provider: {
+          ...provider,
+          api_key: firstKey,
+          api_keys: [firstKey],
+        },
+      });
       set((s) => ({ testResults: { ...s.testResults, [providerId]: result } }));
     } catch (e) {
       set((s) => ({

@@ -30,7 +30,9 @@ import {
   chatDrawerProviderIds,
   DEFAULT_CLAUDE_CODE_MODEL,
   DEFAULT_CODEX_MODEL,
+  providerGroupIdFromRoute,
   useAiStore,
+  type AiConfig,
   type LlmProviderCapability,
 } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
@@ -763,7 +765,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               )}
               {providerIds.map((id) => (
                 <option key={id} value={id}>
-                  {providerLabel(id, t)}
+                  {providerLabel(id, t, aiConfig)}
                 </option>
               ))}
             </select>
@@ -1099,9 +1101,14 @@ function modeIcon(mode: ChatThreadMode) {
   return MessageSquare;
 }
 
-function providerLabel(id: string, t: TranslateFn): string {
+function providerLabel(id: string, t: TranslateFn, config?: AiConfig | null): string {
   if (id === "claude-code") return t("chat.claudeCodeLocal");
   if (id === "codex") return "Codex local";
+  const groupId = providerGroupIdFromRoute(id);
+  if (groupId) {
+    const label = config?.llm.provider_groups?.[groupId]?.label || groupId;
+    return `Group: ${label}`;
+  }
   return id;
 }
 

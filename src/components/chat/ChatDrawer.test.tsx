@@ -45,6 +45,7 @@ function makeConfig(): AiConfig {
           runtime: "openai-compat",
         },
       },
+      provider_groups: {},
       fallback: { enabled: true, primary: "deepseek", secondary: "local", timeout_ms: 8000 },
       task_routing: { chat_drawer: "deepseek" },
     },
@@ -154,6 +155,29 @@ describe("ChatDrawer provider and echo controls", () => {
       "deepseek",
       "local",
     ]);
+  });
+
+  it("includes provider groups in the manual provider picker", () => {
+    const config = makeConfig();
+    config.llm.provider_groups = {
+      balanced: {
+        label: "Balanced",
+        provider_ids: ["deepseek", "local"],
+        enabled: true,
+      },
+    };
+    useAiStore.setState({ config });
+
+    render(<ChatDrawer />);
+
+    const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
+    expect(Array.from(provider.options).map((option) => option.value)).toEqual([
+      "claude-code",
+      "group:balanced",
+      "deepseek",
+      "local",
+    ]);
+    expect(Array.from(provider.options).map((option) => option.textContent)).toContain("Group: Balanced");
   });
 
   it("renders terminal echo as the same compact button style as echo toggles", () => {

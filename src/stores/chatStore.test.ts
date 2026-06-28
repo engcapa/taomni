@@ -41,6 +41,7 @@ function makeConfig(overrides: Partial<AiConfig> = {}): AiConfig {
           runtime: "llama-server",
         },
       },
+      provider_groups: {},
       fallback: { enabled: true, primary: "deepseek", secondary: "local", timeout_ms: 8000 },
       task_routing: { chat_drawer: "deepseek" },
     },
