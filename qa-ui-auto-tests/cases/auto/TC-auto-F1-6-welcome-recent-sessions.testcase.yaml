@@ -52,6 +52,7 @@ steps:
   - wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
   - click: '[data-testid="welcome-recent-reveal"]'
   - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+  - assert_attribute: {selector: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]', name: data-selected, equals: 'true'}
   - right_click: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
   - assert_menu_items: [Connect, Edit..., Duplicate, Move to folder, Delete]
   - click_menu: Connect

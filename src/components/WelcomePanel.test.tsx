@@ -126,7 +126,7 @@ describe("WelcomePanel", () => {
 
     fireEvent.click(screen.getByTestId("welcome-recent-select-filtered"));
     fireEvent.click(screen.getByTestId("welcome-recent-open-selected"));
-    expect(openSessions).toHaveBeenLastCalledWith(recentSessions.slice(0, 2));
+    expect(openSessions).toHaveBeenLastCalledWith([recentSessions[1], recentSessions[0]]);
 
     const firstRow = screen.getAllByTestId("welcome-recent-session-row")[0];
     fireEvent.click(within(firstRow).getByTestId("welcome-recent-open"));

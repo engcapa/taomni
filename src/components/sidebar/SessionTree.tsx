@@ -125,6 +125,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     sessions,
     groups,
     searchQuery,
+    selectedSessionId,
     selectedSessionIds,
     loadSessions,
     removeSessions,
@@ -203,6 +204,24 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       return next;
     });
   };
+
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const selectedSession = sessions.find((session) => session.id === selectedSessionId);
+    if (!selectedSession) return;
+    expandPath(selectedSession.group_path);
+
+    const timer = window.setTimeout(() => {
+      const row = document.querySelector<HTMLElement>(
+        `[data-testid="session-tree-item"][data-session-id="${cssAttributeValue(selectedSessionId)}"]`,
+      );
+      if (typeof row?.scrollIntoView === "function") {
+        row.scrollIntoView({ block: "nearest" });
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedSessionId, sessions]);
 
   const handleDrop = (groupPath: string | null, sessionId: string) => {
     setDragOverGroup(null);
@@ -1878,6 +1897,10 @@ function uniqueSessionsById(sessions: readonly SessionConfig[]): SessionConfig[]
     unique.push(session);
   }
   return unique;
+}
+
+function cssAttributeValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
 }
 
 function filterSessions(sessions: SessionConfig[], query: string): SessionConfig[] {

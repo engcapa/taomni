@@ -6,6 +6,7 @@ import {
   Folder,
   MessageCircle,
   History,
+  ArrowUpDown,
   Search,
   X,
   Server,
@@ -52,7 +53,15 @@ interface WelcomePanelProps {
 }
 
 const EMPTY_RECENT_SESSIONS: SessionConfig[] = [];
-type RecentSessionSort = "last-desc" | "last-asc" | "name-asc" | "type-asc" | "host-asc";
+type RecentSessionSort =
+  | "last-desc"
+  | "last-asc"
+  | "name-asc"
+  | "name-desc"
+  | "type-asc"
+  | "type-desc"
+  | "host-asc"
+  | "host-desc";
 
 export function WelcomePanel({
   onStartLocalTerminal,
@@ -185,8 +194,14 @@ export function WelcomePanel({
 
   const selectedRecentSet = useMemo(() => new Set(selectedRecentIds), [selectedRecentIds]);
   const selectedRecentSessions = useMemo(
-    () => recentSessions.filter((session) => selectedRecentSet.has(session.id)),
-    [recentSessions, selectedRecentSet],
+    () => {
+      const byId = new Map(recentSessions.map((session) => [session.id, session]));
+      return selectedRecentIds.flatMap((id) => {
+        const session = byId.get(id);
+        return session ? [session] : [];
+      });
+    },
+    [recentSessions, selectedRecentIds],
   );
 
   const handleStartAsAdministrator = async () => {
@@ -559,20 +574,28 @@ function RecentSessionsPanel({
             </option>
           ))}
         </select>
-        <select
-          data-testid="welcome-recent-sort"
-          className="taomni-input h-8 w-full"
-          aria-label={t("welcome.recentSessionsSort")}
-          value={sort}
-          disabled={sessions.length === 0}
-          onChange={(event) => onSortChange(event.target.value as RecentSessionSort)}
-        >
-          <option value="last-desc">{t("welcome.recentSessionsSortLastDesc")}</option>
-          <option value="last-asc">{t("welcome.recentSessionsSortLastAsc")}</option>
-          <option value="name-asc">{t("welcome.recentSessionsSortName")}</option>
-          <option value="type-asc">{t("welcome.recentSessionsSortType")}</option>
-          <option value="host-asc">{t("welcome.recentSessionsSortHost")}</option>
-        </select>
+        <div className="relative min-w-0">
+          <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
+          <select
+            data-testid="welcome-recent-sort"
+            className="taomni-input h-8 w-full"
+            style={{ paddingLeft: "2rem" }}
+            aria-label={t("welcome.recentSessionsSort")}
+            title={t("welcome.recentSessionsSort")}
+            value={sort}
+            disabled={sessions.length === 0}
+            onChange={(event) => onSortChange(event.target.value as RecentSessionSort)}
+          >
+            <option value="last-desc">{t("welcome.recentSessionsSortLastDesc")}</option>
+            <option value="last-asc">{t("welcome.recentSessionsSortLastAsc")}</option>
+            <option value="name-asc">{t("welcome.recentSessionsSortNameAsc")}</option>
+            <option value="name-desc">{t("welcome.recentSessionsSortNameDesc")}</option>
+            <option value="type-asc">{t("welcome.recentSessionsSortTypeAsc")}</option>
+            <option value="type-desc">{t("welcome.recentSessionsSortTypeDesc")}</option>
+            <option value="host-asc">{t("welcome.recentSessionsSortHostAsc")}</option>
+            <option value="host-desc">{t("welcome.recentSessionsSortHostDesc")}</option>
+          </select>
+        </div>
         <button
           data-testid="welcome-recent-select-filtered"
           className="taomni-btn h-8 px-3 inline-flex items-center justify-center gap-1.5"
@@ -818,8 +841,11 @@ function compareRecentSessions(a: SessionConfig, b: SessionConfig, sort: RecentS
   const nameB = (b.name || b.host || labelB).toLowerCase();
   if (sort === "last-asc") return (a.last_connected_at ?? 0) - (b.last_connected_at ?? 0);
   if (sort === "name-asc") return nameA.localeCompare(nameB);
+  if (sort === "name-desc") return nameB.localeCompare(nameA);
   if (sort === "type-asc") return labelA.localeCompare(labelB) || nameA.localeCompare(nameB);
+  if (sort === "type-desc") return labelB.localeCompare(labelA) || nameA.localeCompare(nameB);
   if (sort === "host-asc") return (a.host || "").localeCompare(b.host || "") || nameA.localeCompare(nameB);
+  if (sort === "host-desc") return (b.host || "").localeCompare(a.host || "") || nameA.localeCompare(nameB);
   return (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0);
 }
 

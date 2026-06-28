@@ -32,6 +32,8 @@ vi.mock("../../lib/vaultGate", () => ({
   ensureVaultReady: vi.fn(async () => true),
 }));
 
+const scrollIntoView = vi.fn();
+
 function makeSession(id: string, name: string, groupPath: string): SessionConfig {
   return {
     id,
@@ -76,6 +78,10 @@ describe("SessionTree multi-select connect", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
     ipcMocks.listSessions.mockResolvedValue(sessions);
     ipcMocks.listSessionGroups.mockResolvedValue(groups);
     useSessionStore.setState({
@@ -83,6 +89,7 @@ describe("SessionTree multi-select connect", () => {
       groups,
       loading: false,
       selectedSessionId: null,
+      selectedSessionIds: [],
       searchQuery: "",
     });
   });
@@ -140,6 +147,24 @@ describe("SessionTree multi-select connect", () => {
 
     expect(sessionRow("wsl-ubuntu")).toHaveAttribute("data-session-type", "WSL");
     expect(sessionRow("wsl-ubuntu")).toHaveTextContent("WSL");
+  });
+
+  it("expands and scrolls to an externally selected session", async () => {
+    useSessionStore.setState({
+      sessions,
+      groups,
+      loading: false,
+      selectedSessionId: "person-cloudcone",
+      selectedSessionIds: ["person-cloudcone"],
+      searchQuery: "",
+    });
+
+    render(<SessionTree />);
+
+    await waitFor(() => {
+      expect(sessionRow("person-cloudcone")).toHaveAttribute("data-selected", "true");
+    });
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
   });
 });
 
