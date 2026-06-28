@@ -16,7 +16,7 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  Settings2,
+  Settings,
   ListTree,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -538,7 +538,7 @@ function RecentSessionsPanel({
               aria-label={t("welcome.recentSessionsSettings")}
               onClick={onOpenSettings}
             >
-              <Settings2 className="w-3.5 h-3.5" />
+              <Settings className="w-4 h-4 text-[var(--taomni-text)]" aria-hidden="true" />
             </button>
           ) : null}
         </div>
@@ -692,24 +692,26 @@ function RecentSessionsPanel({
                   >
                     {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                   </button>
-                  <button
-                    data-testid="welcome-recent-open"
-                    className="min-w-0 text-left group"
-                    type="button"
-                    aria-label={t("welcome.recentSessionsOpenAria", { name: title })}
-                    onClick={() => onOpenSession?.(session)}
-                  >
+                  <div className="min-w-0 text-left">
                     <div className="min-w-0 flex items-center gap-2">
                       <Server className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-                      <span className="truncate text-[12px] font-medium text-[var(--taomni-accent)] group-hover:underline">{title}</span>
+                      <button
+                        data-testid="welcome-recent-open"
+                        className="min-w-0 truncate text-left text-[12px] font-medium text-[var(--taomni-accent)] hover:underline focus-visible:underline"
+                        type="button"
+                        aria-label={t("welcome.recentSessionsOpenAria", { name: title })}
+                        onClick={() => onOpenSession?.(session)}
+                      >
+                        {title}
+                      </button>
                       <span className="shrink-0 text-[10px] taomni-mono px-1.5 py-0.5 rounded border text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
                         {typeLabel}
                       </span>
                     </div>
-                    <div className="mt-0.5 truncate text-[11px] text-[var(--taomni-text-muted)]">
+                    <div data-testid="welcome-recent-details" className="mt-0.5 truncate text-[11px] text-[var(--taomni-text-muted)]">
                       {recentSessionTarget(session)} · {t("welcome.recentSessionsUpdated", { time: formatRecentSessionTime(session.last_connected_at, t) })}
                     </div>
-                  </button>
+                  </div>
                   <button
                     data-testid="welcome-recent-reveal"
                     className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]"

@@ -101,6 +101,7 @@ describe("WelcomePanel", () => {
         onOpenRecentSessions={openSessions}
         onEditRecentSession={editSession}
         onRevealRecentSession={vi.fn()}
+        onOpenSettings={vi.fn()}
       />,
     );
 
@@ -120,6 +121,7 @@ describe("WelcomePanel", () => {
       target: { value: "name-asc" },
     });
     expect(screen.getAllByTestId("welcome-recent-session-row")[0]).toHaveAttribute("data-session-name", "Prod SFTP");
+    expect(screen.getByTestId("welcome-recent-settings").querySelector("svg")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("welcome-recent-open-filtered"));
     expect(openSessions).toHaveBeenLastCalledWith([recentSessions[1], recentSessions[0]]);
@@ -131,6 +133,10 @@ describe("WelcomePanel", () => {
     const firstRow = screen.getAllByTestId("welcome-recent-session-row")[0];
     fireEvent.click(within(firstRow).getByTestId("welcome-recent-open"));
     expect(openSession).toHaveBeenCalledWith(recentSessions[1]);
+    expect(openSession).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(firstRow).getByTestId("welcome-recent-details"));
+    fireEvent.click(firstRow);
+    expect(openSession).toHaveBeenCalledTimes(1);
 
     fireEvent.contextMenu(firstRow);
     expect(screen.getByTestId("context-menu-item-connect-selected-sessions-2")).toBeInTheDocument();
