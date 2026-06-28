@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useAppStore } from "./appStore";
+import { computeNewTerminalTitle, useAppStore } from "./appStore";
 import type { Tab } from "../types";
 
 const tab = (id: string, overrides: Partial<Tab> = {}): Tab => ({
@@ -158,6 +158,22 @@ describe("appStore.duplicateTab", () => {
     const ids = useAppStore.getState().tabs.map((t) => t.id);
     expect(ids.slice(0, 4)).toEqual(["a", "b", "c", "d"]);
     expect(ids).toHaveLength(5);
+  });
+});
+
+describe("computeNewTerminalTitle", () => {
+  it("keeps the requested title when no terminal title family exists", () => {
+    expect(computeNewTerminalTitle("Local terminal", ["root@example.test"])).toBe("Local terminal");
+  });
+
+  it("adds the next -N suffix when the requested terminal title already exists", () => {
+    expect(computeNewTerminalTitle("Local terminal", ["Local terminal", "Local terminal-1"])).toBe(
+      "Local terminal-2",
+    );
+  });
+
+  it("continues an existing suffixed family even when the base title is closed", () => {
+    expect(computeNewTerminalTitle("PowerShell", ["PowerShell-2"])).toBe("PowerShell-3");
   });
 });
 
