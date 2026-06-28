@@ -219,9 +219,12 @@ interface ChatStore {
   /// Export every thread + message to `outPath` as JSON.
   exportArchive: (outPath: string) => Promise<number>;
   toggleDrawer: () => void;
-  /// Visibility-only primitive. Hiding the drawer never stops in-flight AI work;
-  /// the streaming footer owns the explicit Stop action.
+  /// Visibility-only primitive. This does not change the tab auto-restore flag.
   setDrawerOpen: (open: boolean) => void;
+  /// User-driven dismissal: hide the drawer and clear the current tab's
+  /// auto-restore flag. This never stops in-flight AI work; the streaming footer
+  /// owns the explicit Stop action.
+  dismissDrawer: () => void;
   hideDrawer: () => void;
   openTabChat: (tabId: string) => Promise<void>;
   toggleTabChat: (tabId: string) => Promise<void>;
@@ -653,7 +656,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setDrawerOpen: (open) => {
     set({ drawerOpen: open });
   },
-  hideDrawer: () => {
+  dismissDrawer: () => {
     const s = get();
     const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
     set({
@@ -662,6 +665,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ? { tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false } }
         : {}),
     });
+  },
+  hideDrawer: () => {
+    get().dismissDrawer();
   },
   setDrawerWidth: (w) => {
     const width = clampDrawerWidth(w);

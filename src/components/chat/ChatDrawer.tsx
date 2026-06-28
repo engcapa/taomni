@@ -53,7 +53,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     drawerHeight, drawerPosition, drawerPinned, drawerTabId,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     sendMessage, hideDrawer, setDrawerWidth, setDrawerHeight, setDrawerPosition,
-    setDrawerPinned, setDrawerOpen, purgeOldThreads, stopSending,
+    setDrawerPinned, dismissDrawer, purgeOldThreads, stopSending,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -332,12 +332,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         return;
       }
       setShowPositionMenu(false);
-      setDrawerOpen(false);
+      dismissDrawer();
     };
 
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [drawerOpen, floating, setDrawerOpen]);
+  }, [dismissDrawer, drawerOpen, floating]);
 
   // Drag-to-resize the drawer.
   const handleResizeStart = (

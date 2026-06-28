@@ -40,7 +40,6 @@ src-tauri/frameworks/
 .kiro/
 .agent/
 .codex
-CLAUDE.md
 
 # Generic AI cache / vector index
 .ai-cache/
