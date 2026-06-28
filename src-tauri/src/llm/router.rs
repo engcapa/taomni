@@ -26,11 +26,15 @@ struct KeyRotatingLlm {
     provider_id: String,
     model: String,
     variants: Vec<Arc<dyn Llm>>,
-    next_key: AtomicUsize,
+    key_state: Arc<KeyRotationState>,
 }
 
 impl KeyRotatingLlm {
-    fn new(provider_id: impl Into<String>, variants: Vec<Arc<dyn Llm>>) -> Self {
+    fn new(
+        provider_id: impl Into<String>,
+        variants: Vec<Arc<dyn Llm>>,
+        key_state: Arc<KeyRotationState>,
+    ) -> Self {
         let model = variants
             .first()
             .map(|provider| provider.model().to_string())
@@ -39,7 +43,7 @@ impl KeyRotatingLlm {
             provider_id: provider_id.into(),
             model,
             variants,
-            next_key: AtomicUsize::new(0),
+            key_state,
         }
     }
 
@@ -47,8 +51,28 @@ impl KeyRotatingLlm {
         if self.variants.is_empty() {
             return None;
         }
-        let idx = self.next_key.fetch_add(1, Ordering::Relaxed) % self.variants.len();
+        let idx = self.key_state.next_key_index(self.variants.len());
         self.variants.get(idx).cloned()
+    }
+}
+
+struct KeyRotationState {
+    next_key: AtomicUsize,
+}
+
+impl KeyRotationState {
+    fn new() -> Self {
+        Self {
+            next_key: AtomicUsize::new(0),
+        }
+    }
+
+    fn next_key_index(&self, key_count: usize) -> usize {
+        if key_count <= 1 {
+            0
+        } else {
+            self.next_key.fetch_add(1, Ordering::Relaxed) % key_count
+        }
     }
 }
 
@@ -300,6 +324,7 @@ impl Llm for ProviderGroupLlm {
 /// with optional timeout + fallback to a secondary provider.
 pub struct LlmRouter {
     providers: HashMap<String, Arc<dyn Llm>>,
+    provider_key_states: HashMap<String, Arc<KeyRotationState>>,
     provider_groups: HashMap<String, Arc<ProviderGroupState>>,
     task_routing: HashMap<TaskKind, String>,
     active: String,
@@ -322,6 +347,7 @@ impl LlmRouter {
     pub fn new(active: impl Into<String>) -> Self {
         Self {
             providers: HashMap::new(),
+            provider_key_states: HashMap::new(),
             provider_groups: HashMap::new(),
             task_routing: HashMap::new(),
             active: active.into(),
@@ -336,6 +362,11 @@ impl LlmRouter {
 
     pub fn add_provider_variants(&mut self, id: impl Into<String>, variants: Vec<Arc<dyn Llm>>) {
         let id = id.into();
+        let key_state = self
+            .provider_key_states
+            .entry(id.clone())
+            .or_insert_with(|| Arc::new(KeyRotationState::new()))
+            .clone();
         match variants.len() {
             0 => {}
             1 => {
@@ -343,8 +374,10 @@ impl LlmRouter {
                 self.add_provider(id, provider);
             }
             _ => {
-                self.providers
-                    .insert(id.clone(), Arc::new(KeyRotatingLlm::new(id, variants)));
+                self.providers.insert(
+                    id.clone(),
+                    Arc::new(KeyRotatingLlm::new(id, variants, key_state)),
+                );
             }
         }
     }
@@ -391,6 +424,13 @@ impl LlmRouter {
         self.provider_groups
             .get(route_id)
             .and_then(|group| group.next_provider_id())
+    }
+
+    pub fn next_key_index(&self, provider_id: &str, key_count: usize) -> usize {
+        self.provider_key_states
+            .get(provider_id)
+            .map(|state| state.next_key_index(key_count))
+            .unwrap_or(0)
     }
 
     /// Mark a provider id as blocked on a locked vault. The frontend can call
