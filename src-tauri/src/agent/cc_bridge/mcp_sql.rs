@@ -9,7 +9,7 @@
 //!
 //! Connection resolution (D2 for DB): the live `db_connections` key is a
 //! frontend-generated runtime id that the backend can't derive, so the frontend
-//! bridges it each turn into `AppState.cc_db_bindings[thread_id]`. CC never names
+//! bridges it each turn into `AppState.agent_db_bindings[thread_id]`. CC never names
 //! a connection id — the handler always targets the thread's bound one, so
 //! cross-session access is impossible by construction.
 
@@ -71,7 +71,7 @@ impl SqlHandler {
     /// — e.g. the DB tab isn't connected yet.
     async fn bound_conn(&self, scope: &TokenScope) -> Result<String, ErrorData> {
         self.state()
-            .cc_db_bindings
+            .agent_db_bindings
             .read()
             .await
             .get(&scope.thread_id)

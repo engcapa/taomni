@@ -9,6 +9,7 @@ pub mod router;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -67,6 +68,8 @@ impl ChatContent {
                 .filter_map(|part| match part {
                     ChatContentPart::Text { text } => Some(text.as_str()),
                     ChatContentPart::Image { .. } => None,
+                    ChatContentPart::ToolUse { .. } => None,
+                    ChatContentPart::ToolResult { content, .. } => Some(content.as_str()),
                 })
                 .collect::<Vec<_>>()
                 .join("\n\n"),
@@ -77,10 +80,22 @@ impl ChatContent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChatContentPart {
-    Text { text: String },
+    Text {
+        text: String,
+    },
     Image {
         mime_type: String,
         data_base64: String,
+    },
+    ToolUse {
+        id: String,
+        name: String,
+        arguments: Value,
+    },
+    ToolResult {
+        tool_call_id: String,
+        content: String,
+        is_error: bool,
     },
 }
 
@@ -115,6 +130,41 @@ impl ChatMessage {
             content: ChatContent::Parts(parts),
         }
     }
+    pub fn assistant_tool_calls(tool_calls: Vec<ChatToolCall>) -> Self {
+        Self {
+            role: "assistant".into(),
+            content: ChatContent::Parts(
+                tool_calls
+                    .into_iter()
+                    .map(|call| ChatContentPart::ToolUse {
+                        id: call.id,
+                        name: call.name,
+                        arguments: call.arguments,
+                    })
+                    .collect(),
+            ),
+        }
+    }
+    pub fn tool_result(tool_call_id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: "tool".into(),
+            content: ChatContent::Parts(vec![ChatContentPart::ToolResult {
+                tool_call_id: tool_call_id.into(),
+                content: content.into(),
+                is_error: false,
+            }]),
+        }
+    }
+    pub fn tool_error(tool_call_id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: "tool".into(),
+            content: ChatContent::Parts(vec![ChatContentPart::ToolResult {
+                tool_call_id: tool_call_id.into(),
+                content: content.into(),
+                is_error: true,
+            }]),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,6 +191,8 @@ pub struct ChatResponse {
     pub content: String,
     pub model: Option<String>,
     pub usage: Option<TokenUsage>,
+    #[serde(default)]
+    pub tool_calls: Vec<ChatToolCall>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,9 +202,46 @@ pub struct TokenUsage {
     pub total_tokens: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChatTool {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub input_schema: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChatToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: Value,
+}
+
 #[async_trait]
 pub trait Llm: Send + Sync {
     async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse>;
+
+    async fn chat_with_tools(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+    ) -> LlmResult<ChatResponse> {
+        if tools.is_empty() {
+            self.chat(req).await
+        } else {
+            Err(LlmError::Provider {
+                status: 400,
+                message: format!(
+                    "provider '{}' does not support tool calling",
+                    self.provider_id()
+                ),
+            })
+        }
+    }
+
+    fn supports_tools(&self) -> bool {
+        false
+    }
 
     /// Streaming chat. Default implementation yields a single full event from
     /// the non-streaming `chat` method, so providers that don't natively

@@ -1,6 +1,6 @@
 use super::{
-    ChatContent, ChatContentPart, ChatRequest, ChatResponse, ChatStreamEvent, Llm, LlmError,
-    LlmResult, TokenUsage,
+    ChatContent, ChatContentPart, ChatMessage, ChatRequest, ChatResponse, ChatStreamEvent,
+    ChatTool, ChatToolCall, Llm, LlmError, LlmResult, TokenUsage,
 };
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
@@ -54,7 +54,7 @@ impl AnthropicProvider {
         )
     }
 
-    fn split_system_user(messages: &[super::ChatMessage]) -> (Option<String>, Vec<Value>) {
+    fn split_system_user(messages: &[ChatMessage]) -> (Option<String>, Vec<Value>) {
         let mut system: Option<String> = None;
         let mut convo: Vec<Value> = Vec::with_capacity(messages.len());
         for m in messages {
@@ -68,14 +68,100 @@ impl AnthropicProvider {
                     }
                 }
                 role => {
+                    let anthropic_role = if role == "tool" { "user" } else { role };
                     convo.push(json!({
-                        "role": role,
+                        "role": anthropic_role,
                         "content": anthropic_content(&m.content),
                     }));
                 }
             }
         }
         (system, convo)
+    }
+
+    fn request_body(&self, req: &ChatRequest, stream: bool, tools: &[ChatTool]) -> Value {
+        let (system, messages) = Self::split_system_user(&req.messages);
+        let mut body = json!({
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": req.max_tokens.unwrap_or(1024),
+        });
+        if stream {
+            body["stream"] = json!(true);
+        }
+        if let Some(temp) = req.temperature {
+            body["temperature"] = json!(temp);
+        }
+        if let Some(s) = system {
+            body["system"] = json!(s);
+        }
+        if !tools.is_empty() {
+            body["tools"] = Value::Array(tools.iter().map(anthropic_tool).collect());
+        }
+        body
+    }
+
+    async fn chat_once(&self, req: ChatRequest, tools: &[ChatTool]) -> LlmResult<ChatResponse> {
+        let body = self.request_body(&req, false, tools);
+        let url = format!("{}/messages", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", &self.api_version)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let text = resp.text().await.unwrap_or_default();
+            let message = serde_json::from_str::<ApiError>(&text)
+                .map(|e| e.error.message)
+                .unwrap_or(text);
+            return Err(LlmError::Provider { status, message });
+        }
+
+        let api_resp: ApiResponse = resp.json().await?;
+        let mut text_blocks = Vec::new();
+        let mut tool_calls = Vec::new();
+        for block in api_resp.content {
+            match block.block_type.as_str() {
+                "text" => {
+                    if let Some(text) = block.text {
+                        text_blocks.push(text);
+                    }
+                }
+                "tool_use" => {
+                    let name = block.name.unwrap_or_default();
+                    if !name.is_empty() {
+                        tool_calls.push(ChatToolCall {
+                            id: block
+                                .id
+                                .unwrap_or_else(|| format!("toolu_{}", tool_calls.len())),
+                            name,
+                            arguments: block
+                                .input
+                                .unwrap_or_else(|| Value::Object(serde_json::Map::new())),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let usage = api_resp.usage.map(|u| TokenUsage {
+            prompt_tokens: u.input_tokens,
+            completion_tokens: u.output_tokens,
+            total_tokens: u.input_tokens + u.output_tokens,
+        });
+
+        Ok(ChatResponse {
+            content: text_blocks.join(""),
+            model: api_resp.model,
+            usage,
+            tool_calls,
+        })
     }
 }
 
@@ -102,10 +188,41 @@ fn anthropic_content(content: &ChatContent) -> Value {
                             }
                         })
                     }
+                    ChatContentPart::ToolUse {
+                        id,
+                        name,
+                        arguments,
+                    } => json!({
+                        "type": "tool_use",
+                        "id": id,
+                        "name": name,
+                        "input": arguments
+                    }),
+                    ChatContentPart::ToolResult {
+                        tool_call_id,
+                        content,
+                        is_error,
+                    } => json!({
+                        "type": "tool_result",
+                        "tool_use_id": tool_call_id,
+                        "content": content,
+                        "is_error": is_error,
+                    }),
                 })
                 .collect(),
         ),
     }
+}
+
+fn anthropic_tool(tool: &ChatTool) -> Value {
+    let mut value = json!({
+        "name": &tool.name,
+        "input_schema": tool.input_schema.clone(),
+    });
+    if let Some(description) = tool.description.as_ref() {
+        value["description"] = json!(description);
+    }
+    value
 }
 
 #[derive(Deserialize)]
@@ -121,6 +238,12 @@ struct ApiBlock {
     block_type: String,
     #[serde(default)]
     text: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    input: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -142,78 +265,26 @@ struct ApiErrorBody {
 #[async_trait]
 impl Llm for AnthropicProvider {
     async fn chat(&self, req: ChatRequest) -> LlmResult<ChatResponse> {
-        let (system, messages) = Self::split_system_user(&req.messages);
+        self.chat_once(req, &[]).await
+    }
 
-        let mut body = json!({
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": req.max_tokens.unwrap_or(1024),
-        });
-        if let Some(temp) = req.temperature {
-            body["temperature"] = json!(temp);
-        }
-        if let Some(s) = system {
-            body["system"] = json!(s);
-        }
+    async fn chat_with_tools(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+    ) -> LlmResult<ChatResponse> {
+        self.chat_once(req, &tools).await
+    }
 
-        let url = format!("{}/messages", self.base_url);
-        let resp = self
-            .client
-            .post(&url)
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", &self.api_version)
-            .json(&body)
-            .send()
-            .await?;
-
-        if !resp.status().is_success() {
-            let status = resp.status().as_u16();
-            let text = resp.text().await.unwrap_or_default();
-            let message = serde_json::from_str::<ApiError>(&text)
-                .map(|e| e.error.message)
-                .unwrap_or(text);
-            return Err(LlmError::Provider { status, message });
-        }
-
-        let api_resp: ApiResponse = resp.json().await?;
-        let content = api_resp
-            .content
-            .into_iter()
-            .filter(|b| b.block_type == "text")
-            .filter_map(|b| b.text)
-            .collect::<Vec<_>>()
-            .join("");
-
-        let usage = api_resp.usage.map(|u| TokenUsage {
-            prompt_tokens: u.input_tokens,
-            completion_tokens: u.output_tokens,
-            total_tokens: u.input_tokens + u.output_tokens,
-        });
-
-        Ok(ChatResponse {
-            content,
-            model: api_resp.model,
-            usage,
-        })
+    fn supports_tools(&self) -> bool {
+        true
     }
 
     async fn chat_stream(
         &self,
         req: ChatRequest,
     ) -> LlmResult<BoxStream<'static, LlmResult<ChatStreamEvent>>> {
-        let (system, messages) = Self::split_system_user(&req.messages);
-        let mut body = json!({
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": req.max_tokens.unwrap_or(1024),
-            "stream": true,
-        });
-        if let Some(temp) = req.temperature {
-            body["temperature"] = json!(temp);
-        }
-        if let Some(s) = system {
-            body["system"] = json!(s);
-        }
+        let body = self.request_body(&req, true, &[]);
 
         let url = format!("{}/messages", self.base_url);
         let resp = self

@@ -211,6 +211,10 @@ interface ChatStore {
   /// Mirrors attached SFTP state: each terminal tab remembers whether its
   /// bound chat drawer should be visible when that tab is active.
   tabDrawerOpenByTabId: Record<string, boolean>;
+  /// The current thread per chat-capable tab. Switching tabs should restore
+  /// the user's last selected/open thread for that tab instead of promoting an
+  /// older history item or creating a fresh thread.
+  activeThreadIdByTabId: Record<string, string>;
   drawerWidth: number;
   drawerHeight: number;
   drawerPosition: ChatDrawerPosition;
@@ -259,16 +263,21 @@ interface ChatStore {
   setDrawerPinned: (pinned: boolean) => void;
 }
 
-function latestTabThread(
-  threads: ChatThread[],
-  tabId: string,
-  preferredProviderId?: string | null,
-): ChatThread | undefined {
+function latestTabThread(threads: ChatThread[], tabId: string): ChatThread | undefined {
   const candidates = threads.filter((thread) => thread.linked_session_id === tabId);
-  if (preferredProviderId) {
-    return candidates.find((thread) => thread.provider_id === preferredProviderId);
-  }
   return candidates[0];
+}
+
+function rememberedTabThread(
+  threads: ChatThread[],
+  activeThreadIdByTabId: Record<string, string>,
+  tabId: string,
+): ChatThread | undefined {
+  const rememberedId = activeThreadIdByTabId[tabId];
+  if (!rememberedId) return undefined;
+  return threads.find(
+    (thread) => thread.id === rememberedId && thread.linked_session_id === tabId,
+  );
 }
 
 function scopeForThread(thread: ChatThread | undefined | null): {
@@ -336,6 +345,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerScope: null,
   drawerTabId: null,
   tabDrawerOpenByTabId: {},
+  activeThreadIdByTabId: {},
   drawerWidth: initialDrawerLayoutPrefs.width,
   drawerHeight: initialDrawerLayoutPrefs.height,
   drawerPosition: initialDrawerLayoutPrefs.position,
@@ -368,6 +378,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       tabDrawerOpenByTabId: linkedSessionId
         ? { ...s.tabDrawerOpenByTabId, [linkedSessionId]: true }
         : s.tabDrawerOpenByTabId,
+      activeThreadIdByTabId: linkedSessionId
+        ? { ...s.activeThreadIdByTabId, [linkedSessionId]: thread.id }
+        : s.activeThreadIdByTabId,
     }));
     return thread;
   },
@@ -379,6 +392,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       threads: s.threads.filter((t) => t.id !== threadId),
       activeThreadId: s.activeThreadId === threadId ? null : s.activeThreadId,
       messages: Object.fromEntries(Object.entries(s.messages).filter(([k]) => k !== threadId)),
+      activeThreadIdByTabId: Object.fromEntries(
+        Object.entries(s.activeThreadIdByTabId).filter(([, id]) => id !== threadId),
+      ),
       ...(active ? { drawerScope: null, drawerTabId: null } : {}),
     }));
   },
@@ -418,7 +434,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setActiveThread: (threadId) => {
     const thread = get().threads.find((t) => t.id === threadId);
-    set({ activeThreadId: threadId, ...scopeForThread(thread) });
+    set((s) => ({
+      activeThreadId: threadId,
+      ...scopeForThread(thread),
+      activeThreadIdByTabId: thread?.linked_session_id
+        ? { ...s.activeThreadIdByTabId, [thread.linked_session_id]: thread.id }
+        : s.activeThreadIdByTabId,
+    }));
   },
 
   loadMessages: async (threadId: string) => {
@@ -777,9 +799,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!get().threadsLoaded) {
       await get().loadThreads();
     }
-    const defaultProviderId = await resolveDefaultProviderId();
-    let thread = latestTabThread(get().threads, tabId, defaultProviderId);
+    let thread = rememberedTabThread(
+      get().threads,
+      get().activeThreadIdByTabId,
+      tabId,
+    ) ?? latestTabThread(get().threads, tabId);
     if (!thread) {
+      const defaultProviderId = await resolveDefaultProviderId();
       thread = await get().newThread(defaultProviderId ?? undefined, tabId);
     }
     set((s) => ({
@@ -788,6 +814,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       drawerScope: "tab",
       drawerTabId: tabId,
       tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: true },
+      activeThreadIdByTabId: { ...s.activeThreadIdByTabId, [tabId]: thread.id },
     }));
   },
 

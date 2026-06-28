@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod context;
 pub mod cc_bridge;
 pub mod codex_bridge;
 pub mod cmd_classify;
@@ -6,6 +7,7 @@ pub mod commands;
 pub mod safety;
 pub mod search;
 pub mod sql_classify;
+pub mod tool_runtime;
 pub mod tools;
 
 use crate::llm::{ChatMessage, ChatRequest, Llm, TaskKind};

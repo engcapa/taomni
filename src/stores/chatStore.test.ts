@@ -119,6 +119,7 @@ describe("chatStore new thread provider selection", () => {
       drawerScope: null,
       drawerTabId: null,
       tabDrawerOpenByTabId: {},
+      activeThreadIdByTabId: {},
       drawerWidth: 380,
       drawerHeight: 420,
       drawerPosition: "right",
@@ -160,7 +161,7 @@ describe("chatStore new thread provider selection", () => {
     });
   });
 
-  it("opens a Claude Code tab thread instead of reusing another provider as the default", async () => {
+  it("reuses an existing tab thread instead of creating one for the default provider", async () => {
     useChatStore.setState({
       threads: [
         makeThread({
@@ -174,12 +175,14 @@ describe("chatStore new thread provider selection", () => {
 
     await useChatStore.getState().openTabChat("term-1");
 
-    expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", {
-      providerId: "claude-code",
-      linkedSessionId: "term-1",
-      mode: "chat",
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(useChatStore.getState()).toMatchObject({
+      activeThreadId: "old-thread",
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: "term-1",
+      activeThreadIdByTabId: { "term-1": "old-thread" },
     });
-    expect(useChatStore.getState().activeThreadId).toBe("thread-1");
   });
 });
 
@@ -205,6 +208,7 @@ describe("chatStore media generation", () => {
       drawerScope: null,
       drawerTabId: null,
       tabDrawerOpenByTabId: {},
+      activeThreadIdByTabId: {},
       drawerWidth: 380,
       drawerHeight: 420,
       drawerPosition: "right",
@@ -300,6 +304,7 @@ describe("chatStore drawer lifecycle", () => {
       drawerScope: "tab",
       drawerTabId: "term-a",
       tabDrawerOpenByTabId: { "term-a": true },
+      activeThreadIdByTabId: { "term-a": "thread-a" },
       drawerWidth: 380,
       drawerHeight: 420,
       drawerPosition: "right",
@@ -378,6 +383,47 @@ describe("chatStore drawer lifecycle", () => {
       sending: true,
       sendingByThreadId: { "thread-a": true },
       tabDrawerOpenByTabId: { "term-a": false },
+    });
+  });
+
+  it("restores each tab's remembered current thread without creating a new one", async () => {
+    useChatStore.setState({
+      threads: [
+        makeThread({ id: "thread-a-latest", linked_session_id: "term-a", updated_at: 3 }),
+        makeThread({ id: "thread-a-current", linked_session_id: "term-a", updated_at: 2 }),
+        makeThread({ id: "thread-b", linked_session_id: "term-b", updated_at: 1 }),
+      ],
+      activeThreadId: "thread-a-current",
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: "term-a",
+      tabDrawerOpenByTabId: { "term-a": true, "term-b": true },
+      activeThreadIdByTabId: {
+        "term-a": "thread-a-current",
+        "term-b": "thread-b",
+      },
+    });
+
+    await useChatStore.getState().syncTabChatWithActiveTab("term-b");
+
+    expect(useChatStore.getState()).toMatchObject({
+      activeThreadId: "thread-b",
+      drawerOpen: true,
+      drawerTabId: "term-b",
+    });
+
+    await useChatStore.getState().syncTabChatWithActiveTab("term-a");
+
+    expect(invokeMock).not.toHaveBeenCalledWith("chat_new_thread", expect.anything());
+    expect(useChatStore.getState()).toMatchObject({
+      activeThreadId: "thread-a-current",
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: "term-a",
+      activeThreadIdByTabId: {
+        "term-a": "thread-a-current",
+        "term-b": "thread-b",
+      },
     });
   });
 });
