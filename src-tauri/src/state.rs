@@ -111,10 +111,10 @@ pub struct AppState {
     /// Cancel handles for in-flight captures, keyed by capture id. Firing the
     /// `Notify` drops the SSH exec channel / kills the local child.
     pub cc_capture_cancels: Arc<Mutex<HashMap<String, Arc<tokio::sync::Notify>>>>,
-    /// Last working directory reported for a CC thread (filled each turn from
+    /// Last working directory reported for an agent thread (filled each turn from
     /// `ChatSendRequest.cwd`). The B executor bridges it into `run_captured`
     /// (`cd <cwd> && …`) since an MCP tool call has no per-turn cwd of its own.
-    pub cc_thread_cwd: Arc<Mutex<HashMap<String, String>>>,
+    pub agent_thread_cwd: Arc<Mutex<HashMap<String, String>>>,
     /// Maps a terminal *tab id* (the caller-facing id CC's tools see — equal to
     /// `chat thread.linked_session_id` / the token's `allowed_session_id`) to the
     /// *backend terminal session id* used as the `terminals` map key (a fresh
@@ -124,13 +124,13 @@ pub struct AppState {
     /// `read_capture`) can resolve the live terminal that `run_in_terminal`
     /// reaches indirectly through the frontend registry. Refreshed on reconnect.
     pub cc_tab_sessions: Arc<Mutex<HashMap<String, String>>>,
-    /// Live DB connection id a CC thread is bound to (Phase 6). The runtime key
+    /// Live DB connection id an agent thread is bound to (Phase 6). The runtime key
     /// for `db_connections` is generated in the frontend (`createRuntimeDbSessionId`)
     /// and isn't derivable backend-side, so the frontend bridges it over each
     /// turn via `ChatSendRequest.bound_db_connection_id`. The SQL/Redis MCP
-    /// handlers resolve their bound connection from here (CC never names a
+    /// handlers resolve their bound connection from here (the model never names a
     /// connection id, so this is the only target — scope-safe by construction).
-    pub cc_db_bindings: Arc<RwLock<HashMap<String, String>>>,
+    pub agent_db_bindings: Arc<RwLock<HashMap<String, String>>>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -174,9 +174,9 @@ impl AppState {
                 std::env::temp_dir().join("taomni-cc-captures"),
             )),
             cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
-            cc_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
+            agent_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
             cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
-            cc_db_bindings: Arc::new(RwLock::new(HashMap::new())),
+            agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod context;
 pub mod cc_bridge;
 pub mod codex_bridge;
 pub mod cmd_classify;

@@ -47,7 +47,7 @@ impl RedisHandler {
 
     async fn bound_conn(&self, scope: &TokenScope) -> Result<String, ErrorData> {
         self.state()
-            .cc_db_bindings
+            .agent_db_bindings
             .read()
             .await
             .get(&scope.thread_id)

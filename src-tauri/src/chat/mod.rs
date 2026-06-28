@@ -504,7 +504,7 @@ pub struct ChatSendRequest {
     /// Phase 6 — the live `db_connections` runtime id this CC thread is bound to,
     /// for SQL/Redis DB sessions. Like `cwd`, it is volatile (the frontend
     /// regenerates it on each (re)connect and the backend can't derive it), so
-    /// it is bridged *per turn* and stored into `AppState.cc_db_bindings` so the
+    /// it is bridged *per turn* and stored into `AppState.agent_db_bindings` so the
     /// DB MCP handlers can resolve their bound connection. `None` for non-DB
     /// threads or a DB tab that isn't connected.
     #[serde(default)]
@@ -815,6 +815,19 @@ pub async fn chat_stream(
     emit(&StreamEventOut::UserMessage {
         message: user_msg.clone(),
     });
+
+    let agent_ctx = crate::agent::context::build_agent_thread_context(
+        state.inner(),
+        crate::agent::context::AgentThreadContextInput {
+            thread_id: req.thread_id.clone(),
+            linked_session_id: thread.linked_session_id.clone(),
+            bound_session_id: req.bound_session_id.clone(),
+            cwd: req.cwd.clone(),
+            local_terminal_env: req.local_terminal_env.clone(),
+            bound_db_connection_id: req.bound_db_connection_id.clone(),
+        },
+    )?;
+
     if thread.provider_id == "claude-code" {
         // Allocate the assistant message id and begin streaming.
         let assistant_id = Uuid::new_v4().to_string();
@@ -855,26 +868,9 @@ pub async fn chat_stream(
         let process = match existing {
             Some(p) => p,
             None => {
-                // Phase 6 — pick the MCP flavor from the bound session's type so
-                // the thread loads *only* the right tool surface: a SQL DB
-                // session (MySQL/PG/SQL Server/ClickHouse/Presto) gets the SQL tools, Redis
-                // gets the Redis tools, everything else (SSH/local/unbound) gets
-                // the shell tools. Resolve in a tight scope so the db lock is
-                // dropped before the async provision call.
-                let flavor = {
-                    use crate::agent::cc_bridge::mcp_http::Flavor;
-                    let session_type = req
-                        .bound_session_id
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .and_then(|sid| {
-                            let db = state.db.lock().ok()?;
-                            crate::session::db::get_session(&db, sid).ok()
-                        })
-                        .map(|sc| sc.session_type);
-                    Flavor::for_session_type(session_type.as_ref())
-                };
+                // Phase 6 — pick the MCP flavor from the shared agent context so
+                // the thread loads only the right tool surface: SQL, Redis, or shell.
+                let flavor = agent_ctx.flavor;
 
                 // Provision the in-app rmcp MCP server + a per-thread scoped
                 // token (trust inferred from whether the thread is linked to a
@@ -883,8 +879,8 @@ pub async fn chat_stream(
                     match crate::agent::cc_bridge::mcp_http::provision_for_thread(
                         &app,
                         &req.thread_id,
-                        thread.linked_session_id.clone(),
-                        req.bound_session_id.clone(),
+                        agent_ctx.linked_session_id.clone(),
+                        agent_ctx.bound_session_id.clone(),
                         flavor,
                         ai_config.cc_bridge.confirm_readonly,
                     )
@@ -949,34 +945,7 @@ pub async fn chat_stream(
                 // dir (scrubbed on stop/drop) and passed via the *file* flag so
                 // the bound host/user never appear in argv (which other local
                 // users can read via `ps`).
-                let session_card = {
-                    let db = state.db.lock().map_err(|e| e.to_string())?;
-                    let session = req
-                        .bound_session_id
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .and_then(|sid| crate::session::db::get_session(&db, sid).ok());
-                    let recent = session
-                        .as_ref()
-                        .map(|sc| {
-                            crate::history::db_list_recent(
-                                &db,
-                                &crate::agent::cc_bridge::session_card::host_key_for(sc),
-                                crate::agent::cc_bridge::session_card::HISTORY_LIMIT,
-                            )
-                            .unwrap_or_default()
-                        })
-                        .unwrap_or_default();
-                    let raw = crate::agent::cc_bridge::session_card::render_card(
-                        session.as_ref(),
-                        &req.thread_id,
-                        thread.linked_session_id.is_some(),
-                        &recent,
-                        req.local_terminal_env.as_ref(),
-                    );
-                    redact::redact(&raw).0
-                };
+                let session_card = agent_ctx.session_card.clone();
                 let card_path = files.dir.join("system-prompt.txt");
                 let card_file: Option<String> = match std::fs::write(&card_path, &session_card) {
                     Ok(()) => Some(card_path.to_string_lossy().to_string()),
@@ -1055,39 +1024,9 @@ pub async fn chat_stream(
         let assistant_id_clone = assistant_id.clone();
         let app_clone = app.clone();
         let event_name_clone = event_name.clone();
-        // Stash the live cwd for this thread so backend-side tools invoked
-        // mid-turn (run_captured → B executor) can bridge it (`cd <cwd> && …`);
-        // an MCP tool call has no per-turn cwd of its own. Volatile, so refresh
-        // every turn.
-        if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            state
-                .cc_thread_cwd
-                .lock()
-                .unwrap()
-                .insert(req.thread_id.clone(), cwd.to_string());
-        }
-
-        // Phase 6 — stash the live DB connection id this thread is bound to so
-        // the SQL/Redis MCP handlers can resolve their target connection (the
-        // runtime `db_connections` key is frontend-generated and not derivable
-        // here). Volatile (regenerated on reconnect), so refreshed every turn;
-        // cleared when absent so a stale, disconnected id never lingers.
-        {
-            let conn = req
-                .bound_db_connection_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
-            let mut bindings = state.cc_db_bindings.write().await;
-            match conn {
-                Some(c) => {
-                    bindings.insert(req.thread_id.clone(), c.to_string());
-                }
-                None => {
-                    bindings.remove(&req.thread_id);
-                }
-            }
-        }
+        // Refresh volatile per-turn bindings for backend-side tools: cwd for
+        // run_captured and DB connection id for SQL/Redis MCP handlers.
+        agent_ctx.refresh_runtime_bindings(state.inner()).await;
 
         // Build the per-turn context prefix CC sees: the live working
         // directory (3.3 — volatile, so injected each turn rather than in the
@@ -1305,27 +1244,14 @@ pub async fn chat_stream(
         let process = match existing {
             Some(p) => p,
             None => {
-                let flavor = {
-                    use crate::agent::cc_bridge::mcp_http::Flavor;
-                    let session_type = req
-                        .bound_session_id
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .and_then(|sid| {
-                            let db = state.db.lock().ok()?;
-                            crate::session::db::get_session(&db, sid).ok()
-                        })
-                        .map(|sc| sc.session_type);
-                    Flavor::for_session_type(session_type.as_ref())
-                };
+                let flavor = agent_ctx.flavor;
 
                 let (server_url, token) =
                     match crate::agent::cc_bridge::mcp_http::provision_for_thread_with_inline_permission(
                         &app,
                         &req.thread_id,
-                        thread.linked_session_id.clone(),
-                        req.bound_session_id.clone(),
+                        agent_ctx.linked_session_id.clone(),
+                        agent_ctx.bound_session_id.clone(),
                         flavor,
                         ai_config.codex_bridge.confirm_readonly,
                         true,
@@ -1367,34 +1293,7 @@ pub async fn chat_stream(
                     "{}\n\nYou are connected through Codex app-server inside Taomni. Use the domain Taomni MCP tools only for the bound terminal/database session described in the developer instructions. The separate taomni_control MCP server is the UI/session/tab control plane: when the user asks to open or switch to a saved Taomni session, open the session editor, or manage tabs, call taomni_control tools instead of telling the user to do it manually.",
                     build_system_prompt(&output_format)
                 );
-                let developer_instructions = {
-                    let db = state.db.lock().map_err(|e| e.to_string())?;
-                    let session = req
-                        .bound_session_id
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .and_then(|sid| crate::session::db::get_session(&db, sid).ok());
-                    let recent = session
-                        .as_ref()
-                        .map(|sc| {
-                            crate::history::db_list_recent(
-                                &db,
-                                &crate::agent::cc_bridge::session_card::host_key_for(sc),
-                                crate::agent::cc_bridge::session_card::HISTORY_LIMIT,
-                            )
-                            .unwrap_or_default()
-                        })
-                        .unwrap_or_default();
-                    let raw = crate::agent::cc_bridge::session_card::render_card(
-                        session.as_ref(),
-                        &req.thread_id,
-                        thread.linked_session_id.is_some(),
-                        &recent,
-                        req.local_terminal_env.as_ref(),
-                    );
-                    redact::redact(&raw).0
-                };
+                let developer_instructions = agent_ctx.session_card.clone();
 
                 let temp_dir =
                     std::env::temp_dir().join(format!(".{}", uuid::Uuid::new_v4().simple()));
@@ -1492,29 +1391,7 @@ pub async fn chat_stream(
             }
         };
 
-        if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            state
-                .cc_thread_cwd
-                .lock()
-                .unwrap()
-                .insert(req.thread_id.clone(), cwd.to_string());
-        }
-        {
-            let conn = req
-                .bound_db_connection_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
-            let mut bindings = state.cc_db_bindings.write().await;
-            match conn {
-                Some(c) => {
-                    bindings.insert(req.thread_id.clone(), c.to_string());
-                }
-                None => {
-                    bindings.remove(&req.thread_id);
-                }
-            }
-        }
+        agent_ctx.refresh_runtime_bindings(state.inner()).await;
 
         let codex_message = {
             let mut prefix = String::new();

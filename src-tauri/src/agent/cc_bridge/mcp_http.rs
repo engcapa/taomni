@@ -822,7 +822,7 @@ impl CcHandler {
         };
 
         let cwd = state
-            .cc_thread_cwd
+            .agent_thread_cwd
             .lock()
             .unwrap()
             .get(&scope.thread_id)
