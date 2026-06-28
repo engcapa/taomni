@@ -245,17 +245,37 @@ function escapeRegExp(value: string): string {
  *   "Server-1" ["Server","Server-1","Server-2"] -> "Server-3"
  */
 export function computeDuplicateTitle(sourceTitle: string, openTitles: string[]): string {
+  return computeSequencedTitle(sourceTitle, openTitles, true);
+}
+
+/**
+ * Build the title for a newly opened terminal tab. Unlike duplicates, the
+ * first terminal in a family keeps its requested title; subsequent matching
+ * titles get the same `-<n>` suffix sequence used by duplicates.
+ */
+export function computeNewTerminalTitle(requestedTitle: string, openTerminalTitles: string[]): string {
+  return computeSequencedTitle(requestedTitle, openTerminalTitles, false);
+}
+
+function computeSequencedTitle(sourceTitle: string, openTitles: string[], forceSuffix: boolean): string {
   const suffixMatch = /^(.*?)-(\d+)$/.exec(sourceTitle);
   const base = suffixMatch ? suffixMatch[1] : sourceTitle;
   const familyRe = new RegExp(`^${escapeRegExp(base)}-(\\d+)$`);
   let maxSuffix = 0;
+  let familyExists = false;
   for (const title of openTitles) {
+    if (title === base) {
+      familyExists = true;
+      continue;
+    }
     const m = familyRe.exec(title);
     if (m) {
+      familyExists = true;
       const n = parseInt(m[1], 10);
       if (n > maxSuffix) maxSuffix = n;
     }
   }
+  if (!forceSuffix && !familyExists) return sourceTitle;
   return `${base}-${maxSuffix + 1}`;
 }
 

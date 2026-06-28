@@ -69,7 +69,7 @@ import {
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo } from "../types";
-import { useAppStore, type TerminalSplitLayout } from "../stores/appStore";
+import { computeNewTerminalTitle, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
@@ -1157,10 +1157,17 @@ export function MainLayout() {
     localShell?: LocalShellSelection,
   ) => {
     const id = `local-${Date.now()}`;
+    const requestedTitle = title || tr("tabs.localTerminal");
+    const resolvedTitle = computeNewTerminalTitle(
+      requestedTitle,
+      useAppStore.getState().tabs
+        .filter((tab) => tab.type === "terminal")
+        .map((tab) => tab.title),
+    );
     addTab({
       id,
       type: "terminal",
-      title: title || tr("tabs.localTerminal"),
+      title: resolvedTitle,
       sessionId,
       localShell,
       terminalProfile,

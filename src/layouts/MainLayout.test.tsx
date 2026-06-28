@@ -473,6 +473,26 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
+  it("numbers new local terminal titles from existing terminal tab names", async () => {
+    useAppStore.setState({
+      tabs: [
+        ...useAppStore.getState().tabs,
+        { id: "local-base", type: "terminal", title: "Local terminal", closable: true },
+        { id: "local-copy", type: "terminal", title: "Local terminal-1", closable: true },
+      ],
+      activeTabId: "ssh-tab",
+    });
+    render(<MainLayout />);
+
+    fireEvent.keyDown(window, { key: "T", ctrlKey: true, shiftKey: true });
+
+    await waitFor(() => {
+      expect(
+        useAppStore.getState().tabs.some((tab) => tab.id.startsWith("local-") && tab.title === "Local terminal-2"),
+      ).toBe(true);
+    });
+  });
+
   it("opens saved local shell sessions with the MCP requested shell type", async () => {
     const session: SessionConfig = {
       id: "local-shell-1",
