@@ -8,6 +8,7 @@ import { useT, type TranslateFn } from "../../lib/i18n";
 
 const PROVIDER_LABELS: Record<string, string> = {
   deepseek:    "DeepSeek",
+  agnes:       "Agnes",
   glm:         "GLM-4-Flash (Free)",
   siliconflow: "SiliconFlow",
   groq:        "Groq",
@@ -17,6 +18,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 const PROVIDER_NOTES: Record<string, string> = {
   deepseek:    "~¥1 per million input tokens, strong Chinese support",
+  agnes:       "Text, image, and video generation via Agnes AI",
   glm:         "Completely free, top pick in China",
   siliconflow: "One key, many models; many small models free",
   groq:        "Ultra-fast inference ~500 tok/s, free tier",
@@ -38,6 +40,20 @@ interface ProviderRowProps {
 
 function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const capabilities = {
+    chat: provider.capabilities?.chat !== false,
+    image_generation: provider.capabilities?.image_generation === true,
+    video_generation: provider.capabilities?.video_generation === true,
+  };
+  const setCapability = (key: keyof typeof capabilities, value: boolean) => {
+    onChange({
+      ...provider,
+      capabilities: {
+        ...capabilities,
+        [key]: value,
+      },
+    });
+  };
 
   return (
     <div
@@ -103,6 +119,57 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               onChange={(e) => onChange({ ...provider, model: e.target.value })}
             />
           </div>
+          <div>
+            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmCapabilities")}</label>
+            <div className="flex flex-wrap gap-3 text-[11px] text-[var(--taomni-text-muted)]">
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={capabilities.chat}
+                  onChange={(e) => setCapability("chat", e.target.checked)}
+                />
+                {t("aiSettings.llmCapabilityChat")}
+              </label>
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={capabilities.image_generation}
+                  onChange={(e) => setCapability("image_generation", e.target.checked)}
+                />
+                {t("aiSettings.llmCapabilityImage")}
+              </label>
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={capabilities.video_generation}
+                  onChange={(e) => setCapability("video_generation", e.target.checked)}
+                />
+                {t("aiSettings.llmCapabilityVideo")}
+              </label>
+            </div>
+          </div>
+          {capabilities.image_generation && (
+            <div>
+              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmImageModel")}</label>
+              <input
+                type="text"
+                className="taomni-input h-7 w-full text-[12px]"
+                value={provider.image_model ?? ""}
+                onChange={(e) => onChange({ ...provider, image_model: e.target.value })}
+              />
+            </div>
+          )}
+          {capabilities.video_generation && (
+            <div>
+              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmVideoModel")}</label>
+              <input
+                type="text"
+                className="taomni-input h-7 w-full text-[12px]"
+                value={provider.video_model ?? ""}
+                onChange={(e) => onChange({ ...provider, video_model: e.target.value })}
+              />
+            </div>
+          )}
           <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
             <input

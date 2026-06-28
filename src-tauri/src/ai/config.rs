@@ -60,6 +60,7 @@ impl AiConfig {
     pub fn normalize(&mut self) {
         self.cc_bridge.normalize();
         self.codex_bridge.normalize();
+        self.llm.ensure_default_providers();
     }
 
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
@@ -137,6 +138,25 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 model: "deepseek-chat".into(),
                 runtime: "openai-compat".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
+            },
+        );
+        providers.insert(
+            "agnes".into(),
+            LlmProviderConfig {
+                base_url: "https://apihub.agnes-ai.com/v1".into(),
+                api_key: String::new(),
+                model: "agnes-2.0-flash".into(),
+                runtime: "openai-compat".into(),
+                capabilities: LlmProviderCapabilities {
+                    chat: true,
+                    image_generation: true,
+                    video_generation: true,
+                },
+                image_model: Some("agnes-image-2.1-flash".into()),
+                video_model: Some("agnes-video-v2.0".into()),
             },
         );
         providers.insert(
@@ -146,6 +166,9 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 model: "glm-4-flash".into(),
                 runtime: "openai-compat".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
             },
         );
         providers.insert(
@@ -155,6 +178,9 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 model: "Qwen/Qwen2.5-Coder-7B-Instruct".into(),
                 runtime: "openai-compat".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
             },
         );
         providers.insert(
@@ -164,6 +190,9 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 model: "llama-3.3-70b-versatile".into(),
                 runtime: "openai-compat".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
             },
         );
         providers.insert(
@@ -173,6 +202,9 @@ impl Default for LlmConfig {
                 api_key: "local".into(),
                 model: "qwen3-1.7b-q4_k_m".into(),
                 runtime: "llama-server".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
             },
         );
         providers.insert(
@@ -182,6 +214,9 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 model: "claude-sonnet-4-5".into(),
                 runtime: "anthropic".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
             },
         );
 
@@ -208,12 +243,70 @@ impl Default for LlmConfig {
     }
 }
 
+impl LlmConfig {
+    fn ensure_default_providers(&mut self) {
+        self.providers
+            .entry("agnes".into())
+            .or_insert_with(default_agnes_provider);
+    }
+}
+
+fn default_agnes_provider() -> LlmProviderConfig {
+    LlmProviderConfig {
+        base_url: "https://apihub.agnes-ai.com/v1".into(),
+        api_key: String::new(),
+        model: "agnes-2.0-flash".into(),
+        runtime: "openai-compat".into(),
+        capabilities: LlmProviderCapabilities {
+            chat: true,
+            image_generation: true,
+            video_generation: true,
+        },
+        image_model: Some("agnes-image-2.1-flash".into()),
+        video_model: Some("agnes-video-v2.0".into()),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProviderConfig {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
     pub runtime: String,
+    #[serde(default = "default_llm_provider_capabilities")]
+    pub capabilities: LlmProviderCapabilities,
+    #[serde(default)]
+    pub image_model: Option<String>,
+    #[serde(default)]
+    pub video_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LlmProviderCapabilities {
+    #[serde(default = "default_true")]
+    pub chat: bool,
+    #[serde(default)]
+    pub image_generation: bool,
+    #[serde(default)]
+    pub video_generation: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_llm_provider_capabilities() -> LlmProviderCapabilities {
+    LlmProviderCapabilities {
+        chat: true,
+        image_generation: false,
+        video_generation: false,
+    }
+}
+
+impl Default for LlmProviderCapabilities {
+    fn default() -> Self {
+        default_llm_provider_capabilities()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -220,6 +220,10 @@ pub fn build_router(
     let mut router = LlmRouter::new(&cfg.active);
 
     for (id, p) in &cfg.providers {
+        if !p.capabilities.chat {
+            tracing::info!(provider = %id, "skipping provider without chat capability in LLM router");
+            continue;
+        }
         if full_local_mode && !crate::ai::network_policy::is_local_runtime(&p.runtime) {
             tracing::info!(provider = %id, runtime = %p.runtime, "skipping cloud provider in full-local mode");
             continue;

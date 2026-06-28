@@ -11,7 +11,9 @@
 //!    key cleanly and the provider becomes usable — no Save click needed.
 
 use std::collections::HashMap;
-use taomni_lib::ai::config::{AiConfig, FallbackConfig, LlmConfig, LlmProviderConfig};
+use taomni_lib::ai::config::{
+    AiConfig, FallbackConfig, LlmConfig, LlmProviderCapabilities, LlmProviderConfig,
+};
 use taomni_lib::llm::router::build_router_from_ai;
 use taomni_lib::vault::Vault;
 use tempfile::TempDir;
@@ -27,6 +29,9 @@ fn make_config(api_key: String) -> AiConfig {
             api_key,
             model: "claude-sonnet-4-5".into(),
             runtime: "anthropic".into(),
+            capabilities: LlmProviderCapabilities::default(),
+            image_model: None,
+            video_model: None,
         },
     );
     providers.insert(
@@ -36,6 +41,9 @@ fn make_config(api_key: String) -> AiConfig {
             api_key: "local".into(),
             model: "qwen3-1.7b-q4_k_m".into(),
             runtime: "llama-server".into(),
+            capabilities: LlmProviderCapabilities::default(),
+            image_model: None,
+            video_model: None,
         },
     );
 

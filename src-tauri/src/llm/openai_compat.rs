@@ -105,6 +105,7 @@ impl OpenAiCompatProvider {
     ) -> Option<Self> {
         let (base_url, default_model) = match id {
             "deepseek" => ("https://api.deepseek.com/v1", "deepseek-chat"),
+            "agnes" => ("https://apihub.agnes-ai.com/v1", "agnes-2.0-flash"),
             "glm" => ("https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
             "siliconflow" => (
                 "https://api.siliconflow.cn/v1",
