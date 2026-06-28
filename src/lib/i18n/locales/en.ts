@@ -1950,6 +1950,9 @@ const dict = {
     sectionNetwork: "Network settings",
     sectionBookmark: "Bookmark settings",
     sectionDatabase: "Database settings",
+    plannedClientTitle: "{proto} client is not implemented yet",
+    plannedClientNote:
+      "{proto} sessions can be saved and edited, but the client connection is not implemented yet. Opening this session will show a placeholder until the client backend lands.",
     fieldX11: "X11-Forwarding",
     enable: "Enable",
     x11DisplayLabel: "Display:",

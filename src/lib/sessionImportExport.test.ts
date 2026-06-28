@@ -261,6 +261,20 @@ describe("Taomni session import/export", () => {
       passwordRef: "vault:db-presto",
     });
   });
+
+  it("round-trips planned client session types", () => {
+    const exported = serializeTaomniSessions([
+      session({ id: "rlogin-1", name: "Legacy host", session_type: "Rlogin", port: 513 }),
+      session({ id: "mosh-1", name: "Roaming shell", session_type: "Mosh", port: 60001 }),
+      session({ id: "browser-1", name: "Docs", session_type: "Browser", port: 0 }),
+    ], null);
+
+    const imported = parseTaomniSessions(exported.text, { now: 4444 });
+
+    expect(imported.warnings).toEqual([]);
+    expect(imported.sessions.map((item) => item.session_type)).toEqual(["Rlogin", "Mosh", "Browser"]);
+    expect(imported.sessions.map((item) => item.port)).toEqual([513, 60001, 0]);
+  });
 });
 
 describe("CSV session import/export", () => {

@@ -1946,6 +1946,9 @@ export const zhCN: DeepPartial<typeof en> = {
     sectionNetwork: "网络设置",
     sectionBookmark: "书签设置",
     sectionDatabase: "数据库设置",
+    plannedClientTitle: "{proto} 客户端尚未实现",
+    plannedClientNote:
+      "{proto} 会话可以保存和编辑，但客户端连接尚未实现。打开该会话会显示占位页，直到客户端后端接入。",
     fieldX11: "X11 转发",
     enable: "启用",
     x11DisplayLabel: "显示：",

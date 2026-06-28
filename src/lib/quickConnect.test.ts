@@ -24,4 +24,20 @@ describe("parseQuickConnectInput", () => {
       auth_method: "Password",
     });
   });
+
+  it.each([
+    ["rlogin://bob@legacy.example.test", "Rlogin", "legacy.example.test", 513, "bob"],
+    ["mosh alice@edge.example.test", "Mosh", "edge.example.test", 60001, "alice"],
+    ["browser://docs.example.test", "Browser", "docs.example.test", 0, null],
+  ])("preserves planned client protocol %s", (input, sessionType, host, port, username) => {
+    const parsed = parseQuickConnectInput(input);
+
+    expect(parsed.config).toMatchObject({
+      session_type: sessionType,
+      host,
+      port,
+      username,
+      auth_method: "None",
+    });
+  });
 });

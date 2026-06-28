@@ -28,6 +28,7 @@ const MAX_OPTION_LENGTH = 4_000;
 const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22,
   Telnet: 23,
+  Rlogin: 513,
   RDP: 3389,
   VNC: 5900,
   FTP: 21,
@@ -35,6 +36,8 @@ const DEFAULT_PORTS: Record<string, number> = {
   Serial: 0,
   LocalShell: 0,
   File: 0,
+  Browser: 0,
+  Mosh: 60001,
   MySQL: 3306,
   PostgreSQL: 5432,
   SQLServer: 1433,
@@ -1703,10 +1706,13 @@ function protocolToSessionType(value: unknown, warnings: string[]): string {
   if (!protocol || protocol === "ssh" || protocol === "ssh2") return "SSH";
   if (protocol === "sftp") return "SFTP";
   if (protocol === "telnet") return "Telnet";
+  if (protocol === "rlogin") return "Rlogin";
+  if (protocol === "mosh") return "Mosh";
   if (protocol === "rdp" || protocol === "rdpfile") return "RDP";
   if (protocol === "vnc") return "VNC";
   if (protocol === "ftp") return "FTP";
   if (protocol === "serial") return "Serial";
+  if (protocol === "browser") return "Browser";
   warnings.push(`Imported unsupported protocol "${String(value)}" as SSH.`);
   return "SSH";
 }

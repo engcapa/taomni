@@ -422,6 +422,30 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["Rlogin", 513],
+    ["Mosh", 60001],
+    ["Browser", 0],
+  ])("persists %s as its own planned client type", async (initialProto, expectedPort) => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto });
+
+    expect(screen.getByTestId("session-planned-client-note")).toHaveTextContent(
+      `${initialProto} sessions can be saved and edited`,
+    );
+
+    await user.type(screen.getByLabelText("Remote host"), `${initialProto.toLowerCase()}.example.com`);
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.saveSession.mock.calls[0][0]).toMatchObject({
+      session_type: initialProto,
+      host: `${initialProto.toLowerCase()}.example.com`,
+      port: expectedPort,
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists RDP options through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "RDP" });

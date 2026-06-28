@@ -19,6 +19,8 @@ import {
   Share2,
   Star,
   Database,
+  Globe,
+  Server,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
@@ -1783,6 +1785,12 @@ function sessionIcon(type: string) {
     case "SFTP":
     case "FTP":
       return <Folder className="w-3.5 h-3.5" style={{ color: "#3b7ac2" }} />;
+    case "Rlogin":
+      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#5b8a4a" }} />;
+    case "Mosh":
+      return <Server className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />;
+    case "Browser":
+      return <Globe className="w-3.5 h-3.5" style={{ color: "#1e5fa8" }} />;
     case "Serial":
       return <Wifi className="w-3.5 h-3.5" style={{ color: "#236a98" }} />;
     case "WSL":

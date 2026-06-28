@@ -143,14 +143,15 @@ const DEFAULT_PORTS: Record<string, number> = {
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis"];
+const PLANNED_CLIENT_PROTOS = new Set<Proto>(["Telnet", "Rlogin", "FTP", "Serial", "Browser", "Mosh"]);
 
 /** Map UI proto to the backend session_type string. Object storage ("S3"
  * proto) is resolved to "S3" vs "AzureBlob" by the caller based on the
  * selected provider. */
 function protoToSessionType(p: Proto): string {
   const map: Partial<Record<Proto, string>> = {
-    Rlogin: "Telnet", Shell: "LocalShell",
-    Browser: "LocalShell", Mosh: "SSH", WSL: "LocalShell",
+    Shell: "LocalShell",
+    WSL: "LocalShell",
   };
   return map[p] ?? p;
 }
@@ -1869,6 +1870,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isHBase = proto === "HBaseShell";
   const isProxy = proto === "Proxy";
   const isObjectStorage = proto === "S3";
+  const isPlannedClient = PLANNED_CLIENT_PROTOS.has(proto);
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -2836,6 +2838,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 data-testid={`session-proto-${p.id.toLowerCase()}`}
                 className="taomni-proto-btn"
                 data-active={proto === p.id}
+                data-client-status={PLANNED_CLIENT_PROTOS.has(p.id) ? "planned" : "active"}
+                title={PLANNED_CLIENT_PROTOS.has(p.id) ? t("sessionEditor2.plannedClientTitle", { proto: p.id }) : p.id}
                 onClick={() => handleProtoChange(p.id)}
                 type="button"
               >
@@ -2971,6 +2975,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {isPlannedClient && (
+          <div
+            data-testid="session-planned-client-note"
+            className="mx-4 mt-3 px-3 py-2 rounded border text-[12px]"
+            style={{
+              borderColor: "var(--taomni-input-border)",
+              background: "var(--taomni-panel-bg)",
+              color: "var(--taomni-text-muted)",
+            }}
+          >
+            {t("sessionEditor2.plannedClientNote", { proto })}
           </div>
         )}
 

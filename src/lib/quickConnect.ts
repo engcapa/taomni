@@ -3,11 +3,14 @@ import type { AuthMethod, SessionConfig } from "./ipc";
 const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22,
   Telnet: 23,
+  Rlogin: 513,
   RDP: 3389,
   VNC: 5900,
   FTP: 21,
   SFTP: 22,
   Serial: 0,
+  Browser: 0,
+  Mosh: 60001,
   LocalShell: 0,
 };
 
@@ -16,9 +19,12 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   sftp: "SFTP",
   ftp: "FTP",
   telnet: "Telnet",
+  rlogin: "Rlogin",
+  mosh: "Mosh",
   rdp: "RDP",
   vnc: "VNC",
   serial: "Serial",
+  browser: "Browser",
   shell: "LocalShell",
   local: "LocalShell",
   bash: "LocalShell",
