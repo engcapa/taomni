@@ -52,6 +52,8 @@ pub struct ChatAttachment {
     pub size: u64,
     #[serde(default)]
     pub mime: Option<String>,
+    #[serde(default)]
+    pub preview_url: Option<String>,
 }
 
 pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
@@ -85,6 +87,7 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
             name TEXT NOT NULL,
             size INTEGER NOT NULL,
             mime TEXT,
+            preview_url TEXT,
             created_at INTEGER NOT NULL,
             FOREIGN KEY (message_id) REFERENCES ai_chat_messages(id) ON DELETE CASCADE,
             FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
@@ -113,6 +116,10 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
     // Idempotent column add for media-generation chat drawer modes.
     let _ = conn.execute(
         "ALTER TABLE ai_chat_threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat'",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_message_attachments ADD COLUMN preview_url TEXT",
         [],
     );
     Ok(())
@@ -216,8 +223,8 @@ pub fn insert_message(conn: &Connection, msg: &ChatMessage) -> SqlResult<()> {
     for att in &msg.attachments {
         conn.execute(
             "INSERT OR REPLACE INTO ai_chat_message_attachments
-             (id, message_id, thread_id, kind, path, name, size, mime, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             (id, message_id, thread_id, kind, path, name, size, mime, preview_url, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 &att.id,
                 &msg.id,
@@ -227,6 +234,7 @@ pub fn insert_message(conn: &Connection, msg: &ChatMessage) -> SqlResult<()> {
                 &att.name,
                 att.size as i64,
                 att.mime.as_deref(),
+                att.preview_url.as_deref(),
                 msg.created_at,
             ],
         )?;
@@ -261,7 +269,7 @@ pub fn list_messages(conn: &Connection, thread_id: &str) -> SqlResult<Vec<ChatMe
     }
 
     let mut att_stmt = conn.prepare(
-        "SELECT message_id, id, kind, path, name, size, mime
+        "SELECT message_id, id, kind, path, name, size, mime, preview_url
          FROM ai_chat_message_attachments WHERE thread_id = ?1 ORDER BY created_at ASC",
     )?;
     let att_rows = att_stmt.query_map(params![thread_id], |row| {
@@ -274,6 +282,7 @@ pub fn list_messages(conn: &Connection, thread_id: &str) -> SqlResult<Vec<ChatMe
                 name: row.get(4)?,
                 size: row.get::<_, i64>(5)?.max(0) as u64,
                 mime: row.get(6).ok(),
+                preview_url: row.get(7).ok(),
             },
         ))
     })?;
@@ -386,6 +395,7 @@ mod tests {
                 name: "diagram.png".into(),
                 size: 2048,
                 mime: Some("image/png".into()),
+                preview_url: Some("https://example.test/diagram.png".into()),
             }],
         };
         insert_message(&conn, &message).unwrap();
@@ -395,6 +405,10 @@ mod tests {
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].attachments.len(), 1);
         assert_eq!(messages[0].attachments[0].name, "diagram.png");
+        assert_eq!(
+            messages[0].attachments[0].preview_url.as_deref(),
+            Some("https://example.test/diagram.png")
+        );
         let loaded_thread = get_thread(&conn, "thread-1").unwrap().unwrap();
         assert_eq!(loaded_thread.mode, "chat");
     }

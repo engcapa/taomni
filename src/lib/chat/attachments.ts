@@ -12,6 +12,7 @@ export interface ChatAttachment {
   name: string;
   size: number;
   mime?: string | null;
+  preview_url?: string | null;
 }
 
 export async function pickChatAttachmentPaths(): Promise<string[]> {

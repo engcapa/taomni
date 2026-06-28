@@ -236,6 +236,10 @@ export function MessageBubble({
     () => (message.attachments ?? []).filter(isMediaAttachment),
     [message.attachments],
   );
+  const remoteMediaPreviewUrl = useMemo(
+    () => (!isUser ? extractRemoteMediaUrl(stripped) : null),
+    [isUser, stripped],
+  );
 
   const commitSendAll = (entry: TerminalRegistryEntry, payload: PreparedTerminalInput) => {
     entry.writeInput(payload.text);
@@ -366,8 +370,12 @@ export function MessageBubble({
         </div>
         {mediaAttachments.length > 0 && (
           <div className="mt-2 flex flex-col gap-2">
-            {mediaAttachments.map((attachment) => (
-              <MediaAttachmentPreview key={attachment.id} attachment={attachment} />
+            {mediaAttachments.map((attachment, index) => (
+              <MediaAttachmentPreview
+                key={attachment.id}
+                attachment={attachment}
+                fallbackSrc={index === 0 ? remoteMediaPreviewUrl : null}
+              />
             ))}
           </div>
         )}
@@ -443,12 +451,27 @@ function isDirectMediaSrc(path: string): boolean {
   return /^(data:|blob:|https?:|asset:)/i.test(path);
 }
 
-function mediaPreviewSrc(path: string): string {
-  return isDirectMediaSrc(path) ? path : convertFileSrc(path);
+function extractRemoteMediaUrl(text: string): string | null {
+  const match = text.match(/Remote URL:\s*(https?:\/\/[^\s<>"')]+)/i);
+  return match?.[1] ?? null;
 }
 
-function MediaAttachmentPreview({ attachment }: { attachment: ChatAttachment }) {
-  const src = mediaPreviewSrc(attachment.path);
+function mediaPreviewSrc(attachment: ChatAttachment, fallbackSrc?: string | null): string {
+  const previewUrl = attachment.preview_url?.trim();
+  if (previewUrl && isDirectMediaSrc(previewUrl)) return previewUrl;
+  const fallbackUrl = fallbackSrc?.trim();
+  if (fallbackUrl && isDirectMediaSrc(fallbackUrl)) return fallbackUrl;
+  return isDirectMediaSrc(attachment.path) ? attachment.path : convertFileSrc(attachment.path);
+}
+
+function MediaAttachmentPreview({
+  attachment,
+  fallbackSrc,
+}: {
+  attachment: ChatAttachment;
+  fallbackSrc?: string | null;
+}) {
+  const src = mediaPreviewSrc(attachment, fallbackSrc);
 
   if (attachment.kind === "video") {
     return (

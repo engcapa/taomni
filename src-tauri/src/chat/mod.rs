@@ -158,6 +158,7 @@ fn stat_attachment_path(path: &str, id: Option<String>) -> Result<store::ChatAtt
         name,
         size: metadata.len(),
         mime: Some(mime),
+        preview_url: None,
     })
 }
 
@@ -1138,6 +1139,7 @@ pub async fn chat_generate_media(
             name: generated.name,
             size: generated.size,
             mime: Some(generated.mime),
+            preview_url: generated.remote_url.clone(),
         }],
     };
     {
@@ -2574,6 +2576,7 @@ mod cc_tool_use_tests {
             name: "notes.txt".into(),
             size: 12,
             mime: Some("text/plain".into()),
+            preview_url: None,
         };
 
         let prefix = render_agent_attachment_prefix(&[att]);
@@ -2591,6 +2594,7 @@ mod cc_tool_use_tests {
             name: "large.bin".into(),
             size: CHAT_MAX_ATTACHMENT_BYTES + 1,
             mime: Some("application/octet-stream".into()),
+            preview_url: None,
         };
         assert!(validate_attachment_limits(&[oversized]).is_err());
 
@@ -2602,6 +2606,7 @@ mod cc_tool_use_tests {
                 name: format!("{i}.txt"),
                 size: 1,
                 mime: Some("text/plain".into()),
+                preview_url: None,
             })
             .collect();
         assert!(validate_attachment_limits(&many).is_err());

@@ -109,6 +109,7 @@ interface StubChatAttachment {
   name: string;
   size: number;
   mime?: string | null;
+  preview_url?: string | null;
 }
 
 function loadChatThreads(): StubChatThread[] {
@@ -1192,6 +1193,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
           name: `generated-${kind}.${ext}`,
           size: kind === "video" ? 0 : attachmentPath.length,
           mime,
+          preview_url: kind === "image" ? attachmentPath : null,
         }],
       };
       const messages = loadChatMessages();
