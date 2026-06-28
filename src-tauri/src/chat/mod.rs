@@ -5,7 +5,8 @@ pub mod store;
 
 use crate::ai::config::{default_ai_config_path, AiConfig};
 use crate::llm::{
-    ChatContentPart, ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, TaskKind,
+    ChatContentPart, ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, ChatTool,
+    ChatToolCall, Llm, TaskKind,
 };
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
@@ -14,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
@@ -24,6 +26,7 @@ fn now() -> i64 {
 const CHAT_MAX_ATTACHMENTS: usize = 10;
 const CHAT_MAX_ATTACHMENT_BYTES: u64 = 100 * 1024 * 1024;
 const TEXT_ATTACHMENT_PREVIEW_BYTES: u64 = 64 * 1024;
+const DIRECT_LLM_TOOL_MAX_ROUNDS: usize = 8;
 
 #[tauri::command]
 pub async fn chat_stat_attachment_paths(
@@ -735,6 +738,64 @@ fn cc_tool_result_preview(content: &str) -> String {
         format!("{truncated}…")
     } else {
         flat
+    }
+}
+
+fn append_agent_context_to_system_prompt(
+    mut system_prompt: String,
+    agent_ctx: &crate::agent::context::AgentThreadContext,
+) -> String {
+    let mut block = String::new();
+    if !agent_ctx.session_card.trim().is_empty() {
+        block.push_str(agent_ctx.session_card.trim());
+        block.push('\n');
+    }
+    if let Some(cwd) = agent_ctx
+        .cwd
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let (clean_cwd, _) = redact::redact(cwd);
+        block.push_str(&format!("Current working directory: {clean_cwd}\n"));
+    }
+    if agent_ctx.bound_db_connection_id.is_some() {
+        block.push_str("Database binding: active for SQL/Redis tools.\n");
+    }
+    if block.trim().is_empty() {
+        return system_prompt;
+    }
+    system_prompt.push_str("\n\n[Taomni runtime context]\n");
+    system_prompt.push_str(block.trim_end());
+    system_prompt
+}
+
+fn llm_tools_from_mcp(tools: Vec<rmcp::model::Tool>) -> Vec<ChatTool> {
+    tools
+        .into_iter()
+        .map(|tool| ChatTool {
+            name: tool.name.to_string(),
+            description: tool.description.map(|description| description.to_string()),
+            input_schema: serde_json::Value::Object(tool.input_schema.as_ref().clone()),
+        })
+        .collect()
+}
+
+fn assistant_tool_message(content: &str, tool_calls: &[ChatToolCall]) -> LlmMessage {
+    let mut parts = Vec::new();
+    if !content.is_empty() {
+        parts.push(ChatContentPart::Text {
+            text: content.to_string(),
+        });
+    }
+    parts.extend(tool_calls.iter().map(|call| ChatContentPart::ToolUse {
+        id: call.id.clone(),
+        name: call.name.clone(),
+        arguments: call.arguments.clone(),
+    }));
+    LlmMessage {
+        role: "assistant".into(),
+        content: crate::llm::ChatContent::Parts(parts),
     }
 }
 
@@ -1571,7 +1632,8 @@ pub async fn chat_stream(
     // Build the LLM request.
     let ai_config = AiConfig::load(&default_ai_config_path());
     let output_format = resolve_output_format(&thread, &ai_config);
-    let system_prompt = build_system_prompt(&output_format);
+    let system_prompt =
+        append_agent_context_to_system_prompt(build_system_prompt(&output_format), &agent_ctx);
     let mut llm_messages: Vec<LlmMessage> = vec![LlmMessage::system(system_prompt)];
     if let Some(ctx) = &req.terminal_context {
         let (clean_ctx, _) = redact::redact(ctx);
@@ -1611,8 +1673,8 @@ pub async fn chat_stream(
     });
 
     // Pull the provider via the router so we don't hold the read lock across
-    // the long stream lifetime.
-    let stream_result = {
+    // the long stream/tool lifetime.
+    let provider_result: Result<Arc<dyn Llm>, crate::llm::LlmError> = {
         let ai_ctx = state.ai_ctx.read().await;
         let pinned = ai_ctx.llm.provider(&thread.provider_id);
         let pinned_blocked = pinned.is_none() && ai_ctx.llm.needs_vault_unlock(&thread.provider_id);
@@ -1630,7 +1692,7 @@ pub async fn chat_stream(
             }
         });
         match provider {
-            Some(p) => p.chat_stream(llm_req).await,
+            Some(p) => Ok(p),
             None => {
                 if pinned_blocked {
                     Err(crate::llm::LlmError::VaultLocked {
@@ -1646,8 +1708,8 @@ pub async fn chat_stream(
         }
     };
 
-    let mut stream = match stream_result {
-        Ok(s) => s,
+    let provider = match provider_result {
+        Ok(provider) => provider,
         Err(e) => {
             emit(&StreamEventOut::Error {
                 id: assistant_id,
@@ -1666,32 +1728,78 @@ pub async fn chat_stream(
 
     let mut accumulated = String::new();
     let mut is_cancelled = false;
-    loop {
-        tokio::select! {
+
+    let mut ran_with_tools = false;
+    if provider.supports_tools() {
+        agent_ctx.refresh_runtime_bindings(state.inner()).await;
+
+        let runtime_result = tokio::select! {
             _ = cancel_token.cancelled() => {
                 is_cancelled = true;
-                break;
+                None
             }
-            evt_opt = stream.next() => {
-                match evt_opt {
-                    Some(evt) => {
-                        match evt {
-                            Ok(ChatStreamEvent::Token { content }) => {
-                                accumulated.push_str(&content);
-                                emit(&StreamEventOut::Token {
-                                    id: assistant_id.clone(),
-                                    content,
-                                });
+            result = crate::agent::tool_runtime::AgentToolRuntime::provision(
+                &app,
+                &agent_ctx,
+                ai_config.cc_bridge.confirm_readonly,
+            ) => Some(result),
+        };
+
+        if let Some(runtime_result) = runtime_result {
+            let runtime = match runtime_result {
+                Ok(runtime) => runtime,
+                Err(e) => {
+                    emit(&StreamEventOut::Error {
+                        id: assistant_id,
+                        message: e,
+                    });
+                    state.chat_runs.lock().await.remove(&req.thread_id);
+                    return Ok(());
+                }
+            };
+
+            let mcp_tools = tokio::select! {
+                _ = cancel_token.cancelled() => {
+                    is_cancelled = true;
+                    None
+                }
+                result = runtime.list_tools() => Some(result),
+            };
+
+            if let Some(mcp_tools) = mcp_tools {
+                let llm_tools = match mcp_tools {
+                    Ok(tools) => llm_tools_from_mcp(tools),
+                    Err(e) => {
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id,
+                            message: e,
+                        });
+                        state.chat_runs.lock().await.remove(&req.thread_id);
+                        return Ok(());
+                    }
+                };
+
+                if !llm_tools.is_empty() {
+                    ran_with_tools = true;
+                    let mut messages = llm_req.messages.clone();
+                    let mut completed = false;
+
+                    'tool_rounds: for round in 0..DIRECT_LLM_TOOL_MAX_ROUNDS {
+                        let turn_req = ChatRequest {
+                            messages: messages.clone(),
+                            max_tokens: llm_req.max_tokens,
+                            temperature: llm_req.temperature,
+                            stream: false,
+                        };
+                        let resp = tokio::select! {
+                            _ = cancel_token.cancelled() => {
+                                is_cancelled = true;
+                                break 'tool_rounds;
                             }
-                            Ok(ChatStreamEvent::End { .. }) => break,
-                            Ok(ChatStreamEvent::Error { message }) => {
-                                emit(&StreamEventOut::Error {
-                                    id: assistant_id,
-                                    message,
-                                });
-                                state.chat_runs.lock().await.remove(&req.thread_id);
-                                return Ok(());
-                            }
+                            result = provider.chat_with_tools(turn_req, llm_tools.clone()) => result,
+                        };
+                        let resp = match resp {
+                            Ok(resp) => resp,
                             Err(e) => {
                                 emit(&StreamEventOut::Error {
                                     id: assistant_id,
@@ -1700,9 +1808,154 @@ pub async fn chat_stream(
                                 state.chat_runs.lock().await.remove(&req.thread_id);
                                 return Ok(());
                             }
+                        };
+
+                        if !resp.content.is_empty() {
+                            accumulated.push_str(&resp.content);
+                            emit(&StreamEventOut::Token {
+                                id: assistant_id.clone(),
+                                content: resp.content.clone(),
+                            });
+                        }
+
+                        if resp.tool_calls.is_empty() {
+                            completed = true;
+                            break;
+                        }
+                        if round + 1 == DIRECT_LLM_TOOL_MAX_ROUNDS {
+                            emit(&StreamEventOut::Error {
+                                id: assistant_id,
+                                message: format!(
+                                    "Tool call limit exceeded after {DIRECT_LLM_TOOL_MAX_ROUNDS} rounds"
+                                ),
+                            });
+                            state.chat_runs.lock().await.remove(&req.thread_id);
+                            return Ok(());
+                        }
+
+                        messages.push(assistant_tool_message(&resp.content, &resp.tool_calls));
+                        for call in resp.tool_calls {
+                            accumulated.push_str(&format_cc_tool_use(&call.name, &call.arguments));
+                            emit(&StreamEventOut::CcToolActivity {
+                                id: assistant_id.clone(),
+                                call_id: call.id.clone(),
+                                phase: "use".into(),
+                                tool: call.name.clone(),
+                                detail: cc_tool_arg_summary(&call.arguments)
+                                    .unwrap_or("")
+                                    .to_string(),
+                            });
+
+                            let tool_result = tokio::select! {
+                                _ = cancel_token.cancelled() => {
+                                    is_cancelled = true;
+                                    break 'tool_rounds;
+                                }
+                                result = runtime.call_tool(&call.name, call.arguments.clone()) => result,
+                            };
+
+                            let (tool_text, is_error) = match tool_result {
+                                Ok(result) => (
+                                    crate::agent::tool_runtime::call_tool_result_text(&result),
+                                    false,
+                                ),
+                                Err(e) => (format!("Tool error: {e}"), true),
+                            };
+                            let preview = cc_tool_result_preview(&tool_text);
+                            emit(&StreamEventOut::CcToolActivity {
+                                id: assistant_id.clone(),
+                                call_id: call.id.clone(),
+                                phase: "result".into(),
+                                tool: String::new(),
+                                detail: preview.clone(),
+                            });
+                            if !preview.is_empty() {
+                                accumulated.push_str(&format!("> ↳ {}\n", preview));
+                            }
+
+                            if is_error {
+                                messages.push(LlmMessage::tool_error(call.id, tool_text));
+                            } else {
+                                messages.push(LlmMessage::tool_result(call.id, tool_text));
+                            }
                         }
                     }
-                    None => break,
+
+                    if !completed && !is_cancelled {
+                        emit(&StreamEventOut::Error {
+                            id: assistant_id,
+                            message: "Tool loop ended before the provider returned a final answer"
+                                .into(),
+                        });
+                        state.chat_runs.lock().await.remove(&req.thread_id);
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
+
+    if !ran_with_tools && !is_cancelled {
+        let stream_result = tokio::select! {
+            _ = cancel_token.cancelled() => {
+                is_cancelled = true;
+                None
+            }
+            result = provider.chat_stream(llm_req) => Some(result),
+        };
+
+        if let Some(stream_result) = stream_result {
+            let mut stream = match stream_result {
+                Ok(s) => s,
+                Err(e) => {
+                    emit(&StreamEventOut::Error {
+                        id: assistant_id,
+                        message: e.to_string(),
+                    });
+                    state.chat_runs.lock().await.remove(&req.thread_id);
+                    return Ok(());
+                }
+            };
+
+            loop {
+                tokio::select! {
+                    _ = cancel_token.cancelled() => {
+                        is_cancelled = true;
+                        break;
+                    }
+                    evt_opt = stream.next() => {
+                        match evt_opt {
+                            Some(evt) => {
+                                match evt {
+                                    Ok(ChatStreamEvent::Token { content }) => {
+                                        accumulated.push_str(&content);
+                                        emit(&StreamEventOut::Token {
+                                            id: assistant_id.clone(),
+                                            content,
+                                        });
+                                    }
+                                    Ok(ChatStreamEvent::End { .. }) => break,
+                                    Ok(ChatStreamEvent::Error { message }) => {
+                                        emit(&StreamEventOut::Error {
+                                            id: assistant_id,
+                                            message,
+                                        });
+                                        state.chat_runs.lock().await.remove(&req.thread_id);
+                                        return Ok(());
+                                    }
+                                    Err(e) => {
+                                        emit(&StreamEventOut::Error {
+                                            id: assistant_id,
+                                            message: e.to_string(),
+                                        });
+                                        state.chat_runs.lock().await.remove(&req.thread_id);
+                                        return Ok(());
+                                    }
+                                }
+                            }
+                            None => break,
+                        }
+                    }
                 }
             }
         }

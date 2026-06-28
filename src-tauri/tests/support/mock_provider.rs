@@ -64,6 +64,7 @@ impl Llm for MockLlm {
                 completion_tokens: 0,
                 total_tokens: 0,
             }),
+            tool_calls: Vec::new(),
         })
     }
 
