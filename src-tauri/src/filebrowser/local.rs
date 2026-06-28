@@ -169,12 +169,11 @@ pub fn open_path(path: &Path) -> Result<(), String> {
     if !path.exists() {
         return Err(format!("Path does not exist: {}", path.display()));
     }
-    open_path_platform(path)
+    open_target_platform(&path.to_string_lossy(), &path.display().to_string())
 }
 
 #[cfg(target_os = "windows")]
-fn open_path_platform(path: &Path) -> Result<(), String> {
-    let path_str = path.to_string_lossy().to_string();
+fn open_target_platform(target: &str, display: &str) -> Result<(), String> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use std::ptr;
@@ -182,7 +181,7 @@ fn open_path_platform(path: &Path) -> Result<(), String> {
     use winapi::um::winuser::SW_SHOWNORMAL;
 
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
-    let file: Vec<u16> = OsStr::new(&path_str).encode_wide().chain(Some(0)).collect();
+    let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
     let result = unsafe {
         ShellExecuteW(
             ptr::null_mut(),
@@ -195,42 +194,38 @@ fn open_path_platform(path: &Path) -> Result<(), String> {
     } as isize;
     if result <= 32 {
         return Err(format!(
-            "No default application could open {} (ShellExecute error {})",
-            path.display(),
-            result
+            "No default application could open {display} (ShellExecute error {result})"
         ));
     }
     Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn open_path_platform(path: &Path) -> Result<(), String> {
-    let path_str = path.to_string_lossy().to_string();
-
-    let cmd: (&str, Vec<&str>);
+fn open_target_platform(target: &str, display: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    {
-        cmd = ("open", vec![path_str.as_str()]);
-    }
+    let cmd = "open";
     #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        cmd = ("xdg-open", vec![path_str.as_str()]);
-    }
+    let cmd = "xdg-open";
 
-    let status = std::process::Command::new(cmd.0)
-        .args(&cmd.1)
+    let status = std::process::Command::new(cmd)
+        .arg(target)
         .status()
-        .map_err(|e| format!("Failed to open {}: {}", path.display(), e))?;
+        .map_err(|e| format!("Failed to open {display}: {e}"))?;
     if status.success() {
         Ok(())
     } else {
         Err(format!(
-            "No default application could open {} ({} exited with {})",
-            path.display(),
-            cmd.0,
-            status
+            "No default application could open {display} ({cmd} exited with {status})"
         ))
     }
+}
+
+pub fn open_url(url: &str) -> Result<(), String> {
+    let trimmed = url.trim();
+    if !(trimmed.starts_with("http://") || trimmed.starts_with("https://")) {
+        return Err("Only http:// and https:// URLs can be opened.".into());
+    }
+    open_target_platform(trimmed, trimmed)
 }
 
 fn entry_for(path: &Path) -> Result<FileEntryDto, String> {
@@ -309,5 +304,16 @@ fn mode_for(meta: &fs::Metadata) -> u32 {
         0o444
     } else {
         0o644
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::open_url;
+
+    #[test]
+    fn open_url_rejects_non_http_schemes() {
+        let err = open_url("file:///tmp/demo").expect_err("file URLs should be rejected");
+        assert!(err.contains("Only http:// and https:// URLs"));
     }
 }

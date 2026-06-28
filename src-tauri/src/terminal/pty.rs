@@ -538,6 +538,38 @@ pub fn create_pty(
     shell_args: Option<Vec<String>>,
     cwd: Option<String>,
 ) -> Result<(PtyHandle, Box<dyn Read + Send>, String), String> {
+    let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
+    let integration =
+        super::shell_integration::integration_for(&shell_launch.program, &shell_id, &shell_launch.args);
+    let (handle, reader) = create_pty_for_launch(
+        cols,
+        rows,
+        &shell_launch.program,
+        &shell_launch.args,
+        Some(integration),
+        cwd,
+    )?;
+
+    Ok((handle, reader, shell_id))
+}
+
+pub fn create_command_pty(
+    cols: u16,
+    rows: u16,
+    program: &str,
+    args: &[String],
+) -> Result<(PtyHandle, Box<dyn Read + Send>), String> {
+    create_pty_for_launch(cols, rows, program, args, None, None)
+}
+
+fn create_pty_for_launch(
+    cols: u16,
+    rows: u16,
+    program: &str,
+    args: &[String],
+    integration: Option<super::shell_integration::Integration>,
+    cwd: Option<String>,
+) -> Result<(PtyHandle, Box<dyn Read + Send>), String> {
     let pty_system = native_pty_system();
 
     let size = PtySize {
@@ -551,18 +583,18 @@ pub fn create_pty(
         .openpty(size)
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
-    let integration =
-        super::shell_integration::integration_for(&shell_launch.program, &shell_id, &shell_launch.args);
-    let mut cmd = CommandBuilder::new(&shell_launch.program);
-    for arg in &shell_launch.args {
+    let mut cmd = CommandBuilder::new(program);
+    for arg in args {
         cmd.arg(arg);
     }
     // Shell-integration args (e.g. PowerShell's `-NoExit -Command ". '<script>'"`)
     // go after the shell's own args so OSC 7 cwd reporting is installed once the
     // shell is interactive.
-    for arg in &integration.extra_args {
-        cmd.arg(arg);
+    let integration = integration.unwrap_or_default();
+    {
+        for arg in &integration.extra_args {
+            cmd.arg(arg);
+        }
     }
 
     #[cfg(unix)]
@@ -603,7 +635,7 @@ pub fn create_pty(
         master: pair.master,
     };
 
-    Ok((handle, reader, shell_id))
+    Ok((handle, reader))
 }
 
 pub fn resize_pty(

@@ -27,6 +27,7 @@ pub struct SessionConfig {
 pub enum SessionType {
     SSH,
     Telnet,
+    Rlogin,
     RDP,
     VNC,
     FTP,
@@ -34,6 +35,8 @@ pub enum SessionType {
     Serial,
     LocalShell,
     File,
+    Browser,
+    Mosh,
     MySQL,
     PostgreSQL,
     SQLServer,
@@ -59,6 +62,7 @@ impl SessionType {
         match self {
             Self::SSH => "SSH",
             Self::Telnet => "Telnet",
+            Self::Rlogin => "Rlogin",
             Self::RDP => "RDP",
             Self::VNC => "VNC",
             Self::FTP => "FTP",
@@ -66,6 +70,8 @@ impl SessionType {
             Self::Serial => "Serial",
             Self::LocalShell => "LocalShell",
             Self::File => "File",
+            Self::Browser => "Browser",
+            Self::Mosh => "Mosh",
             Self::MySQL => "MySQL",
             Self::PostgreSQL => "PostgreSQL",
             Self::SQLServer => "SQLServer",
@@ -83,6 +89,7 @@ impl SessionType {
         match s {
             "SSH" => Self::SSH,
             "Telnet" => Self::Telnet,
+            "Rlogin" => Self::Rlogin,
             "RDP" => Self::RDP,
             "VNC" => Self::VNC,
             "FTP" => Self::FTP,
@@ -90,6 +97,8 @@ impl SessionType {
             "Serial" => Self::Serial,
             "LocalShell" => Self::LocalShell,
             "File" => Self::File,
+            "Browser" => Self::Browser,
+            "Mosh" => Self::Mosh,
             "MySQL" => Self::MySQL,
             "PostgreSQL" => Self::PostgreSQL,
             "SQLServer" | "SQL Server" | "MSSQL" => Self::SQLServer,
@@ -108,9 +117,11 @@ impl SessionType {
         match self {
             Self::SSH | Self::SFTP => 22,
             Self::Telnet => 23,
+            Self::Rlogin => 513,
             Self::RDP => 3389,
             Self::VNC => 5900,
             Self::FTP => 21,
+            Self::Mosh => 60001,
             Self::MySQL => 3306,
             Self::PostgreSQL => 5432,
             Self::SQLServer => 1433,
@@ -121,7 +132,7 @@ impl SessionType {
             Self::Proxy => 3128,
             // Object storage speaks HTTPS; the real endpoint lives in options_json.
             Self::S3 | Self::AzureBlob => 443,
-            Self::Serial | Self::LocalShell | Self::File => 0,
+            Self::Serial | Self::LocalShell | Self::File | Self::Browser => 0,
         }
     }
 }
@@ -170,6 +181,19 @@ mod tests {
     fn session_type_proxy_round_trips() {
         assert_eq!(SessionType::Proxy.as_str(), "Proxy");
         assert_eq!(SessionType::from_str("Proxy"), SessionType::Proxy);
+    }
+
+    #[test]
+    fn planned_client_session_types_round_trip() {
+        for (raw, expected_port) in [
+            ("Rlogin", 513),
+            ("Mosh", 60001),
+            ("Browser", 0),
+        ] {
+            let ty = SessionType::from_str(raw);
+            assert_eq!(ty.as_str(), raw);
+            assert_eq!(ty.default_port(), expected_port);
+        }
     }
 
     #[test]

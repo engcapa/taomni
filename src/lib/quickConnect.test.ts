@@ -24,4 +24,49 @@ describe("parseQuickConnectInput", () => {
       auth_method: "Password",
     });
   });
+
+  it.each([
+    ["ftp://ops@files.example.test:2121", "FTP", "files.example.test", 2121, "ops"],
+    ["rlogin://bob@legacy.example.test", "Rlogin", "legacy.example.test", 513, "bob"],
+    ["mosh alice@edge.example.test", "Mosh", "edge.example.test", 60001, "alice"],
+  ])("parses terminal client protocol %s", (input, sessionType, host, port, username) => {
+    const parsed = parseQuickConnectInput(input);
+
+    expect(parsed.config).toMatchObject({
+      session_type: sessionType,
+      host,
+      port,
+      username,
+      auth_method: "None",
+    });
+  });
+
+  it("parses Serial targets without storing baud in the session port", () => {
+    const parsed = parseQuickConnectInput("serial /dev/ttyUSB0:115200");
+
+    expect(parsed.config).toMatchObject({
+      session_type: "Serial",
+      host: "/dev/ttyUSB0",
+      port: 0,
+      auth_method: "None",
+    });
+    expect(JSON.parse(parsed.config.options_json)).toMatchObject({ serialBaud: "115200" });
+  });
+
+  it.each([
+    ["browser://docs.example.test", "https://docs.example.test"],
+    ["browser https://docs.example.test/path?q=1", "https://docs.example.test/path?q=1"],
+    ["https://docs.example.test/path?q=1", "https://docs.example.test/path?q=1"],
+  ])("parses Browser targets as URL sessions", (input, url) => {
+    const parsed = parseQuickConnectInput(input);
+
+    expect(parsed.config).toMatchObject({
+      name: url,
+      session_type: "Browser",
+      host: url,
+      port: 0,
+      username: null,
+      auth_method: "None",
+    });
+  });
 });

@@ -256,6 +256,7 @@ export interface Tab {
   connectionId?: string;
   closable: boolean;
   ssh?: SshConnectInfo;
+  commandTerminal?: CommandTerminalConnectInfo;
   localShell?: LocalShellSelection;
   adoptedTerminal?: AdoptedTerminalInfo;
   terminalProfile?: TerminalProfile;
@@ -303,6 +304,15 @@ export interface LocalShellSelection {
   id: string;
   name: string;
   args?: string[];
+}
+
+export interface CommandTerminalConnectInfo {
+  sessionId?: string;
+  kind: "FTP" | "Telnet" | "Rlogin" | "Serial" | "Mosh";
+  host: string;
+  port: number;
+  username?: string | null;
+  optionsJson?: string | null;
 }
 
 export interface AdoptedTerminalInfo {

@@ -3,11 +3,14 @@ import type { AuthMethod, SessionConfig } from "./ipc";
 const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22,
   Telnet: 23,
+  Rlogin: 513,
   RDP: 3389,
   VNC: 5900,
   FTP: 21,
   SFTP: 22,
   Serial: 0,
+  Browser: 0,
+  Mosh: 60001,
   LocalShell: 0,
 };
 
@@ -16,9 +19,14 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   sftp: "SFTP",
   ftp: "FTP",
   telnet: "Telnet",
+  rlogin: "Rlogin",
+  mosh: "Mosh",
   rdp: "RDP",
   vnc: "VNC",
   serial: "Serial",
+  browser: "Browser",
+  http: "Browser",
+  https: "Browser",
   shell: "LocalShell",
   local: "LocalShell",
   bash: "LocalShell",
@@ -62,16 +70,44 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
     };
   }
 
-  const parsed = parseTarget(target);
-  if (!parsed.host) {
-    throw new Error("Remote host is required.");
+  if (sessionType === "Browser") {
+    const url = normalizeBrowserTarget(target);
+    if (!url) {
+      throw new Error("Browser URL or host is required.");
+    }
+    return {
+      transient: true,
+      authData: null,
+      config: {
+        id: `quick-browser-${Date.now()}`,
+        name: url,
+        session_type: "Browser",
+        group_path: null,
+        host: url,
+        port: 0,
+        username: null,
+        auth_method: "None",
+        options_json: "{}",
+        created_at: now,
+        updated_at: now,
+        last_connected_at: null,
+        sort_order: 0,
+      },
+    };
   }
 
-  const port = parsed.port ?? DEFAULT_PORTS[sessionType] ?? 22;
+  const parsed = parseTarget(target);
+  if (!parsed.host) {
+    throw new Error(sessionType === "Serial" ? "Serial device path is required." : "Remote host is required.");
+  }
+
+  const serialBaud = sessionType === "Serial" && parsed.port ? parsed.port : null;
+  const port = sessionType === "Serial" ? 0 : (parsed.port ?? DEFAULT_PORTS[sessionType] ?? 22);
   const username = parsed.username ?? (sessionType === "SSH" || sessionType === "SFTP" ? "root" : null);
   const authMethod: AuthMethod =
     sessionType === "SSH" || sessionType === "RDP" ? "Password" : "None";
   const titlePrefix = username ? `${username}@` : "";
+  const optionsJson = serialBaud ? JSON.stringify({ serialBaud: String(serialBaud) }) : "{}";
 
   return {
     transient: true,
@@ -85,7 +121,7 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
       port,
       username,
       auth_method: authMethod,
-      options_json: "{}",
+      options_json: optionsJson,
       created_at: now,
       updated_at: now,
       last_connected_at: null,
@@ -173,6 +209,16 @@ function splitProtocol(raw: string): { sessionType: string; target: string } {
   }
 
   return { sessionType: "SSH", target: raw };
+}
+
+function normalizeBrowserTarget(target: string): string {
+  const trimmed = target.trim();
+  if (!trimmed) return "";
+  if (/^browser:\/\//i.test(trimmed)) {
+    return `https://${trimmed.replace(/^browser:\/\//i, "")}`;
+  }
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/+/, "")}`;
 }
 
 function parseTarget(target: string): { username?: string; host: string; port?: number } {

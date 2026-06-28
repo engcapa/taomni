@@ -46,9 +46,8 @@ import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../li
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
 import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
-import { openSftpWindow } from "../lib/sftp";
+import { effectiveFileType, openExternalUrl, openSftpWindow, sftpOpenPath, sftpStat } from "../lib/sftp";
 import { openDetachedWindow } from "../lib/detachWindowing";
-import { sftpOpenPath, sftpStat, effectiveFileType } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
 import {
@@ -200,6 +199,31 @@ function localShellSelectionFromSession(session: SessionConfig): LocalShellSelec
     id: path,
     name: session.name || path,
     ...(args && args.length > 0 ? { args } : {}),
+  };
+}
+
+function browserUrlFromSession(session: SessionConfig): string | null {
+  const target = session.host.trim();
+  if (!target) return null;
+  if (/^https?:\/\//i.test(target)) return target;
+  const withoutSlashes = target.replace(/^\/+/, "");
+  const port = session.port > 0 ? `:${session.port}` : "";
+  return `https://${withoutSlashes}${port}`;
+}
+
+const COMMAND_TERMINAL_SESSION_TYPES = new Set(["FTP", "Telnet", "Rlogin", "Serial", "Mosh"]);
+
+function commandTerminalFromSession(session: SessionConfig): NonNullable<Tab["commandTerminal"]> | null {
+  if (!COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) return null;
+  const host = session.host.trim();
+  if (!host) return null;
+  return {
+    sessionId: session.id,
+    kind: session.session_type as NonNullable<Tab["commandTerminal"]>["kind"],
+    host,
+    port: session.port,
+    username: session.username,
+    optionsJson: session.options_json,
   };
 }
 
@@ -629,7 +653,7 @@ export function MainLayout() {
         const tracked = terminalCwdsRef.current[tabId];
         if (tracked) {
           initialCwd = tracked;
-        } else if (!source.ssh && localShellSupportsCwdProbe(source.localShell)) {
+        } else if (!source.ssh && !source.commandTerminal && localShellSupportsCwdProbe(source.localShell)) {
           const cwd = await queryTerminalCwd(tabId);
           initialCwd = cwd ?? undefined;
         }
@@ -819,6 +843,7 @@ export function MainLayout() {
         tabId,
         title,
         ssh: tab.ssh ?? null,
+        commandTerminal: tab.commandTerminal ?? null,
         localShell: tab.localShell ?? null,
         terminalProfile: tab.terminalProfile ?? null,
         reattach,
@@ -975,6 +1000,7 @@ export function MainLayout() {
             title: p.title || tr("tabs.localTerminal"),
             closable: true,
             ssh: p.ssh ?? undefined,
+            commandTerminal: p.commandTerminal ?? undefined,
             localShell: p.localShell ?? undefined,
             terminalProfile: p.terminalProfile ?? undefined,
             adoptedTerminal: adopted,
@@ -1355,7 +1381,7 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [addTab, markConnected]);
 
-  // Open a local path or URL: URLs and files always go to the system handler;
+  // Open a local path or URL: http(s) URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
   const handleOpenLocalPath = useCallback(async (
@@ -1364,10 +1390,10 @@ export function MainLayout() {
   ) => {
     const trimmed = target.trim();
     if (!trimmed) return;
-    const isUrl = /^(https?|file|ftp):\/\//i.test(trimmed);
+    const isUrl = /^https?:\/\//i.test(trimmed);
     if (isUrl) {
       try {
-        await sftpOpenPath(trimmed);
+        await openExternalUrl(trimmed);
       } catch (err) {
         setStatusMessage(tr("status.openFailed", {
           error: err instanceof Error ? err.message : String(err),
@@ -1419,6 +1445,20 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [handleOpenLocalPath, markConnected, setStatusMessage]);
 
+  const openBrowserSession = useCallback((session: SessionConfig) => {
+    const url = browserUrlFromSession(session);
+    if (!url) {
+      setStatusMessage(tr("status.browserSessionMissing"));
+      return;
+    }
+    void openExternalUrl(url).catch((err) => {
+      setStatusMessage(tr("status.openFailed", {
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    });
+    void markConnected(session.id);
+  }, [markConnected, setStatusMessage]);
+
   const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const id = `ssh-${session.id}-${Date.now()}`;
     addTab({
@@ -1440,6 +1480,34 @@ export function MainLayout() {
     });
     void markConnected(session.id);
   }, [addTab, markConnected]);
+
+  const openCommandTerminalTab = useCallback((session: SessionConfig) => {
+    const commandTerminal = commandTerminalFromSession(session);
+    if (!commandTerminal) {
+      setStatusMessage(
+        session.session_type === "Serial"
+          ? tr("status.serialSessionMissing")
+          : tr("status.remoteSessionMissing"),
+      );
+      return;
+    }
+    const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
+    const title = session.name || (
+      session.session_type === "Serial"
+        ? commandTerminal.host
+        : `${session.session_type} ${commandTerminal.username ? `${commandTerminal.username}@` : ""}${commandTerminal.host}`
+    );
+    addTab({
+      id,
+      type: "terminal",
+      title,
+      sessionId: session.id,
+      closable: true,
+      commandTerminal,
+      terminalProfile: getSessionTerminalProfile(session.options_json),
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected, setStatusMessage]);
 
   const openUnsupportedTab = useCallback((session: SessionConfig) => {
     const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
@@ -1544,6 +1612,10 @@ export function MainLayout() {
       }
     } else if (session.session_type === "File") {
       openFileSession(session);
+    } else if (session.session_type === "Browser") {
+      openBrowserSession(session);
+    } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
+      openCommandTerminalTab(session);
     } else if (
       session.session_type === "MySQL" ||
       session.session_type === "PostgreSQL" ||
@@ -1590,6 +1662,8 @@ export function MainLayout() {
     return "opened";
   }, [
     markConnected,
+    openBrowserSession,
+    openCommandTerminalTab,
     openFileSession,
     openLocalTab,
     openSftpTab,
@@ -1704,6 +1778,10 @@ export function MainLayout() {
       const session = parsed.config;
       if (session.session_type === "LocalShell") {
         openLocalTab(session.name);
+      } else if (session.session_type === "Browser") {
+        openBrowserSession(session);
+      } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
+        openCommandTerminalTab(session);
       } else if (
         session.session_type === "SSH"
         || session.session_type === "SFTP"
@@ -1728,7 +1806,7 @@ export function MainLayout() {
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : String(err));
     }
-  }, [openLocalTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
+  }, [openBrowserSession, openCommandTerminalTab, openLocalTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
 
   const openPlaceholderTab = useCallback((title: string, message: string) => {
     addTab({
@@ -2564,6 +2642,7 @@ export function MainLayout() {
                             tabId={tab.id}
                             tabTitle={tab.title}
                             ssh={tab.ssh}
+                            commandTerminal={tab.commandTerminal}
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
                             adoptedTerminal={tab.adoptedTerminal}

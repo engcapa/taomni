@@ -60,7 +60,13 @@ pub fn host_key_for(session: &SessionConfig) -> String {
 fn is_remote(t: &SessionType) -> bool {
     matches!(
         t,
-        SessionType::SSH | SessionType::Telnet | SessionType::SFTP | SessionType::Serial
+        SessionType::SSH
+            | SessionType::Telnet
+            | SessionType::Rlogin
+            | SessionType::FTP
+            | SessionType::SFTP
+            | SessionType::Serial
+            | SessionType::Mosh
     )
 }
 

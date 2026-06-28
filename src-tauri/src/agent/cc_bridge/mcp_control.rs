@@ -337,6 +337,7 @@ fn parse_session_type(s: &str) -> Result<SessionType, String> {
     let canonical = [
         "SSH",
         "Telnet",
+        "Rlogin",
         "RDP",
         "VNC",
         "FTP",
@@ -344,6 +345,8 @@ fn parse_session_type(s: &str) -> Result<SessionType, String> {
         "Serial",
         "LocalShell",
         "File",
+        "Browser",
+        "Mosh",
         "MySQL",
         "PostgreSQL",
         "SQLServer",

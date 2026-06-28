@@ -38,7 +38,7 @@ import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import type { RdpOptions } from "../../types/rdp";
 import type { DbConnectInfo, TabKind } from "../../types";
 import type { TerminalProfile } from "../../lib/terminalProfile";
-import type { SshConnectInfo } from "../terminal/TerminalPanel";
+import type { CommandTerminalConnectInfo, SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
 import { useT, t as tr } from "../../lib/i18n";
 import { useAppTheme } from "../../lib/appTheme";
@@ -86,6 +86,7 @@ export interface DetachedTerminalParams {
   tabId?: string;
   title?: string;
   ssh?: SshConnectInfo | null;
+  commandTerminal?: CommandTerminalConnectInfo | null;
   localShell?: LocalShellSelection | null;
   terminalProfile?: TerminalProfile | null;
   reattach?: TerminalReattachState;
@@ -546,6 +547,7 @@ function renderInner(
           tabId={p.tabId ?? `detached-term-${id}`}
           tabTitle={p.title}
           ssh={p.ssh ?? undefined}
+          commandTerminal={p.commandTerminal ?? undefined}
           localShell={p.localShell ?? undefined}
           terminalProfile={p.terminalProfile ?? undefined}
           adoptedTerminal={adopted}

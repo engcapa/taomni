@@ -16,6 +16,7 @@ const ipcMocks = vi.hoisted(() => ({
   deleteSessionGroup: vi.fn(),
   listSystemFonts: vi.fn(),
   listWslDistros: vi.fn(),
+  listLocalShells: vi.fn(),
   hbaseTestConnection: vi.fn(),
   dbTestConnection: vi.fn(),
   vaultPut: vi.fn(async () => ({ id: "vault-pwd", reference: "vault:pwd" })),
@@ -65,6 +66,16 @@ describe("SessionEditor SSH settings tabs", () => {
     ipcMocks.saveSessionGroup.mockResolvedValue(undefined);
     ipcMocks.testSshConnection.mockResolvedValue("Connection successful");
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
+    ipcMocks.listLocalShells.mockResolvedValue([
+      {
+        id: "bash",
+        name: "Bash",
+        path: "/bin/bash",
+        args: ["--login"],
+        isDefault: true,
+        canElevate: false,
+      },
+    ]);
     ipcMocks.hbaseTestConnection.mockResolvedValue("HBase REST connection OK");
     ipcMocks.dbTestConnection.mockResolvedValue("Database connection OK");
     ipcMocks.listWslDistros.mockResolvedValue([
@@ -413,11 +424,110 @@ describe("SessionEditor SSH settings tabs", () => {
       name: "WSL: Ubuntu",
       host: "",
       port: 0,
+      auth_method: "None",
     });
     expect(savedOptions).toMatchObject({
       wslDistro: "Ubuntu",
       localShellPath: "wsl.exe",
       localShellArgs: ["-d", "Ubuntu"],
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["FTP", 21],
+    ["Telnet", 23],
+    ["Rlogin", 513],
+    ["Mosh", 60001],
+  ])("persists %s as an implemented command terminal client type", async (initialProto, expectedPort) => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto });
+
+    expect(screen.queryByTestId("session-planned-client-note")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Remote host"), `${initialProto.toLowerCase()}.example.com`);
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.saveSession.mock.calls[0][0]).toMatchObject({
+      session_type: initialProto,
+      host: `${initialProto.toLowerCase()}.example.com`,
+      port: expectedPort,
+      auth_method: "None",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists Serial device settings as a command terminal client", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Serial" });
+
+    expect(screen.queryByTestId("session-planned-client-note")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Device *"), "/dev/ttyUSB0");
+    await user.clear(screen.getByLabelText("Baud"));
+    await user.type(screen.getByLabelText("Baud"), "57600");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    expect(savedConfig).toMatchObject({
+      session_type: "Serial",
+      host: "/dev/ttyUSB0",
+      port: 0,
+      auth_method: "None",
+    });
+    expect(JSON.parse(savedConfig.options_json)).toMatchObject({
+      serialDevice: "/dev/ttyUSB0",
+      serialBaud: "57600",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists Browser sessions as URL clients without a planned-client warning", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Browser" });
+
+    expect(screen.queryByTestId("session-planned-client-note")).not.toBeInTheDocument();
+
+    await user.type(screen.getByTestId("session-host"), "https://docs.example.test/path");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.saveSession.mock.calls[0][0]).toMatchObject({
+      session_type: "Browser",
+      host: "https://docs.example.test/path",
+      port: 0,
+      auth_method: "None",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists local Shell launch options through the session store save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Shell" });
+
+    await waitFor(() => expect(screen.getByTestId("local-shell-select")).toHaveValue("__default__"));
+    await waitFor(() => expect(screen.getByRole("option", { name: /Bash/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText("Local shell"), "/bin/bash");
+    expect(screen.getByLabelText("Executable")).toHaveValue("/bin/bash");
+    expect(screen.getByLabelText("Arguments")).toHaveValue("--login");
+
+    await user.clear(screen.getByLabelText("Arguments"));
+    await user.type(screen.getByLabelText("Arguments"), "--login -i");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    expect(savedConfig).toMatchObject({
+      session_type: "LocalShell",
+      host: "",
+      port: 0,
+      auth_method: "None",
+    });
+    expect(JSON.parse(savedConfig.options_json)).toMatchObject({
+      localShellPath: "/bin/bash",
+      localShellArgs: ["--login", "-i"],
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });

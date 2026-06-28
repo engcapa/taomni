@@ -1,3 +1,4 @@
+pub mod client;
 pub mod forwards;
 pub mod network;
 pub mod pty;
@@ -209,6 +210,62 @@ pub async fn create_local_terminal(
         session_id,
         shell_id,
     })
+}
+
+#[tauri::command]
+pub async fn create_command_terminal(
+    session_id: String,
+    kind: String,
+    host: String,
+    port: u16,
+    username: Option<String>,
+    options_json: Option<String>,
+    cols: u16,
+    rows: u16,
+    on_output: TerminalOutputChannel,
+    state: State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    validate_session_id(&session_id)?;
+    {
+        let terminals = state.terminals.read().await;
+        if terminals.contains_key(&session_id) {
+            return Err(format!("Terminal {} already exists", session_id));
+        }
+    }
+
+    let launch = client::build_client_terminal_launch(
+        &kind,
+        &host,
+        port,
+        username.as_deref(),
+        options_json.as_deref(),
+    )?;
+    let (handle, reader) = pty::create_command_pty(cols, rows, &launch.program, &launch.args)?;
+
+    let terminal = ActiveTerminal::Local {
+        writer: Mutex::new(handle.writer),
+        master: Mutex::new(handle.master),
+        child: Mutex::new(handle.child),
+    };
+
+    {
+        let mut terminals = state.terminals.write().await;
+        if terminals.contains_key(&session_id) {
+            return Err(format!("Terminal {} already exists", session_id));
+        }
+        terminals.insert(session_id.clone(), terminal);
+    }
+    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
+
+    let sid = session_id.clone();
+    let app = app_handle.clone();
+    let outputs = state.terminal_outputs.clone();
+    std::thread::spawn(move || {
+        read_loop_local(reader, sid, app, outputs);
+    });
+
+    Ok(session_id)
 }
 
 /// Resolve SSH jump-host credentials into the manual `jump_*` fields of

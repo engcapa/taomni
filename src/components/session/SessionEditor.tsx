@@ -41,7 +41,9 @@ import {
   isVaultReference,
   isVaultLockedError,
   listWslDistros,
+  listLocalShells,
   type WslDistro,
+  type LocalShellOption,
 } from "../../lib/ipc";
 import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
 import { getAppPlatform } from "../../lib/runtime";
@@ -81,6 +83,11 @@ import {
   serializeRdpOptions,
   type RdpOptions,
 } from "../../types/rdp";
+import {
+  parseLocalShellOptions,
+  serializeLocalShellOptions,
+  type LocalShellOptions,
+} from "../../types/localShell";
 import { RdpOptionsForm } from "./forms/RdpOptionsForm";
 import {
   ObjectStorageSettings,
@@ -89,6 +96,7 @@ import {
 } from "./ObjectStorageSettings";
 import { engineForProvider } from "../../types/objectStorage";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
+import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import {
@@ -143,14 +151,15 @@ const DEFAULT_PORTS: Record<string, number> = {
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis"];
+const PLANNED_CLIENT_PROTOS = new Set<Proto>();
 
 /** Map UI proto to the backend session_type string. Object storage ("S3"
  * proto) is resolved to "S3" vs "AzureBlob" by the caller based on the
  * selected provider. */
 function protoToSessionType(p: Proto): string {
   const map: Partial<Record<Proto, string>> = {
-    Rlogin: "Telnet", Shell: "LocalShell",
-    Browser: "LocalShell", Mosh: "SSH", WSL: "LocalShell",
+    Shell: "LocalShell",
+    WSL: "LocalShell",
   };
   return map[p] ?? p;
 }
@@ -202,6 +211,25 @@ function stripDeprecatedCwdOptions(options: Record<string, unknown>): Record<str
   const next = { ...options };
   delete next.followPath;
   delete next.osc7AutoInject;
+  return next;
+}
+
+function stripLocalShellLaunchOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...options };
+  delete next.localShellPath;
+  delete next.localShellArgs;
+  delete next.wslDistro;
+  delete next.wslUser;
+  delete next.wslCwd;
+  delete next.wslInitialCommand;
+  delete next.wslAsAdministrator;
+  return next;
+}
+
+function stripSerialOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...options };
+  delete next.serialDevice;
+  delete next.serialBaud;
   return next;
 }
 
@@ -1797,6 +1825,40 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
   );
 
+  /* --- serial client options --- */
+  const [serialDevice, setSerialDevice] = useState(() =>
+    session?.session_type === "Serial" ? session.host : optionString(initialOptions, "serialDevice", ""),
+  );
+  const [serialBaud, setSerialBaud] = useState(() =>
+    optionString(initialOptions, "serialBaud", "115200"),
+  );
+
+  /* --- local shell options --- */
+  const [localShellOptions, setLocalShellOptions] = useState<LocalShellOptions>(() =>
+    parseLocalShellOptions(session?.options_json),
+  );
+  const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
+  const [localShellStatus, setLocalShellStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    if (proto !== "Shell") return;
+    let cancelled = false;
+    setLocalShellStatus("loading");
+    listLocalShells()
+      .then((shells) => {
+        if (cancelled) return;
+        setLocalShells(shells);
+        setLocalShellStatus("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLocalShellStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [proto]);
+
   /* --- WSL options --- */
   const [wslOptions, setWslOptions] = useState<WslOptions>(() =>
     parseWslOptions(session?.options_json),
@@ -1869,6 +1931,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isHBase = proto === "HBaseShell";
   const isProxy = proto === "Proxy";
   const isObjectStorage = proto === "S3";
+  const isPlannedClient = PLANNED_CLIENT_PROTOS.has(proto);
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -1939,7 +2002,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
      *  refs by handleSave). Falls back to current form state when omitted. */
     ossConfigValue?: Record<string, unknown>;
   } = {}): string => {
-    const previousOptions = stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json));
+    const previousOptions = stripSerialOptions(
+      stripLocalShellLaunchOptions(
+        stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
+      ),
+    );
+    const localShellOverrides: Record<string, unknown> =
+      proto === "Shell" ? serializeLocalShellOptions(localShellOptions) : {};
+    const serialOverrides: Record<string, unknown> =
+      proto === "Serial"
+        ? {
+            serialDevice: serialDevice.trim(),
+            serialBaud: serialBaud.trim() || "115200",
+          }
+        : {};
     const wslOverrides: Record<string, unknown> =
       proto === "WSL"
         ? {
@@ -2038,12 +2114,25 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...proxyOverrides,
       ...hbaseOverrides,
       ...ossOverrides,
+      ...localShellOverrides,
+      ...serialOverrides,
     });
   };
 
   const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
     const now = Math.floor(Date.now() / 1000);
-    let auth: AuthMethod = "Password";
+    let auth: AuthMethod =
+      proto === "Shell" ||
+      proto === "WSL" ||
+      proto === "File" ||
+      proto === "Browser" ||
+      proto === "FTP" ||
+      proto === "Telnet" ||
+      proto === "Rlogin" ||
+      proto === "Serial" ||
+      proto === "Mosh"
+        ? "None"
+        : "Password";
     if (authMethod === "PrivateKey")
       auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
     else if (authMethod === "Agent") auth = "Agent";
@@ -2054,9 +2143,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         ? t("sessionEditor2.wslDefaultName", { distro: wslOptions.distro || "Linux" })
         : proto === "S3"
           ? (oss.defaultBucket || oss.defaultContainer || oss.accountName || oss.endpoint || "Object Storage")
+          : proto === "Serial"
+            ? (serialDevice ? `Serial ${serialDevice}` : "Serial terminal")
           : (proto === "File" && host
             ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
             : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal")));
+    const storedHost = proto === "Serial" ? serialDevice.trim() : host;
+    const storedPort = proto === "Serial" ? 0 : (parseInt(port) || DEFAULT_PORTS[proto] || 0);
     return {
       id: session?.id ?? crypto.randomUUID(),
       name: displayName,
@@ -2065,8 +2158,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           ? (engineForProvider(oss.provider) === "azure" ? "AzureBlob" : "S3")
           : protoToSessionType(proto),
       group_path: toStoredGroupPath(groupPath),
-      host,
-      port: parseInt(port) || DEFAULT_PORTS[proto] || 0,
+      host: storedHost,
+      port: storedPort,
       username: username || null,
       auth_method: auth,
       options_json: buildOptionsJson(),
@@ -2080,6 +2173,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const validate = () => {
     if (needsHost && !host.trim()) return t("sessionEditor2.errHostRequired");
+    if (proto === "Serial" && !serialDevice.trim()) return t("sessionEditor2.errSerialDeviceRequired");
     if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");
     if (proto === "WSL" && !wslOptions.distro.trim()) return t("sessionEditor2.errWslDistroRequired");
     if (proto === "Presto" && !dbCatalog.trim()) return "Presto catalog is required.";
@@ -2367,6 +2461,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
     setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
+    setSerialDevice(session?.session_type === "Serial" ? session.host : optionString(nextOptions, "serialDevice", ""));
+    setSerialBaud(optionString(nextOptions, "serialBaud", "115200"));
+    setLocalShellOptions(parseLocalShellOptions(session?.options_json));
     setWslOptions(parseWslOptions(session?.options_json));
     setRdpOptions(parseRdpOptions(session?.options_json));
     setPathMappings(parsePathMappingsFromOptions(session?.options_json));
@@ -2836,6 +2933,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 data-testid={`session-proto-${p.id.toLowerCase()}`}
                 className="taomni-proto-btn"
                 data-active={proto === p.id}
+                data-client-status={PLANNED_CLIENT_PROTOS.has(p.id) ? "planned" : "active"}
+                title={PLANNED_CLIENT_PROTOS.has(p.id) ? t("sessionEditor2.plannedClientTitle", { proto: p.id }) : p.id}
                 onClick={() => handleProtoChange(p.id)}
                 type="button"
               >
@@ -2867,7 +2966,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
               <label className="col-span-2 text-[12px] text-right">
-                {t("sessionEditor2.remoteHost")}
+                {proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHost")}
               </label>
               <div className="col-span-5 flex items-center gap-1">
                 <input
@@ -2875,9 +2974,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   className="taomni-input flex-1"
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
-                  onBlur={handleHostLookup}
-                  aria-label={t("sessionEditor2.remoteHostAria")}
-                  placeholder={t("sessionEditor2.remoteHostPlaceholder")}
+                  onBlur={proto === "Browser" ? undefined : handleHostLookup}
+                  aria-label={proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHostAria")}
+                  placeholder={proto === "Browser" ? t("sessionEditor2.browserUrlPlaceholder") : t("sessionEditor2.remoteHostPlaceholder")}
                 />
                 <button
                   title={t("sessionEditor2.lookup")}
@@ -2974,6 +3073,67 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           </div>
         )}
 
+        {isPlannedClient && (
+          <div
+            data-testid="session-planned-client-note"
+            className="mx-4 mt-3 px-3 py-2 rounded border text-[12px]"
+            style={{
+              borderColor: "var(--taomni-input-border)",
+              background: "var(--taomni-panel-bg)",
+              color: "var(--taomni-text-muted)",
+            }}
+          >
+            {t("sessionEditor2.plannedClientNote", { proto })}
+          </div>
+        )}
+
+        {/* Basic Serial settings — appears for the Serial protocol only */}
+        {proto === "Serial" && (
+          <div
+            data-testid="session-serial-section"
+            className="px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+          >
+            <div
+              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              style={{ color: "var(--taomni-accent)" }}
+            >
+              <Wifi className="w-3.5 h-3.5" />
+              {t("sessionEditor2.basicSerialTitle")}
+            </div>
+            <div className="grid grid-cols-12 gap-2 items-center">
+              <label className="col-span-2 text-[12px] text-right" htmlFor="session-serial-device">
+                {t("sessionEditor2.serialDeviceLabel")}
+              </label>
+              <input
+                id="session-serial-device"
+                data-testid="session-serial-device"
+                className="taomni-input col-span-5"
+                value={serialDevice}
+                onChange={(e) => setSerialDevice(e.target.value)}
+                aria-label={t("sessionEditor2.serialDeviceLabel")}
+                placeholder={t("sessionEditor2.serialDevicePlaceholder")}
+              />
+              <label className="col-span-2 text-[12px] text-right" htmlFor="session-serial-baud">
+                {t("sessionEditor2.serialBaudLabel")}
+              </label>
+              <input
+                id="session-serial-baud"
+                data-testid="session-serial-baud"
+                className="taomni-input col-span-3"
+                value={serialBaud}
+                inputMode="numeric"
+                onChange={(e) => setSerialBaud(e.target.value)}
+                aria-label={t("sessionEditor2.serialBaudLabel")}
+                placeholder="115200"
+              />
+              <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)]">
+                {t("sessionEditor2.serialHint")}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Basic File settings — appears for the File protocol only */}
         {proto === "File" && (
           <div
@@ -3021,6 +3181,28 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 {t("sessionEditor2.fileTargetHint")}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Basic Shell settings - appears for the local Shell protocol only */}
+        {proto === "Shell" && (
+          <div
+            className="px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+          >
+            <div
+              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              style={{ color: "var(--taomni-accent)" }}
+            >
+              <TerminalIcon className="w-3.5 h-3.5" />
+              {t("sessionEditor2.localShellTitle")}
+            </div>
+            <LocalShellOptionsForm
+              options={localShellOptions}
+              shells={localShells}
+              status={localShellStatus}
+              onChange={setLocalShellOptions}
+            />
           </div>
         )}
 

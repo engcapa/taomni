@@ -272,6 +272,10 @@ export async function sftpOpenPath(path: string): Promise<void> {
   return invoke("sftp_open_path", { path });
 }
 
+export async function openExternalUrl(url: string): Promise<void> {
+  return invoke("open_external_url", { url });
+}
+
 /**
  * Returns the *effective* type for navigation/open routing. A symlink
  * whose target stat'd as a directory should be treated like a directory
