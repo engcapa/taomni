@@ -225,6 +225,18 @@ describe("ChatDrawer layout resizing", () => {
     vi.clearAllMocks();
   });
 
+  it("dismisses a floating drawer on outside pointer down", () => {
+    useChatStore.setState({ drawerPosition: "top" });
+    render(<ChatDrawer />);
+
+    fireEvent.pointerDown(document.body);
+
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      tabDrawerOpenByTabId: { "term-1": false },
+    });
+  });
+
   it("resizes a top drawer by dragging its bottom edge", () => {
     useChatStore.setState({ drawerPosition: "top" });
     render(<ChatDrawer />);

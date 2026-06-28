@@ -257,6 +257,25 @@ describe("chatStore drawer lifecycle", () => {
     });
   });
 
+  it("dismisses the active tab drawer and prevents tab sync from reopening it", async () => {
+    useChatStore.getState().dismissDrawer();
+
+    expect(invokeMock).not.toHaveBeenCalledWith("chat_stop_stream", expect.anything());
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      sending: true,
+      sendingByThreadId: { "thread-a": true },
+      tabDrawerOpenByTabId: { "term-a": false },
+    });
+
+    await useChatStore.getState().syncTabChatWithActiveTab("term-a");
+
+    expect(useChatStore.getState()).toMatchObject({
+      drawerOpen: false,
+      tabDrawerOpenByTabId: { "term-a": false },
+    });
+  });
+
   it("hides the active tab drawer without stopping the running thread", async () => {
     await useChatStore.getState().toggleTabChat("term-a");
 
