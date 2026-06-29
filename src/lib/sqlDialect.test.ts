@@ -57,6 +57,7 @@ describe("sqlDialect identifiers", () => {
   it("narrows engine strings", () => {
     expect(asSqlEngine("PostgreSQL")).toBe("PostgreSQL");
     expect(asSqlEngine("SQLServer")).toBe("SQLServer");
+    expect(asSqlEngine("StarRocks")).toBe("StarRocks");
     expect(asSqlEngine("nonsense")).toBe("MySQL");
   });
 
@@ -64,6 +65,7 @@ describe("sqlDialect identifiers", () => {
     expect(setDefaultSchemaSql("PostgreSQL", "s")).toBe('SET search_path TO "s"');
     expect(setDefaultSchemaSql("Presto", "s", "c")).toBe('USE "c"."s"');
     expect(setDefaultSchemaSql("MySQL", "s")).toBe("USE `s`");
+    expect(setDefaultSchemaSql("StarRocks", "s")).toBe("USE `s`");
     expect(setDefaultSchemaSql("SQLServer", "dbo")).toContain("[dbo].[table_name]");
   });
 });
@@ -73,6 +75,7 @@ describe("sqlDialect capabilities", () => {
     expect(categoriesForEngine("MySQL")).toContain("trigger");
     expect(categoriesForEngine("PostgreSQL")).toContain("sequence");
     expect(categoriesForEngine("SQLServer")).toContain("procedure");
+    expect(categoriesForEngine("StarRocks")).toEqual(["table", "view"]);
     expect(categoriesForEngine("ClickHouse")).toContain("dictionary");
     expect(categoriesForEngine("Presto")).toEqual(["table", "view"]);
   });
@@ -80,9 +83,11 @@ describe("sqlDialect capabilities", () => {
   it("gates inline edit / indexes to row stores", () => {
     expect(supportsInlineEdit("MySQL")).toBe(true);
     expect(supportsInlineEdit("SQLServer")).toBe(true);
+    expect(supportsInlineEdit("StarRocks")).toBe(false);
     expect(supportsInlineEdit("ClickHouse")).toBe(false);
     expect(supportsIndexes("PostgreSQL")).toBe(true);
     expect(supportsIndexes("SQLServer")).toBe(true);
+    expect(supportsIndexes("StarRocks")).toBe(false);
     expect(supportsIndexes("Presto")).toBe(false);
   });
 
@@ -94,6 +99,8 @@ describe("sqlDialect capabilities", () => {
     expect(actionMode("SQLServer", "disableTrigger")).toBe("execute");
     expect(actionMode("SQLServer", "renameDatabase")).toBe("disabled");
     expect(actionMode("MySQL", "disableTrigger")).toBe("disabled");
+    expect(actionMode("StarRocks", "renameDatabase")).toBe("disabled");
+    expect(actionMode("StarRocks", "rename")).toBe("editor");
     expect(actionMode("Presto", "drop")).toBe("editor");
     expect(actionMode("Presto", "disableTrigger")).toBe("disabled");
   });

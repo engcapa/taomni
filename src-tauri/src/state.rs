@@ -74,7 +74,7 @@ pub struct AppState {
     pub servers: Arc<ServerRegistry>,
     pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
     pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
-    /// Live database client connections (MySQL/PostgreSQL/SQL Server/ClickHouse/Redis),
+    /// Live database client connections (MySQL/PostgreSQL/SQL Server/StarRocks/ClickHouse/Redis),
     /// keyed by session id. Each `DbSession` wraps the per-engine connection
     /// handle plus a cancellation token for in-flight queries.
     pub db_connections: Arc<RwLock<HashMap<String, Arc<DbSession>>>>,

@@ -41,6 +41,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   MySQL: 3306,
   PostgreSQL: 5432,
   SQLServer: 1433,
+  StarRocks: 9030,
   ClickHouse: 9000,
   Presto: 8080,
   Redis: 6379,
@@ -803,6 +804,7 @@ function navicatConnectionToSession(
 
 function navicatSessionType(value: string): string | null {
   const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (/\b(starrocks|starrocksdb|star rocks)\b/.test(key)) return "StarRocks";
   if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
   if (/\b(postgresql|postgres|pgsql)\b/.test(key)) return "PostgreSQL";
   if (/\b(sqlserver|sql server|mssql|azure sql)\b/.test(key)) return "SQLServer";
@@ -1085,6 +1087,7 @@ function dbeaverConnectionToSession(
 
 function dbeaverSessionType(value: string): string | null {
   const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (/\b(starrocks|starrocksdb|star rocks)\b/.test(key)) return "StarRocks";
   if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
   if (/\b(postgresql|postgres|cockroach|yugabyte)\b/.test(key)) return "PostgreSQL";
   if (/\b(sqlserver|sql server|mssql|jtds|azure sql)\b/.test(key)) return "SQLServer";

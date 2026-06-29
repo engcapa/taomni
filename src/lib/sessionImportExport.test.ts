@@ -336,6 +336,14 @@ describe("DBeaver session import", () => {
             url: "jdbc:jtds:sqlserver://sql.example.com:1444/warehouse;encrypt=true;user=sa",
           },
         },
+        starrocks: {
+          driver: "StarRocks",
+          name: "Lake Analytics",
+          configuration: {
+            url: "jdbc:mysql://sr.example.com:9030/warehouse",
+            user: "reader",
+          },
+        },
         pg: {
           driver: "postgresql",
           name: "Analytics",
@@ -383,6 +391,7 @@ describe("DBeaver session import", () => {
     expect(result.sessions.map((s) => s.session_type)).toEqual([
       "MySQL",
       "SQLServer",
+      "StarRocks",
       "PostgreSQL",
       "ClickHouse",
       "Presto",
@@ -404,6 +413,18 @@ describe("DBeaver session import", () => {
       dbSsl: true,
       dbTimeout: "15",
     });
+    expect(result.sessions[2]).toMatchObject({
+      name: "Lake Analytics",
+      session_type: "StarRocks",
+      host: "sr.example.com",
+      port: 9030,
+      username: "reader",
+    });
+    expect(JSON.parse(result.sessions[2].options_json)).toMatchObject({
+      dbDatabase: "warehouse",
+      dbSsl: false,
+      dbTimeout: "15",
+    });
     expect(result.sessions[1]).toMatchObject({
       name: "Warehouse",
       session_type: "SQLServer",
@@ -415,29 +436,29 @@ describe("DBeaver session import", () => {
       dbDatabase: "warehouse",
       dbSsl: true,
     });
-    expect(JSON.parse(result.sessions[2].options_json)).toMatchObject({
+    expect(JSON.parse(result.sessions[3].options_json)).toMatchObject({
       dbDatabase: "analytics",
       dbSsl: true,
     });
-    expect(result.sessions[3]).toMatchObject({
+    expect(result.sessions[4]).toMatchObject({
       name: "Events",
       session_type: "ClickHouse",
       host: "ch.example.com",
       port: 9000,
       username: "reader",
     });
-    expect(JSON.parse(result.sessions[3].options_json)).toMatchObject({
+    expect(JSON.parse(result.sessions[4].options_json)).toMatchObject({
       dbDatabase: "events",
       dbHttpPort: "8123",
       dbChProtocol: "HTTP",
       dbSsl: true,
     });
-    expect(JSON.parse(result.sessions[4].options_json)).toMatchObject({
+    expect(JSON.parse(result.sessions[5].options_json)).toMatchObject({
       dbCatalog: "hive",
       dbDatabase: "sales",
       dbSsl: true,
     });
-    expect(JSON.parse(result.sessions[5].options_json)).toMatchObject({
+    expect(JSON.parse(result.sessions[6].options_json)).toMatchObject({
       dbRedisIndex: "2",
     });
   });
@@ -586,6 +607,7 @@ describe("Navicat session import", () => {
       "<Connections>",
       '  <Group Name="Production">',
       '    <Connection ConnectionName="Prod MySQL" ConnType="MYSQL" Host="mysql.example.com" Port="3307" UserName="app" Database="appdb" Ssl="true" Password="4B1C473F8F0856717EF48AA51DA9855B" />',
+      '    <Connection ConnectionName="StarRocks FE" ConnType="STARROCKS" Host="sr.example.com" UserName="reader" Database="warehouse" />',
       "  </Group>",
       '  <Connection ConnectionName="Cache" ConnType="REDIS" Host="redis.example.com" Port="6380" UserName="default" Database="2" />',
       '  <Connection ConnectionName="Skipped Oracle" ConnType="ORACLE" Host="oracle.example.com" Port="1521" />',
@@ -594,7 +616,7 @@ describe("Navicat session import", () => {
 
     const result = await parseNavicatSessions(text, { targetFolder: "Imported", now: 6060 });
 
-    expect(result.sessions.map((s) => s.session_type)).toEqual(["MySQL", "Redis"]);
+    expect(result.sessions.map((s) => s.session_type)).toEqual(["MySQL", "StarRocks", "Redis"]);
     expect(result.skipped).toBe(1);
     expect(result.sessions[0]).toMatchObject({
       name: "Prod MySQL",
@@ -612,7 +634,19 @@ describe("Navicat session import", () => {
       dbSsl: true,
       dbTimeout: "15",
     });
+    expect(result.sessions[1]).toMatchObject({
+      name: "StarRocks FE",
+      session_type: "StarRocks",
+      host: "sr.example.com",
+      port: 9030,
+      username: "reader",
+    });
     expect(JSON.parse(result.sessions[1].options_json)).toMatchObject({
+      dbDatabase: "warehouse",
+      dbSsl: false,
+      dbTimeout: "15",
+    });
+    expect(JSON.parse(result.sessions[2].options_json)).toMatchObject({
       dbRedisIndex: "2",
     });
     expect(result.secrets).toEqual([

@@ -161,7 +161,7 @@ export function sqlStatementsForExecution(engine: string, sql: string): string[]
 }
 
 function shouldSplitSqlForExecution(engine: string): boolean {
-  return engine === "MySQL" || engine === "SQLServer" || engine === "Presto";
+  return engine === "MySQL" || engine === "StarRocks" || engine === "SQLServer" || engine === "Presto";
 }
 
 function hasExecutableSql(statement: string): boolean {

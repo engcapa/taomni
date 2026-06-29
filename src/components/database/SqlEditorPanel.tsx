@@ -82,6 +82,7 @@ function autocompleteFor(
 function dialectFor(engine: string): SQLDialect {
   switch (engine) {
     case "MySQL":
+    case "StarRocks":
       return MySQL;
     case "PostgreSQL":
       return PostgreSQL;

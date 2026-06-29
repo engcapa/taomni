@@ -112,7 +112,7 @@ import type { SftpPathMapping } from "../../types";
 type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
-  | "MySQL" | "PostgreSQL" | "SQLServer" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
+  | "MySQL" | "PostgreSQL" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
   | "Proxy";
 
 type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage";
@@ -135,6 +135,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "MySQL",      icon: <Database className="w-7 h-7" />, color: "#00758f" },
   { id: "PostgreSQL", icon: <Database className="w-7 h-7" />, color: "#336791" },
   { id: "SQLServer",  icon: <Database className="w-7 h-7" />, color: "#cc2927" },
+  { id: "StarRocks",  icon: <Database className="w-7 h-7" />, color: "#0f8f8c" },
   { id: "ClickHouse", icon: <Database className="w-7 h-7" />, color: "#e6a817" },
   { id: "Presto",     icon: <Database className="w-7 h-7" />, color: "#5a4fcf" },
   { id: "Redis",      icon: <Database className="w-7 h-7" />, color: "#d82c20" },
@@ -146,11 +147,11 @@ const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22, Telnet: 23, Rlogin: 513, RDP: 3389, VNC: 5900,
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
-  MySQL: 3306, PostgreSQL: 5432, SQLServer: 1433, ClickHouse: 9000, Presto: 8080, Redis: 6379,
+  MySQL: 3306, PostgreSQL: 5432, SQLServer: 1433, StarRocks: 9030, ClickHouse: 9000, Presto: 8080, Redis: 6379,
   HBaseShell: 8080, Proxy: 3128,
 };
 
-const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis"];
+const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "StarRocks", "ClickHouse", "Presto", "Redis"];
 const PLANNED_CLIENT_PROTOS = new Set<Proto>();
 
 /** Map UI proto to the backend session_type string. Object storage ("S3"
@@ -1792,7 +1793,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
   const [fileExtraArgs, setFileExtraArgs] = useState(() => optionString(initialOptions, "fileExtraArgs", ""));
 
-  /* --- database session options (MySQL/PostgreSQL/SQLServer/ClickHouse/Presto/Redis) --- */
+  /* --- database session options (MySQL/PostgreSQL/SQLServer/StarRocks/ClickHouse/Presto/Redis) --- */
   const [dbCatalog, setDbCatalog] = useState(() => optionString(initialOptions, "dbCatalog", ""));
   const [dbDatabase, setDbDatabase] = useState(() => optionString(initialOptions, "dbDatabase", ""));
   const [dbSsl, setDbSsl] = useState(() => optionBoolean(initialOptions, "dbSsl", false));

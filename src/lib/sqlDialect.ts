@@ -6,7 +6,7 @@
  * menus, and the query editor all agree on how to talk to each engine.
  */
 
-export type SqlEngine = "MySQL" | "PostgreSQL" | "SQLServer" | "ClickHouse" | "Presto";
+export type SqlEngine = "MySQL" | "PostgreSQL" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto";
 
 /** Canonical object kinds surfaced as tree folders / context menus. */
 export type ObjectKind =
@@ -46,7 +46,7 @@ const DOUBLE_QUOTE_ENGINES: SqlEngine[] = ["PostgreSQL", "Presto"];
 
 /** Narrow an arbitrary engine string to a known `SqlEngine` (else MySQL). */
 export function asSqlEngine(engine: string): SqlEngine {
-  return engine === "PostgreSQL" || engine === "SQLServer" || engine === "ClickHouse" || engine === "Presto"
+  return engine === "PostgreSQL" || engine === "SQLServer" || engine === "StarRocks" || engine === "ClickHouse" || engine === "Presto"
     ? engine
     : "MySQL";
 }
@@ -101,6 +101,7 @@ const ENGINE_CATEGORIES: Record<SqlEngine, ObjectKind[]> = {
   MySQL: ["table", "view", "procedure", "function", "trigger", "event"],
   PostgreSQL: ["table", "view", "materialized_view", "function", "sequence"],
   SQLServer: ["table", "view", "procedure", "function", "trigger", "sequence"],
+  StarRocks: ["table", "view"],
   ClickHouse: ["table", "view", "materialized_view", "dictionary"],
   Presto: ["table", "view"],
 };
@@ -131,14 +132,20 @@ export function usesAlterMutations(engine: SqlEngine): boolean {
  * `disabled` (engine has no safe equivalent).
  */
 export function actionMode(engine: SqlEngine, action: DialectAction): ActionMode {
+  if (engine === "StarRocks") {
+    if (action === "disableTrigger" || action === "renameDatabase") return "disabled";
+    if (action === "rename" || action === "alterColumn" || action === "dropColumn" || action === "dropIndex") {
+      return "editor";
+    }
+  }
   if (engine === "Presto") {
     // Connector write-support is unknown; never auto-execute mutations.
     return action === "disableTrigger" ? "disabled" : "editor";
   }
   switch (action) {
     case "renameDatabase":
-      // MySQL has no safe RENAME DATABASE; SQL Server has no direct schema rename.
-      return engine === "MySQL" || engine === "SQLServer" ? "disabled" : "execute";
+      // MySQL and StarRocks have no safe RENAME DATABASE; SQL Server has no direct schema rename.
+      return engine === "MySQL" || engine === "StarRocks" || engine === "SQLServer" ? "disabled" : "execute";
     case "disableTrigger":
       // PostgreSQL and SQL Server support per-trigger enable/disable.
       return engine === "PostgreSQL" || engine === "SQLServer" ? "execute" : "disabled";
@@ -247,7 +254,7 @@ export function renameTableStatement(
   newName: string,
 ): string {
   const oldName = qualifiedName(engine, target);
-  if (engine === "MySQL" || engine === "ClickHouse") {
+  if (engine === "MySQL" || engine === "StarRocks" || engine === "ClickHouse") {
     const renamed = qualifiedName(engine, { ...target, name: newName });
     return `RENAME TABLE ${oldName} TO ${renamed};`;
   }
@@ -337,8 +344,8 @@ export function alterColumnStatement(
     }
     return lines.join("\n");
   }
-  // MySQL / ClickHouse: CHANGE renames, MODIFY keeps the name.
-  if (engine === "MySQL" && change.newName && change.newName !== change.oldName) {
+  // MySQL / StarRocks / ClickHouse: CHANGE renames, MODIFY keeps the name.
+  if ((engine === "MySQL" || engine === "StarRocks") && change.newName && change.newName !== change.oldName) {
     return `ALTER TABLE ${tbl} CHANGE COLUMN ${oldCol} ${newCol} ${change.type}${nullSuffix};`;
   }
   return `ALTER TABLE ${tbl} MODIFY COLUMN ${oldCol} ${change.type}${nullSuffix};`;
@@ -351,7 +358,7 @@ export function dropIndexStatement(
   index: string,
 ): string {
   const tbl = qualifiedName(engine, { schema, name: table });
-  if (engine === "MySQL") {
+  if (engine === "MySQL" || engine === "StarRocks") {
     return `DROP INDEX ${quoteIdent(engine, index)} ON ${tbl};`;
   }
   if (engine === "ClickHouse") {
