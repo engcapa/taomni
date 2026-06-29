@@ -100,6 +100,10 @@
 - `[data-testid="schema-tree"]` — display [optional] — F-DB-1.schema-tree
 - `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
+- `[data-testid="query-cell-value-dialog"]` — display [optional] — F-DB-1.query-cell-value-dialog
+- `[data-testid="query-cell-value-text"]` — display [optional] — F-DB-1.query-cell-value-text
+- `[data-testid="query-cell-value-copy"]` — interactive [optional] — F-DB-1.query-cell-value-copy
+- `[data-testid="query-cell-value-wrap"]` — interactive [optional] — F-DB-1.query-cell-value-wrap
 - `select[aria-label="Schema"]` — interactive [optional] — F-DB-1.schema-select
 - `[data-testid="db-schema-drawer-handle"]` — interactive [optional] — F-DB-1.schema-drawer-handle
 - `[data-testid="db-floating-toolbar"]` — display [optional] — F-DB-1.floating-toolbar

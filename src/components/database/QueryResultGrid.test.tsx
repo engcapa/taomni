@@ -66,6 +66,24 @@ function filterResult(): DbQueryResult {
   };
 }
 
+function longTextResult(): DbQueryResult {
+  return {
+    columns: [
+      { name: "id", type: "Int" },
+      { name: "payload", type: "Text" },
+    ],
+    rows: [
+      [
+        "1",
+        "first line\nsecond line with a long value that should stay complete when viewed from the result grid",
+      ],
+    ],
+    rowsAffected: 0,
+    durationMs: 5,
+    warnings: [],
+  };
+}
+
 describe("QueryResultGrid", () => {
   it("keeps the table header horizontally synchronized with the body scroll", () => {
     render(<QueryResultGrid result={wideResult()} />);
@@ -108,5 +126,29 @@ describe("QueryResultGrid", () => {
     fireEvent.keyDown(grid, { key: "c", ctrlKey: true });
 
     expect(vi.mocked(writeText)).toHaveBeenLastCalledWith("name\tstatus\nAnn\tactive\nAnne\tinactive");
+  });
+
+  it("opens the full cell value with Ctrl+Enter and preserves line breaks", () => {
+    const result = longTextResult();
+    const value = result.rows[0][1]!;
+    render(<QueryResultGrid result={result} />);
+
+    fireEvent.click(screen.getByText(/first line/));
+    fireEvent.keyDown(screen.getByTestId("query-result-grid-scroll"), { key: "Enter", ctrlKey: true });
+
+    expect(screen.getByTestId("query-cell-value-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("query-cell-value-text")).toHaveValue(value);
+  });
+
+  it("copies the complete cell value from the full value dialog", () => {
+    const result = longTextResult();
+    const value = result.rows[0][1]!;
+    render(<QueryResultGrid result={result} />);
+
+    fireEvent.contextMenu(screen.getByText(/first line/));
+    fireEvent.click(screen.getByTestId("context-menu-item-view-full-value"));
+    fireEvent.click(screen.getByTestId("query-cell-value-copy"));
+
+    expect(vi.mocked(writeText)).toHaveBeenLastCalledWith(value);
   });
 });
