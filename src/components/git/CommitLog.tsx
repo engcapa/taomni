@@ -14,6 +14,7 @@ import { DiffViewer } from "./DiffViewer";
 
 const ROW_H = 44;
 const LANE_W = 14;
+const AUTO_PREVIEW_FILE_LIMIT = 300;
 
 function GraphCell({ row, maxWidth }: { row: GraphRow; maxWidth: number }) {
   const width = Math.max(maxWidth, 1) * LANE_W;
@@ -105,13 +106,19 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
     if (!selected) {
       setFiles([]);
       setFilePath(null);
+      setPair(null);
+      setPairLoading(false);
       return;
     }
+    setFiles([]);
+    setFilePath(null);
+    setPair(null);
+    setPairLoading(false);
     gitCommitFiles(repoRoot, selected.oid)
       .then((list) => {
         if (cancelled) return;
         setFiles(list);
-        setFilePath(list[0]?.path ?? null);
+        setFilePath(list.length > AUTO_PREVIEW_FILE_LIMIT ? null : list[0]?.path ?? null);
       })
       .catch(() => {
         if (!cancelled) setFiles([]);
@@ -127,6 +134,7 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
     const file = files.find((f) => f.path === filePath) ?? null;
     if (!selected || !file) {
       setPair(null);
+      setPairLoading(false);
       return;
     }
     setPairLoading(true);
@@ -147,6 +155,10 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
 
   const graph = useMemo(() => buildGraph(entries), [entries]);
   const maxWidth = useMemo(() => graph.reduce((m, r) => Math.max(m, r.width), 1), [graph]);
+  const diffEmptyLabel =
+    files.length > AUTO_PREVIEW_FILE_LIMIT && !filePath
+      ? `Large commit (${files.length} files). Select a file to preview its diff.`
+      : "Select a file to preview its diff";
 
   // RENDER_LOG
   return (
@@ -268,7 +280,7 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
           </Panel>
           <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-row-resize" />
           <Panel id="log-diff" defaultSize={70} minSize={20} className="min-h-0 flex flex-col">
-            <DiffViewer pair={pair} loading={pairLoading} emptyLabel="Select a file to preview its diff" />
+            <DiffViewer pair={pair} loading={pairLoading} emptyLabel={diffEmptyLabel} />
           </Panel>
         </PanelGroup>
       </Panel>

@@ -9,6 +9,8 @@ import {
 } from "../../lib/git";
 import { DiffViewer } from "./DiffViewer";
 
+const AUTO_PREVIEW_FILE_LIMIT = 300;
+
 export interface CompareViewProps {
   repoRoot: string;
   refA: string;
@@ -41,11 +43,15 @@ export function CompareView({ repoRoot, refA, refB, title, onClose }: CompareVie
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setFiles([]);
+    setFilePath(null);
+    setPair(null);
+    setPairLoading(false);
     gitCompare(repoRoot, refA, refB)
       .then((list) => {
         if (cancelled) return;
         setFiles(list);
-        setFilePath(list[0]?.path ?? null);
+        setFilePath(list.length > AUTO_PREVIEW_FILE_LIMIT ? null : list[0]?.path ?? null);
       })
       .catch(() => {
         if (!cancelled) setFiles([]);
@@ -59,11 +65,16 @@ export function CompareView({ repoRoot, refA, refB, title, onClose }: CompareVie
   }, [repoRoot, refA, refB]);
 
   const file = useMemo(() => files.find((f) => f.path === filePath) ?? null, [files, filePath]);
+  const diffEmptyLabel =
+    files.length > AUTO_PREVIEW_FILE_LIMIT && !filePath
+      ? `Large comparison (${files.length} files). Select a file to preview its diff.`
+      : "Select a file to preview its diff";
 
   useEffect(() => {
     let cancelled = false;
     if (!file) {
       setPair(null);
+      setPairLoading(false);
       return;
     }
     setPairLoading(true);
@@ -121,7 +132,7 @@ export function CompareView({ repoRoot, refA, refB, title, onClose }: CompareVie
           </Panel>
           <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
           <Panel id="compare-diff" defaultSize={68} minSize={35} className="min-w-0 min-h-0 flex flex-col">
-            <DiffViewer pair={pair} loading={pairLoading} emptyLabel="Select a file to preview its diff" />
+            <DiffViewer pair={pair} loading={pairLoading} emptyLabel={diffEmptyLabel} />
           </Panel>
         </PanelGroup>
       </div>

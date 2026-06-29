@@ -189,7 +189,7 @@ pub async fn git_probe_path(path: String) -> Result<GitProbeResult, String> {
 #[tauri::command]
 pub async fn git_init_repo(path: String) -> Result<GitProbeResult, String> {
     blocking(move || {
-        let path_buf = PathBuf::from(&path);
+        let path_buf = git_cwd_path(&path);
         run_git_in(Some(&path_buf), ["init"])?;
         probe_path(&path)
     })
@@ -252,9 +252,9 @@ pub async fn git_blob_pair(
             .clone()
             .and_then(|p| non_empty_string(&p))
             .unwrap_or_else(|| path.clone());
-        let old_bytes = read_blob_bytes(&root, &old_ref, &old_target)?;
-        let new_bytes = read_blob_bytes(&root, &new_ref, &path)?;
-        Ok(build_blob_pair(path, old_path, old_bytes, new_bytes))
+        let old_blob = read_blob(&root, &old_ref, &old_target)?;
+        let new_blob = read_blob(&root, &new_ref, &path)?;
+        Ok(build_blob_pair(path, old_path, old_blob, new_blob))
     })
     .await
 }
@@ -1009,7 +1009,7 @@ fn snapshot(root: &Path) -> Result<GitSnapshot, String> {
 }
 
 fn probe_path(path: &str) -> Result<GitProbeResult, String> {
-    let path_buf = PathBuf::from(path);
+    let path_buf = git_cwd_path(path);
     if !git_available() {
         return Ok(GitProbeResult {
             path: path.to_string(),
@@ -1036,6 +1036,75 @@ fn probe_path(path: &str) -> Result<GitProbeResult, String> {
             error: Some(error),
         }),
     }
+}
+
+fn git_cwd_path(path: &str) -> PathBuf {
+    PathBuf::from(normalize_windows_shell_path(path).unwrap_or_else(|| path.to_string()))
+}
+
+#[cfg(windows)]
+fn normalize_windows_shell_path(path: &str) -> Option<String> {
+    let path = path.trim();
+    if path.is_empty() {
+        return None;
+    }
+
+    let drive_uri_path = path.as_bytes();
+    if drive_uri_path.len() >= 3
+        && drive_uri_path[0] == b'/'
+        && drive_uri_path[2] == b':'
+        && drive_uri_path[1].is_ascii_alphabetic()
+    {
+        let rest = match &path[3..] {
+            "" => "/",
+            rest => rest,
+        };
+        return Some(
+            format!(
+                "{}:{}",
+                (drive_uri_path[1] as char).to_ascii_uppercase(),
+                rest
+            )
+            .replace('/', "\\"),
+        );
+    }
+
+    let mut parts = path.split('/');
+    if parts.next() == Some("") {
+        match (parts.next(), parts.next()) {
+            (Some(drive), None) if is_single_drive_letter(drive) => {
+                return Some(format!("{}:\\", drive.to_ascii_uppercase()));
+            }
+            (Some(drive), Some(rest)) if is_single_drive_letter(drive) => {
+                let suffix = std::iter::once(rest)
+                    .chain(parts)
+                    .collect::<Vec<_>>()
+                    .join("\\");
+                return Some(format!("{}:\\{}", drive.to_ascii_uppercase(), suffix));
+            }
+            (Some("cygdrive"), Some(drive)) if is_single_drive_letter(drive) => {
+                let suffix = parts.collect::<Vec<_>>().join("\\");
+                return Some(if suffix.is_empty() {
+                    format!("{}:\\", drive.to_ascii_uppercase())
+                } else {
+                    format!("{}:\\{}", drive.to_ascii_uppercase(), suffix)
+                });
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+#[cfg(not(windows))]
+fn normalize_windows_shell_path(_path: &str) -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
+fn is_single_drive_letter(value: &str) -> bool {
+    value.len() == 1 && value.as_bytes()[0].is_ascii_alphabetic()
 }
 
 fn git_available() -> bool {
@@ -1635,17 +1704,61 @@ fn non_empty_string(value: &str) -> Option<String> {
 }
 
 const MAX_DIFF_BYTES: usize = 2_000_000;
+const MAX_DIFF_BYTES_U64: u64 = MAX_DIFF_BYTES as u64;
 
-fn read_blob_bytes(root: &Path, reference: &str, path: &str) -> Result<Option<Vec<u8>>, String> {
+#[derive(Debug, Clone)]
+struct BlobSide {
+    exists: bool,
+    bytes: Option<Vec<u8>>,
+    size: u64,
+}
+
+impl BlobSide {
+    fn absent() -> Self {
+        Self {
+            exists: false,
+            bytes: None,
+            size: 0,
+        }
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self {
+            size: bytes.len() as u64,
+            exists: true,
+            bytes: Some(bytes),
+        }
+    }
+
+    fn oversized(size: u64) -> Self {
+        Self {
+            exists: true,
+            bytes: None,
+            size,
+        }
+    }
+}
+
+fn read_blob(root: &Path, reference: &str, path: &str) -> Result<BlobSide, String> {
     let reference = reference.trim();
     if reference.is_empty() {
-        return Ok(None);
+        return Ok(BlobSide::absent());
     }
     if reference == ":WORKTREE" {
         let full = root.join(path);
+        let size = match fs::metadata(&full) {
+            Ok(metadata) => metadata.len(),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(BlobSide::absent());
+            }
+            Err(e) => return Err(format!("failed to stat {path}: {e}")),
+        };
+        if size > MAX_DIFF_BYTES_U64 {
+            return Ok(BlobSide::oversized(size));
+        }
         return match fs::read(&full) {
-            Ok(bytes) => Ok(Some(bytes)),
-            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Ok(bytes) => Ok(BlobSide::from_bytes(bytes)),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(BlobSide::absent()),
             Err(e) => Err(format!("failed to read {path}: {e}")),
         };
     }
@@ -1654,6 +1767,13 @@ fn read_blob_bytes(root: &Path, reference: &str, path: &str) -> Result<Option<Ve
     } else {
         format!("{reference}:{path}")
     };
+    let size = match git_blob_size(root, &spec)? {
+        Some(size) => size,
+        None => return Ok(BlobSide::absent()),
+    };
+    if size > MAX_DIFF_BYTES_U64 {
+        return Ok(BlobSide::oversized(size));
+    }
     let output = Command::new("git")
         .current_dir(root)
         .env("LC_ALL", "C")
@@ -1664,24 +1784,44 @@ fn read_blob_bytes(root: &Path, reference: &str, path: &str) -> Result<Option<Ve
     // A path that does not exist at the requested ref is "absent" rather than an
     // error: that is the added/deleted side of a diff.
     if output.status.success() {
-        Ok(Some(output.stdout))
+        Ok(BlobSide::from_bytes(output.stdout))
     } else {
-        Ok(None)
+        Ok(BlobSide::absent())
     }
+}
+
+fn git_blob_size(root: &Path, spec: &str) -> Result<Option<u64>, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .env("LC_ALL", "C")
+        .env("LANG", "C")
+        .args(["cat-file", "-s", spec])
+        .output()
+        .map_err(|e| format!("failed to start git: {e}"))?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let raw = String::from_utf8_lossy(&output.stdout);
+    raw.trim()
+        .parse::<u64>()
+        .map(Some)
+        .map_err(|e| format!("failed to parse blob size for {spec}: {e}"))
 }
 
 fn build_blob_pair(
     path: String,
     old_path: Option<String>,
-    old_bytes: Option<Vec<u8>>,
-    new_bytes: Option<Vec<u8>>,
+    old_blob: BlobSide,
+    new_blob: BlobSide,
 ) -> GitBlobPair {
-    let old_exists = old_bytes.is_some();
-    let new_exists = new_bytes.is_some();
-    let old_size = old_bytes.as_ref().map(|b| b.len() as u64).unwrap_or(0);
-    let new_size = new_bytes.as_ref().map(|b| b.len() as u64).unwrap_or(0);
+    let old_exists = old_blob.exists;
+    let new_exists = new_blob.exists;
+    let old_size = old_blob.size;
+    let new_size = new_blob.size;
+    let old_bytes = old_blob.bytes;
+    let new_bytes = new_blob.bytes;
     let image = is_image_path(&path);
-    let oversize = old_size as usize > MAX_DIFF_BYTES || new_size as usize > MAX_DIFF_BYTES;
+    let oversize = old_size > MAX_DIFF_BYTES_U64 || new_size > MAX_DIFF_BYTES_U64;
 
     if image && !oversize {
         return GitBlobPair {
@@ -1817,6 +1957,53 @@ fn require_non_empty(label: &str, value: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[cfg(windows)]
+    #[test]
+    fn maps_windows_shell_paths_for_git_cwd() {
+        assert_eq!(
+            git_cwd_path("/D:/code/person/taomni"),
+            PathBuf::from(r"D:\code\person\taomni")
+        );
+        assert_eq!(
+            git_cwd_path("/d/code/person/taomni"),
+            PathBuf::from(r"D:\code\person\taomni")
+        );
+        assert_eq!(git_cwd_path("/c"), PathBuf::from(r"C:\"));
+        assert_eq!(git_cwd_path("/C:"), PathBuf::from(r"C:\"));
+        assert_eq!(
+            git_cwd_path("/cygdrive/e/work/repo"),
+            PathBuf::from(r"E:\work\repo")
+        );
+        assert_eq!(
+            git_cwd_path("/home/user/repo"),
+            PathBuf::from("/home/user/repo")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn probes_repo_from_msys_drive_path() {
+        if !git_available() {
+            return;
+        }
+
+        let tmp = TempDir::new().unwrap();
+        run_git_in(Some(tmp.path()), ["init"]).unwrap();
+
+        let native = tmp.path().to_string_lossy();
+        let bytes = native.as_bytes();
+        if bytes.len() < 3 || bytes[1] != b':' {
+            return;
+        }
+        let drive = (bytes[0] as char).to_ascii_lowercase();
+        let rest = native[2..].replace('\\', "/");
+        let msys_path = format!("/{drive}/{}", rest.trim_start_matches('/'));
+
+        let probe = probe_path(&msys_path).unwrap();
+        assert!(probe.is_repo, "{probe:?}");
+        assert!(probe.repo_root.is_some(), "{probe:?}");
+    }
 
     #[test]
     fn parses_status_with_branch_and_changes() {
@@ -1997,8 +2184,8 @@ mod tests {
         let pair = build_blob_pair(
             "notes.txt".into(),
             None,
-            None,
-            Some(b"line one\nline two\n".to_vec()),
+            BlobSide::absent(),
+            BlobSide::from_bytes(b"line one\nline two\n".to_vec()),
         );
         assert!(!pair.old_exists);
         assert!(pair.new_exists);
@@ -2012,8 +2199,8 @@ mod tests {
         let pair = build_blob_pair(
             "logo.png".into(),
             None,
-            None,
-            Some(vec![0x89, 0x50, 0x4e, 0x47]),
+            BlobSide::absent(),
+            BlobSide::from_bytes(vec![0x89, 0x50, 0x4e, 0x47]),
         );
         assert!(pair.image);
         assert!(pair.binary);
@@ -2037,15 +2224,34 @@ mod tests {
         run_git_in(Some(root), ["commit", "-m", "init"]).unwrap();
         fs::write(root.join("a.txt"), "v2\n").unwrap();
 
-        let head = read_blob_bytes(root, "HEAD", "a.txt").unwrap();
-        assert_eq!(head.as_deref(), Some(b"v1\n".as_ref()));
-        let worktree = read_blob_bytes(root, ":WORKTREE", "a.txt").unwrap();
-        assert_eq!(worktree.as_deref(), Some(b"v2\n".as_ref()));
+        let head = read_blob(root, "HEAD", "a.txt").unwrap();
+        assert!(head.exists);
+        assert_eq!(head.bytes.as_deref(), Some(b"v1\n".as_ref()));
+        let worktree = read_blob(root, ":WORKTREE", "a.txt").unwrap();
+        assert!(worktree.exists);
+        assert_eq!(worktree.bytes.as_deref(), Some(b"v2\n".as_ref()));
         // Missing path at a ref is absent, not an error.
-        assert!(read_blob_bytes(root, "HEAD", "missing.txt")
-            .unwrap()
-            .is_none());
-        assert!(read_blob_bytes(root, "", "a.txt").unwrap().is_none());
+        assert!(!read_blob(root, "HEAD", "missing.txt").unwrap().exists);
+        assert!(!read_blob(root, "", "a.txt").unwrap().exists);
+    }
+
+    #[test]
+    fn skips_oversized_worktree_blob_body() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let path = root.join("large.txt");
+        fs::write(&path, vec![b'a'; MAX_DIFF_BYTES + 1]).unwrap();
+
+        let blob = read_blob(root, ":WORKTREE", "large.txt").unwrap();
+        assert!(blob.exists);
+        assert_eq!(blob.size, (MAX_DIFF_BYTES + 1) as u64);
+        assert!(blob.bytes.is_none());
+
+        let pair = build_blob_pair("large.txt".into(), None, BlobSide::absent(), blob);
+        assert!(pair.oversize);
+        assert!(pair.new_exists);
+        assert_eq!(pair.new_size, (MAX_DIFF_BYTES + 1) as u64);
+        assert_eq!(pair.new_text, None);
     }
 
     #[test]

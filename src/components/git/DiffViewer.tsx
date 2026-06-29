@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
@@ -24,6 +24,8 @@ interface DiffViewerProps {
 
 const VIEW_KEY = "taomni.git.diff.view";
 const WS_KEY = "taomni.git.diff.ws";
+const MAX_AUTO_RENDER_CHARS = 300_000;
+const MAX_AUTO_RENDER_LINES = 12_000;
 
 function readPref<T extends string>(key: string, fallback: T): T {
   try {
@@ -268,11 +270,17 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
   const [whitespace, setWhitespace] = useState<WhitespaceMode>(() => readPref<WhitespaceMode>(WS_KEY, "none"));
   const [highlightWords, setHighlightWords] = useState(true);
   const [diffCount, setDiffCount] = useState(0);
+  const [forceRenderLargeDiffKey, setForceRenderLargeDiffKey] = useState("");
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mergeRef = useRef<MergeView | null>(null);
   const unifiedRef = useRef<EditorView | null>(null);
   const navRef = useRef<EditorView | null>(null);
+  const pairKey = pair
+    ? `${pair.path}\0${pair.oldPath ?? ""}\0${pair.oldSize}\0${pair.newSize}\0${pair.oldText?.length ?? -1}\0${pair.newText?.length ?? -1}`
+    : "";
+  const complexity = useMemo(() => (pair ? diffComplexity(pair) : null), [pairKey, pair]);
+  const largeTextDiff = !!complexity?.tooLarge && forceRenderLargeDiffKey !== pairKey;
 
   const renderable = useMemo(
     () =>
@@ -280,8 +288,9 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
       !pair.binary &&
       !pair.image &&
       !pair.oversize &&
+      !largeTextDiff &&
       (pair.oldText != null || pair.newText != null),
-    [pair],
+    [largeTextDiff, pair],
   );
 
   useEffect(() => writePref(VIEW_KEY, view), [view]);
@@ -386,9 +395,6 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
   if (!pair) {
     return <DiffNotice text={emptyLabel ?? "Select an item to preview its diff"} />;
   }
-  if (pair.image) {
-    return <ImageDiff pair={pair} />;
-  }
   if (pair.oversize) {
     return (
       <DiffNotice
@@ -396,11 +402,25 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
       />
     );
   }
+  if (pair.image) {
+    return <ImageDiff pair={pair} />;
+  }
   if (pair.binary) {
     return (
       <DiffNotice
         text={`Binary file — no text diff available (${formatBytes(pair.oldSize)} → ${formatBytes(pair.newSize)}).`}
       />
+    );
+  }
+  if (largeTextDiff && complexity) {
+    return (
+      <DiffNotice
+        text={`Large text diff skipped (${formatBytes(pair.oldSize)} to ${formatBytes(pair.newSize)}, ${formatLines(complexity.maxLines)}).`}
+      >
+        <button className="taomni-btn h-7 px-2 mt-3" type="button" onClick={() => setForceRenderLargeDiffKey(pairKey)}>
+          Render anyway
+        </button>
+      </DiffNotice>
     );
   }
 
@@ -481,12 +501,37 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
   );
 }
 
-function DiffNotice({ text }: { text: string }) {
+function DiffNotice({ text, children }: { text: string; children?: ReactNode }) {
   return (
-    <div className="h-full min-h-24 flex items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
-      {text}
+    <div className="h-full min-h-24 flex flex-col items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div>{text}</div>
+      {children}
     </div>
   );
+}
+
+function diffComplexity(pair: GitBlobPair): { tooLarge: boolean; maxLines: number } {
+  const oldText = pair.oldText ?? "";
+  const newText = pair.newText ?? "";
+  const maxChars = Math.max(oldText.length, newText.length);
+  const maxLines = Math.max(countLines(oldText), countLines(newText));
+  return {
+    tooLarge: maxChars > MAX_AUTO_RENDER_CHARS || maxLines > MAX_AUTO_RENDER_LINES,
+    maxLines,
+  };
+}
+
+function countLines(text: string): number {
+  if (!text) return 0;
+  let lines = 1;
+  for (let i = 0; i < text.length; i += 1) {
+    if (text.charCodeAt(i) === 10) lines += 1;
+  }
+  return lines;
+}
+
+function formatLines(n: number): string {
+  return `${n.toLocaleString()} line${n === 1 ? "" : "s"}`;
 }
 
 function ImageDiff({ pair }: { pair: GitBlobPair }) {
