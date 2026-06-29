@@ -2746,6 +2746,20 @@ export function MainLayout() {
                                 }
                               }
                             } : undefined}
+                            gitToggle={!tab.ssh && !tab.commandTerminal ? {
+                              cwd: terminalCwds[tab.id] ?? null,
+                              onOpen: async () => {
+                                const cwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
+                                if (!cwd) {
+                                  await alertAppDialog({
+                                    title: "Git Repository",
+                                    message: "The current terminal directory is not available yet.",
+                                  });
+                                  return;
+                                }
+                                await openGitRepository(cwd);
+                              },
+                            } : undefined}
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
                             } : undefined}

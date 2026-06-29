@@ -62,7 +62,7 @@ import {
   FT_BUTTON_ACTIVE_OVERRIDE,
   FT_ICON_BUTTON_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
+import { Bot, ExternalLink, FolderOpen, GitBranch, Maximize2, Minimize2 } from "lucide-react";
 import {
   createOsc7BlankingSuppressor,
   type InputEchoSuppressor,
@@ -133,6 +133,7 @@ import {
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as tauriOpen } from "@tauri-apps/plugin-shell";
 import { useT } from "../../lib/i18n";
+import { gitProbePath, gitSnapshot } from "../../lib/git";
 import "@xterm/xterm/css/xterm.css";
 
 export interface SshConnectInfo {
@@ -222,6 +223,11 @@ interface TerminalPanelProps {
     open: boolean;
     onToggle: () => void;
   };
+  /** Local-terminal Git entry for the current working directory. */
+  gitToggle?: {
+    cwd: string | null;
+    onOpen: () => void;
+  };
   /** When set, the floating toolbar exposes a "Detach to its own window"
    *  button that calls back into MainLayout. Hidden in detached windows
    *  themselves (which already live in their own OS window). */
@@ -269,6 +275,11 @@ interface TerminalEventLogEntry {
 }
 
 type TerminalConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "reconnecting";
+type TerminalGitState =
+  | { kind: "unknown"; label: string; title: string }
+  | { kind: "repo"; label: string; title: string; repoRoot: string }
+  | { kind: "none"; label: string; title: string }
+  | { kind: "error"; label: string; title: string };
 
 export function TerminalPanel({
   tabId,
@@ -295,6 +306,7 @@ export function TerminalPanel({
   onInputBroadcast,
   sftpToggle,
   chatToggle,
+  gitToggle,
   detachToggle,
 }: TerminalPanelProps) {
   const t = useT();
@@ -600,6 +612,66 @@ export function TerminalPanel({
   useEffect(() => {
     cwdProbeCommandRef.current = cwdProbeCommand;
   }, [cwdProbeCommand]);
+
+  const [gitState, setGitState] = useState<TerminalGitState>({
+    kind: "unknown",
+    label: "Git",
+    title: "Open Git panel",
+  });
+
+  useEffect(() => {
+    if (!isLocal || !gitToggle) {
+      setGitState({ kind: "unknown", label: "Git", title: "Open Git panel" });
+      return;
+    }
+    const cwd = gitToggle.cwd?.trim();
+    if (!cwd) {
+      setGitState({ kind: "unknown", label: "Git", title: "Waiting for terminal cwd" });
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      gitProbePath(cwd)
+        .then(async (probe) => {
+          if (cancelled) return;
+          if (!probe.gitAvailable) {
+            setGitState({ kind: "error", label: "Git", title: probe.error ?? "Git executable was not found" });
+            return;
+          }
+          if (!probe.isRepo || !probe.repoRoot) {
+            setGitState({ kind: "none", label: "Git", title: "Initialize Git repository" });
+            return;
+          }
+          try {
+            const snapshot = await gitSnapshot(probe.repoRoot);
+            if (cancelled) return;
+            setGitState({
+              kind: "repo",
+              label: snapshot.currentBranch ?? snapshot.headOid ?? "repo",
+              title: `Open Git panel for ${probe.repoRoot}`,
+              repoRoot: probe.repoRoot,
+            });
+          } catch {
+            if (!cancelled) {
+              setGitState({ kind: "repo", label: "repo", title: `Open Git panel for ${probe.repoRoot}`, repoRoot: probe.repoRoot });
+            }
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setGitState({
+              kind: "error",
+              label: "Git",
+              title: err instanceof Error ? err.message : String(err),
+            });
+          }
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [gitToggle?.cwd, isLocal]);
 
   // Refs decouple the once-mounted xterm.onData callback from the live
   // history/enabled values. Without this, the initial writeXtermInput closure
@@ -1476,6 +1548,17 @@ export function TerminalPanel({
       saveBufferToFile();
       return false;
     }
+    if (
+      gitToggle &&
+      event.shiftKey &&
+      event.key.toLowerCase() === "g" &&
+      (isMac ? event.metaKey : event.ctrlKey) &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      gitToggle.onOpen();
+      return false;
+    }
     if (event.ctrlKey && (event.key === "+" || event.key === "=")) {
       event.preventDefault();
       increaseFontSize();
@@ -1517,9 +1600,11 @@ export function TerminalPanel({
     clearTerminalBlockSelection,
     decreaseFontSize,
     executeMacro,
+    gitToggle,
     extendTerminalBlockSelectionByKeyboard,
     getActiveTerminalSelectionText,
     increaseFontSize,
+    isMac,
     isLocal,
     openSearch,
     pasteFromClipboard,
@@ -1540,6 +1625,17 @@ export function TerminalPanel({
       { label: "Copy formatted text (HTML/RTF)", onClick: () => void copyFormattedSelection(), disabled: !hasSelection },
       { label: "Paste", shortcut: pasteShortcut, onClick: () => void pasteFromClipboard(), disabled: effectiveReadOnly },
       { label: "Find", shortcut: "Ctrl+Shift+F", onClick: openSearch },
+      ...(gitToggle
+        ? [
+            { label: "", separator: true },
+            {
+              label: gitState.kind === "none" ? "Initialize Git Repository..." : "Open Git Panel",
+              shortcut: isMac ? "Cmd+Shift+G" : "Ctrl+Shift+G",
+              onClick: gitToggle.onOpen,
+              disabled: !gitToggle.cwd,
+            },
+          ]
+        : []),
       { label: "", separator: true },
       {
         label: "Font settings",
@@ -1655,7 +1751,10 @@ export function TerminalPanel({
     fontLigatures,
     fullscreen,
     getActiveTerminalSelectionText,
+    gitState.kind,
+    gitToggle,
     increaseFontSize,
+    isMac,
     openSearch,
     pasteFromClipboard,
     quickFontOptions,
@@ -2919,6 +3018,33 @@ export function TerminalPanel({
       onAuxClick={handleMiddleClick}
     >
       <div ref={containerRef} className="w-full h-full overflow-hidden" />
+
+      {isLocal && gitToggle && (
+        <button
+          type="button"
+          data-testid="terminal-git-toggle"
+          className={`absolute left-3 bottom-3 z-40 h-7 max-w-[180px] px-2 rounded border shadow-sm inline-flex items-center gap-1.5 text-[11px] ${
+            gitState.kind === "repo"
+              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700"
+              : gitState.kind === "none"
+                ? "border-slate-400/50 bg-white/80 text-slate-600"
+                : gitState.kind === "error"
+                  ? "border-red-500/40 bg-red-500/15 text-red-600"
+                  : "border-slate-400/50 bg-white/70 text-slate-500"
+          }`}
+          title={gitState.title}
+          disabled={!gitToggle.cwd}
+          onClick={(event) => {
+            event.stopPropagation();
+            gitToggle.onOpen();
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
+        >
+          <GitBranch size={14} />
+          <span className="truncate">{gitState.label}</span>
+        </button>
+      )}
 
       <TabActions active={activeForShortcuts}>
         {sftpToggle && (

@@ -11,6 +11,7 @@ const terminalMocks = vi.hoisted(() => {
   const state = {
     onDataHandler: null as ((data: string) => void) | null,
     onResizeHandler: null as ((size: { cols: number; rows: number }) => void) | null,
+    customKeyEventHandler: null as ((event: KeyboardEvent) => boolean) | null,
   };
   const terminalCtor = vi.fn().mockImplementation(function () {
     return {
@@ -48,7 +49,9 @@ const terminalMocks = vi.hoisted(() => {
         return { dispose: vi.fn() };
       }),
       onSelectionChange: vi.fn(() => ({ dispose: vi.fn() })),
-      attachCustomKeyEventHandler: vi.fn(),
+      attachCustomKeyEventHandler: vi.fn((handler: (event: KeyboardEvent) => boolean) => {
+        state.customKeyEventHandler = handler;
+      }),
       refresh: vi.fn(),
       write: vi.fn(),
       focus,
@@ -132,6 +135,40 @@ const ipcMocks = vi.hoisted(() => {
   };
 });
 
+const gitMocks = vi.hoisted(() => ({
+  gitProbePath: vi.fn(async (path: string) => ({
+    path,
+    gitAvailable: true,
+    isRepo: true,
+    repoRoot: path,
+    error: null,
+  })),
+  gitSnapshot: vi.fn(async (repoRoot: string) => ({
+    repoRoot,
+    currentBranch: "main",
+    headOid: "abc123",
+    detached: false,
+    upstream: null,
+    ahead: 0,
+    behind: 0,
+    changes: [],
+    remotes: [],
+    branches: [],
+    stashes: [],
+    settings: {
+      userName: null,
+      userEmail: null,
+      httpProxy: null,
+      httpsProxy: null,
+      pullRebase: null,
+      pushDefault: null,
+      coreAutocrlf: null,
+      coreFilemode: null,
+      commitGpgsign: null,
+    },
+  })),
+}));
+
 vi.mock("@xterm/xterm", () => ({
   Terminal: terminalMocks.terminalCtor,
 }));
@@ -163,6 +200,8 @@ vi.mock("@xterm/addon-webgl", () => ({
 }));
 
 vi.mock("../../lib/ipc", () => ipcMocks);
+
+vi.mock("../../lib/git", () => gitMocks);
 
 vi.mock("../../lib/terminalImeGuard", () => ({
   attachTerminalImeGuard: vi.fn(() => vi.fn()),
@@ -220,6 +259,7 @@ describe("TerminalPanel focus behavior", () => {
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
     terminalMocks.state.onResizeHandler = null;
+    terminalMocks.state.customKeyEventHandler = null;
     ipcMocks.terminalExitHandlers.clear();
     ipcMocks.createTerminalSessionId.mockImplementation(() => "terminal-session");
     ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
@@ -1161,6 +1201,74 @@ describe("TerminalPanel focus behavior", () => {
     });
     expect(screen.queryByTestId("context-menu-item-receive-file-using-z-modem")).not.toBeInTheDocument();
     expect(screen.getByTestId("context-menu-item-send-file-using-z-modem")).toBeInTheDocument();
+  });
+
+  it("opens the current local terminal repository from the Git button", async () => {
+    const onOpen = vi.fn();
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        gitToggle={{ cwd: "/repo", onOpen }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.click(screen.getByTestId("terminal-git-toggle"));
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds a Git action to the local terminal context menu", async () => {
+    const onOpen = vi.fn();
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        gitToggle={{ cwd: "/repo", onOpen }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByText("Open Git Panel"));
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens Git from the terminal shortcut", async () => {
+    const onOpen = vi.fn();
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        gitToggle={{ cwd: "/repo", onOpen }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      expect(terminalMocks.state.customKeyEventHandler).toBeTruthy();
+    });
+
+    const handled = terminalMocks.state.customKeyEventHandler?.(
+      new KeyboardEvent("keydown", { key: "g", ctrlKey: true, shiftKey: true }),
+    );
+
+    expect(handled).toBe(false);
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
   it("queues a ZMODEM send from the context menu without reading the selected file into memory", async () => {
