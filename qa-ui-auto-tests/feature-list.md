@@ -3250,6 +3250,22 @@ controls:
     selector: '[data-testid="query-result-grid"]'
     kind: display
     optional: true
+  - id: query-cell-value-dialog
+    selector: '[data-testid="query-cell-value-dialog"]'
+    kind: display
+    optional: true       # opened from a live query result cell via Ctrl+Enter/context menu
+  - id: query-cell-value-text
+    selector: '[data-testid="query-cell-value-text"]'
+    kind: display
+    optional: true
+  - id: query-cell-value-copy
+    selector: '[data-testid="query-cell-value-copy"]'
+    kind: interactive
+    optional: true
+  - id: query-cell-value-wrap
+    selector: '[data-testid="query-cell-value-wrap"]'
+    kind: interactive
+    optional: true
   - id: schema-select
     selector: 'select[aria-label="Schema"]'
     kind: interactive
@@ -3284,7 +3300,7 @@ controls:
 - DB 会话（MySQL/PostgreSQL/ClickHouse）经 `SessionEditor` 创建（proto 选择器 + database section 由 F6.3 拥有），打开后 `MainLayout.openDbTab` 挂载 `DbClientTab`（`type:"database"`），与 SFTP/VNC 一样常驻挂载以便查询跨标签存活
 - 左侧 `SchemaTree`：懒加载 schema→table→column/index 展开（`db-schema-drawer-handle` 抽屉折叠）；右侧查询工作区为多 query 面板（最多 4 个）的 tab 布局
 - `SqlEditorPanel` 封装 CodeMirror 6：按引擎选 dialect、schema-aware 自动补全（`SQLNamespace`），暴露命令式 `SqlEditorHandle`；工具条 Run (F5) / Run selection / Cancel / Format / History / Save / Rows / Sheets / Schema 选择
-- `QueryResultGrid` 为手写虚拟化网格（行高 24 + overscan）：NULL 徽标、数值右对齐、排序、CSV/单元格复制、列显隐、聚合统计、行筛选、Table/List/Chart 视图、增删改行 + 提交/撤销
+- `QueryResultGrid` 为手写虚拟化网格（行高 24 + overscan）：NULL 徽标、数值右对齐、排序、CSV/单元格复制、完整值查看（Ctrl+Enter / 右键菜单，保留长文本和换行）、列显隐、聚合统计、行筛选、Table/List/Chart 视图、增删改行 + 提交/撤销
 - 查询工作区跨会话持久化（`queryRegistry` + `ef0b686`），结果可经 Export Grid 对话框导出
 - 浮动工具条复用共享 `FloatingToolbar`（F10.1，`db-floating-toolbar`）：Chat 入口 / 最大化 / 分离到独立窗口（`db-detach`，分离/重挂载行为属 F-Detach-1）
 - **e2e 测试限制**：实际查询需活的 MySQL/PostgreSQL/ClickHouse fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 DB proto → 填 host/port → 保存 → 打开标签 → schema-tree / sql-editor / query-result-grid 挂载」的路由路径（参照 TC-111 RDP scaffold 模式），真实查询/编辑留待配置 DB fixture 的手动/native 回归
