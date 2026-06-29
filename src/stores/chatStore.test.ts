@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { listen } from "@tauri-apps/api/event";
+import { useAppStore } from "./appStore";
 import { useChatStore, type ChatThread } from "./chatStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "./aiStore";
+import type { Tab } from "../types";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
@@ -273,6 +276,103 @@ describe("chatStore media generation", () => {
       path: "/tmp/image.png",
     });
     expect(useChatStore.getState().sending).toBe(false);
+  });
+});
+
+describe("chatStore DB MCP context bridge", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    vi.mocked(listen).mockResolvedValue(() => undefined);
+    const thread = makeThread({
+      id: "thread-db",
+      provider_id: "claude-code",
+      linked_session_id: "db-tab",
+    });
+    useChatStore.setState({
+      threads: [thread],
+      threadsLoaded: true,
+      activeThreadId: thread.id,
+      messages: { [thread.id]: [] },
+      streamingId: {},
+      ccToolCards: {},
+      ccUsage: {},
+      sendingByThreadId: {},
+      sending: false,
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: "db-tab",
+      tabDrawerOpenByTabId: { "db-tab": true },
+      activeThreadIdByTabId: { "db-tab": thread.id },
+      drawerWidth: 380,
+      drawerHeight: 420,
+      drawerPosition: "right",
+      drawerPinned: true,
+      pendingComposerText: "",
+    });
+    useAppStore.setState({
+      tabs: [
+        {
+          id: "db-tab",
+          type: "database",
+          title: "MySQL",
+          closable: true,
+          sessionId: "saved-db",
+        } as Tab,
+      ],
+      activeTabId: "db-tab",
+      cwdByTab: {},
+      dbConnByTab: { "db-tab": "saved-db::runtime" },
+      dbSelectedObjectsByTab: {
+        "db-tab": [
+          {
+            catalog: null,
+            schema: "shop",
+            name: "orders",
+            kind: "table",
+          },
+          {
+            catalog: null,
+            schema: "shop",
+            name: "sp_sync",
+            kind: "procedure",
+          },
+        ],
+      },
+    });
+    invokeMock.mockImplementation((command: string) => {
+      if (command !== "chat_stream") throw new Error(`unexpected command: ${command}`);
+      return Promise.resolve(null);
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends the live DB connection and selected objects with each turn", async () => {
+    await useChatStore.getState().sendMessage("thread-db", "select 多选表前10条记录");
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_stream", {
+      req: expect.objectContaining({
+        thread_id: "thread-db",
+        bound_session_id: "saved-db",
+        bound_db_connection_id: "saved-db::runtime",
+        bound_db_selected_objects: [
+          {
+            catalog: null,
+            schema: "shop",
+            name: "orders",
+            kind: "table",
+          },
+          {
+            catalog: null,
+            schema: "shop",
+            name: "sp_sync",
+            kind: "procedure",
+          },
+        ],
+      }),
+    });
   });
 });
 

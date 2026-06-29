@@ -45,7 +45,7 @@ import {
   type DbColumnDescription,
   type DbQueryResult,
 } from "../../lib/ipc";
-import { SchemaTree } from "./SchemaTree";
+import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
 import { BookmarksPanel } from "./BookmarksPanel";
 import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
 import {
@@ -439,6 +439,7 @@ export default function DbClientTab({
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabDbConn = useAppStore((s) => s.setTabDbConn);
+  const setTabDbSelectedObjects = useAppStore((s) => s.setTabDbSelectedObjects);
   const { fontSize: dbFontSize } = useDbSessionFontSize(visible, rootRef);
   const dbFontStyle = useMemo(
     () => ({
@@ -496,6 +497,7 @@ export default function DbClientTab({
     const runtimeSessionId = createRuntimeDbSessionId(sessionId);
     setConnectionSessionId(null);
     setConnError(null);
+    setTabDbSelectedObjects(tabId, null);
     void dbConnect({ ...info, sessionId: runtimeSessionId })
       .then(() => {
         if (cancelled) {
@@ -514,6 +516,7 @@ export default function DbClientTab({
       cancelled = true;
       void dbDisconnect(runtimeSessionId).catch(() => undefined);
       setTabDbConn(tabId, null);
+      setTabDbSelectedObjects(tabId, null);
       Object.values(timersRef.current).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1186,6 +1189,21 @@ export default function DbClientTab({
     [activePanelId, activeSchema, info.catalog, info.engine, rowLimit, runQuery],
   );
 
+  const handleSchemaSelectionChange = useCallback(
+    (objects: SchemaTreeSelectedObject[]) => {
+      setTabDbSelectedObjects(
+        tabId,
+        objects.map((object) => ({
+          catalog: info.catalog ?? null,
+          schema: object.schema,
+          name: object.name,
+          kind: object.kind,
+        })),
+      );
+    },
+    [info.catalog, setTabDbSelectedObjects, tabId],
+  );
+
   const addPanel = () => {
     if (panels.length >= MAX_PANELS) return;
     const p = newPanel();
@@ -1580,6 +1598,7 @@ export default function DbClientTab({
                     sessionId={connectionSessionId}
                     engine={info.engine}
                     catalog={info.catalog}
+                    onSelectionChange={handleSchemaSelectionChange}
                     onInsertTable={insertIntoActive}
                     onQuickSelect={quickSelect}
                     quickSelectLimit={rowLimit}

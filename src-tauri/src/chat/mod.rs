@@ -3,18 +3,18 @@ pub mod redact;
 pub mod run;
 pub mod store;
 
-use crate::ai::config::{default_ai_config_path, AiConfig};
+use crate::ai::config::{AiConfig, default_ai_config_path};
 use crate::llm::router::provider_group_id_from_route;
 use crate::llm::{
     ChatContentPart, ChatMessage as LlmMessage, ChatRequest, ChatStreamEvent, ChatTool,
     ChatToolCall, Llm, TaskKind,
 };
 use crate::state::AppState;
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use futures::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -329,16 +329,22 @@ fn build_system_prompt(format: &str) -> String {
                 Help the user manage SSH sessions, analyse terminal output, and craft shell commands. \
                 Reply in the same language the user writes in (default Chinese), and stay concise.";
     let format_clause = match format {
-        "html" => "Render your reply as a self-contained HTML fragment. \
+        "html" => {
+            "Render your reply as a self-contained HTML fragment. \
                    Use semantic tags such as <p>, <ul>/<ol>, <li>, <h2>/<h3>, <code>, and <pre><code class=\"language-…\"> for code blocks. \
-                   Do NOT wrap the answer in <html>, <body>, <head>, <script>, <style>, or include event handlers — the host sanitises everything else.",
-        "plain" => "Reply in plain text only — no Markdown syntax, no HTML tags. \
-                    Keep paragraphs short and use blank lines for separation.",
+                   Do NOT wrap the answer in <html>, <body>, <head>, <script>, <style>, or include event handlers — the host sanitises everything else."
+        }
+        "plain" => {
+            "Reply in plain text only — no Markdown syntax, no HTML tags. \
+                    Keep paragraphs short and use blank lines for separation."
+        }
         // "md" is the default.
-        _ => "Format your reply as GitHub-flavoured Markdown. \
+        _ => {
+            "Format your reply as GitHub-flavoured Markdown. \
               Use ```language fenced blocks for code, `inline code` for symbols/commands, \
               tables / bullet lists / headings (##, ###) when they help readability. \
-              Do NOT wrap the entire answer in a single fenced block.",
+              Do NOT wrap the entire answer in a single fenced block."
+        }
     };
     format!("{}\n\n{}", base, format_clause)
 }
@@ -546,6 +552,13 @@ pub struct ChatSendRequest {
     /// threads or a DB tab that isn't connected.
     #[serde(default)]
     pub bound_db_connection_id: Option<String>,
+    /// Current objects selected in the bound DB tab's object tree. Bridged per
+    /// turn so SQL MCP tools can answer prompts containing "selected tables".
+    #[serde(default)]
+    pub bound_db_selected_objects: Vec<crate::agent::context::AgentDbSelectedObject>,
+    /// Backward-compatible single-table field accepted from older frontends.
+    #[serde(default)]
+    pub bound_db_selected_table: Option<crate::agent::context::AgentDbSelectedObject>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1086,7 +1099,11 @@ fn build_provider_http_client(
         crate::ai::config::resolve_provider_proxy_url(provider, Some(&db), Some(&state.vault))?
     };
     let mut builder = Client::builder().timeout(timeout);
-    if let Some(proxy_url) = proxy_url.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(proxy_url) = proxy_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
             builder = builder.proxy(proxy);
         }
@@ -1108,8 +1125,7 @@ async fn generate_media_with_provider_keys(
     let api_keys = provider.effective_api_keys();
     let key_count = api_keys.len();
     let mut last_err: Option<String> = None;
-    let client =
-        build_provider_http_client(state, provider, std::time::Duration::from_secs(360))?;
+    let client = build_provider_http_client(state, provider, std::time::Duration::from_secs(360))?;
 
     for _ in 0..key_count {
         let key_index = {
@@ -1585,12 +1601,48 @@ fn append_agent_context_to_system_prompt(
     if agent_ctx.bound_db_connection_id.is_some() {
         block.push_str("Database binding: active for SQL/Redis tools.\n");
     }
+    if let Some(line) = selected_objects_context_line(agent_ctx) {
+        block.push_str(&line);
+    }
     if block.trim().is_empty() {
         return system_prompt;
     }
     system_prompt.push_str("\n\n[Taomni runtime context]\n");
     system_prompt.push_str(block.trim_end());
     system_prompt
+}
+
+fn selected_objects_context_line(
+    agent_ctx: &crate::agent::context::AgentThreadContext,
+) -> Option<String> {
+    let objects =
+        crate::agent::context::normalize_selected_objects(&agent_ctx.bound_db_selected_objects);
+    if objects.is_empty() {
+        return None;
+    }
+    let selected = objects
+        .iter()
+        .take(10)
+        .map(|object| format!("{} [{}]", object.display_name(), object.kind))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let selectable = objects
+        .iter()
+        .filter(|object| object.is_selectable())
+        .take(10)
+        .map(|object| format!("{} [{}]", object.display_name(), object.kind))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let suffix = if objects.len() > 10 { ", ..." } else { "" };
+    let mut line = format!("Database selected objects: {selected}{suffix}\n");
+    if selectable.is_empty() {
+        line.push_str("Database selected queryable objects: (none)\n");
+    } else {
+        line.push_str(&format!(
+            "Database selected queryable objects: {selectable}{suffix}\n"
+        ));
+    }
+    Some(line)
 }
 
 fn llm_tools_from_mcp(tools: Vec<rmcp::model::Tool>) -> Vec<ChatTool> {
@@ -1713,6 +1765,8 @@ pub async fn chat_stream(
             cwd: req.cwd.clone(),
             local_terminal_env: req.local_terminal_env.clone(),
             bound_db_connection_id: req.bound_db_connection_id.clone(),
+            bound_db_selected_objects: req.bound_db_selected_objects.clone(),
+            bound_db_selected_table: req.bound_db_selected_table.clone(),
         },
     )?;
 
@@ -1942,6 +1996,10 @@ pub async fn chat_stream(
             if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 let (clean_cwd, _) = redact::redact(cwd);
                 prefix.push_str(&format!("当前工作目录：{}\n\n", clean_cwd));
+            }
+            if let Some(line) = selected_objects_context_line(&agent_ctx) {
+                let (clean_line, _) = redact::redact(line.trim_end());
+                prefix.push_str(&format!("{clean_line}\n\n"));
             }
             if let Some(ctx) = req
                 .terminal_context
@@ -2301,6 +2359,10 @@ pub async fn chat_stream(
             if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 let (clean_cwd, _) = redact::redact(cwd);
                 prefix.push_str(&format!("当前工作目录：{}\n\n", clean_cwd));
+            }
+            if let Some(line) = selected_objects_context_line(&agent_ctx) {
+                let (clean_line, _) = redact::redact(line.trim_end());
+                prefix.push_str(&format!("{clean_line}\n\n"));
             }
             if let Some(ctx) = req
                 .terminal_context

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
 import type { ChatAttachment } from "../lib/chat/attachments";
+import type { DbSelectedObject } from "./appStore";
 import type { LlmProviderCapability } from "./aiStore";
 
 export type ChatThreadMode = "chat" | "image" | "video";
@@ -520,6 +521,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // bridged per-turn so the CC DB MCP can target it (the backend can't derive
     // the runtime key). Null for non-DB threads or a disconnected DB tab.
     let boundDbConnectionId: string | null = null;
+    // Current object-tree selection for DB SQL MCP. Empty for non-DB/Redis tabs
+    // or when no object is selected.
+    let boundDbSelectedObjects: DbSelectedObject[] = [];
     // Local terminal facts for Claude Code's appended system prompt. Only set
     // for a live local terminal; SSH/remote tabs deliberately leave this null.
     let localTerminalEnv: LocalTerminalEnv | null = null;
@@ -535,6 +539,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           boundSessionId = boundTab?.sessionId ?? null;
           cwd = appState.cwdByTab[tabId] ?? appState.cwdByTab[runtimeTabId] ?? null;
           boundDbConnectionId = appState.dbConnByTab[tabId] ?? appState.dbConnByTab[runtimeTabId] ?? null;
+          boundDbSelectedObjects =
+            appState.dbSelectedObjectsByTab[tabId] ??
+            appState.dbSelectedObjectsByTab[runtimeTabId] ??
+            [];
           const localEnv = getTerminal(tabId)?.localEnvironment ?? getTerminal(runtimeTabId)?.localEnvironment ?? null;
           if (localEnv) {
             localTerminalEnv = { ...localEnv, cwd };
@@ -675,6 +683,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           cwd,
           local_terminal_env: localTerminalEnv,
           bound_db_connection_id: boundDbConnectionId,
+          bound_db_selected_objects: boundDbSelectedObjects,
         },
       });
     } catch (e) {
@@ -708,6 +717,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             cwd,
             local_terminal_env: localTerminalEnv,
             bound_db_connection_id: boundDbConnectionId,
+            bound_db_selected_objects: boundDbSelectedObjects,
           },
         });
         set((s) => ({

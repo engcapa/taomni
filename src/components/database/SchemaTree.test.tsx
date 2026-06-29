@@ -17,7 +17,15 @@ const ipcMock = vi.hoisted(() => ({
   dbListIndexes: vi.fn(async () => [{ name: "idx_user", columns: ["user_id"], unique: false }]),
 }));
 
-const menuRef = vi.hoisted(() => ({ items: [] as Array<{ label: string; danger?: boolean; disabled?: boolean; children?: unknown[] }> }));
+const menuRef = vi.hoisted(() => ({
+  items: [] as Array<{
+    label: string;
+    danger?: boolean;
+    disabled?: boolean;
+    children?: unknown[];
+    onClick?: () => void;
+  }>,
+}));
 
 vi.mock("../../lib/ipc", () => ipcMock);
 
@@ -99,6 +107,30 @@ describe("SchemaTree folder model", () => {
     expect(await screen.findByText("idx_user")).toBeInTheDocument();
   });
 
+  it("reports single and multi-selected object kinds when tree objects are clicked", async () => {
+    const onSelectionChange = vi.fn();
+    render(<SchemaTree sessionId="s1" engine="MySQL" onSelectionChange={onSelectionChange} />);
+
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.click(await screen.findByText("orders"));
+    expect(onSelectionChange).toHaveBeenLastCalledWith([
+      { schema: "ecommerce", name: "orders", kind: "table" },
+    ]);
+
+    fireEvent.click(await screen.findByText("Procedures"));
+    fireEvent.click(await screen.findByText("sp_sync"), { ctrlKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith([
+      { schema: "ecommerce", name: "orders", kind: "table" },
+      { schema: "ecommerce", name: "sp_sync", kind: "procedure" },
+    ]);
+
+    fireEvent.click(screen.getByText("orders"), { ctrlKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith([
+      { schema: "ecommerce", name: "sp_sync", kind: "procedure" },
+    ]);
+  });
+
   it("only shows Tables/Views folders for Presto", async () => {
     render(<SchemaTree sessionId="s1" engine="Presto" />);
     fireEvent.click(await screen.findByText("ecommerce"));
@@ -122,6 +154,28 @@ describe("SchemaTree context menus", () => {
     expect(items).toContain("Truncate (TRUNCATE)…");
     expect(items).toContain("Drop (DROP)…");
     expect(menuRef.items.find((i) => i.label === "Drop (DROP)…")?.danger).toBe(true);
+  });
+
+  it("uses a batch-safe menu for multiple selected objects", async () => {
+    const onInsertSql = vi.fn();
+    render(<SchemaTree sessionId="s1" engine="MySQL" onInsertSql={onInsertSql} />);
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.click(await screen.findByText("orders"));
+    fireEvent.click(await screen.findByText("Procedures"));
+    fireEvent.click(await screen.findByText("sp_sync"), { ctrlKey: true });
+
+    fireEvent.contextMenu(screen.getByText("sp_sync"));
+    const items = labels();
+    expect(items).toContain("Copy selected names (2)");
+    expect(items).toContain("Insert SELECT statements (1)");
+    expect(items).toContain("View selected DDL (2)");
+    expect(items).not.toContain("Drop (DROP)…");
+    expect(items).not.toContain("Rename…");
+
+    menuRef.items.find((item) => item.label === "Insert SELECT statements (1)")?.onClick?.();
+    await waitFor(() => expect(onInsertSql).toHaveBeenCalledWith(expect.stringContaining("orders")));
+    expect(onInsertSql).not.toHaveBeenCalledWith(expect.stringContaining("sp_sync"));
   });
 
   it("hides inline edit + indexes for ClickHouse tables", async () => {
