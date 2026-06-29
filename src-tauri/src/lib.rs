@@ -6,6 +6,7 @@ mod chat;
 mod config;
 mod database;
 mod filebrowser;
+mod git;
 mod hbase;
 mod history;
 mod lanchat;
@@ -333,6 +334,37 @@ pub fn run() {
             filebrowser::sftp_pause_transfer,
             filebrowser::sftp_resume_transfer,
             filebrowser::open_sftp_window,
+            git::git_probe_path,
+            git::git_init_repo,
+            git::git_snapshot,
+            git::git_diff,
+            git::git_stage,
+            git::git_unstage,
+            git::git_discard,
+            git::git_clean_untracked,
+            git::git_commit,
+            git::git_fetch,
+            git::git_pull,
+            git::git_push,
+            git::git_checkout_branch,
+            git::git_create_branch,
+            git::git_delete_branch,
+            git::git_merge_branch,
+            git::git_log,
+            git::git_reset,
+            git::git_revert,
+            git::git_cherry_pick,
+            git::git_cherry_pick_continue,
+            git::git_cherry_pick_abort,
+            git::git_stash_save,
+            git::git_stash_list,
+            git::git_stash_show,
+            git::git_stash_apply,
+            git::git_stash_drop,
+            git::git_set_remote,
+            git::git_delete_remote,
+            git::git_save_settings,
+            git::git_save_remote_auth,
             windowing::open_detached_window,
             windowing::close_current_detached_window,
             appearance::list_system_fonts,
