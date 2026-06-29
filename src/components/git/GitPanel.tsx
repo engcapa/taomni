@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
   GitBranch,
   GitCommitHorizontal,
   GitFork,
   GitMerge,
+  List,
+  ListTree,
   Loader2,
   Plus,
   RefreshCw,
@@ -16,21 +18,29 @@ import {
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import {
-  gitChangeLabel,
   gitCheckoutBranch,
   gitCherryPick,
-  gitCherryPickAbort,
-  gitCherryPickContinue,
+  gitOperationState,
+  gitOperationContinue,
+  gitOperationAbort,
+  gitRebaseSkip,
+  gitResolveConflict,
   gitCleanUntracked,
   gitCommit,
   gitCreateBranch,
   gitDeleteBranch,
   gitDeleteRemote,
-  gitDiff,
+  gitBlobPair,
+  GIT_REF_WORKTREE,
   gitDiscard,
   gitFetch,
-  gitLog,
   gitMergeBranch,
+  gitRenameBranch,
+  gitSetUpstream,
+  gitCreateTag,
+  gitDeleteTag,
+  gitPushTag,
+  gitCheckoutTag,
   gitPull,
   gitPush,
   gitRepoName,
@@ -48,22 +58,30 @@ import {
   gitUnstage,
   selectedRemote,
   type GitBranch as GitBranchInfo,
+  type GitBlobPair,
   type GitChange,
   type GitLogEntry,
+  type GitOperationState,
   type GitRemote,
   type GitRepoSettings,
   type GitResetMode,
   type GitSnapshot,
   type GitStashEntry,
+  type GitTag,
 } from "../../lib/git";
 import { alertAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { ContextMenu, type MenuItem } from "../ContextMenu";
+import { ChangesTree } from "./ChangesTree";
+import { CommitLog } from "./CommitLog";
+import { CompareView } from "./CompareView";
+import { DiffViewer } from "./DiffViewer";
 import { useAppStore } from "../../stores/appStore";
 
 interface GitPanelProps {
   repoRoot: string;
 }
 
-type GitView = "changes" | "log" | "branches" | "stash" | "settings";
+type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
 
 const EMPTY_SETTINGS: GitRepoSettings = {
   userName: null,
@@ -85,17 +103,42 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [selectedLog, setSelectedLog] = useState<GitLogEntry | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<GitBranchInfo | null>(null);
   const [selectedStash, setSelectedStash] = useState<GitStashEntry | null>(null);
   const [diff, setDiff] = useState("");
   const [diffLoading, setDiffLoading] = useState(false);
-  const [logEntries, setLogEntries] = useState<GitLogEntry[]>([]);
+  const [pair, setPair] = useState<GitBlobPair | null>(null);
+  const [pairLoading, setPairLoading] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
   const [remoteName, setRemoteName] = useState("");
   const [settingsDraft, setSettingsDraft] = useState<GitRepoSettings>(EMPTY_SETTINGS);
   const [remoteDrafts, setRemoteDrafts] = useState<Record<string, RemoteDraft>>({});
   const [includeUntracked, setIncludeUntracked] = useState(false);
+  // Track explicitly *unchecked* paths so new changes are committed by default.
+  const [unchecked, setUnchecked] = useState<Set<string>>(() => new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [treeMode, setTreeMode] = useState(() => {
+    try {
+      return localStorage.getItem("taomni.git.changes.tree") !== "flat";
+    } catch {
+      return true;
+    }
+  });
+  const [amendChecked, setAmendChecked] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  const [commitMenu, setCommitMenu] = useState<{ x: number; y: number; entry: GitLogEntry } | null>(null);
+  const anchorRef = useRef<string | null>(null);
+  const [operation, setOperation] = useState<GitOperationState | null>(null);
+  const [compare, setCompare] = useState<{ refA: string; refB: string; title: string } | null>(null);
+  const [historyPath, setHistoryPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("taomni.git.changes.tree", treeMode ? "tree" : "flat");
+    } catch {
+      /* ignore */
+    }
+  }, [treeMode]);
 
   const repoName = useMemo(() => gitRepoName(repoRoot), [repoRoot]);
   const selectedChange = useMemo(
@@ -112,6 +155,10 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
       setSnapshot(next);
       setSettingsDraft(normalizeSettings(next.settings));
       setRemoteDrafts((current) => buildRemoteDrafts(next.remotes, current));
+      const paths = new Set(next.changes.map((c) => c.path));
+      // Drop unchecked entries that no longer exist; everything else stays checked.
+      setUnchecked((current) => new Set([...current].filter((p) => paths.has(p))));
+      setSelected((current) => new Set([...current].filter((p) => paths.has(p))));
       if (!selectedPath || !next.changes.some((change) => change.path === selectedPath)) {
         setSelectedPath(next.changes[0]?.path ?? null);
       }
@@ -123,6 +170,11 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
       }
       const remote = selectedRemote(next);
       setRemoteName((current) => current || remote?.name || "");
+      try {
+        setOperation(await gitOperationState(repoRoot));
+      } catch {
+        setOperation(null);
+      }
     } catch (err) {
       const message = errorMessage(err);
       setError(message);
@@ -137,38 +189,45 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   }, [refresh]);
 
   useEffect(() => {
-    if (view !== "log") return;
     let cancelled = false;
-    gitLog(repoRoot, 160)
-      .then((entries) => {
-        if (cancelled) return;
-        setLogEntries(entries);
-        setSelectedLog((current) =>
-          current && entries.some((entry) => entry.oid === current.oid)
-            ? current
-            : entries[0] ?? null,
+    async function loadPair() {
+      if (view !== "changes" || !selectedChange) {
+        setPair(null);
+        return;
+      }
+      setPairLoading(true);
+      try {
+        // Local Changes diff: HEAD ↔ working tree (covers staged + unstaged combined;
+        // untracked files have no HEAD side and show as fully added).
+        const next = await gitBlobPair(
+          repoRoot,
+          selectedChange.path,
+          "HEAD",
+          GIT_REF_WORKTREE,
+          selectedChange.oldPath,
         );
-      })
-      .catch((err) => setError(errorMessage(err)));
+        if (!cancelled) setPair(next);
+      } catch (err) {
+        if (!cancelled) {
+          setPair(null);
+          setError(errorMessage(err));
+        }
+      } finally {
+        if (!cancelled) setPairLoading(false);
+      }
+    }
+    void loadPair();
     return () => {
       cancelled = true;
     };
-  }, [repoRoot, snapshot?.headOid, view]);
+  }, [repoRoot, selectedChange, view]);
 
   useEffect(() => {
     let cancelled = false;
     async function loadDiff() {
       setDiffLoading(true);
       try {
-        if (view === "changes" && selectedChange) {
-          const text = selectedChange.staged && !selectedChange.unstaged
-            ? await gitDiff(repoRoot, selectedChange.path, true)
-            : await gitDiff(repoRoot, selectedChange.path, false);
-          if (!cancelled) setDiff(text || "(no diff available)");
-        } else if (view === "log" && selectedLog) {
-          const text = await gitDiff(repoRoot, null, false, selectedLog.oid);
-          if (!cancelled) setDiff(text || "(commit has no patch)");
-        } else if (view === "stash" && selectedStash) {
+        if (view === "stash" && selectedStash) {
           const text = await gitStashShow(repoRoot, selectedStash.selector);
           if (!cancelled) setDiff(text || "(stash has no patch)");
         } else {
@@ -184,24 +243,15 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [repoRoot, selectedChange, selectedLog, selectedStash, view]);
+  }, [repoRoot, selectedStash, view]);
 
   const runAction = useCallback(
-    async (label: string, action: () => Promise<void>, options: { refreshLog?: boolean } = {}) => {
+    async (label: string, action: () => Promise<void>) => {
       setBusy(true);
       setError(null);
       try {
         await action();
         await refresh();
-        if (options.refreshLog || view === "log") {
-          const entries = await gitLog(repoRoot, 160);
-          setLogEntries(entries);
-          setSelectedLog((current) =>
-            current && entries.some((entry) => entry.oid === current.oid)
-              ? current
-              : entries[0] ?? null,
-          );
-        }
         setStatusMessage(`${label} completed`);
       } catch (err) {
         const message = errorMessage(err);
@@ -212,14 +262,111 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
         setBusy(false);
       }
     },
-    [refresh, repoRoot, setStatusMessage, view],
+    [refresh, setStatusMessage],
   );
 
-  const selectedPaths = selectedPath ? [selectedPath] : [];
+  const changesList = useMemo(() => snapshot?.changes ?? [], [snapshot]);
+  const orderedPaths = useMemo(
+    () => [...changesList].map((c) => c.path).sort((a, b) => a.localeCompare(b)),
+    [changesList],
+  );
+  const checked = useMemo(
+    () => new Set(changesList.filter((c) => !unchecked.has(c.path)).map((c) => c.path)),
+    [changesList, unchecked],
+  );
+  const checkedPaths = useMemo(() => [...checked], [checked]);
+  const opPaths = selected.size > 0 ? [...selected] : selectedPath ? [selectedPath] : [];
 
-  const stageAll = () => runAction("Stage all", () => gitStage(repoRoot, snapshot?.changes.map((c) => c.path) ?? []));
+  const toggleChecked = useCallback((paths: string[], value: boolean) => {
+    setUnchecked((prev) => {
+      const next = new Set(prev);
+      for (const p of paths) {
+        if (value) next.delete(p);
+        else next.add(p);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelect = useCallback(
+    (path: string, mods: { ctrl: boolean; shift: boolean }) => {
+      setSelectedPath(path);
+      setSelected((prev) => {
+        if (mods.ctrl) {
+          const next = new Set(prev);
+          if (next.has(path)) next.delete(path);
+          else next.add(path);
+          anchorRef.current = path;
+          return next;
+        }
+        if (mods.shift && anchorRef.current) {
+          const from = orderedPaths.indexOf(anchorRef.current);
+          const to = orderedPaths.indexOf(path);
+          if (from !== -1 && to !== -1) {
+            const [lo, hi] = from <= to ? [from, to] : [to, from];
+            return new Set(orderedPaths.slice(lo, hi + 1));
+          }
+        }
+        anchorRef.current = path;
+        return new Set([path]);
+      });
+    },
+    [orderedPaths],
+  );
+
+  const stageAll = () =>
+    runAction("Stage all", () => gitStage(repoRoot, changesList.map((c) => c.path)));
   const unstageAll = () =>
-    runAction("Unstage all", () => gitUnstage(repoRoot, snapshot?.changes.filter((c) => c.staged).map((c) => c.path) ?? []));
+    runAction("Unstage all", () => gitUnstage(repoRoot, changesList.filter((c) => c.staged).map((c) => c.path)));
+  const stageSelected = () => opPaths.length && runAction("Stage", () => gitStage(repoRoot, opPaths));
+  const unstageSelected = () => opPaths.length && runAction("Unstage", () => gitUnstage(repoRoot, opPaths));
+  const discardSelected = () => {
+    if (opPaths.length === 0) return;
+    const set = new Set(opPaths);
+    const untracked = changesList.filter((c) => set.has(c.path) && c.status === "untracked").map((c) => c.path);
+    const tracked = changesList.filter((c) => set.has(c.path) && c.status !== "untracked").map((c) => c.path);
+    void confirmAndRun(
+      "Discard changes",
+      `Discard changes in ${opPaths.length} file(s)? This cannot be undone.`,
+      true,
+      () =>
+        runAction("Discard", async () => {
+          if (tracked.length) await gitDiscard(repoRoot, tracked);
+          if (untracked.length) await gitCleanUntracked(repoRoot, untracked);
+        }),
+    );
+  };
+  const doCommit = (push: boolean) => {
+    if (checkedPaths.length === 0 || !commitMessage.trim()) return;
+    void runAction(
+      push ? "Commit and Push" : "Commit",
+      async () => {
+        await gitCommit(repoRoot, commitMessage, amendChecked, checkedPaths);
+        setCommitMessage("");
+        setAmendChecked(false);
+        if (push) {
+          await gitPush(repoRoot, remoteName || null, snapshot?.currentBranch ?? null, !snapshot?.upstream);
+        }
+      },
+    );
+  };
+  const resolveConflict = (side: "ours" | "theirs") => {
+    const targets = changesList.filter((c) => opPaths.includes(c.path) && c.conflict).map((c) => c.path);
+    if (targets.length === 0) return;
+    void runAction(`Accept ${side}`, async () => {
+      for (const p of targets) await gitResolveConflict(repoRoot, p, side);
+    });
+  };
+  const markResolved = () => opPaths.length && runAction("Mark resolved", () => gitStage(repoRoot, opPaths));
+  const openMenu = (path: string, event: ReactMouseEvent) => {
+    event.preventDefault();
+    if (!selected.has(path)) {
+      setSelected(new Set([path]));
+      setSelectedPath(path);
+      anchorRef.current = path;
+    }
+    setMenu({ x: event.clientX, y: event.clientY, path });
+  };
 
   return (
     <div data-testid="git-panel" className="h-full w-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]">
@@ -255,7 +402,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
       </header>
 
       <nav className="h-9 shrink-0 flex items-center gap-1 px-3 border-b border-[var(--taomni-divider)]">
-        {(["changes", "log", "branches", "stash", "settings"] as GitView[]).map((item) => (
+        {(["changes", "log", "branches", "tags", "stash", "settings"] as GitView[]).map((item) => (
           <button
             key={item}
             type="button"
@@ -269,57 +416,105 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
         {error && <span className="ml-2 text-[11px] text-red-500 truncate">{error}</span>}
       </nav>
 
-      {hasConflicts && (
-        <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-amber-500/30 bg-amber-500/10 text-[12px]">
-          <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <span>Conflict state detected. Resolve files, stage them, then continue or abort the active operation.</span>
+      {(operation && operation.kind !== "none") || hasConflicts ? (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-[12px]">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="min-w-0">
+            {operationLabel(operation)}
+            {operation?.conflictedPaths.length
+              ? ` — ${operation.conflictedPaths.length} conflicted file(s). Resolve and stage them, then continue.`
+              : " Resolve conflicts, stage them, then continue or abort."}
+          </span>
           <div className="flex-1" />
-          <button className="taomni-btn h-7 px-2" type="button" onClick={() => void runAction("Continue cherry-pick", () => gitCherryPickContinue(repoRoot), { refreshLog: true })}>
-            Continue cherry-pick
-          </button>
-          <button className="taomni-btn h-7 px-2" type="button" onClick={() => void runAction("Abort cherry-pick", () => gitCherryPickAbort(repoRoot), { refreshLog: true })}>
-            Abort cherry-pick
-          </button>
+          {operation && operation.kind !== "none" ? (
+            <>
+              <button
+                className="taomni-btn h-7 px-2"
+                type="button"
+                disabled={busy}
+                onClick={() => void runAction(`Continue ${operation.kind}`, () => gitOperationContinue(repoRoot, operation.kind))}
+              >
+                Continue
+              </button>
+              {operation.kind === "rebase" && (
+                <button
+                  className="taomni-btn h-7 px-2"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void runAction("Skip", () => gitRebaseSkip(repoRoot))}
+                >
+                  Skip
+                </button>
+              )}
+              <button
+                className="taomni-btn h-7 px-2 text-red-500"
+                type="button"
+                disabled={busy}
+                onClick={() => void runAction(`Abort ${operation.kind}`, () => gitOperationAbort(repoRoot, operation.kind))}
+              >
+                Abort
+              </button>
+            </>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       <main className="flex-1 min-h-0">
+        {compare ? (
+          <CompareView
+            repoRoot={repoRoot}
+            refA={compare.refA}
+            refB={compare.refB}
+            title={compare.title}
+            onClose={() => setCompare(null)}
+          />
+        ) : historyPath ? (
+          <CommitLog
+            repoRoot={repoRoot}
+            headOid={snapshot?.headOid ?? null}
+            busy={busy}
+            pathFilter={historyPath}
+            onClose={() => setHistoryPath(null)}
+            onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
+          />
+        ) : (
+        <>
         {view === "changes" && (
           <ChangesView
-            snapshot={snapshot}
-            selectedPath={selectedPath}
-            setSelectedPath={setSelectedPath}
-            diff={diff}
-            diffLoading={diffLoading}
+            changes={changesList}
+            treeMode={treeMode}
+            setTreeMode={setTreeMode}
+            checked={checked}
+            checkedCount={checkedPaths.length}
+            selected={selected}
+            opCount={opPaths.length}
+            activePath={selectedPath}
+            onToggleChecked={toggleChecked}
+            onSelect={handleSelect}
+            onContextMenu={openMenu}
+            pair={pair}
+            pairLoading={pairLoading}
             commitMessage={commitMessage}
             setCommitMessage={setCommitMessage}
+            amendChecked={amendChecked}
+            setAmendChecked={setAmendChecked}
             busy={busy}
+            hasRemote={!!remoteName}
             stageAll={stageAll}
             unstageAll={unstageAll}
-            stageSelected={() => void runAction("Stage", () => gitStage(repoRoot, selectedPaths))}
-            unstageSelected={() => void runAction("Unstage", () => gitUnstage(repoRoot, selectedPaths))}
-            discardSelected={() => void confirmAndRun("Discard changes", `Discard changes in ${selectedPath}?`, true, () => runAction("Discard", () => selectedChange?.status === "untracked" ? gitCleanUntracked(repoRoot, selectedPaths) : gitDiscard(repoRoot, selectedPaths)))}
-            commit={() => void runAction("Commit", async () => {
-              await gitCommit(repoRoot, commitMessage, false);
-              setCommitMessage("");
-            }, { refreshLog: true })}
-            amend={() => void runAction("Amend", async () => {
-              await gitCommit(repoRoot, commitMessage, true);
-              setCommitMessage("");
-            }, { refreshLog: true })}
+            stageSelected={stageSelected}
+            unstageSelected={unstageSelected}
+            discardSelected={discardSelected}
+            commit={() => doCommit(false)}
+            commitAndPush={() => doCommit(true)}
           />
         )}
         {view === "log" && (
-          <LogView
-            entries={logEntries}
-            selected={selectedLog}
-            setSelected={setSelectedLog}
-            diff={diff}
-            diffLoading={diffLoading}
+          <CommitLog
+            repoRoot={repoRoot}
+            headOid={snapshot?.headOid ?? null}
             busy={busy}
-            onCherryPick={() => selectedLog && void confirmAndRun("Cherry-pick", `Cherry-pick ${selectedLog.shortOid}: ${selectedLog.subject}?`, false, () => runAction("Cherry-pick", () => gitCherryPick(repoRoot, selectedLog.oid), { refreshLog: true }))}
-            onRevert={() => selectedLog && void confirmAndRun("Revert commit", `Revert ${selectedLog.shortOid}: ${selectedLog.subject}?`, false, () => runAction("Revert", () => gitRevert(repoRoot, selectedLog.oid), { refreshLog: true }))}
-            onReset={(mode) => selectedLog && void confirmAndRun(`Reset ${mode}`, `Reset current branch to ${selectedLog.shortOid} using --${mode}?`, mode === "hard", () => runAction("Reset", () => gitReset(repoRoot, selectedLog.oid, mode), { refreshLog: true }))}
+            onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
           />
         )}
         {view === "branches" && (
@@ -330,11 +525,47 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
             busy={busy}
             onCreate={async () => {
               const name = await promptAppDialog({ title: "Create branch", label: "Branch name" });
-              if (name) await runAction("Create branch", () => gitCreateBranch(repoRoot, name, selectedBranch?.name ?? null, true), { refreshLog: true });
+              if (name) await runAction("Create branch", () => gitCreateBranch(repoRoot, name, selectedBranch?.name ?? null, true));
             }}
             onCheckout={() => selectedBranch && void checkoutBranch(repoRoot, selectedBranch, runAction)}
-            onMerge={() => selectedBranch && void confirmAndRun("Merge branch", `Merge ${selectedBranch.name} into current branch?`, false, () => runAction("Merge", () => gitMergeBranch(repoRoot, selectedBranch.name), { refreshLog: true }))}
+            onMerge={() => selectedBranch && void confirmAndRun("Merge branch", `Merge ${selectedBranch.name} into current branch?`, false, () => runAction("Merge", () => gitMergeBranch(repoRoot, selectedBranch.name)))}
             onDelete={() => selectedBranch && void confirmAndRun("Delete branch", `Delete local branch ${selectedBranch.name}?`, true, () => runAction("Delete branch", () => gitDeleteBranch(repoRoot, selectedBranch.name, false)))}
+            onRename={async () => {
+              if (!selectedBranch) return;
+              const next = await promptAppDialog({ title: "Rename branch", label: "New name", initialValue: selectedBranch.name });
+              if (next && next !== selectedBranch.name) await runAction("Rename branch", () => gitRenameBranch(repoRoot, selectedBranch.name, next));
+            }}
+            onPush={() => selectedBranch && void runAction("Push branch", () => gitPush(repoRoot, remoteName || null, selectedBranch.name, !selectedBranch.upstream))}
+            onSetUpstream={async () => {
+              if (!selectedBranch) return;
+              const up = await promptAppDialog({
+                title: "Set upstream",
+                label: "Upstream (remote/branch, empty to clear)",
+                initialValue: selectedBranch.upstream ?? `${remoteName || "origin"}/${selectedBranch.name}`,
+                allowEmpty: true,
+              });
+              if (up !== null) await runAction("Set upstream", () => gitSetUpstream(repoRoot, selectedBranch.name, up || null));
+            }}
+            onCompare={() => {
+              if (!selectedBranch || !snapshot?.currentBranch) return;
+              setCompare({ refA: selectedBranch.name, refB: snapshot.currentBranch, title: `${selectedBranch.name} → ${snapshot.currentBranch}` });
+            }}
+          />
+        )}
+        {view === "tags" && (
+          <TagsView
+            snapshot={snapshot}
+            busy={busy}
+            hasRemote={!!remoteName}
+            onCreate={async () => {
+              const name = await promptAppDialog({ title: "Create tag", label: "Tag name" });
+              if (!name) return;
+              const message = await promptAppDialog({ title: "Create tag", label: "Annotation message (empty = lightweight)", allowEmpty: true });
+              await runAction("Create tag", () => gitCreateTag(repoRoot, name, null, message || null));
+            }}
+            onCheckout={(tag) => void confirmAndRun("Checkout tag", `Checkout ${tag.name}? This detaches HEAD.`, false, () => runAction("Checkout tag", () => gitCheckoutTag(repoRoot, tag.name)))}
+            onDelete={(tag) => void confirmAndRun("Delete tag", `Delete tag ${tag.name}?`, true, () => runAction("Delete tag", () => gitDeleteTag(repoRoot, tag.name)))}
+            onPush={(tag) => void runAction("Push tag", () => gitPushTag(repoRoot, remoteName || null, tag.name, false))}
           />
         )}
         {view === "stash" && (
@@ -383,71 +614,139 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
             }}
           />
         )}
+        </>
+        )}
       </main>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={changeMenuItems({
+            repoRoot,
+            opPaths,
+            conflicted: changesList.some((c) => opPaths.includes(c.path) && c.conflict),
+            onStage: stageSelected,
+            onUnstage: unstageSelected,
+            onDiscard: discardSelected,
+            onShowDiff: () => setSelectedPath(menu.path),
+            onShowHistory: () => setHistoryPath(menu.path),
+            onAcceptOurs: () => resolveConflict("ours"),
+            onAcceptTheirs: () => resolveConflict("theirs"),
+            onMarkResolved: markResolved,
+          })}
+        />
+      )}
+      {commitMenu && (
+        <ContextMenu
+          x={commitMenu.x}
+          y={commitMenu.y}
+          onClose={() => setCommitMenu(null)}
+          items={commitMenuItems(commitMenu.entry, {
+            onCherryPick: (e) =>
+              void confirmAndRun("Cherry-pick", `Cherry-pick ${e.shortOid}: ${e.subject}?`, false, () =>
+                runAction("Cherry-pick", () => gitCherryPick(repoRoot, e.oid))),
+            onRevert: (e) =>
+              void confirmAndRun("Revert commit", `Revert ${e.shortOid}: ${e.subject}?`, false, () =>
+                runAction("Revert", () => gitRevert(repoRoot, e.oid))),
+            onReset: (e, mode) =>
+              void confirmAndRun(`Reset ${mode}`, `Reset current branch to ${e.shortOid} using --${mode}? `, mode === "hard", () =>
+                runAction("Reset", () => gitReset(repoRoot, e.oid, mode))),
+            onNewBranch: async (e) => {
+              const name = await promptAppDialog({ title: "New branch from commit", label: "Branch name" });
+              if (name) await runAction("Create branch", () => gitCreateBranch(repoRoot, name, e.oid, true));
+            },
+          })}
+        />
+      )}
     </div>
   );
 }
 
 function ChangesView({
-  snapshot,
-  selectedPath,
-  setSelectedPath,
-  diff,
-  diffLoading,
+  changes,
+  treeMode,
+  setTreeMode,
+  checked,
+  checkedCount,
+  selected,
+  opCount,
+  activePath,
+  onToggleChecked,
+  onSelect,
+  onContextMenu,
+  pair,
+  pairLoading,
   commitMessage,
   setCommitMessage,
+  amendChecked,
+  setAmendChecked,
   busy,
+  hasRemote,
   stageAll,
   unstageAll,
   stageSelected,
   unstageSelected,
   discardSelected,
   commit,
-  amend,
+  commitAndPush,
 }: {
-  snapshot: GitSnapshot | null;
-  selectedPath: string | null;
-  setSelectedPath: (path: string) => void;
-  diff: string;
-  diffLoading: boolean;
+  changes: GitChange[];
+  treeMode: boolean;
+  setTreeMode: (value: boolean) => void;
+  checked: Set<string>;
+  checkedCount: number;
+  selected: Set<string>;
+  opCount: number;
+  activePath: string | null;
+  onToggleChecked: (paths: string[], value: boolean) => void;
+  onSelect: (path: string, mods: { ctrl: boolean; shift: boolean }) => void;
+  onContextMenu: (path: string, event: ReactMouseEvent) => void;
+  pair: GitBlobPair | null;
+  pairLoading: boolean;
   commitMessage: string;
   setCommitMessage: (message: string) => void;
+  amendChecked: boolean;
+  setAmendChecked: (value: boolean) => void;
   busy: boolean;
+  hasRemote: boolean;
   stageAll: () => void;
   unstageAll: () => void;
   stageSelected: () => void;
   unstageSelected: () => void;
   discardSelected: () => void;
   commit: () => void;
-  amend: () => void;
+  commitAndPush: () => void;
 }) {
-  const changes = snapshot?.changes ?? [];
-  const selected = changes.find((change) => change.path === selectedPath) ?? null;
+  const active = changes.find((change) => change.path === activePath) ?? null;
+  const canCommit = !busy && checkedCount > 0 && !!commitMessage.trim();
   return (
     <PanelGroup orientation="horizontal" id="git-changes-layout">
-      <Panel id="changes-list" defaultSize={32} minSize={22} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
+      <Panel id="changes-list" defaultSize={36} minSize={24} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
         <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
           <button className="taomni-btn h-7 px-2" type="button" disabled={busy || changes.length === 0} onClick={stageAll}>Stage all</button>
           <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !changes.some((c) => c.staged)} onClick={unstageAll}>Unstage all</button>
+          <div className="flex-1" />
+          <span className="text-[11px] text-[var(--taomni-text-muted)]">{checkedCount}/{changes.length}</span>
+          <button
+            className="taomni-btn h-7 px-2"
+            type="button"
+            title={treeMode ? "Switch to flat list" : "Switch to directory tree"}
+            onClick={() => setTreeMode(!treeMode)}
+          >
+            {treeMode ? <ListTree className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
+          </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-auto">
-          {changes.length === 0 ? (
-            <EmptyState title="No local changes" />
-          ) : changes.map((change) => (
-            <button
-              key={`${change.status}-${change.path}`}
-              type="button"
-              className={`w-full px-3 py-2 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selectedPath === change.path ? "bg-[var(--taomni-hover)]" : ""}`}
-              onClick={() => setSelectedPath(change.path)}
-            >
-              <StatusPill change={change} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px]">{change.path}</div>
-                {change.oldPath && <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">from {change.oldPath}</div>}
-              </div>
-            </button>
-          ))}
-        </div>
+        <ChangesTree
+          changes={changes}
+          treeMode={treeMode}
+          checked={checked}
+          onToggleChecked={onToggleChecked}
+          selected={selected}
+          activePath={activePath}
+          onSelect={onSelect}
+          onContextMenu={onContextMenu}
+        />
         <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2 space-y-2">
           <textarea
             className="taomni-input w-full min-h-20 resize-none"
@@ -455,88 +754,34 @@ function ChangesView({
             placeholder="Commit message"
             onChange={(event) => setCommitMessage(event.target.value)}
           />
-          <div className="flex items-center gap-1">
-            <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !commitMessage.trim()} onClick={commit}>Commit</button>
-            <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !commitMessage.trim()} onClick={amend}>Amend</button>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-[12px] select-none">
+              <input type="checkbox" checked={amendChecked} onChange={(e) => setAmendChecked(e.target.checked)} />
+              Amend
+            </label>
+            <div className="flex-1" />
+            <button className="taomni-btn h-7 px-2" type="button" disabled={!canCommit} onClick={commit}>
+              Commit{checkedCount ? ` (${checkedCount})` : ""}
+            </button>
+            <button className="taomni-btn h-7 px-2" type="button" disabled={!canCommit || !hasRemote} onClick={commitAndPush}>
+              Commit and Push
+            </button>
           </div>
         </div>
       </Panel>
       <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
-      <Panel id="changes-diff" defaultSize={68} minSize={35} className="min-w-0 min-h-0 flex flex-col">
+      <Panel id="changes-diff" defaultSize={64} minSize={35} className="min-w-0 min-h-0 flex flex-col">
         <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-          <span className="font-semibold truncate text-[12px]">{selected?.path ?? "Diff"}</span>
+          <span className="font-semibold truncate text-[12px]">
+            {active?.path ?? "Diff"}
+            {opCount > 1 ? ` (+${opCount - 1} selected)` : ""}
+          </span>
           <div className="flex-1" />
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={stageSelected}>Stage</button>
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected?.staged} onClick={unstageSelected}>Unstage</button>
-          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected} onClick={discardSelected}>Discard</button>
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || opCount === 0} onClick={stageSelected}>Stage</button>
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || opCount === 0} onClick={unstageSelected}>Unstage</button>
+          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || opCount === 0} onClick={discardSelected}>Discard</button>
         </div>
-        <DiffPane diff={diff} loading={diffLoading} />
-      </Panel>
-    </PanelGroup>
-  );
-}
-
-function LogView({
-  entries,
-  selected,
-  setSelected,
-  diff,
-  diffLoading,
-  busy,
-  onCherryPick,
-  onRevert,
-  onReset,
-}: {
-  entries: GitLogEntry[];
-  selected: GitLogEntry | null;
-  setSelected: (entry: GitLogEntry) => void;
-  diff: string;
-  diffLoading: boolean;
-  busy: boolean;
-  onCherryPick: () => void;
-  onRevert: () => void;
-  onReset: (mode: GitResetMode) => void;
-}) {
-  return (
-    <PanelGroup orientation="horizontal" id="git-log-layout">
-      <Panel id="log-list" defaultSize={38} minSize={26} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
-        <div className="h-9 shrink-0 flex items-center px-3 border-b border-[var(--taomni-divider)] text-[12px] font-semibold">Commit Log</div>
-        <div className="flex-1 min-h-0 overflow-auto">
-          {entries.length === 0 ? <EmptyState title="No commits" /> : entries.map((entry) => (
-            <button
-              key={entry.oid}
-              type="button"
-              className={`w-full px-3 py-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected?.oid === entry.oid ? "bg-[var(--taomni-hover)]" : ""}`}
-              onClick={() => setSelected(entry)}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="taomni-mono text-[11px] text-[var(--taomni-accent)]">{entry.shortOid}</span>
-                <span className="truncate text-[12px]">{entry.subject}</span>
-              </div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">{entry.authorName} · {formatDate(entry.date)}</div>
-            </button>
-          ))}
-        </div>
-      </Panel>
-      <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
-      <Panel id="log-diff" defaultSize={62} minSize={35} className="min-w-0 min-h-0 flex flex-col">
-        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-          <span className="font-semibold truncate text-[12px]">{selected ? `${selected.shortOid} · ${selected.subject}` : "Commit"}</span>
-          <div className="flex-1" />
-          <IconButton label="Cherry-pick" icon={<GitCommitHorizontal className="w-3.5 h-3.5" />} disabled={busy || !selected} onClick={onCherryPick} />
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={onRevert}>Revert</button>
-          <select className="taomni-input h-7 w-28" disabled={busy || !selected} defaultValue="" onChange={(event) => {
-            const mode = event.target.value as GitResetMode | "";
-            event.target.value = "";
-            if (mode) onReset(mode);
-          }}>
-            <option value="">Reset...</option>
-            <option value="soft">Soft</option>
-            <option value="mixed">Mixed</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-        <DiffPane diff={diff} loading={diffLoading} />
+        <DiffViewer pair={pair} loading={pairLoading} emptyLabel="Select a file to preview its diff" />
       </Panel>
     </PanelGroup>
   );
@@ -551,6 +796,10 @@ function BranchesView({
   onCheckout,
   onMerge,
   onDelete,
+  onRename,
+  onPush,
+  onSetUpstream,
+  onCompare,
 }: {
   snapshot: GitSnapshot | null;
   selected: GitBranchInfo | null;
@@ -560,18 +809,21 @@ function BranchesView({
   onCheckout: () => void;
   onMerge: () => void;
   onDelete: () => void;
+  onRename: () => void;
+  onPush: () => void;
+  onSetUpstream: () => void;
+  onCompare: () => void;
 }) {
   const branches = snapshot?.branches ?? [];
-  return (
-    <div className="h-full min-h-0 flex flex-col">
-      <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-        <IconButton label="New branch" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current} onClick={onCheckout}>Checkout</button>
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onMerge}>Merge into current</button>
-        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onDelete}>Delete local</button>
-      </div>
-      <div className="flex-1 min-h-0 overflow-auto">
-        {branches.length === 0 ? <EmptyState title="No branches" /> : branches.map((branch) => (
+  const local = branches.filter((b) => !b.remote);
+  const remote = branches.filter((b) => b.remote);
+  const renderGroup = (label: string, list: GitBranchInfo[]) =>
+    list.length === 0 ? null : (
+      <div>
+        <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-quick-bg)] border-b border-[var(--taomni-divider)]">
+          {label} ({list.length})
+        </div>
+        {list.map((branch) => (
           <button
             key={branch.fullName}
             type="button"
@@ -582,10 +834,84 @@ function BranchesView({
             <div className="min-w-0 flex-1">
               <div className="text-[12px] truncate">{branch.name}</div>
               <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                {branch.remote ? "remote" : "local"}{branch.upstream ? ` · tracks ${branch.upstream}` : ""}{branch.subject ? ` · ${branch.subject}` : ""}
+                {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
+                {branch.subject ? ` · ${branch.subject}` : ""}
               </div>
             </div>
             {branch.current && <span className="text-[11px] text-[var(--taomni-accent)]">current</span>}
+          </button>
+        ))}
+      </div>
+    );
+  const localSel = !!selected && !selected.remote;
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)] overflow-x-auto">
+        <IconButton label="New" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current} onClick={onCheckout}>Checkout</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onMerge}>Merge</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={onCompare}>Compare</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onRename}>Rename</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onPush}>Push</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onSetUpstream}>Upstream</button>
+        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onDelete}>Delete</button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {branches.length === 0 ? <EmptyState title="No branches" /> : (
+          <>
+            {renderGroup("Local", local)}
+            {renderGroup("Remote", remote)}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TagsView({
+  snapshot,
+  busy,
+  hasRemote,
+  onCreate,
+  onCheckout,
+  onDelete,
+  onPush,
+}: {
+  snapshot: GitSnapshot | null;
+  busy: boolean;
+  hasRemote: boolean;
+  onCreate: () => void;
+  onCheckout: (tag: GitTag) => void;
+  onDelete: (tag: GitTag) => void;
+  onPush: (tag: GitTag) => void;
+}) {
+  const tags = snapshot?.tags ?? [];
+  const [selected, setSelected] = useState<string | null>(null);
+  const current = tags.find((t) => t.name === selected) ?? null;
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
+        <IconButton label="New tag" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current} onClick={() => current && onCheckout(current)}>Checkout</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current || !hasRemote} onClick={() => current && onPush(current)}>Push</button>
+        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !current} onClick={() => current && onDelete(current)}>Delete</button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {tags.length === 0 ? <EmptyState title="No tags" /> : tags.map((tag) => (
+          <button
+            key={tag.name}
+            type="button"
+            className={`w-full px-3 py-2 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected === tag.name ? "bg-[var(--taomni-hover)]" : ""}`}
+            onClick={() => setSelected(tag.name)}
+          >
+            <GitCommitHorizontal className="w-4 h-4 text-[var(--taomni-text-muted)]" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] truncate">{tag.name}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
+                {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
+              </div>
+            </div>
           </button>
         ))}
       </div>
@@ -804,17 +1130,6 @@ function BranchBadge({ snapshot }: { snapshot: GitSnapshot | null }) {
   );
 }
 
-function StatusPill({ change }: { change: GitChange }) {
-  const color = change.conflict
-    ? "bg-red-500/15 text-red-500"
-    : change.status === "untracked"
-      ? "bg-amber-500/15 text-amber-500"
-      : change.staged
-        ? "bg-emerald-500/15 text-emerald-500"
-        : "bg-blue-500/15 text-blue-500";
-  return <span className={`w-20 text-center rounded px-1 py-0.5 text-[10px] uppercase ${color}`}>{gitChangeLabel(change)}</span>;
-}
-
 function IconButton({ label, icon, disabled, onClick }: { label: string; icon: React.ReactNode; disabled?: boolean; onClick: () => void }) {
   return (
     <button className="taomni-btn h-7 px-2 inline-flex items-center gap-1" type="button" disabled={disabled} onClick={onClick} title={label}>
@@ -869,20 +1184,107 @@ function errorMessage(error: unknown): string {
   return typeof error === "string" ? error : String(error);
 }
 
-function formatDate(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
-
 async function confirmAndRun(title: string, message: string, danger: boolean, action: () => Promise<void>) {
   const ok = await confirmAppDialog({ title, message, danger, confirmLabel: title });
   if (ok) await action();
 }
 
+function changeMenuItems(opts: {
+  repoRoot: string;
+  opPaths: string[];
+  conflicted: boolean;
+  onStage: () => void;
+  onUnstage: () => void;
+  onDiscard: () => void;
+  onShowDiff: () => void;
+  onShowHistory: () => void;
+  onAcceptOurs: () => void;
+  onAcceptTheirs: () => void;
+  onMarkResolved: () => void;
+}): MenuItem[] {
+  const { repoRoot, opPaths, conflicted, onStage, onUnstage, onDiscard, onShowDiff } = opts;
+  const sep = repoRoot.includes("\\") ? "\\" : "/";
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => {});
+  };
+  const disabled = opPaths.length === 0;
+  const items: MenuItem[] = [
+    { label: "Show diff", disabled, onClick: onShowDiff },
+    { label: "Show history", disabled: opPaths.length !== 1, onClick: opts.onShowHistory },
+  ];
+  if (conflicted) {
+    items.push(
+      { label: "", separator: true },
+      { label: "Accept ours", onClick: opts.onAcceptOurs },
+      { label: "Accept theirs", onClick: opts.onAcceptTheirs },
+      { label: "Mark resolved", onClick: opts.onMarkResolved },
+    );
+  }
+  items.push(
+    { label: "", separator: true },
+    { label: "Stage", disabled, onClick: onStage },
+    { label: "Unstage", disabled, onClick: onUnstage },
+    { label: "Discard…", disabled, danger: true, onClick: onDiscard },
+    { label: "", separator: true },
+    {
+      label: opPaths.length > 1 ? `Copy paths (${opPaths.length})` : "Copy path",
+      disabled,
+      onClick: () => copy(opPaths.map((p) => `${repoRoot}${sep}${p.split("/").join(sep)}`).join("\n")),
+    },
+    { label: "Copy relative path", disabled, onClick: () => copy(opPaths.join("\n")) },
+  );
+  return items;
+}
+
+function commitMenuItems(
+  entry: GitLogEntry,
+  handlers: {
+    onCherryPick: (e: GitLogEntry) => void;
+    onRevert: (e: GitLogEntry) => void;
+    onReset: (e: GitLogEntry, mode: GitResetMode) => void;
+    onNewBranch: (e: GitLogEntry) => void;
+  },
+): MenuItem[] {
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => {});
+  };
+  return [
+    { label: "Cherry-pick", onClick: () => handlers.onCherryPick(entry) },
+    { label: "Revert", onClick: () => handlers.onRevert(entry) },
+    {
+      label: "Reset current branch to here",
+      children: [
+        { label: "Soft", onClick: () => handlers.onReset(entry, "soft") },
+        { label: "Mixed", onClick: () => handlers.onReset(entry, "mixed") },
+        { label: "Hard", danger: true, onClick: () => handlers.onReset(entry, "hard") },
+      ],
+    },
+    { label: "New branch here…", onClick: () => handlers.onNewBranch(entry) },
+    { label: "", separator: true },
+    { label: "Copy revision hash", onClick: () => copy(entry.oid) },
+    { label: "Copy subject", onClick: () => copy(entry.subject) },
+  ];
+}
+
+function operationLabel(operation: GitOperationState | null): string {
+  switch (operation?.kind) {
+    case "merge":
+      return "Merge in progress.";
+    case "cherryPick":
+      return "Cherry-pick in progress.";
+    case "revert":
+      return "Revert in progress.";
+    case "rebase":
+      return "Rebase in progress.";
+    default:
+      return "Conflicts detected.";
+  }
+}
+
 async function checkoutBranch(
   repoRoot: string,
   branch: GitBranchInfo,
-  runAction: (label: string, action: () => Promise<void>, options?: { refreshLog?: boolean }) => Promise<void>,
+  runAction: (label: string, action: () => Promise<void>) => Promise<void>,
 ) {
   if (branch.remote) {
     const suggested = branch.name.split("/").slice(1).join("/") || branch.name;

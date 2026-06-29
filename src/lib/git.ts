@@ -21,6 +21,7 @@ export interface GitSnapshot {
   remotes: GitRemote[];
   branches: GitBranch[];
   stashes: GitStashEntry[];
+  tags: GitTag[];
   settings: GitRepoSettings;
 }
 
@@ -31,6 +32,22 @@ export interface GitChange {
   staged: boolean;
   unstaged: boolean;
   conflict: boolean;
+}
+
+export interface GitBlobPair {
+  path: string;
+  oldPath: string | null;
+  oldText: string | null;
+  newText: string | null;
+  oldExists: boolean;
+  newExists: boolean;
+  binary: boolean;
+  image: boolean;
+  oldImageB64: string | null;
+  newImageB64: string | null;
+  oversize: boolean;
+  oldSize: number;
+  newSize: number;
 }
 
 export interface GitRemote {
@@ -71,6 +88,19 @@ export interface GitLogEntry {
   authorEmail: string;
   date: string;
   subject: string;
+  refs: string[];
+}
+
+export interface GitLogFilter {
+  limit?: number | null;
+  skip?: number | null;
+  author?: string | null;
+  grep?: string | null;
+  path?: string | null;
+  all?: boolean | null;
+  after?: string | null;
+  before?: string | null;
+  branch?: string | null;
 }
 
 export interface GitStashEntry {
@@ -78,6 +108,20 @@ export interface GitStashEntry {
   oid: string;
   date: string;
   message: string;
+}
+
+export interface GitTag {
+  name: string;
+  oid: string;
+  subject: string | null;
+  annotated: boolean;
+}
+
+export type GitOperationKind = "merge" | "cherryPick" | "revert" | "rebase" | "none";
+
+export interface GitOperationState {
+  kind: GitOperationKind;
+  conflictedPaths: string[];
 }
 
 export type GitResetMode = "soft" | "mixed" | "hard";
@@ -108,6 +152,27 @@ export function gitDiff(
   return invoke<string>("git_diff", { repoRoot, path: path ?? null, staged, commit: commit ?? null });
 }
 
+// Ref tokens for gitBlobPair: ":WORKTREE" (file on disk), ":INDEX" (staged blob),
+// "" (side does not exist), or any revision (HEAD, a branch, a commit hash).
+export const GIT_REF_WORKTREE = ":WORKTREE";
+export const GIT_REF_INDEX = ":INDEX";
+
+export function gitBlobPair(
+  repoRoot: string,
+  path: string,
+  oldRef: string,
+  newRef: string,
+  oldPath?: string | null,
+): Promise<GitBlobPair> {
+  return invoke<GitBlobPair>("git_blob_pair", {
+    repoRoot,
+    path,
+    oldPath: oldPath ?? null,
+    oldRef,
+    newRef,
+  });
+}
+
 export function gitStage(repoRoot: string, paths: string[]): Promise<void> {
   return invoke("git_stage", { repoRoot, paths });
 }
@@ -124,8 +189,13 @@ export function gitCleanUntracked(repoRoot: string, paths: string[]): Promise<vo
   return invoke("git_clean_untracked", { repoRoot, paths });
 }
 
-export function gitCommit(repoRoot: string, message: string, amend = false): Promise<void> {
-  return invoke("git_commit", { repoRoot, message, amend });
+export function gitCommit(
+  repoRoot: string,
+  message: string,
+  amend = false,
+  paths?: string[] | null,
+): Promise<void> {
+  return invoke("git_commit", { repoRoot, message, amend, paths: paths ?? null });
 }
 
 export function gitFetch(repoRoot: string, remote?: string | null): Promise<void> {
@@ -182,8 +252,56 @@ export function gitMergeBranch(repoRoot: string, branch: string): Promise<void> 
   return invoke("git_merge_branch", { repoRoot, branch });
 }
 
-export function gitLog(repoRoot: string, limit = 120): Promise<GitLogEntry[]> {
-  return invoke<GitLogEntry[]>("git_log", { repoRoot, limit });
+export function gitRenameBranch(repoRoot: string, branch: string, newName: string): Promise<void> {
+  return invoke("git_rename_branch", { repoRoot, branch, newName });
+}
+
+export function gitSetUpstream(
+  repoRoot: string,
+  branch: string,
+  upstream?: string | null,
+): Promise<void> {
+  return invoke("git_set_upstream", { repoRoot, branch, upstream: upstream ?? null });
+}
+
+export function gitCreateTag(
+  repoRoot: string,
+  name: string,
+  target?: string | null,
+  message?: string | null,
+): Promise<void> {
+  return invoke("git_create_tag", { repoRoot, name, target: target ?? null, message: message ?? null });
+}
+
+export function gitDeleteTag(repoRoot: string, name: string): Promise<void> {
+  return invoke("git_delete_tag", { repoRoot, name });
+}
+
+export function gitPushTag(
+  repoRoot: string,
+  remote: string | null,
+  name: string,
+  del = false,
+): Promise<void> {
+  return withVaultLockedNotice(() =>
+    invoke("git_push_tag", { repoRoot, remote: remote ?? null, name, delete: del }),
+  );
+}
+
+export function gitCheckoutTag(repoRoot: string, name: string): Promise<void> {
+  return invoke("git_checkout_tag", { repoRoot, name });
+}
+
+export function gitLog(repoRoot: string, limit = 120, filter?: GitLogFilter): Promise<GitLogEntry[]> {
+  return invoke<GitLogEntry[]>("git_log", { repoRoot, limit, filter: filter ?? null });
+}
+
+export function gitCommitFiles(repoRoot: string, oid: string): Promise<GitChange[]> {
+  return invoke<GitChange[]>("git_commit_files", { repoRoot, oid });
+}
+
+export function gitCompare(repoRoot: string, refA: string, refB: string): Promise<GitChange[]> {
+  return invoke<GitChange[]>("git_compare", { repoRoot, refA, refB });
 }
 
 export function gitReset(repoRoot: string, target: string, mode: GitResetMode): Promise<void> {
@@ -204,6 +322,34 @@ export function gitCherryPickContinue(repoRoot: string): Promise<void> {
 
 export function gitCherryPickAbort(repoRoot: string): Promise<void> {
   return invoke("git_cherry_pick_abort", { repoRoot });
+}
+
+export function gitOperationState(repoRoot: string): Promise<GitOperationState> {
+  return invoke<GitOperationState>("git_operation_state", { repoRoot });
+}
+
+export function gitOperationContinue(repoRoot: string, kind: GitOperationKind): Promise<void> {
+  return invoke("git_operation_continue", { repoRoot, kind });
+}
+
+export function gitOperationAbort(repoRoot: string, kind: GitOperationKind): Promise<void> {
+  return invoke("git_operation_abort", { repoRoot, kind });
+}
+
+export function gitRebase(repoRoot: string, onto: string): Promise<void> {
+  return invoke("git_rebase", { repoRoot, onto });
+}
+
+export function gitRebaseSkip(repoRoot: string): Promise<void> {
+  return invoke("git_rebase_skip", { repoRoot });
+}
+
+export function gitResolveConflict(
+  repoRoot: string,
+  path: string,
+  side: "ours" | "theirs",
+): Promise<void> {
+  return invoke("git_resolve_conflict", { repoRoot, path, side });
 }
 
 export function gitStashSave(

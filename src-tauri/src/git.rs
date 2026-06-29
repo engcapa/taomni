@@ -1,5 +1,6 @@
 use crate::state::AppState;
 use crate::vault::Vault;
+use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -31,6 +32,7 @@ pub struct GitSnapshot {
     pub remotes: Vec<GitRemote>,
     pub branches: Vec<GitBranch>,
     pub stashes: Vec<GitStashEntry>,
+    pub tags: Vec<GitTag>,
     pub settings: GitRepoSettings,
 }
 
@@ -91,6 +93,21 @@ pub struct GitLogEntry {
     pub author_email: String,
     pub date: String,
     pub subject: String,
+    pub refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitLogFilter {
+    pub limit: Option<u32>,
+    pub skip: Option<u32>,
+    pub author: Option<String>,
+    pub grep: Option<String>,
+    pub path: Option<String>,
+    pub all: Option<bool>,
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub branch: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,9 +121,44 @@ pub struct GitStashEntry {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GitTag {
+    pub name: String,
+    pub oid: String,
+    pub subject: Option<String>,
+    pub annotated: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GitRemoteAuthResult {
     pub username: Option<String>,
     pub token_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBlobPair {
+    pub path: String,
+    pub old_path: Option<String>,
+    pub old_text: Option<String>,
+    pub new_text: Option<String>,
+    pub old_exists: bool,
+    pub new_exists: bool,
+    pub binary: bool,
+    pub image: bool,
+    pub old_image_b64: Option<String>,
+    pub new_image_b64: Option<String>,
+    pub oversize: bool,
+    pub old_size: u64,
+    pub new_size: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitOperationState {
+    /// "merge" | "cherryPick" | "revert" | "rebase" | "none"
+    pub kind: String,
+    pub conflicted_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -180,6 +232,33 @@ pub async fn git_diff(
     .await
 }
 
+/// Fetch the old/new byte content of a path for a structured (side-by-side) diff.
+///
+/// `old_ref` / `new_ref` accept the special tokens `:WORKTREE` (read the file from
+/// disk), `:INDEX` (the staged blob), an empty string (the side does not exist), or
+/// any revision (`HEAD`, a branch, a commit) resolved as `<rev>:<path>`.
+#[tauri::command]
+pub async fn git_blob_pair(
+    repo_root: String,
+    path: String,
+    old_path: Option<String>,
+    old_ref: String,
+    new_ref: String,
+) -> Result<GitBlobPair, String> {
+    blocking(move || {
+        let root = PathBuf::from(repo_root);
+        ensure_repo(&root)?;
+        let old_target = old_path
+            .clone()
+            .and_then(|p| non_empty_string(&p))
+            .unwrap_or_else(|| path.clone());
+        let old_bytes = read_blob_bytes(&root, &old_ref, &old_target)?;
+        let new_bytes = read_blob_bytes(&root, &new_ref, &path)?;
+        Ok(build_blob_pair(path, old_path, old_bytes, new_bytes))
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn git_stage(repo_root: String, paths: Vec<String>) -> Result<(), String> {
     blocking(move || {
@@ -233,20 +312,51 @@ pub async fn git_clean_untracked(repo_root: String, paths: Vec<String>) -> Resul
 }
 
 #[tauri::command]
-pub async fn git_commit(repo_root: String, message: String, amend: bool) -> Result<(), String> {
-    blocking(move || {
-        let root = PathBuf::from(repo_root);
-        let trimmed = message.trim();
-        if trimmed.is_empty() {
-            return Err("commit message is required".to_string());
-        }
-        let mut args = vec!["commit".to_string(), "-m".to_string(), trimmed.to_string()];
-        if amend {
-            args.push("--amend".into());
-        }
-        run_git_strings(Some(&root), args).map(|_| ())
-    })
-    .await
+pub async fn git_commit(
+    repo_root: String,
+    message: String,
+    amend: bool,
+    paths: Option<Vec<String>>,
+) -> Result<(), String> {
+    blocking(move || commit_changes(&PathBuf::from(repo_root), &message, amend, paths)).await
+}
+
+/// Create a commit. When `paths` is `Some` and non-empty, only those paths are
+/// committed: they are staged first (covering modified, untracked, deleted and
+/// renamed states) and `commit --only -- <paths>` keeps any other already-staged
+/// files out of this commit, matching IntelliJ's "commit checked items" behaviour.
+fn commit_changes(
+    root: &Path,
+    message: &str,
+    amend: bool,
+    paths: Option<Vec<String>>,
+) -> Result<(), String> {
+    let trimmed = message.trim();
+    if trimmed.is_empty() {
+        return Err("commit message is required".to_string());
+    }
+    let selected = paths
+        .map(|p| {
+            p.into_iter()
+                .filter_map(|s| non_empty_string(&s))
+                .collect::<Vec<_>>()
+        })
+        .filter(|p| !p.is_empty());
+    if let Some(selected) = &selected {
+        let mut add_args = vec!["add".to_string(), "--all".to_string(), "--".to_string()];
+        add_args.extend(selected.clone());
+        run_git_strings(Some(root), add_args)?;
+    }
+    let mut args = vec!["commit".to_string(), "-m".to_string(), trimmed.to_string()];
+    if amend {
+        args.push("--amend".into());
+    }
+    if let Some(selected) = selected {
+        args.push("--only".into());
+        args.push("--".into());
+        args.extend(selected);
+    }
+    run_git_strings(Some(root), args).map(|_| ())
 }
 
 #[tauri::command]
@@ -378,8 +488,179 @@ pub async fn git_merge_branch(repo_root: String, branch: String) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn git_log(repo_root: String, limit: Option<u32>) -> Result<Vec<GitLogEntry>, String> {
-    blocking(move || list_log(&PathBuf::from(repo_root), limit.unwrap_or(120))).await
+pub async fn git_rename_branch(
+    repo_root: String,
+    branch: String,
+    new_name: String,
+) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("branch", &branch)?;
+        require_non_empty("new name", &new_name)?;
+        run_git_in(
+            Some(Path::new(&repo_root)),
+            ["branch", "-m", branch.as_str(), new_name.as_str()],
+        )
+        .map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_set_upstream(
+    repo_root: String,
+    branch: String,
+    upstream: Option<String>,
+) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("branch", &branch)?;
+        let root = PathBuf::from(repo_root);
+        match upstream.and_then(|s| non_empty_string(&s)) {
+            Some(upstream) => run_git_strings(
+                Some(&root),
+                vec![
+                    "branch".into(),
+                    "--set-upstream-to".into(),
+                    upstream,
+                    branch,
+                ],
+            )
+            .map(|_| ()),
+            None => run_git_strings(
+                Some(&root),
+                vec!["branch".into(), "--unset-upstream".into(), branch],
+            )
+            .map(|_| ()),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_create_tag(
+    repo_root: String,
+    name: String,
+    target: Option<String>,
+    message: Option<String>,
+) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("tag name", &name)?;
+        let root = PathBuf::from(repo_root);
+        let mut args = vec!["tag".to_string()];
+        if let Some(message) = message.and_then(|s| non_empty_string(&s)) {
+            args.push("-a".into());
+            args.push(name.clone());
+            args.push("-m".into());
+            args.push(message);
+        } else {
+            args.push(name.clone());
+        }
+        if let Some(target) = target.and_then(|s| non_empty_string(&s)) {
+            args.push(target);
+        }
+        run_git_strings(Some(&root), args).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_delete_tag(repo_root: String, name: String) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("tag name", &name)?;
+        run_git_in(Some(Path::new(&repo_root)), ["tag", "-d", name.as_str()]).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_push_tag(
+    repo_root: String,
+    remote: Option<String>,
+    name: String,
+    delete: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let vault = state.vault.clone();
+    blocking(move || {
+        require_non_empty("tag name", &name)?;
+        let root = PathBuf::from(repo_root);
+        let remote = remote.filter(|s| !s.trim().is_empty());
+        let mut args = vec!["push".to_string()];
+        args.push(remote.clone().unwrap_or_else(|| "origin".into()));
+        if delete {
+            args.push("--delete".into());
+        }
+        args.push(format!("refs/tags/{name}"));
+        run_git_authed(&root, args, vault, remote.as_deref()).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_checkout_tag(repo_root: String, name: String) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("tag name", &name)?;
+        run_git_in(Some(Path::new(&repo_root)), ["checkout", name.as_str()]).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_log(
+    repo_root: String,
+    limit: Option<u32>,
+    filter: Option<GitLogFilter>,
+) -> Result<Vec<GitLogEntry>, String> {
+    blocking(move || {
+        let mut filter = filter.unwrap_or_default();
+        if filter.limit.is_none() {
+            filter.limit = Some(limit.unwrap_or(120));
+        }
+        list_log(&PathBuf::from(repo_root), &filter)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_commit_files(repo_root: String, oid: String) -> Result<Vec<GitChange>, String> {
+    blocking(move || {
+        require_non_empty("oid", &oid)?;
+        let out = run_git_strings(
+            Some(Path::new(&repo_root)),
+            vec![
+                "show".into(),
+                "--name-status".into(),
+                "--format=".into(),
+                "--find-renames".into(),
+                oid,
+            ],
+        )?;
+        Ok(parse_name_status(&out))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_compare(
+    repo_root: String,
+    ref_a: String,
+    ref_b: String,
+) -> Result<Vec<GitChange>, String> {
+    blocking(move || {
+        require_non_empty("ref_a", &ref_a)?;
+        require_non_empty("ref_b", &ref_b)?;
+        let out = run_git_strings(
+            Some(Path::new(&repo_root)),
+            vec![
+                "diff".into(),
+                "--name-status".into(),
+                "--find-renames".into(),
+                ref_a,
+                ref_b,
+            ],
+        )?;
+        Ok(parse_name_status(&out))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -438,6 +719,77 @@ pub async fn git_cherry_pick_continue(repo_root: String) -> Result<(), String> {
 pub async fn git_cherry_pick_abort(repo_root: String) -> Result<(), String> {
     blocking(move || {
         run_git_in(Some(Path::new(&repo_root)), ["cherry-pick", "--abort"]).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_operation_state(repo_root: String) -> Result<GitOperationState, String> {
+    blocking(move || {
+        let root = PathBuf::from(repo_root);
+        ensure_repo(&root)?;
+        let kind = detect_operation(&root);
+        Ok(GitOperationState {
+            conflicted_paths: conflicted_paths(&root),
+            kind,
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_operation_continue(repo_root: String, kind: String) -> Result<(), String> {
+    blocking(move || {
+        let cmd = operation_command(&kind)?;
+        // GIT_EDITOR=true keeps the prepared commit message without an interactive editor.
+        run_git_no_editor(Path::new(&repo_root), vec![cmd.into(), "--continue".into()]).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_operation_abort(repo_root: String, kind: String) -> Result<(), String> {
+    blocking(move || {
+        let cmd = operation_command(&kind)?;
+        run_git_in(Some(Path::new(&repo_root)), [cmd, "--abort"]).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_rebase(repo_root: String, onto: String) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("onto", &onto)?;
+        run_git_no_editor(Path::new(&repo_root), vec!["rebase".into(), onto]).map(|_| ())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_rebase_skip(repo_root: String) -> Result<(), String> {
+    blocking(move || run_git_in(Some(Path::new(&repo_root)), ["rebase", "--skip"]).map(|_| ()))
+        .await
+}
+
+#[tauri::command]
+pub async fn git_resolve_conflict(
+    repo_root: String,
+    path: String,
+    side: String,
+) -> Result<(), String> {
+    blocking(move || {
+        require_non_empty("path", &path)?;
+        let root = PathBuf::from(repo_root);
+        let flag = match side.as_str() {
+            "ours" => "--ours",
+            "theirs" => "--theirs",
+            other => return Err(format!("unknown conflict side: {other}")),
+        };
+        run_git_strings(
+            Some(&root),
+            vec!["checkout".into(), flag.into(), "--".into(), path.clone()],
+        )?;
+        run_git_strings(Some(&root), vec!["add".into(), "--".into(), path]).map(|_| ())
     })
     .await
 }
@@ -651,6 +1003,7 @@ fn snapshot(root: &Path) -> Result<GitSnapshot, String> {
         remotes: list_remotes(root)?,
         branches: list_branches(root)?,
         stashes: list_stashes(root)?,
+        tags: list_tags(root).unwrap_or_default(),
         settings: load_settings(root),
     })
 }
@@ -902,18 +1255,46 @@ fn list_branches(root: &Path) -> Result<Vec<GitBranch>, String> {
     Ok(branches)
 }
 
-fn list_log(root: &Path, limit: u32) -> Result<Vec<GitLogEntry>, String> {
-    let limit = limit.clamp(1, 500).to_string();
-    let raw = run_git_in(
-        Some(root),
-        [
-            "log",
-            "--date=iso-strict",
-            "--pretty=format:%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%s",
-            "-n",
-            limit.as_str(),
-        ],
-    )?;
+fn list_log(root: &Path, filter: &GitLogFilter) -> Result<Vec<GitLogEntry>, String> {
+    let limit = filter.limit.unwrap_or(120).clamp(1, 2000).to_string();
+    let mut args: Vec<String> = vec![
+        "log".into(),
+        "--date=iso-strict".into(),
+        "--pretty=format:%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%s%x1f%D".into(),
+        "-n".into(),
+        limit,
+    ];
+    if let Some(skip) = filter.skip.filter(|n| *n > 0) {
+        args.push("--skip".into());
+        args.push(skip.to_string());
+    }
+    if let Some(author) = filter.author.as_deref().and_then(non_empty_string) {
+        args.push("--author".into());
+        args.push(author);
+    }
+    if let Some(grep) = filter.grep.as_deref().and_then(non_empty_string) {
+        args.push("-i".into());
+        args.push("--grep".into());
+        args.push(grep);
+    }
+    if let Some(after) = filter.after.as_deref().and_then(non_empty_string) {
+        args.push("--after".into());
+        args.push(after);
+    }
+    if let Some(before) = filter.before.as_deref().and_then(non_empty_string) {
+        args.push("--before".into());
+        args.push(before);
+    }
+    if let Some(branch) = filter.branch.as_deref().and_then(non_empty_string) {
+        args.push(branch);
+    } else if filter.all.unwrap_or(false) {
+        args.push("--all".into());
+    }
+    if let Some(path) = filter.path.as_deref().and_then(non_empty_string) {
+        args.push("--".into());
+        args.push(path);
+    }
+    let raw = run_git_strings(Some(root), args)?;
     let mut entries = Vec::new();
     for line in raw.lines() {
         let parts: Vec<_> = line.split('\x1f').collect();
@@ -931,9 +1312,89 @@ fn list_log(root: &Path, limit: u32) -> Result<Vec<GitLogEntry>, String> {
             author_email: parts[4].to_string(),
             date: parts[5].to_string(),
             subject: parts[6].to_string(),
+            refs: parts.get(7).map(|d| parse_refs(d)).unwrap_or_default(),
         });
     }
     Ok(entries)
+}
+
+/// Parse a `%D` decoration string ("HEAD -> main, origin/main, tag: v1") into
+/// short ref labels for chips.
+fn parse_refs(decoration: &str) -> Vec<String> {
+    decoration
+        .split(", ")
+        .filter_map(|token| {
+            let token = token.trim();
+            let cleaned = token
+                .strip_prefix("HEAD -> ")
+                .or_else(|| token.strip_prefix("tag: "))
+                .unwrap_or(token);
+            non_empty_string(cleaned)
+        })
+        .filter(|t| t != "HEAD")
+        .collect()
+}
+
+fn parse_name_status(output: &str) -> Vec<GitChange> {
+    let mut out = Vec::new();
+    for line in output.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut parts = line.split('\t');
+        let code = parts.next().unwrap_or("");
+        let c0 = code.chars().next().unwrap_or(' ');
+        let (old_path, path) = match c0 {
+            'R' | 'C' => {
+                let old = parts.next().map(unquote_path);
+                let new = parts.next().map(unquote_path).or_else(|| old.clone());
+                (old, new.unwrap_or_default())
+            }
+            _ => (None, parts.next().map(unquote_path).unwrap_or_default()),
+        };
+        let status = match c0 {
+            'A' => "added",
+            'D' => "deleted",
+            'R' => "renamed",
+            'C' => "copied",
+            _ => "modified",
+        };
+        out.push(GitChange {
+            path,
+            old_path,
+            status: status.to_string(),
+            staged: false,
+            unstaged: false,
+            conflict: false,
+        });
+    }
+    out
+}
+
+fn list_tags(root: &Path) -> Result<Vec<GitTag>, String> {
+    let raw = run_git_in(
+        Some(root),
+        [
+            "for-each-ref",
+            "refs/tags",
+            "--sort=-creatordate",
+            "--format=%(refname:short)%1f%(objectname:short)%1f%(objecttype)%1f%(contents:subject)",
+        ],
+    )?;
+    let mut tags = Vec::new();
+    for line in raw.lines() {
+        let parts: Vec<_> = line.split('\x1f').collect();
+        if parts.len() < 4 {
+            continue;
+        }
+        tags.push(GitTag {
+            name: parts[0].to_string(),
+            oid: parts[1].to_string(),
+            annotated: parts[2] == "tag",
+            subject: non_empty_string(parts[3]),
+        });
+    }
+    Ok(tags)
 }
 
 fn list_stashes(root: &Path) -> Result<Vec<GitStashEntry>, String> {
@@ -975,6 +1436,7 @@ fn run_git_strings(cwd: Option<&Path>, args: Vec<String>) -> Result<String, Stri
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
     }
+    apply_stable_locale(&mut command);
     for arg in args {
         command.arg(arg);
     }
@@ -982,6 +1444,14 @@ fn run_git_strings(cwd: Option<&Path>, args: Vec<String>) -> Result<String, Stri
         .output()
         .map_err(|e| format!("failed to start git: {e}"))?;
     command_output(output)
+}
+
+/// Force git to emit machine-stable English output. Porcelain strings such as
+/// "No commits yet on", "[ahead N]" and rename markers are localized otherwise,
+/// which breaks status/branch parsing for users on non-English git locales.
+fn apply_stable_locale(command: &mut Command) {
+    command.env("LC_ALL", "C");
+    command.env("LANG", "C");
 }
 
 fn run_git_authed(
@@ -1008,6 +1478,7 @@ fn run_git_authed(
     let askpass = write_askpass_script()?;
     let mut command = Command::new("git");
     command.current_dir(root);
+    apply_stable_locale(&mut command);
     for arg in args {
         command.arg(arg);
     }
@@ -1163,6 +1634,177 @@ fn non_empty_string(value: &str) -> Option<String> {
     }
 }
 
+const MAX_DIFF_BYTES: usize = 2_000_000;
+
+fn read_blob_bytes(root: &Path, reference: &str, path: &str) -> Result<Option<Vec<u8>>, String> {
+    let reference = reference.trim();
+    if reference.is_empty() {
+        return Ok(None);
+    }
+    if reference == ":WORKTREE" {
+        let full = root.join(path);
+        return match fs::read(&full) {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(format!("failed to read {path}: {e}")),
+        };
+    }
+    let spec = if reference == ":INDEX" {
+        format!(":{path}")
+    } else {
+        format!("{reference}:{path}")
+    };
+    let output = Command::new("git")
+        .current_dir(root)
+        .env("LC_ALL", "C")
+        .env("LANG", "C")
+        .args(["show", spec.as_str()])
+        .output()
+        .map_err(|e| format!("failed to start git: {e}"))?;
+    // A path that does not exist at the requested ref is "absent" rather than an
+    // error: that is the added/deleted side of a diff.
+    if output.status.success() {
+        Ok(Some(output.stdout))
+    } else {
+        Ok(None)
+    }
+}
+
+fn build_blob_pair(
+    path: String,
+    old_path: Option<String>,
+    old_bytes: Option<Vec<u8>>,
+    new_bytes: Option<Vec<u8>>,
+) -> GitBlobPair {
+    let old_exists = old_bytes.is_some();
+    let new_exists = new_bytes.is_some();
+    let old_size = old_bytes.as_ref().map(|b| b.len() as u64).unwrap_or(0);
+    let new_size = new_bytes.as_ref().map(|b| b.len() as u64).unwrap_or(0);
+    let image = is_image_path(&path);
+    let oversize = old_size as usize > MAX_DIFF_BYTES || new_size as usize > MAX_DIFF_BYTES;
+
+    if image && !oversize {
+        return GitBlobPair {
+            path,
+            old_path,
+            old_text: None,
+            new_text: None,
+            old_exists,
+            new_exists,
+            binary: true,
+            image: true,
+            old_image_b64: old_bytes.as_deref().map(|b| B64.encode(b)),
+            new_image_b64: new_bytes.as_deref().map(|b| B64.encode(b)),
+            oversize: false,
+            old_size,
+            new_size,
+        };
+    }
+
+    let binary = is_binary(old_bytes.as_deref()) || is_binary(new_bytes.as_deref());
+    let (old_text, new_text) = if binary || oversize {
+        (None, None)
+    } else {
+        (
+            old_bytes.map(|b| String::from_utf8_lossy(&b).into_owned()),
+            new_bytes.map(|b| String::from_utf8_lossy(&b).into_owned()),
+        )
+    };
+    GitBlobPair {
+        path,
+        old_path,
+        old_text,
+        new_text,
+        old_exists,
+        new_exists,
+        binary,
+        image: false,
+        old_image_b64: None,
+        new_image_b64: None,
+        oversize,
+        old_size,
+        new_size,
+    }
+}
+
+fn is_binary(bytes: Option<&[u8]>) -> bool {
+    match bytes {
+        Some(b) => b.iter().take(8000).any(|&c| c == 0),
+        None => false,
+    }
+}
+
+fn is_image_path(path: &str) -> bool {
+    let ext = path.rsplit('.').next().map(|e| e.to_ascii_lowercase());
+    matches!(
+        ext.as_deref(),
+        Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "tiff" | "avif")
+    )
+}
+
+fn git_path(root: &Path, name: &str) -> Option<PathBuf> {
+    run_git_in(Some(root), ["rev-parse", "--git-path", name])
+        .ok()
+        .and_then(|s| non_empty_string(&s))
+        .map(|p| {
+            let pb = PathBuf::from(&p);
+            if pb.is_absolute() {
+                pb
+            } else {
+                root.join(pb)
+            }
+        })
+}
+
+/// Detect an in-progress operation that may be holding a conflict, so the UI can
+/// label continue/abort correctly (a long-standing bug: it always said "cherry-pick").
+fn detect_operation(root: &Path) -> String {
+    let exists = |name: &str| git_path(root, name).map(|p| p.exists()).unwrap_or(false);
+    if exists("rebase-merge") || exists("rebase-apply") {
+        "rebase".into()
+    } else if exists("MERGE_HEAD") {
+        "merge".into()
+    } else if exists("CHERRY_PICK_HEAD") {
+        "cherryPick".into()
+    } else if exists("REVERT_HEAD") {
+        "revert".into()
+    } else {
+        "none".into()
+    }
+}
+
+fn conflicted_paths(root: &Path) -> Vec<String> {
+    run_git_in(Some(root), ["diff", "--name-only", "--diff-filter=U"])
+        .ok()
+        .map(|s| s.lines().filter_map(non_empty_string).collect())
+        .unwrap_or_default()
+}
+
+fn operation_command(kind: &str) -> Result<&'static str, String> {
+    match kind {
+        "merge" => Ok("merge"),
+        "cherryPick" | "cherry-pick" => Ok("cherry-pick"),
+        "revert" => Ok("revert"),
+        "rebase" => Ok("rebase"),
+        other => Err(format!("unknown git operation: {other}")),
+    }
+}
+
+fn run_git_no_editor(root: &Path, args: Vec<String>) -> Result<String, String> {
+    let mut command = Command::new("git");
+    command.current_dir(root);
+    apply_stable_locale(&mut command);
+    command.env("GIT_EDITOR", "true");
+    command.env("GIT_TERMINAL_PROMPT", "0");
+    for arg in args {
+        command.arg(arg);
+    }
+    let output = command
+        .output()
+        .map_err(|e| format!("failed to start git: {e}"))?;
+    command_output(output)
+}
+
 fn require_non_empty(label: &str, value: &str) -> Result<(), String> {
     if value.trim().is_empty() {
         Err(format!("{label} is required"))
@@ -1271,7 +1913,14 @@ mod tests {
         run_git_in(Some(root), ["commit", "-m", "initial commit"]).unwrap();
         let clean = snapshot(root).unwrap();
         assert!(clean.changes.is_empty());
-        let log = list_log(root, 10).unwrap();
+        let log = list_log(
+            root,
+            &GitLogFilter {
+                limit: Some(10),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(log[0].subject, "initial commit");
 
         fs::write(root.join("readme.md"), "hello\nworld\n").unwrap();
@@ -1329,5 +1978,196 @@ mod tests {
             settings.http_proxy.as_deref(),
             Some("http://127.0.0.1:8080")
         );
+    }
+
+    #[test]
+    fn detects_image_and_binary_content() {
+        assert!(is_image_path("assets/logo.PNG"));
+        assert!(is_image_path("a/b/c.jpeg"));
+        assert!(!is_image_path("diagram.drawio"));
+        assert!(!is_image_path("src/main.rs"));
+        assert!(is_binary(Some(&[0x00, 0x01, 0x02])));
+        assert!(!is_binary(Some(b"plain text\n")));
+        assert!(!is_binary(None));
+    }
+
+    #[test]
+    fn blob_pair_handles_untracked_added_side() {
+        // No old side (empty ref) + new working-tree side => added file shown in full.
+        let pair = build_blob_pair(
+            "notes.txt".into(),
+            None,
+            None,
+            Some(b"line one\nline two\n".to_vec()),
+        );
+        assert!(!pair.old_exists);
+        assert!(pair.new_exists);
+        assert!(!pair.binary);
+        assert_eq!(pair.old_text, None);
+        assert_eq!(pair.new_text.as_deref(), Some("line one\nline two\n"));
+    }
+
+    #[test]
+    fn blob_pair_marks_images_with_base64() {
+        let pair = build_blob_pair(
+            "logo.png".into(),
+            None,
+            None,
+            Some(vec![0x89, 0x50, 0x4e, 0x47]),
+        );
+        assert!(pair.image);
+        assert!(pair.binary);
+        assert_eq!(pair.new_text, None);
+        assert_eq!(pair.new_image_b64.as_deref(), Some("iVBORw=="));
+    }
+
+    #[test]
+    fn reads_worktree_and_head_blobs() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "main"]).unwrap();
+        run_git_in(Some(root), ["config", "user.name", "Taomni Test"]).unwrap();
+        run_git_in(Some(root), ["config", "user.email", "t@example.test"]).unwrap();
+        fs::write(root.join("a.txt"), "v1\n").unwrap();
+        run_git_in(Some(root), ["add", "a.txt"]).unwrap();
+        run_git_in(Some(root), ["commit", "-m", "init"]).unwrap();
+        fs::write(root.join("a.txt"), "v2\n").unwrap();
+
+        let head = read_blob_bytes(root, "HEAD", "a.txt").unwrap();
+        assert_eq!(head.as_deref(), Some(b"v1\n".as_ref()));
+        let worktree = read_blob_bytes(root, ":WORKTREE", "a.txt").unwrap();
+        assert_eq!(worktree.as_deref(), Some(b"v2\n".as_ref()));
+        // Missing path at a ref is absent, not an error.
+        assert!(read_blob_bytes(root, "HEAD", "missing.txt")
+            .unwrap()
+            .is_none());
+        assert!(read_blob_bytes(root, "", "a.txt").unwrap().is_none());
+    }
+
+    #[test]
+    fn selective_commit_only_includes_chosen_paths() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "main"]).unwrap();
+        run_git_in(Some(root), ["config", "user.name", "Taomni Test"]).unwrap();
+        run_git_in(Some(root), ["config", "user.email", "t@example.test"]).unwrap();
+        fs::write(root.join("seed.txt"), "seed\n").unwrap();
+        run_git_in(Some(root), ["add", "seed.txt"]).unwrap();
+        run_git_in(Some(root), ["commit", "-m", "seed"]).unwrap();
+
+        // One untracked file we want, one staged file we do NOT want in this commit.
+        fs::write(root.join("wanted.txt"), "wanted\n").unwrap();
+        fs::write(root.join("other.txt"), "other\n").unwrap();
+        run_git_in(Some(root), ["add", "other.txt"]).unwrap();
+
+        commit_changes(
+            root,
+            "add wanted only",
+            false,
+            Some(vec!["wanted.txt".into()]),
+        )
+        .unwrap();
+
+        // wanted.txt is committed; other.txt remains staged (uncommitted).
+        let committed =
+            run_git_in(Some(root), ["show", "--name-only", "--format=", "HEAD"]).unwrap();
+        assert!(committed.contains("wanted.txt"));
+        assert!(!committed.contains("other.txt"));
+        let snap = snapshot(root).unwrap();
+        let other = snap.changes.iter().find(|c| c.path == "other.txt").unwrap();
+        assert!(other.staged);
+    }
+
+    #[test]
+    fn detects_merge_conflict_operation() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "main"]).unwrap();
+        run_git_in(Some(root), ["config", "user.name", "Taomni Test"]).unwrap();
+        run_git_in(Some(root), ["config", "user.email", "t@example.test"]).unwrap();
+        fs::write(root.join("f.txt"), "base\n").unwrap();
+        run_git_in(Some(root), ["add", "f.txt"]).unwrap();
+        run_git_in(Some(root), ["commit", "-m", "base"]).unwrap();
+        assert_eq!(detect_operation(root), "none");
+
+        run_git_in(Some(root), ["checkout", "-b", "feature"]).unwrap();
+        fs::write(root.join("f.txt"), "feature\n").unwrap();
+        run_git_in(Some(root), ["commit", "-am", "feature"]).unwrap();
+        run_git_in(Some(root), ["checkout", "main"]).unwrap();
+        fs::write(root.join("f.txt"), "mainline\n").unwrap();
+        run_git_in(Some(root), ["commit", "-am", "mainline"]).unwrap();
+
+        // Conflicting merge leaves MERGE_HEAD + an unmerged path.
+        let _ = run_git_in(Some(root), ["merge", "feature"]);
+        assert_eq!(detect_operation(root), "merge");
+        assert_eq!(conflicted_paths(root), vec!["f.txt".to_string()]);
+        assert_eq!(operation_command("merge").unwrap(), "merge");
+        assert!(operation_command("bogus").is_err());
+    }
+
+    #[test]
+    fn parses_decoration_refs() {
+        assert_eq!(
+            parse_refs("HEAD -> main, origin/main, tag: v1.0"),
+            vec![
+                "main".to_string(),
+                "origin/main".to_string(),
+                "v1.0".to_string()
+            ]
+        );
+        assert!(parse_refs("").is_empty());
+    }
+
+    #[test]
+    fn parses_name_status_with_renames() {
+        let changes =
+            parse_name_status("M\tsrc/a.ts\nA\tnew.txt\nD\tgone.txt\nR100\told.txt\tnew.txt\n");
+        assert_eq!(changes.len(), 4);
+        assert_eq!(changes[0].status, "modified");
+        assert_eq!(changes[1].status, "added");
+        assert_eq!(changes[2].status, "deleted");
+        assert_eq!(changes[3].status, "renamed");
+        assert_eq!(changes[3].old_path.as_deref(), Some("old.txt"));
+        assert_eq!(changes[3].path, "new.txt");
+    }
+
+    #[test]
+    fn lists_lightweight_and_annotated_tags() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "main"]).unwrap();
+        run_git_in(Some(root), ["config", "user.name", "Taomni Test"]).unwrap();
+        run_git_in(Some(root), ["config", "user.email", "t@example.test"]).unwrap();
+        fs::write(root.join("f.txt"), "x\n").unwrap();
+        run_git_in(Some(root), ["add", "f.txt"]).unwrap();
+        run_git_in(Some(root), ["commit", "-m", "c1"]).unwrap();
+        run_git_in(Some(root), ["tag", "v1"]).unwrap();
+        run_git_in(Some(root), ["tag", "-a", "v2", "-m", "release two"]).unwrap();
+
+        let tags = list_tags(root).unwrap();
+        let names: Vec<_> = tags.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"v1"));
+        assert!(names.contains(&"v2"));
+        let v2 = tags.iter().find(|t| t.name == "v2").unwrap();
+        assert!(v2.annotated);
+        assert_eq!(v2.subject.as_deref(), Some("release two"));
+        let v1 = tags.iter().find(|t| t.name == "v1").unwrap();
+        assert!(!v1.annotated);
     }
 }
