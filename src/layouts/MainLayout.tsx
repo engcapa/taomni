@@ -1496,6 +1496,29 @@ export function MainLayout() {
     }
   }, [openGitTab, setStatusMessage]);
 
+  const activeTerminalGitAction = useMemo(() => {
+    const tab = activeTab;
+    if (!tab || tab.type !== "terminal" || tab.ssh || tab.commandTerminal) {
+      return undefined;
+    }
+    const cwd = terminalCwds[tab.id] ?? null;
+    return {
+      label: cwd ? `Git · ${cwd}` : "Git Repository",
+      title: cwd ? `Open Git panel for ${cwd}` : "Open Git panel for the current terminal directory",
+      onOpen: async () => {
+        const latestCwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
+        if (!latestCwd) {
+          await alertAppDialog({
+            title: "Git Repository",
+            message: "The current terminal directory is not available yet.",
+          });
+          return;
+        }
+        await openGitRepository(latestCwd);
+      },
+    };
+  }, [activeTab, openGitRepository, queryTerminalCwd, terminalCwds]);
+
   const openBrowserSession = useCallback((session: SessionConfig) => {
     const url = browserUrlFromSession(session);
     if (!url) {
@@ -2576,6 +2599,7 @@ export function MainLayout() {
               onEditSession={handleEditSession}
               onConnectSession={handleConnectSession}
               onOpenSettings={() => handleCommand("settings")}
+              gitAction={activeTerminalGitAction}
             />
           </div>
         )}
@@ -2616,6 +2640,7 @@ export function MainLayout() {
                 onEditSession={handleEditSession}
                 onConnectSession={handleConnectSession}
                 onOpenSettings={() => handleCommand("settings")}
+                gitAction={activeTerminalGitAction}
               />
             </div>
           </Panel>

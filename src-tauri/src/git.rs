@@ -280,16 +280,8 @@ pub async fn git_pull(
     blocking(move || {
         let root = PathBuf::from(repo_root);
         let remote = remote.filter(|s| !s.trim().is_empty());
-        let mut args = vec!["pull".to_string()];
-        if rebase {
-            args.push("--rebase".into());
-        }
-        if let Some(remote) = &remote {
-            args.push(remote.clone());
-            if let Some(branch) = branch.filter(|s| !s.trim().is_empty()) {
-                args.push(branch);
-            }
-        }
+        let branch = branch.filter(|s| !s.trim().is_empty());
+        let args = build_pull_args(&root, remote.as_deref(), branch.as_deref(), rebase)?;
         run_git_authed(&root, args, vault, remote.as_deref()).map(|_| ())
     })
     .await
@@ -1031,9 +1023,9 @@ fn run_git_authed(
 }
 
 fn default_remote_for_head(root: &Path) -> Option<String> {
-    run_git_in(Some(root), ["config", "--get", "branch.HEAD.remote"])
-        .ok()
-        .and_then(|s| non_empty_string(&s))
+    current_branch_name(root)
+        .as_deref()
+        .and_then(|branch| get_config(root, &format!("branch.{branch}.remote")))
         .or_else(|| {
             run_git_in(
                 Some(root),
@@ -1042,6 +1034,54 @@ fn default_remote_for_head(root: &Path) -> Option<String> {
             .ok()
             .and_then(|upstream| upstream.split('/').next().and_then(non_empty_string))
         })
+}
+
+fn build_pull_args(
+    root: &Path,
+    remote: Option<&str>,
+    branch: Option<&str>,
+    rebase: bool,
+) -> Result<Vec<String>, String> {
+    let mut args = vec!["pull".to_string()];
+    if rebase {
+        args.push("--rebase".into());
+    }
+    let Some(remote) = remote.and_then(non_empty_string) else {
+        return Ok(args);
+    };
+    args.push(remote.clone());
+    let branch = branch
+        .and_then(non_empty_string)
+        .or_else(|| upstream_branch_for_remote(root, &remote))
+        .or_else(|| current_branch_name(root));
+    let Some(branch) = branch else {
+        return Err(
+            "Pull from a selected remote requires a branch, but the current HEAD is detached."
+                .into(),
+        );
+    };
+    args.push(branch);
+    Ok(args)
+}
+
+fn current_branch_name(root: &Path) -> Option<String> {
+    run_git_in(Some(root), ["symbolic-ref", "--quiet", "--short", "HEAD"])
+        .ok()
+        .and_then(|s| non_empty_string(&s))
+}
+
+fn upstream_branch_for_remote(root: &Path, remote: &str) -> Option<String> {
+    let branch = current_branch_name(root)?;
+    let configured_remote = get_config(root, &format!("branch.{branch}.remote"))?;
+    if configured_remote.trim() != remote {
+        return None;
+    }
+    let merge = get_config(root, &format!("branch.{branch}.merge"))?;
+    let remote_branch = merge
+        .trim()
+        .strip_prefix("refs/heads/")
+        .unwrap_or(merge.trim());
+    non_empty_string(remote_branch)
 }
 
 fn load_remote_auth(
@@ -1166,6 +1206,44 @@ mod tests {
             remote_auth_key("origin/private", "tokenRef"),
             "taomni-auth.origin-private.tokenRef"
         );
+    }
+
+    #[test]
+    fn pull_args_add_current_branch_for_selected_remote() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "main"]).unwrap();
+
+        let args = build_pull_args(root, Some("origin"), None, false).unwrap();
+        assert_eq!(args, vec!["pull", "origin", "main"]);
+    }
+
+    #[test]
+    fn pull_args_prefer_upstream_branch_for_selected_remote() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "feature/local"]).unwrap();
+        run_git_in(
+            Some(root),
+            ["config", "branch.feature/local.remote", "origin"],
+        )
+        .unwrap();
+        run_git_in(
+            Some(root),
+            ["config", "branch.feature/local.merge", "refs/heads/main"],
+        )
+        .unwrap();
+
+        let args = build_pull_args(root, Some("origin"), None, true).unwrap();
+        assert_eq!(args, vec!["pull", "--rebase", "origin", "main"]);
     }
 
     #[test]

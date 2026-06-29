@@ -249,7 +249,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
           )) : <option value="">No remote</option>}
         </select>
         <IconButton label="Fetch" icon={<Download className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Fetch", () => gitFetch(repoRoot, remoteName))} />
-        <IconButton label="Pull" icon={<GitMerge className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Pull", () => gitPull(repoRoot, remoteName))} />
+        <IconButton label="Pull" icon={<GitMerge className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Pull", () => gitPull(repoRoot, remoteName, pullBranchForRemote(snapshot, remoteName)))} />
         <IconButton label="Push" icon={<Upload className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Push", () => gitPush(repoRoot, remoteName, snapshot?.currentBranch ?? null, !snapshot?.upstream))} />
         <IconButton label="Refresh" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={() => void refresh()} />
       </header>
@@ -830,6 +830,15 @@ function EmptyState({ title }: { title: string }) {
 
 function normalizeSettings(settings: GitRepoSettings | null | undefined): GitRepoSettings {
   return { ...EMPTY_SETTINGS, ...(settings ?? {}) };
+}
+
+function pullBranchForRemote(snapshot: GitSnapshot | null, remoteName: string): string | null {
+  if (!snapshot?.currentBranch || !remoteName) return null;
+  const prefix = `${remoteName}/`;
+  if (snapshot.upstream?.startsWith(prefix)) {
+    return snapshot.upstream.slice(prefix.length) || snapshot.currentBranch;
+  }
+  return snapshot.currentBranch;
 }
 
 function buildRemoteDrafts(remotes: GitRemote[], current: Record<string, RemoteDraft>): Record<string, RemoteDraft> {

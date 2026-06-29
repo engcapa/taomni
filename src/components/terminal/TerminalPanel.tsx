@@ -62,7 +62,7 @@ import {
   FT_BUTTON_ACTIVE_OVERRIDE,
   FT_ICON_BUTTON_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { Bot, ExternalLink, FolderOpen, GitBranch, Maximize2, Minimize2 } from "lucide-react";
+import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
 import {
   createOsc7BlankingSuppressor,
   type InputEchoSuppressor,
@@ -3018,33 +3018,6 @@ export function TerminalPanel({
       onAuxClick={handleMiddleClick}
     >
       <div ref={containerRef} className="w-full h-full overflow-hidden" />
-
-      {isLocal && gitToggle && (
-        <button
-          type="button"
-          data-testid="terminal-git-toggle"
-          className={`absolute left-3 bottom-3 z-40 h-7 max-w-[180px] px-2 rounded border shadow-sm inline-flex items-center gap-1.5 text-[11px] ${
-            gitState.kind === "repo"
-              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700"
-              : gitState.kind === "none"
-                ? "border-slate-400/50 bg-white/80 text-slate-600"
-                : gitState.kind === "error"
-                  ? "border-red-500/40 bg-red-500/15 text-red-600"
-                  : "border-slate-400/50 bg-white/70 text-slate-500"
-          }`}
-          title={gitState.title}
-          disabled={!gitToggle.cwd}
-          onClick={(event) => {
-            event.stopPropagation();
-            gitToggle.onOpen();
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          onContextMenu={(event) => event.stopPropagation()}
-        >
-          <GitBranch size={14} />
-          <span className="truncate">{gitState.label}</span>
-        </button>
-      )}
 
       <TabActions active={activeForShortcuts}>
         {sftpToggle && (

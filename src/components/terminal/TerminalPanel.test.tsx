@@ -1203,7 +1203,7 @@ describe("TerminalPanel focus behavior", () => {
     expect(screen.getByTestId("context-menu-item-send-file-using-z-modem")).toBeInTheDocument();
   });
 
-  it("opens the current local terminal repository from the Git button", async () => {
+  it("does not render the Git rail button inside the terminal pane", async () => {
     const onOpen = vi.fn();
     const onSessionReady = vi.fn();
 
@@ -1219,9 +1219,8 @@ describe("TerminalPanel focus behavior", () => {
       expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
     });
 
-    fireEvent.click(screen.getByTestId("terminal-git-toggle"));
-
-    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("terminal-git-toggle")).not.toBeInTheDocument();
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it("adds a Git action to the local terminal context menu", async () => {

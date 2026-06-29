@@ -9,6 +9,7 @@ import {
   Wrench,
   Bot,
   Settings,
+  GitBranch,
 } from "lucide-react";
 import { useState } from "react";
 import { SessionTree } from "./SessionTree";
@@ -24,10 +25,16 @@ interface SidebarProps {
   onEditSession?: (session: SessionConfig) => void;
   onConnectSession?: (session: SessionConfig) => void;
   onOpenSettings?: () => void;
+  gitAction?: {
+    label: string;
+    title: string;
+    disabled?: boolean;
+    onOpen: () => void;
+  };
   compact?: boolean;
 }
 
-export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenSettings, compact = false }: SidebarProps) {
+export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenSettings, gitAction, compact = false }: SidebarProps) {
   const {
     activeSideTab,
     setActiveSideTab,
@@ -106,6 +113,30 @@ export function Sidebar({ onNewSession, onEditSession, onConnectSession, onOpenS
           );
         })}
         <div className="flex-1" />
+        {gitAction && (
+          <button
+            data-testid="ribbon-git"
+            type="button"
+            aria-label={gitAction.title}
+            className="group relative mb-1 h-8 w-full inline-flex items-center justify-center border-t hover:bg-[var(--taomni-hover)] text-[var(--taomni-text)] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ borderColor: "var(--taomni-sidebar-border)" }}
+            disabled={gitAction.disabled}
+            onClick={gitAction.onOpen}
+          >
+            <GitBranch className="w-[17px] h-[17px]" />
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute left-full bottom-1/2 z-50 ml-2 translate-y-1/2 whitespace-nowrap rounded border px-2 py-1 text-[11px] opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              style={{
+                background: "var(--taomni-card-bg)",
+                borderColor: "var(--taomni-card-border)",
+                color: "var(--taomni-text)",
+              }}
+            >
+              {gitAction.label}
+            </span>
+          </button>
+        )}
         <button
           data-testid="ribbon-settings"
           type="button"
