@@ -714,10 +714,11 @@ fn parse_status(output: &str) -> (Option<String>, bool, Vec<GitChange>) {
             if rest.starts_with("HEAD ") || rest.starts_with("HEAD(") {
                 detached = true;
             } else {
-                let branch = rest
+                let branch_source = rest.strip_prefix("No commits yet on ").unwrap_or(rest);
+                let branch = branch_source
                     .split("...")
                     .next()
-                    .unwrap_or(rest)
+                    .unwrap_or(branch_source)
                     .trim()
                     .trim_end_matches("[gone]")
                     .trim();
@@ -1133,6 +1134,7 @@ fn require_non_empty(label: &str, value: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn parses_status_with_branch_and_changes() {
@@ -1150,10 +1152,104 @@ mod tests {
     }
 
     #[test]
+    fn parses_unborn_branch_status() {
+        let (branch, detached, changes) = parse_status("## No commits yet on main\n?? file.txt\n");
+        assert_eq!(branch.as_deref(), Some("main"));
+        assert!(!detached);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].status, "untracked");
+    }
+
+    #[test]
     fn remote_auth_key_sanitizes_remote_names() {
         assert_eq!(
             remote_auth_key("origin/private", "tokenRef"),
             "taomni-auth.origin-private.tokenRef"
+        );
+    }
+
+    #[test]
+    fn snapshots_real_repo_status_and_log() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["checkout", "-b", "main"]).unwrap();
+        run_git_in(Some(root), ["config", "user.name", "Taomni Test"]).unwrap();
+        run_git_in(Some(root), ["config", "user.email", "taomni@example.test"]).unwrap();
+
+        fs::write(root.join("readme.md"), "hello\n").unwrap();
+        let initial = snapshot(root).unwrap();
+        assert_eq!(initial.current_branch.as_deref(), Some("main"));
+        assert_eq!(initial.changes.len(), 1);
+        assert_eq!(initial.changes[0].status, "untracked");
+
+        run_git_in(Some(root), ["add", "readme.md"]).unwrap();
+        let staged = snapshot(root).unwrap();
+        assert!(staged.changes[0].staged);
+
+        run_git_in(Some(root), ["commit", "-m", "initial commit"]).unwrap();
+        let clean = snapshot(root).unwrap();
+        assert!(clean.changes.is_empty());
+        let log = list_log(root, 10).unwrap();
+        assert_eq!(log[0].subject, "initial commit");
+
+        fs::write(root.join("readme.md"), "hello\nworld\n").unwrap();
+        let modified = snapshot(root).unwrap();
+        assert_eq!(modified.changes.len(), 1);
+        assert_eq!(modified.changes[0].status, "modified");
+        assert!(modified.changes[0].unstaged);
+    }
+
+    #[test]
+    fn reads_real_repo_remotes_and_local_settings() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(
+            Some(root),
+            ["remote", "add", "origin", "https://example.test/repo.git"],
+        )
+        .unwrap();
+        set_optional_config(root, "user.name", Some("Repo User".to_string())).unwrap();
+        set_optional_config(root, "user.email", Some("repo@example.test".to_string())).unwrap();
+        set_optional_config(
+            root,
+            "http.proxy",
+            Some("http://127.0.0.1:8080".to_string()),
+        )
+        .unwrap();
+        set_optional_config(
+            root,
+            &remote_auth_key("origin", "username"),
+            Some("octo".to_string()),
+        )
+        .unwrap();
+        set_optional_config(
+            root,
+            &remote_auth_key("origin", "tokenRef"),
+            Some("vault:test-token".to_string()),
+        )
+        .unwrap();
+
+        let remotes = list_remotes(root).unwrap();
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0].name, "origin");
+        assert_eq!(remotes[0].fetch_url, "https://example.test/repo.git");
+        assert_eq!(remotes[0].username.as_deref(), Some("octo"));
+        assert_eq!(remotes[0].token_ref.as_deref(), Some("vault:test-token"));
+
+        let settings = load_settings(root);
+        assert_eq!(settings.user_name.as_deref(), Some("Repo User"));
+        assert_eq!(settings.user_email.as_deref(), Some("repo@example.test"));
+        assert_eq!(
+            settings.http_proxy.as_deref(),
+            Some("http://127.0.0.1:8080")
         );
     }
 }
