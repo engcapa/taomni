@@ -17,15 +17,15 @@ use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, Content, ServerCapabilities, ServerInfo};
 use rmcp::service::{RequestContext, RoleServer};
-use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
+use rmcp::{ErrorData, ServerHandler, tool, tool_handler, tool_router};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::mcp_http::{
-    decide_permission, enforce_inline_permission, scope_from_ctx, PermissionParams, TokenMap,
-    TokenScope,
+    PermissionParams, TokenMap, TokenScope, decide_permission, enforce_inline_permission,
+    scope_from_ctx,
 };
-use crate::agent::capture::reduce::{reduce_file, ReduceOp, ReduceResult};
+use crate::agent::capture::reduce::{ReduceOp, ReduceResult, reduce_file};
 use crate::agent::capture::{CaptureSource, CaptureStatus, CaptureWriter};
 use crate::database::{ColumnDescription, DbObject, IndexInfo, QueryResult, SchemaInfo, TableInfo};
 use crate::state::AppState;
@@ -91,6 +91,12 @@ fn text(s: impl Into<String>) -> CallToolResult {
     CallToolResult::success(vec![Content::text(s.into())])
 }
 
+fn json_text<T: Serialize>(value: &T) -> Result<CallToolResult, ErrorData> {
+    serde_json::to_string_pretty(value)
+        .map(text)
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))
+}
+
 fn err(e: impl Into<String>) -> ErrorData {
     ErrorData::internal_error(e.into(), None)
 }
@@ -154,7 +160,10 @@ fn fmt_schemas(rows: &[SchemaInfo]) -> String {
     if rows.is_empty() {
         return "(no schemas)".into();
     }
-    rows.iter().map(|s| s.name.clone()).collect::<Vec<_>>().join("\n")
+    rows.iter()
+        .map(|s| s.name.clone())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn fmt_tables(rows: &[TableInfo]) -> String {
@@ -295,8 +304,12 @@ fn exports_dir() -> std::path::PathBuf {
 /// capture). No `jq` — the capture is CSV, not JSON.
 fn parse_read_op(p: &ReadResultParams) -> Result<ReduceOp, String> {
     match p.op.as_str() {
-        "head" => Ok(ReduceOp::Head { n: p.n.unwrap_or(50) as usize }),
-        "tail" => Ok(ReduceOp::Tail { n: p.n.unwrap_or(50) as usize }),
+        "head" => Ok(ReduceOp::Head {
+            n: p.n.unwrap_or(50) as usize,
+        }),
+        "tail" => Ok(ReduceOp::Tail {
+            n: p.n.unwrap_or(50) as usize,
+        }),
         "range" => {
             let start = p.start.ok_or("range requires `start`")? as usize;
             let end = p.end.ok_or("range requires `end`")? as usize;
@@ -307,7 +320,9 @@ fn parse_read_op(p: &ReadResultParams) -> Result<ReduceOp, String> {
             context: p.context.unwrap_or(0) as usize,
         }),
         "stats" => Ok(ReduceOp::Stats),
-        other => Err(format!("unknown op '{other}' (expected head|tail|range|grep|stats)")),
+        other => Err(format!(
+            "unknown op '{other}' (expected head|tail|range|grep|stats)"
+        )),
     }
 }
 
@@ -323,10 +338,41 @@ fn annotate(r: ReduceResult) -> String {
     text
 }
 
+fn selected_object_value(
+    object: &crate::agent::context::AgentDbSelectedObject,
+) -> serde_json::Value {
+    serde_json::json!({
+        "catalog": object.catalog.clone(),
+        "schema": object.schema.clone(),
+        "name": object.name.clone(),
+        "kind": object.kind.clone(),
+        "displayName": object.display_name(),
+        "isSelectable": object.is_selectable(),
+    })
+}
+
 // --- tool parameter schemas ------------------------------------------------
 
 #[derive(Deserialize, schemars::JsonSchema, Default)]
 struct ListCatalogsParams {}
+
+#[derive(Deserialize, schemars::JsonSchema, Default)]
+struct SelectedTableParams {
+    /// When true, also include the selected table's column structure.
+    #[serde(default)]
+    include_columns: bool,
+}
+
+#[derive(Deserialize, schemars::JsonSchema, Default)]
+struct SelectedObjectsParams {
+    /// When true, `objects` is filtered to objects that can be queried with SELECT
+    /// (table/view/materialized_view). The full split is still returned.
+    #[serde(default)]
+    selectable_only: bool,
+    /// When true, include column structure for selected queryable objects.
+    #[serde(default)]
+    include_columns: bool,
+}
 
 #[derive(Deserialize, schemars::JsonSchema, Default)]
 struct ListSchemasParams {
@@ -425,7 +471,136 @@ struct ExportResultParams {
 
 #[tool_router]
 impl SqlHandler {
-    #[tool(name = "list_catalogs", description = "列出 catalog（仅 Presto/Trino；其他引擎返回空）")]
+    #[tool(
+        name = "selected_objects",
+        description = "返回当前 DB tab 左侧对象树多选的对象。支持跨对象类型；selectable_only=true 时 objects 只保留可 SELECT 的 table/view/materialized_view，nonSelectableObjects 会列出被过滤对象；include_columns=true 时给可查询对象附带字段结构。"
+    )]
+    async fn selected_objects(
+        &self,
+        Parameters(p): Parameters<SelectedObjectsParams>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let scope = self.scope(&ctx)?;
+        let conn = self.bound_conn(&scope).await?;
+        let selected = self
+            .state()
+            .agent_db_selected_objects
+            .read()
+            .await
+            .get(&scope.thread_id)
+            .cloned()
+            .unwrap_or_default();
+
+        if selected.is_empty() {
+            return Err(ErrorData::invalid_params(
+                "no database objects are currently selected in the bound DB tab's object tree"
+                    .to_string(),
+                None,
+            ));
+        }
+
+        let mut selectable_values = Vec::new();
+        let mut non_selectable_values = Vec::new();
+        for object in &selected {
+            let mut value = selected_object_value(object);
+            if object.is_selectable() {
+                if p.include_columns {
+                    match crate::database::db_describe_table(
+                        self.state(),
+                        conn.clone(),
+                        object.schema.clone(),
+                        object.name.clone(),
+                        object.catalog.clone(),
+                    )
+                    .await
+                    {
+                        Ok(columns) => {
+                            value["columns"] = serde_json::to_value(columns)
+                                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+                        }
+                        Err(e) => {
+                            value["columnsError"] = serde_json::Value::String(e);
+                        }
+                    }
+                }
+                selectable_values.push(value);
+            } else {
+                non_selectable_values.push(value);
+            }
+        }
+
+        let objects = if p.selectable_only {
+            selectable_values.clone()
+        } else {
+            selected.iter().map(selected_object_value).collect()
+        };
+        let selectable_count = selectable_values.len();
+        let non_selectable_count = non_selectable_values.len();
+        let value = serde_json::json!({
+            "objects": objects,
+            "selectedCount": selected.len(),
+            "selectableObjects": selectable_values,
+            "selectableCount": selectable_count,
+            "nonSelectableObjects": non_selectable_values,
+            "nonSelectableCount": non_selectable_count,
+        });
+
+        json_text(&value)
+    }
+
+    #[tool(
+        name = "selected_table",
+        description = "兼容工具：返回当前 DB tab 左侧对象树选中的第一个可 SELECT 对象（table/view/materialized_view）。多选场景优先用 selected_objects；include_columns=true 时同时返回字段结构。"
+    )]
+    async fn selected_table(
+        &self,
+        Parameters(p): Parameters<SelectedTableParams>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let scope = self.scope(&ctx)?;
+        let conn = self.bound_conn(&scope).await?;
+        let selected = self
+            .state()
+            .agent_db_selected_objects
+            .read()
+            .await
+            .get(&scope.thread_id)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|object| object.is_selectable())
+            .ok_or_else(|| {
+                ErrorData::invalid_params(
+                    "no table/view/materialized_view is currently selected in the bound DB tab's object tree"
+                        .to_string(),
+                    None,
+                )
+            })?;
+
+        let mut value = selected_object_value(&selected);
+        value["table"] = serde_json::Value::String(selected.name.clone());
+
+        if p.include_columns {
+            let columns = crate::database::db_describe_table(
+                self.state(),
+                conn,
+                selected.schema.clone(),
+                selected.name.clone(),
+                selected.catalog.clone(),
+            )
+            .await
+            .map_err(err)?;
+            value["columns"] = serde_json::to_value(columns)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        }
+
+        json_text(&value)
+    }
+
+    #[tool(
+        name = "list_catalogs",
+        description = "列出 catalog（仅 Presto/Trino；其他引擎返回空）"
+    )]
     async fn list_catalogs(
         &self,
         Parameters(_p): Parameters<ListCatalogsParams>,
@@ -472,7 +647,10 @@ impl SqlHandler {
         Ok(text(fmt_tables(&rows)))
     }
 
-    #[tool(name = "describe_table", description = "查看表结构（列、类型、主键、可空、默认值）")]
+    #[tool(
+        name = "describe_table",
+        description = "查看表结构（列、类型、主键、可空、默认值）"
+    )]
     async fn describe_table(
         &self,
         Parameters(p): Parameters<DescribeTableParams>,
@@ -480,9 +658,10 @@ impl SqlHandler {
     ) -> Result<CallToolResult, ErrorData> {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
-        let rows = crate::database::db_describe_table(self.state(), conn, p.schema, p.table, p.catalog)
-            .await
-            .map_err(err)?;
+        let rows =
+            crate::database::db_describe_table(self.state(), conn, p.schema, p.table, p.catalog)
+                .await
+                .map_err(err)?;
         Ok(text(fmt_columns(&rows)))
     }
 
@@ -500,7 +679,10 @@ impl SqlHandler {
         Ok(text(fmt_indexes(&rows)))
     }
 
-    #[tool(name = "list_objects", description = "列出非表对象：procedure|function|trigger|event|sequence|dictionary")]
+    #[tool(
+        name = "list_objects",
+        description = "列出非表对象：procedure|function|trigger|event|sequence|dictionary"
+    )]
     async fn list_objects(
         &self,
         Parameters(p): Parameters<ListObjectsParams>,
@@ -528,7 +710,10 @@ impl SqlHandler {
         Ok(text(ddl))
     }
 
-    #[tool(name = "table_stats", description = "查看表的统计信息（行数、大小等，引擎相关）")]
+    #[tool(
+        name = "table_stats",
+        description = "查看表的统计信息（行数、大小等，引擎相关）"
+    )]
     async fn table_stats(
         &self,
         Parameters(p): Parameters<TableStatsParams>,
@@ -597,9 +782,11 @@ impl SqlHandler {
 
         let state = self.state();
         let dir = state.captures.thread_dir(&scope.thread_id);
-        let meta = state
-            .captures
-            .begin(&scope.thread_id, &p.sql, CaptureSource::LocalFile(dir.join("placeholder")));
+        let meta = state.captures.begin(
+            &scope.thread_id,
+            &p.sql,
+            CaptureSource::LocalFile(dir.join("placeholder")),
+        );
         let writer = CaptureWriter::create(&dir, &meta.id)
             .map_err(|e| ErrorData::internal_error(format!("capture file: {e}"), None))?;
         writer.write_chunk(query_result_to_csv(&r).as_bytes());
@@ -630,7 +817,11 @@ impl SqlHandler {
             r.columns.len(),
             cols.join(", "),
             r.duration_ms,
-            if truncated { " (capture truncated by cap)" } else { "" },
+            if truncated {
+                " (capture truncated by cap)"
+            } else {
+                ""
+            },
             preview.rows.len(),
             fmt_query_result(&preview),
             meta.id,
@@ -654,7 +845,10 @@ impl SqlHandler {
             .captures
             .get_scoped(&scope.thread_id, &p.capture_id)
             .ok_or_else(|| {
-                ErrorData::invalid_params(format!("no capture '{}' for this thread", p.capture_id), None)
+                ErrorData::invalid_params(
+                    format!("no capture '{}' for this thread", p.capture_id),
+                    None,
+                )
             })?;
         let op = parse_read_op(&p).map_err(|e| ErrorData::invalid_params(e, None))?;
         match &meta.source {
@@ -696,7 +890,10 @@ impl SqlHandler {
             .captures
             .get_scoped(&scope.thread_id, &p.capture_id)
             .ok_or_else(|| {
-                ErrorData::invalid_params(format!("no capture '{}' for this thread", p.capture_id), None)
+                ErrorData::invalid_params(
+                    format!("no capture '{}' for this thread", p.capture_id),
+                    None,
+                )
             })?;
         let src = match &meta.source {
             CaptureSource::LocalFile(path) => path.clone(),
@@ -704,7 +901,7 @@ impl SqlHandler {
                 return Err(ErrorData::internal_error(
                     "this capture is not a local SQL result".to_string(),
                     None,
-                ))
+                ));
             }
         };
         let dir = exports_dir();
@@ -752,6 +949,8 @@ impl ServerHandler for SqlHandler {
         info.instructions = Some(
             "Taomni SQL database tools. You operate on the chat thread's bound DB connection \
              (MySQL/PostgreSQL/SQL Server/StarRocks/ClickHouse/Presto). Use these tools, not local Bash/Read. \
+             When the user says selected/current/multiple tables or objects, call selected_objects first; \
+             for SELECT workflows pass selectable_only=true to filter out non-queryable objects. \
              Mutating statements route through human confirmation."
                 .into(),
         );
@@ -765,7 +964,10 @@ mod tests {
     use crate::database::ColumnInfo;
 
     fn col(name: &str) -> ColumnInfo {
-        ColumnInfo { name: name.into(), type_name: "text".into() }
+        ColumnInfo {
+            name: name.into(),
+            type_name: "text".into(),
+        }
     }
 
     #[test]
@@ -808,7 +1010,10 @@ mod tests {
         };
         assert!(parse_read_op(&base("head")).is_ok());
         assert!(parse_read_op(&base("stats")).is_ok());
-        assert!(parse_read_op(&base("jq")).is_err(), "jq not supported for CSV");
+        assert!(
+            parse_read_op(&base("jq")).is_err(),
+            "jq not supported for CSV"
+        );
         assert!(parse_read_op(&base("range")).is_err(), "range needs bounds");
         assert!(parse_read_op(&base("grep")).is_err(), "grep needs pattern");
     }

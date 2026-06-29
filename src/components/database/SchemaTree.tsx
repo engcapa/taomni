@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -70,8 +70,8 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 interface SchemaTreeProps {
   sessionId: string;
   engine: string;
-  /** Called when a table is selected (single click). */
-  onSelectTable?: (schema: string | null, table: string) => void;
+  /** Called when one or more tree objects are selected. */
+  onSelectionChange?: (objects: SchemaTreeSelectedObject[]) => void;
   /** Called when a table is double-clicked — inserts its name into the editor. */
   onInsertTable?: (table: string) => void;
   /** "Select top N rows" context action. */
@@ -95,6 +95,12 @@ interface SchemaTreeProps {
   metadataCache?: DbMetadataCache;
 }
 
+export interface SchemaTreeSelectedObject {
+  schema: string | null;
+  name: string;
+  kind: ObjectKind;
+}
+
 const CATEGORY_META: Record<
   ObjectKind,
   { label: string; Icon: typeof Table2; color: string }
@@ -115,6 +121,8 @@ const TABLE_CATEGORIES: ObjectKind[] = ["table", "view", "materialized_view"];
 
 /** Categories whose objects can expand to show their columns. */
 const COLUMN_CATEGORIES: ObjectKind[] = ["table", "view", "materialized_view"];
+
+const SELECTABLE_OBJECT_KINDS = new Set<ObjectKind>(TABLE_CATEGORIES);
 
 const dbKey = (db: string) => db;
 const catKey = (db: string, kind: ObjectKind) => `${db}::${kind}`;
@@ -137,7 +145,7 @@ interface ObjNodeState {
 export function SchemaTree({
   sessionId,
   engine,
-  onSelectTable,
+  onSelectionChange,
   onInsertTable,
   onQuickSelect,
   quickSelectLimit = 1000,
@@ -164,7 +172,7 @@ export function SchemaTree({
   const [tablesByDb, setTablesByDb] = useState<Record<string, DbTable[]>>({});
   const [objectsByCat, setObjectsByCat] = useState<Record<string, DbObject[]>>({});
   const [objState, setObjState] = useState<Record<string, ObjNodeState>>({});
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedObjects, setSelectedObjects] = useState<Record<string, SchemaTreeSelectedObject>>({});
   const [error, setError] = useState<string | null>(null);
   const [loadingSchemas, setLoadingSchemas] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -284,9 +292,29 @@ export function SchemaTree({
     }
   }, [ensureTables, filterActive, schemas]);
 
-  const selectObject = (db: string, kind: ObjectKind, name: string) => {
-    setSelected(objKey(db, kind, name));
-    onSelectTable?.(db, name);
+  const publishSelection = useCallback(
+    (next: Record<string, SchemaTreeSelectedObject>) => {
+      onSelectionChange?.(Object.values(next));
+    },
+    [onSelectionChange],
+  );
+
+  const selectObject = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    db: string,
+    kind: ObjectKind,
+    name: string,
+  ) => {
+    const key = objKey(db, kind, name);
+    const multi = event.ctrlKey || event.metaKey || event.shiftKey;
+    const next = multi ? { ...selectedObjects } : {};
+    if (multi && next[key]) {
+      delete next[key];
+    } else {
+      next[key] = { schema: db, name, kind };
+    }
+    setSelectedObjects(next);
+    publishSelection(next);
   };
 
   const refreshAll = () => {
@@ -331,7 +359,7 @@ export function SchemaTree({
     return list ? list.length : null;
   };
 
-  const target = (db: string, name: string): ObjectTarget => ({ catalog, schema: db, name });
+  const target = (db: string | null, name: string): ObjectTarget => ({ catalog, schema: db, name });
 
   const copy = async (text: string) => {
     await writeText(text);
@@ -399,8 +427,12 @@ export function SchemaTree({
     if (ok) await runExec(sql, db, kind);
   };
 
-  const getColumns = async (db: string, name: string): Promise<DbColumnDescription[]> => {
-    const cached = objState[objKey(db, "table", name)]?.columns ?? objState[objKey(db, "view", name)]?.columns;
+  const getColumns = async (db: string | null, name: string): Promise<DbColumnDescription[]> => {
+    const keyDb = db ?? "";
+    const cached =
+      objState[objKey(keyDb, "table", name)]?.columns ??
+      objState[objKey(keyDb, "view", name)]?.columns ??
+      objState[objKey(keyDb, "materialized_view", name)]?.columns;
     if (cached) return cached;
     return cache.describeTable(db, name, catalog).catch(() => [] as DbColumnDescription[]);
   };
@@ -429,6 +461,55 @@ export function SchemaTree({
       setError(String(e));
       onStatus?.(t("dbObjects.failed", { error: String(e) }));
     }
+  };
+
+  const objectDisplayName = (object: SchemaTreeSelectedObject): string => {
+    const parts = [];
+    if (catalog) parts.push(catalog);
+    if (object.schema) parts.push(object.schema);
+    parts.push(object.name);
+    return parts.join(".");
+  };
+
+  const selectedDdlText = async (objects: SchemaTreeSelectedObject[]): Promise<string> => {
+    const parts = await Promise.all(
+      objects.map(async (object) => {
+        const heading = `-- ${kindLabel(object.kind)} ${objectDisplayName(object)}`;
+        try {
+          const ddl = await dbObjectDdl(sessionId, object.schema, object.kind, object.name);
+          return `${heading}\n${ddl}`;
+        } catch (error) {
+          return `${heading}\n-- ${t("dbObjects.failed", { error: String(error) })}`;
+        }
+      }),
+    );
+    return parts.join("\n\n");
+  };
+
+  const showSelectedDdl = async (objects: SchemaTreeSelectedObject[]) => {
+    const sql = await selectedDdlText(objects);
+    setDetail({
+      kind: "ddl",
+      title: t("dbObjects.selectedDdlTitle", { count: objects.length }),
+      sql,
+    });
+  };
+
+  const insertSelectedDdl = async (objects: SchemaTreeSelectedObject[]) => {
+    const sql = await selectedDdlText(objects);
+    onInsertSql?.(sql);
+    onStatus?.(t("dbObjects.insertedToEditor"));
+  };
+
+  const insertSelectedSelects = async (objects: SchemaTreeSelectedObject[]) => {
+    const statements = await Promise.all(
+      objects.map(async (object) => {
+        const cols = await cache.describeTable(object.schema, object.name, catalog).catch(() => [] as DbColumnDescription[]);
+        return selectStatement(sqlEngine, target(object.schema, object.name), cols.map((col) => col.name), quickSelectLimit);
+      }),
+    );
+    onInsertSql?.(statements.join("\n\n"));
+    onStatus?.(t("dbObjects.insertedToEditor"));
   };
 
   const showStats = async (db: string, name: string) => {
@@ -713,6 +794,67 @@ export function SchemaTree({
     }
   };
 
+  const multiObjectMenu = (objects: SchemaTreeSelectedObject[]): MenuItem[] => {
+    const selectable = objects.filter((object) => SELECTABLE_OBJECT_KINDS.has(object.kind));
+    const items: MenuItem[] = [
+      {
+        label: t("dbObjects.copySelectedNames", { count: objects.length }),
+        onClick: () => void copy(objects.map(objectDisplayName).join("\n")),
+      },
+    ];
+    if (selectable.length > 0) {
+      items.push({
+        label: t("dbObjects.insertSelectedSelects", { count: selectable.length }),
+        disabled: !onInsertSql,
+        onClick: () => void insertSelectedSelects(selectable),
+      });
+    }
+    items.push(
+      sep,
+      {
+        label: t("dbObjects.viewSelectedDdl", { count: objects.length }),
+        onClick: () => void showSelectedDdl(objects),
+      },
+      {
+        label: t("dbObjects.insertSelectedDdl", { count: objects.length }),
+        disabled: !onInsertSql,
+        onClick: () => void insertSelectedDdl(objects),
+      },
+    );
+    return items;
+  };
+
+  const objectContextObjects = (
+    db: string,
+    kind: ObjectKind,
+    name: string,
+  ): SchemaTreeSelectedObject[] => {
+    const key = objKey(db, kind, name);
+    const selected = Object.values(selectedObjects);
+    return selectedObjects[key] && selected.length > 1 ? selected : [{ schema: db, name, kind }];
+  };
+
+  const openObjectContextMenu = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    db: string,
+    kind: ObjectKind,
+    name: string,
+    owner?: string,
+  ) => {
+    const objects = objectContextObjects(db, kind, name);
+    if (objects.length > 1) {
+      openMenu(event, multiObjectMenu(objects));
+      return;
+    }
+    const key = objKey(db, kind, name);
+    if (!selectedObjects[key]) {
+      const next = { [key]: { schema: db, name, kind } };
+      setSelectedObjects(next);
+      publishSelection(next);
+    }
+    openMenu(event, objectMenu(db, kind, name, owner));
+  };
+
   const columnMenu = (db: string, table: string, col: DbColumnDescription): MenuItem[] => [
     { label: t("dbObjects.copyColumn"), onClick: () => void copy(col.name) },
     { label: t("dbObjects.insertColumn"), onClick: () => onInsertTable?.(columnReference(sqlEngine, col.name)) },
@@ -775,19 +917,22 @@ export function SchemaTree({
     return items.map((obj) => {
       const key = objKey(db, kind, obj.name);
       const st = objState[key];
-      const isSel = selected === key;
+      const isSel = selectedObjects[key] !== undefined;
       return (
         <div key={obj.name}>
           <button
             type="button"
             className="taomni-tree-row w-full text-left"
             style={{ paddingLeft: 34, background: isSel ? "var(--taomni-selected)" : undefined }}
-            onClick={() => {
-              selectObject(db, kind, obj.name);
-              if (expandable) void toggleObject(db, kind, obj.name);
+            aria-pressed={isSel}
+            onClick={(event) => {
+              selectObject(event, db, kind, obj.name);
+              if (expandable && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+                void toggleObject(db, kind, obj.name);
+              }
             }}
             onDoubleClick={() => onInsertTable?.(obj.name)}
-            onContextMenu={(e) => openMenu(e, objectMenu(db, kind, obj.name, obj.owner))}
+            onContextMenu={(event) => openObjectContextMenu(event, db, kind, obj.name, obj.owner)}
             title={obj.name}
           >
             {expandable ? (

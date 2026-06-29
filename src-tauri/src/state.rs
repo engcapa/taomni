@@ -131,6 +131,13 @@ pub struct AppState {
     /// handlers resolve their bound connection from here (the model never names a
     /// connection id, so this is the only target — scope-safe by construction).
     pub agent_db_bindings: Arc<RwLock<HashMap<String, String>>>,
+    /// Current objects selected in the bound DB tab's schema tree, bridged
+    /// per chat turn just like `agent_db_bindings`. SQL MCP tools use this to
+    /// resolve user phrases such as "selected tables" without reading frontend
+    /// UI state directly. The list can include non-queryable object kinds; SQL
+    /// MCP tools expose a queryable subset for SELECT workflows.
+    pub agent_db_selected_objects:
+        Arc<RwLock<HashMap<String, Vec<crate::agent::context::AgentDbSelectedObject>>>>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -177,6 +184,7 @@ impl AppState {
             agent_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
             cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
             agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
+            agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

@@ -205,6 +205,64 @@ describe("appStore.uiAppearance", () => {
   });
 });
 
+describe("appStore.dbSelectedObjects", () => {
+  beforeEach(() => {
+    useAppStore.setState({ dbSelectedObjectsByTab: {} });
+  });
+
+  it("records, updates, and clears DB tab selected objects", () => {
+    useAppStore.getState().setTabDbSelectedObjects("db-tab-1", [
+      {
+        catalog: "hive",
+        schema: "default",
+        name: "orders",
+        kind: "table",
+      },
+      {
+        catalog: "hive",
+        schema: "default",
+        name: "sp_sync",
+        kind: "procedure",
+      },
+    ]);
+
+    expect(useAppStore.getState().dbSelectedObjectsByTab["db-tab-1"]).toMatchObject([
+      {
+        catalog: "hive",
+        schema: "default",
+        name: "orders",
+        kind: "table",
+      },
+      {
+        catalog: "hive",
+        schema: "default",
+        name: "sp_sync",
+        kind: "procedure",
+      },
+    ]);
+
+    useAppStore.getState().setTabDbSelectedObjects("db-tab-1", [
+      {
+        catalog: null,
+        schema: "public",
+        name: "report_v",
+        kind: "view",
+      },
+    ]);
+    expect(useAppStore.getState().dbSelectedObjectsByTab["db-tab-1"]).toMatchObject([
+      {
+        catalog: null,
+        schema: "public",
+        name: "report_v",
+        kind: "view",
+      },
+    ]);
+
+    useAppStore.getState().setTabDbSelectedObjects("db-tab-1", null);
+    expect(useAppStore.getState().dbSelectedObjectsByTab["db-tab-1"]).toBeUndefined();
+  });
+});
+
 describe("appStore.sidebar", () => {
   beforeEach(() => {
     window.localStorage.clear();

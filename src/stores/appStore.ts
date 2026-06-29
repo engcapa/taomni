@@ -7,6 +7,24 @@ import type { TabFilter } from "../lib/tabFilter";
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
+export type DbObjectKind =
+  | "table"
+  | "view"
+  | "materialized_view"
+  | "procedure"
+  | "function"
+  | "trigger"
+  | "event"
+  | "sequence"
+  | "dictionary";
+
+export interface DbSelectedObject {
+  catalog: string | null;
+  schema: string | null;
+  name: string;
+  kind: DbObjectKind;
+}
+
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
@@ -68,6 +86,14 @@ interface AppState {
   dbConnByTab: Record<string, string>;
 
   /**
+   * Current objects selected in a DB tab's left schema tree. Ephemeral and keyed
+   * by DB tab id; bridged into AI chat turns so SQL MCP tools can resolve
+   * phrases such as "selected tables" without guessing. This can include
+   * tables, views, routines, triggers, and other engine-specific object kinds.
+   */
+  dbSelectedObjectsByTab: Record<string, DbSelectedObject[]>;
+
+  /**
    * Whether SQL run by the in-app AI/Claude Code agent is echoed into the
    * linked query tab's editor (appended, never auto-run). Toggled from the chat
    * drawer; persisted to localStorage, default on.
@@ -125,6 +151,8 @@ interface AppState {
    * (see {@link dbConnByTab}). Called by the DB client on connect/disconnect.
    */
   setTabDbConn: (tabId: string, connId: string | null) => void;
+  /** Record or clear a DB tab's current schema-tree object selection. */
+  setTabDbSelectedObjects: (tabId: string, selected: DbSelectedObject[] | null) => void;
   /** Toggle SQL echo to the linked query tab (see {@link sqlEcho}). */
   setSqlEcho: (enabled: boolean) => void;
 }
@@ -261,6 +289,20 @@ function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
   return next;
 }
 
+function dbSelectedObjectsEqual(a: DbSelectedObject[] | undefined, b: DbSelectedObject[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  return a.every((item, index) => {
+    const other = b[index];
+    return (
+      other &&
+      item.catalog === other.catalog &&
+      item.schema === other.schema &&
+      item.name === other.name &&
+      item.kind === other.kind
+    );
+  });
+}
+
 function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
   return !!activeTabId && tabs.some((tab) => tab.id === activeTabId && tab.type === "terminal");
 }
@@ -329,6 +371,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeSideTab: "sessions",
   cwdByTab: {},
   dbConnByTab: {},
+  dbSelectedObjectsByTab: {},
   sqlEcho: readSqlEcho(),
   xServerEnabled: false,
   xServerStatus: null,
@@ -662,6 +705,25 @@ export const useAppStore = create<AppState>((set) => ({
       return s.dbConnByTab[tabId] === connId
         ? s
         : { dbConnByTab: { ...s.dbConnByTab, [tabId]: connId } };
+    }),
+
+  setTabDbSelectedObjects: (tabId, selected) =>
+    set((s) => {
+      if (selected === null || selected.length === 0) {
+        if (!(tabId in s.dbSelectedObjectsByTab)) return s;
+        const next = { ...s.dbSelectedObjectsByTab };
+        delete next[tabId];
+        return { dbSelectedObjectsByTab: next };
+      }
+      if (dbSelectedObjectsEqual(s.dbSelectedObjectsByTab[tabId], selected)) {
+        return s;
+      }
+      return {
+        dbSelectedObjectsByTab: {
+          ...s.dbSelectedObjectsByTab,
+          [tabId]: selected,
+        },
+      };
     }),
 
   setSqlEcho: (enabled) =>
