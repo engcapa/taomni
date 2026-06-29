@@ -16,6 +16,7 @@ export type AppCommand =
   | "split"
   | "multiexec"
   | "tunneling"
+  | "git"
   | "lan-chat"
   | "packages"
   | "settings"
