@@ -1,7 +1,7 @@
 use russh::client::{self, KeyboardInteractiveAuthResponse};
 use russh::keys::ssh_key::{Algorithm as SshAlgorithm, EcdsaCurve, HashAlg};
 use russh::keys::{self, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
-use russh::{client::Msg, kex, ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty};
+use russh::{client::Msg, kex, mac, ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty};
 use russh::ChannelStream;
 use std::borrow::Cow;
 use std::future::Future;
@@ -304,6 +304,24 @@ const COMPAT_HOST_KEY_ORDER: &[SshAlgorithm] = &[
     SshAlgorithm::Rsa { hash: None },
 ];
 
+/// MAC algorithms offered to the server. This mirrors russh's modern default
+/// (`SAFE_HMAC_ORDER`) but appends the SHA-1 HMACs that russh 0.61 dropped from
+/// its built-in default. Some legacy servers (older OpenSSH, Dropbear, embedded
+/// devices) only support hmac-sha1; without it the handshake fails with
+/// "No common Mac algorithm". The SHA-1 variants are listed last so modern
+/// servers still negotiate a SHA-2 MAC and only old servers fall back to SHA-1.
+/// Note: russh 0.61 implements only these MAC names — hmac-md5, umac-64,
+/// hmac-ripemd160 and the *-96 truncated variants are not available, so
+/// hmac-sha1 is the only legacy MAC we can offer.
+const COMPAT_MAC_ORDER: &[mac::Name] = &[
+    mac::HMAC_SHA512_ETM,
+    mac::HMAC_SHA256_ETM,
+    mac::HMAC_SHA512,
+    mac::HMAC_SHA256,
+    mac::HMAC_SHA1_ETM,
+    mac::HMAC_SHA1,
+];
+
 const DEFAULT_PTY_MODES: &[(Pty, u32)] = &[
     (Pty::VINTR, 3),
     (Pty::VQUIT, 28),
@@ -360,7 +378,7 @@ fn build_client_config(network: Option<&NetworkSettings>) -> Arc<client::Config>
         kex: Cow::Borrowed(COMPAT_KEX_ORDER),
         key: Cow::Borrowed(COMPAT_HOST_KEY_ORDER),
         cipher: preferred.cipher,
-        mac: preferred.mac,
+        mac: Cow::Borrowed(COMPAT_MAC_ORDER),
         compression: preferred.compression,
     };
     if let Some(n) = network {
