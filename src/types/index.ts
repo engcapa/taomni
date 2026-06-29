@@ -4,7 +4,7 @@ import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";
@@ -243,6 +243,10 @@ export interface ObjectStorageTabInfo {
   config: ObjectStorageConfig;
 }
 
+export interface GitTabInfo {
+  repoRoot: string;
+}
+
 export interface Tab {
   id: string;
   /**
@@ -269,6 +273,7 @@ export interface Tab {
   fileBrowser?: FileBrowserTabInfo;
   proxyTest?: ProxyTestTabInfo;
   objectStorage?: ObjectStorageTabInfo;
+  git?: GitTabInfo;
   hasNewOutput?: boolean;
   /**
    * One-shot starting directory for a freshly opened local/SSH terminal tab.

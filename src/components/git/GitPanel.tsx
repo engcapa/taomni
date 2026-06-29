@@ -1,0 +1,1301 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  AlertTriangle,
+  GitBranch,
+  GitCommitHorizontal,
+  GitFork,
+  GitMerge,
+  List,
+  ListTree,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Save,
+  Settings,
+  Trash2,
+  Upload,
+  Download,
+} from "lucide-react";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
+import {
+  gitCheckoutBranch,
+  gitCherryPick,
+  gitOperationState,
+  gitOperationContinue,
+  gitOperationAbort,
+  gitRebaseSkip,
+  gitResolveConflict,
+  gitCleanUntracked,
+  gitCommit,
+  gitCreateBranch,
+  gitDeleteBranch,
+  gitDeleteRemote,
+  gitBlobPair,
+  GIT_REF_WORKTREE,
+  gitDiscard,
+  gitFetch,
+  gitMergeBranch,
+  gitRenameBranch,
+  gitSetUpstream,
+  gitCreateTag,
+  gitDeleteTag,
+  gitPushTag,
+  gitCheckoutTag,
+  gitPull,
+  gitPush,
+  gitRepoName,
+  gitReset,
+  gitRevert,
+  gitSaveRemoteAuth,
+  gitSaveSettings,
+  gitSetRemote,
+  gitSnapshot,
+  gitStage,
+  gitStashApply,
+  gitStashDrop,
+  gitStashSave,
+  gitStashShow,
+  gitUnstage,
+  selectedRemote,
+  type GitBranch as GitBranchInfo,
+  type GitBlobPair,
+  type GitChange,
+  type GitLogEntry,
+  type GitOperationState,
+  type GitRemote,
+  type GitRepoSettings,
+  type GitResetMode,
+  type GitSnapshot,
+  type GitStashEntry,
+  type GitTag,
+} from "../../lib/git";
+import { alertAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { ContextMenu, type MenuItem } from "../ContextMenu";
+import { ChangesTree } from "./ChangesTree";
+import { CommitLog } from "./CommitLog";
+import { CompareView } from "./CompareView";
+import { DiffViewer } from "./DiffViewer";
+import { useAppStore } from "../../stores/appStore";
+
+interface GitPanelProps {
+  repoRoot: string;
+}
+
+type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
+
+const EMPTY_SETTINGS: GitRepoSettings = {
+  userName: null,
+  userEmail: null,
+  httpProxy: null,
+  httpsProxy: null,
+  pullRebase: null,
+  pushDefault: null,
+  coreAutocrlf: null,
+  coreFilemode: null,
+  commitGpgsign: null,
+};
+
+export function GitPanel({ repoRoot }: GitPanelProps) {
+  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const [view, setView] = useState<GitView>("changes");
+  const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<GitBranchInfo | null>(null);
+  const [selectedStash, setSelectedStash] = useState<GitStashEntry | null>(null);
+  const [diff, setDiff] = useState("");
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [pair, setPair] = useState<GitBlobPair | null>(null);
+  const [pairLoading, setPairLoading] = useState(false);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [remoteName, setRemoteName] = useState("");
+  const [settingsDraft, setSettingsDraft] = useState<GitRepoSettings>(EMPTY_SETTINGS);
+  const [remoteDrafts, setRemoteDrafts] = useState<Record<string, RemoteDraft>>({});
+  const [includeUntracked, setIncludeUntracked] = useState(false);
+  // Track explicitly *unchecked* paths so new changes are committed by default.
+  const [unchecked, setUnchecked] = useState<Set<string>>(() => new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [treeMode, setTreeMode] = useState(() => {
+    try {
+      return localStorage.getItem("taomni.git.changes.tree") !== "flat";
+    } catch {
+      return true;
+    }
+  });
+  const [amendChecked, setAmendChecked] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  const [commitMenu, setCommitMenu] = useState<{ x: number; y: number; entry: GitLogEntry } | null>(null);
+  const anchorRef = useRef<string | null>(null);
+  const [operation, setOperation] = useState<GitOperationState | null>(null);
+  const [compare, setCompare] = useState<{ refA: string; refB: string; title: string } | null>(null);
+  const [historyPath, setHistoryPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("taomni.git.changes.tree", treeMode ? "tree" : "flat");
+    } catch {
+      /* ignore */
+    }
+  }, [treeMode]);
+
+  const repoName = useMemo(() => gitRepoName(repoRoot), [repoRoot]);
+  const selectedChange = useMemo(
+    () => snapshot?.changes.find((change) => change.path === selectedPath) ?? null,
+    [selectedPath, snapshot],
+  );
+  const hasConflicts = !!snapshot?.changes.some((change) => change.conflict);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await gitSnapshot(repoRoot);
+      setSnapshot(next);
+      setSettingsDraft(normalizeSettings(next.settings));
+      setRemoteDrafts((current) => buildRemoteDrafts(next.remotes, current));
+      const paths = new Set(next.changes.map((c) => c.path));
+      // Drop unchecked entries that no longer exist; everything else stays checked.
+      setUnchecked((current) => new Set([...current].filter((p) => paths.has(p))));
+      setSelected((current) => new Set([...current].filter((p) => paths.has(p))));
+      if (!selectedPath || !next.changes.some((change) => change.path === selectedPath)) {
+        setSelectedPath(next.changes[0]?.path ?? null);
+      }
+      if (!selectedBranch || !next.branches.some((branch) => branch.fullName === selectedBranch.fullName)) {
+        setSelectedBranch(next.branches.find((branch) => branch.current) ?? next.branches[0] ?? null);
+      }
+      if (!selectedStash || !next.stashes.some((stash) => stash.selector === selectedStash.selector)) {
+        setSelectedStash(next.stashes[0] ?? null);
+      }
+      const remote = selectedRemote(next);
+      setRemoteName((current) => current || remote?.name || "");
+      try {
+        setOperation(await gitOperationState(repoRoot));
+      } catch {
+        setOperation(null);
+      }
+    } catch (err) {
+      const message = errorMessage(err);
+      setError(message);
+      setStatusMessage(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [repoRoot, selectedBranch, selectedPath, selectedStash, setStatusMessage]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPair() {
+      if (view !== "changes" || !selectedChange) {
+        setPair(null);
+        return;
+      }
+      setPairLoading(true);
+      try {
+        // Local Changes diff: HEAD ↔ working tree (covers staged + unstaged combined;
+        // untracked files have no HEAD side and show as fully added).
+        const next = await gitBlobPair(
+          repoRoot,
+          selectedChange.path,
+          "HEAD",
+          GIT_REF_WORKTREE,
+          selectedChange.oldPath,
+        );
+        if (!cancelled) setPair(next);
+      } catch (err) {
+        if (!cancelled) {
+          setPair(null);
+          setError(errorMessage(err));
+        }
+      } finally {
+        if (!cancelled) setPairLoading(false);
+      }
+    }
+    void loadPair();
+    return () => {
+      cancelled = true;
+    };
+  }, [repoRoot, selectedChange, view]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDiff() {
+      setDiffLoading(true);
+      try {
+        if (view === "stash" && selectedStash) {
+          const text = await gitStashShow(repoRoot, selectedStash.selector);
+          if (!cancelled) setDiff(text || "(stash has no patch)");
+        } else {
+          setDiff("");
+        }
+      } catch (err) {
+        if (!cancelled) setDiff(errorMessage(err));
+      } finally {
+        if (!cancelled) setDiffLoading(false);
+      }
+    }
+    void loadDiff();
+    return () => {
+      cancelled = true;
+    };
+  }, [repoRoot, selectedStash, view]);
+
+  const runAction = useCallback(
+    async (label: string, action: () => Promise<void>) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await action();
+        await refresh();
+        setStatusMessage(`${label} completed`);
+      } catch (err) {
+        const message = errorMessage(err);
+        setError(message);
+        setStatusMessage(message);
+        await alertAppDialog({ title: label, message });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh, setStatusMessage],
+  );
+
+  const changesList = useMemo(() => snapshot?.changes ?? [], [snapshot]);
+  const orderedPaths = useMemo(
+    () => [...changesList].map((c) => c.path).sort((a, b) => a.localeCompare(b)),
+    [changesList],
+  );
+  const checked = useMemo(
+    () => new Set(changesList.filter((c) => !unchecked.has(c.path)).map((c) => c.path)),
+    [changesList, unchecked],
+  );
+  const checkedPaths = useMemo(() => [...checked], [checked]);
+  const opPaths = selected.size > 0 ? [...selected] : selectedPath ? [selectedPath] : [];
+
+  const toggleChecked = useCallback((paths: string[], value: boolean) => {
+    setUnchecked((prev) => {
+      const next = new Set(prev);
+      for (const p of paths) {
+        if (value) next.delete(p);
+        else next.add(p);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelect = useCallback(
+    (path: string, mods: { ctrl: boolean; shift: boolean }) => {
+      setSelectedPath(path);
+      setSelected((prev) => {
+        if (mods.ctrl) {
+          const next = new Set(prev);
+          if (next.has(path)) next.delete(path);
+          else next.add(path);
+          anchorRef.current = path;
+          return next;
+        }
+        if (mods.shift && anchorRef.current) {
+          const from = orderedPaths.indexOf(anchorRef.current);
+          const to = orderedPaths.indexOf(path);
+          if (from !== -1 && to !== -1) {
+            const [lo, hi] = from <= to ? [from, to] : [to, from];
+            return new Set(orderedPaths.slice(lo, hi + 1));
+          }
+        }
+        anchorRef.current = path;
+        return new Set([path]);
+      });
+    },
+    [orderedPaths],
+  );
+
+  const stageAll = () =>
+    runAction("Stage all", () => gitStage(repoRoot, changesList.map((c) => c.path)));
+  const unstageAll = () =>
+    runAction("Unstage all", () => gitUnstage(repoRoot, changesList.filter((c) => c.staged).map((c) => c.path)));
+  const stageSelected = () => opPaths.length && runAction("Stage", () => gitStage(repoRoot, opPaths));
+  const unstageSelected = () => opPaths.length && runAction("Unstage", () => gitUnstage(repoRoot, opPaths));
+  const discardSelected = () => {
+    if (opPaths.length === 0) return;
+    const set = new Set(opPaths);
+    const untracked = changesList.filter((c) => set.has(c.path) && c.status === "untracked").map((c) => c.path);
+    const tracked = changesList.filter((c) => set.has(c.path) && c.status !== "untracked").map((c) => c.path);
+    void confirmAndRun(
+      "Discard changes",
+      `Discard changes in ${opPaths.length} file(s)? This cannot be undone.`,
+      true,
+      () =>
+        runAction("Discard", async () => {
+          if (tracked.length) await gitDiscard(repoRoot, tracked);
+          if (untracked.length) await gitCleanUntracked(repoRoot, untracked);
+        }),
+    );
+  };
+  const doCommit = (push: boolean) => {
+    if (checkedPaths.length === 0 || !commitMessage.trim()) return;
+    void runAction(
+      push ? "Commit and Push" : "Commit",
+      async () => {
+        await gitCommit(repoRoot, commitMessage, amendChecked, checkedPaths);
+        setCommitMessage("");
+        setAmendChecked(false);
+        if (push) {
+          await gitPush(repoRoot, remoteName || null, snapshot?.currentBranch ?? null, !snapshot?.upstream);
+        }
+      },
+    );
+  };
+  const resolveConflict = (side: "ours" | "theirs") => {
+    const targets = changesList.filter((c) => opPaths.includes(c.path) && c.conflict).map((c) => c.path);
+    if (targets.length === 0) return;
+    void runAction(`Accept ${side}`, async () => {
+      for (const p of targets) await gitResolveConflict(repoRoot, p, side);
+    });
+  };
+  const markResolved = () => opPaths.length && runAction("Mark resolved", () => gitStage(repoRoot, opPaths));
+  const openMenu = (path: string, event: ReactMouseEvent) => {
+    event.preventDefault();
+    if (!selected.has(path)) {
+      setSelected(new Set([path]));
+      setSelectedPath(path);
+      anchorRef.current = path;
+    }
+    setMenu({ x: event.clientX, y: event.clientY, path });
+  };
+
+  return (
+    <div data-testid="git-panel" className="h-full w-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]">
+      <header className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+        <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
+        <div className="min-w-0">
+          <div className="font-semibold leading-4 truncate">Git · {repoName}</div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{repoRoot}</div>
+        </div>
+        <span className="taomni-divider-v h-5 mx-1" />
+        <BranchBadge snapshot={snapshot} />
+        {snapshot && (
+          <span className="text-[11px] text-[var(--taomni-text-muted)]">
+            {snapshot.changes.length} changes
+            {snapshot.ahead || snapshot.behind ? ` · ↑${snapshot.ahead} ↓${snapshot.behind}` : ""}
+          </span>
+        )}
+        <div className="flex-1" />
+        <select
+          className="taomni-input h-7 w-32"
+          value={remoteName}
+          onChange={(event) => setRemoteName(event.target.value)}
+          disabled={!snapshot?.remotes.length}
+        >
+          {snapshot?.remotes.length ? snapshot.remotes.map((remote) => (
+            <option key={remote.name} value={remote.name}>{remote.name}</option>
+          )) : <option value="">No remote</option>}
+        </select>
+        <IconButton label="Fetch" icon={<Download className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Fetch", () => gitFetch(repoRoot, remoteName))} />
+        <IconButton label="Pull" icon={<GitMerge className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Pull", () => gitPull(repoRoot, remoteName, pullBranchForRemote(snapshot, remoteName)))} />
+        <IconButton label="Push" icon={<Upload className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Push", () => gitPush(repoRoot, remoteName, snapshot?.currentBranch ?? null, !snapshot?.upstream))} />
+        <IconButton label="Refresh" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={() => void refresh()} />
+      </header>
+
+      <nav className="h-9 shrink-0 flex items-center gap-1 px-3 border-b border-[var(--taomni-divider)]">
+        {(["changes", "log", "branches", "tags", "stash", "settings"] as GitView[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`h-7 px-3 rounded text-[12px] capitalize ${view === item ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
+            onClick={() => setView(item)}
+          >
+            {item}
+          </button>
+        ))}
+        {(busy || loading) && <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" />}
+        {error && <span className="ml-2 text-[11px] text-red-500 truncate">{error}</span>}
+      </nav>
+
+      {(operation && operation.kind !== "none") || hasConflicts ? (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-[12px]">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="min-w-0">
+            {operationLabel(operation)}
+            {operation?.conflictedPaths.length
+              ? ` — ${operation.conflictedPaths.length} conflicted file(s). Resolve and stage them, then continue.`
+              : " Resolve conflicts, stage them, then continue or abort."}
+          </span>
+          <div className="flex-1" />
+          {operation && operation.kind !== "none" ? (
+            <>
+              <button
+                className="taomni-btn h-7 px-2"
+                type="button"
+                disabled={busy}
+                onClick={() => void runAction(`Continue ${operation.kind}`, () => gitOperationContinue(repoRoot, operation.kind))}
+              >
+                Continue
+              </button>
+              {operation.kind === "rebase" && (
+                <button
+                  className="taomni-btn h-7 px-2"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void runAction("Skip", () => gitRebaseSkip(repoRoot))}
+                >
+                  Skip
+                </button>
+              )}
+              <button
+                className="taomni-btn h-7 px-2 text-red-500"
+                type="button"
+                disabled={busy}
+                onClick={() => void runAction(`Abort ${operation.kind}`, () => gitOperationAbort(repoRoot, operation.kind))}
+              >
+                Abort
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <main className="flex-1 min-h-0">
+        {compare ? (
+          <CompareView
+            repoRoot={repoRoot}
+            refA={compare.refA}
+            refB={compare.refB}
+            title={compare.title}
+            onClose={() => setCompare(null)}
+          />
+        ) : historyPath ? (
+          <CommitLog
+            repoRoot={repoRoot}
+            headOid={snapshot?.headOid ?? null}
+            busy={busy}
+            pathFilter={historyPath}
+            onClose={() => setHistoryPath(null)}
+            onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
+          />
+        ) : (
+        <>
+        {view === "changes" && (
+          <ChangesView
+            changes={changesList}
+            treeMode={treeMode}
+            setTreeMode={setTreeMode}
+            checked={checked}
+            checkedCount={checkedPaths.length}
+            selected={selected}
+            opCount={opPaths.length}
+            activePath={selectedPath}
+            onToggleChecked={toggleChecked}
+            onSelect={handleSelect}
+            onContextMenu={openMenu}
+            pair={pair}
+            pairLoading={pairLoading}
+            commitMessage={commitMessage}
+            setCommitMessage={setCommitMessage}
+            amendChecked={amendChecked}
+            setAmendChecked={setAmendChecked}
+            busy={busy}
+            hasRemote={!!remoteName}
+            stageAll={stageAll}
+            unstageAll={unstageAll}
+            stageSelected={stageSelected}
+            unstageSelected={unstageSelected}
+            discardSelected={discardSelected}
+            commit={() => doCommit(false)}
+            commitAndPush={() => doCommit(true)}
+          />
+        )}
+        {view === "log" && (
+          <CommitLog
+            repoRoot={repoRoot}
+            headOid={snapshot?.headOid ?? null}
+            busy={busy}
+            onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
+          />
+        )}
+        {view === "branches" && (
+          <BranchesView
+            snapshot={snapshot}
+            selected={selectedBranch}
+            setSelected={setSelectedBranch}
+            busy={busy}
+            onCreate={async () => {
+              const name = await promptAppDialog({ title: "Create branch", label: "Branch name" });
+              if (name) await runAction("Create branch", () => gitCreateBranch(repoRoot, name, selectedBranch?.name ?? null, true));
+            }}
+            onCheckout={() => selectedBranch && void checkoutBranch(repoRoot, selectedBranch, runAction)}
+            onMerge={() => selectedBranch && void confirmAndRun("Merge branch", `Merge ${selectedBranch.name} into current branch?`, false, () => runAction("Merge", () => gitMergeBranch(repoRoot, selectedBranch.name)))}
+            onDelete={() => selectedBranch && void confirmAndRun("Delete branch", `Delete local branch ${selectedBranch.name}?`, true, () => runAction("Delete branch", () => gitDeleteBranch(repoRoot, selectedBranch.name, false)))}
+            onRename={async () => {
+              if (!selectedBranch) return;
+              const next = await promptAppDialog({ title: "Rename branch", label: "New name", initialValue: selectedBranch.name });
+              if (next && next !== selectedBranch.name) await runAction("Rename branch", () => gitRenameBranch(repoRoot, selectedBranch.name, next));
+            }}
+            onPush={() => selectedBranch && void runAction("Push branch", () => gitPush(repoRoot, remoteName || null, selectedBranch.name, !selectedBranch.upstream))}
+            onSetUpstream={async () => {
+              if (!selectedBranch) return;
+              const up = await promptAppDialog({
+                title: "Set upstream",
+                label: "Upstream (remote/branch, empty to clear)",
+                initialValue: selectedBranch.upstream ?? `${remoteName || "origin"}/${selectedBranch.name}`,
+                allowEmpty: true,
+              });
+              if (up !== null) await runAction("Set upstream", () => gitSetUpstream(repoRoot, selectedBranch.name, up || null));
+            }}
+            onCompare={() => {
+              if (!selectedBranch || !snapshot?.currentBranch) return;
+              setCompare({ refA: selectedBranch.name, refB: snapshot.currentBranch, title: `${selectedBranch.name} → ${snapshot.currentBranch}` });
+            }}
+          />
+        )}
+        {view === "tags" && (
+          <TagsView
+            snapshot={snapshot}
+            busy={busy}
+            hasRemote={!!remoteName}
+            onCreate={async () => {
+              const name = await promptAppDialog({ title: "Create tag", label: "Tag name" });
+              if (!name) return;
+              const message = await promptAppDialog({ title: "Create tag", label: "Annotation message (empty = lightweight)", allowEmpty: true });
+              await runAction("Create tag", () => gitCreateTag(repoRoot, name, null, message || null));
+            }}
+            onCheckout={(tag) => void confirmAndRun("Checkout tag", `Checkout ${tag.name}? This detaches HEAD.`, false, () => runAction("Checkout tag", () => gitCheckoutTag(repoRoot, tag.name)))}
+            onDelete={(tag) => void confirmAndRun("Delete tag", `Delete tag ${tag.name}?`, true, () => runAction("Delete tag", () => gitDeleteTag(repoRoot, tag.name)))}
+            onPush={(tag) => void runAction("Push tag", () => gitPushTag(repoRoot, remoteName || null, tag.name, false))}
+          />
+        )}
+        {view === "stash" && (
+          <StashView
+            snapshot={snapshot}
+            selected={selectedStash}
+            setSelected={setSelectedStash}
+            diff={diff}
+            diffLoading={diffLoading}
+            busy={busy}
+            includeUntracked={includeUntracked}
+            setIncludeUntracked={setIncludeUntracked}
+            onSave={async () => {
+              const message = await promptAppDialog({ title: "Stash changes", label: "Message", allowEmpty: true });
+              if (message !== null) await runAction("Stash", () => gitStashSave(repoRoot, message, includeUntracked));
+            }}
+            onApply={() => selectedStash && void runAction("Apply stash", () => gitStashApply(repoRoot, selectedStash.selector, false))}
+            onPop={() => selectedStash && void runAction("Pop stash", () => gitStashApply(repoRoot, selectedStash.selector, true))}
+            onDrop={() => selectedStash && void confirmAndRun("Drop stash", `Drop ${selectedStash.selector}?`, true, () => runAction("Drop stash", () => gitStashDrop(repoRoot, selectedStash.selector)))}
+          />
+        )}
+        {view === "settings" && (
+          <SettingsView
+            snapshot={snapshot}
+            settings={settingsDraft}
+            setSettings={setSettingsDraft}
+            remoteDrafts={remoteDrafts}
+            setRemoteDrafts={setRemoteDrafts}
+            busy={busy}
+            onSaveSettings={() => void runAction("Save Git settings", () => gitSaveSettings(repoRoot, settingsDraft))}
+            onSaveRemote={(remote, draft) => void runAction("Save remote", async () => {
+              await gitSetRemote(repoRoot, draft.name || remote.name, draft.fetchUrl, draft.pushUrl);
+              await gitSaveRemoteAuth(repoRoot, draft.name || remote.name, draft.username, draft.token, false);
+              setRemoteDrafts({ ...remoteDrafts, [remote.name]: { ...draft, token: "" } });
+            })}
+            onClearToken={(remote) => void runAction("Clear remote token", async () => {
+              await gitSaveRemoteAuth(repoRoot, remote.name, remoteDrafts[remote.name]?.username ?? remote.username, null, true);
+            })}
+            onDeleteRemote={(remote) => void confirmAndRun("Delete remote", `Delete remote ${remote.name}?`, true, () => runAction("Delete remote", () => gitDeleteRemote(repoRoot, remote.name)))}
+            onAddRemote={async () => {
+              const name = await promptAppDialog({ title: "Add remote", label: "Remote name", initialValue: "origin" });
+              if (!name) return;
+              const url = await promptAppDialog({ title: "Add remote", label: "Remote URL" });
+              if (!url) return;
+              await runAction("Add remote", () => gitSetRemote(repoRoot, name, url, null));
+            }}
+          />
+        )}
+        </>
+        )}
+      </main>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={changeMenuItems({
+            repoRoot,
+            opPaths,
+            conflicted: changesList.some((c) => opPaths.includes(c.path) && c.conflict),
+            onStage: stageSelected,
+            onUnstage: unstageSelected,
+            onDiscard: discardSelected,
+            onShowDiff: () => setSelectedPath(menu.path),
+            onShowHistory: () => setHistoryPath(menu.path),
+            onAcceptOurs: () => resolveConflict("ours"),
+            onAcceptTheirs: () => resolveConflict("theirs"),
+            onMarkResolved: markResolved,
+          })}
+        />
+      )}
+      {commitMenu && (
+        <ContextMenu
+          x={commitMenu.x}
+          y={commitMenu.y}
+          onClose={() => setCommitMenu(null)}
+          items={commitMenuItems(commitMenu.entry, {
+            onCherryPick: (e) =>
+              void confirmAndRun("Cherry-pick", `Cherry-pick ${e.shortOid}: ${e.subject}?`, false, () =>
+                runAction("Cherry-pick", () => gitCherryPick(repoRoot, e.oid))),
+            onRevert: (e) =>
+              void confirmAndRun("Revert commit", `Revert ${e.shortOid}: ${e.subject}?`, false, () =>
+                runAction("Revert", () => gitRevert(repoRoot, e.oid))),
+            onReset: (e, mode) =>
+              void confirmAndRun(`Reset ${mode}`, `Reset current branch to ${e.shortOid} using --${mode}? `, mode === "hard", () =>
+                runAction("Reset", () => gitReset(repoRoot, e.oid, mode))),
+            onNewBranch: async (e) => {
+              const name = await promptAppDialog({ title: "New branch from commit", label: "Branch name" });
+              if (name) await runAction("Create branch", () => gitCreateBranch(repoRoot, name, e.oid, true));
+            },
+          })}
+        />
+      )}
+    </div>
+  );
+}
+
+function ChangesView({
+  changes,
+  treeMode,
+  setTreeMode,
+  checked,
+  checkedCount,
+  selected,
+  opCount,
+  activePath,
+  onToggleChecked,
+  onSelect,
+  onContextMenu,
+  pair,
+  pairLoading,
+  commitMessage,
+  setCommitMessage,
+  amendChecked,
+  setAmendChecked,
+  busy,
+  hasRemote,
+  stageAll,
+  unstageAll,
+  stageSelected,
+  unstageSelected,
+  discardSelected,
+  commit,
+  commitAndPush,
+}: {
+  changes: GitChange[];
+  treeMode: boolean;
+  setTreeMode: (value: boolean) => void;
+  checked: Set<string>;
+  checkedCount: number;
+  selected: Set<string>;
+  opCount: number;
+  activePath: string | null;
+  onToggleChecked: (paths: string[], value: boolean) => void;
+  onSelect: (path: string, mods: { ctrl: boolean; shift: boolean }) => void;
+  onContextMenu: (path: string, event: ReactMouseEvent) => void;
+  pair: GitBlobPair | null;
+  pairLoading: boolean;
+  commitMessage: string;
+  setCommitMessage: (message: string) => void;
+  amendChecked: boolean;
+  setAmendChecked: (value: boolean) => void;
+  busy: boolean;
+  hasRemote: boolean;
+  stageAll: () => void;
+  unstageAll: () => void;
+  stageSelected: () => void;
+  unstageSelected: () => void;
+  discardSelected: () => void;
+  commit: () => void;
+  commitAndPush: () => void;
+}) {
+  const active = changes.find((change) => change.path === activePath) ?? null;
+  const canCommit = !busy && checkedCount > 0 && !!commitMessage.trim();
+  return (
+    <PanelGroup orientation="horizontal" id="git-changes-layout">
+      <Panel id="changes-list" defaultSize={36} minSize={24} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
+        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || changes.length === 0} onClick={stageAll}>Stage all</button>
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !changes.some((c) => c.staged)} onClick={unstageAll}>Unstage all</button>
+          <div className="flex-1" />
+          <span className="text-[11px] text-[var(--taomni-text-muted)]">{checkedCount}/{changes.length}</span>
+          <button
+            className="taomni-btn h-7 px-2"
+            type="button"
+            title={treeMode ? "Switch to flat list" : "Switch to directory tree"}
+            onClick={() => setTreeMode(!treeMode)}
+          >
+            {treeMode ? <ListTree className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+        <ChangesTree
+          changes={changes}
+          treeMode={treeMode}
+          checked={checked}
+          onToggleChecked={onToggleChecked}
+          selected={selected}
+          activePath={activePath}
+          onSelect={onSelect}
+          onContextMenu={onContextMenu}
+        />
+        <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2 space-y-2">
+          <textarea
+            className="taomni-input w-full min-h-20 resize-none"
+            value={commitMessage}
+            placeholder="Commit message"
+            onChange={(event) => setCommitMessage(event.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-[12px] select-none">
+              <input type="checkbox" checked={amendChecked} onChange={(e) => setAmendChecked(e.target.checked)} />
+              Amend
+            </label>
+            <div className="flex-1" />
+            <button className="taomni-btn h-7 px-2" type="button" disabled={!canCommit} onClick={commit}>
+              Commit{checkedCount ? ` (${checkedCount})` : ""}
+            </button>
+            <button className="taomni-btn h-7 px-2" type="button" disabled={!canCommit || !hasRemote} onClick={commitAndPush}>
+              Commit and Push
+            </button>
+          </div>
+        </div>
+      </Panel>
+      <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
+      <Panel id="changes-diff" defaultSize={64} minSize={35} className="min-w-0 min-h-0 flex flex-col">
+        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
+          <span className="font-semibold truncate text-[12px]">
+            {active?.path ?? "Diff"}
+            {opCount > 1 ? ` (+${opCount - 1} selected)` : ""}
+          </span>
+          <div className="flex-1" />
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || opCount === 0} onClick={stageSelected}>Stage</button>
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || opCount === 0} onClick={unstageSelected}>Unstage</button>
+          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || opCount === 0} onClick={discardSelected}>Discard</button>
+        </div>
+        <DiffViewer pair={pair} loading={pairLoading} emptyLabel="Select a file to preview its diff" />
+      </Panel>
+    </PanelGroup>
+  );
+}
+
+function BranchesView({
+  snapshot,
+  selected,
+  setSelected,
+  busy,
+  onCreate,
+  onCheckout,
+  onMerge,
+  onDelete,
+  onRename,
+  onPush,
+  onSetUpstream,
+  onCompare,
+}: {
+  snapshot: GitSnapshot | null;
+  selected: GitBranchInfo | null;
+  setSelected: (branch: GitBranchInfo) => void;
+  busy: boolean;
+  onCreate: () => void;
+  onCheckout: () => void;
+  onMerge: () => void;
+  onDelete: () => void;
+  onRename: () => void;
+  onPush: () => void;
+  onSetUpstream: () => void;
+  onCompare: () => void;
+}) {
+  const branches = snapshot?.branches ?? [];
+  const local = branches.filter((b) => !b.remote);
+  const remote = branches.filter((b) => b.remote);
+  const renderGroup = (label: string, list: GitBranchInfo[]) =>
+    list.length === 0 ? null : (
+      <div>
+        <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-quick-bg)] border-b border-[var(--taomni-divider)]">
+          {label} ({list.length})
+        </div>
+        {list.map((branch) => (
+          <button
+            key={branch.fullName}
+            type="button"
+            className={`w-full px-3 py-2 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected?.fullName === branch.fullName ? "bg-[var(--taomni-hover)]" : ""}`}
+            onClick={() => setSelected(branch)}
+          >
+            <GitFork className={`w-4 h-4 ${branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] truncate">{branch.name}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
+                {branch.subject ? ` · ${branch.subject}` : ""}
+              </div>
+            </div>
+            {branch.current && <span className="text-[11px] text-[var(--taomni-accent)]">current</span>}
+          </button>
+        ))}
+      </div>
+    );
+  const localSel = !!selected && !selected.remote;
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)] overflow-x-auto">
+        <IconButton label="New" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current} onClick={onCheckout}>Checkout</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onMerge}>Merge</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={onCompare}>Compare</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onRename}>Rename</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onPush}>Push</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onSetUpstream}>Upstream</button>
+        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onDelete}>Delete</button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {branches.length === 0 ? <EmptyState title="No branches" /> : (
+          <>
+            {renderGroup("Local", local)}
+            {renderGroup("Remote", remote)}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TagsView({
+  snapshot,
+  busy,
+  hasRemote,
+  onCreate,
+  onCheckout,
+  onDelete,
+  onPush,
+}: {
+  snapshot: GitSnapshot | null;
+  busy: boolean;
+  hasRemote: boolean;
+  onCreate: () => void;
+  onCheckout: (tag: GitTag) => void;
+  onDelete: (tag: GitTag) => void;
+  onPush: (tag: GitTag) => void;
+}) {
+  const tags = snapshot?.tags ?? [];
+  const [selected, setSelected] = useState<string | null>(null);
+  const current = tags.find((t) => t.name === selected) ?? null;
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
+        <IconButton label="New tag" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current} onClick={() => current && onCheckout(current)}>Checkout</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current || !hasRemote} onClick={() => current && onPush(current)}>Push</button>
+        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !current} onClick={() => current && onDelete(current)}>Delete</button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {tags.length === 0 ? <EmptyState title="No tags" /> : tags.map((tag) => (
+          <button
+            key={tag.name}
+            type="button"
+            className={`w-full px-3 py-2 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected === tag.name ? "bg-[var(--taomni-hover)]" : ""}`}
+            onClick={() => setSelected(tag.name)}
+          >
+            <GitCommitHorizontal className="w-4 h-4 text-[var(--taomni-text-muted)]" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] truncate">{tag.name}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
+                {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StashView({
+  snapshot,
+  selected,
+  setSelected,
+  diff,
+  diffLoading,
+  busy,
+  includeUntracked,
+  setIncludeUntracked,
+  onSave,
+  onApply,
+  onPop,
+  onDrop,
+}: {
+  snapshot: GitSnapshot | null;
+  selected: GitStashEntry | null;
+  setSelected: (stash: GitStashEntry) => void;
+  diff: string;
+  diffLoading: boolean;
+  busy: boolean;
+  includeUntracked: boolean;
+  setIncludeUntracked: (value: boolean) => void;
+  onSave: () => void;
+  onApply: () => void;
+  onPop: () => void;
+  onDrop: () => void;
+}) {
+  const stashes = snapshot?.stashes ?? [];
+  return (
+    <PanelGroup orientation="horizontal" id="git-stash-layout">
+      <Panel id="stash-list" defaultSize={34} minSize={24} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
+        <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy} onClick={onSave}>Stash</button>
+          <label className="flex items-center gap-1 text-[12px]">
+            <input type="checkbox" checked={includeUntracked} onChange={(event) => setIncludeUntracked(event.target.checked)} />
+            Include untracked
+          </label>
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto">
+          {stashes.length === 0 ? <EmptyState title="No stashes" /> : stashes.map((stash) => (
+            <button
+              key={stash.selector}
+              type="button"
+              className={`w-full px-3 py-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected?.selector === stash.selector ? "bg-[var(--taomni-hover)]" : ""}`}
+              onClick={() => setSelected(stash)}
+            >
+              <div className="taomni-mono text-[11px] text-[var(--taomni-accent)]">{stash.selector}</div>
+              <div className="text-[12px] truncate">{stash.message}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)]">{stash.date}</div>
+            </button>
+          ))}
+        </div>
+      </Panel>
+      <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
+      <Panel id="stash-diff" defaultSize={66} minSize={35} className="min-w-0 min-h-0 flex flex-col">
+        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
+          <span className="font-semibold text-[12px] truncate">{selected?.selector ?? "Stash"}</span>
+          <div className="flex-1" />
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={onApply}>Apply</button>
+          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={onPop}>Pop</button>
+          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected} onClick={onDrop}>Drop</button>
+        </div>
+        <DiffPane diff={diff} loading={diffLoading} />
+      </Panel>
+    </PanelGroup>
+  );
+}
+
+interface RemoteDraft {
+  name: string;
+  fetchUrl: string;
+  pushUrl: string;
+  username: string;
+  token: string;
+}
+
+function SettingsView({
+  snapshot,
+  settings,
+  setSettings,
+  remoteDrafts,
+  setRemoteDrafts,
+  busy,
+  onSaveSettings,
+  onSaveRemote,
+  onClearToken,
+  onDeleteRemote,
+  onAddRemote,
+}: {
+  snapshot: GitSnapshot | null;
+  settings: GitRepoSettings;
+  setSettings: (settings: GitRepoSettings) => void;
+  remoteDrafts: Record<string, RemoteDraft>;
+  setRemoteDrafts: (drafts: Record<string, RemoteDraft>) => void;
+  busy: boolean;
+  onSaveSettings: () => void;
+  onSaveRemote: (remote: GitRemote, draft: RemoteDraft) => void;
+  onClearToken: (remote: GitRemote) => void;
+  onDeleteRemote: (remote: GitRemote) => void;
+  onAddRemote: () => void;
+}) {
+  const remotes = snapshot?.remotes ?? [];
+  return (
+    <div className="h-full min-h-0 overflow-auto">
+      <div className="max-w-[1100px] p-4 space-y-5">
+        <section>
+          <div className="flex items-center gap-2 mb-2">
+            <Settings className="w-4 h-4" />
+            <h2 className="font-semibold">Repository config</h2>
+            <button className="taomni-btn h-7 px-2 ml-auto" type="button" disabled={busy} onClick={onSaveSettings}>
+              <Save className="w-3.5 h-3.5 mr-1" /> Save config
+            </button>
+          </div>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            <SettingInput label="user.name" value={settings.userName} onChange={(value) => setSettings({ ...settings, userName: value })} />
+            <SettingInput label="user.email" value={settings.userEmail} onChange={(value) => setSettings({ ...settings, userEmail: value })} />
+            <SettingInput label="http.proxy" value={settings.httpProxy} onChange={(value) => setSettings({ ...settings, httpProxy: value })} />
+            <SettingInput label="https.proxy" value={settings.httpsProxy} onChange={(value) => setSettings({ ...settings, httpsProxy: value })} />
+            <SettingInput label="pull.rebase" value={settings.pullRebase} onChange={(value) => setSettings({ ...settings, pullRebase: value })} />
+            <SettingInput label="push.default" value={settings.pushDefault} onChange={(value) => setSettings({ ...settings, pushDefault: value })} />
+            <SettingInput label="core.autocrlf" value={settings.coreAutocrlf} onChange={(value) => setSettings({ ...settings, coreAutocrlf: value })} />
+            <SettingInput label="core.filemode" value={settings.coreFilemode} onChange={(value) => setSettings({ ...settings, coreFilemode: value })} />
+            <SettingInput label="commit.gpgsign" value={settings.commitGpgsign} onChange={(value) => setSettings({ ...settings, commitGpgsign: value })} />
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-center gap-2 mb-2">
+            <GitBranch className="w-4 h-4" />
+            <h2 className="font-semibold">Remotes and credentials</h2>
+            <button className="taomni-btn h-7 px-2 ml-auto" type="button" disabled={busy} onClick={onAddRemote}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add remote
+            </button>
+          </div>
+          <div className="space-y-3">
+            {remotes.length === 0 ? <EmptyState title="No remotes configured" /> : remotes.map((remote) => {
+              const draft = remoteDrafts[remote.name] ?? remoteDraft(remote);
+              const updateDraft = (next: RemoteDraft) => setRemoteDrafts({ ...remoteDrafts, [remote.name]: next });
+              return (
+                <div key={remote.name} className="border border-[var(--taomni-divider)] rounded-md overflow-hidden">
+                  <div className="h-8 flex items-center px-3 bg-[var(--taomni-quick-bg)] border-b border-[var(--taomni-divider)]">
+                    <span className="font-semibold">{remote.name}</span>
+                    <span className="ml-2 text-[11px] text-[var(--taomni-text-muted)]">{remote.tokenRef ? "token stored in Vault" : "no token"}</span>
+                    <div className="flex-1" />
+                    <button className="taomni-btn h-6 px-2" type="button" disabled={busy} onClick={() => onSaveRemote(remote, draft)}>Save</button>
+                    <button className="taomni-btn h-6 px-2 ml-1" type="button" disabled={busy || !remote.tokenRef} onClick={() => onClearToken(remote)}>Clear token</button>
+                    <button className="taomni-btn h-6 px-2 ml-1 text-red-500" type="button" disabled={busy} onClick={() => onDeleteRemote(remote)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid gap-3 p-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+                    <SettingInput label="name" value={draft.name} onChange={(value) => updateDraft({ ...draft, name: value ?? "" })} />
+                    <SettingInput label="fetch URL" value={draft.fetchUrl} onChange={(value) => updateDraft({ ...draft, fetchUrl: value ?? "" })} />
+                    <SettingInput label="push URL" value={draft.pushUrl} onChange={(value) => updateDraft({ ...draft, pushUrl: value ?? "" })} />
+                    <SettingInput label="account / username" value={draft.username} onChange={(value) => updateDraft({ ...draft, username: value ?? "" })} />
+                    <label className="text-[12px]">
+                      <span className="block mb-1 text-[var(--taomni-text-muted)]">token</span>
+                      <input
+                        className="taomni-input w-full h-8"
+                        type="password"
+                        value={draft.token}
+                        placeholder={remote.tokenRef ? "Stored in Vault; enter new token to replace" : "Personal access token"}
+                        onChange={(event) => updateDraft({ ...draft, token: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SettingInput({ label, value, onChange }: { label: string; value: string | null; onChange: (value: string | null) => void }) {
+  return (
+    <label className="text-[12px]">
+      <span className="block mb-1 text-[var(--taomni-text-muted)]">{label}</span>
+      <input className="taomni-input w-full h-8" value={value ?? ""} onChange={(event) => onChange(emptyToNull(event.target.value))} />
+    </label>
+  );
+}
+
+function DiffPane({ diff, loading }: { diff: string; loading: boolean }) {
+  return (
+    <div className="flex-1 min-h-0 overflow-auto bg-[var(--taomni-terminal-bg,#111827)]">
+      {loading ? (
+        <div className="h-full flex items-center justify-center text-[var(--taomni-text-muted)]">
+          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading diff
+        </div>
+      ) : diff ? (
+        <pre className="taomni-mono text-[12px] leading-5 p-3 whitespace-pre-wrap break-words text-slate-100">{diff}</pre>
+      ) : (
+        <EmptyState title="Select an item to preview its diff" />
+      )}
+    </div>
+  );
+}
+
+function BranchBadge({ snapshot }: { snapshot: GitSnapshot | null }) {
+  if (!snapshot) return <span className="text-[11px] text-[var(--taomni-text-muted)]">No repo state</span>;
+  return (
+    <span className="inline-flex items-center gap-1 h-6 px-2 rounded bg-[var(--taomni-hover)] text-[12px]">
+      <GitCommitHorizontal className="w-3.5 h-3.5" />
+      {snapshot.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot.currentBranch ?? "(no branch)"}
+    </span>
+  );
+}
+
+function IconButton({ label, icon, disabled, onClick }: { label: string; icon: React.ReactNode; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button className="taomni-btn h-7 px-2 inline-flex items-center gap-1" type="button" disabled={disabled} onClick={onClick} title={label}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function EmptyState({ title }: { title: string }) {
+  return <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">{title}</div>;
+}
+
+function normalizeSettings(settings: GitRepoSettings | null | undefined): GitRepoSettings {
+  return { ...EMPTY_SETTINGS, ...(settings ?? {}) };
+}
+
+function pullBranchForRemote(snapshot: GitSnapshot | null, remoteName: string): string | null {
+  if (!snapshot?.currentBranch || !remoteName) return null;
+  const prefix = `${remoteName}/`;
+  if (snapshot.upstream?.startsWith(prefix)) {
+    return snapshot.upstream.slice(prefix.length) || snapshot.currentBranch;
+  }
+  return snapshot.currentBranch;
+}
+
+function buildRemoteDrafts(remotes: GitRemote[], current: Record<string, RemoteDraft>): Record<string, RemoteDraft> {
+  const next: Record<string, RemoteDraft> = {};
+  for (const remote of remotes) {
+    next[remote.name] = current[remote.name] ?? remoteDraft(remote);
+  }
+  return next;
+}
+
+function remoteDraft(remote: GitRemote): RemoteDraft {
+  return {
+    name: remote.name,
+    fetchUrl: remote.fetchUrl,
+    pushUrl: remote.pushUrl ?? "",
+    username: remote.username ?? "",
+    token: "",
+  };
+}
+
+function emptyToNull(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" ? error : String(error);
+}
+
+async function confirmAndRun(title: string, message: string, danger: boolean, action: () => Promise<void>) {
+  const ok = await confirmAppDialog({ title, message, danger, confirmLabel: title });
+  if (ok) await action();
+}
+
+function changeMenuItems(opts: {
+  repoRoot: string;
+  opPaths: string[];
+  conflicted: boolean;
+  onStage: () => void;
+  onUnstage: () => void;
+  onDiscard: () => void;
+  onShowDiff: () => void;
+  onShowHistory: () => void;
+  onAcceptOurs: () => void;
+  onAcceptTheirs: () => void;
+  onMarkResolved: () => void;
+}): MenuItem[] {
+  const { repoRoot, opPaths, conflicted, onStage, onUnstage, onDiscard, onShowDiff } = opts;
+  const sep = repoRoot.includes("\\") ? "\\" : "/";
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => {});
+  };
+  const disabled = opPaths.length === 0;
+  const items: MenuItem[] = [
+    { label: "Show diff", disabled, onClick: onShowDiff },
+    { label: "Show history", disabled: opPaths.length !== 1, onClick: opts.onShowHistory },
+  ];
+  if (conflicted) {
+    items.push(
+      { label: "", separator: true },
+      { label: "Accept ours", onClick: opts.onAcceptOurs },
+      { label: "Accept theirs", onClick: opts.onAcceptTheirs },
+      { label: "Mark resolved", onClick: opts.onMarkResolved },
+    );
+  }
+  items.push(
+    { label: "", separator: true },
+    { label: "Stage", disabled, onClick: onStage },
+    { label: "Unstage", disabled, onClick: onUnstage },
+    { label: "Discard…", disabled, danger: true, onClick: onDiscard },
+    { label: "", separator: true },
+    {
+      label: opPaths.length > 1 ? `Copy paths (${opPaths.length})` : "Copy path",
+      disabled,
+      onClick: () => copy(opPaths.map((p) => `${repoRoot}${sep}${p.split("/").join(sep)}`).join("\n")),
+    },
+    { label: "Copy relative path", disabled, onClick: () => copy(opPaths.join("\n")) },
+  );
+  return items;
+}
+
+function commitMenuItems(
+  entry: GitLogEntry,
+  handlers: {
+    onCherryPick: (e: GitLogEntry) => void;
+    onRevert: (e: GitLogEntry) => void;
+    onReset: (e: GitLogEntry, mode: GitResetMode) => void;
+    onNewBranch: (e: GitLogEntry) => void;
+  },
+): MenuItem[] {
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => {});
+  };
+  return [
+    { label: "Cherry-pick", onClick: () => handlers.onCherryPick(entry) },
+    { label: "Revert", onClick: () => handlers.onRevert(entry) },
+    {
+      label: "Reset current branch to here",
+      children: [
+        { label: "Soft", onClick: () => handlers.onReset(entry, "soft") },
+        { label: "Mixed", onClick: () => handlers.onReset(entry, "mixed") },
+        { label: "Hard", danger: true, onClick: () => handlers.onReset(entry, "hard") },
+      ],
+    },
+    { label: "New branch here…", onClick: () => handlers.onNewBranch(entry) },
+    { label: "", separator: true },
+    { label: "Copy revision hash", onClick: () => copy(entry.oid) },
+    { label: "Copy subject", onClick: () => copy(entry.subject) },
+  ];
+}
+
+function operationLabel(operation: GitOperationState | null): string {
+  switch (operation?.kind) {
+    case "merge":
+      return "Merge in progress.";
+    case "cherryPick":
+      return "Cherry-pick in progress.";
+    case "revert":
+      return "Revert in progress.";
+    case "rebase":
+      return "Rebase in progress.";
+    default:
+      return "Conflicts detected.";
+  }
+}
+
+async function checkoutBranch(
+  repoRoot: string,
+  branch: GitBranchInfo,
+  runAction: (label: string, action: () => Promise<void>) => Promise<void>,
+) {
+  if (branch.remote) {
+    const suggested = branch.name.split("/").slice(1).join("/") || branch.name;
+    const localName = await promptAppDialog({
+      title: "Checkout remote branch",
+      label: "Local branch name",
+      initialValue: suggested,
+    });
+    if (!localName) return;
+    await runAction("Checkout remote branch", () => gitCreateBranch(repoRoot, localName, branch.name, true));
+    return;
+  }
+  await runAction("Checkout branch", () => gitCheckoutBranch(repoRoot, branch.name));
+}

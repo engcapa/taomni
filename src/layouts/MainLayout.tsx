@@ -31,6 +31,7 @@ import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
 import { StatusBar } from "../components/statusbar/StatusBar";
 import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import { GitPanel } from "../components/git/GitPanel";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -77,7 +78,7 @@ import { useUpdateStore } from "../stores/updateStore";
 import { ServersDialog } from "../components/servers/ServersDialog";
 import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
-import { exitApp, type SessionConfig } from "../lib/ipc";
+import { exitApp, selectFolderPath, type SessionConfig } from "../lib/ipc";
 import {
   vaultPut,
   VAULT_LOCKED_EVENT,
@@ -100,6 +101,8 @@ import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
 import { setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
+import { gitInitRepo, gitProbePath, gitRepoName } from "../lib/git";
+import { alertAppDialog, confirmAppDialog } from "../lib/appDialogs";
 
 const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
 const RdpPanel = lazy(() => import("../components/rdp/RdpPanel"));
@@ -1445,6 +1448,77 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [handleOpenLocalPath, markConnected, setStatusMessage]);
 
+  const openGitTab = useCallback((repoRoot: string) => {
+    const normalized = repoRoot.trim();
+    if (!normalized) return;
+    const existing = tabsRef.current.find((tab) => tab.type === "git" && tab.git?.repoRoot === normalized);
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: `git-${Date.now()}`,
+      type: "git",
+      title: `Git · ${gitRepoName(normalized)}`,
+      closable: true,
+      git: { repoRoot: normalized },
+    });
+  }, [addTab, setActiveTab]);
+
+  const openGitRepository = useCallback(async (path?: string | null) => {
+    const target = path ?? await selectFolderPath();
+    if (!target) return;
+    try {
+      const probe = await gitProbePath(target);
+      if (!probe.gitAvailable) {
+        await alertAppDialog({
+          title: "Git Repository",
+          message: probe.error ?? "Git executable was not found.",
+        });
+        return;
+      }
+      if (probe.isRepo && probe.repoRoot) {
+        openGitTab(probe.repoRoot);
+        return;
+      }
+      const shouldInit = await confirmAppDialog({
+        title: "Initialize Git repository",
+        message: `"${target}" is not inside a Git repository. Initialize a new repository here?`,
+        confirmLabel: "Initialize",
+      });
+      if (!shouldInit) return;
+      const initialized = await gitInitRepo(target);
+      openGitTab(initialized.repoRoot ?? target);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatusMessage(message);
+      await alertAppDialog({ title: "Git Repository", message });
+    }
+  }, [openGitTab, setStatusMessage]);
+
+  const activeTerminalGitAction = useMemo(() => {
+    const tab = activeTab;
+    if (!tab || tab.type !== "terminal" || tab.ssh || tab.commandTerminal) {
+      return undefined;
+    }
+    const cwd = terminalCwds[tab.id] ?? null;
+    return {
+      label: cwd ? `Git · ${cwd}` : "Git Repository",
+      title: cwd ? `Open Git panel for ${cwd}` : "Open Git panel for the current terminal directory",
+      onOpen: async () => {
+        const latestCwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
+        if (!latestCwd) {
+          await alertAppDialog({
+            title: "Git Repository",
+            message: "The current terminal directory is not available yet.",
+          });
+          return;
+        }
+        await openGitRepository(latestCwd);
+      },
+    };
+  }, [activeTab, openGitRepository, queryTerminalCwd, terminalCwds]);
+
   const openBrowserSession = useCallback((session: SessionConfig) => {
     const url = browserUrlFromSession(session);
     if (!url) {
@@ -2214,6 +2288,9 @@ export function MainLayout() {
       case "tools":
         openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
         break;
+      case "git":
+        void openGitRepository();
+        break;
       case "packages":
         openPlaceholderTab(t("tabs.packages"), t("status.commandUnavailable"));
         break;
@@ -2238,6 +2315,7 @@ export function MainLayout() {
     handleNewSftpSession,
     loadSessions,
     openLocalTab,
+    openGitRepository,
     openPlaceholderTab,
     openSettingsTab,
     openLanChatTab,
@@ -2521,6 +2599,7 @@ export function MainLayout() {
               onEditSession={handleEditSession}
               onConnectSession={handleConnectSession}
               onOpenSettings={() => handleCommand("settings")}
+              gitAction={activeTerminalGitAction}
             />
           </div>
         )}
@@ -2561,6 +2640,7 @@ export function MainLayout() {
                 onEditSession={handleEditSession}
                 onConnectSession={handleConnectSession}
                 onOpenSettings={() => handleCommand("settings")}
+                gitAction={activeTerminalGitAction}
               />
             </div>
           </Panel>
@@ -2690,6 +2770,20 @@ export function MainLayout() {
                                   toggleAttachedSidebar(tab.id);
                                 }
                               }
+                            } : undefined}
+                            gitToggle={!tab.ssh && !tab.commandTerminal ? {
+                              cwd: terminalCwds[tab.id] ?? null,
+                              onOpen: async () => {
+                                const cwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
+                                if (!cwd) {
+                                  await alertAppDialog({
+                                    title: "Git Repository",
+                                    message: "The current terminal directory is not available yet.",
+                                  });
+                                  return;
+                                }
+                                await openGitRepository(cwd);
+                              },
                             } : undefined}
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
@@ -2921,6 +3015,10 @@ export function MainLayout() {
 
                 {activeTab?.type === "settings" && <SettingsPanel />}
 
+                {activeTab?.type === "git" && activeTab.git && (
+                  <GitPanel repoRoot={activeTab.git.repoRoot} />
+                )}
+
                 {activeTab?.type === "lan-chat" && <LanChatGate />}
 
                 {/* VNC tabs — always mounted so connection survives tab switches */}
@@ -3100,6 +3198,7 @@ export function MainLayout() {
                   activeTab.type !== "redis" &&
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "settings" &&
+                  activeTab.type !== "git" &&
                   activeTab.type !== "nettools" &&
                   activeTab.type !== "lan-chat" &&
                   activeTab.type !== "proxy-test" && (
