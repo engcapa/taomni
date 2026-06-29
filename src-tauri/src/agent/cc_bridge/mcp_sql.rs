@@ -1,5 +1,5 @@
 //! Phase 6 — the `taomni_sql` MCP flavor: the tool surface a Claude Code thread
-//! bound to a SQL DB session (MySQL / PostgreSQL / SQL Server / ClickHouse / Presto) sees.
+//! bound to a SQL DB session (MySQL / PostgreSQL / SQL Server / StarRocks / ClickHouse / Presto) sees.
 //!
 //! Unlike the shell flavor (which routes side-effects back through the frontend
 //! terminal), every tool here runs **backend-direct**: it resolves the thread's
@@ -751,7 +751,7 @@ impl ServerHandler for SqlHandler {
         info.capabilities = ServerCapabilities::builder().enable_tools().build();
         info.instructions = Some(
             "Taomni SQL database tools. You operate on the chat thread's bound DB connection \
-             (MySQL/PostgreSQL/SQL Server/ClickHouse/Presto). Use these tools, not local Bash/Read. \
+             (MySQL/PostgreSQL/SQL Server/StarRocks/ClickHouse/Presto). Use these tools, not local Bash/Read. \
              Mutating statements route through human confirmation."
                 .into(),
         );

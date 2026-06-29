@@ -575,6 +575,8 @@ function dbEngineColor(engine?: string): string {
       return "#336791";
     case "SQLServer":
       return "#cc2927";
+    case "StarRocks":
+      return "#0f8f8c";
     case "ClickHouse":
       return "#e6a817";
     case "Presto":

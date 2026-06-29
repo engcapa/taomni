@@ -40,6 +40,13 @@ describe("splitSqlStatements", () => {
     ]);
   });
 
+  it("splits StarRocks scripts for execution like MySQL-compatible sessions", () => {
+    expect(sqlStatementsForExecution("StarRocks", "select 1; select 2;")).toEqual([
+      "select 1",
+      "select 2",
+    ]);
+  });
+
   it("continues splitting Presto scripts so each request sends one statement", () => {
     expect(sqlStatementsForExecution("Presto", "select 1; select 2;")).toEqual([
       "select 1",

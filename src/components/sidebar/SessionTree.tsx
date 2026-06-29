@@ -100,7 +100,7 @@ import { useT } from "../../lib/i18n";
 import { ensureVaultReady } from "../../lib/vaultGate";
 
 const SESSION_DRAG_MIME = "taomni/session";
-const DB_PASSWORD_SESSION_TYPES = new Set(["MySQL", "PostgreSQL", "SQLServer", "ClickHouse", "Presto", "Redis", "HBaseShell"]);
+const DB_PASSWORD_SESSION_TYPES = new Set(["MySQL", "PostgreSQL", "SQLServer", "StarRocks", "ClickHouse", "Presto", "Redis", "HBaseShell"]);
 
 interface SessionDragPayload {
   sessionId: string;
@@ -1822,6 +1822,8 @@ function sessionIcon(type: string) {
       return <Database className="w-3.5 h-3.5" style={{ color: "#336791" }} />;
     case "SQLServer":
       return <Database className="w-3.5 h-3.5" style={{ color: "#cc2927" }} />;
+    case "StarRocks":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#0f8f8c" }} />;
     case "ClickHouse":
       return <Database className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />;
     case "Redis":

@@ -1,6 +1,6 @@
-//! MySQL / PostgreSQL backend via `sqlx` and SQL Server via `tiberius`. Values
-//! are decoded to `Option<String>` based on the column's SQL type so the
-//! frontend grid can render them as text with a distinct NULL badge.
+//! MySQL / StarRocks / PostgreSQL backend via `sqlx` and SQL Server via
+//! `tiberius`. Values are decoded to `Option<String>` based on the column's SQL
+//! type so the frontend grid can render them as text with a distinct NULL badge.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -77,6 +77,42 @@ pub async fn connect_mysql(config: &DbConfig, password: Option<&str>) -> Result<
         .await
         .map_err(|e| format!("MySQL connect failed: {e}"))?;
     Ok(DbHandle::MySql(pool))
+}
+
+pub async fn connect_starrocks(
+    config: &DbConfig,
+    password: Option<&str>,
+) -> Result<DbHandle, String> {
+    let mut opts = MySqlConnectOptions::new()
+        .host(&config.host)
+        .port(config.port)
+        .pipes_as_concat(false)
+        .no_engine_substitution(false)
+        .timezone(None)
+        .set_names(false);
+    if let Some(user) = config.username.as_deref().filter(|u| !u.is_empty()) {
+        opts = opts.username(user);
+    }
+    if let Some(pw) = password {
+        opts = opts.password(pw);
+    }
+    if let Some(db) = config.database.as_deref().filter(|d| !d.is_empty()) {
+        opts = opts.database(db);
+    }
+    opts = opts.ssl_mode(if config.ssl {
+        MySqlSslMode::Preferred
+    } else {
+        MySqlSslMode::Disabled
+    });
+
+    let pool = MySqlPoolOptions::new()
+        .max_connections(1)
+        .acquire_timeout(timeout(config))
+        .test_before_acquire(true)
+        .connect_with(opts)
+        .await
+        .map_err(|e| format!("StarRocks connect failed: {e}"))?;
+    Ok(DbHandle::StarRocks(pool))
 }
 
 pub async fn connect_postgres(
@@ -163,6 +199,14 @@ pub async fn ping_mysql(pool: &Pool<MySql>) -> Result<String, String> {
         .await
         .map_err(|e| format!("MySQL ping failed: {e}"))?;
     Ok("MySQL connection OK".into())
+}
+
+pub async fn ping_starrocks(pool: &Pool<MySql>) -> Result<String, String> {
+    query("SELECT 1")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("StarRocks ping failed: {e}"))?;
+    Ok("StarRocks connection OK".into())
 }
 
 pub async fn ping_postgres(pool: &Pool<Postgres>) -> Result<String, String> {
