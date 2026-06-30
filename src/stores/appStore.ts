@@ -36,6 +36,7 @@ export interface CodeWorkspaceContext {
   activeFile?: CodeWorkspaceFileContext | null;
   openFiles?: CodeWorkspaceFileContext[];
   dirtyFiles?: CodeWorkspaceFileContext[];
+  lsp?: CodeWorkspaceLspContext | null;
 }
 
 export interface CodeWorkspaceRootContext {
@@ -65,6 +66,29 @@ export type CodeWorkspaceFileContext =
       name?: string;
       path: string;
     };
+
+export interface CodeWorkspaceLspContext {
+  activeStatus?: CodeWorkspaceLspStatusContext | null;
+  diagnostics: CodeWorkspaceLspDiagnosticContext[];
+}
+
+export interface CodeWorkspaceLspStatusContext {
+  displayName?: string | null;
+  languageId?: string | null;
+  active: boolean;
+  available: boolean;
+  selectedCommand?: string | null;
+  installHint?: string | null;
+  error?: string | null;
+}
+
+export interface CodeWorkspaceLspDiagnosticContext {
+  file: CodeWorkspaceFileContext;
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+  messages: string[];
+}
 
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
@@ -812,7 +836,8 @@ export const useAppStore = create<AppState>((set) => ({
         jsonEqual(current.looseFiles, context.looseFiles) &&
         jsonEqual(current.activeFile, context.activeFile) &&
         jsonEqual(current.openFiles, context.openFiles) &&
-        jsonEqual(current.dirtyFiles, context.dirtyFiles)
+        jsonEqual(current.dirtyFiles, context.dirtyFiles) &&
+        jsonEqual(current.lsp, context.lsp)
       ) {
         return s;
       }

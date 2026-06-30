@@ -1523,6 +1523,40 @@ export function CodeWorkspaceTab({
         path: ref.path,
       };
     };
+    const lspDiagnostics = openStates
+      .map((file) => {
+        const diagnostics = lspFiles[file.key]?.diagnostics ?? [];
+        if (diagnostics.length === 0) return null;
+        return {
+          file: toContextFile(file),
+          errorCount: diagnostics.filter((item) => item.severity === 1).length,
+          warningCount: diagnostics.filter((item) => item.severity === 2).length,
+          infoCount: diagnostics.filter((item) => item.severity !== 1 && item.severity !== 2).length,
+          messages: diagnostics
+            .slice()
+            .sort((a, b) => (a.severity ?? 99) - (b.severity ?? 99))
+            .slice(0, 5)
+            .map((item) => item.message),
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => !!item);
+    const activeStatus = activeLspState?.status
+      ? {
+          displayName: activeLspState.status.displayName,
+          languageId: activeLspState.status.languageId,
+          active: activeLspState.status.active,
+          available: activeLspState.status.available,
+          selectedCommand: activeLspState.status.selectedCommand,
+          installHint: activeLspState.status.installHint,
+          error: activeLspState.status.error ?? activeLspState.error,
+        }
+      : null;
+    const lspContext = activeStatus || lspDiagnostics.length > 0
+      ? {
+          activeStatus,
+          diagnostics: lspDiagnostics,
+        }
+      : null;
     setTabCodeWorkspaceContext(tabId, {
       repoRoot: firstRoot?.path ?? workspace.repoRoot ?? "",
       activePath: activeFile?.ref.kind === "root" && activeFile.ref.rootId === firstRoot?.id ? activeFile.ref.path : null,
@@ -1533,8 +1567,9 @@ export function CodeWorkspaceTab({
       activeFile: activeFile ? toContextFile(activeFile) : null,
       openFiles: openStates.map(toContextFile),
       dirtyFiles: dirtyFiles.map(toContextFile),
+      lsp: lspContext,
     });
-  }, [activeFile, dirtyFiles, looseFiles, openFiles, openOrder, roots, setTabCodeWorkspaceContext, tabId, workspace.repoRoot]);
+  }, [activeFile, activeLspState, dirtyFiles, looseFiles, lspFiles, openFiles, openOrder, roots, setTabCodeWorkspaceContext, tabId, workspace.repoRoot]);
 
   useEffect(() => {
     return () => setTabCodeWorkspaceContext(tabId, null);

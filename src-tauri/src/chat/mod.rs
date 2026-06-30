@@ -1713,6 +1713,62 @@ fn code_workspace_context_block(
             format_code_workspace_paths(&workspace.dirty_paths)
         ));
     }
+    if let Some(lsp) = workspace.lsp.as_ref() {
+        if let Some(status) = lsp.active_status.as_ref() {
+            let name = status
+                .display_name
+                .as_deref()
+                .or(status.language_id.as_deref())
+                .unwrap_or("language server");
+            let state = if status.active {
+                "active"
+            } else if status.available {
+                "available"
+            } else {
+                "missing"
+            };
+            let command = status
+                .selected_command
+                .as_deref()
+                .map(|cmd| format!(" via {cmd}"))
+                .unwrap_or_default();
+            lines.push(format!("Code LSP: {name} {state}{command}"));
+            if !status.active {
+                if let Some(hint) = status.install_hint.as_deref() {
+                    lines.push(format!("Code LSP install hint: {hint}"));
+                } else if let Some(error) = status.error.as_deref() {
+                    lines.push(format!("Code LSP issue: {error}"));
+                }
+            }
+        }
+        if !lsp.diagnostics.is_empty() {
+            lines.push("Code diagnostics:".into());
+            for diagnostic in lsp.diagnostics.iter().take(12) {
+                let file = format_code_workspace_file(&diagnostic.file);
+                let mut counts = Vec::new();
+                if diagnostic.error_count > 0 {
+                    counts.push(format!("{} error(s)", diagnostic.error_count));
+                }
+                if diagnostic.warning_count > 0 {
+                    counts.push(format!("{} warning(s)", diagnostic.warning_count));
+                }
+                if diagnostic.info_count > 0 {
+                    counts.push(format!("{} info/hint", diagnostic.info_count));
+                }
+                let counts = if counts.is_empty() {
+                    "diagnostics".to_string()
+                } else {
+                    counts.join(", ")
+                };
+                let messages = if diagnostic.messages.is_empty() {
+                    String::new()
+                } else {
+                    format!(" - {}", diagnostic.messages.join("; "))
+                };
+                lines.push(format!("- {file}: {counts}{messages}"));
+            }
+        }
+    }
     Some(format!("{}\n", lines.join("\n")))
 }
 

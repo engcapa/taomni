@@ -21,6 +21,9 @@ const MAX_CODE_WORKSPACE_PATHS: usize = 64;
 const MAX_CODE_WORKSPACE_PATH_LEN: usize = 512;
 const MAX_CODE_WORKSPACE_ROOTS: usize = 16;
 const MAX_CODE_WORKSPACE_LOOSE_FILES: usize = 64;
+const MAX_CODE_WORKSPACE_LSP_DIAGNOSTIC_FILES: usize = 16;
+const MAX_CODE_WORKSPACE_LSP_MESSAGES: usize = 5;
+const MAX_CODE_WORKSPACE_LSP_TEXT_LEN: usize = 240;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgentDbSelectedObject {
@@ -117,6 +120,48 @@ pub struct AgentCodeWorkspaceFile {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct AgentCodeWorkspaceLspStatus {
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub language_id: Option<String>,
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub available: bool,
+    #[serde(default)]
+    pub selected_command: Option<String>,
+    #[serde(default)]
+    pub install_hint: Option<String>,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCodeWorkspaceLspDiagnostic {
+    pub file: AgentCodeWorkspaceFile,
+    #[serde(default)]
+    pub error_count: u32,
+    #[serde(default)]
+    pub warning_count: u32,
+    #[serde(default)]
+    pub info_count: u32,
+    #[serde(default)]
+    pub messages: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCodeWorkspaceLsp {
+    #[serde(default)]
+    pub active_status: Option<AgentCodeWorkspaceLspStatus>,
+    #[serde(default)]
+    pub diagnostics: Vec<AgentCodeWorkspaceLspDiagnostic>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentCodeWorkspace {
     #[serde(default)]
     pub repo_root: String,
@@ -136,6 +181,8 @@ pub struct AgentCodeWorkspace {
     pub open_files: Vec<AgentCodeWorkspaceFile>,
     #[serde(default)]
     pub dirty_files: Vec<AgentCodeWorkspaceFile>,
+    #[serde(default)]
+    pub lsp: Option<AgentCodeWorkspaceLsp>,
 }
 
 impl AgentCodeWorkspace {
@@ -177,6 +224,10 @@ impl AgentCodeWorkspace {
                     .and_then(clean_code_workspace_path)
                     .and_then(|path| roots.first().map(|root| root_file_for_path(root, path)))
             });
+        let lsp = self
+            .lsp
+            .as_ref()
+            .and_then(|lsp| normalize_code_workspace_lsp(lsp, &roots, &loose_files));
         Some(Self {
             repo_root,
             active_path: self
@@ -190,6 +241,7 @@ impl AgentCodeWorkspace {
             active_file,
             open_files,
             dirty_files,
+            lsp,
         })
     }
 }
@@ -422,6 +474,96 @@ fn normalize_code_workspace_files(
         }
     }
     Some(out)
+}
+
+fn clean_lsp_text(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let mut out = s.replace(['\n', '\r'], " ");
+            if out.len() > MAX_CODE_WORKSPACE_LSP_TEXT_LEN {
+                out.truncate(MAX_CODE_WORKSPACE_LSP_TEXT_LEN);
+                out.push_str("...");
+            }
+            out
+        })
+}
+
+fn normalize_code_workspace_lsp(
+    lsp: &AgentCodeWorkspaceLsp,
+    roots: &[AgentCodeWorkspaceRoot],
+    loose_files: &[AgentCodeWorkspaceLooseFile],
+) -> Option<AgentCodeWorkspaceLsp> {
+    let active_status = lsp.active_status.as_ref().and_then(|status| {
+        let display_name = clean_lsp_text(status.display_name.as_deref());
+        let language_id = clean_lsp_text(status.language_id.as_deref());
+        let selected_command = clean_lsp_text(status.selected_command.as_deref());
+        let install_hint = clean_lsp_text(status.install_hint.as_deref());
+        let error = clean_lsp_text(status.error.as_deref());
+        if display_name.is_none()
+            && language_id.is_none()
+            && selected_command.is_none()
+            && install_hint.is_none()
+            && error.is_none()
+            && !status.active
+            && !status.available
+        {
+            return None;
+        }
+        Some(AgentCodeWorkspaceLspStatus {
+            display_name,
+            language_id,
+            active: status.active,
+            available: status.available,
+            selected_command,
+            install_hint,
+            error,
+        })
+    });
+
+    let mut diagnostics = Vec::new();
+    for diagnostic in &lsp.diagnostics {
+        let Some(file) = normalize_code_workspace_file(&diagnostic.file, roots, loose_files) else {
+            continue;
+        };
+        let total = diagnostic.error_count + diagnostic.warning_count + diagnostic.info_count;
+        if total == 0 && diagnostic.messages.is_empty() {
+            continue;
+        }
+        let mut messages = Vec::new();
+        for message in &diagnostic.messages {
+            let Some(clean) = clean_lsp_text(Some(message)) else {
+                continue;
+            };
+            if messages.iter().any(|existing| existing == &clean) {
+                continue;
+            }
+            messages.push(clean);
+            if messages.len() >= MAX_CODE_WORKSPACE_LSP_MESSAGES {
+                break;
+            }
+        }
+        diagnostics.push(AgentCodeWorkspaceLspDiagnostic {
+            file,
+            error_count: diagnostic.error_count.min(999),
+            warning_count: diagnostic.warning_count.min(999),
+            info_count: diagnostic.info_count.min(999),
+            messages,
+        });
+        if diagnostics.len() >= MAX_CODE_WORKSPACE_LSP_DIAGNOSTIC_FILES {
+            break;
+        }
+    }
+
+    if active_status.is_none() && diagnostics.is_empty() {
+        None
+    } else {
+        Some(AgentCodeWorkspaceLsp {
+            active_status,
+            diagnostics,
+        })
+    }
 }
 
 fn legacy_paths_to_files(
@@ -694,6 +836,7 @@ mod tests {
             active_file: None,
             open_files: vec![],
             dirty_files: vec![],
+            lsp: None,
         }
         .normalized()
         .unwrap();
@@ -719,6 +862,7 @@ mod tests {
             active_file: None,
             open_files: vec![],
             dirty_files: vec![],
+            lsp: None,
         };
 
         assert!(workspace.normalized().is_none());
@@ -788,6 +932,7 @@ mod tests {
                 name: None,
                 path: Some("README.md".into()),
             }],
+            lsp: None,
         }
         .normalized()
         .unwrap();
