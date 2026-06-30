@@ -11,6 +11,7 @@ mod hbase;
 mod history;
 mod lanchat;
 pub mod llm;
+mod mail;
 mod migrate;
 pub mod models;
 mod nettools;
@@ -80,6 +81,7 @@ pub fn run() {
             let db_path = app_data.join("taomni.db");
             let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
+            mail::init_mail_tables(&conn).expect("failed to init mail cache tables");
             servers::db::init_server_tables(&conn).expect("init server tables");
 
             let vault_path = vault::default_vault_path(app.handle());
@@ -480,6 +482,13 @@ pub fn run() {
             objectstorage::storage_cancel_transfer,
             objectstorage::storage_pause_transfer,
             objectstorage::storage_resume_transfer,
+            mail::mail_test_connection,
+            mail::mail_sync_headers,
+            mail::mail_list_cached_folders,
+            mail::mail_list_cached_messages,
+            mail::mail_get_message_body,
+            mail::mail_send_message,
+            mail::mail_clear_cache,
             history::history_append,
             history::history_match_prefix,
             history::history_list_recent,
