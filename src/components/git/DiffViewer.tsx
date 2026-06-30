@@ -96,6 +96,11 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
   --taomni-diff-connector-deleted: rgba(210, 63, 79, 0.18);
   --taomni-diff-connector-modified: rgba(42, 111, 201, 0.19);
   --taomni-diff-connector-stroke: rgba(91, 111, 140, 0.26);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 html[data-app-theme="dark"] .taomni-diff-host {
@@ -123,20 +128,30 @@ html[data-app-theme="dark"] .taomni-diff-host {
 .taomni-diff-host .cm-editor {
   height: 100% !important;
   min-height: 0;
+  min-width: 0;
 }
 
 .taomni-diff-host .cm-mergeView {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   overflow: hidden !important;
   background: var(--taomni-diff-editor-bg);
 }
 
 .taomni-diff-host .cm-mergeViewEditors {
   align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .taomni-diff-host .cm-mergeViewEditor {
+  display: flex;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: var(--taomni-diff-editor-bg);
 }
 
@@ -146,8 +161,12 @@ html[data-app-theme="dark"] .taomni-diff-host {
 
 .taomni-diff-host .cm-mergeView .cm-editor .cm-scroller,
 .taomni-diff-host > .cm-editor .cm-scroller {
+  flex: 1 1 auto;
   height: 100% !important;
-  overflow: auto !important;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
 }
 
 .taomni-diff-host .cm-editor,
@@ -243,10 +262,12 @@ html[data-app-theme="dark"] .taomni-diff-host {
 
 .taomni-diff-host .taomni-diff-connector {
   position: relative;
+  align-self: stretch;
   flex: 0 0 ${CONNECTOR_WIDTH}px;
   width: ${CONNECTOR_WIDTH}px;
   min-width: ${CONNECTOR_WIDTH}px;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
   background:
     linear-gradient(to right, transparent 0, color-mix(in srgb, var(--taomni-diff-border) 55%, transparent) 50%, transparent 100%),
@@ -367,16 +388,81 @@ function mappedScrollTop(source: HTMLElement, target: HTMLElement): number {
   return (source.scrollTop / sourceMax) * targetMax;
 }
 
-function setupSplitDiffInteractions(mv: MergeView, isSyncEnabled: () => boolean): () => void {
+function setImportantStyle(element: HTMLElement, property: string, value: string) {
+  element.style.setProperty(property, value, "important");
+}
+
+function applyEditorViewportLayout(view: EditorView) {
+  const editor = view.dom;
+  const scroller = view.scrollDOM;
+
+  setImportantStyle(editor, "display", "flex");
+  setImportantStyle(editor, "flex-direction", "column");
+  setImportantStyle(editor, "height", "100%");
+  setImportantStyle(editor, "min-height", "0");
+  setImportantStyle(editor, "min-width", "0");
+  setImportantStyle(editor, "overflow", "hidden");
+
+  scroller.style.setProperty("flex", "1 1 auto");
+  setImportantStyle(scroller, "height", "100%");
+  setImportantStyle(scroller, "min-height", "0");
+  setImportantStyle(scroller, "min-width", "0");
+  setImportantStyle(scroller, "overflow-x", "auto");
+  setImportantStyle(scroller, "overflow-y", "auto");
+}
+
+function applySplitDiffLayout(
+  mv: MergeView,
+): { editorDom: HTMLElement; leftWrap: HTMLElement; rightWrap: HTMLElement } | null {
   const editorDom = mv.dom.querySelector<HTMLElement>(".cm-mergeViewEditors");
-  const editorWraps = editorDom
-    ? Array.from(editorDom.children).filter((child): child is HTMLElement =>
-        child instanceof HTMLElement && child.classList.contains("cm-mergeViewEditor"),
-      )
-    : [];
-  const leftWrap = editorWraps[0];
-  const rightWrap = editorWraps[1];
-  if (!editorDom || !leftWrap || !rightWrap) return () => {};
+  const leftWrap = mv.a.dom.parentElement;
+  const rightWrap = mv.b.dom.parentElement;
+  if (
+    !editorDom ||
+    !leftWrap ||
+    !rightWrap ||
+    leftWrap.parentElement !== editorDom ||
+    rightWrap.parentElement !== editorDom
+  ) {
+    return null;
+  }
+
+  setImportantStyle(mv.dom, "display", "flex");
+  setImportantStyle(mv.dom, "flex-direction", "column");
+  setImportantStyle(mv.dom, "height", "100%");
+  setImportantStyle(mv.dom, "min-height", "0");
+  setImportantStyle(mv.dom, "min-width", "0");
+  setImportantStyle(mv.dom, "overflow", "hidden");
+
+  setImportantStyle(editorDom, "display", "flex");
+  editorDom.style.setProperty("flex", "1 1 auto");
+  setImportantStyle(editorDom, "height", "100%");
+  setImportantStyle(editorDom, "min-height", "0");
+  setImportantStyle(editorDom, "min-width", "0");
+  setImportantStyle(editorDom, "overflow", "hidden");
+
+  for (const wrap of [leftWrap, rightWrap]) {
+    setImportantStyle(wrap, "display", "flex");
+    wrap.style.setProperty("flex", "1 1 0");
+    setImportantStyle(wrap, "min-height", "0");
+    setImportantStyle(wrap, "min-width", "0");
+    setImportantStyle(wrap, "overflow", "hidden");
+  }
+
+  applyEditorViewportLayout(mv.a);
+  applyEditorViewportLayout(mv.b);
+  mv.a.requestMeasure();
+  mv.b.requestMeasure();
+
+  return { editorDom, leftWrap, rightWrap };
+}
+
+function setupSplitDiffInteractions(mv: MergeView, isSyncEnabled: () => boolean): () => void {
+  const layout = applySplitDiffLayout(mv);
+  if (!layout) return () => {};
+  const { editorDom, rightWrap } = layout;
+
+  editorDom.querySelector(".taomni-diff-connector")?.remove();
 
   const connector = document.createElement("div");
   connector.className = "taomni-diff-connector";
@@ -397,7 +483,11 @@ function setupSplitDiffInteractions(mv: MergeView, isSyncEnabled: () => boolean)
     renderFrame = 0;
     if (!connector.isConnected) return;
     const width = connector.clientWidth || CONNECTOR_WIDTH;
-    const height = connector.clientHeight;
+    const height =
+      connector.clientHeight ||
+      editorDom.clientHeight ||
+      Math.max(aScroll.clientHeight, bScroll.clientHeight);
+    if (height <= 0) return;
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     svg.setAttribute("width", String(width));
     svg.setAttribute("height", String(height));
@@ -442,6 +532,8 @@ function setupSplitDiffInteractions(mv: MergeView, isSyncEnabled: () => boolean)
   bScroll.addEventListener("scroll", onBScroll, { passive: true });
 
   const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(queueRender) : null;
+  resizeObserver?.observe(mv.dom);
+  resizeObserver?.observe(editorDom);
   resizeObserver?.observe(connector);
   resizeObserver?.observe(aScroll);
   resizeObserver?.observe(bScroll);
@@ -578,6 +670,8 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
             ],
           });
           unifiedRef.current = uv;
+          applyEditorViewportLayout(uv);
+          uv.requestMeasure();
           setDiffCount(getChunks(uv.state)?.chunks.length ?? 0);
         }
       })

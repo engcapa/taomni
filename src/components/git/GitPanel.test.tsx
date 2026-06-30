@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
 import { GitPanel } from "./GitPanel";
-import type { GitOperationState, GitSnapshot } from "../../lib/git";
+import type { GitLogEntry, GitOperationState, GitSnapshot } from "../../lib/git";
 
 const gitMocks = vi.hoisted(() => {
   const settings = {
@@ -50,6 +50,8 @@ const gitMocks = vi.hoisted(() => {
     gitChangeLabel: vi.fn((change: { status: string }) => change.status),
     selectedRemote: vi.fn(() => null),
     gitBlobPair: vi.fn(),
+    gitCommitFiles: vi.fn(async () => []),
+    gitLog: vi.fn(async (): Promise<GitLogEntry[]> => []),
     gitCheckoutBranch: vi.fn(),
     gitCherryPick: vi.fn(),
     gitOperationContinue: vi.fn(),
@@ -101,6 +103,10 @@ describe("GitPanel", () => {
     });
     gitMocks.gitSnapshot.mockClear();
     gitMocks.gitOperationState.mockClear();
+    gitMocks.gitCommitFiles.mockClear();
+    gitMocks.gitCommitFiles.mockResolvedValue([]);
+    gitMocks.gitLog.mockClear();
+    gitMocks.gitLog.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -138,5 +144,89 @@ describe("GitPanel", () => {
 
     fireEvent.wheel(panel, { ctrlKey: true, deltaY: 100 });
     expect(useAppStore.getState().uiFontSize).toBe(12);
+  });
+
+  it("keeps the visited log view mounted across Git sub-tab switches", async () => {
+    gitMocks.gitLog.mockResolvedValue([
+      {
+        oid: "abc123",
+        shortOid: "abc123",
+        parents: [],
+        authorName: "Ada",
+        authorEmail: "ada@example.com",
+        date: "2026-06-30T10:00:00Z",
+        subject: "Initial commit",
+        refs: [],
+      },
+    ]);
+
+    render(<GitPanel repoRoot="D:\\repo" />);
+
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "log" }));
+    await waitFor(() => expect(gitMocks.gitLog).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "log" }));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(gitMocks.gitLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh the repository snapshot when selecting a branch", async () => {
+    const snapshotWithBranches: GitSnapshot = {
+      repoRoot: "D:\\repo",
+      currentBranch: "main",
+      headOid: "abc123",
+      detached: false,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      changes: [],
+      remotes: [],
+      branches: [
+        {
+          name: "main",
+          fullName: "main",
+          current: true,
+          remote: false,
+          upstream: null,
+          oid: "abc123",
+          subject: "Initial commit",
+        },
+        {
+          name: "feature",
+          fullName: "feature",
+          current: false,
+          remote: false,
+          upstream: null,
+          oid: "def456",
+          subject: "Feature work",
+        },
+      ],
+      stashes: [],
+      tags: [],
+      settings: {
+        userName: null,
+        userEmail: null,
+        httpProxy: null,
+        httpsProxy: null,
+        pullRebase: null,
+        pushDefault: null,
+        coreAutocrlf: null,
+        coreFilemode: null,
+        commitGpgsign: null,
+      },
+    };
+    gitMocks.gitSnapshot.mockResolvedValueOnce(snapshotWithBranches);
+
+    render(<GitPanel repoRoot="D:\\repo" />);
+
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "branches" }));
+    fireEvent.click(await screen.findByText("feature"));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1);
   });
 });

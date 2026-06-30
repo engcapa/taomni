@@ -2421,6 +2421,7 @@ export function MainLayout() {
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
+  const gitTabs = tabs.filter((t) => t.type === "git" && t.git);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
   const rdpTabs = tabs.filter((t) => t.type === "rdp" && t.rdp);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
@@ -3015,9 +3016,21 @@ export function MainLayout() {
 
                 {activeTab?.type === "settings" && <SettingsPanel />}
 
-                {activeTab?.type === "git" && activeTab.git && (
-                  <GitPanel repoRoot={activeTab.git.repoRoot} />
-                )}
+                {/* Git tabs stay mounted so repository views, loaded logs, and
+                    scroll position survive switching to another app tab. */}
+                {gitTabs.map((tab) => {
+                  if (!tab.git) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <GitPanel repoRoot={tab.git.repoRoot} visible={isActive} />
+                    </div>
+                  );
+                })}
 
                 {activeTab?.type === "lan-chat" && <LanChatGate />}
 
