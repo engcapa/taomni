@@ -228,6 +228,32 @@ export class Resource {
   }
 }
 
+function joinWorkspacePath(repoRoot: string, relative = ""): string {
+  const root = (repoRoot || VFS_ROOT).replace(/\/+$/, "") || VFS_ROOT;
+  const clean = relative.replace(/^\/+/, "").replace(/\\/g, "/");
+  return clean ? `${root}/${clean}` : root;
+}
+
+function relativeWorkspacePath(repoRoot: string, path: string): string {
+  const root = (repoRoot || VFS_ROOT).replace(/\/+$/, "") || VFS_ROOT;
+  const normalized = path.replace(/\\/g, "/");
+  return normalized === root ? "" : normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  let hash = 0x811c9dc5;
+  for (const byte of bytes) {
+    hash ^= byte;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 /** No-op plugin-listener shim so plugins that import `addPluginListener`
  *  (e.g. @tauri-apps/plugin-notification) load in browser preview. */
 export class PluginListener {
@@ -588,6 +614,59 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       await vfsMkdir(`${VFS_ROOT}/tmp`).catch(() => undefined);
       await vfsMkdir(dir).catch(() => undefined);
       return `${dir}/${Date.now()}-${defaultName.replace(/[\\/:*?"<>|]/g, "_")}` as T;
+    }
+    case "workspace_list_dir": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = (args?.path as string) || "";
+      const target = joinWorkspacePath(repoRoot, path);
+      const entries = await vfsList(target);
+      return entries.map((entry) => ({
+        name: entry.name,
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        fileType: entry.fileType === "dir" ? "dir" : entry.fileType === "file" ? "file" : "other",
+        size: entry.size,
+        mtime: entry.mtime,
+        isHidden: entry.isHidden,
+      })) as T;
+    }
+    case "workspace_read_file": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      const target = joinWorkspacePath(repoRoot, path);
+      const [entry, text] = await Promise.all([vfsStat(target), vfsReadText(target)]);
+      return {
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        text,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(text),
+      } as T;
+    }
+    case "workspace_write_file": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      if (path.split(/[\\/]+/).includes(".git")) {
+        throw new Error("Writing inside .git is not allowed");
+      }
+      const target = joinWorkspacePath(repoRoot, path);
+      const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
+      if (expectedHash) {
+        const current = await vfsReadText(target);
+        const currentHash = await sha256Hex(current);
+        if (currentHash !== expectedHash) {
+          throw new Error(`File changed on disk; expected hash ${expectedHash}, found ${currentHash}`);
+        }
+      }
+      const contents = (args?.contents as string) ?? "";
+      await vfsWriteText(target, contents);
+      const entry = await vfsStat(target);
+      return {
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        text: contents,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(contents),
+      } as T;
     }
     case "create_local_terminal": {
       throw new Error(

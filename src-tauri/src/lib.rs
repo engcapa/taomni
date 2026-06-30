@@ -30,6 +30,7 @@ pub mod vault;
 mod vnc;
 mod voice;
 mod windowing;
+mod workspace;
 mod wsl;
 
 use state::AppState;
@@ -380,6 +381,9 @@ pub fn run() {
             git::git_delete_remote,
             git::git_save_settings,
             git::git_save_remote_auth,
+            workspace::workspace_list_dir,
+            workspace::workspace_read_file,
+            workspace::workspace_write_file,
             windowing::open_detached_window,
             windowing::close_current_detached_window,
             appearance::list_system_fonts,
