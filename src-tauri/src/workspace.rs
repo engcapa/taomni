@@ -508,12 +508,26 @@ fn loose_file_from_bytes(
     let text =
         String::from_utf8(bytes.clone()).map_err(|e| format!("File is not valid UTF-8: {e}"))?;
     Ok(WorkspaceFile {
-        path: target.to_string_lossy().to_string(),
+        path: path_for_display(target),
         text,
         size: meta.len(),
         mtime: mtime_secs(&meta),
         hash: sha256_hex(&bytes),
     })
+}
+
+fn path_for_display(path: &Path) -> String {
+    let value = path.to_string_lossy().to_string();
+    #[cfg(windows)]
+    {
+        if let Some(rest) = value.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{rest}");
+        }
+        if let Some(rest) = value.strip_prefix(r"\\?\") {
+            return rest.to_string();
+        }
+    }
+    value
 }
 
 fn relative_path(root: &Path, target: &Path) -> Result<String, String> {
@@ -610,12 +624,8 @@ mod tests {
         let path = git_dir.join("config");
         fs::write(&path, "x").unwrap();
 
-        let err = workspace_write_loose_file(
-            path.to_string_lossy().to_string(),
-            "y".into(),
-            None,
-        )
-        .unwrap_err();
+        let err = workspace_write_loose_file(path.to_string_lossy().to_string(), "y".into(), None)
+            .unwrap_err();
         assert!(err.contains(".git"));
     }
 
@@ -625,14 +635,13 @@ mod tests {
         let root = dir.path().to_string_lossy().to_string();
 
         workspace_create_dir(root.clone(), "src".into()).unwrap();
-        let file = workspace_create_file(root.clone(), "src/main.ts".into(), Some("one".into()))
-            .unwrap();
+        let file =
+            workspace_create_file(root.clone(), "src/main.ts".into(), Some("one".into())).unwrap();
         assert_eq!(file.path, "src/main.ts");
         assert_eq!(file.text, "one");
 
         let renamed =
-            workspace_rename_path(root.clone(), "src/main.ts".into(), "src/app.ts".into())
-                .unwrap();
+            workspace_rename_path(root.clone(), "src/main.ts".into(), "src/app.ts".into()).unwrap();
         assert_eq!(renamed.path, "src/app.ts");
         assert!(!dir.path().join("src/main.ts").exists());
         assert!(dir.path().join("src/app.ts").exists());
