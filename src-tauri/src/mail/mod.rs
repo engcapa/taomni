@@ -148,6 +148,8 @@ pub struct MailAccountConfig {
     pub display_name: Option<String>,
     #[serde(default)]
     pub reply_to: Option<String>,
+    #[serde(default)]
+    pub signature: Option<String>,
     pub imap: MailServerConfig,
     pub smtp: MailSmtpConfig,
     #[serde(default)]
@@ -260,6 +262,9 @@ pub struct MailSyncResult {
     pub fetched_messages: usize,
     pub cached_bodies: usize,
     pub synced_at: i64,
+    pub offset: u32,
+    pub limit: u32,
+    pub has_more: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -318,10 +323,17 @@ impl ActiveImapSession {
         &mut self,
         account: &ResolvedMailAccount,
         folder: &str,
-    ) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
+        offset: u32,
+        limit: u32,
+        include_bodies: bool,
+    ) -> Result<(MailFolder, Vec<MailMessageCached>, bool), String> {
         match self {
-            Self::Tls(session) => imap_sync_folder(session, account, folder),
-            Self::Plain(session) => imap_sync_folder(session, account, folder),
+            Self::Tls(session) => {
+                imap_sync_folder(session, account, folder, offset, limit, include_bodies)
+            }
+            Self::Plain(session) => {
+                imap_sync_folder(session, account, folder, offset, limit, include_bodies)
+            }
         }
     }
 
@@ -437,6 +449,9 @@ pub async fn mail_test_connection(
 pub async fn mail_sync_headers(
     config: MailAccountConfig,
     folder: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+    include_bodies: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailSyncResult, String> {
     let account = resolve_config(&state, config)?;
@@ -446,15 +461,22 @@ pub async fn mail_sync_headers(
     let cache_enabled = account.config.cache.enabled;
     let cache_settings = account.config.cache.clone();
     let account_id = account.config.session_id.clone();
+    let offset = offset.unwrap_or(0);
+    let limit = limit
+        .unwrap_or(account.config.sync.max_fetch_per_sync)
+        .max(1)
+        .min(2000);
+    let include_bodies = include_bodies.unwrap_or(true);
 
     let mut result = tokio::task::spawn_blocking(move || {
         let mut imap = connect_imap(&account)?;
         let mut folders = imap.list_folders(&account.config.session_id)?;
-        let (selected_folder, cached) = imap.sync_folder(&account, &folder)?;
+        let (selected_folder, cached, has_more) =
+            imap.sync_folder(&account, &folder, offset, limit, include_bodies)?;
         merge_selected_folder(&mut folders, selected_folder.clone());
         imap.logout();
         let cached_bodies = cached.iter().filter(|m| m.body_cached_at.is_some()).count();
-        Ok::<_, String>((folders, selected_folder, cached, cached_bodies))
+        Ok::<_, String>((folders, selected_folder, cached, cached_bodies, has_more))
     })
     .await
     .map_err(|e| format!("mail sync task failed: {e}"))??;
@@ -483,6 +505,9 @@ pub async fn mail_sync_headers(
         cached_bodies: result.3,
         messages,
         synced_at,
+        offset,
+        limit,
+        has_more: result.4,
     })
 }
 
@@ -795,7 +820,10 @@ fn imap_sync_folder<T: Read + Write>(
     session: &mut imap::Session<T>,
     account: &ResolvedMailAccount,
     folder: &str,
-) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
+    offset: u32,
+    limit: u32,
+    include_bodies: bool,
+) -> Result<(MailFolder, Vec<MailMessageCached>, bool), String> {
     let mailbox = session
         .examine(folder)
         .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
@@ -823,15 +851,24 @@ fn imap_sync_folder<T: Read + Write>(
         .into_iter()
         .collect::<Vec<_>>();
     uids.sort_unstable();
-    let max_fetch = account.config.sync.max_fetch_per_sync.max(1).min(2000) as usize;
-    let start = uids.len().saturating_sub(max_fetch);
-    let fetch_uids = &uids[start..];
+    let total_uids = uids.len();
+    let offset = offset as usize;
+    let limit = limit.max(1).min(2000) as usize;
+    let mut fetch_uids = uids
+        .iter()
+        .rev()
+        .skip(offset)
+        .take(limit)
+        .copied()
+        .collect::<Vec<_>>();
+    let has_more = offset.saturating_add(fetch_uids.len()) < total_uids;
+    fetch_uids.sort_unstable();
     if fetch_uids.is_empty() {
         folder_info.updated_at = now_ts();
-        return Ok((folder_info, Vec::new()));
+        return Ok((folder_info, Vec::new(), false));
     }
 
-    let uid_set = uid_set_string(fetch_uids);
+    let uid_set = uid_set_string(&fetch_uids);
     let fetches = session
         .uid_fetch(
             &uid_set,
@@ -852,7 +889,7 @@ fn imap_sync_folder<T: Read + Write>(
     });
 
     let body_limit = account.config.cache.body_recent_limit as usize;
-    if account.config.cache.enabled && body_limit > 0 {
+    if include_bodies && account.config.cache.enabled && body_limit > 0 {
         let body_uids = fetch_uids
             .iter()
             .rev()
@@ -896,7 +933,7 @@ fn imap_sync_folder<T: Read + Write>(
             .cmp(&a.header.date_ts)
             .then(b.header.uid.cmp(&a.header.uid))
     });
-    Ok((folder_info, messages))
+    Ok((folder_info, messages, has_more))
 }
 
 fn imap_fetch_body<T: Read + Write>(

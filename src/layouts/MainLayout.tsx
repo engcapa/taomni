@@ -367,6 +367,7 @@ function sessionToMailTabInfo(
     emailAddress,
     displayName: str("mailDisplayName") || null,
     replyTo: str("mailReplyTo") || null,
+    signature: str("mailSignature") || null,
     imap: {
       host: session.host,
       port: session.port,

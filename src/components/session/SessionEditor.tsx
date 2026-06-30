@@ -1142,6 +1142,7 @@ function MailSettings({
   emailAddress, setEmailAddress,
   displayName, setDisplayName,
   replyTo, setReplyTo,
+  signature, setSignature,
   imapSecurity, setImapSecurity,
   smtpHost, setSmtpHost,
   smtpPort, setSmtpPort,
@@ -1167,6 +1168,7 @@ function MailSettings({
   emailAddress: string; setEmailAddress: (v: string) => void;
   displayName: string; setDisplayName: (v: string) => void;
   replyTo: string; setReplyTo: (v: string) => void;
+  signature: string; setSignature: (v: string) => void;
   imapSecurity: MailSecurityMode; setImapSecurity: (v: MailSecurityMode) => void;
   smtpHost: string; setSmtpHost: (v: string) => void;
   smtpPort: string; setSmtpPort: (v: string) => void;
@@ -1216,6 +1218,15 @@ function MailSettings({
           aria-label="Mail reply-to address"
           placeholder="Optional reply address"
           onChange={(e) => setReplyTo(e.target.value)}
+        />
+      </Field>
+      <Field label="Signature">
+        <textarea
+          className="taomni-input w-[420px] min-h-[76px] resize-y font-sans leading-5"
+          value={signature}
+          aria-label="Mail default signature"
+          placeholder="Default text appended to new messages and replies"
+          onChange={(e) => setSignature(e.target.value)}
         />
       </Field>
 
@@ -2072,6 +2083,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailEmailAddress, setMailEmailAddress] = useState(() => optionString(initialOptions, "mailEmailAddress", session?.username ?? ""));
   const [mailDisplayName, setMailDisplayName] = useState(() => optionString(initialOptions, "mailDisplayName", ""));
   const [mailReplyTo, setMailReplyTo] = useState(() => optionString(initialOptions, "mailReplyTo", ""));
+  const [mailSignature, setMailSignature] = useState(() => optionString(initialOptions, "mailSignature", ""));
   const [mailImapSecurity, setMailImapSecurity] = useState<MailSecurityMode>(() => {
     const value = optionString(initialOptions, "mailImapSecurity", "TLS");
     return value === "STARTTLS" || value === "None" ? value : "TLS";
@@ -2335,6 +2347,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailEmailAddress,
           mailDisplayName,
           mailReplyTo,
+          mailSignature,
           mailImapSecurity,
           mailSmtpHost,
           mailSmtpPort,
@@ -2832,6 +2845,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailEmailAddress(optionString(nextOptions, "mailEmailAddress", session?.username ?? ""));
     setMailDisplayName(optionString(nextOptions, "mailDisplayName", ""));
     setMailReplyTo(optionString(nextOptions, "mailReplyTo", ""));
+    setMailSignature(optionString(nextOptions, "mailSignature", ""));
     setMailImapSecurity((() => {
       const value = optionString(nextOptions, "mailImapSecurity", "TLS");
       return value === "STARTTLS" || value === "None" ? value : "TLS";
@@ -3715,6 +3729,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 emailAddress={mailEmailAddress} setEmailAddress={setMailEmailAddress}
                 displayName={mailDisplayName} setDisplayName={setMailDisplayName}
                 replyTo={mailReplyTo} setReplyTo={setMailReplyTo}
+                signature={mailSignature} setSignature={setMailSignature}
                 imapSecurity={mailImapSecurity} setImapSecurity={setMailImapSecurity}
                 smtpHost={mailSmtpHost} setSmtpHost={setMailSmtpHost}
                 smtpPort={mailSmtpPort} setSmtpPort={setMailSmtpPort}

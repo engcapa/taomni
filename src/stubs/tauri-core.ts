@@ -1362,14 +1362,20 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const accountId = stubMailAccountId(invokeArgs);
       const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
       const messages = stubMailMessages(accountId, folder);
+      const limit = Math.max(1, Number((invokeArgs?.limit as number | undefined) ?? messages.length));
+      const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
+      const page = messages.slice(offset, offset + limit);
       return {
         accountId,
         folder,
         folders: stubMailFolderList(accountId),
-        messages,
-        fetchedMessages: messages.length,
-        cachedBodies: messages.filter((message) => message.bodyCached).length,
+        messages: page,
+        fetchedMessages: page.length,
+        cachedBodies: page.filter((message) => message.bodyCached).length,
         syncedAt: Math.floor(Date.now() / 1000),
+        offset,
+        limit,
+        hasMore: offset + page.length < messages.length,
       } as T;
     }
     case "mail_get_message_body": {

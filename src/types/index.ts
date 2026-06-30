@@ -264,6 +264,7 @@ export interface MailTabInfo {
   emailAddress: string;
   displayName?: string | null;
   replyTo?: string | null;
+  signature?: string | null;
   imap: {
     host: string;
     port: number;

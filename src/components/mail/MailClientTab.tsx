@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type UIEvent } from "react";
+import {
+  Group as PanelGroup,
+  Panel,
+  Separator as PanelResizeHandle,
+  type PanelImperativeHandle,
+  type PanelSize,
+} from "react-resizable-panels";
 import {
   AlertTriangle,
   Archive,
@@ -7,6 +13,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Download,
+  ExternalLink,
   FileText,
   Folder,
   Inbox,
@@ -40,8 +47,10 @@ import {
   type MailMessageHeader,
 } from "../../lib/mail";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
+import { temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
 
 interface MailClientTabProps {
   tabId: string;
@@ -58,6 +67,15 @@ interface ComposeDraft {
 }
 
 type AiAction = "summarize" | "reply" | "tasks";
+type SyncIndicator = "sync" | "more" | "none";
+
+interface SyncFolderOptions {
+  limit?: number;
+  offset?: number;
+  includeBodies?: boolean;
+  append?: boolean;
+  indicator?: SyncIndicator;
+}
 
 const DEFAULT_FOLDER: MailFolder = {
   accountId: "",
@@ -80,6 +98,10 @@ const EMPTY_DRAFT: ComposeDraft = {
 };
 
 const MAIL_MESSAGE_PAGE_SIZE = 200;
+const MAIL_REFRESH_BATCH_SIZE = 50;
+const MAILBOX_RIBBON_THRESHOLD = 7;
+const MAILBOX_RIBBON_SIZE = 4;
+const MAILBOX_EXPANDED_SIZE = 14;
 
 function messageKey(message: MailMessageHeader): string {
   return `${message.folder}:${message.uid}`;
@@ -196,15 +218,32 @@ function messagePageSize(info: MailTabInfo): number {
   return Math.max(50, Math.min(500, info.sync.maxFetchPerSync || MAIL_MESSAGE_PAGE_SIZE));
 }
 
-function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader[]): MailMessageHeader[] {
-  const seen = new Set(current.map(messageKey));
-  const uniqueNext = next.filter((message) => {
-    const key = messageKey(message);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+function refreshBatchSize(info: MailTabInfo): number {
+  return Math.max(1, Math.min(MAIL_REFRESH_BATCH_SIZE, info.sync.maxFetchPerSync || MAIL_REFRESH_BATCH_SIZE));
+}
+
+function sortMessages(messages: MailMessageHeader[]): MailMessageHeader[] {
+  return messages.slice().sort((a, b) => {
+    const date = (b.dateTs ?? 0) - (a.dateTs ?? 0);
+    if (date !== 0) return date;
+    return b.uid - a.uid;
   });
-  return current.concat(uniqueNext);
+}
+
+function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader[]): MailMessageHeader[] {
+  const byKey = new Map<string, MailMessageHeader>();
+  for (const message of current) byKey.set(messageKey(message), message);
+  for (const message of next) byKey.set(messageKey(message), message);
+  return sortMessages(Array.from(byKey.values()));
+}
+
+function draftBodyWithSignature(body: string | undefined, signature: string | null | undefined): string {
+  const cleanSignature = signature?.trimEnd();
+  const cleanBody = body ?? "";
+  if (!cleanSignature) return cleanBody;
+  if (!cleanBody.trim()) return `\n\n${cleanSignature}`;
+  if (cleanBody.includes(cleanSignature)) return cleanBody;
+  return `${cleanBody.trimEnd()}\n\n${cleanSignature}`;
 }
 
 function suggestedAttachmentName(attachment: MailAttachmentInfo, index: number, subject?: string): string {
@@ -296,12 +335,18 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
   const [allowRemoteImages, setAllowRemoteImages] = useState(false);
   const initialSyncDoneRef = useRef(false);
+  const autoSyncedFoldersRef = useRef(new Set<string>());
+  const foldersPanelRef = useRef<PanelImperativeHandle>(null);
+  const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
+  const attachmentMenu = useContextMenu();
 
   const openTabChat = useChatStore((s) => s.openTabChat);
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
 
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
+  const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
+  const mailboxRibbon = mailboxPaneSize <= MAILBOX_RIBBON_THRESHOLD;
   const selectedMessage = useMemo(
     () => messages.find((message) => messageKey(message) === selectedMessageKey) ?? null,
     [messages, selectedMessageKey],
@@ -360,15 +405,18 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     try {
       const cached = await mailListCachedMessages(info.sessionId, folder, pageSize + 1, offset);
       const page = cached.slice(0, pageSize);
-      setHasMoreMessages(cached.length > pageSize);
-      setMessages((current) => append ? mergeMessagePages(current, page) : page);
+      const hasMore = cached.length > pageSize;
+      setHasMoreMessages(hasMore);
+      setMessages((current) => append ? mergeMessagePages(current, page) : sortMessages(page));
       setStatus(
         append
           ? page.length > 0 ? `Loaded ${page.length} older cached messages` : "No more cached messages"
           : page.length > 0 ? `Loaded ${page.length} cached messages` : "No cached messages",
       );
+      return { page, hasMore };
     } catch (e) {
       setError(String(e));
+      return { page: [] as MailMessageHeader[], hasMore: false };
     } finally {
       if (append) {
         setLoadingMoreMessages(false);
@@ -378,24 +426,53 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   }, [info.sessionId, pageSize]);
 
-  const syncFolder = useCallback(async (folder = selectedFolder, quiet = false) => {
-    setSyncing(true);
-    if (!quiet) setStatus(null);
-    setError(null);
+  const syncFolder = useCallback(async (
+    folder = selectedFolder,
+    quiet = false,
+    options: SyncFolderOptions = {},
+  ) => {
+    const indicator = options.indicator ?? "sync";
+    const append = options.append ?? false;
+    const offset = Math.max(0, options.offset ?? 0);
+    const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
+    const includeBodies = options.includeBodies ?? offset === 0;
+
+    if (indicator === "more") {
+      setLoadingMoreMessages(true);
+    } else if (indicator === "sync") {
+      setSyncing(true);
+    }
+    if (!quiet && indicator !== "none") setStatus(null);
+    if (indicator !== "none") setError(null);
+
     try {
-      const result = await mailSyncHeaders(info, folder);
+      const result = await mailSyncHeaders(info, folder, { limit, offset, includeBodies });
       setFolders(result.folders);
       setSelectedFolder(result.folder);
-      setMessages(result.messages.slice(0, pageSize));
-      setHasMoreMessages(result.messages.length >= Math.max(1, Math.min(pageSize, info.sync.maxFetchPerSync || pageSize)));
-      setLoadingMoreMessages(false);
-      setStatus(`Synced ${result.fetchedMessages} messages, cached ${result.cachedBodies} bodies`);
+      setMessages((current) => mergeMessagePages(
+        current.filter((message) => message.folder === result.folder),
+        result.messages,
+      ));
+      setHasMoreMessages(result.hasMore);
+      if (indicator !== "none") {
+        setStatus(
+          append
+            ? result.fetchedMessages > 0 ? `Loaded ${result.fetchedMessages} older messages` : "No more messages"
+            : `Synced ${result.fetchedMessages} messages, cached ${result.cachedBodies} bodies`,
+        );
+      }
+      return result;
     } catch (e) {
-      setError(String(e));
+      if (indicator !== "none") setError(String(e));
+      return null;
     } finally {
-      setSyncing(false);
+      if (indicator === "more") {
+        setLoadingMoreMessages(false);
+      } else if (indicator === "sync") {
+        setSyncing(false);
+      }
     }
-  }, [info, pageSize, selectedFolder]);
+  }, [batchSize, info, pageSize, selectedFolder]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     setBodyLoading(true);
@@ -413,8 +490,26 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   }, [info]);
 
+  const loadInitialMessages = useCallback(async (folder: string) => {
+    const result = await loadCachedMessages(folder);
+    if (
+      result.page.length === 0 &&
+      info.sync.onOpen &&
+      !autoSyncedFoldersRef.current.has(folder)
+    ) {
+      autoSyncedFoldersRef.current.add(folder);
+      await syncFolder(folder, true, {
+        limit: batchSize,
+        offset: 0,
+        includeBodies: true,
+        indicator: "sync",
+      });
+    }
+  }, [batchSize, info.sync.onOpen, loadCachedMessages, syncFolder]);
+
   useEffect(() => {
     initialSyncDoneRef.current = false;
+    autoSyncedFoldersRef.current = new Set();
     setFolders([]);
     setMessages([]);
     setSelectedMessageKey(null);
@@ -427,23 +522,34 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [info.sessionId, loadCachedFolders]);
 
   useEffect(() => {
-    void loadCachedMessages(selectedFolder);
-  }, [loadCachedMessages, selectedFolder]);
+    void loadInitialMessages(selectedFolder);
+  }, [loadInitialMessages, selectedFolder]);
 
   useEffect(() => {
     if (!visible || !info.sync.onOpen || initialSyncDoneRef.current) return;
     initialSyncDoneRef.current = true;
-    void syncFolder(selectedFolder, true);
-  }, [info.sync.onOpen, selectedFolder, syncFolder, visible]);
+    autoSyncedFoldersRef.current.add(selectedFolder);
+    void syncFolder(selectedFolder, true, {
+      limit: batchSize,
+      offset: 0,
+      includeBodies: true,
+      indicator: "sync",
+    });
+  }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
 
   useEffect(() => {
-    if (!visible || info.sync.intervalMinutes <= 0) return;
+    if (info.sync.intervalMinutes <= 0) return;
     const intervalMs = Math.max(1, info.sync.intervalMinutes) * 60 * 1000;
     const id = window.setInterval(() => {
-      void syncFolder(selectedFolder, true);
+      void syncFolder(selectedFolder, true, {
+        limit: batchSize,
+        offset: 0,
+        includeBodies: true,
+        indicator: "none",
+      });
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [info.sync.intervalMinutes, selectedFolder, syncFolder, visible]);
+  }, [batchSize, info.sync.intervalMinutes, selectedFolder, syncFolder]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -506,15 +612,26 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   const loadMoreMessages = useCallback(async () => {
     if (query.trim() || loadingMessages || loadingMoreMessages || !hasMoreMessages) return;
-    await loadCachedMessages(selectedFolder, messages.length, true);
+    const result = await syncFolder(selectedFolder, true, {
+      limit: pageSize,
+      offset: messages.length,
+      includeBodies: false,
+      append: true,
+      indicator: "more",
+    });
+    if (!result) {
+      await loadCachedMessages(selectedFolder, messages.length, true);
+    }
   }, [
     hasMoreMessages,
     loadCachedMessages,
     loadingMessages,
     loadingMoreMessages,
     messages.length,
+    pageSize,
     query,
     selectedFolder,
+    syncFolder,
   ]);
 
   const handleMessageListScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
@@ -525,7 +642,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [loadMoreMessages]);
 
   const openCompose = (nextDraft: Partial<ComposeDraft> = {}) => {
-    setDraft({ ...EMPTY_DRAFT, ...nextDraft });
+    setDraft({
+      ...EMPTY_DRAFT,
+      ...nextDraft,
+      body: draftBodyWithSignature(nextDraft.body, info.signature),
+    });
     setComposeOpen(true);
   };
 
@@ -631,6 +752,45 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   };
 
+  const handleOpenAttachment = async (attachment: MailAttachmentInfo, index: number) => {
+    if (!selectedMessage) return;
+    setDownloadingAttachmentIndex(index);
+    setError(null);
+    try {
+      const defaultPath = suggestedAttachmentName(attachment, index, selectedMessage.subject);
+      const targetPath = await temporaryFilePath(defaultPath);
+      const result = await mailDownloadAttachment(info, selectedMessage.folder, selectedMessage.uid, index, targetPath);
+      const { open } = await import("@tauri-apps/plugin-shell");
+      await open(result.path);
+      setStatus(`Opened attachment ${result.name || defaultPath}`);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDownloadingAttachmentIndex(null);
+    }
+  };
+
+  const attachmentMenuItems = (attachment: MailAttachmentInfo, index: number): MenuItem[] => [
+    {
+      label: "Save attachment as...",
+      icon: <Download className="w-3.5 h-3.5" />,
+      onClick: () => void handleDownloadAttachment(attachment, index),
+    },
+    {
+      label: "Open with default app",
+      icon: <ExternalLink className="w-3.5 h-3.5" />,
+      onClick: () => void handleOpenAttachment(attachment, index),
+    },
+  ];
+
+  const handleAttachmentContextMenu = (
+    event: ReactMouseEvent,
+    attachment: MailAttachmentInfo,
+    index: number,
+  ) => {
+    attachmentMenu.show(event, attachmentMenuItems(attachment, index));
+  };
+
   const activeFolder = displayFolders.find((folder) => folder.name === selectedFolder) ?? displayFolders[0];
   const cacheLine = info.cache.enabled
     ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
@@ -646,7 +806,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         <button
           type="button"
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
-          onClick={() => void syncFolder(selectedFolder)}
+          onClick={() => void syncFolder(selectedFolder, false, {
+            limit: batchSize,
+            offset: 0,
+            includeBodies: true,
+            indicator: "sync",
+          })}
           disabled={syncing}
           data-testid="mail-sync-button"
         >
@@ -707,47 +872,78 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           onLayoutChanged={saveResizableLayout(`mail-client-${info.sessionId}`)}
           className="h-full min-h-0"
         >
-          <Panel id="folders" defaultSize="14%" minSize="10%" maxSize="35%" className="min-w-0">
-            <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col">
-              <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
-                Mailbox
-                {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
-              </div>
-              <div className="flex-1 min-h-0 py-1 overflow-auto">
-                {displayFolders.map((folder) => {
-                  const active = folder.name === selectedFolder;
-                  const label = folderLabel(folder);
-                  return (
-                    <button
-                      key={folder.name}
-                      type="button"
-                      className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
-                      style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
-                      data-active={active || undefined}
-                      onClick={() => handleFolderSelect(folder)}
-                    >
-                      <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
-                      <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
-                      {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
-                        <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
-                      )}
-                      {folder.total !== null && folder.total !== undefined && (
-                        <span className="text-[11px] text-[var(--taomni-text-muted)]">{folder.total}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
-                <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
-                  IMAP {info.imap.host}:{info.imap.port}
+          <Panel
+            id="folders"
+            panelRef={foldersPanelRef}
+            defaultSize={`${MAILBOX_EXPANDED_SIZE}%`}
+            minSize={`${MAILBOX_RIBBON_SIZE}%`}
+            maxSize="35%"
+            collapsible
+            collapsedSize={`${MAILBOX_RIBBON_SIZE}%`}
+            className="min-w-0"
+            onResize={(size: PanelSize) => setMailboxPaneSize(size.asPercentage)}
+          >
+            {mailboxRibbon ? (
+              <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col items-center py-2 border-r border-[var(--taomni-divider)]">
+                <button
+                  type="button"
+                  className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
+                  title="Expand mailbox"
+                  aria-label="Expand mailbox"
+                  onClick={() => foldersPanelRef.current?.resize(`${MAILBOX_EXPANDED_SIZE}%`)}
+                >
+                  <Inbox className="w-4 h-4" />
+                </button>
+                <div className="mt-3 text-[11px] font-semibold text-[var(--taomni-text-muted)] [writing-mode:vertical-rl] rotate-180">
+                  Mailbox
                 </div>
-                <div className="truncate" title={`${info.smtp.host}:${info.smtp.port}`}>
-                  SMTP {info.smtp.host}:{info.smtp.port}
+                {loadingFolders && <Loader2 className="w-3.5 h-3.5 mt-3 animate-spin text-[var(--taomni-text-muted)]" />}
+                {activeFolder?.unread ? (
+                  <span className="mt-auto mb-1 text-[11px] text-[var(--taomni-accent)]">{activeFolder.unread}</span>
+                ) : null}
+              </aside>
+            ) : (
+              <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col">
+                <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
+                  Mailbox
+                  {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
                 </div>
-                <div className="truncate" title={cacheLine}>{cacheLine}</div>
-              </div>
-            </aside>
+                <div className="flex-1 min-h-0 py-1 overflow-auto">
+                  {displayFolders.map((folder) => {
+                    const active = folder.name === selectedFolder;
+                    const label = folderLabel(folder);
+                    return (
+                      <button
+                        key={folder.name}
+                        type="button"
+                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
+                        style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
+                        data-active={active || undefined}
+                        onClick={() => handleFolderSelect(folder)}
+                      >
+                        <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
+                        <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
+                        {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
+                          <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
+                        )}
+                        {folder.total !== null && folder.total !== undefined && (
+                          <span className="text-[11px] text-[var(--taomni-text-muted)]">{folder.total}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
+                  <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
+                    IMAP {info.imap.host}:{info.imap.port}
+                  </div>
+                  <div className="truncate" title={`${info.smtp.host}:${info.smtp.port}`}>
+                    SMTP {info.smtp.host}:{info.smtp.port}
+                  </div>
+                  <div className="truncate" title={cacheLine}>{cacheLine}</div>
+                </div>
+              </aside>
+            )}
           </Panel>
 
           <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
@@ -786,7 +982,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                           }}
                         >
                           <div className="flex items-start gap-2">
-                            <div className={`min-w-0 flex-1 text-[13px] leading-5 truncate ${unread ? "font-semibold" : "font-medium"}`}>
+                            <div className={`min-w-0 flex-1 text-[14px] leading-5 truncate ${unread ? "font-semibold" : "font-semibold text-[var(--taomni-text)]"}`}>
                               {message.subject || "(no subject)"}
                             </div>
                             <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
@@ -928,8 +1124,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                               key={`${name}-${index}`}
                               type="button"
                               className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
-                              title={`Download ${name}`}
+                              title={`Download ${name}; right-click for more actions`}
                               onClick={() => void handleDownloadAttachment(attachment, index)}
+                              onContextMenu={(event) => handleAttachmentContextMenu(event, attachment, index)}
                               disabled={downloading}
                             >
                               {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
@@ -967,6 +1164,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           </Panel>
         </PanelGroup>
       </div>
+
+      {attachmentMenu.render}
 
       {composeOpen && (
         <div className="absolute inset-0 z-[120] bg-black/30 flex items-center justify-center p-4">

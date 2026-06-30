@@ -113,6 +113,7 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
   const optionsJson = sessionType === "Mail"
     ? JSON.stringify({
         mailEmailAddress: parsed.username ?? "",
+        mailSignature: "",
         mailImapSecurity: "TLS",
         mailSmtpHost: "",
         mailSmtpPort: "465",

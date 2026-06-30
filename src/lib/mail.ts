@@ -68,6 +68,15 @@ export interface MailSyncResult {
   fetchedMessages: number;
   cachedBodies: number;
   syncedAt: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export interface MailSyncOptions {
+  limit?: number;
+  offset?: number;
+  includeBodies?: boolean;
 }
 
 export interface MailTestConnectionResult {
@@ -118,11 +127,15 @@ export function mailListCachedMessages(
 export function mailSyncHeaders(
   config: MailTabInfo,
   folder?: string | null,
+  options: MailSyncOptions = {},
 ): Promise<MailSyncResult> {
   return withVaultLockedNotice(() =>
     invoke<MailSyncResult>("mail_sync_headers", {
       config,
       folder: folder ?? null,
+      limit: options.limit ?? null,
+      offset: options.offset ?? null,
+      includeBodies: options.includeBodies ?? null,
     }),
   );
 }
