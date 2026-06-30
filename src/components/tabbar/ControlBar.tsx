@@ -171,6 +171,7 @@ export function ControlBar({
         children: [
           { label: t("ribbon.tunneling"), icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
           { label: "Git Repository...", icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
+          { label: "Code Workspace...", icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
           { label: t("tabs.lanChat"), icon: <MessageSquare className="w-3 h-3" />, onClick: () => onCommand("lan-chat") },
           { label: t("tabs.networkTools"), onClick: () => onCommand("tools") },
           { label: t("ribbon.packages"), onClick: () => onCommand("packages") },

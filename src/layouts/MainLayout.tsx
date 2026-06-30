@@ -69,7 +69,7 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, CodeWorkspaceRootInfo } from "../types";
 import { computeNewTerminalTitle, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -1483,14 +1483,46 @@ export function MainLayout() {
       setActiveTab(existing.id);
       return;
     }
+    const root: CodeWorkspaceRootInfo = {
+      id: `root-${Date.now()}`,
+      name: gitRepoName(normalized),
+      path: normalized,
+      kind: "git",
+    };
     addTab({
       id: `code-workspace-${Date.now()}`,
       type: "code-workspace",
       title: `Code · ${gitRepoName(normalized)}`,
       closable: true,
-      codeWorkspace: { repoRoot: normalized, initialPath: initialPath ?? null },
+      codeWorkspace: {
+        repoRoot: normalized,
+        initialPath: initialPath ?? null,
+        workspaceId: `workspace-${Date.now()}`,
+        name: root.name,
+        roots: [root],
+        looseFiles: [],
+        initialFile: initialPath ? { kind: "root", rootId: root.id, path: initialPath } : null,
+      },
     });
   }, [addTab, setActiveTab]);
+
+  const openEmptyCodeWorkspaceTab = useCallback(() => {
+    const id = `code-workspace-${Date.now()}`;
+    addTab({
+      id,
+      type: "code-workspace",
+      title: "Code · Editor Workspace",
+      closable: true,
+      codeWorkspace: {
+        repoRoot: "",
+        workspaceId: id,
+        name: "Editor Workspace",
+        roots: [],
+        looseFiles: [],
+        initialFile: null,
+      },
+    });
+  }, [addTab]);
 
   const openGitRepository = useCallback(async (path?: string | null) => {
     const target = path ?? await selectFolderPath();
@@ -2318,6 +2350,9 @@ export function MainLayout() {
       case "git":
         void openGitRepository();
         break;
+      case "code-workspace":
+        openEmptyCodeWorkspaceTab();
+        break;
       case "packages":
         openPlaceholderTab(t("tabs.packages"), t("status.commandUnavailable"));
         break;
@@ -2343,6 +2378,7 @@ export function MainLayout() {
     loadSessions,
     openLocalTab,
     openGitRepository,
+    openEmptyCodeWorkspaceTab,
     openPlaceholderTab,
     openSettingsTab,
     openLanChatTab,
@@ -3075,8 +3111,7 @@ export function MainLayout() {
                     >
                       <CodeWorkspaceTab
                         tabId={tab.id}
-                        repoRoot={tab.codeWorkspace.repoRoot}
-                        initialPath={tab.codeWorkspace.initialPath}
+                        workspace={tab.codeWorkspace}
                         visible={isActive}
                       />
                     </div>

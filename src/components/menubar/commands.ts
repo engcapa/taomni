@@ -17,6 +17,7 @@ export type AppCommand =
   | "multiexec"
   | "tunneling"
   | "git"
+  | "code-workspace"
   | "lan-chat"
   | "packages"
   | "settings"
