@@ -104,7 +104,7 @@ interface ChatDrawerLayoutPrefs {
 }
 
 function isChatCapableTabType(type: string | null | undefined): boolean {
-  return type === "welcome" || type === "terminal" || type === "rdp" || type === "database" || type === "redis";
+  return type === "welcome" || type === "terminal" || type === "rdp" || type === "database" || type === "redis" || type === "mail";
 }
 
 export function normalizeChatThreadMode(mode: string | null | undefined): ChatThreadMode {

@@ -130,7 +130,7 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
-const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>(["welcome", "terminal", "rdp", "database", "redis"]);
+const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>(["welcome", "terminal", "rdp", "database", "redis", "mail"]);
 
 function chatBindingIdForTab(tab: Tab | null | undefined): string | null {
   if (!tab || !CHAT_CAPABLE_TAB_TYPES.has(tab.type)) return null;
@@ -3238,7 +3238,7 @@ export function MainLayout() {
                       className="absolute inset-0"
                       style={{ display: isActive ? "block" : "none" }}
                     >
-                      <MailClientTab info={tab.mail} />
+                      <MailClientTab tabId={tab.id} info={tab.mail} visible={isActive} />
                     </div>
                   );
                 })}
