@@ -63,6 +63,7 @@ import { confirmAppDialog } from "../../lib/appDialogs";
 import { languageForPath } from "../git/diffLanguage";
 
 interface CodeWorkspaceTabProps {
+  tabId: string;
   repoRoot: string;
   initialPath?: string | null;
   visible?: boolean;
@@ -155,11 +156,13 @@ function makeLoadingFile(path: string): OpenFileState {
 }
 
 export function CodeWorkspaceTab({
+  tabId,
   repoRoot,
   initialPath,
   visible = true,
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
   const [treeFilter, setTreeFilter] = useState("");
@@ -455,7 +458,24 @@ export function CodeWorkspaceTab({
     () => Object.values(openFiles).filter((file) => file.dirty).length,
     [openFiles],
   );
+  const dirtyPaths = useMemo(
+    () => openOrder.filter((path) => openFiles[path]?.dirty),
+    [openFiles, openOrder],
+  );
   const title = repoName(repoRoot);
+
+  useEffect(() => {
+    setTabCodeWorkspaceContext(tabId, {
+      repoRoot,
+      activePath,
+      openPaths: openOrder,
+      dirtyPaths,
+    });
+  }, [activePath, dirtyPaths, openOrder, repoRoot, setTabCodeWorkspaceContext, tabId]);
+
+  useEffect(() => {
+    return () => setTabCodeWorkspaceContext(tabId, null);
+  }, [setTabCodeWorkspaceContext, tabId]);
 
   const renderEntries = useCallback(
     (path: string, depth: number): ReactNode => {

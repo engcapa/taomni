@@ -130,7 +130,14 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
-const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>(["welcome", "terminal", "rdp", "database", "redis"]);
+const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>([
+  "welcome",
+  "terminal",
+  "rdp",
+  "database",
+  "redis",
+  "code-workspace",
+]);
 
 function chatBindingIdForTab(tab: Tab | null | undefined): string | null {
   if (!tab || !CHAT_CAPABLE_TAB_TYPES.has(tab.type)) return null;
@@ -3067,6 +3074,7 @@ export function MainLayout() {
                       style={{ display: isActive ? "block" : "none" }}
                     >
                       <CodeWorkspaceTab
+                        tabId={tab.id}
                         repoRoot={tab.codeWorkspace.repoRoot}
                         initialPath={tab.codeWorkspace.initialPath}
                         visible={isActive}

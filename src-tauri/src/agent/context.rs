@@ -17,6 +17,8 @@ const SUPPORTED_DB_OBJECT_KINDS: &[&str] = &[
     "dictionary",
 ];
 const MAX_SELECTED_DB_OBJECTS: usize = 128;
+const MAX_CODE_WORKSPACE_PATHS: usize = 64;
+const MAX_CODE_WORKSPACE_PATH_LEN: usize = 512;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgentDbSelectedObject {
@@ -74,11 +76,73 @@ impl AgentDbSelectedObject {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCodeWorkspace {
+    pub repo_root: String,
+    #[serde(default)]
+    pub active_path: Option<String>,
+    #[serde(default)]
+    pub open_paths: Vec<String>,
+    #[serde(default)]
+    pub dirty_paths: Vec<String>,
+}
+
+impl AgentCodeWorkspace {
+    pub fn normalized(&self) -> Option<Self> {
+        let repo_root = self.repo_root.trim();
+        if repo_root.is_empty() {
+            return None;
+        }
+        Some(Self {
+            repo_root: repo_root.to_string(),
+            active_path: self
+                .active_path
+                .as_deref()
+                .and_then(clean_code_workspace_path),
+            open_paths: normalize_code_workspace_paths(&self.open_paths),
+            dirty_paths: normalize_code_workspace_paths(&self.dirty_paths),
+        })
+    }
+}
+
 fn clean_opt(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(ToString::to_string)
+}
+
+fn clean_code_workspace_path(value: &str) -> Option<String> {
+    let path = value.trim().replace('\\', "/");
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.contains(':')
+        || path
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+        || path.len() > MAX_CODE_WORKSPACE_PATH_LEN
+    {
+        return None;
+    }
+    Some(path)
+}
+
+fn normalize_code_workspace_paths(paths: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for path in paths {
+        let Some(clean) = clean_code_workspace_path(path) else {
+            continue;
+        };
+        if out.iter().any(|existing| existing == &clean) {
+            continue;
+        }
+        out.push(clean);
+        if out.len() >= MAX_CODE_WORKSPACE_PATHS {
+            break;
+        }
+    }
+    out
 }
 
 /// Per-turn execution context shared by Claude Code, Codex app-server, and
@@ -92,6 +156,7 @@ pub struct AgentThreadContext {
     pub local_terminal_env: Option<LocalTerminalEnv>,
     pub bound_db_connection_id: Option<String>,
     pub bound_db_selected_objects: Vec<AgentDbSelectedObject>,
+    pub code_workspace: Option<AgentCodeWorkspace>,
     pub flavor: Flavor,
     pub session_card: String,
 }
@@ -134,6 +199,21 @@ impl AgentThreadContext {
         } else {
             selected_objects.insert(self.thread_id.clone(), selected);
         }
+        drop(selected_objects);
+
+        let workspace = self
+            .code_workspace
+            .as_ref()
+            .and_then(AgentCodeWorkspace::normalized);
+        let mut workspaces = state.agent_code_workspaces.write().await;
+        match workspace {
+            Some(workspace) => {
+                workspaces.insert(self.thread_id.clone(), workspace);
+            }
+            None => {
+                workspaces.remove(&self.thread_id);
+            }
+        }
     }
 }
 
@@ -147,6 +227,7 @@ pub struct AgentThreadContextInput {
     pub bound_db_connection_id: Option<String>,
     pub bound_db_selected_objects: Vec<AgentDbSelectedObject>,
     pub bound_db_selected_table: Option<AgentDbSelectedObject>,
+    pub code_workspace: Option<AgentCodeWorkspace>,
 }
 
 pub fn normalize_selected_objects(objects: &[AgentDbSelectedObject]) -> Vec<AgentDbSelectedObject> {
@@ -213,6 +294,10 @@ pub fn build_agent_thread_context(
         } else {
             input.bound_db_selected_objects
         },
+        code_workspace: input
+            .code_workspace
+            .as_ref()
+            .and_then(AgentCodeWorkspace::normalized),
         flavor,
         session_card,
     })
@@ -296,6 +381,41 @@ mod tests {
         assert_eq!(normalized.len(), 2);
         assert_eq!(normalized[0].name, "orders");
         assert_eq!(normalized[1].kind, "procedure");
+    }
+
+    #[test]
+    fn code_workspace_normalized_keeps_repo_relative_paths() {
+        let workspace = AgentCodeWorkspace {
+            repo_root: "  /repo/app  ".into(),
+            active_path: Some(" src/main.ts ".into()),
+            open_paths: vec![
+                "src/main.ts".into(),
+                "src/main.ts".into(),
+                "../secret".into(),
+                "/tmp/file".into(),
+                "src/lib.rs".into(),
+            ],
+            dirty_paths: vec!["src/lib.rs".into(), "C:/absolute/file.rs".into()],
+        }
+        .normalized()
+        .unwrap();
+
+        assert_eq!(workspace.repo_root, "/repo/app");
+        assert_eq!(workspace.active_path.as_deref(), Some("src/main.ts"));
+        assert_eq!(workspace.open_paths, vec!["src/main.ts", "src/lib.rs"]);
+        assert_eq!(workspace.dirty_paths, vec!["src/lib.rs"]);
+    }
+
+    #[test]
+    fn code_workspace_normalized_rejects_empty_repo() {
+        let workspace = AgentCodeWorkspace {
+            repo_root: " ".into(),
+            active_path: Some("src/main.ts".into()),
+            open_paths: vec![],
+            dirty_paths: vec![],
+        };
+
+        assert!(workspace.normalized().is_none());
     }
 }
 

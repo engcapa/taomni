@@ -25,6 +25,13 @@ export interface DbSelectedObject {
   kind: DbObjectKind;
 }
 
+export interface CodeWorkspaceContext {
+  repoRoot: string;
+  activePath: string | null;
+  openPaths: string[];
+  dirtyPaths: string[];
+}
+
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
 const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
@@ -96,6 +103,12 @@ interface AppState {
   dbSelectedObjectsByTab: Record<string, DbSelectedObject[]>;
 
   /**
+   * Current code-workspace editor state keyed by tab id. Bridged into local
+   * agent turns so Claude Code/Codex app-server know the active repo and files.
+   */
+  codeWorkspaceByTab: Record<string, CodeWorkspaceContext>;
+
+  /**
    * Whether SQL run by the in-app AI/Claude Code agent is echoed into the
    * linked query tab's editor (appended, never auto-run). Toggled from the chat
    * drawer; persisted to localStorage, default on.
@@ -155,6 +168,8 @@ interface AppState {
   setTabDbConn: (tabId: string, connId: string | null) => void;
   /** Record or clear a DB tab's current schema-tree object selection. */
   setTabDbSelectedObjects: (tabId: string, selected: DbSelectedObject[] | null) => void;
+  /** Record or clear a code workspace tab's current editor context. */
+  setTabCodeWorkspaceContext: (tabId: string, context: CodeWorkspaceContext | null) => void;
   /** Toggle SQL echo to the linked query tab (see {@link sqlEcho}). */
   setSqlEcho: (enabled: boolean) => void;
 }
@@ -310,6 +325,11 @@ function dbSelectedObjectsEqual(a: DbSelectedObject[] | undefined, b: DbSelected
   });
 }
 
+function arraysEqual(a: string[] | undefined, b: string[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+}
+
 function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
   return !!activeTabId && tabs.some((tab) => tab.id === activeTabId && tab.type === "terminal");
 }
@@ -379,6 +399,7 @@ export const useAppStore = create<AppState>((set) => ({
   cwdByTab: {},
   dbConnByTab: {},
   dbSelectedObjectsByTab: {},
+  codeWorkspaceByTab: {},
   sqlEcho: readSqlEcho(),
   xServerEnabled: false,
   xServerStatus: null,
@@ -730,6 +751,32 @@ export const useAppStore = create<AppState>((set) => ({
         dbSelectedObjectsByTab: {
           ...s.dbSelectedObjectsByTab,
           [tabId]: selected,
+        },
+      };
+    }),
+
+  setTabCodeWorkspaceContext: (tabId, context) =>
+    set((s) => {
+      if (context === null) {
+        if (!(tabId in s.codeWorkspaceByTab)) return s;
+        const next = { ...s.codeWorkspaceByTab };
+        delete next[tabId];
+        return { codeWorkspaceByTab: next };
+      }
+      const current = s.codeWorkspaceByTab[tabId];
+      if (
+        current &&
+        current.repoRoot === context.repoRoot &&
+        current.activePath === context.activePath &&
+        arraysEqual(current.openPaths, context.openPaths) &&
+        arraysEqual(current.dirtyPaths, context.dirtyPaths)
+      ) {
+        return s;
+      }
+      return {
+        codeWorkspaceByTab: {
+          ...s.codeWorkspaceByTab,
+          [tabId]: context,
         },
       };
     }),

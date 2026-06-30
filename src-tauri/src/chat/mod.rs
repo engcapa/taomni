@@ -559,6 +559,9 @@ pub struct ChatSendRequest {
     /// Backward-compatible single-table field accepted from older frontends.
     #[serde(default)]
     pub bound_db_selected_table: Option<crate::agent::context::AgentDbSelectedObject>,
+    /// Current code-workspace editor context for local repo agent turns.
+    #[serde(default)]
+    pub code_workspace: Option<crate::agent::context::AgentCodeWorkspace>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1598,6 +1601,10 @@ fn append_agent_context_to_system_prompt(
         let (clean_cwd, _) = redact::redact(cwd);
         block.push_str(&format!("Current working directory: {clean_cwd}\n"));
     }
+    if let Some(code_block) = code_workspace_context_block(agent_ctx) {
+        block.push_str(code_block.trim_end());
+        block.push('\n');
+    }
     if agent_ctx.bound_db_connection_id.is_some() {
         block.push_str("Database binding: active for SQL/Redis tools.\n");
     }
@@ -1643,6 +1650,48 @@ fn selected_objects_context_line(
         ));
     }
     Some(line)
+}
+
+fn code_workspace_context_block(
+    agent_ctx: &crate::agent::context::AgentThreadContext,
+) -> Option<String> {
+    let workspace = agent_ctx
+        .code_workspace
+        .as_ref()
+        .and_then(crate::agent::context::AgentCodeWorkspace::normalized)?;
+    let (repo_root, _) = redact::redact(&workspace.repo_root);
+    let mut lines = vec![format!("Code workspace: {repo_root}")];
+    if let Some(active_path) = workspace.active_path.as_deref() {
+        lines.push(format!("Code active file: {active_path}"));
+    }
+    if !workspace.open_paths.is_empty() {
+        lines.push(format!(
+            "Code open files: {}",
+            format_code_workspace_paths(&workspace.open_paths)
+        ));
+    }
+    if !workspace.dirty_paths.is_empty() {
+        lines.push(format!(
+            "Code unsaved files: {}",
+            format_code_workspace_paths(&workspace.dirty_paths)
+        ));
+    }
+    Some(format!("{}\n", lines.join("\n")))
+}
+
+fn format_code_workspace_paths(paths: &[String]) -> String {
+    const MAX_DISPLAY_PATHS: usize = 12;
+    let shown = paths
+        .iter()
+        .take(MAX_DISPLAY_PATHS)
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    if paths.len() > MAX_DISPLAY_PATHS {
+        format!("{shown}, ...")
+    } else {
+        shown
+    }
 }
 
 fn llm_tools_from_mcp(tools: Vec<rmcp::model::Tool>) -> Vec<ChatTool> {
@@ -1767,6 +1816,7 @@ pub async fn chat_stream(
             bound_db_connection_id: req.bound_db_connection_id.clone(),
             bound_db_selected_objects: req.bound_db_selected_objects.clone(),
             bound_db_selected_table: req.bound_db_selected_table.clone(),
+            code_workspace: req.code_workspace.clone(),
         },
     )?;
 
@@ -1996,6 +2046,10 @@ pub async fn chat_stream(
             if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 let (clean_cwd, _) = redact::redact(cwd);
                 prefix.push_str(&format!("当前工作目录：{}\n\n", clean_cwd));
+            }
+            if let Some(block) = code_workspace_context_block(&agent_ctx) {
+                let (clean_block, _) = redact::redact(block.trim_end());
+                prefix.push_str(&format!("{clean_block}\n\n"));
             }
             if let Some(line) = selected_objects_context_line(&agent_ctx) {
                 let (clean_line, _) = redact::redact(line.trim_end());
@@ -2359,6 +2413,10 @@ pub async fn chat_stream(
             if let Some(cwd) = req.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 let (clean_cwd, _) = redact::redact(cwd);
                 prefix.push_str(&format!("当前工作目录：{}\n\n", clean_cwd));
+            }
+            if let Some(block) = code_workspace_context_block(&agent_ctx) {
+                let (clean_block, _) = redact::redact(block.trim_end());
+                prefix.push_str(&format!("{clean_block}\n\n"));
             }
             if let Some(line) = selected_objects_context_line(&agent_ctx) {
                 let (clean_line, _) = redact::redact(line.trim_end());

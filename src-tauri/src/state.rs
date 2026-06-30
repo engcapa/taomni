@@ -138,6 +138,11 @@ pub struct AppState {
     /// MCP tools expose a queryable subset for SELECT workflows.
     pub agent_db_selected_objects:
         Arc<RwLock<HashMap<String, Vec<crate::agent::context::AgentDbSelectedObject>>>>,
+    /// Current code workspace bound to an agent thread, bridged per chat turn.
+    /// This gives Codex/Claude sidecars a stable repo/file context without
+    /// reading frontend UI state directly.
+    pub agent_code_workspaces:
+        Arc<RwLock<HashMap<String, crate::agent::context::AgentCodeWorkspace>>>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -185,6 +190,7 @@ impl AppState {
             cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
             agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
             agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
+            agent_code_workspaces: Arc::new(RwLock::new(HashMap::new())),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }
