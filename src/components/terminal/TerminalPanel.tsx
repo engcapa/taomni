@@ -2564,6 +2564,7 @@ export function TerminalPanel({
 
       const ns = getSessionNetworkSettings(ssh.optionsJson);
       const opts = parseSessionOptions(ssh.optionsJson);
+      const startupCommand = typeof opts.startupCmd === "string" ? opts.startupCmd.trim() : "";
       createSshTerminal(
         targetSid,
         ssh.host,
@@ -2580,6 +2581,8 @@ export function TerminalPanel({
         // explicitly opts into untrusted.
         opts.x11 !== false,
         opts.x11Trusted !== false,
+        startupCommand || null,
+        startupCommand ? opts.doNotExit !== false : false,
       )
         .then((sessionId) => handleConnected({ sessionId, shellId: null }, mode))
         .catch((err) => handleConnectFailure(err, mode));

@@ -124,9 +124,9 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(keyPath).toBeDisabled();
 
     const doNotExit = screen.getByLabelText("Do not exit after command ends");
-    expect(doNotExit).not.toBeChecked();
-    await user.click(screen.getByText("Do not exit after command ends"));
     expect(doNotExit).toBeChecked();
+    await user.click(screen.getByText("Do not exit after command ends"));
+    expect(doNotExit).not.toBeChecked();
   });
 
   it("loads and preserves saved Advanced SSH options", async () => {

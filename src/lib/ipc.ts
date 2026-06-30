@@ -121,6 +121,8 @@ export async function createSshTerminal(
   onOutput?: (data: Uint8Array) => void,
   x11: boolean = false,
   x11Trusted: boolean = true,
+  startupCommand: string | null = null,
+  keepOpenAfterStartupCommand: boolean = false,
 ): Promise<string> {
   return withVaultLockedNotice(() =>
     invoke<string>("create_ssh_terminal", {
@@ -135,6 +137,8 @@ export async function createSshTerminal(
       networkSettingsJson,
       x11,
       x11Trusted,
+      startupCommand,
+      keepOpenAfterStartupCommand,
       onOutput: createBinaryOutputChannel(onOutput ?? (() => undefined)),
     }),
   );

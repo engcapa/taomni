@@ -101,6 +101,12 @@ pub enum SshAuth {
     Agent,
 }
 
+#[derive(Debug, Clone)]
+pub struct SshStartupCommand {
+    pub command: String,
+    pub keep_open: bool,
+}
+
 /// The byte transport an SSH session is layered on top of.
 ///
 /// - `Tcp` — a direct or proxied (HTTP CONNECT / SOCKS5) TCP socket.
@@ -592,6 +598,7 @@ pub async fn connect_ssh(
     network: Option<&NetworkSettings>,
     prompter: Option<&KbdInteractivePrompter>,
     x11: Option<Arc<XForward>>,
+    startup: Option<&SshStartupCommand>,
 ) -> Result<
     (
         client::Handle<SshHandler>,
@@ -653,10 +660,31 @@ pub async fn connect_ssh(
         }
     }
 
-    channel
-        .request_shell(false)
-        .await
-        .map_err(|e| format!("Failed to request shell: {}", e))?;
+    if let Some(startup) = startup {
+        if startup.keep_open {
+            channel
+                .request_shell(false)
+                .await
+                .map_err(|e| format!("Failed to request shell: {}", e))?;
+
+            let mut command = startup.command.trim().as_bytes().to_vec();
+            command.push(b'\r');
+            channel
+                .data_bytes(command)
+                .await
+                .map_err(|e| format!("Failed to send startup command: {}", e))?;
+        } else {
+            channel
+                .exec(false, startup.command.trim().as_bytes().to_vec())
+                .await
+                .map_err(|e| format!("Failed to execute startup command: {}", e))?;
+        }
+    } else {
+        channel
+            .request_shell(false)
+            .await
+            .map_err(|e| format!("Failed to request shell: {}", e))?;
+    }
 
     let (read_half, write_half) = channel.split();
     spawn_terminal_output_pump(read_half, output_tx);
@@ -777,6 +805,7 @@ mod tests {
             SshAuth::Password(password),
             80,
             24,
+            None,
             None,
             None,
             None,

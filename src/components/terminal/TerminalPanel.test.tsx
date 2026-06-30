@@ -1023,6 +1023,8 @@ describe("TerminalPanel focus behavior", () => {
       expect.any(Function),
       true,
       true,
+      null,
+      false,
     );
     await waitFor(() => {
       expect(onSessionReady).toHaveBeenCalledWith("terminal-session-reconnect");
@@ -1040,6 +1042,41 @@ describe("TerminalPanel focus behavior", () => {
         btoa("whoami\r"),
       );
     });
+  });
+
+  it("passes saved SSH startup command options to the backend", async () => {
+    render(
+      <TerminalPanel
+        visible
+        ssh={{
+          ...sshInfo,
+          optionsJson: JSON.stringify({
+            startupCmd: "  tmux new -A -s main  ",
+          }),
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(ipcMocks.createSshTerminal).toHaveBeenCalled();
+    });
+
+    expect(ipcMocks.createSshTerminal).toHaveBeenCalledWith(
+      "terminal-session",
+      sshInfo.host,
+      sshInfo.port,
+      sshInfo.username,
+      sshInfo.authMethod,
+      sshInfo.authData,
+      80,
+      24,
+      expect.any(String),
+      expect.any(Function),
+      true,
+      true,
+      "tmux new -A -s main",
+      true,
+    );
   });
 
   it("uses the latest measured terminal size when reconnecting SSH", async () => {
@@ -1080,6 +1117,8 @@ describe("TerminalPanel focus behavior", () => {
         expect.any(Function),
         true,
         true,
+        null,
+        false,
       );
       await waitFor(() => {
         expect(ipcMocks.resizeTerminal).toHaveBeenCalledWith("terminal-session-reconnect", 132, 37);

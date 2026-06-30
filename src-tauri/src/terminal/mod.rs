@@ -383,6 +383,8 @@ pub async fn create_ssh_terminal(
     network_settings_json: Option<String>,
     x11: Option<bool>,
     x11_trusted: Option<bool>,
+    startup_command: Option<String>,
+    keep_open_after_startup_command: Option<bool>,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
@@ -456,6 +458,15 @@ pub async fn create_ssh_terminal(
         None
     };
 
+    let startup_command = startup_command
+        .as_deref()
+        .map(str::trim)
+        .filter(|command| !command.is_empty())
+        .map(|command| ssh::SshStartupCommand {
+            command: command.to_string(),
+            keep_open: keep_open_after_startup_command.unwrap_or(false),
+        });
+
     let connect_result = ssh::connect_ssh(
         &host,
         port,
@@ -466,6 +477,7 @@ pub async fn create_ssh_terminal(
         network.as_ref(),
         Some(&prompter),
         x11_forward,
+        startup_command.as_ref(),
     )
     .await;
     // Drop any responder left dangling for this session (e.g. auth failed
@@ -828,6 +840,7 @@ pub async fn test_ssh_connection(
         80,
         24,
         network.as_ref(),
+        None,
         None,
         None,
     )
