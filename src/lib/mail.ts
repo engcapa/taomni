@@ -16,6 +16,7 @@ export interface MailAttachmentInfo {
 export interface MailFolder {
   accountId: string;
   name: string;
+  displayName?: string | null;
   delimiter?: string | null;
   flags: string[];
   uidValidity?: number | null;
@@ -89,6 +90,13 @@ export interface MailSendResult {
   response: string;
 }
 
+export interface MailDownloadAttachmentResult {
+  path: string;
+  name?: string | null;
+  contentType?: string | null;
+  size: number;
+}
+
 export function mailListCachedFolders(accountId: string): Promise<MailFolder[]> {
   return invoke<MailFolder[]>("mail_list_cached_folders", { accountId });
 }
@@ -126,6 +134,24 @@ export function mailGetMessageBody(
 ): Promise<MailMessageBody> {
   return withVaultLockedNotice(() =>
     invoke<MailMessageBody>("mail_get_message_body", { config, folder, uid }),
+  );
+}
+
+export function mailDownloadAttachment(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  attachmentIndex: number,
+  targetPath: string,
+): Promise<MailDownloadAttachmentResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailDownloadAttachmentResult>("mail_download_attachment", {
+      config,
+      folder,
+      uid,
+      attachmentIndex,
+      targetPath,
+    }),
   );
 }
 

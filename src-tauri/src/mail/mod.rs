@@ -9,6 +9,7 @@ use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use lettre::message::{Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
@@ -186,6 +187,7 @@ pub struct MailAttachmentInfo {
 pub struct MailFolder {
     pub account_id: String,
     pub name: String,
+    pub display_name: String,
     pub delimiter: Option<String>,
     pub flags: Vec<String>,
     pub uid_validity: Option<u32>,
@@ -241,6 +243,13 @@ struct MailMessageCached {
     body_cached_at: Option<i64>,
 }
 
+#[derive(Debug)]
+struct DownloadedMailAttachment {
+    name: Option<String>,
+    content_type: Option<String>,
+    bytes: Vec<u8>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailSyncResult {
@@ -283,6 +292,15 @@ pub struct MailSendResult {
     pub response: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailDownloadAttachmentResult {
+    pub path: String,
+    pub name: Option<String>,
+    pub content_type: Option<String>,
+    pub size: usize,
+}
+
 enum ActiveImapSession {
     Tls(imap::Session<native_tls::TlsStream<TcpStream>>),
     Plain(imap::Session<TcpStream>),
@@ -316,6 +334,24 @@ impl ActiveImapSession {
         match self {
             Self::Tls(session) => imap_fetch_body(session, account, folder, uid),
             Self::Plain(session) => imap_fetch_body(session, account, folder, uid),
+        }
+    }
+
+    fn download_attachment(
+        &mut self,
+        account: &ResolvedMailAccount,
+        folder: &str,
+        uid: u32,
+        attachment_index: usize,
+        target_path: &str,
+    ) -> Result<MailDownloadAttachmentResult, String> {
+        match self {
+            Self::Tls(session) => {
+                imap_download_attachment(session, account, folder, uid, attachment_index, target_path)
+            }
+            Self::Plain(session) => {
+                imap_download_attachment(session, account, folder, uid, attachment_index, target_path)
+            }
         }
     }
 
@@ -519,6 +555,31 @@ pub async fn mail_get_message_body(
 }
 
 #[tauri::command]
+pub async fn mail_download_attachment(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    attachment_index: usize,
+    target_path: String,
+    state: State<'_, AppState>,
+) -> Result<MailDownloadAttachmentResult, String> {
+    let target_path = target_path.trim().to_string();
+    if target_path.is_empty() {
+        return Err("attachment download path is required".into());
+    }
+    let account = resolve_config(&state, config)?;
+    tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result =
+            imap.download_attachment(&account, &folder, uid, attachment_index, &target_path);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail attachment download task failed: {e}"))?
+}
+
+#[tauri::command]
 pub async fn mail_send_message(
     config: MailAccountConfig,
     request: MailSendRequest,
@@ -708,20 +769,24 @@ fn imap_list_folders<T: Read + Write>(
     let now = now_ts();
     Ok(names
         .iter()
-        .map(|name| MailFolder {
-            account_id: account_id.to_string(),
-            name: name.name().to_string(),
-            delimiter: name.delimiter().map(ToOwned::to_owned),
-            flags: name
-                .attributes()
-                .iter()
-                .map(|attr| format!("{attr:?}"))
-                .collect(),
-            uid_validity: None,
-            uid_next: None,
-            total: None,
-            unread: None,
-            updated_at: now,
+        .map(|name| {
+            let raw_name = name.name().to_string();
+            MailFolder {
+                account_id: account_id.to_string(),
+                display_name: decode_imap_modified_utf7(&raw_name),
+                name: raw_name,
+                delimiter: name.delimiter().map(ToOwned::to_owned),
+                flags: name
+                    .attributes()
+                    .iter()
+                    .map(|attr| format!("{attr:?}"))
+                    .collect(),
+                uid_validity: None,
+                uid_next: None,
+                total: None,
+                unread: None,
+                updated_at: now,
+            }
         })
         .collect())
 }
@@ -742,6 +807,7 @@ fn imap_sync_folder<T: Read + Write>(
     let mut folder_info = MailFolder {
         account_id: account_id.clone(),
         name: folder.to_string(),
+        display_name: decode_imap_modified_utf7(folder),
         delimiter: None,
         flags: mailbox.flags.iter().map(|flag| flag.to_string()).collect(),
         uid_validity: mailbox.uid_validity,
@@ -872,6 +938,43 @@ fn imap_fetch_body<T: Read + Write>(
         merge_body(&mut message, parsed);
     }
     Ok(message)
+}
+
+fn imap_download_attachment<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    _account: &ResolvedMailAccount,
+    folder: &str,
+    uid: u32,
+    attachment_index: usize,
+    target_path: &str,
+) -> Result<MailDownloadAttachmentResult, String> {
+    session
+        .examine(folder)
+        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+    let fetches = session
+        .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
+        .map_err(|e| format!("IMAP UID FETCH attachment failed: {e}"))?;
+    let fetch = fetches
+        .iter()
+        .next()
+        .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
+    let body = fetch
+        .body()
+        .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
+    let attachment = extract_attachment(body, attachment_index)?;
+    let path = std::path::PathBuf::from(target_path);
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("failed to create attachment folder: {e}"))?;
+    }
+    std::fs::write(&path, &attachment.bytes)
+        .map_err(|e| format!("failed to write attachment: {e}"))?;
+    Ok(MailDownloadAttachmentResult {
+        path: path.to_string_lossy().to_string(),
+        name: attachment.name,
+        content_type: attachment.content_type,
+        size: attachment.bytes.len(),
+    })
 }
 
 fn parse_fetch_header(
@@ -1366,9 +1469,11 @@ fn list_cached_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<Mai
     )?;
     let rows = stmt.query_map(params![account_id], |row| {
         let flags_json: String = row.get(3)?;
+        let name: String = row.get(1)?;
         Ok(MailFolder {
             account_id: row.get(0)?,
-            name: row.get(1)?,
+            display_name: decode_imap_modified_utf7(&name),
+            name,
             delimiter: row.get(2)?,
             flags: serde_json::from_str(&flags_json).unwrap_or_default(),
             uid_validity: row.get(4)?,
@@ -1531,6 +1636,80 @@ fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInfo {
     }
 }
 
+fn extract_attachment(body: &[u8], attachment_index: usize) -> Result<DownloadedMailAttachment, String> {
+    let message = MessageParser::default()
+        .parse(body)
+        .ok_or_else(|| "failed to parse message attachments".to_string())?;
+    let mut attachments = message.attachments();
+    let part = attachments
+        .nth(attachment_index)
+        .ok_or_else(|| format!("attachment #{} not found", attachment_index + 1))?;
+    let info = attachment_info(part);
+    let bytes = match &part.body {
+        PartType::Text(s) | PartType::Html(s) => s.as_ref().as_bytes().to_vec(),
+        PartType::Binary(b) | PartType::InlineBinary(b) => b.as_ref().to_vec(),
+        PartType::Message(message) => message.raw_message.to_vec(),
+        PartType::Multipart(_) => {
+            return Err("selected attachment is a multipart container".into());
+        }
+    };
+    Ok(DownloadedMailAttachment {
+        name: info.name,
+        content_type: info.content_type,
+        bytes,
+    })
+}
+
+fn decode_imap_modified_utf7(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut index = 0;
+    while index < input.len() {
+        let rest = &input[index..];
+        if !rest.starts_with('&') {
+            let ch = rest.chars().next().unwrap_or_default();
+            out.push(ch);
+            index += ch.len_utf8();
+            continue;
+        }
+
+        let after_amp = index + 1;
+        let Some(relative_end) = input[after_amp..].find('-') else {
+            out.push_str(rest);
+            break;
+        };
+        let end = after_amp + relative_end;
+        let encoded = &input[after_amp..end];
+        if encoded.is_empty() {
+            out.push('&');
+            index = end + 1;
+            continue;
+        }
+
+        match decode_imap_modified_utf7_segment(encoded) {
+            Some(decoded) => out.push_str(&decoded),
+            None => out.push_str(&input[index..=end]),
+        }
+        index = end + 1;
+    }
+    out
+}
+
+fn decode_imap_modified_utf7_segment(encoded: &str) -> Option<String> {
+    let mut b64 = encoded.replace(',', "/");
+    while b64.len() % 4 != 0 {
+        b64.push('=');
+    }
+    let bytes = BASE64_STANDARD.decode(b64.as_bytes()).ok()?;
+    if bytes.len() % 2 != 0 {
+        return None;
+    }
+    let units = bytes
+        .chunks_exact(2)
+        .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    String::from_utf16(&units).ok()
+}
+
 fn uid_set_string(uids: &[u32]) -> String {
     uids.iter()
         .map(ToString::to_string)
@@ -1614,6 +1793,21 @@ mod tests {
             .to_vec()
     }
 
+    fn sample_attachment_message() -> Vec<u8> {
+        b"From: Example Sender <sender@example.com>\r\nTo: Receiver <receiver@example.com>\r\nSubject: Attachment sample\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nBody text.\r\n--b\r\nContent-Type: text/plain; name=\"report.txt\"\r\nContent-Disposition: attachment; filename=\"report.txt\"\r\n\r\nAttachment content.\r\n--b--\r\n"
+            .to_vec()
+    }
+
+    #[test]
+    fn decode_imap_modified_utf7_mailbox_names() {
+        assert_eq!(decode_imap_modified_utf7("INBOX"), "INBOX");
+        assert_eq!(decode_imap_modified_utf7("A &- B"), "A & B");
+        assert_eq!(
+            decode_imap_modified_utf7("~peter/mail/&U,BTFw-/&ZeVnLIqe-"),
+            "~peter/mail/台北/日本語"
+        );
+    }
+
     #[test]
     fn parse_body_decodes_headers_and_preview() {
         let parsed = parse_body_message("acct", "INBOX", 7, Some(512), &sample_message(), 4096);
@@ -1638,6 +1832,20 @@ mod tests {
     }
 
     #[test]
+    fn parse_and_extract_attachment() {
+        let raw = sample_attachment_message();
+        let parsed = parse_body_message("acct", "INBOX", 8, Some(raw.len() as u32), &raw, 4096);
+        assert!(parsed.header.has_attachments);
+        assert_eq!(parsed.header.attachment_count, 1);
+        assert_eq!(parsed.header.attachments[0].name.as_deref(), Some("report.txt"));
+
+        let attachment = extract_attachment(&raw, 0).unwrap();
+        assert_eq!(attachment.name.as_deref(), Some("report.txt"));
+        assert_eq!(attachment.content_type.as_deref(), Some("text/plain"));
+        assert_eq!(attachment.bytes, b"Attachment content.");
+    }
+
+    #[test]
     fn cache_roundtrips_folders_messages_and_body() {
         let conn = Connection::open_in_memory().unwrap();
         init_mail_tables(&conn).unwrap();
@@ -1647,6 +1855,7 @@ mod tests {
         let folder = MailFolder {
             account_id: "acct".into(),
             name: "INBOX".into(),
+            display_name: "INBOX".into(),
             delimiter: Some("/".into()),
             flags: vec![],
             uid_validity: Some(1),

@@ -487,6 +487,7 @@ pub fn run() {
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,
+            mail::mail_download_attachment,
             mail::mail_send_message,
             mail::mail_clear_cache,
             history::history_append,

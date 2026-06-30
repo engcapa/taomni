@@ -364,9 +364,9 @@ const LANCHAT_MOCK_MESSAGES: Record<string, unknown[]> = {
 };
 
 const MAIL_STUB_FOLDERS = [
-  { name: "INBOX", total: 3, unread: 1 },
-  { name: "Sent", total: 1, unread: 0 },
-  { name: "Archive", total: 8, unread: 0 },
+  { name: "INBOX", displayName: "INBOX", total: 3, unread: 1 },
+  { name: "Sent", displayName: "Sent", total: 1, unread: 0 },
+  { name: "Archive", displayName: "Archive", total: 8, unread: 0 },
 ];
 
 function stubMailAccountId(args?: InvokeArgs): string {
@@ -379,6 +379,7 @@ function stubMailFolderList(accountId: string) {
   return MAIL_STUB_FOLDERS.map((folder) => ({
     accountId,
     name: folder.name,
+    displayName: folder.displayName,
     delimiter: "/",
     flags: [],
     uidValidity: 1,
@@ -1352,7 +1353,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
-      return stubMailMessages(accountId, folder) as T;
+      const limit = Math.max(0, Number((invokeArgs?.limit as number | undefined) ?? 200));
+      const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
+      return stubMailMessages(accountId, folder).slice(offset, offset + limit) as T;
     }
     case "mail_sync_headers": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -1375,6 +1378,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uid = Number((invokeArgs?.uid as number | undefined) ?? 91);
       return stubMailBody(accountId, folder, uid) as T;
+    }
+    case "mail_download_attachment": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const targetPath = (invokeArgs?.targetPath as string | undefined) ?? "attachment";
+      return { path: targetPath, name: "policy.txt", contentType: "text/plain", size: 1240 } as T;
     }
     case "mail_send_message": {
       return { accepted: true, response: "browser-preview accepted" } as T;

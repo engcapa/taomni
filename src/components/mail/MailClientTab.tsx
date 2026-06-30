@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import {
   AlertTriangle,
   Archive,
   Bot,
   CheckCircle2,
+  ChevronDown,
+  Download,
   FileText,
   Folder,
   Inbox,
@@ -23,6 +26,7 @@ import {
 import type { MailTabInfo } from "../../types";
 import {
   mailClearCache,
+  mailDownloadAttachment,
   mailGetMessageBody,
   mailListCachedFolders,
   mailListCachedMessages,
@@ -30,12 +34,14 @@ import {
   mailSyncHeaders,
   mailTestConnection,
   type MailAddress,
+  type MailAttachmentInfo,
   type MailFolder,
   type MailMessageBody,
   type MailMessageHeader,
 } from "../../lib/mail";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useChatStore } from "../../stores/chatStore";
+import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 
 interface MailClientTabProps {
   tabId: string;
@@ -73,6 +79,8 @@ const EMPTY_DRAFT: ComposeDraft = {
   body: "",
 };
 
+const MAIL_MESSAGE_PAGE_SIZE = 200;
+
 function messageKey(message: MailMessageHeader): string {
   return `${message.folder}:${message.uid}`;
 }
@@ -85,18 +93,69 @@ function addressLabel(address: MailAddress | null | undefined): string {
   return name || mail || "";
 }
 
+function decodeImapModifiedUtf7(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    if (value[index] !== "&") {
+      out += value[index];
+      index += 1;
+      continue;
+    }
+    const end = value.indexOf("-", index + 1);
+    if (end === -1) {
+      out += value.slice(index);
+      break;
+    }
+    const encoded = value.slice(index + 1, end);
+    if (!encoded) {
+      out += "&";
+      index = end + 1;
+      continue;
+    }
+    const decoded = decodeImapModifiedUtf7Segment(encoded);
+    out += decoded ?? value.slice(index, end + 1);
+    index = end + 1;
+  }
+  return out;
+}
+
+function decodeImapModifiedUtf7Segment(encoded: string): string | null {
+  if (typeof atob === "undefined") return null;
+  try {
+    let b64 = encoded.replace(/,/g, "/");
+    while (b64.length % 4 !== 0) b64 += "=";
+    const binary = atob(b64);
+    if (binary.length % 2 !== 0) return null;
+    let result = "";
+    for (let i = 0; i < binary.length; i += 2) {
+      result += String.fromCharCode((binary.charCodeAt(i) << 8) | binary.charCodeAt(i + 1));
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 function folderLabel(folder: MailFolder): string {
+  const displayName = folder.displayName?.trim();
+  if (displayName) return displayName;
   const name = folder.name || "INBOX";
-  const parts = name.split(/[/.]/).filter(Boolean);
-  return parts.at(-1) || name;
+  return decodeImapModifiedUtf7(name) || name;
+}
+
+function folderDepth(folder: MailFolder): number {
+  const delimiter = folder.delimiter?.trim();
+  if (!delimiter) return 0;
+  return Math.max(0, folder.name.split(delimiter).filter(Boolean).length - 1);
 }
 
 function folderIcon(folder: MailFolder) {
-  const name = folder.name.toLowerCase();
-  if (name.includes("inbox")) return <Inbox className="w-4 h-4" />;
-  if (name.includes("sent")) return <Send className="w-4 h-4" />;
-  if (name.includes("trash") || name.includes("deleted")) return <Trash2 className="w-4 h-4" />;
-  if (name.includes("archive")) return <Archive className="w-4 h-4" />;
+  const name = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
+  if (name.includes("inbox") || name.includes("收件")) return <Inbox className="w-4 h-4" />;
+  if (name.includes("sent") || name.includes("已发送") || name.includes("已傳送")) return <Send className="w-4 h-4" />;
+  if (name.includes("trash") || name.includes("deleted") || name.includes("垃圾") || name.includes("已删除")) return <Trash2 className="w-4 h-4" />;
+  if (name.includes("archive") || name.includes("归档") || name.includes("封存")) return <Archive className="w-4 h-4" />;
   return <Folder className="w-4 h-4" />;
 }
 
@@ -131,6 +190,30 @@ function formatBytes(value: number | null | undefined): string {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function messagePageSize(info: MailTabInfo): number {
+  return Math.max(50, Math.min(500, info.sync.maxFetchPerSync || MAIL_MESSAGE_PAGE_SIZE));
+}
+
+function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader[]): MailMessageHeader[] {
+  const seen = new Set(current.map(messageKey));
+  const uniqueNext = next.filter((message) => {
+    const key = messageKey(message);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return current.concat(uniqueNext);
+}
+
+function suggestedAttachmentName(attachment: MailAttachmentInfo, index: number, subject?: string): string {
+  const raw = attachment.name?.trim() || `${subject?.trim() || "attachment"}-${index + 1}`;
+  const cleaned = raw
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (cleaned || `attachment-${index + 1}`).slice(0, 160);
 }
 
 function splitRecipients(value: string): string[] {
@@ -203,11 +286,14 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [bodyLoading, setBodyLoading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [testing, setTesting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
   const [sending, setSending] = useState(false);
+  const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
   const [allowRemoteImages, setAllowRemoteImages] = useState(false);
   const initialSyncDoneRef = useRef(false);
 
@@ -215,6 +301,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
 
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
+  const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const selectedMessage = useMemo(
     () => messages.find((message) => messageKey(message) === selectedMessageKey) ?? null,
     [messages, selectedMessageKey],
@@ -239,6 +326,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     return sanitizeMailHtml(body.html, allowRemoteImages);
   }, [allowRemoteImages, body?.html]);
 
+  const visibleAttachments = useMemo(
+    () => (body?.attachments.length ? body.attachments : selectedMessage?.attachments ?? []),
+    [body?.attachments, selectedMessage?.attachments],
+  );
+
   const loadCachedFolders = useCallback(async () => {
     setLoadingFolders(true);
     setError(null);
@@ -257,19 +349,34 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   }, [info.sessionId]);
 
-  const loadCachedMessages = useCallback(async (folder: string) => {
-    setLoadingMessages(true);
+  const loadCachedMessages = useCallback(async (folder: string, offset = 0, append = false) => {
+    if (append) {
+      setLoadingMoreMessages(true);
+    } else {
+      setLoadingMessages(true);
+      setHasMoreMessages(false);
+    }
     setError(null);
     try {
-      const cached = await mailListCachedMessages(info.sessionId, folder, info.sync.maxFetchPerSync || 200, 0);
-      setMessages(cached);
-      setStatus(cached.length > 0 ? `Loaded ${cached.length} cached messages` : "No cached messages");
+      const cached = await mailListCachedMessages(info.sessionId, folder, pageSize + 1, offset);
+      const page = cached.slice(0, pageSize);
+      setHasMoreMessages(cached.length > pageSize);
+      setMessages((current) => append ? mergeMessagePages(current, page) : page);
+      setStatus(
+        append
+          ? page.length > 0 ? `Loaded ${page.length} older cached messages` : "No more cached messages"
+          : page.length > 0 ? `Loaded ${page.length} cached messages` : "No cached messages",
+      );
     } catch (e) {
       setError(String(e));
     } finally {
-      setLoadingMessages(false);
+      if (append) {
+        setLoadingMoreMessages(false);
+      } else {
+        setLoadingMessages(false);
+      }
     }
-  }, [info.sessionId, info.sync.maxFetchPerSync]);
+  }, [info.sessionId, pageSize]);
 
   const syncFolder = useCallback(async (folder = selectedFolder, quiet = false) => {
     setSyncing(true);
@@ -279,14 +386,16 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       const result = await mailSyncHeaders(info, folder);
       setFolders(result.folders);
       setSelectedFolder(result.folder);
-      setMessages(result.messages);
+      setMessages(result.messages.slice(0, pageSize));
+      setHasMoreMessages(result.messages.length >= Math.max(1, Math.min(pageSize, info.sync.maxFetchPerSync || pageSize)));
+      setLoadingMoreMessages(false);
       setStatus(`Synced ${result.fetchedMessages} messages, cached ${result.cachedBodies} bodies`);
     } catch (e) {
       setError(String(e));
     } finally {
       setSyncing(false);
     }
-  }, [info, selectedFolder]);
+  }, [info, pageSize, selectedFolder]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     setBodyLoading(true);
@@ -310,6 +419,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setMessages([]);
     setSelectedMessageKey(null);
     setBody(null);
+    setHasMoreMessages(false);
+    setLoadingMoreMessages(false);
+    setDownloadingAttachmentIndex(null);
     setSelectedFolder("INBOX");
     void loadCachedFolders();
   }, [info.sessionId, loadCachedFolders]);
@@ -355,6 +467,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setSelectedFolder(folder.name);
     setSelectedMessageKey(null);
     setBody(null);
+    setHasMoreMessages(false);
+    setLoadingMoreMessages(false);
     setQuery("");
   };
 
@@ -380,6 +494,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setMessages([]);
       setBody(null);
       setSelectedMessageKey(null);
+      setHasMoreMessages(false);
+      setLoadingMoreMessages(false);
       setStatus("Mail cache cleared");
     } catch (e) {
       setError(String(e));
@@ -387,6 +503,26 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setClearing(false);
     }
   };
+
+  const loadMoreMessages = useCallback(async () => {
+    if (query.trim() || loadingMessages || loadingMoreMessages || !hasMoreMessages) return;
+    await loadCachedMessages(selectedFolder, messages.length, true);
+  }, [
+    hasMoreMessages,
+    loadCachedMessages,
+    loadingMessages,
+    loadingMoreMessages,
+    messages.length,
+    query,
+    selectedFolder,
+  ]);
+
+  const handleMessageListScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 96) {
+      void loadMoreMessages();
+    }
+  }, [loadMoreMessages]);
 
   const openCompose = (nextDraft: Partial<ComposeDraft> = {}) => {
     setDraft({ ...EMPTY_DRAFT, ...nextDraft });
@@ -471,6 +607,30 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   };
 
+  const handleDownloadAttachment = async (attachment: MailAttachmentInfo, index: number) => {
+    if (!selectedMessage) return;
+    setDownloadingAttachmentIndex(index);
+    setError(null);
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const defaultPath = suggestedAttachmentName(attachment, index, selectedMessage.subject);
+      const targetPath = await save({
+        title: "Save attachment",
+        defaultPath,
+      });
+      if (typeof targetPath !== "string" || !targetPath.trim()) {
+        setStatus("Attachment download cancelled");
+        return;
+      }
+      const result = await mailDownloadAttachment(info, selectedMessage.folder, selectedMessage.uid, index, targetPath);
+      setStatus(`Downloaded attachment to ${result.path}`);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDownloadingAttachmentIndex(null);
+    }
+  };
+
   const activeFolder = displayFolders.find((folder) => folder.name === selectedFolder) ?? displayFolders[0];
   const cacheLine = info.cache.enabled
     ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
@@ -539,228 +699,273 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 grid grid-cols-[220px_minmax(300px,36%)_1fr]">
-        <aside className="min-w-0 border-r border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-          <div className="h-8 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
-            Mailbox
-            {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
-          </div>
-          <div className="py-1 overflow-auto max-h-[calc(100%-92px)]">
-            {displayFolders.map((folder) => {
-              const active = folder.name === selectedFolder;
-              return (
-                <button
-                  key={folder.name}
-                  type="button"
-                  className={`w-full h-7 px-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
-                  data-active={active || undefined}
-                  onClick={() => handleFolderSelect(folder)}
-                >
-                  <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
-                  <span className="min-w-0 flex-1 truncate" title={folder.name}>{folderLabel(folder)}</span>
-                  {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
-                    <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
-                  )}
-                  {folder.total !== null && folder.total !== undefined && (
-                    <span className="text-[11px] text-[var(--taomni-text-muted)]">{folder.total}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          <div className="border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
-            <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
-              IMAP {info.imap.host}:{info.imap.port}
-            </div>
-            <div className="truncate" title={`${info.smtp.host}:${info.smtp.port}`}>
-              SMTP {info.smtp.host}:{info.smtp.port}
-            </div>
-            <div className="truncate" title={cacheLine}>{cacheLine}</div>
-          </div>
-        </aside>
-
-        <section className="min-w-0 border-r border-[var(--taomni-divider)] flex flex-col">
-          <div className="h-8 px-3 flex items-center justify-between border-b border-[var(--taomni-divider)]">
-            <span className="text-[12px] font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
-            <span className="text-[11px] text-[var(--taomni-text-muted)]">
-              {loadingMessages ? "Loading" : `${filteredMessages.length}/${messages.length}`}
-            </span>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {loadingMessages && messages.length === 0 ? (
-              <div className="h-20 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Loading cached headers
+      <div className="flex-1 min-h-0">
+        <PanelGroup
+          orientation="horizontal"
+          id={`mail-client-${info.sessionId}`}
+          defaultLayout={loadResizableLayout(`mail-client-${info.sessionId}`, ["folders", "messages", "reader"])}
+          onLayoutChanged={saveResizableLayout(`mail-client-${info.sessionId}`)}
+          className="h-full min-h-0"
+        >
+          <Panel id="folders" defaultSize="14%" minSize="10%" maxSize="35%" className="min-w-0">
+            <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col">
+              <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
+                Mailbox
+                {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
               </div>
-            ) : filteredMessages.length === 0 ? (
-              <div className="h-28 flex items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
-                {query ? "No cached messages match the search." : "No cached messages. Run Sync for this folder."}
-              </div>
-            ) : (
-              filteredMessages.map((message) => {
-                const active = messageKey(message) === selectedMessageKey;
-                const unread = isUnread(message);
-                return (
-                  <button
-                    key={messageKey(message)}
-                    type="button"
-                    className={`w-full min-h-[74px] px-3 py-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)]" : ""}`}
-                    onClick={() => {
-                      setSelectedMessageKey(messageKey(message));
-                      setBody(null);
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`${unread ? "font-semibold" : ""} text-[12px] min-w-0 truncate`}>
-                        {addressLabel(message.from) || "(unknown)"}
-                      </span>
-                      {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
-                      {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
-                      <span className="ml-auto text-[11px] text-[var(--taomni-text-muted)] shrink-0">{formatShortDate(message.dateTs)}</span>
-                    </div>
-                    <div className={`${unread ? "font-semibold" : ""} text-[12px] truncate mt-1`}>
-                      {message.subject || "(no subject)"}
-                    </div>
-                    <div className="text-[11px] text-[var(--taomni-text-muted)] line-clamp-2 mt-1">
-                      {message.snippet || "No preview"}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </section>
-
-        <main className="min-w-0 flex flex-col">
-          <div className="h-8 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
-            <span className="text-[12px] font-semibold min-w-0 truncate">
-              {selectedMessage?.subject || "Message"}
-            </span>
-            {bodyLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-text-muted)]" />}
-            <div className="ml-auto flex items-center gap-1">
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                onClick={openReply}
-                disabled={!selectedMessage}
-                title="Reply"
-              >
-                <MessageSquareReply className="w-3.5 h-3.5" />
-                Reply
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                onClick={() => void handleAiAction("summarize")}
-                disabled={!selectedMessage || !info.ai.enabled}
-                title="Summarize with AI"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                Summary
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                onClick={() => void handleAiAction("reply")}
-                disabled={!selectedMessage || !info.ai.enabled}
-                title="Draft reply with AI"
-              >
-                <Bot className="w-3.5 h-3.5" />
-                Draft
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                onClick={() => void handleAiAction("tasks")}
-                disabled={!selectedMessage || !info.ai.enabled}
-                title="Extract tasks with AI"
-              >
-                <MailOpen className="w-3.5 h-3.5" />
-                Tasks
-              </button>
-            </div>
-          </div>
-
-          {!selectedMessage ? (
-            <div className="flex-1 min-h-0 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-              Select a message
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 overflow-auto">
-              <div className="px-4 py-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-                <h2 className="text-[16px] font-semibold leading-6 mb-1 break-words">
-                  {selectedMessage.subject || "(no subject)"}
-                </h2>
-                <div className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1 text-[12px]">
-                  <span className="text-[var(--taomni-text-muted)]">From</span>
-                  <span className="truncate" title={addressLabel(selectedMessage.from)}>{addressLabel(selectedMessage.from) || "(unknown)"}</span>
-                  <span className="text-[var(--taomni-text-muted)]">To</span>
-                  <span className="truncate" title={selectedMessage.to.map(addressLabel).join(", ")}>
-                    {selectedMessage.to.map(addressLabel).filter(Boolean).join(", ") || "(none)"}
-                  </span>
-                  {selectedMessage.cc.length > 0 && (
-                    <>
-                      <span className="text-[var(--taomni-text-muted)]">Cc</span>
-                      <span className="truncate" title={selectedMessage.cc.map(addressLabel).join(", ")}>
-                        {selectedMessage.cc.map(addressLabel).filter(Boolean).join(", ")}
-                      </span>
-                    </>
-                  )}
-                  <span className="text-[var(--taomni-text-muted)]">Date</span>
-                  <span>{formatFullDate(selectedMessage.dateTs) || "(unknown)"}</span>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-                  <span>{body?.source === "cache" ? "cached body" : body?.source === "remote" ? "remote body" : "header cached"}</span>
-                  {selectedMessage.rawSize ? <span>{formatBytes(selectedMessage.rawSize)}</span> : null}
-                  {info.ai.enabled && <span>AI confirm {info.ai.skipBodyConfirm ? "skipped" : "required"}</span>}
-                  {body?.html && (
+              <div className="flex-1 min-h-0 py-1 overflow-auto">
+                {displayFolders.map((folder) => {
+                  const active = folder.name === selectedFolder;
+                  const label = folderLabel(folder);
+                  return (
                     <button
+                      key={folder.name}
                       type="button"
-                      className="taomni-btn h-5 px-2 text-[10px]"
-                      onClick={() => setAllowRemoteImages((value) => !value)}
+                      className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
+                      style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
+                      data-active={active || undefined}
+                      onClick={() => handleFolderSelect(folder)}
                     >
-                      {allowRemoteImages ? "Block images" : "Load images"}
+                      <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
+                      <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
+                      {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
+                        <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
+                      )}
+                      {folder.total !== null && folder.total !== undefined && (
+                        <span className="text-[11px] text-[var(--taomni-text-muted)]">{folder.total}</span>
+                      )}
                     </button>
-                  )}
-                </div>
-                {(body?.attachments.length || selectedMessage.attachments.length) ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {(body?.attachments.length ? body.attachments : selectedMessage.attachments).map((attachment, index) => (
-                      <span
-                        key={`${attachment.name ?? "attachment"}-${index}`}
-                        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)]"
-                      >
-                        <Paperclip className="w-3 h-3" />
-                        {attachment.name || "attachment"}
-                        {attachment.size ? ` ${formatBytes(attachment.size)}` : ""}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
+                  );
+                })}
               </div>
+              <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
+                <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
+                  IMAP {info.imap.host}:{info.imap.port}
+                </div>
+                <div className="truncate" title={`${info.smtp.host}:${info.smtp.port}`}>
+                  SMTP {info.smtp.host}:{info.smtp.port}
+                </div>
+                <div className="truncate" title={cacheLine}>{cacheLine}</div>
+              </div>
+            </aside>
+          </Panel>
 
-              <div className="p-4 text-[13px] leading-6">
-                {bodyLoading && !body ? (
-                  <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+          <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
+
+          <Panel id="messages" defaultSize="34%" minSize="18%" maxSize="55%" className="min-w-0">
+            <section className="h-full min-w-0 flex flex-col">
+              <div className="h-8 shrink-0 px-3 flex items-center justify-between border-b border-[var(--taomni-divider)]">
+                <span className="text-[12px] font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
+                <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                  {loadingMessages ? "Loading" : `${filteredMessages.length}/${messages.length}${!query.trim() && hasMoreMessages ? "+" : ""}`}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto" onScroll={handleMessageListScroll}>
+                {loadingMessages && messages.length === 0 ? (
+                  <div className="h-20 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Loading message body
+                    Loading cached headers
                   </div>
-                ) : readerHtml ? (
-                  <div
-                    className="max-w-none text-[13px] leading-6 [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--taomni-divider)] [&_td]:px-2 [&_td]:py-1 [&_a]:text-[var(--taomni-accent)]"
-                    dangerouslySetInnerHTML={{ __html: readerHtml }}
-                  />
-                ) : body?.text ? (
-                  <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{body.text}</pre>
+                ) : filteredMessages.length === 0 ? (
+                  <div className="h-28 flex items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
+                    {query ? "No cached messages match the search." : "No cached messages. Run Sync for this folder."}
+                  </div>
                 ) : (
-                  <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                    {selectedMessage.snippet || "No cached body content."}
-                  </div>
+                  <>
+                    {filteredMessages.map((message) => {
+                      const active = messageKey(message) === selectedMessageKey;
+                      const unread = isUnread(message);
+                      return (
+                        <button
+                          key={messageKey(message)}
+                          type="button"
+                          className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)]" : ""}`}
+                          onClick={() => {
+                            setSelectedMessageKey(messageKey(message));
+                            setBody(null);
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`min-w-0 flex-1 text-[13px] leading-5 truncate ${unread ? "font-semibold" : "font-medium"}`}>
+                              {message.subject || "(no subject)"}
+                            </div>
+                            <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
+                            <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
+                              {addressLabel(message.from) || "(unknown)"}
+                            </span>
+                            {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
+                            {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
+                          </div>
+                          <div className="text-[11px] text-[var(--taomni-text-muted)] line-clamp-2 mt-1.5">
+                            {message.snippet || "No preview"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {!query.trim() && (hasMoreMessages || loadingMoreMessages) && (
+                      <div className="p-2">
+                        <button
+                          type="button"
+                          className="taomni-btn h-7 w-full inline-flex items-center justify-center gap-1.5 text-[12px]"
+                          onClick={() => void loadMoreMessages()}
+                          disabled={loadingMoreMessages}
+                        >
+                          {loadingMoreMessages ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          Load older messages
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            </div>
-          )}
-        </main>
+            </section>
+          </Panel>
+
+          <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
+
+          <Panel id="reader" defaultSize="52%" minSize="25%" className="min-w-0">
+            <main className="h-full min-w-0 flex flex-col">
+              <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
+                <span className="text-[12px] font-semibold min-w-0 truncate">
+                  {selectedMessage?.subject || "Message"}
+                </span>
+                {bodyLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-text-muted)]" />}
+                <div className="ml-auto flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    onClick={openReply}
+                    disabled={!selectedMessage}
+                    title="Reply"
+                  >
+                    <MessageSquareReply className="w-3.5 h-3.5" />
+                    Reply
+                  </button>
+                  <button
+                    type="button"
+                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    onClick={() => void handleAiAction("summarize")}
+                    disabled={!selectedMessage || !info.ai.enabled}
+                    title="Summarize with AI"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Summary
+                  </button>
+                  <button
+                    type="button"
+                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    onClick={() => void handleAiAction("reply")}
+                    disabled={!selectedMessage || !info.ai.enabled}
+                    title="Draft reply with AI"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    Draft
+                  </button>
+                  <button
+                    type="button"
+                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    onClick={() => void handleAiAction("tasks")}
+                    disabled={!selectedMessage || !info.ai.enabled}
+                    title="Extract tasks with AI"
+                  >
+                    <MailOpen className="w-3.5 h-3.5" />
+                    Tasks
+                  </button>
+                </div>
+              </div>
+
+              {!selectedMessage ? (
+                <div className="flex-1 min-h-0 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                  Select a message
+                </div>
+              ) : (
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <div className="px-4 py-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
+                    <h2 className="text-[17px] font-semibold leading-6 mb-1 break-words">
+                      {selectedMessage.subject || "(no subject)"}
+                    </h2>
+                    <div className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1 text-[12px]">
+                      <span className="text-[var(--taomni-text-muted)]">From</span>
+                      <span className="truncate" title={addressLabel(selectedMessage.from)}>{addressLabel(selectedMessage.from) || "(unknown)"}</span>
+                      <span className="text-[var(--taomni-text-muted)]">To</span>
+                      <span className="truncate" title={selectedMessage.to.map(addressLabel).join(", ")}>
+                        {selectedMessage.to.map(addressLabel).filter(Boolean).join(", ") || "(none)"}
+                      </span>
+                      {selectedMessage.cc.length > 0 && (
+                        <>
+                          <span className="text-[var(--taomni-text-muted)]">Cc</span>
+                          <span className="truncate" title={selectedMessage.cc.map(addressLabel).join(", ")}>
+                            {selectedMessage.cc.map(addressLabel).filter(Boolean).join(", ")}
+                          </span>
+                        </>
+                      )}
+                      <span className="text-[var(--taomni-text-muted)]">Date</span>
+                      <span>{formatFullDate(selectedMessage.dateTs) || "(unknown)"}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+                      <span>{body?.source === "cache" ? "cached body" : body?.source === "remote" ? "remote body" : "header cached"}</span>
+                      {selectedMessage.rawSize ? <span>{formatBytes(selectedMessage.rawSize)}</span> : null}
+                      {info.ai.enabled && <span>AI confirm {info.ai.skipBodyConfirm ? "skipped" : "required"}</span>}
+                      {body?.html && (
+                        <button
+                          type="button"
+                          className="taomni-btn h-5 px-2 text-[10px]"
+                          onClick={() => setAllowRemoteImages((value) => !value)}
+                        >
+                          {allowRemoteImages ? "Block images" : "Load images"}
+                        </button>
+                      )}
+                    </div>
+                    {visibleAttachments.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {visibleAttachments.map((attachment, index) => {
+                          const downloading = downloadingAttachmentIndex === index;
+                          const name = attachment.name || `attachment-${index + 1}`;
+                          return (
+                            <button
+                              key={`${name}-${index}`}
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
+                              title={`Download ${name}`}
+                              onClick={() => void handleDownloadAttachment(attachment, index)}
+                              disabled={downloading}
+                            >
+                              {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                              <span className="max-w-[260px] truncate">{name}</span>
+                              {attachment.size ? <span>{formatBytes(attachment.size)}</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="p-4 text-[13px] leading-6">
+                    {bodyLoading && !body ? (
+                      <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Loading message body
+                      </div>
+                    ) : readerHtml ? (
+                      <div
+                        className="max-w-none text-[13px] leading-6 [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--taomni-divider)] [&_td]:px-2 [&_td]:py-1 [&_a]:text-[var(--taomni-accent)]"
+                        dangerouslySetInnerHTML={{ __html: readerHtml }}
+                      />
+                    ) : body?.text ? (
+                      <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{body.text}</pre>
+                    ) : (
+                      <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                        {selectedMessage.snippet || "No cached body content."}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </main>
+          </Panel>
+        </PanelGroup>
       </div>
 
       {composeOpen && (
