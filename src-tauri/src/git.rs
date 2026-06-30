@@ -8,6 +8,9 @@ use std::process::Command;
 use std::sync::Arc;
 use tauri::State;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitProbeResult {
@@ -1108,7 +1111,7 @@ fn is_single_drive_letter(value: &str) -> bool {
 }
 
 fn git_available() -> bool {
-    Command::new("git")
+    new_git_command()
         .arg("--version")
         .output()
         .map(|output| output.status.success())
@@ -1501,7 +1504,7 @@ where
 }
 
 fn run_git_strings(cwd: Option<&Path>, args: Vec<String>) -> Result<String, String> {
-    let mut command = Command::new("git");
+    let mut command = new_git_command();
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
     }
@@ -1545,7 +1548,7 @@ fn run_git_authed(
         return run_git_strings(Some(root), args);
     };
     let askpass = write_askpass_script()?;
-    let mut command = Command::new("git");
+    let mut command = new_git_command();
     command.current_dir(root);
     apply_stable_locale(&mut command);
     for arg in args {
@@ -1774,7 +1777,7 @@ fn read_blob(root: &Path, reference: &str, path: &str) -> Result<BlobSide, Strin
     if size > MAX_DIFF_BYTES_U64 {
         return Ok(BlobSide::oversized(size));
     }
-    let output = Command::new("git")
+    let output = new_git_command()
         .current_dir(root)
         .env("LC_ALL", "C")
         .env("LANG", "C")
@@ -1791,7 +1794,7 @@ fn read_blob(root: &Path, reference: &str, path: &str) -> Result<BlobSide, Strin
 }
 
 fn git_blob_size(root: &Path, spec: &str) -> Result<Option<u64>, String> {
-    let output = Command::new("git")
+    let output = new_git_command()
         .current_dir(root)
         .env("LC_ALL", "C")
         .env("LANG", "C")
@@ -1931,7 +1934,7 @@ fn operation_command(kind: &str) -> Result<&'static str, String> {
 }
 
 fn run_git_no_editor(root: &Path, args: Vec<String>) -> Result<String, String> {
-    let mut command = Command::new("git");
+    let mut command = new_git_command();
     command.current_dir(root);
     apply_stable_locale(&mut command);
     command.env("GIT_EDITOR", "true");
@@ -1943,6 +1946,26 @@ fn run_git_no_editor(root: &Path, args: Vec<String>) -> Result<String, String> {
         .output()
         .map_err(|e| format!("failed to start git: {e}"))?;
     command_output(output)
+}
+
+fn new_git_command() -> Command {
+    let mut command = Command::new("git");
+    no_console_window(&mut command);
+    command
+}
+
+/// Release builds are Windows GUI-subsystem processes. Without this flag,
+/// short-lived `git.exe` probes can flash console windows behind the app.
+fn no_console_window(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = command;
+    }
 }
 
 fn require_non_empty(label: &str, value: &str) -> Result<(), String> {
