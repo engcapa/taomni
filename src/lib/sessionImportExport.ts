@@ -47,6 +47,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   Redis: 6379,
   HBaseShell: 8080,
   Proxy: 3128,
+  Mail: 993,
 };
 
 const MOBAXTERM_TYPE_TO_SESSION: Record<string, string> = {

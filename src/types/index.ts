@@ -4,7 +4,7 @@ import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";
@@ -243,6 +243,51 @@ export interface ObjectStorageTabInfo {
   config: ObjectStorageConfig;
 }
 
+export type MailConnectionSecurity = "tls" | "starttls" | "none";
+
+export interface MailCacheSettings {
+  enabled: boolean;
+  headerRetentionDays: number;
+  headerLimitPerFolder: number;
+  bodyRecentLimit: number;
+  bodyMaxBytes: number;
+  attachmentCache: boolean;
+}
+
+export interface MailAiSettings {
+  enabled: boolean;
+  skipBodyConfirm: boolean;
+}
+
+export interface MailTabInfo {
+  sessionId: string;
+  emailAddress: string;
+  displayName?: string | null;
+  replyTo?: string | null;
+  imap: {
+    host: string;
+    port: number;
+    username?: string | null;
+    password?: string;
+    security: MailConnectionSecurity;
+  };
+  smtp: {
+    host: string;
+    port: number;
+    username?: string | null;
+    password?: string;
+    security: MailConnectionSecurity;
+    useImapAuth: boolean;
+  };
+  sync: {
+    onOpen: boolean;
+    intervalMinutes: number;
+    maxFetchPerSync: number;
+  };
+  cache: MailCacheSettings;
+  ai: MailAiSettings;
+}
+
 export interface GitTabInfo {
   repoRoot: string;
 }
@@ -273,6 +318,7 @@ export interface Tab {
   fileBrowser?: FileBrowserTabInfo;
   proxyTest?: ProxyTestTabInfo;
   objectStorage?: ObjectStorageTabInfo;
+  mail?: MailTabInfo;
   git?: GitTabInfo;
   hasNewOutput?: boolean;
   /**

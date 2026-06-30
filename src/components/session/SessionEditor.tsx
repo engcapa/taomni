@@ -23,6 +23,7 @@ import {
   HelpCircle,
   Database,
   Info,
+  Mail,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
@@ -113,9 +114,10 @@ type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
   | "MySQL" | "PostgreSQL" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
-  | "Proxy";
+  | "Proxy" | "Mail";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage";
+type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage" | "mail";
+type MailSecurityMode = "TLS" | "STARTTLS" | "None";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -141,6 +143,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "Redis",      icon: <Database className="w-7 h-7" />, color: "#d82c20" },
   { id: "HBaseShell", icon: <Database className="w-7 h-7" />, color: "#1d7f8c" },
   { id: "Proxy",     icon: <Network className="w-7 h-7" />, color: "#6b7280" },
+  { id: "Mail",      icon: <Mail className="w-7 h-7" />,    color: "#256f6a" },
 ];
 
 const DEFAULT_PORTS: Record<string, number> = {
@@ -148,7 +151,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
   MySQL: 3306, PostgreSQL: 5432, SQLServer: 1433, StarRocks: 9030, ClickHouse: 9000, Presto: 8080, Redis: 6379,
-  HBaseShell: 8080, Proxy: 3128,
+  HBaseShell: 8080, Proxy: 3128, Mail: 993,
 };
 
 const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "SQLServer", "StarRocks", "ClickHouse", "Presto", "Redis"];
@@ -1135,6 +1138,250 @@ function BookmarkSettings({
   );
 }
 
+function MailSettings({
+  emailAddress, setEmailAddress,
+  displayName, setDisplayName,
+  replyTo, setReplyTo,
+  imapSecurity, setImapSecurity,
+  smtpHost, setSmtpHost,
+  smtpPort, setSmtpPort,
+  smtpSecurity, setSmtpSecurity,
+  smtpUsername, setSmtpUsername,
+  smtpUseImapAuth, setSmtpUseImapAuth,
+  smtpPassword, setSmtpPassword,
+  smtpPasswordRef, clearSmtpPasswordRef,
+  smtpSaveInVault, setSmtpSaveInVault,
+  cacheEnabled, setCacheEnabled,
+  headerRetentionDays, setHeaderRetentionDays,
+  headerLimitPerFolder, setHeaderLimitPerFolder,
+  bodyRecentLimit, setBodyRecentLimit,
+  bodyMaxBytes, setBodyMaxBytes,
+  attachmentCache, setAttachmentCache,
+  syncOnOpen, setSyncOnOpen,
+  syncIntervalMinutes, setSyncIntervalMinutes,
+  maxFetchPerSync, setMaxFetchPerSync,
+  aiEnabled, setAiEnabled,
+  aiSkipBodyConfirm, setAiSkipBodyConfirm,
+  vaultState,
+}: {
+  emailAddress: string; setEmailAddress: (v: string) => void;
+  displayName: string; setDisplayName: (v: string) => void;
+  replyTo: string; setReplyTo: (v: string) => void;
+  imapSecurity: MailSecurityMode; setImapSecurity: (v: MailSecurityMode) => void;
+  smtpHost: string; setSmtpHost: (v: string) => void;
+  smtpPort: string; setSmtpPort: (v: string) => void;
+  smtpSecurity: MailSecurityMode; setSmtpSecurity: (v: MailSecurityMode) => void;
+  smtpUsername: string; setSmtpUsername: (v: string) => void;
+  smtpUseImapAuth: boolean; setSmtpUseImapAuth: (v: boolean) => void;
+  smtpPassword: string; setSmtpPassword: (v: string) => void;
+  smtpPasswordRef: string; clearSmtpPasswordRef: () => void;
+  smtpSaveInVault: boolean; setSmtpSaveInVault: (v: boolean) => void;
+  cacheEnabled: boolean; setCacheEnabled: (v: boolean) => void;
+  headerRetentionDays: string; setHeaderRetentionDays: (v: string) => void;
+  headerLimitPerFolder: string; setHeaderLimitPerFolder: (v: string) => void;
+  bodyRecentLimit: string; setBodyRecentLimit: (v: string) => void;
+  bodyMaxBytes: string; setBodyMaxBytes: (v: string) => void;
+  attachmentCache: boolean; setAttachmentCache: (v: boolean) => void;
+  syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
+  syncIntervalMinutes: string; setSyncIntervalMinutes: (v: string) => void;
+  maxFetchPerSync: string; setMaxFetchPerSync: (v: string) => void;
+  aiEnabled: boolean; setAiEnabled: (v: boolean) => void;
+  aiSkipBodyConfirm: boolean; setAiSkipBodyConfirm: (v: boolean) => void;
+  vaultState: "empty" | "locked" | "unlocked";
+}) {
+  return (
+    <div data-testid="mail-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <Field label="Email address">
+        <input
+          className="taomni-input w-72"
+          value={emailAddress}
+          aria-label="Mail email address"
+          placeholder="name@example.com"
+          onChange={(e) => setEmailAddress(e.target.value)}
+        />
+      </Field>
+      <Field label="Display name">
+        <input
+          className="taomni-input w-72"
+          value={displayName}
+          aria-label="Mail display name"
+          placeholder="Shown on outgoing messages"
+          onChange={(e) => setDisplayName(e.target.value)}
+        />
+      </Field>
+      <Field label="Reply-To">
+        <input
+          className="taomni-input w-72"
+          value={replyTo}
+          aria-label="Mail reply-to address"
+          placeholder="Optional reply address"
+          onChange={(e) => setReplyTo(e.target.value)}
+        />
+      </Field>
+
+      <Field label="IMAP security">
+        <Select
+          value={imapSecurity}
+          className="w-32"
+          options={["TLS", "STARTTLS", "None"]}
+          onChange={(value) => setImapSecurity(value as MailSecurityMode)}
+        />
+      </Field>
+
+      <Field label="SMTP host">
+        <input
+          className="taomni-input w-72"
+          value={smtpHost}
+          aria-label="SMTP host"
+          placeholder="smtp.example.com"
+          onChange={(e) => setSmtpHost(e.target.value)}
+        />
+        <span className="ml-2 text-[var(--taomni-text-muted)]">Port</span>
+        <input
+          className="taomni-input w-20 ml-1"
+          value={smtpPort}
+          aria-label="SMTP port"
+          onChange={(e) => setSmtpPort(e.target.value)}
+        />
+      </Field>
+
+      <Field label="SMTP security">
+        <Select
+          value={smtpSecurity}
+          className="w-32"
+          options={["TLS", "STARTTLS", "None"]}
+          onChange={(value) => setSmtpSecurity(value as MailSecurityMode)}
+        />
+      </Field>
+
+      <Field label="SMTP auth">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={smtpUseImapAuth} onChange={setSmtpUseImapAuth} />
+          Reuse IMAP username and app password token
+        </label>
+      </Field>
+
+      {!smtpUseImapAuth && (
+        <>
+          <Field label="SMTP username">
+            <input
+              className="taomni-input w-72"
+              value={smtpUsername}
+              aria-label="SMTP username"
+              placeholder="Defaults to the email address"
+              onChange={(e) => setSmtpUsername(e.target.value)}
+            />
+          </Field>
+          <Field label="SMTP password">
+            <input
+              className="taomni-input w-64"
+              type="password"
+              value={smtpPassword}
+              aria-label="SMTP password or app password token"
+              placeholder={smtpPasswordRef ? "saved in vault" : "Password / app password token"}
+              onChange={(e) => {
+                setSmtpPassword(e.target.value);
+                if (smtpPasswordRef) clearSmtpPasswordRef();
+              }}
+            />
+            <label
+              className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+              title={vaultState === "empty" ? "Set up the vault on save to store this token" : "Encrypt and store this token in the vault"}
+            >
+              <input
+                type="checkbox"
+                className="taomni-checkbox"
+                data-testid="mail-smtp-save-in-vault"
+                checked={smtpSaveInVault}
+                onChange={(e) => setSmtpSaveInVault(e.target.checked)}
+              />
+              Save in vault
+            </label>
+            <span className="taomni-pill">
+              <Shield className="w-3 h-3" /> Encrypted
+            </span>
+          </Field>
+        </>
+      )}
+
+      <Field label="Sync">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={syncOnOpen} onChange={setSyncOnOpen} />
+          Sync when tab opens
+        </label>
+        <span className="ml-3 text-[var(--taomni-text-muted)]">Interval</span>
+        <input
+          className="taomni-input w-16 ml-1"
+          value={syncIntervalMinutes}
+          aria-label="Mail sync interval minutes"
+          onChange={(e) => setSyncIntervalMinutes(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">min</span>
+        <span className="ml-3 text-[var(--taomni-text-muted)]">Fetch</span>
+        <input
+          className="taomni-input w-20 ml-1"
+          value={maxFetchPerSync}
+          aria-label="Mail max fetch per sync"
+          onChange={(e) => setMaxFetchPerSync(e.target.value)}
+        />
+      </Field>
+
+      <Field label="Cache">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={cacheEnabled} onChange={setCacheEnabled} />
+          Cache headers and recent bodies
+        </label>
+        <label className="ml-3 flex items-center gap-1.5">
+          <Checkbox checked={attachmentCache} onChange={setAttachmentCache} />
+          Cache attachments
+        </label>
+      </Field>
+
+      <Field label="Cache limits">
+        <span className="text-[var(--taomni-text-muted)]">Headers</span>
+        <input
+          className="taomni-input w-20 ml-1"
+          value={headerLimitPerFolder}
+          aria-label="Mail header limit per folder"
+          onChange={(e) => setHeaderLimitPerFolder(e.target.value)}
+        />
+        <span className="ml-3 text-[var(--taomni-text-muted)]">Days</span>
+        <input
+          className="taomni-input w-16 ml-1"
+          value={headerRetentionDays}
+          aria-label="Mail header retention days"
+          onChange={(e) => setHeaderRetentionDays(e.target.value)}
+        />
+        <span className="ml-3 text-[var(--taomni-text-muted)]">Bodies</span>
+        <input
+          className="taomni-input w-16 ml-1"
+          value={bodyRecentLimit}
+          aria-label="Mail recent body limit"
+          onChange={(e) => setBodyRecentLimit(e.target.value)}
+        />
+        <span className="ml-3 text-[var(--taomni-text-muted)]">Max bytes</span>
+        <input
+          className="taomni-input w-24 ml-1"
+          value={bodyMaxBytes}
+          aria-label="Mail body max bytes"
+          onChange={(e) => setBodyMaxBytes(e.target.value)}
+        />
+      </Field>
+
+      <Field label="AI">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={aiEnabled} onChange={setAiEnabled} />
+          Enable AI actions for this account
+        </label>
+        <label className="ml-3 flex items-center gap-1.5">
+          <Checkbox checked={aiSkipBodyConfirm} onChange={setAiSkipBodyConfirm} />
+          Do not ask before sending mail body text to AI
+        </label>
+      </Field>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Database settings sub-form                                         */
 /* ------------------------------------------------------------------ */
@@ -1821,6 +2068,37 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   });
   const [proxyTestUrl, setProxyTestUrl] = useState(() => optionString(initialOptions, "testUrl", "www.google.com:443"));
 
+  /* --- mail session options (generic IMAP + SMTP) --- */
+  const [mailEmailAddress, setMailEmailAddress] = useState(() => optionString(initialOptions, "mailEmailAddress", session?.username ?? ""));
+  const [mailDisplayName, setMailDisplayName] = useState(() => optionString(initialOptions, "mailDisplayName", ""));
+  const [mailReplyTo, setMailReplyTo] = useState(() => optionString(initialOptions, "mailReplyTo", ""));
+  const [mailImapSecurity, setMailImapSecurity] = useState<MailSecurityMode>(() => {
+    const value = optionString(initialOptions, "mailImapSecurity", "TLS");
+    return value === "STARTTLS" || value === "None" ? value : "TLS";
+  });
+  const [mailSmtpHost, setMailSmtpHost] = useState(() => optionString(initialOptions, "mailSmtpHost", ""));
+  const [mailSmtpPort, setMailSmtpPort] = useState(() => optionString(initialOptions, "mailSmtpPort", "465"));
+  const [mailSmtpSecurity, setMailSmtpSecurity] = useState<MailSecurityMode>(() => {
+    const value = optionString(initialOptions, "mailSmtpSecurity", "TLS");
+    return value === "STARTTLS" || value === "None" ? value : "TLS";
+  });
+  const [mailSmtpUsername, setMailSmtpUsername] = useState(() => optionString(initialOptions, "mailSmtpUsername", ""));
+  const [mailSmtpUseImapAuth, setMailSmtpUseImapAuth] = useState(() => optionBoolean(initialOptions, "mailSmtpUseImapAuth", true));
+  const [mailSmtpPassword, setMailSmtpPassword] = useState("");
+  const [mailSmtpPasswordRef, setMailSmtpPasswordRef] = useState(() => optionString(initialOptions, "mailSmtpPasswordRef", ""));
+  const [mailSmtpSaveInVault, setMailSmtpSaveInVault] = useState(() => !!optionString(initialOptions, "mailSmtpPasswordRef", ""));
+  const [mailCacheEnabled, setMailCacheEnabled] = useState(() => optionBoolean(initialOptions, "mailCacheEnabled", true));
+  const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => optionString(initialOptions, "mailHeaderRetentionDays", "30"));
+  const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => optionString(initialOptions, "mailHeaderLimitPerFolder", "2000"));
+  const [mailBodyRecentLimit, setMailBodyRecentLimit] = useState(() => optionString(initialOptions, "mailBodyRecentLimit", "200"));
+  const [mailBodyMaxBytes, setMailBodyMaxBytes] = useState(() => optionString(initialOptions, "mailBodyMaxBytes", "262144"));
+  const [mailAttachmentCache, setMailAttachmentCache] = useState(() => optionBoolean(initialOptions, "mailAttachmentCache", false));
+  const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
+  const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
+  const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
+  const [mailAiEnabled, setMailAiEnabled] = useState(() => optionBoolean(initialOptions, "mailAiEnabled", true));
+  const [mailAiSkipBodyConfirm, setMailAiSkipBodyConfirm] = useState(() => optionBoolean(initialOptions, "mailAiSkipBodyConfirm", false));
+
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
     getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
@@ -1931,6 +2209,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isDb = DB_PROTOS.includes(proto);
   const isHBase = proto === "HBaseShell";
   const isProxy = proto === "Proxy";
+  const isMail = proto === "Mail";
   const isObjectStorage = proto === "S3";
   const isPlannedClient = PLANNED_CLIENT_PROTOS.has(proto);
   const folderOptions = useMemo(() => {
@@ -1966,6 +2245,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (DB_PROTOS.includes(p) || p === "HBaseShell") setSection("database");
     // Proxy proto opens to its settings tab.
     if (p === "Proxy") setSection("proxy");
+    if (p === "Mail") {
+      setSection("mail");
+      setSpecifyUser(true);
+      setSaveInVault(true);
+      setMailSmtpSaveInVault(true);
+    }
     // Object storage opens straight to its settings tab.
     if (p === "S3") setSection("objectstorage");
   };
@@ -1993,12 +2278,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     networkSettingsValue = networkSettings,
     proxyPassValue = networkSettings.proxyPass,
     jumpPasswordValue = networkSettings.jumpPassword,
+    mailSmtpPasswordRefValue = mailSmtpPasswordRef,
     ossConfigValue,
   }: {
     passwordRefValue?: string;
     networkSettingsValue?: NetworkSettingsValue;
     proxyPassValue?: string;
     jumpPasswordValue?: string;
+    mailSmtpPasswordRefValue?: string;
     /** Resolved object-storage option map (secrets already swapped for vault
      *  refs by handleSave). Falls back to current form state when omitted. */
     ossConfigValue?: Record<string, unknown>;
@@ -2042,6 +2329,31 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       : {};
     const proxyOverrides: Record<string, unknown> = isProxy
       ? { proxyKind, testUrl: proxyTestUrl }
+      : {};
+    const mailOverrides: Record<string, unknown> = isMail
+      ? {
+          mailEmailAddress,
+          mailDisplayName,
+          mailReplyTo,
+          mailImapSecurity,
+          mailSmtpHost,
+          mailSmtpPort,
+          mailSmtpSecurity,
+          mailSmtpUsername,
+          mailSmtpUseImapAuth,
+          mailSmtpPasswordRef: mailSmtpUseImapAuth ? "" : mailSmtpPasswordRefValue,
+          mailCacheEnabled,
+          mailHeaderRetentionDays,
+          mailHeaderLimitPerFolder,
+          mailBodyRecentLimit,
+          mailBodyMaxBytes,
+          mailAttachmentCache,
+          mailSyncOnOpen,
+          mailSyncIntervalMinutes,
+          mailMaxFetchPerSync,
+          mailAiEnabled,
+          mailAiSkipBodyConfirm,
+        }
       : {};
     const ossOverrides: Record<string, unknown> =
       proto === "S3"
@@ -2113,6 +2425,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...rdpOverrides,
       ...dbOverrides,
       ...proxyOverrides,
+      ...mailOverrides,
       ...hbaseOverrides,
       ...ossOverrides,
       ...localShellOverrides,
@@ -2144,6 +2457,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         ? t("sessionEditor2.wslDefaultName", { distro: wslOptions.distro || "Linux" })
         : proto === "S3"
           ? (oss.defaultBucket || oss.defaultContainer || oss.accountName || oss.endpoint || "Object Storage")
+          : proto === "Mail"
+            ? (mailEmailAddress || username || host || "Mail account")
           : proto === "Serial"
             ? (serialDevice ? `Serial ${serialDevice}` : "Serial terminal")
           : (proto === "File" && host
@@ -2178,6 +2493,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");
     if (proto === "WSL" && !wslOptions.distro.trim()) return t("sessionEditor2.errWslDistroRequired");
     if (proto === "Presto" && !dbCatalog.trim()) return "Presto catalog is required.";
+    if (proto === "Mail") {
+      if (!mailEmailAddress.trim()) return "Mail email address is required.";
+      if (!host.trim()) return "IMAP host is required.";
+      if (!mailSmtpHost.trim()) return "SMTP host is required.";
+      if (!username.trim()) return "IMAP username is required.";
+      if (!saveInVault) return "Mail credentials must be saved in the vault.";
+      if (!passwordRef && !password) return "Mail password or app password token is required.";
+      if (!mailSmtpUseImapAuth && !mailSmtpSaveInVault) return "SMTP credentials must be saved in the vault.";
+      if (!mailSmtpUseImapAuth && !mailSmtpPasswordRef && !mailSmtpPassword) {
+        return "SMTP password or app password token is required.";
+      }
+    }
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
     if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
     if (proto === "HBaseShell") {
@@ -2207,8 +2534,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // building the config so the reference lands in options_json.
     let nextPasswordRef = passwordRef;
     if (
-      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy) &&
-      (isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || authMethod === "Password") &&
+      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || isMail) &&
+      (isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || isMail || authMethod === "Password") &&
       saveInVault &&
       password.length > 0
     ) {
@@ -2226,9 +2553,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             ? "rdp-password"
             : proto === "VNC"
               ? "vnc-password"
-              : isProxy
-                ? "proxy-password"
-                : isHBase
+            : isProxy
+              ? "proxy-password"
+              : isMail
+                ? "mail-imap-password"
+              : isHBase
                   ? "hbase-password"
                   : isDb
                     ? "db-password"
@@ -2312,6 +2641,37 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
     setPasswordRef(nextPasswordRef);
 
+    let nextMailSmtpPasswordRef = mailSmtpPasswordRef;
+    if (isMail && !mailSmtpUseImapAuth) {
+      if (mailSmtpSaveInVault && mailSmtpPassword.length > 0) {
+        const ready = await ensureVaultReady(t("vault.gateReasonSession"));
+        if (!ready) {
+          setSaveError(t("sessionEditor2.errVaultLockedSave"));
+          return;
+        }
+        try {
+          const label = `${mailSmtpUsername || username || mailEmailAddress || "mail"}@${mailSmtpHost || "smtp"}:${mailSmtpPort || "465"}`;
+          const result = await vaultPut("mail-smtp-password", label, mailSmtpPassword);
+          nextMailSmtpPasswordRef = result.reference;
+          setMailSmtpPasswordRef(result.reference);
+          setMailSmtpPassword("");
+        } catch (err) {
+          if (isVaultLockedError(err)) {
+            setSaveError(t("sessionEditor2.errVaultLockedSave"));
+          } else {
+            setSaveError(err instanceof Error ? err.message : String(err));
+          }
+          return;
+        }
+      } else if (!mailSmtpSaveInVault) {
+        nextMailSmtpPasswordRef = "";
+      }
+    } else if (isMail && mailSmtpUseImapAuth) {
+      nextMailSmtpPasswordRef = "";
+      setMailSmtpPasswordRef("");
+      setMailSmtpPassword("");
+    }
+
     // Object-storage secrets: swap freshly-typed plaintext for vault refs when
     // "Save secrets in vault" is on. When off, secrets are stored as plaintext
     // in options_json (the backend resolve() accepts either form).
@@ -2381,6 +2741,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         passwordRefValue: nextPasswordRef,
         proxyPassValue: nextProxyPass,
         jumpPasswordValue: nextJumpPass,
+        mailSmtpPasswordRefValue: nextMailSmtpPasswordRef,
         ossConfigValue,
       }),
     });
@@ -2427,7 +2788,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setPassword("");
     const restoredRef = optionString(nextOptions, "passwordRef", "");
     setPasswordRef(restoredRef);
-    setSaveInVault(!!restoredRef);
+    setSaveInVault(!!restoredRef || nextProto === "Mail");
     setX11(optionBoolean(nextOptions, "x11", true));
     setX11Trusted(optionBoolean(nextOptions, "x11Trusted", true));
     setCompression(optionBoolean(nextOptions, "compression", false));
@@ -2468,6 +2829,36 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setWslOptions(parseWslOptions(session?.options_json));
     setRdpOptions(parseRdpOptions(session?.options_json));
     setPathMappings(parsePathMappingsFromOptions(session?.options_json));
+    setMailEmailAddress(optionString(nextOptions, "mailEmailAddress", session?.username ?? ""));
+    setMailDisplayName(optionString(nextOptions, "mailDisplayName", ""));
+    setMailReplyTo(optionString(nextOptions, "mailReplyTo", ""));
+    setMailImapSecurity((() => {
+      const value = optionString(nextOptions, "mailImapSecurity", "TLS");
+      return value === "STARTTLS" || value === "None" ? value : "TLS";
+    })());
+    setMailSmtpHost(optionString(nextOptions, "mailSmtpHost", ""));
+    setMailSmtpPort(optionString(nextOptions, "mailSmtpPort", "465"));
+    setMailSmtpSecurity((() => {
+      const value = optionString(nextOptions, "mailSmtpSecurity", "TLS");
+      return value === "STARTTLS" || value === "None" ? value : "TLS";
+    })());
+    setMailSmtpUsername(optionString(nextOptions, "mailSmtpUsername", ""));
+    setMailSmtpUseImapAuth(optionBoolean(nextOptions, "mailSmtpUseImapAuth", true));
+    setMailSmtpPassword("");
+    const restoredSmtpRef = optionString(nextOptions, "mailSmtpPasswordRef", "");
+    setMailSmtpPasswordRef(restoredSmtpRef);
+    setMailSmtpSaveInVault(!!restoredSmtpRef || nextProto === "Mail");
+    setMailCacheEnabled(optionBoolean(nextOptions, "mailCacheEnabled", true));
+    setMailHeaderRetentionDays(optionString(nextOptions, "mailHeaderRetentionDays", "30"));
+    setMailHeaderLimitPerFolder(optionString(nextOptions, "mailHeaderLimitPerFolder", "2000"));
+    setMailBodyRecentLimit(optionString(nextOptions, "mailBodyRecentLimit", "200"));
+    setMailBodyMaxBytes(optionString(nextOptions, "mailBodyMaxBytes", "262144"));
+    setMailAttachmentCache(optionBoolean(nextOptions, "mailAttachmentCache", false));
+    setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
+    setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
+    setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
+    setMailAiEnabled(optionBoolean(nextOptions, "mailAiEnabled", true));
+    setMailAiSkipBodyConfirm(optionBoolean(nextOptions, "mailAiSkipBodyConfirm", false));
     setOss(ossFormFromOptions(session?.options_json));
     setSaveError(null);
     setTestResult(null);
@@ -2812,6 +3203,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         { id: "network", label: t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
+    : isMail
+    ? [
+        { id: "mail", label: "Mail account", icon: <Mail className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+      ]
     : [
         ...(isSSH
           ? [{ id: "advanced" as SectionTab, label: t("sessionEditor2.sectionAdvancedSsh"), icon: <Shield className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
@@ -2839,6 +3235,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         ? (section === "proxy" || section === "bookmark" ? section : "proxy")
         : isObjectStorage
         ? (section === "objectstorage" || section === "bookmark" || section === "network" ? section : "objectstorage")
+        : isMail
+        ? (section === "mail" || section === "bookmark" ? section : "mail")
         : isDb || isHBase
         ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
@@ -3029,7 +3427,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 })()}
               </div>
 
-              {(proto === "RDP" || proto === "VNC" || isProxy) && (
+              {(proto === "RDP" || proto === "VNC" || isProxy || isMail) && (
                 <>
                   <label className="col-span-2 text-[12px] text-right">
                     {t("sessionEditor2.passwordLabel")}
@@ -3040,8 +3438,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                         className="taomni-input w-64"
                         type="password"
                         value={password}
-                        aria-label={t("sessionEditor2.passwordLabel")}
-                        placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : ""}
+                        aria-label={isMail ? "Mail password or app password token" : t("sessionEditor2.passwordLabel")}
+                        placeholder={passwordRef ? t("sessionEditor2.passwordPlaceholderSaved") : isMail ? "Password / app password token" : ""}
                         onChange={(e) => {
                           setPassword(e.target.value);
                           if (passwordRef) setPasswordRef("");
@@ -3309,6 +3707,36 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           {activeSection === "rdp" && (
             <div data-testid="session-rdp-section">
               <RdpOptionsForm options={rdpOptions} onChange={setRdpOptions} />
+            </div>
+          )}
+          {activeSection === "mail" && isMail && (
+            <div data-testid="session-mail-section">
+              <MailSettings
+                emailAddress={mailEmailAddress} setEmailAddress={setMailEmailAddress}
+                displayName={mailDisplayName} setDisplayName={setMailDisplayName}
+                replyTo={mailReplyTo} setReplyTo={setMailReplyTo}
+                imapSecurity={mailImapSecurity} setImapSecurity={setMailImapSecurity}
+                smtpHost={mailSmtpHost} setSmtpHost={setMailSmtpHost}
+                smtpPort={mailSmtpPort} setSmtpPort={setMailSmtpPort}
+                smtpSecurity={mailSmtpSecurity} setSmtpSecurity={setMailSmtpSecurity}
+                smtpUsername={mailSmtpUsername} setSmtpUsername={setMailSmtpUsername}
+                smtpUseImapAuth={mailSmtpUseImapAuth} setSmtpUseImapAuth={setMailSmtpUseImapAuth}
+                smtpPassword={mailSmtpPassword} setSmtpPassword={setMailSmtpPassword}
+                smtpPasswordRef={mailSmtpPasswordRef} clearSmtpPasswordRef={() => setMailSmtpPasswordRef("")}
+                smtpSaveInVault={mailSmtpSaveInVault} setSmtpSaveInVault={setMailSmtpSaveInVault}
+                cacheEnabled={mailCacheEnabled} setCacheEnabled={setMailCacheEnabled}
+                headerRetentionDays={mailHeaderRetentionDays} setHeaderRetentionDays={setMailHeaderRetentionDays}
+                headerLimitPerFolder={mailHeaderLimitPerFolder} setHeaderLimitPerFolder={setMailHeaderLimitPerFolder}
+                bodyRecentLimit={mailBodyRecentLimit} setBodyRecentLimit={setMailBodyRecentLimit}
+                bodyMaxBytes={mailBodyMaxBytes} setBodyMaxBytes={setMailBodyMaxBytes}
+                attachmentCache={mailAttachmentCache} setAttachmentCache={setMailAttachmentCache}
+                syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
+                syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
+                maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}
+                aiEnabled={mailAiEnabled} setAiEnabled={setMailAiEnabled}
+                aiSkipBodyConfirm={mailAiSkipBodyConfirm} setAiSkipBodyConfirm={setMailAiSkipBodyConfirm}
+                vaultState={vaultState}
+              />
             </div>
           )}
           {activeSection === "database" && isDb && (

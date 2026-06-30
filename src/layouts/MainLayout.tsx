@@ -43,6 +43,7 @@ import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOv
 import { FileBrowser } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
+import { MailClientTab } from "../components/mail/MailClientTab";
 import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
@@ -68,7 +69,7 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo } from "../types";
 import { computeNewTerminalTitle, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -322,6 +323,83 @@ function passwordRefFromOptions(session: SessionConfig): string | null {
   const opts = parseSessionOptions(session.options_json);
   const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
   return ref && ref.startsWith("vault:") ? ref : null;
+}
+
+function mailSmtpPasswordRefFromOptions(session: SessionConfig): string | null {
+  const opts = parseSessionOptions(session.options_json);
+  const useImapAuth = opts.mailSmtpUseImapAuth !== false;
+  if (useImapAuth) return null;
+  const ref = typeof opts.mailSmtpPasswordRef === "string" ? opts.mailSmtpPasswordRef : "";
+  return ref && ref.startsWith("vault:") ? ref : null;
+}
+
+function mailSecurityFromOptions(value: unknown, fallback: MailConnectionSecurity): MailConnectionSecurity {
+  if (value === "STARTTLS" || value === "starttls") return "starttls";
+  if (value === "None" || value === "none") return "none";
+  if (value === "TLS" || value === "tls") return "tls";
+  return fallback;
+}
+
+function mailNumberOption(
+  options: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  min = 0,
+): number {
+  const raw = options[key];
+  const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.round(n));
+}
+
+function sessionToMailTabInfo(
+  session: SessionConfig,
+  password?: string,
+  smtpPassword?: string,
+): MailTabInfo {
+  const opts = parseSessionOptions(session.options_json);
+  const str = (key: string, fallback = ""): string =>
+    typeof opts[key] === "string" ? (opts[key] as string) : fallback;
+  const smtpUseImapAuth = opts.mailSmtpUseImapAuth !== false;
+  const emailAddress = str("mailEmailAddress", session.username ?? "");
+  return {
+    sessionId: session.id,
+    emailAddress,
+    displayName: str("mailDisplayName") || null,
+    replyTo: str("mailReplyTo") || null,
+    imap: {
+      host: session.host,
+      port: session.port,
+      username: session.username || emailAddress || null,
+      password,
+      security: mailSecurityFromOptions(opts.mailImapSecurity, "tls"),
+    },
+    smtp: {
+      host: str("mailSmtpHost"),
+      port: mailNumberOption(opts, "mailSmtpPort", 465, 1),
+      username: smtpUseImapAuth ? (session.username || emailAddress || null) : (str("mailSmtpUsername") || emailAddress || null),
+      password: smtpUseImapAuth ? password : smtpPassword,
+      security: mailSecurityFromOptions(opts.mailSmtpSecurity, "tls"),
+      useImapAuth: smtpUseImapAuth,
+    },
+    sync: {
+      onOpen: opts.mailSyncOnOpen !== false,
+      intervalMinutes: mailNumberOption(opts, "mailSyncIntervalMinutes", 5, 1),
+      maxFetchPerSync: mailNumberOption(opts, "mailMaxFetchPerSync", 200, 1),
+    },
+    cache: {
+      enabled: opts.mailCacheEnabled !== false,
+      headerRetentionDays: mailNumberOption(opts, "mailHeaderRetentionDays", 30, 1),
+      headerLimitPerFolder: mailNumberOption(opts, "mailHeaderLimitPerFolder", 2000, 1),
+      bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),
+      bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
+      attachmentCache: opts.mailAttachmentCache === true,
+    },
+    ai: {
+      enabled: opts.mailAiEnabled !== false,
+      skipBodyConfirm: opts.mailAiSkipBodyConfirm === true,
+    },
+  };
 }
 
 /**
@@ -1384,6 +1462,21 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [addTab, markConnected]);
 
+  const openMailTab = useCallback((session: SessionConfig, password?: string, smtpPassword?: string) => {
+    const id = `mail-${session.id}-${Date.now()}`;
+    const info = sessionToMailTabInfo(session, password, smtpPassword);
+    const title = session.name || info.emailAddress || `Mail ${session.host}`;
+    addTab({
+      id,
+      type: "mail",
+      title,
+      sessionId: session.id,
+      closable: true,
+      mail: info,
+    });
+    void markConnected(session.id);
+  }, [addTab, markConnected]);
+
   // Open a local path or URL: http(s) URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
   // they fall through to the OS file manager via sftpOpenPath.
@@ -1730,6 +1823,14 @@ export function MainLayout() {
         if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
       }
       openObjectStorageTab(session);
+    } else if (session.session_type === "Mail") {
+      const ref = passwordRefFromOptions(session);
+      const smtpRef = mailSmtpPasswordRefFromOptions(session);
+      if (ref || smtpRef) {
+        const vaultState = useVaultStore.getState().state;
+        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
+      }
+      openMailTab(session, ref ?? undefined, smtpRef ?? undefined);
     } else {
       openUnsupportedTab(session);
       void markConnected(session.id);
@@ -1750,6 +1851,7 @@ export function MainLayout() {
     openHBaseShellTab,
     openProxyTestTab,
     openObjectStorageTab,
+    openMailTab,
     queueVaultUnlock,
   ]);
 
@@ -1855,6 +1957,8 @@ export function MainLayout() {
         openLocalTab(session.name);
       } else if (session.session_type === "Browser") {
         openBrowserSession(session);
+      } else if (session.session_type === "Mail") {
+        openMailTab(session);
       } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
         openCommandTerminalTab(session);
       } else if (
@@ -1881,7 +1985,7 @@ export function MainLayout() {
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : String(err));
     }
-  }, [openBrowserSession, openCommandTerminalTab, openLocalTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
+  }, [openBrowserSession, openCommandTerminalTab, openLocalTab, openMailTab, openRdpTab, openSftpTab, openSshTab, openUnsupportedTab, setStatusMessage]);
 
   const openPlaceholderTab = useCallback((title: string, message: string) => {
     addTab({
@@ -2429,6 +2533,7 @@ export function MainLayout() {
   const dbTabs = tabs.filter((t) => t.type === "database" && t.db);
   const redisTabs = tabs.filter((t) => t.type === "redis" && t.db);
   const hbaseTabs = tabs.filter((t) => t.type === "hbase-shell" && t.hbase);
+  const mailTabs = tabs.filter((t) => t.type === "mail" && t.mail);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
   const effectiveMultiExecSelectedCount = terminalSplitActive
@@ -3124,6 +3229,20 @@ export function MainLayout() {
                   );
                 })}
 
+                {mailTabs.map((tab) => {
+                  if (!tab.mail) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <MailClientTab info={tab.mail} />
+                    </div>
+                  );
+                })}
+
                 {/* SQL database client tabs — always mounted so long queries
                     keep running across tab switches. */}
                 {dbTabs.map((tab) => {
@@ -3210,6 +3329,7 @@ export function MainLayout() {
                   activeTab.type !== "database" &&
                   activeTab.type !== "redis" &&
                   activeTab.type !== "hbase-shell" &&
+                  activeTab.type !== "mail" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "git" &&
                   activeTab.type !== "nettools" &&
