@@ -125,62 +125,66 @@ button, input, select, textarea, optgroup {
 }
 
 html[data-app-theme="dark"] {
-  --taomni-bg: #0b0f19; /*星空暗夜深蓝色调和底色*/
-  --taomni-chrome-bg: #0f172a; 
-  --taomni-chrome-border: #1e293b;
-  --taomni-titlebar-from: #1e293b;
-  --taomni-titlebar-to: #0f172a;
-  --taomni-menubar-bg: #0b0f19;
-  --taomni-quick-bg: #1e293b;
-  --taomni-accent: #60a5fa;
-  --taomni-accent-soft: #93c5fd;
-  --taomni-tab-active: #0b0f19;
-  --taomni-tab-inactive: #1e293b;
-  --taomni-tab-border: #334155;
-  --taomni-sidebar-bg: #0b0f19;
-  --taomni-sidebar-border: #1e293b;
-  --taomni-panel-bg: #0f172a;
-  --taomni-card-bg: #1e293b;
-  --taomni-card-border: #334155;
-  --taomni-status-bg: #0b0f19;
-  --taomni-status-text: #cbd5e1;
-  --taomni-text: #f8fafc;
-  --taomni-text-muted: #94a3b8;
-  --taomni-divider: #1e293b;
-  --taomni-hover: #1e293b;
-  --taomni-selected: #1e3a8a;
-  --taomni-selected-border: #3b82f6;
-  --taomni-editor-selection-bg: rgba(96, 165, 250, 0.46);
-  --taomni-editor-selection-text: #f8fafc;
-  --taomni-editor-selection-match-bg: rgba(250, 204, 21, 0.28);
-  --taomni-editor-selection-match-border: rgba(250, 204, 21, 0.72);
-  --taomni-control-hover: rgba(255, 255, 255, 0.05);
-  --taomni-input-bg: #0b0f19;
-  --taomni-input-border: #334155;
-  --taomni-button-from: #1e293b;
-  --taomni-button-to: #0f172a;
-  --taomni-button-hover-from: #334155;
-  --taomni-button-hover-to: #1e293b;
-  --taomni-button-disabled: #0f172a;
-  --taomni-scrollbar-track: #0b0f19;
-  --taomni-scrollbar-thumb: #334155;
-  --taomni-scrollbar-thumb-hover: #475569;
-  --taomni-db-syntax-keyword: #93c5fd;
-  --taomni-db-syntax-name: #f8fafc;
-  --taomni-db-syntax-function: #67e8f9;
-  --taomni-db-syntax-string: #86efac;
-  --taomni-db-syntax-atom: #fcd34d;
-  --taomni-db-syntax-comment: #94a3b8;
-  --taomni-db-syntax-operator: #cbd5e1;
-  --taomni-db-syntax-punctuation: #cbd5e1;
-  --taomni-link: #60a5fa;
-  --taomni-ribbon-from: #0f172a;
-  --taomni-ribbon-to: #0b0f19;
-  --taomni-ribbon-border: #1e293b;
-  --taomni-tao-ribbon-bg: #20384a;
-  --taomni-tao-ribbon-text: #d8f3ef;
-  --taomni-tao-ribbon-border: #4f8f9d;
-  --taomni-tao-ribbon-shadow: 0 8px 22px rgba(79, 143, 157, 0.24);
+  --taomni-bg: #1e1f22;
+  --taomni-chrome-bg: #191a1c;
+  --taomni-chrome-border: #303238;
+  --taomni-titlebar-from: #202124;
+  --taomni-titlebar-to: #191a1c;
+  --taomni-menubar-bg: #191a1c;
+  --taomni-quick-bg: #26282e;
+  --taomni-accent: #6aa6f8;
+  --taomni-accent-soft: #8bbcff;
+  --taomni-tab-active: #1e1f22;
+  --taomni-tab-inactive: #26282e;
+  --taomni-tab-border: #35383f;
+  --taomni-sidebar-bg: #1e1f22;
+  --taomni-sidebar-border: #303238;
+  --taomni-panel-bg: #1e1f22;
+  --taomni-card-bg: #26282e;
+  --taomni-card-border: #35383f;
+  --taomni-status-bg: #191a1c;
+  --taomni-status-text: #c6ccd6;
+  --taomni-text: #e6eaf0;
+  --taomni-text-muted: #9ca3ad;
+  --taomni-divider: #303238;
+  --taomni-hover: #282a30;
+  --taomni-selected: #293b55;
+  --taomni-selected-border: #5c8fd6;
+  --taomni-editor-selection-bg: rgba(92, 143, 214, 0.4);
+  --taomni-editor-selection-text: #eef2f7;
+  --taomni-editor-selection-match-bg: rgba(225, 177, 75, 0.3);
+  --taomni-editor-selection-match-border: rgba(225, 177, 75, 0.72);
+  --taomni-control-hover: rgba(255, 255, 255, 0.06);
+  --taomni-input-bg: #191a1c;
+  --taomni-input-border: #35383f;
+  --taomni-button-from: #2b2d33;
+  --taomni-button-to: #24262b;
+  --taomni-button-hover-from: #35383f;
+  --taomni-button-hover-to: #2b2d33;
+  --taomni-button-disabled: #202124;
+  --taomni-scrollbar-track: #1e1f22;
+  --taomni-scrollbar-thumb: #3a3d44;
+  --taomni-scrollbar-thumb-hover: #4b4f58;
+  --taomni-term-bg: #1e1f22;
+  --taomni-term-text: #e6eaf0;
+  --taomni-term-prompt: #5fd58a;
+  --taomni-term-path: #6aa6f8;
+  --taomni-db-syntax-keyword: #8bbcff;
+  --taomni-db-syntax-name: #e6eaf0;
+  --taomni-db-syntax-function: #78d6e8;
+  --taomni-db-syntax-string: #9bd68f;
+  --taomni-db-syntax-atom: #e5c07b;
+  --taomni-db-syntax-comment: #8b929d;
+  --taomni-db-syntax-operator: #c6ccd6;
+  --taomni-db-syntax-punctuation: #c6ccd6;
+  --taomni-link: #78a8f8;
+  --taomni-ribbon-from: #24262b;
+  --taomni-ribbon-to: #1e1f22;
+  --taomni-ribbon-border: #303238;
+  --taomni-tao-ribbon-bg: #24363b;
+  --taomni-tao-ribbon-text: #d9f0ec;
+  --taomni-tao-ribbon-border: #5aa3a3;
+  --taomni-tao-ribbon-shadow: 0 8px 22px rgba(90, 163, 163, 0.2);
 
   /* Warning banner tokens — readable on the dark panel surface */
   --taomni-warning-bg: rgba(245, 158, 11, 0.18);
@@ -200,9 +204,9 @@ html[data-app-theme="dark"] {
   --taomni-badge-warning-border: #b45309;
 
   /* Ambient shadows optimized for night theme */
-  --taomni-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --taomni-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
-  --taomni-shadow-lg: 0 16px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(0, 0, 0, 0.25);
+  --taomni-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --taomni-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.36), 0 2px 4px -1px rgba(0, 0, 0, 0.18);
+  --taomni-shadow-lg: 0 16px 24px -4px rgba(0, 0, 0, 0.46), 0 4px 8px -2px rgba(0, 0, 0, 0.24);
 }
 
 body {
@@ -469,54 +473,63 @@ body {
 
 [data-testid="sftp-browser"],
 [data-testid="sftp-detached-window"],
+[data-testid="git-panel"],
 [role="dialog"] {
   font-family: var(--taomni-ui-font-family) !important;
 }
 
 [data-testid="sftp-browser"] *:not(.taomni-mono):not(.font-mono),
 [data-testid="sftp-detached-window"] *:not(.taomni-mono):not(.font-mono),
+[data-testid="git-panel"] *:not(.taomni-mono):not(.font-mono):not(.taomni-diff-host):not(.taomni-diff-host *),
 [role="dialog"] *:not(.taomni-mono):not(.font-mono) {
   font-family: inherit;
 }
 
 [data-testid="sftp-browser"] .text-\[12px\],
 [data-testid="sftp-detached-window"] .text-\[12px\],
+[data-testid="git-panel"] .text-\[12px\]:not(.taomni-diff-host *),
 [role="dialog"] .text-\[12px\] {
   font-size: var(--taomni-ui-font-size) !important;
 }
 
 [data-testid="sftp-browser"] .text-\[11px\],
 [data-testid="sftp-detached-window"] .text-\[11px\],
+[data-testid="git-panel"] .text-\[11px\]:not(.taomni-diff-host *),
 [role="dialog"] .text-\[11px\] {
   font-size: calc(var(--taomni-ui-font-size) - 1px) !important;
 }
 
 [data-testid="sftp-browser"] .text-\[10px\],
 [data-testid="sftp-detached-window"] .text-\[10px\],
+[data-testid="git-panel"] .text-\[10px\]:not(.taomni-diff-host *),
 [role="dialog"] .text-\[10px\] {
   font-size: calc(var(--taomni-ui-font-size) - 2px) !important;
 }
 
 [data-testid="sftp-browser"] .text-xs,
 [data-testid="sftp-detached-window"] .text-xs,
+[data-testid="git-panel"] .text-xs:not(.taomni-diff-host *),
 [role="dialog"] .text-xs {
   font-size: var(--taomni-ui-font-size) !important;
 }
 
 [data-testid="sftp-browser"] .text-sm,
 [data-testid="sftp-detached-window"] .text-sm,
+[data-testid="git-panel"] .text-sm:not(.taomni-diff-host *),
 [role="dialog"] .text-sm {
   font-size: calc(var(--taomni-ui-font-size) + 2px) !important;
 }
 
 [data-testid="sftp-browser"] .text-\[14px\],
 [data-testid="sftp-detached-window"] .text-\[14px\],
+[data-testid="git-panel"] .text-\[14px\]:not(.taomni-diff-host *),
 [role="dialog"] .text-\[14px\] {
   font-size: calc(var(--taomni-ui-font-size) + 2px) !important;
 }
 
 [data-testid="sftp-browser"] .text-base,
 [data-testid="sftp-detached-window"] .text-base,
+[data-testid="git-panel"] .text-base:not(.taomni-diff-host *),
 [role="dialog"] .text-base {
   font-size: calc(var(--taomni-ui-font-size) + 4px) !important;
 }

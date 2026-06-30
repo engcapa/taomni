@@ -35,6 +35,8 @@ const WELCOME_RECENT_SESSION_LIMIT_KEY = "taomni.welcomeRecentSessionLimit";
 const DEFAULT_WELCOME_RECENT_SESSION_LIMIT = 20;
 const MIN_WELCOME_RECENT_SESSION_LIMIT = 1;
 const MAX_WELCOME_RECENT_SESSION_LIMIT = 100;
+const MIN_UI_FONT_SIZE = 10;
+const MAX_UI_FONT_SIZE = 18;
 
 interface AppState {
   tabs: Tab[];
@@ -178,7 +180,7 @@ function readUiFontSize(): number {
     const val = window.localStorage.getItem(UI_FONT_SIZE_KEY);
     if (val) {
       const parsed = parseInt(val, 10);
-      if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) {
+      if (!isNaN(parsed) && parsed >= MIN_UI_FONT_SIZE && parsed <= MAX_UI_FONT_SIZE) {
         return parsed;
       }
     }
@@ -194,6 +196,11 @@ function writeUiFontSize(size: number) {
   } catch {
     // Ignore storage failures
   }
+}
+
+function clampUiFontSize(size: number): number {
+  if (!Number.isFinite(size)) return 12;
+  return Math.min(MAX_UI_FONT_SIZE, Math.max(MIN_UI_FONT_SIZE, Math.round(size)));
 }
 
 function readTerminalSplitLayout(): TerminalSplitLayout {
@@ -678,8 +685,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   setUiFontSize: (size) =>
     set(() => {
-      writeUiFontSize(size);
-      return { uiFontSize: size };
+      const next = clampUiFontSize(size);
+      writeUiFontSize(next);
+      return { uiFontSize: next };
     }),
 
   setWelcomeRecentSessionLimit: (limit) =>

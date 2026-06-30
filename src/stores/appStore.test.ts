@@ -192,6 +192,16 @@ describe("appStore.uiAppearance", () => {
     expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("14");
   });
 
+  it("clamps uiFontSize to the supported settings range", () => {
+    useAppStore.getState().setUiFontSize(99);
+    expect(useAppStore.getState().uiFontSize).toBe(18);
+    expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("18");
+
+    useAppStore.getState().setUiFontSize(3);
+    expect(useAppStore.getState().uiFontSize).toBe(10);
+    expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("10");
+  });
+
   it("allows setting and persisting the welcome recent session limit", () => {
     useAppStore.getState().setWelcomeRecentSessionLimit(35);
     expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(35);
