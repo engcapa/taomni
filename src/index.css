@@ -57,6 +57,14 @@
   --taomni-term-text: #f8fafc;
   --taomni-term-prompt: #10b981;
   --taomni-term-path: #3b82f6;
+  --taomni-db-syntax-keyword: #1d4ed8;
+  --taomni-db-syntax-name: #0f172a;
+  --taomni-db-syntax-function: #0f766e;
+  --taomni-db-syntax-string: #047857;
+  --taomni-db-syntax-atom: #b45309;
+  --taomni-db-syntax-comment: #64748b;
+  --taomni-db-syntax-operator: #475569;
+  --taomni-db-syntax-punctuation: #475569;
   --taomni-link: #2563eb;
   --taomni-ribbon-from: #f8fafc;
   --taomni-ribbon-to: #e2e8f0;
@@ -157,6 +165,14 @@ html[data-app-theme="dark"] {
   --taomni-scrollbar-track: #0b0f19;
   --taomni-scrollbar-thumb: #334155;
   --taomni-scrollbar-thumb-hover: #475569;
+  --taomni-db-syntax-keyword: #93c5fd;
+  --taomni-db-syntax-name: #f8fafc;
+  --taomni-db-syntax-function: #67e8f9;
+  --taomni-db-syntax-string: #86efac;
+  --taomni-db-syntax-atom: #fcd34d;
+  --taomni-db-syntax-comment: #94a3b8;
+  --taomni-db-syntax-operator: #cbd5e1;
+  --taomni-db-syntax-punctuation: #cbd5e1;
   --taomni-link: #60a5fa;
   --taomni-ribbon-from: #0f172a;
   --taomni-ribbon-to: #0b0f19;
@@ -824,18 +840,24 @@ html[data-app-theme="dark"] .bg-white {
 html[data-app-theme="dark"] .bg-white\/90 {
   background-color: color-mix(in srgb, var(--taomni-panel-bg) 90%, transparent) !important;
 }
-html[data-app-theme="dark"] .bg-slate-100 {
+html[data-app-theme="dark"] .bg-slate-100,
+html[data-app-theme="dark"] .bg-slate-200 {
   background-color: var(--taomni-quick-bg) !important;
 }
 html[data-app-theme="dark"] .border-slate-100,
+html[data-app-theme="dark"] .border-slate-200,
+html[data-app-theme="dark"] .border-slate-300,
 html[data-app-theme="dark"] .border-slate-400,
 html[data-app-theme="dark"] .border-slate-500 {
   border-color: var(--taomni-divider) !important;
 }
-html[data-app-theme="dark"] .text-slate-300,
-html[data-app-theme="dark"] .text-slate-500,
-html[data-app-theme="dark"] .text-slate-600,
 html[data-app-theme="dark"] .text-slate-700 {
+  color: var(--taomni-text) !important;
+}
+html[data-app-theme="dark"] .text-slate-300,
+html[data-app-theme="dark"] .text-slate-400,
+html[data-app-theme="dark"] .text-slate-500,
+html[data-app-theme="dark"] .text-slate-600 {
   color: var(--taomni-text-muted) !important;
 }
 html[data-app-theme="dark"] .hover\:bg-white\/15:hover,

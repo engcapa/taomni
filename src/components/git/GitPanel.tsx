@@ -1106,7 +1106,7 @@ function SettingInput({ label, value, onChange }: { label: string; value: string
 
 function DiffPane({ diff, loading }: { diff: string; loading: boolean }) {
   return (
-    <div className="flex-1 min-h-0 overflow-auto bg-[var(--taomni-terminal-bg,#111827)]">
+    <div className="flex-1 min-h-0 overflow-auto bg-[var(--taomni-term-bg,#111827)]">
       {loading ? (
         <div className="h-full flex items-center justify-center text-[var(--taomni-text-muted)]">
           <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading diff

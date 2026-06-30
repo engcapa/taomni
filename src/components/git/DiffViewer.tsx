@@ -792,7 +792,7 @@ function ImageDiff({ pair }: { pair: GitBlobPair }) {
   const oldUrl = imageDataUrl(pair.oldPath ?? pair.path, pair.oldImageB64);
   const newUrl = imageDataUrl(pair.path, pair.newImageB64);
   return (
-    <div className="h-full min-h-0 grid grid-cols-2 gap-2 p-3 overflow-auto bg-[var(--taomni-terminal-bg,#111827)]">
+    <div className="h-full min-h-0 grid grid-cols-2 gap-2 p-3 overflow-auto bg-[var(--taomni-term-bg,#111827)]">
       <ImageSide label={`Before · ${formatBytes(pair.oldSize)}`} url={oldUrl} missing="Not present" />
       <ImageSide label={`After · ${formatBytes(pair.newSize)}`} url={newUrl} missing="Deleted" />
     </div>
