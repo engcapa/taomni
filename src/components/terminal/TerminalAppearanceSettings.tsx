@@ -31,7 +31,7 @@ import { historyClear } from "../../lib/ipc";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { getAppPlatform } from "../../lib/runtime";
-import { useSystemPrefersDark } from "../../lib/systemColorScheme";
+import { useAppTheme } from "../../lib/appTheme";
 
 interface TerminalAppearanceSettingsProps {
   profile: TerminalProfile;
@@ -98,7 +98,8 @@ export function TerminalAppearanceSettings({
   const safeFontFamily = useMemo(() => {
     return isMonospaceFont(primaryFont) ? profile.fontFamily : makeTerminalFontFamily("Source Code Pro");
   }, [primaryFont, profile.fontFamily]);
-  const systemPrefersDark = useSystemPrefersDark();
+  const { resolvedTheme: resolvedAppTheme } = useAppTheme();
+  const systemPrefersDark = resolvedAppTheme === "dark";
   const systemThemeSelected = allowSystemTheme && profile.theme === SYSTEM_TERMINAL_THEME;
   const resolvedThemeId = systemThemeSelected ? resolveSystemTerminalThemeId(systemPrefersDark) : profile.theme;
   const colors = useMemo(

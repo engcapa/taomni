@@ -56,8 +56,8 @@ import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { DEFAULT_MAIL_TERMINAL_PROFILE, resolveTerminalThemeWithSystem, type TerminalProfile } from "../../lib/terminalProfile";
-import { useSystemPrefersDark } from "../../lib/systemColorScheme";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
+import { useAppTheme } from "../../lib/appTheme";
 
 interface MailClientTabProps {
   tabId: string;
@@ -502,7 +502,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   );
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
-  const systemPrefersDark = useSystemPrefersDark();
+  const { resolvedTheme } = useAppTheme();
+  const systemPrefersDark = resolvedTheme === "dark";
 
   const openTabChat = useChatStore((s) => s.openTabChat);
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
