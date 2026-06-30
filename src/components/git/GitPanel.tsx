@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   AlertTriangle,
   GitBranch,
@@ -97,6 +104,7 @@ const EMPTY_SETTINGS: GitRepoSettings = {
 
 export function GitPanel({ repoRoot }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
   const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,6 +135,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   const [amendChecked, setAmendChecked] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
   const [commitMenu, setCommitMenu] = useState<{ x: number; y: number; entry: GitLogEntry } | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const anchorRef = useRef<string | null>(null);
   const [operation, setOperation] = useState<GitOperationState | null>(null);
   const [compare, setCompare] = useState<{ refA: string; refB: string; title: string } | null>(null);
@@ -146,6 +155,72 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
     [selectedPath, snapshot],
   );
   const hasConflicts = !!snapshot?.changes.some((change) => change.conflict);
+  const setGitUiFontSize = useCallback(
+    (size: number) => {
+      const next = Math.min(18, Math.max(10, Math.round(size)));
+      setUiFontSize(next);
+      setStatusMessage(`UI font size ${next}px`);
+    },
+    [setStatusMessage, setUiFontSize],
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || event.altKey || event.metaKey) return;
+
+      const increase =
+        event.key === "+" ||
+        event.key === "=" ||
+        event.code === "NumpadAdd";
+      const decrease =
+        event.key === "-" ||
+        event.key === "_" ||
+        event.code === "NumpadSubtract";
+      const reset =
+        event.key === "0" ||
+        event.code === "Digit0" ||
+        event.code === "Numpad0";
+
+      if (!increase && !decrease && !reset) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const current = useAppStore.getState().uiFontSize;
+      if (increase) {
+        setGitUiFontSize(current + 1);
+      } else if (decrease) {
+        setGitUiFontSize(current - 1);
+      } else {
+        setGitUiFontSize(12);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [setGitUiFontSize]);
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const current = useAppStore.getState().uiFontSize;
+      if (event.deltaY < 0) {
+        setGitUiFontSize(current + 1);
+      } else if (event.deltaY > 0) {
+        setGitUiFontSize(current - 1);
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+    return () => el.removeEventListener("wheel", handleWheel, { capture: true });
+  }, [setGitUiFontSize]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -369,7 +444,11 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   };
 
   return (
-    <div data-testid="git-panel" className="h-full w-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]">
+    <div
+      ref={rootRef}
+      data-testid="git-panel"
+      className="h-full w-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
+    >
       <header className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
         <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="min-w-0">

@@ -48,7 +48,7 @@ const diffTheme = EditorView.theme({
   "&": { backgroundColor: "transparent", color: "var(--taomni-text)", height: "100%" },
   ".cm-scroller": {
     fontFamily: '"JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    fontSize: "13px",
+    fontSize: "var(--taomni-git-diff-font-size)",
     lineHeight: "1.6",
   },
   ".cm-gutters": {
@@ -78,6 +78,7 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
   style.id = STYLE_ID;
   style.textContent = `
 .taomni-diff-host {
+  --taomni-git-diff-font-size: calc(var(--taomni-ui-font-size) + 1px);
   --taomni-diff-editor-bg: #fbfdff;
   --taomni-diff-gutter-bg: #f4f7fb;
   --taomni-diff-text: #142033;
@@ -153,7 +154,7 @@ html[data-app-theme="dark"] .taomni-diff-host {
 .taomni-diff-host .cm-mergeView,
 .taomni-diff-host .cm-deletedChunk {
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  font-size: 13px !important;
+  font-size: var(--taomni-git-diff-font-size) !important;
   line-height: 1.58 !important;
 }
 
