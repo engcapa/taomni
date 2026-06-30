@@ -47,6 +47,14 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "code-view-appearance",
+    titleKeys: ["settings.codeViewAppearanceTitle"],
+    terms: [
+      "code view", "code editor", "diff viewer", "syntax highlighting", "code font", "code theme",
+      "代码视图", "代码编辑器", "diff", "差异", "语法高亮", "代码字体", "代码主题",
+    ],
+  },
+  {
     id: "vault",
     titleKeys: ["vaultSettings.sectionTitle"],
     terms: ["vault", "password", "secret", "master password", "credentials", "credential vault", "encryption", "密钥库", "保险库", "密码", "凭据", "主密码", "加密"],

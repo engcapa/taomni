@@ -8,6 +8,7 @@ import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
 import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { detectDetachedRoute } from "./lib/detachedSession";
 import { useAppTheme } from "./lib/appTheme";
+import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
 import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindow";
 import { dispatchNativeFileDrop, isOsFileDrag } from "./lib/osFileDrop";
@@ -15,6 +16,7 @@ import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { useAppStore } from "./stores/appStore";
 import { AppDialogProvider } from "./lib/appDialogs";
 import { VaultGateProvider } from "./lib/vaultGate";
+import { loadGlobalTerminalProfile } from "./lib/terminalProfile";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -34,6 +36,10 @@ function App() {
     root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
     root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
   }, [uiFontFamily, uiFontSize]);
+
+  useEffect(() => {
+    applyCodeViewProfile(loadCodeViewProfile(), loadGlobalTerminalProfile());
+  }, []);
 
   // In production builds (the shipped binary, not `pnpm dev` / `tauri dev`),
   // suppress the WebView's native right-click menu. On WebView2/WKWebView that

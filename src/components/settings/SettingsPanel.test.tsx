@@ -16,6 +16,7 @@ vi.mock("../../lib/ipc", () => ({
 }));
 
 const STORAGE_KEY = "taomni.terminalProfile.v1";
+const CODE_VIEW_STORAGE_KEY = "taomni.codeViewProfile.v1";
 const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
 
 describe("SettingsPanel", () => {
@@ -106,6 +107,29 @@ describe("SettingsPanel", () => {
     expect(window.localStorage.getItem("taomni.uiFontFamily")).toContain("Inter");
     expect(window.localStorage.getItem("taomni.uiFontSize")).toBe("12");
   });
+
+  it("persists code view appearance settings", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    const codeFontSelect = screen.getByLabelText("Code font");
+    await waitFor(() => expect(within(codeFontSelect).getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
+
+    await user.selectOptions(codeFontSelect, "JetBrains Mono");
+    const fontSize = screen.getByLabelText("Code font size");
+    await user.clear(fontSize);
+    await user.type(fontSize, "15");
+    await user.click(screen.getByLabelText("Enable code font ligatures"));
+    await user.selectOptions(screen.getByLabelText("Code theme"), "kanagawa-wave");
+
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem(CODE_VIEW_STORAGE_KEY) ?? "{}");
+      expect(saved.fontFamily).toContain("JetBrains Mono");
+      expect(saved.fontSize).toBe(15);
+      expect(saved.fontLigatures).toBe(false);
+      expect(saved.theme).toBe("kanagawa-wave");
+    });
+  }, 10_000);
 
   it("persists the welcome recent session history limit", () => {
     render(<SettingsPanel />);
