@@ -68,6 +68,8 @@ import {
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import {
+  DEFAULT_MAIL_TERMINAL_PROFILE,
+  SYSTEM_TERMINAL_THEME,
   getSessionTerminalProfile,
   loadGlobalTerminalProfile,
   parseSessionOptions,
@@ -523,9 +525,11 @@ function AdvancedSshSettings({
 function TerminalSettings({
   profile,
   onProfileChange,
+  allowSystemTheme = false,
 }: {
   profile: TerminalProfile;
   onProfileChange: (profile: TerminalProfile) => void;
+  allowSystemTheme?: boolean;
 }) {
   return (
     <div data-testid="terminal-settings" className="text-[12px]">
@@ -533,9 +537,21 @@ function TerminalSettings({
         profile={profile}
         onProfileChange={onProfileChange}
         showCustomColors
+        allowSystemTheme={allowSystemTheme}
       />
     </div>
   );
+}
+
+function initialTerminalProfileForProto(optionsJson: string | null | undefined, proto: Proto): TerminalProfile {
+  const saved = getSessionTerminalProfile(optionsJson);
+  if (saved) {
+    if (proto !== "Mail" && saved.theme === SYSTEM_TERMINAL_THEME) {
+      return { ...saved, theme: loadGlobalTerminalProfile().theme };
+    }
+    return saved;
+  }
+  return proto === "Mail" ? DEFAULT_MAIL_TERMINAL_PROFILE : loadGlobalTerminalProfile();
 }
 
 /** Proxy selector + (HTTP/SOCKS5) proxy fields or the SSH jump-host section.
@@ -2197,7 +2213,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
-    getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile(),
+    initialTerminalProfileForProto(session?.options_json, initialProtoValue),
   );
 
   /* --- serial client options --- */
@@ -2346,6 +2362,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setSpecifyUser(true);
       setSaveInVault(true);
       setMailSmtpSaveInVault(true);
+      setTerminalProfile((current) => ({ ...current, theme: SYSTEM_TERMINAL_THEME }));
+    } else {
+      setTerminalProfile((current) => current.theme === SYSTEM_TERMINAL_THEME
+        ? { ...current, theme: loadGlobalTerminalProfile().theme }
+        : current);
     }
     // Object storage opens straight to its settings tab.
     if (p === "S3") setSection("objectstorage");
@@ -2923,7 +2944,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setHBaseKeytabPath(optionString(nextOptions, "hbaseKeytabPath", ""));
     setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
     setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
-    setTerminalProfile(getSessionTerminalProfile(session?.options_json) ?? loadGlobalTerminalProfile());
+    setTerminalProfile(initialTerminalProfileForProto(session?.options_json, nextProto));
     setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setSerialDevice(session?.session_type === "Serial" ? session.host : optionString(nextOptions, "serialDevice", ""));
     setSerialBaud(optionString(nextOptions, "serialBaud", "115200"));
@@ -3816,7 +3837,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           )}
 
           {activeSection === "terminal" && (
-            <TerminalSettings profile={terminalProfile} onProfileChange={setTerminalProfile} />
+            <TerminalSettings
+              profile={terminalProfile}
+              onProfileChange={setTerminalProfile}
+              allowSystemTheme={isMail}
+            />
           )}
           {activeSection === "rdp" && (
             <div data-testid="session-rdp-section">

@@ -55,7 +55,8 @@ import { temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
-import { DEFAULT_TERMINAL_PROFILE, resolveTerminalTheme, type TerminalProfile } from "../../lib/terminalProfile";
+import { DEFAULT_MAIL_TERMINAL_PROFILE, resolveTerminalThemeWithSystem, type TerminalProfile } from "../../lib/terminalProfile";
+import { useSystemPrefersDark } from "../../lib/systemColorScheme";
 
 interface MailClientTabProps {
   tabId: string;
@@ -69,6 +70,11 @@ interface ComposeDraft {
   bcc: string;
   subject: string;
   body: string;
+}
+
+interface OpenMailMessageTab {
+  key: string;
+  message: MailMessageHeader;
 }
 
 type AiAction = "summarize" | "reply" | "tasks";
@@ -105,9 +111,8 @@ const EMPTY_DRAFT: ComposeDraft = {
 const MAIL_MESSAGE_PAGE_SIZE = 200;
 const MAIL_REFRESH_BATCH_SIZE = 50;
 const MAILBOX_RIBBON_THRESHOLD = 7;
-const MAILBOX_RIBBON_SIZE = 4;
 const MAILBOX_EXPANDED_SIZE = 14;
-const MAIL_BASE_FONT_SIZE = DEFAULT_TERMINAL_PROFILE.fontSize;
+const MAIL_BASE_FONT_SIZE = DEFAULT_MAIL_TERMINAL_PROFILE.fontSize;
 const MAIL_MIN_FONT_SIZE = 8;
 const MAIL_MAX_FONT_SIZE = 32;
 
@@ -148,9 +153,9 @@ function mixColor(foreground: string, background: string, amount: number): strin
   return `#${hex(mixed[0])}${hex(mixed[1])}${hex(mixed[2])}`;
 }
 
-function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number): CSSProperties {
-  const terminalProfile = profile ?? DEFAULT_TERMINAL_PROFILE;
-  const theme = resolveTerminalTheme(terminalProfile.theme);
+function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, systemPrefersDark: boolean): CSSProperties {
+  const terminalProfile = profile ?? DEFAULT_MAIL_TERMINAL_PROFILE;
+  const theme = resolveTerminalThemeWithSystem(terminalProfile.theme, systemPrefersDark);
   const background = color(theme.background, "#1d1f21");
   const foreground = color(theme.foreground, "#eaeaea");
   const accent = color(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
@@ -335,6 +340,18 @@ function splitRecipients(value: string): string[] {
     .filter(Boolean);
 }
 
+function normalizedMailAddress(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function appendUniqueAddress(target: string[], seen: Set<string>, address: MailAddress | null | undefined, ownAddresses: Set<string>) {
+  const label = addressLabel(address);
+  const mail = normalizedMailAddress(address?.address ?? label);
+  if (!label || !mail || ownAddresses.has(mail) || seen.has(mail)) return;
+  seen.add(mail);
+  target.push(label);
+}
+
 function sanitizeMailHtml(html: string, allowImages: boolean): string {
   const sanitized = renderFormatted(html, "html") ?? "";
   if (allowImages) return sanitized;
@@ -391,6 +408,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [selectedFolder, setSelectedFolder] = useState("INBOX");
   const [messages, setMessages] = useState<MailMessageHeader[]>([]);
   const [selectedMessageKey, setSelectedMessageKey] = useState<string | null>(null);
+  const [mailViewKey, setMailViewKey] = useState("mailbox");
+  const [messageTabs, setMessageTabs] = useState<OpenMailMessageTab[]>([]);
+  const [popupMessageKey, setPopupMessageKey] = useState<string | null>(null);
   const [checkedMessageKeys, setCheckedMessageKeys] = useState<Set<string>>(() => new Set());
   const [body, setBody] = useState<MailMessageBody | null>(null);
   const [query, setQuery] = useState("");
@@ -412,11 +432,14 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [allowRemoteImages, setAllowRemoteImages] = useState(false);
   const initialSyncDoneRef = useRef(false);
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
+  const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
   const [mailFontSize, setMailFontSize] = useState(() =>
     clampMailFontSize(info.terminalProfile?.fontSize ?? MAIL_BASE_FONT_SIZE),
   );
   const attachmentMenu = useContextMenu();
+  const mailMenu = useContextMenu();
+  const systemPrefersDark = useSystemPrefersDark();
 
   const openTabChat = useChatStore((s) => s.openTabChat);
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
@@ -424,14 +447,29 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
-  const mailboxRibbon = mailboxPaneSize <= MAILBOX_RIBBON_THRESHOLD;
   const mailAppearance = useMemo(
-    () => mailAppearanceStyle(info.terminalProfile, mailFontSize),
-    [info.terminalProfile, mailFontSize],
+    () => mailAppearanceStyle(info.terminalProfile, mailFontSize, systemPrefersDark),
+    [info.terminalProfile, mailFontSize, systemPrefersDark],
   );
   const selectedMessage = useMemo(
-    () => messages.find((message) => messageKey(message) === selectedMessageKey) ?? null,
-    [messages, selectedMessageKey],
+    () =>
+      messages.find((message) => messageKey(message) === selectedMessageKey)
+      ?? messageTabs.find((tab) => tab.key === selectedMessageKey)?.message
+      ?? null,
+    [messageTabs, messages, selectedMessageKey],
+  );
+  const activeMessageTab = useMemo(
+    () => messageTabs.find((tab) => tab.key === mailViewKey) ?? null,
+    [mailViewKey, messageTabs],
+  );
+  const popupMessage = useMemo(
+    () =>
+      popupMessageKey
+        ? messages.find((message) => messageKey(message) === popupMessageKey)
+          ?? messageTabs.find((tab) => tab.key === popupMessageKey)?.message
+          ?? null
+        : null,
+    [messageTabs, messages, popupMessageKey],
   );
   const checkedMessages = useMemo(
     () => messages.filter((message) => checkedMessageKeys.has(messageKey(message))),
@@ -540,6 +578,25 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     root.addEventListener("wheel", handleWheel, { capture: true, passive: false });
     return () => root.removeEventListener("wheel", handleWheel, { capture: true });
   }, [decreaseFontSize, increaseFontSize, visible]);
+
+  const expandMailboxPanel = useCallback(() => {
+    foldersPanelRef.current?.resize(`${MAILBOX_EXPANDED_SIZE}%`);
+    setMailboxPaneSize(MAILBOX_EXPANDED_SIZE);
+    setMailboxCollapsed(false);
+  }, []);
+
+  const handleMailboxResize = useCallback((size: PanelSize) => {
+    const percentage = size.asPercentage;
+    setMailboxPaneSize(percentage);
+    setMailboxCollapsed(percentage === 0);
+  }, []);
+
+  useEffect(() => {
+    if (mailboxPaneSize > 0 && mailboxPaneSize <= MAILBOX_RIBBON_THRESHOLD) {
+      setMailboxCollapsed(true);
+      window.requestAnimationFrame(() => foldersPanelRef.current?.resize("0%"));
+    }
+  }, [mailboxPaneSize]);
 
   const loadCachedFolders = useCallback(async () => {
     setLoadingFolders(true);
@@ -701,10 +758,13 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const markMessagesReadLocally = useCallback((folder: string, uids: number[] | null, markedCount: number) => {
     if (markedCount <= 0) return;
     const uidSet = uids ? new Set(uids) : null;
+    const shouldMark = (message: MailMessageHeader) =>
+      message.folder === folder && (!uidSet || uidSet.has(message.uid));
     setMessages((current) => current.map((message) => {
-      if (message.folder !== folder) return message;
-      if (uidSet && !uidSet.has(message.uid)) return message;
-      return withSeenFlag(message);
+      return shouldMark(message) ? withSeenFlag(message) : message;
+    }));
+    setMessageTabs((current) => current.map((tab) => {
+      return shouldMark(tab.message) ? { ...tab, message: withSeenFlag(tab.message) } : tab;
     }));
     setFolders((current) => current.map((entry) => {
       if (entry.name !== folder || entry.unread === null || entry.unread === undefined) return entry;
@@ -747,12 +807,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   }, [checkedMessages, info, markMessagesReadLocally]);
 
-  const handleMarkFolderRead = useCallback(async () => {
+  const handleMarkFolderRead = useCallback(async (folderName = selectedFolder) => {
     setMarkingRead(true);
     setError(null);
     try {
-      const result = await mailMarkRead(info, selectedFolder, [], true);
-      markMessagesReadLocally(selectedFolder, null, result.marked);
+      const result = await mailMarkRead(info, folderName, [], true);
+      markMessagesReadLocally(folderName, null, result.marked);
       setCheckedMessageKeys(new Set());
       setStatus(result.marked > 0 ? `Marked ${result.marked} cached messages as read` : "No unread cached messages");
     } catch (e) {
@@ -790,6 +850,56 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     });
   }, [filteredMessages]);
 
+  const selectMessage = useCallback((message: MailMessageHeader, viewKey = "mailbox") => {
+    setSelectedFolder(message.folder);
+    setSelectedMessageKey(messageKey(message));
+    setMailViewKey(viewKey);
+    setBody(null);
+  }, []);
+
+  const openMessageTab = useCallback((message: MailMessageHeader) => {
+    const key = messageKey(message);
+    setMessageTabs((current) => {
+      if (current.some((tab) => tab.key === key)) return current;
+      return [...current, { key, message }];
+    });
+    selectMessage(message, key);
+  }, [selectMessage]);
+
+  const closeMessageTab = useCallback((key: string) => {
+    setMessageTabs((current) => current.filter((tab) => tab.key !== key));
+    if (mailViewKey === key) {
+      setMailViewKey("mailbox");
+      setBody(null);
+    }
+    if (popupMessageKey === key) {
+      setPopupMessageKey(null);
+    }
+  }, [mailViewKey, popupMessageKey]);
+
+  const openMessagePopup = useCallback((message: MailMessageHeader) => {
+    selectMessage(message, mailViewKey === "mailbox" ? "mailbox" : messageKey(message));
+    setPopupMessageKey(messageKey(message));
+  }, [mailViewKey, selectMessage]);
+
+  const handleMarkSingleRead = useCallback(async (message: MailMessageHeader) => {
+    if (!isUnread(message)) {
+      setStatus("Message is already read");
+      return;
+    }
+    setMarkingRead(true);
+    setError(null);
+    try {
+      const result = await mailMarkRead(info, message.folder, [message.uid], false);
+      markMessagesReadLocally(message.folder, [message.uid], result.marked);
+      setStatus(result.marked > 0 ? "Marked message as read" : "Message was already read");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setMarkingRead(false);
+    }
+  }, [info, markMessagesReadLocally]);
+
   const loadInitialMessages = useCallback(async (folder: string) => {
     await loadCachedMessages(folder);
   }, [loadCachedMessages]);
@@ -799,6 +909,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setFolders([]);
     setMessages([]);
     setSelectedMessageKey(null);
+    setMailViewKey("mailbox");
+    setMessageTabs([]);
+    setPopupMessageKey(null);
     setCheckedMessageKeys(new Set());
     setBody(null);
     setHasMoreMessages(false);
@@ -837,15 +950,23 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   useEffect(() => {
     if (messages.length === 0) {
-      setSelectedMessageKey(null);
+      if (!selectedMessageKey || !messageTabs.some((tab) => tab.key === selectedMessageKey)) {
+        setSelectedMessageKey(null);
+      }
       setBody(null);
       return;
     }
-    if (!selectedMessageKey || !messages.some((message) => messageKey(message) === selectedMessageKey)) {
+    if (
+      !selectedMessageKey
+      || (
+        !messages.some((message) => messageKey(message) === selectedMessageKey)
+        && !messageTabs.some((tab) => tab.key === selectedMessageKey)
+      )
+    ) {
       setSelectedMessageKey(messageKey(messages[0]));
       setBody(null);
     }
-  }, [messages, selectedMessageKey]);
+  }, [messageTabs, messages, selectedMessageKey]);
 
   useEffect(() => {
     if (!selectedMessage) return;
@@ -909,6 +1030,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setMessages([]);
       setBody(null);
       setSelectedMessageKey(null);
+      setMailViewKey("mailbox");
+      setMessageTabs([]);
+      setPopupMessageKey(null);
       setCheckedMessageKeys(new Set());
       setHasMoreMessages(false);
       setLoadingMoreMessages(false);
@@ -960,28 +1084,75 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setComposeOpen(true);
   };
 
-  const openReply = () => {
-    if (!selectedMessage) return;
-    const from = selectedMessage.from?.address ?? addressLabel(selectedMessage.from);
+  const openReply = (target = selectedMessage) => {
+    if (!target) return;
+    const from = target.from?.address ?? addressLabel(target.from);
+    const replyBody = body && body.uid === target.uid && body.folder === target.folder
+      ? body
+      : {
+          accountId: target.accountId,
+          folder: target.folder,
+          uid: target.uid,
+          messageId: target.messageId,
+          subject: target.subject,
+          text: target.snippet ?? "",
+          html: null,
+          snippet: target.snippet,
+          attachments: [],
+          rawSize: target.rawSize,
+          cachedAt: null,
+          source: "header",
+        } satisfies MailMessageBody;
     openCompose({
       to: from,
-      subject: selectedMessage.subject.toLowerCase().startsWith("re:")
-        ? selectedMessage.subject
-        : `Re: ${selectedMessage.subject || "(no subject)"}`,
-      body: bodyTextForAi(body ?? {
-        accountId: selectedMessage.accountId,
-        folder: selectedMessage.folder,
-        uid: selectedMessage.uid,
-        messageId: selectedMessage.messageId,
-        subject: selectedMessage.subject,
-        text: selectedMessage.snippet ?? "",
-        html: null,
-        snippet: selectedMessage.snippet,
-        attachments: [],
-        rawSize: selectedMessage.rawSize,
-        cachedAt: null,
-        source: "header",
-      }),
+      subject: target.subject.toLowerCase().startsWith("re:")
+        ? target.subject
+        : `Re: ${target.subject || "(no subject)"}`,
+      body: bodyTextForAi(replyBody),
+    });
+  };
+
+  const openReplyAll = (target = selectedMessage) => {
+    if (!target) return;
+    const ownAddresses = new Set([
+      normalizedMailAddress(info.emailAddress),
+      normalizedMailAddress(info.imap.username),
+      normalizedMailAddress(info.smtp.username),
+    ].filter(Boolean));
+    const to: string[] = [];
+    const cc: string[] = [];
+    const seenTo = new Set<string>();
+    const seenCc = new Set<string>();
+    appendUniqueAddress(to, seenTo, target.from, ownAddresses);
+    for (const recipient of target.to) appendUniqueAddress(to, seenTo, recipient, ownAddresses);
+    for (const recipient of target.cc) {
+      const mail = normalizedMailAddress(recipient.address ?? addressLabel(recipient));
+      if (seenTo.has(mail)) continue;
+      appendUniqueAddress(cc, seenCc, recipient, ownAddresses);
+    }
+    const replyBody = body && body.uid === target.uid && body.folder === target.folder
+      ? body
+      : {
+          accountId: target.accountId,
+          folder: target.folder,
+          uid: target.uid,
+          messageId: target.messageId,
+          subject: target.subject,
+          text: target.snippet ?? "",
+          html: null,
+          snippet: target.snippet,
+          attachments: [],
+          rawSize: target.rawSize,
+          cachedAt: null,
+          source: "header",
+        } satisfies MailMessageBody;
+    openCompose({
+      to: to.join(", "),
+      cc: cc.join(", "),
+      subject: target.subject.toLowerCase().startsWith("re:")
+        ? target.subject
+        : `Re: ${target.subject || "(no subject)"}`,
+      body: bodyTextForAi(replyBody),
     });
   };
 
@@ -1101,10 +1272,280 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     attachmentMenu.show(event, attachmentMenuItems(attachment, index));
   };
 
+  const copyText = (label: string, value: string | null | undefined) => {
+    const text = value?.trim();
+    if (!text) return;
+    void navigator.clipboard.writeText(text)
+      .then(() => setStatus(`Copied ${label}`))
+      .catch((e) => setError(String(e)));
+  };
+
+  const messageMenuItems = (message: MailMessageHeader): MenuItem[] => [
+    {
+      label: "Open",
+      icon: <MailOpen className="w-3.5 h-3.5" />,
+      onClick: () => selectMessage(message, "mailbox"),
+    },
+    {
+      label: "Open in mail tab",
+      icon: <FileText className="w-3.5 h-3.5" />,
+      onClick: () => openMessageTab(message),
+    },
+    {
+      label: "Open in popup window",
+      icon: <ExternalLink className="w-3.5 h-3.5" />,
+      onClick: () => openMessagePopup(message),
+    },
+    { label: "", separator: true },
+    {
+      label: "Reply",
+      icon: <MessageSquareReply className="w-3.5 h-3.5" />,
+      onClick: () => openReply(message),
+    },
+    {
+      label: "Reply all",
+      icon: <MessageSquareReply className="w-3.5 h-3.5" />,
+      onClick: () => openReplyAll(message),
+    },
+    {
+      label: "Forward",
+      icon: <Send className="w-3.5 h-3.5" />,
+      disabled: true,
+      onClick: () => undefined,
+    },
+    { label: "", separator: true },
+    {
+      label: "Mark as read",
+      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+      disabled: !isUnread(message) || markingRead,
+      onClick: () => void handleMarkSingleRead(message),
+    },
+    {
+      label: "Mark folder read",
+      icon: <MailOpen className="w-3.5 h-3.5" />,
+      disabled: markingRead,
+      onClick: () => void handleMarkFolderRead(message.folder),
+    },
+    { label: "", separator: true },
+    {
+      label: "Copy subject",
+      icon: <FileText className="w-3.5 h-3.5" />,
+      onClick: () => copyText("subject", message.subject || "(no subject)"),
+    },
+    {
+      label: "Copy sender",
+      icon: <MailIcon className="w-3.5 h-3.5" />,
+      onClick: () => copyText("sender", addressLabel(message.from)),
+    },
+  ];
+
+  const folderMenuItems = (folder: MailFolder): MenuItem[] => [
+    {
+      label: "Open folder",
+      icon: folderIcon(folder),
+      onClick: () => handleFolderSelect(folder),
+    },
+    {
+      label: "Sync all folders",
+      icon: <RefreshCw className="w-3.5 h-3.5" />,
+      disabled: syncing,
+      onClick: () => void syncAllFolders(false, {
+        limit: batchSize,
+        includeBodies: true,
+        indicator: "sync",
+      }),
+    },
+    {
+      label: "Mark folder read",
+      icon: <MailOpen className="w-3.5 h-3.5" />,
+      disabled: markingRead || (folder.unread ?? 0) === 0,
+      onClick: () => void handleMarkFolderRead(folder.name),
+    },
+    { label: "", separator: true },
+    {
+      label: "Copy folder name",
+      icon: <Folder className="w-3.5 h-3.5" />,
+      onClick: () => copyText("folder name", folder.name),
+    },
+  ];
+
+  const messageListMenuItems = (): MenuItem[] => [
+    {
+      label: "Sync all folders",
+      icon: <RefreshCw className="w-3.5 h-3.5" />,
+      disabled: syncing,
+      onClick: () => void syncAllFolders(false, {
+        limit: batchSize,
+        includeBodies: true,
+        indicator: "sync",
+      }),
+    },
+    {
+      label: "Mark folder read",
+      icon: <MailOpen className="w-3.5 h-3.5" />,
+      disabled: markingRead || Math.max(activeFolder?.unread ?? 0, visibleUnreadCount) === 0,
+      onClick: () => void handleMarkFolderRead(),
+    },
+    {
+      label: allFilteredMessagesChecked ? "Clear visible selection" : "Select visible messages",
+      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+      disabled: filteredMessages.length === 0,
+      onClick: () => toggleFilteredMessagesChecked(!allFilteredMessagesChecked),
+    },
+  ];
+
   const activeFolder = displayFolders.find((folder) => folder.name === selectedFolder) ?? displayFolders[0];
   const cacheLine = info.cache.enabled
     ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
     : "cache off";
+  const renderReaderSurface = (message: MailMessageHeader | null, popup = false) => {
+    const currentBody = message && body?.uid === message.uid && body.folder === message.folder ? body : null;
+    const currentHtml = currentBody?.html ? sanitizeMailHtml(currentBody.html, allowRemoteImages) : null;
+    const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
+    const loadingThisBody = !!message && bodyLoading && selectedMessageKey === messageKey(message);
+
+    return (
+      <main
+        className="h-full min-w-0 flex flex-col"
+        onContextMenu={(event) => {
+          if (message) {
+            mailMenu.show(event, messageMenuItems(message));
+          } else {
+            mailMenu.show(event, messageListMenuItems());
+          }
+        }}
+      >
+        <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
+          <span className="text-[12px] font-semibold min-w-0 truncate">
+            {message?.subject || "Message"}
+          </span>
+          {loadingThisBody && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-text-muted)]" />}
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+              onClick={() => openReply(message)}
+              disabled={!message}
+              title="Reply"
+            >
+              <MessageSquareReply className="w-3.5 h-3.5" />
+              Reply
+            </button>
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+              onClick={() => openReplyAll(message)}
+              disabled={!message}
+              title="Reply all"
+            >
+              <MessageSquareReply className="w-3.5 h-3.5" />
+              Reply all
+            </button>
+            {!popup && (
+              <button
+                type="button"
+                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                onClick={() => message && openMessagePopup(message)}
+                disabled={!message}
+                title="Open message in popup window"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Popup
+              </button>
+            )}
+          </div>
+        </div>
+
+        {!message ? (
+          <div className="flex-1 min-h-0 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+            Select a message
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-auto">
+            <div className="px-4 py-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
+              <h2 className="text-[17px] font-semibold leading-6 mb-1 break-words">
+                {message.subject || "(no subject)"}
+              </h2>
+              <div className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1 text-[12px]">
+                <span className="text-[var(--taomni-text-muted)]">From</span>
+                <span className="truncate" title={addressLabel(message.from)}>{addressLabel(message.from) || "(unknown)"}</span>
+                <span className="text-[var(--taomni-text-muted)]">To</span>
+                <span className="truncate" title={message.to.map(addressLabel).join(", ")}>
+                  {message.to.map(addressLabel).filter(Boolean).join(", ") || "(none)"}
+                </span>
+                {message.cc.length > 0 && (
+                  <>
+                    <span className="text-[var(--taomni-text-muted)]">Cc</span>
+                    <span className="truncate" title={message.cc.map(addressLabel).join(", ")}>
+                      {message.cc.map(addressLabel).filter(Boolean).join(", ")}
+                    </span>
+                  </>
+                )}
+                <span className="text-[var(--taomni-text-muted)]">Date</span>
+                <span>{formatFullDate(message.dateTs) || "(unknown)"}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+                <span>{currentBody?.source === "cache" ? "cached body" : currentBody?.source === "remote" ? "remote body" : "header cached"}</span>
+                {message.rawSize ? <span>{formatBytes(message.rawSize)}</span> : null}
+                {currentBody?.html && (
+                  <button
+                    type="button"
+                    className="taomni-btn h-5 px-2 text-[10px]"
+                    onClick={() => setAllowRemoteImages((value) => !value)}
+                  >
+                    {allowRemoteImages ? "Block images" : "Load images"}
+                  </button>
+                )}
+              </div>
+              {currentAttachments.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {currentAttachments.map((attachment, index) => {
+                    const downloading = downloadingAttachmentIndex === index;
+                    const name = attachment.name || `attachment-${index + 1}`;
+                    return (
+                      <button
+                        key={`${name}-${index}`}
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
+                        title={`Download ${name}; right-click for more actions`}
+                        onClick={() => void handleDownloadAttachment(attachment, index)}
+                        onContextMenu={(event) => handleAttachmentContextMenu(event, attachment, index)}
+                        disabled={downloading}
+                      >
+                        {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        <span className="max-w-[360px] truncate">{name}</span>
+                        {attachment.size ? <span>{formatBytes(attachment.size)}</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="p-5 text-[13px] leading-6">
+              {loadingThisBody && !currentBody ? (
+                <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading message body
+                </div>
+              ) : currentHtml ? (
+                <div
+                  className="max-w-none text-[13px] leading-6 [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--taomni-divider)] [&_td]:px-2 [&_td]:py-1 [&_a]:text-[var(--taomni-accent)]"
+                  dangerouslySetInnerHTML={{ __html: currentHtml }}
+                />
+              ) : currentBody?.text ? (
+                <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{currentBody.text}</pre>
+              ) : (
+                <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                  {message.snippet || "No cached body content."}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+    );
+  };
 
   return (
     <div
@@ -1211,6 +1652,41 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         </div>
       </div>
 
+      {messageTabs.length > 0 && (
+        <div className="h-8 shrink-0 flex items-end gap-1 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] overflow-x-auto">
+          <button
+            type="button"
+            className={`h-7 max-w-[220px] px-2 rounded-t border border-b-0 inline-flex items-center gap-1.5 text-[12px] ${mailViewKey === "mailbox" ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]" : "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text-muted)]"}`}
+            style={{ borderColor: "var(--taomni-divider)" }}
+            onClick={() => setMailViewKey("mailbox")}
+          >
+            <Inbox className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Mailbox</span>
+          </button>
+          {messageTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`h-7 max-w-[280px] px-2 rounded-t border border-b-0 inline-flex items-center gap-1.5 text-[12px] ${mailViewKey === tab.key ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]" : "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text-muted)]"}`}
+              style={{ borderColor: "var(--taomni-divider)" }}
+              title={tab.message.subject || "(no subject)"}
+              onClick={() => selectMessage(tab.message, tab.key)}
+              onContextMenu={(event) => mailMenu.show(event, messageMenuItems(tab.message))}
+            >
+              <MailOpen className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{tab.message.subject || "(no subject)"}</span>
+              <X
+                className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeMessageTab(tab.key);
+                }}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
       {(error || status) && (
         <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
           {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
@@ -1218,7 +1694,31 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         </div>
       )}
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
+        {mailboxCollapsed && (
+          <button
+            type="button"
+            className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
+            style={{
+              background: "var(--taomni-panel-bg)",
+              borderColor: "var(--taomni-divider)",
+              color: "var(--taomni-text-muted)",
+            }}
+            title="Show mailbox"
+            aria-label="Show mailbox"
+            onClick={expandMailboxPanel}
+          >
+            <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+            <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>
+              Mailbox
+            </span>
+          </button>
+        )}
+        {mailViewKey !== "mailbox" && activeMessageTab ? (
+          <div className="h-full min-h-0 border-l border-[var(--taomni-divider)]">
+            {renderReaderSurface(selectedMessage ?? activeMessageTab.message)}
+          </div>
+        ) : (
         <PanelGroup
           orientation="horizontal"
           id={`mail-client-${info.sessionId}`}
@@ -1230,33 +1730,14 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
             id="folders"
             panelRef={foldersPanelRef}
             defaultSize={`${MAILBOX_EXPANDED_SIZE}%`}
-            minSize={`${MAILBOX_RIBBON_SIZE}%`}
+            minSize="0%"
             maxSize="35%"
             collapsible
-            collapsedSize={`${MAILBOX_RIBBON_SIZE}%`}
+            collapsedSize={0}
             className="min-w-0"
-            onResize={(size: PanelSize) => setMailboxPaneSize(size.asPercentage)}
+            onResize={handleMailboxResize}
           >
-            {mailboxRibbon ? (
-              <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col items-center py-2 border-r border-[var(--taomni-divider)]">
-                <button
-                  type="button"
-                  className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
-                  title="Expand mailbox"
-                  aria-label="Expand mailbox"
-                  onClick={() => foldersPanelRef.current?.resize(`${MAILBOX_EXPANDED_SIZE}%`)}
-                >
-                  <Inbox className="w-4 h-4" />
-                </button>
-                <div className="mt-3 text-[11px] font-semibold text-[var(--taomni-text-muted)] [writing-mode:vertical-rl] rotate-180">
-                  Mailbox
-                </div>
-                {loadingFolders && <Loader2 className="w-3.5 h-3.5 mt-3 animate-spin text-[var(--taomni-text-muted)]" />}
-                {activeFolder?.unread ? (
-                  <span className="mt-auto mb-1 text-[11px] text-[var(--taomni-accent)]">{activeFolder.unread}</span>
-                ) : null}
-              </aside>
-            ) : (
+            {!mailboxCollapsed && (
               <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col">
                 <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
                   Mailbox
@@ -1274,6 +1755,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                         style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
                         data-active={active || undefined}
                         onClick={() => handleFolderSelect(folder)}
+                        onContextMenu={(event) => mailMenu.show(event, folderMenuItems(folder))}
                       >
                         <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
                         <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
@@ -1320,7 +1802,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                   {loadingMessages ? "Loading" : `${filteredMessages.length}/${messages.length}${!query.trim() && hasMoreMessages ? "+" : ""}`}
                 </span>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto" onScroll={handleMessageListScroll}>
+              <div
+                className="flex-1 min-h-0 overflow-auto"
+                onScroll={handleMessageListScroll}
+                onContextMenu={(event) => mailMenu.show(event, messageListMenuItems())}
+              >
                 {loadingMessages && messages.length === 0 ? (
                   <div className="h-20 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1346,6 +1832,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                             setSelectedMessageKey(messageKey(message));
                             setBody(null);
                           }}
+                          onDoubleClick={() => openMessageTab(message)}
+                          onContextMenu={(event) => mailMenu.show(event, messageMenuItems(message))}
                           onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
                             event.preventDefault();
@@ -1404,7 +1892,16 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
 
           <Panel id="reader" defaultSize="52%" minSize="25%" className="min-w-0">
-            <main className="h-full min-w-0 flex flex-col">
+            <main
+              className="h-full min-w-0 flex flex-col"
+              onContextMenu={(event) => {
+                if (selectedMessage) {
+                  mailMenu.show(event, messageMenuItems(selectedMessage));
+                } else {
+                  mailMenu.show(event, messageListMenuItems());
+                }
+              }}
+            >
               <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
                 <span className="text-[12px] font-semibold min-w-0 truncate">
                   {selectedMessage?.subject || "Message"}
@@ -1414,12 +1911,32 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                   <button
                     type="button"
                     className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                    onClick={openReply}
+                    onClick={() => openReply()}
                     disabled={!selectedMessage}
                     title="Reply"
                   >
                     <MessageSquareReply className="w-3.5 h-3.5" />
                     Reply
+                  </button>
+                  <button
+                    type="button"
+                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    onClick={() => openReplyAll()}
+                    disabled={!selectedMessage}
+                    title="Reply all"
+                  >
+                    <MessageSquareReply className="w-3.5 h-3.5" />
+                    Reply all
+                  </button>
+                  <button
+                    type="button"
+                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    onClick={() => selectedMessage && openMessagePopup(selectedMessage)}
+                    disabled={!selectedMessage}
+                    title="Open message in popup window"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Popup
                   </button>
                   <button
                     type="button"
@@ -1545,12 +2062,56 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
             </main>
           </Panel>
         </PanelGroup>
+        )}
       </div>
 
       {attachmentMenu.render}
+      {mailMenu.render}
+
+      {popupMessage && (
+        <div className="absolute inset-0 z-[130] bg-black/35 flex items-center justify-center p-5">
+          <section
+            className="w-[min(1120px,92vw)] h-[min(780px,86vh)] min-h-[480px] flex flex-col rounded-md border shadow-2xl"
+            style={{
+              background: "var(--taomni-bg)",
+              borderColor: "var(--taomni-divider)",
+              color: "var(--taomni-text)",
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={popupMessage.subject || "Mail message"}
+          >
+            <div className="h-9 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
+              <MailOpen className="w-4 h-4 text-[var(--taomni-text-muted)]" />
+              <span className="text-[12px] font-semibold min-w-0 flex-1 truncate">
+                {popupMessage.subject || "(no subject)"}
+              </span>
+              <button
+                type="button"
+                className="taomni-btn h-6 px-2 text-[11px]"
+                onClick={() => openMessageTab(popupMessage)}
+              >
+                Open tab
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+                onClick={() => setPopupMessageKey(null)}
+                aria-label="Close popup"
+                title="Close"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              {renderReaderSurface(popupMessage, true)}
+            </div>
+          </section>
+        </div>
+      )}
 
       {composeOpen && (
-        <div className="absolute inset-0 z-[120] bg-black/30 flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4">
           <div className="w-[760px] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)] flex flex-col rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] shadow-xl">
             <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
               <MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />

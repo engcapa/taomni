@@ -2,12 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Minus, Plus, Trash2 } from "lucide-react";
 import {
   TERMINAL_THEME_DEFINITIONS,
+  getTerminalThemeDefinition,
   resolveThemeId,
   type TerminalThemeDefinition,
 } from "../../lib/themes";
 import {
+  SYSTEM_DARK_TERMINAL_THEME,
+  SYSTEM_LIGHT_TERMINAL_THEME,
+  SYSTEM_TERMINAL_THEME,
   makeCustomTerminalTheme,
   resolveTerminalTheme,
+  resolveSystemTerminalThemeId,
   terminalProfileThemeColors,
   type TerminalCursorStyle,
   type TerminalProfile,
@@ -26,12 +31,14 @@ import { historyClear } from "../../lib/ipc";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { getAppPlatform } from "../../lib/runtime";
+import { useSystemPrefersDark } from "../../lib/systemColorScheme";
 
 interface TerminalAppearanceSettingsProps {
   profile: TerminalProfile;
   onProfileChange: (profile: TerminalProfile) => void;
   showCustomColors?: boolean;
   showPreview?: boolean;
+  allowSystemTheme?: boolean;
   className?: string;
 }
 
@@ -59,6 +66,7 @@ export function TerminalAppearanceSettings({
   onProfileChange,
   showCustomColors = false,
   showPreview = true,
+  allowSystemTheme = false,
   className = "",
 }: TerminalAppearanceSettingsProps) {
   const t = useT();
@@ -90,7 +98,13 @@ export function TerminalAppearanceSettings({
   const safeFontFamily = useMemo(() => {
     return isMonospaceFont(primaryFont) ? profile.fontFamily : makeTerminalFontFamily("Source Code Pro");
   }, [primaryFont, profile.fontFamily]);
-  const colors = terminalProfileThemeColors(profile);
+  const systemPrefersDark = useSystemPrefersDark();
+  const systemThemeSelected = allowSystemTheme && profile.theme === SYSTEM_TERMINAL_THEME;
+  const resolvedThemeId = systemThemeSelected ? resolveSystemTerminalThemeId(systemPrefersDark) : profile.theme;
+  const colors = useMemo(
+    () => terminalProfileThemeColors({ ...profile, theme: resolvedThemeId }),
+    [profile, resolvedThemeId],
+  );
   const [bg, setBg] = useState(colors.background);
   const [fg, setFg] = useState(colors.foreground);
   const [fontSizeText, setFontSizeText] = useState(String(profile.fontSize));
@@ -106,10 +120,9 @@ export function TerminalAppearanceSettings({
   }, [profile]);
 
   useEffect(() => {
-    const nextColors = terminalProfileThemeColors(profile);
-    setBg(nextColors.background);
-    setFg(nextColors.foreground);
-  }, [profile.theme]);
+    setBg(colors.background);
+    setFg(colors.foreground);
+  }, [colors.background, colors.foreground]);
 
   useEffect(() => {
     setFontSizeText(String(profile.fontSize));
@@ -137,8 +150,9 @@ export function TerminalAppearanceSettings({
     }
   };
 
-  const resolvedTheme = resolveTerminalTheme(profile.theme);
-  const selectedThemeId = resolveThemeId(profile.theme);
+  const resolvedTheme = resolveTerminalTheme(resolvedThemeId);
+  const selectedThemeId = systemThemeSelected ? SYSTEM_TERMINAL_THEME : resolveThemeId(profile.theme);
+  const resolvedSystemThemeName = getTerminalThemeDefinition(resolvedThemeId)?.name ?? resolvedThemeId;
   const selectedCursor = cursorOptions.find((option) =>
     option.style === profile.cursorStyle && option.blink === profile.cursorBlink
   )?.label ?? cursorOptions[0].label;
@@ -249,6 +263,16 @@ export function TerminalAppearanceSettings({
         <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.themeHeading")}</div>
         <div className="max-h-[300px] overflow-auto rounded-md pr-0.5">
           <ul data-testid="terminal-theme-gallery" className="flex flex-col gap-1.5">
+            {allowSystemTheme && (
+              <li>
+                <SystemThemeCard
+                  selected={selectedThemeId === SYSTEM_TERMINAL_THEME}
+                  resolvedName={resolvedSystemThemeName}
+                  onSelect={() => updateProfile({ theme: SYSTEM_TERMINAL_THEME })}
+                  t={t}
+                />
+              </li>
+            )}
             {TERMINAL_THEME_DEFINITIONS.map((definition) => (
               <li key={definition.id}>
                 <ThemeCard
@@ -611,6 +635,70 @@ function CheckControl({
       />
       <span>{label}</span>
     </label>
+  );
+}
+
+function SystemThemeCard({
+  selected,
+  resolvedName,
+  onSelect,
+  t,
+}: {
+  selected: boolean;
+  resolvedName: string;
+  onSelect: () => void;
+  t: TranslateFn;
+}) {
+  const light = getTerminalThemeDefinition(SYSTEM_LIGHT_TERMINAL_THEME);
+  const dark = getTerminalThemeDefinition(SYSTEM_DARK_TERMINAL_THEME);
+  const borderColor = selected ? "var(--taomni-accent)" : "var(--taomni-divider)";
+
+  return (
+    <button
+      type="button"
+      aria-label={t("terminalAppearance.themeUseSystemLabel")}
+      data-selected={selected}
+      className="w-full rounded-md border bg-[var(--taomni-card-bg)] text-left px-2.5 py-1.5 flex items-center gap-3 hover:bg-[var(--taomni-hover)]"
+      style={{ borderColor }}
+      onClick={onSelect}
+    >
+      <span
+        className="w-[58px] h-[40px] rounded border overflow-hidden flex flex-shrink-0"
+        style={{ borderColor: "var(--taomni-divider)" }}
+        aria-hidden="true"
+      >
+        <span
+          className="flex-1"
+          style={{ background: light?.theme.background ?? "#eef3f7", color: light?.theme.foreground ?? "#1d2633" }}
+        >
+          <span className="block h-1.5 m-1 rounded-sm" style={{ background: light?.theme.blue ?? "#3765a8" }} />
+          <span className="block h-1.5 mx-1 rounded-sm" style={{ background: light?.theme.green ?? "#16846b" }} />
+        </span>
+        <span
+          className="flex-1"
+          style={{ background: dark?.theme.background ?? "#101420", color: dark?.theme.foreground ?? "#d7dde8" }}
+        >
+          <span className="block h-1.5 m-1 rounded-sm" style={{ background: dark?.theme.blue ?? "#6ea8ff" }} />
+          <span className="block h-1.5 mx-1 rounded-sm" style={{ background: dark?.theme.green ?? "#00c986" }} />
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="text-[12px] font-semibold truncate">{t("terminalAppearance.themeSystemName")}</span>
+          <span className="flex-shrink-0 rounded-sm border border-[var(--taomni-divider)] px-1 py-px text-[10px] leading-none text-[var(--taomni-text-muted)]">
+            {t("terminalAppearance.themeVariantSystem")}
+          </span>
+        </span>
+        <span className="block mt-0.5 text-[11px] text-[var(--taomni-text-muted)] truncate">
+          {t("terminalAppearance.themeSystemDesc", { name: resolvedName })}
+        </span>
+      </span>
+      {selected ? (
+        <Check className="w-4 h-4 text-[var(--taomni-accent)] flex-shrink-0" />
+      ) : (
+        <span className="w-4 flex-shrink-0" aria-hidden="true" />
+      )}
+    </button>
   );
 }
 

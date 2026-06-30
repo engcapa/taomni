@@ -88,7 +88,7 @@ import { useVaultStore } from "../stores/vaultStore";
 import { ensureVaultReady } from "../lib/vaultGate";
 import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
-import { getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
+import { DEFAULT_MAIL_TERMINAL_PROFILE, getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
 import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout";
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
@@ -368,7 +368,7 @@ function sessionToMailTabInfo(
     displayName: str("mailDisplayName") || null,
     replyTo: str("mailReplyTo") || null,
     signature: str("mailSignature") || null,
-    terminalProfile: getSessionTerminalProfile(session.options_json),
+    terminalProfile: getSessionTerminalProfile(session.options_json) ?? DEFAULT_MAIL_TERMINAL_PROFILE,
     imap: {
       host: session.host,
       port: session.port,
@@ -1466,6 +1466,11 @@ export function MainLayout() {
   }, [addTab, markConnected]);
 
   const openMailTab = useCallback((session: SessionConfig, password?: string, smtpPassword?: string) => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mail" && tab.sessionId === session.id);
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
     const id = `mail-${session.id}-${Date.now()}`;
     const info = sessionToMailTabInfo(session, password, smtpPassword);
     const title = session.name || info.emailAddress || `Mail ${session.host}`;
@@ -1478,7 +1483,7 @@ export function MainLayout() {
       mail: info,
     });
     void markConnected(session.id);
-  }, [addTab, markConnected]);
+  }, [addTab, markConnected, setActiveTab]);
 
   // Open a local path or URL: http(s) URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
@@ -1827,6 +1832,11 @@ export function MainLayout() {
       }
       openObjectStorageTab(session);
     } else if (session.session_type === "Mail") {
+      const existing = tabsRef.current.find((tab) => tab.type === "mail" && tab.sessionId === session.id);
+      if (existing) {
+        setActiveTab(existing.id);
+        return "opened";
+      }
       const ref = passwordRefFromOptions(session);
       const smtpRef = mailSmtpPasswordRefFromOptions(session);
       if (ref || smtpRef) {
@@ -1856,6 +1866,7 @@ export function MainLayout() {
     openObjectStorageTab,
     openMailTab,
     queueVaultUnlock,
+    setActiveTab,
   ]);
 
   const continueConnectQueue = useCallback(() => {
