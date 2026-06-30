@@ -135,7 +135,7 @@ pub fn workspace_write_file(
         file.sync_all()
             .map_err(|e| format!("sync {}: {e}", tmp.display()))?;
     }
-    if let Err(e) = fs::rename(&tmp, &target) {
+    if let Err(e) = replace_file(&tmp, &target) {
         let _ = fs::remove_file(&tmp);
         return Err(format!(
             "rename {} -> {}: {e}",
@@ -145,6 +145,90 @@ pub fn workspace_write_file(
     }
 
     workspace_read_file(repo_root, path, None)
+}
+
+#[tauri::command]
+pub fn workspace_create_file(
+    repo_root: String,
+    path: String,
+    contents: Option<String>,
+) -> Result<WorkspaceFile, String> {
+    let root = canonical_repo_root(&repo_root)?;
+    let target = resolve_writable_path(&root, &path)?;
+    reject_protected_write(&root, &target)?;
+    if target.exists() {
+        return Err(format!("Path already exists: {}", target.display()));
+    }
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&target)
+        .map_err(|e| format!("create {}: {e}", target.display()))?;
+    {
+        use std::io::Write;
+        file.write_all(contents.unwrap_or_default().as_bytes())
+            .map_err(|e| format!("write {}: {e}", target.display()))?;
+        file.sync_all()
+            .map_err(|e| format!("sync {}: {e}", target.display()))?;
+    }
+    workspace_read_file(repo_root, path, None)
+}
+
+#[tauri::command]
+pub fn workspace_create_dir(repo_root: String, path: String) -> Result<WorkspaceEntry, String> {
+    let root = canonical_repo_root(&repo_root)?;
+    let target = resolve_writable_path(&root, &path)?;
+    reject_protected_write(&root, &target)?;
+    if target.exists() {
+        return Err(format!("Path already exists: {}", target.display()));
+    }
+    fs::create_dir(&target).map_err(|e| format!("mkdir {}: {e}", target.display()))?;
+    workspace_entry(&root, &target)
+}
+
+#[tauri::command]
+pub fn workspace_delete_path(
+    repo_root: String,
+    path: String,
+    recursive: Option<bool>,
+) -> Result<(), String> {
+    let root = canonical_repo_root(&repo_root)?;
+    let target = resolve_existing_path(&root, &path)?;
+    reject_workspace_root_target(&root, &target, "delete")?;
+    reject_protected_write(&root, &target)?;
+    let meta =
+        fs::symlink_metadata(&target).map_err(|e| format!("stat {}: {e}", target.display()))?;
+    if meta.is_dir() && !meta.file_type().is_symlink() {
+        if recursive.unwrap_or(false) {
+            fs::remove_dir_all(&target).map_err(|e| format!("rmdir {}: {e}", target.display()))?;
+        } else {
+            fs::remove_dir(&target).map_err(|e| format!("rmdir {}: {e}", target.display()))?;
+        }
+    } else {
+        fs::remove_file(&target).map_err(|e| format!("remove {}: {e}", target.display()))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn workspace_rename_path(
+    repo_root: String,
+    from_path: String,
+    to_path: String,
+) -> Result<WorkspaceEntry, String> {
+    let root = canonical_repo_root(&repo_root)?;
+    let from = resolve_existing_path(&root, &from_path)?;
+    reject_workspace_root_target(&root, &from, "rename")?;
+    reject_protected_write(&root, &from)?;
+    let to = resolve_writable_path(&root, &to_path)?;
+    reject_protected_write(&root, &to)?;
+    if to.exists() {
+        return Err(format!("Path already exists: {}", to.display()));
+    }
+    fs::rename(&from, &to)
+        .map_err(|e| format!("rename {} -> {}: {e}", from.display(), to.display()))?;
+    workspace_entry(&root, &to)
 }
 
 fn canonical_repo_root(repo_root: &str) -> Result<PathBuf, String> {
@@ -216,6 +300,24 @@ fn ensure_inside(root: &Path, target: &Path) -> Result<(), String> {
             target.display(),
             root.display()
         ))
+    }
+}
+
+fn replace_file(tmp: &Path, target: &Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        if target.exists() {
+            fs::remove_file(target)?;
+        }
+    }
+    fs::rename(tmp, target)
+}
+
+fn reject_workspace_root_target(root: &Path, target: &Path, operation: &str) -> Result<(), String> {
+    if target == root {
+        Err(format!("Cannot {operation} the workspace root"))
+    } else {
+        Ok(())
     }
 }
 
@@ -339,5 +441,58 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("changed on disk"));
+    }
+
+    #[test]
+    fn creates_renames_and_deletes_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+
+        workspace_create_dir(root.clone(), "src".into()).unwrap();
+        let file = workspace_create_file(root.clone(), "src/main.ts".into(), Some("one".into()))
+            .unwrap();
+        assert_eq!(file.path, "src/main.ts");
+        assert_eq!(file.text, "one");
+
+        let renamed =
+            workspace_rename_path(root.clone(), "src/main.ts".into(), "src/app.ts".into())
+                .unwrap();
+        assert_eq!(renamed.path, "src/app.ts");
+        assert!(!dir.path().join("src/main.ts").exists());
+        assert!(dir.path().join("src/app.ts").exists());
+
+        workspace_delete_path(root, "src/app.ts".into(), None).unwrap();
+        assert!(!dir.path().join("src/app.ts").exists());
+    }
+
+    #[test]
+    fn creates_and_deletes_directory_tree() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+
+        let entry = workspace_create_dir(root.clone(), "src".into()).unwrap();
+        assert_eq!(entry.file_type, "dir");
+        workspace_create_file(root.clone(), "src/main.ts".into(), None).unwrap();
+
+        let err = workspace_delete_path(root.clone(), "src".into(), Some(false)).unwrap_err();
+        assert!(err.contains("rmdir"));
+
+        workspace_delete_path(root, "src".into(), Some(true)).unwrap();
+        assert!(!dir.path().join("src").exists());
+    }
+
+    #[test]
+    fn rejects_dot_git_deletes() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join(".git")).unwrap();
+        fs::write(dir.path().join(".git/config"), "x").unwrap();
+
+        let err = workspace_delete_path(
+            dir.path().to_string_lossy().to_string(),
+            ".git/config".into(),
+            None,
+        )
+        .unwrap_err();
+        assert!(err.contains(".git"));
     }
 }

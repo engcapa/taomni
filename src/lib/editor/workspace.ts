@@ -51,3 +51,42 @@ export function workspaceWriteFile(
     expectedHash: expectedHash ?? null,
   });
 }
+
+export function workspaceCreateFile(
+  repoRoot: string,
+  path: string,
+  contents = "",
+): Promise<WorkspaceFile> {
+  return invoke<WorkspaceFile>("workspace_create_file", {
+    repoRoot,
+    path,
+    contents,
+  });
+}
+
+export function workspaceCreateDir(
+  repoRoot: string,
+  path: string,
+): Promise<WorkspaceEntry> {
+  return invoke<WorkspaceEntry>("workspace_create_dir", { repoRoot, path });
+}
+
+export function workspaceDeletePath(
+  repoRoot: string,
+  path: string,
+  recursive = false,
+): Promise<void> {
+  return invoke<void>("workspace_delete_path", { repoRoot, path, recursive });
+}
+
+export function workspaceRenamePath(
+  repoRoot: string,
+  fromPath: string,
+  toPath: string,
+): Promise<WorkspaceEntry> {
+  return invoke<WorkspaceEntry>("workspace_rename_path", {
+    repoRoot,
+    fromPath,
+    toPath,
+  });
+}

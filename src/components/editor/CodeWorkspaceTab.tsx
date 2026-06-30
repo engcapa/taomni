@@ -43,23 +43,32 @@ import {
   ChevronDown,
   ChevronRight,
   File,
+  FilePlus,
   Folder,
+  FolderPlus,
   Loader2,
+  Pencil,
   RefreshCw,
   RotateCcw,
   Save,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import {
+  workspaceCreateDir,
+  workspaceCreateFile,
+  workspaceDeletePath,
   workspaceListDir,
   workspaceReadFile,
+  workspaceRenamePath,
   workspaceWriteFile,
   type WorkspaceEntry,
+  type WorkspaceEntryType,
 } from "../../lib/editor/workspace";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { useAppStore } from "../../stores/appStore";
-import { confirmAppDialog } from "../../lib/appDialogs";
+import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { languageForPath } from "../git/diffLanguage";
 
 interface CodeWorkspaceTabProps {
@@ -117,6 +126,21 @@ function basename(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+function parentPath(path: string): string {
+  const idx = path.lastIndexOf("/");
+  return idx === -1 ? "" : path.slice(0, idx);
+}
+
+function joinRelativePath(parent: string, name: string): string {
+  const cleanName = name.trim().replace(/^[/\\]+/, "").replace(/\\/g, "/");
+  return parent ? `${parent}/${cleanName}` : cleanName;
+}
+
+function remapRelativePath(path: string, fromPath: string, toPath: string): string {
+  if (path === fromPath) return toPath;
+  return path.startsWith(`${fromPath}/`) ? `${toPath}${path.slice(fromPath.length)}` : path;
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -166,6 +190,8 @@ export function CodeWorkspaceTab({
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
   const [treeFilter, setTreeFilter] = useState("");
+  const [selectedTreePath, setSelectedTreePath] = useState<string | null>(null);
+  const [selectedTreeType, setSelectedTreeType] = useState<WorkspaceEntryType | null>(null);
   const [openFiles, setOpenFiles] = useState<Record<string, OpenFileState>>({});
   const [openOrder, setOpenOrder] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -225,6 +251,8 @@ export function CodeWorkspaceTab({
     setOpenFiles({});
     setOpenOrder([]);
     setActivePath(null);
+    setSelectedTreePath(null);
+    setSelectedTreeType(null);
     initialPathRef.current = undefined;
     void loadDir("");
   }, [loadDir, repoRoot]);
@@ -302,6 +330,150 @@ export function CodeWorkspaceTab({
     setExpanded(new Set([""]));
     void loadDir("");
   }, [loadDir]);
+
+  const selectedDirectory = useMemo(() => {
+    if (selectedTreeType === "dir") return selectedTreePath ?? "";
+    if (selectedTreePath) return parentPath(selectedTreePath);
+    if (activePath) return parentPath(activePath);
+    return "";
+  }, [activePath, selectedTreePath, selectedTreeType]);
+
+  const selectedTargetPath = selectedTreePath ?? activePath;
+  const selectedTargetType = selectedTreePath
+    ? selectedTreeType
+    : activePath
+      ? "file"
+      : null;
+
+  const createFile = useCallback(async () => {
+    const name = await promptAppDialog({
+      title: "New file",
+      label: "File name",
+      initialValue: selectedDirectory ? `${selectedDirectory}/` : "",
+    });
+    if (!name) return;
+    const path = name.includes("/") || name.includes("\\")
+      ? name.trim().replace(/\\/g, "/").replace(/^\/+/, "")
+      : joinRelativePath(selectedDirectory, name);
+    try {
+      const file = await workspaceCreateFile(repoRoot, path);
+      await loadDir(parentPath(file.path));
+      setSelectedTreePath(file.path);
+      setSelectedTreeType("file");
+      await openFile(file.path);
+      setStatusMessage(`Created ${file.path}`);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [loadDir, openFile, repoRoot, selectedDirectory, setStatusMessage]);
+
+  const createDir = useCallback(async () => {
+    const name = await promptAppDialog({
+      title: "New directory",
+      label: "Directory name",
+      initialValue: selectedDirectory ? `${selectedDirectory}/` : "",
+    });
+    if (!name) return;
+    const path = name.includes("/") || name.includes("\\")
+      ? name.trim().replace(/\\/g, "/").replace(/^\/+/, "")
+      : joinRelativePath(selectedDirectory, name);
+    try {
+      const entry = await workspaceCreateDir(repoRoot, path);
+      await loadDir(parentPath(entry.path));
+      setExpanded((current) => new Set(current).add(parentPath(entry.path)));
+      setSelectedTreePath(entry.path);
+      setSelectedTreeType("dir");
+      setStatusMessage(`Created ${entry.path}`);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [loadDir, repoRoot, selectedDirectory, setStatusMessage]);
+
+  const renameSelected = useCallback(async () => {
+    if (!selectedTargetPath) return;
+    const nextName = await promptAppDialog({
+      title: "Rename",
+      label: "New name",
+      initialValue: basename(selectedTargetPath),
+    });
+    if (!nextName || nextName === basename(selectedTargetPath)) return;
+    const nextPath = joinRelativePath(parentPath(selectedTargetPath), nextName);
+    try {
+      const entry = await workspaceRenamePath(repoRoot, selectedTargetPath, nextPath);
+      const newPath = entry.path;
+      await loadDir(parentPath(selectedTargetPath));
+      await loadDir(parentPath(newPath));
+      setExpanded((current) => {
+        const next = new Set<string>();
+        for (const item of current) {
+          next.add(remapRelativePath(item, selectedTargetPath, newPath));
+        }
+        return next;
+      });
+      setOpenFiles((current) => {
+        const next: Record<string, OpenFileState> = {};
+        for (const [path, file] of Object.entries(current)) {
+          const mapped = remapRelativePath(path, selectedTargetPath, newPath);
+          next[mapped] = { ...file, path: mapped };
+        }
+        return next;
+      });
+      setOpenOrder((current) => current.map((path) => remapRelativePath(path, selectedTargetPath, newPath)));
+      setActivePath((current) => current ? remapRelativePath(current, selectedTargetPath, newPath) : current);
+      setSelectedTreePath(newPath);
+      setSelectedTreeType(entry.fileType);
+      setStatusMessage(`Renamed to ${newPath}`);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [loadDir, repoRoot, selectedTargetPath, setStatusMessage]);
+
+  const deleteSelected = useCallback(async () => {
+    if (!selectedTargetPath) return;
+    const confirmed = await confirmAppDialog({
+      title: "Delete",
+      message: `Delete ${selectedTargetPath}?`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await workspaceDeletePath(repoRoot, selectedTargetPath, selectedTargetType === "dir");
+      await loadDir(parentPath(selectedTargetPath));
+      setExpanded((current) => {
+        const next = new Set<string>();
+        for (const item of current) {
+          if (item !== selectedTargetPath && !item.startsWith(`${selectedTargetPath}/`)) {
+            next.add(item);
+          }
+        }
+        return next;
+      });
+      setOpenFiles((current) => {
+        const next: Record<string, OpenFileState> = {};
+        for (const [path, file] of Object.entries(current)) {
+          if (path !== selectedTargetPath && !path.startsWith(`${selectedTargetPath}/`)) {
+            next[path] = file;
+          }
+        }
+        return next;
+      });
+      const remainingOpen = openOrderRef.current.filter(
+        (path) => path !== selectedTargetPath && !path.startsWith(`${selectedTargetPath}/`),
+      );
+      setOpenOrder(remainingOpen);
+      setActivePath((current) =>
+        current && (current === selectedTargetPath || current.startsWith(`${selectedTargetPath}/`))
+          ? remainingOpen[0] ?? null
+          : current,
+      );
+      setSelectedTreePath(null);
+      setSelectedTreeType(null);
+      setStatusMessage(`Deleted ${selectedTargetPath}`);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [loadDir, repoRoot, selectedTargetPath, selectedTargetType, setStatusMessage]);
 
   const updateFileText = useCallback((path: string, text: string) => {
     setOpenFiles((current) => {
@@ -514,16 +686,22 @@ export function CodeWorkspaceTab({
         const rowStyle = { paddingLeft: `${8 + depth * 14}px` };
         if (isDir) {
           const childState = directories[entry.path];
+          const selected = selectedTreePath === entry.path;
           return (
             <Fragment key={entry.path}>
               <button
                 type="button"
                 data-testid="code-workspace-tree-dir"
                 data-path={entry.path}
-                className="h-7 w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
+                data-selected={selected || undefined}
+                className="h-7 w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] data-[selected=true]:bg-[var(--taomni-hover)]"
                 style={rowStyle}
                 title={entry.path}
-                onClick={() => toggleDir(entry.path)}
+                onClick={() => {
+                  setSelectedTreePath(entry.path);
+                  setSelectedTreeType("dir");
+                  toggleDir(entry.path);
+                }}
               >
                 {isExpanded ? (
                   <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
@@ -539,6 +717,7 @@ export function CodeWorkspaceTab({
           );
         }
         const active = activePath === entry.path;
+        const selected = selectedTreePath === entry.path;
         const open = openFiles[entry.path];
         return (
           <button
@@ -547,10 +726,15 @@ export function CodeWorkspaceTab({
             data-testid="code-workspace-tree-file"
             data-path={entry.path}
             data-active={active || undefined}
-            className="h-7 w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
+            data-selected={selected || undefined}
+            className="h-7 w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)] data-[selected=true]:bg-[var(--taomni-hover)]"
             style={rowStyle}
             title={`${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
-            onClick={() => void openFile(entry.path)}
+            onClick={() => {
+              setSelectedTreePath(entry.path);
+              setSelectedTreeType("file");
+              void openFile(entry.path);
+            }}
           >
             <span className="w-3.5 shrink-0" />
             <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
@@ -616,6 +800,10 @@ export function CodeWorkspaceTab({
                 placeholder="Filter"
                 className="min-w-0 flex-1 bg-transparent outline-none text-[12px]"
               />
+              <IconButton label="New file" icon={<FilePlus className="w-3.5 h-3.5" />} onClick={() => void createFile()} />
+              <IconButton label="New directory" icon={<FolderPlus className="w-3.5 h-3.5" />} onClick={() => void createDir()} />
+              <IconButton label="Rename" icon={<Pencil className="w-3.5 h-3.5" />} disabled={!selectedTargetPath} onClick={() => void renameSelected()} />
+              <IconButton label="Delete" icon={<Trash2 className="w-3.5 h-3.5" />} disabled={!selectedTargetPath} onClick={() => void deleteSelected()} />
             </div>
             <div data-testid="code-workspace-tree" className="flex-1 min-h-0 overflow-auto py-1">
               {renderEntries("", 0)}

@@ -240,6 +240,24 @@ function relativeWorkspacePath(repoRoot: string, path: string): string {
   return normalized === root ? "" : normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
 }
 
+function assertWorkspaceWritablePath(path: string): void {
+  if (path.split(/[\\/]+/).includes(".git")) {
+    throw new Error("Writing inside .git is not allowed");
+  }
+}
+
+async function workspaceEntryFromVfs(repoRoot: string, path: string) {
+  const entry = await vfsStat(path);
+  return {
+    name: entry.name,
+    path: relativeWorkspacePath(repoRoot, entry.path),
+    fileType: entry.fileType === "dir" ? "dir" : entry.fileType === "file" ? "file" : "other",
+    size: entry.size,
+    mtime: entry.mtime,
+    isHidden: entry.isHidden,
+  };
+}
+
 async function sha256Hex(text: string): Promise<string> {
   const bytes = new TextEncoder().encode(text);
   if (globalThis.crypto?.subtle) {
@@ -645,9 +663,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "workspace_write_file": {
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
       const path = args?.path as string;
-      if (path.split(/[\\/]+/).includes(".git")) {
-        throw new Error("Writing inside .git is not allowed");
-      }
+      assertWorkspaceWritablePath(path);
       const target = joinWorkspacePath(repoRoot, path);
       const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
       if (expectedHash) {
@@ -667,6 +683,73 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         mtime: entry.mtime,
         hash: await sha256Hex(contents),
       } as T;
+    }
+    case "workspace_create_file": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      await vfsStat(target)
+        .then(() => {
+          throw new Error(`Path already exists: ${target}`);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.message.startsWith("Path already exists:")) throw err;
+        });
+      const contents = (args?.contents as string | null | undefined) ?? "";
+      await vfsWriteText(target, contents);
+      const entry = await vfsStat(target);
+      return {
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        text: contents,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(contents),
+      } as T;
+    }
+    case "workspace_create_dir": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      await vfsStat(target)
+        .then(() => {
+          throw new Error(`Path already exists: ${target}`);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.message.startsWith("Path already exists:")) throw err;
+        });
+      await vfsMkdir(target);
+      return await workspaceEntryFromVfs(repoRoot, target) as T;
+    }
+    case "workspace_delete_path": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      if (relativeWorkspacePath(repoRoot, target) === "") {
+        throw new Error("Cannot delete the workspace root");
+      }
+      await vfsRemove(target, !!args?.recursive);
+      return undefined as T;
+    }
+    case "workspace_rename_path": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const fromPath = args?.fromPath as string;
+      const toPath = args?.toPath as string;
+      assertWorkspaceWritablePath(fromPath);
+      assertWorkspaceWritablePath(toPath);
+      const from = joinWorkspacePath(repoRoot, fromPath);
+      const to = joinWorkspacePath(repoRoot, toPath);
+      await vfsStat(to)
+        .then(() => {
+          throw new Error(`Path already exists: ${to}`);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.message.startsWith("Path already exists:")) throw err;
+        });
+      await vfsRename(from, to);
+      return await workspaceEntryFromVfs(repoRoot, to) as T;
     }
     case "create_local_terminal": {
       throw new Error(
