@@ -1378,6 +1378,19 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         hasMore: offset + page.length < messages.length,
       } as T;
     }
+    case "mail_sync_all_folders": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folders = stubMailFolderList(accountId);
+      const messages = folders.flatMap((folder) => stubMailMessages(accountId, folder.name));
+      return {
+        accountId,
+        folders,
+        fetchedMessages: messages.length,
+        cachedBodies: messages.filter((message) => message.bodyCached).length,
+        syncedAt: Math.floor(Date.now() / 1000),
+      } as T;
+    }
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
@@ -1389,6 +1402,13 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const invokeArgs = args as InvokeArgs | undefined;
       const targetPath = (invokeArgs?.targetPath as string | undefined) ?? "attachment";
       return { path: targetPath, name: "policy.txt", contentType: "text/plain", size: 1240 } as T;
+    }
+    case "mail_mark_read": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uids = Array.isArray(invokeArgs?.uids) ? invokeArgs?.uids as unknown[] : [];
+      const all = Boolean(invokeArgs?.all);
+      return { folder, marked: all ? 1 : uids.length } as T;
     }
     case "mail_send_message": {
       return { accepted: true, response: "browser-preview accepted" } as T;

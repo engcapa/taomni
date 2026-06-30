@@ -252,6 +252,7 @@ export interface MailCacheSettings {
   bodyRecentLimit: number;
   bodyMaxBytes: number;
   attachmentCache: boolean;
+  saveDirectory?: string | null;
 }
 
 export interface MailAiSettings {
@@ -265,6 +266,7 @@ export interface MailTabInfo {
   displayName?: string | null;
   replyTo?: string | null;
   signature?: string | null;
+  terminalProfile?: TerminalProfile;
   imap: {
     host: string;
     port: number;

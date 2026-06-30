@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
@@ -85,6 +86,8 @@ pub struct MailCacheSettings {
     pub body_max_bytes: u32,
     #[serde(default)]
     pub attachment_cache: bool,
+    #[serde(default)]
+    pub save_directory: Option<String>,
 }
 
 impl Default for MailCacheSettings {
@@ -96,6 +99,7 @@ impl Default for MailCacheSettings {
             body_recent_limit: default_body_recent_limit(),
             body_max_bytes: default_body_max_bytes(),
             attachment_cache: false,
+            save_directory: None,
         }
     }
 }
@@ -245,6 +249,12 @@ struct MailMessageCached {
     body_cached_at: Option<i64>,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct FolderSyncState {
+    max_uid: u32,
+    uid_validity: Option<u32>,
+}
+
 #[derive(Debug)]
 struct DownloadedMailAttachment {
     name: Option<String>,
@@ -265,6 +275,23 @@ pub struct MailSyncResult {
     pub offset: u32,
     pub limit: u32,
     pub has_more: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailSyncAllResult {
+    pub account_id: String,
+    pub folders: Vec<MailFolder>,
+    pub fetched_messages: usize,
+    pub cached_bodies: usize,
+    pub synced_at: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailMarkReadResult {
+    pub folder: String,
+    pub marked: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -337,6 +364,24 @@ impl ActiveImapSession {
         }
     }
 
+    fn sync_folder_incremental(
+        &mut self,
+        account: &ResolvedMailAccount,
+        folder: &str,
+        state: FolderSyncState,
+        limit: u32,
+        include_bodies: bool,
+    ) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
+        match self {
+            Self::Tls(session) => {
+                imap_sync_folder_incremental(session, account, folder, state, limit, include_bodies)
+            }
+            Self::Plain(session) => {
+                imap_sync_folder_incremental(session, account, folder, state, limit, include_bodies)
+            }
+        }
+    }
+
     fn fetch_body(
         &mut self,
         account: &ResolvedMailAccount,
@@ -346,6 +391,17 @@ impl ActiveImapSession {
         match self {
             Self::Tls(session) => imap_fetch_body(session, account, folder, uid),
             Self::Plain(session) => imap_fetch_body(session, account, folder, uid),
+        }
+    }
+
+    fn mark_read(
+        &mut self,
+        folder: &str,
+        uids: &[u32],
+    ) -> Result<usize, String> {
+        match self {
+            Self::Tls(session) => imap_mark_read(session, folder, uids),
+            Self::Plain(session) => imap_mark_read(session, folder, uids),
         }
     }
 
@@ -512,6 +568,72 @@ pub async fn mail_sync_headers(
 }
 
 #[tauri::command]
+pub async fn mail_sync_all_folders(
+    config: MailAccountConfig,
+    limit: Option<u32>,
+    include_bodies: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<MailSyncAllResult, String> {
+    let account = resolve_config(&state, config)?;
+    let cache_enabled = account.config.cache.enabled;
+    let cache_settings = account.config.cache.clone();
+    let account_id = account.config.session_id.clone();
+    let limit = limit
+        .unwrap_or(account.config.sync.max_fetch_per_sync)
+        .max(1)
+        .min(2000);
+    let include_bodies = include_bodies.unwrap_or(true);
+    let sync_states = if cache_enabled {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        init_mail_tables(&db).map_err(|e| e.to_string())?;
+        cached_folder_sync_states(&db, &account_id).map_err(|e| e.to_string())?
+    } else {
+        HashMap::new()
+    };
+
+    let result = tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let mut folders = imap.list_folders(&account.config.session_id)?;
+        let mut messages = Vec::new();
+        for listed in folders.clone() {
+            let folder_name = listed.name;
+            let state = sync_states.get(&folder_name).copied().unwrap_or_default();
+            match imap.sync_folder_incremental(&account, &folder_name, state, limit, include_bodies)
+            {
+                Ok((synced_folder, mut synced_messages)) => {
+                    merge_selected_folder(&mut folders, synced_folder);
+                    messages.append(&mut synced_messages);
+                }
+                Err(e) => {
+                    tracing::debug!("mail incremental sync skipped folder {folder_name}: {e}");
+                }
+            }
+        }
+        imap.logout();
+        let cached_bodies = messages.iter().filter(|m| m.body_cached_at.is_some()).count();
+        Ok::<_, String>((folders, messages, cached_bodies))
+    })
+    .await
+    .map_err(|e| format!("mail sync all task failed: {e}"))??;
+
+    if cache_enabled {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        init_mail_tables(&db).map_err(|e| e.to_string())?;
+        cache_sync_all_result(&db, &account_id, &result.0, &result.1, &cache_settings)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let fetched_messages = result.1.len();
+    Ok(MailSyncAllResult {
+        account_id,
+        folders: result.0,
+        fetched_messages,
+        cached_bodies: result.2,
+        synced_at: now_ts(),
+    })
+}
+
+#[tauri::command]
 pub async fn mail_list_cached_folders(
     account_id: String,
     state: State<'_, AppState>,
@@ -615,6 +737,55 @@ pub async fn mail_send_message(
     tokio::task::spawn_blocking(move || send_smtp(&account, &request))
         .await
         .map_err(|e| format!("mail send task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn mail_mark_read(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Option<Vec<u32>>,
+    all: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<MailMarkReadResult, String> {
+    let folder = folder.trim().to_string();
+    if folder.is_empty() {
+        return Err("mail folder is required".into());
+    }
+    let account_id = config.session_id.clone();
+    let target_uids = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        init_mail_tables(&db).map_err(|e| e.to_string())?;
+        if all.unwrap_or(false) {
+            unread_cached_uids(&db, &account_id, &folder).map_err(|e| e.to_string())?
+        } else {
+            uids.unwrap_or_default()
+                .into_iter()
+                .filter(|uid| *uid > 0)
+                .collect::<Vec<_>>()
+        }
+    };
+    if target_uids.is_empty() {
+        return Ok(MailMarkReadResult { folder, marked: 0 });
+    }
+
+    let account = resolve_config(&state, config)?;
+    let marked = target_uids.len();
+    let folder_for_task = folder.clone();
+    let uids_for_task = target_uids.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result = imap.mark_read(&folder_for_task, &uids_for_task);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail mark read task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    mark_cached_messages_read(&db, &account_id, &folder, &target_uids)
+        .map_err(|e| e.to_string())?;
+    Ok(MailMarkReadResult { folder, marked })
 }
 
 #[tauri::command]
@@ -868,7 +1039,97 @@ fn imap_sync_folder<T: Read + Write>(
         return Ok((folder_info, Vec::new(), false));
     }
 
-    let uid_set = uid_set_string(&fetch_uids);
+    let mut messages = imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
+    messages.sort_by(|a, b| {
+        b.header
+            .date_ts
+            .cmp(&a.header.date_ts)
+            .then(b.header.uid.cmp(&a.header.uid))
+    });
+    Ok((folder_info, messages, has_more))
+}
+
+fn imap_sync_folder_incremental<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    account: &ResolvedMailAccount,
+    folder: &str,
+    state: FolderSyncState,
+    limit: u32,
+    include_bodies: bool,
+) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
+    let mailbox = session
+        .examine(folder)
+        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+    let unread = session
+        .uid_search("UNSEEN")
+        .ok()
+        .map(|ids| ids.len() as u32);
+    let account_id = &account.config.session_id;
+    let folder_info = MailFolder {
+        account_id: account_id.clone(),
+        name: folder.to_string(),
+        display_name: decode_imap_modified_utf7(folder),
+        delimiter: None,
+        flags: mailbox.flags.iter().map(|flag| flag.to_string()).collect(),
+        uid_validity: mailbox.uid_validity,
+        uid_next: mailbox.uid_next,
+        total: Some(mailbox.exists),
+        unread,
+        updated_at: now_ts(),
+    };
+
+    let limit = limit.max(1).min(2000) as usize;
+    let same_uid_validity = state.max_uid > 0
+        && (state.uid_validity.is_none()
+            || mailbox.uid_validity.is_none()
+            || state.uid_validity == mailbox.uid_validity);
+    let mut fetch_uids = if same_uid_validity {
+        let start_uid = state.max_uid.saturating_add(1);
+        let mut uids = session
+            .uid_search(format!("UID {start_uid}:*"))
+            .map_err(|e| format!("IMAP UID SEARCH incremental failed: {e}"))?
+            .into_iter()
+            .filter(|uid| *uid > state.max_uid)
+            .collect::<Vec<_>>();
+        uids.sort_unstable();
+        uids.into_iter().take(limit).collect::<Vec<_>>()
+    } else {
+        let mut uids = session
+            .uid_search("ALL")
+            .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
+            .into_iter()
+            .collect::<Vec<_>>();
+        uids.sort_unstable();
+        let start = uids.len().saturating_sub(limit);
+        uids[start..].to_vec()
+    };
+    fetch_uids.sort_unstable();
+    if fetch_uids.is_empty() {
+        return Ok((folder_info, Vec::new()));
+    }
+
+    let mut messages = imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
+    messages.sort_by(|a, b| {
+        b.header
+            .date_ts
+            .cmp(&a.header.date_ts)
+            .then(b.header.uid.cmp(&a.header.uid))
+    });
+    Ok((folder_info, messages))
+}
+
+fn imap_fetch_messages_for_uids<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    account: &ResolvedMailAccount,
+    folder: &str,
+    fetch_uids: &[u32],
+    include_bodies: bool,
+) -> Result<Vec<MailMessageCached>, String> {
+    if fetch_uids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let account_id = &account.config.session_id;
+    let uid_set = uid_set_string(fetch_uids);
     let fetches = session
         .uid_fetch(
             &uid_set,
@@ -913,6 +1174,7 @@ fn imap_sync_folder<T: Read + Write>(
         for fetch in body_fetches.iter() {
             if let Some(uid) = fetch.uid {
                 if let Some(body) = fetch.body() {
+                    save_raw_message(account, folder, uid, body)?;
                     bodies.insert(
                         uid,
                         parse_body_message(account_id, folder, uid, fetch.size, body, raw_limit),
@@ -927,13 +1189,7 @@ fn imap_sync_folder<T: Read + Write>(
         }
     }
 
-    messages.sort_by(|a, b| {
-        b.header
-            .date_ts
-            .cmp(&a.header.date_ts)
-            .then(b.header.uid.cmp(&a.header.uid))
-    });
-    Ok((folder_info, messages, has_more))
+    Ok(messages)
 }
 
 fn imap_fetch_body<T: Read + Write>(
@@ -964,6 +1220,7 @@ fn imap_fetch_body<T: Read + Write>(
     let mut message = parse_fetch_header(&account.config.session_id, folder, fetch)
         .unwrap_or_else(|| empty_cached_message(&account.config.session_id, folder, uid));
     if let Some(body) = fetch.body() {
+        save_raw_message(account, folder, uid, body)?;
         let parsed = parse_body_message(
             &account.config.session_id,
             folder,
@@ -975,6 +1232,80 @@ fn imap_fetch_body<T: Read + Write>(
         merge_body(&mut message, parsed);
     }
     Ok(message)
+}
+
+fn save_raw_message(
+    account: &ResolvedMailAccount,
+    folder: &str,
+    uid: u32,
+    body: &[u8],
+) -> Result<(), String> {
+    let Some(root) = account
+        .config
+        .cache
+        .save_directory
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+
+    let folder_component = sanitize_path_component(folder);
+    let account_component = sanitize_path_component(&account.config.session_id);
+    let dir = Path::new(root).join(account_component).join(folder_component);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("failed to create mail save directory: {e}"))?;
+    let path = dir.join(format!("{uid}.eml"));
+    if path.exists() {
+        return Ok(());
+    }
+    write_new_file(&path, body).map_err(|e| format!("failed to save fetched email: {e}"))
+}
+
+fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    file.write_all(bytes)
+}
+
+fn sanitize_path_component(value: &str) -> String {
+    let cleaned = value
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string();
+    if cleaned.is_empty() {
+        "_".into()
+    } else {
+        cleaned
+    }
+}
+
+fn imap_mark_read<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uids: &[u32],
+) -> Result<usize, String> {
+    if uids.is_empty() {
+        return Ok(0);
+    }
+    session
+        .select(folder)
+        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
+    let uid_set = uid_set_string(uids);
+    session
+        .uid_store(uid_set, "+FLAGS.SILENT (\\Seen)")
+        .map_err(|e| format!("IMAP UID STORE \\Seen failed: {e}"))?;
+    Ok(uids.len())
 }
 
 fn imap_download_attachment<T: Read + Write>(
@@ -1342,12 +1673,55 @@ fn cache_sync_result(
     cache: &MailCacheSettings,
 ) -> SqlResult<()> {
     for folder in folders {
+        reset_folder_if_uid_validity_changed(conn, folder)?;
         upsert_folder(conn, folder)?;
     }
     for message in messages {
         upsert_message(conn, message)?;
     }
     prune_mail_cache(conn, account_id, folder, cache)?;
+    Ok(())
+}
+
+fn cache_sync_all_result(
+    conn: &Connection,
+    account_id: &str,
+    folders: &[MailFolder],
+    messages: &[MailMessageCached],
+    cache: &MailCacheSettings,
+) -> SqlResult<()> {
+    for folder in folders {
+        reset_folder_if_uid_validity_changed(conn, folder)?;
+        upsert_folder(conn, folder)?;
+    }
+    for message in messages {
+        upsert_message(conn, message)?;
+    }
+    for folder in folders {
+        prune_mail_cache(conn, account_id, &folder.name, cache)?;
+    }
+    Ok(())
+}
+
+fn reset_folder_if_uid_validity_changed(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
+    let Some(next_uid_validity) = folder.uid_validity else {
+        return Ok(());
+    };
+    let current: Option<Option<i64>> = conn
+        .query_row(
+            "SELECT uid_validity FROM mail_folders WHERE account_id = ?1 AND name = ?2",
+            params![folder.account_id, folder.name],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(Some(current_uid_validity)) = current {
+        if current_uid_validity as u32 != next_uid_validity {
+            conn.execute(
+                "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
+                params![folder.account_id, folder.name],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -1523,6 +1897,38 @@ fn list_cached_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<Mai
     rows.collect()
 }
 
+fn cached_folder_sync_states(
+    conn: &Connection,
+    account_id: &str,
+) -> SqlResult<HashMap<String, FolderSyncState>> {
+    let mut stmt = conn.prepare(
+        "SELECT f.name, f.uid_validity, COALESCE(MAX(m.uid), 0)
+         FROM mail_folders f
+         LEFT JOIN mail_messages m
+           ON m.account_id = f.account_id AND m.folder = f.name
+         WHERE f.account_id = ?1
+         GROUP BY f.name, f.uid_validity",
+    )?;
+    let rows = stmt.query_map(params![account_id], |row| {
+        let name: String = row.get(0)?;
+        let uid_validity: Option<i64> = row.get(1)?;
+        let max_uid: i64 = row.get(2)?;
+        Ok((
+            name,
+            FolderSyncState {
+                max_uid: max_uid.max(0) as u32,
+                uid_validity: uid_validity.map(|value| value as u32),
+            },
+        ))
+    })?;
+    let mut states = HashMap::new();
+    for row in rows {
+        let (name, state) = row?;
+        states.insert(name, state);
+    }
+    Ok(states)
+}
+
 fn list_cached_messages(
     conn: &Connection,
     account_id: &str,
@@ -1541,6 +1947,80 @@ fn list_cached_messages(
     )?;
     let rows = stmt.query_map(params![account_id, folder, limit, offset], row_to_header)?;
     rows.collect()
+}
+
+fn unread_cached_uids(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<Vec<u32>> {
+    let mut stmt = conn.prepare(
+        "SELECT uid, flags_json
+         FROM mail_messages
+         WHERE account_id = ?1 AND folder = ?2",
+    )?;
+    let rows = stmt.query_map(params![account_id, folder], |row| {
+        Ok((row.get::<_, i64>(0)? as u32, row.get::<_, String>(1)?))
+    })?;
+    let mut uids = Vec::new();
+    for row in rows {
+        let (uid, flags_json) = row?;
+        let flags: Vec<String> = serde_json::from_str(&flags_json).unwrap_or_default();
+        if !flags_include_seen(&flags) {
+            uids.push(uid);
+        }
+    }
+    Ok(uids)
+}
+
+fn mark_cached_messages_read(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: &[u32],
+) -> SqlResult<()> {
+    let mut changed = 0usize;
+    for uid in uids {
+        let flags_json: Option<String> = conn
+            .query_row(
+                "SELECT flags_json
+                 FROM mail_messages
+                 WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+                params![account_id, folder, *uid as i64],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(flags_json) = flags_json else {
+            continue;
+        };
+        let mut flags: Vec<String> = serde_json::from_str(&flags_json).unwrap_or_default();
+        if flags_include_seen(&flags) {
+            continue;
+        }
+        flags.push("\\Seen".into());
+        let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
+        conn.execute(
+            "UPDATE mail_messages
+             SET flags_json = ?4, updated_at = ?5
+             WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+            params![account_id, folder, *uid as i64, next_flags_json, now_ts()],
+        )?;
+        changed += 1;
+    }
+    if changed > 0 {
+        conn.execute(
+            "UPDATE mail_folders
+             SET unread = CASE
+               WHEN unread IS NULL THEN NULL
+               WHEN unread <= ?3 THEN 0
+               ELSE unread - ?3
+             END,
+             updated_at = ?4
+             WHERE account_id = ?1 AND name = ?2",
+            params![account_id, folder, changed as i64, now_ts()],
+        )?;
+    }
+    Ok(())
+}
+
+fn flags_include_seen(flags: &[String]) -> bool {
+    flags.iter().any(|flag| flag.eq_ignore_ascii_case("\\Seen"))
 }
 
 fn get_cached_body(

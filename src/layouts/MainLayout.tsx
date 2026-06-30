@@ -361,13 +361,14 @@ function sessionToMailTabInfo(
   const str = (key: string, fallback = ""): string =>
     typeof opts[key] === "string" ? (opts[key] as string) : fallback;
   const smtpUseImapAuth = opts.mailSmtpUseImapAuth !== false;
-  const emailAddress = str("mailEmailAddress", session.username ?? "");
+  const emailAddress = session.username || str("mailEmailAddress");
   return {
     sessionId: session.id,
     emailAddress,
     displayName: str("mailDisplayName") || null,
     replyTo: str("mailReplyTo") || null,
     signature: str("mailSignature") || null,
+    terminalProfile: getSessionTerminalProfile(session.options_json),
     imap: {
       host: session.host,
       port: session.port,
@@ -395,6 +396,7 @@ function sessionToMailTabInfo(
       bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),
       bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
       attachmentCache: opts.mailAttachmentCache === true,
+      saveDirectory: str("mailSaveDirectory") || null,
     },
     ai: {
       enabled: opts.mailAiEnabled !== false,

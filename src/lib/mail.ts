@@ -73,10 +73,23 @@ export interface MailSyncResult {
   hasMore: boolean;
 }
 
+export interface MailSyncAllResult {
+  accountId: string;
+  folders: MailFolder[];
+  fetchedMessages: number;
+  cachedBodies: number;
+  syncedAt: number;
+}
+
 export interface MailSyncOptions {
   limit?: number;
   offset?: number;
   includeBodies?: boolean;
+}
+
+export interface MailMarkReadResult {
+  folder: string;
+  marked: number;
 }
 
 export interface MailTestConnectionResult {
@@ -140,6 +153,19 @@ export function mailSyncHeaders(
   );
 }
 
+export function mailSyncAllFolders(
+  config: MailTabInfo,
+  options: Pick<MailSyncOptions, "limit" | "includeBodies"> = {},
+): Promise<MailSyncAllResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailSyncAllResult>("mail_sync_all_folders", {
+      config,
+      limit: options.limit ?? null,
+      includeBodies: options.includeBodies ?? null,
+    }),
+  );
+}
+
 export function mailGetMessageBody(
   config: MailTabInfo,
   folder: string,
@@ -147,6 +173,22 @@ export function mailGetMessageBody(
 ): Promise<MailMessageBody> {
   return withVaultLockedNotice(() =>
     invoke<MailMessageBody>("mail_get_message_body", { config, folder, uid }),
+  );
+}
+
+export function mailMarkRead(
+  config: MailTabInfo,
+  folder: string,
+  uids: number[],
+  all = false,
+): Promise<MailMarkReadResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailMarkReadResult>("mail_mark_read", {
+      config,
+      folder,
+      uids,
+      all,
+    }),
   );
 }
 

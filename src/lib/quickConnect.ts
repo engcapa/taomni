@@ -112,7 +112,6 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
   const titlePrefix = username ? `${username}@` : "";
   const optionsJson = sessionType === "Mail"
     ? JSON.stringify({
-        mailEmailAddress: parsed.username ?? "",
         mailSignature: "",
         mailImapSecurity: "TLS",
         mailSmtpHost: "",
@@ -120,6 +119,7 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
         mailSmtpSecurity: "TLS",
         mailSmtpUseImapAuth: true,
         mailCacheEnabled: true,
+        mailSaveDirectory: "",
         mailHeaderRetentionDays: "30",
         mailHeaderLimitPerFolder: "2000",
         mailBodyRecentLimit: "200",

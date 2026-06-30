@@ -884,4 +884,46 @@ describe("SessionEditor SSH settings tabs", () => {
     expect(savedOptions.terminalProfile.fontFamily).toContain("JetBrains Mono");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("saves mail sessions with username identity and appearance settings", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Mail" });
+
+    expect(screen.queryByTestId("session-host")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("IMAP server"), "imap.example.com");
+    await user.type(screen.getByLabelText("Mail email or username"), "me@example.com");
+    await user.type(screen.getByLabelText("Mail password or app password token"), "imap-secret");
+    await user.type(screen.getByLabelText("SMTP server"), "smtp.example.com");
+    await user.type(screen.getByLabelText("Mail save directory"), "D:\\mail-cache");
+
+    await user.click(screen.getByRole("button", { name: /appearance/i }));
+    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
+    const fontSize = screen.getByLabelText("Terminal font size");
+    await user.clear(fontSize);
+    await user.type(fontSize, "16");
+    await user.click(screen.getByRole("button", { name: /use theme termius dark/i }));
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+
+    expect(savedConfig).toMatchObject({
+      session_type: "Mail",
+      host: "imap.example.com",
+      port: 993,
+      username: "me@example.com",
+      auth_method: "Password",
+    });
+    expect(savedOptions.mailEmailAddress).toBeUndefined();
+    expect(savedOptions.mailSmtpHost).toBe("smtp.example.com");
+    expect(savedOptions.mailSaveDirectory).toBe("D:\\mail-cache");
+    expect(savedOptions.passwordRef).toBe("vault:pwd");
+    expect(savedOptions.terminalProfile).toMatchObject({
+      fontSize: 16,
+      theme: "termius-dark",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
