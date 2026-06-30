@@ -228,6 +228,183 @@ export class Resource {
   }
 }
 
+function joinWorkspacePath(repoRoot: string, relative = ""): string {
+  const root = (repoRoot || VFS_ROOT).replace(/\/+$/, "") || VFS_ROOT;
+  const clean = relative.replace(/^\/+/, "").replace(/\\/g, "/");
+  return clean ? `${root}/${clean}` : root;
+}
+
+function relativeWorkspacePath(repoRoot: string, path: string): string {
+  const root = (repoRoot || VFS_ROOT).replace(/\/+$/, "") || VFS_ROOT;
+  const normalized = path.replace(/\\/g, "/");
+  return normalized === root ? "" : normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
+}
+
+function assertWorkspaceWritablePath(path: string): void {
+  if (path.split(/[\\/]+/).includes(".git")) {
+    throw new Error("Writing inside .git is not allowed");
+  }
+}
+
+async function workspaceEntryFromVfs(repoRoot: string, path: string) {
+  const entry = await vfsStat(path);
+  return {
+    name: entry.name,
+    path: relativeWorkspacePath(repoRoot, entry.path),
+    fileType: entry.fileType === "dir" ? "dir" : entry.fileType === "file" ? "file" : "other",
+    size: entry.size,
+    mtime: entry.mtime,
+    isHidden: entry.isHidden,
+  };
+}
+
+const STUB_LSP_PRESETS = [
+  {
+    id: "typescript-javascript",
+    displayName: "TypeScript / JavaScript",
+    documentLanguageIds: ["typescript", "typescriptreact", "javascript", "javascriptreact"],
+    fileExtensions: ["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"],
+    fileNames: [],
+    commands: [
+      {
+        id: "typescript-language-server",
+        label: "typescript-language-server",
+        command: "typescript-language-server",
+        args: ["--stdio"],
+        installHint: "npm install -g typescript typescript-language-server",
+        fallback: false,
+      },
+    ],
+  },
+  {
+    id: "rust",
+    displayName: "Rust",
+    documentLanguageIds: ["rust"],
+    fileExtensions: ["rs"],
+    fileNames: [],
+    commands: [{ id: "rust-analyzer", label: "rust-analyzer", command: "rust-analyzer", args: [], installHint: "rustup component add rust-analyzer", fallback: false }],
+  },
+  {
+    id: "python",
+    displayName: "Python",
+    documentLanguageIds: ["python"],
+    fileExtensions: ["py", "pyi"],
+    fileNames: [],
+    commands: [{ id: "pyright", label: "pyright-langserver", command: "pyright-langserver", args: ["--stdio"], installHint: "npm install -g pyright", fallback: false }],
+  },
+  {
+    id: "go",
+    displayName: "Go",
+    documentLanguageIds: ["go"],
+    fileExtensions: ["go"],
+    fileNames: [],
+    commands: [{ id: "gopls", label: "gopls", command: "gopls", args: [], installHint: "go install golang.org/x/tools/gopls@latest", fallback: false }],
+  },
+  {
+    id: "java",
+    displayName: "Java",
+    documentLanguageIds: ["java"],
+    fileExtensions: ["java"],
+    fileNames: [],
+    commands: [{ id: "jdtls", label: "jdtls", command: "jdtls", args: [], installHint: "Install Eclipse JDT LS and ensure `jdtls` is on PATH", fallback: false }],
+  },
+  {
+    id: "cpp",
+    displayName: "C / C++",
+    documentLanguageIds: ["c", "cpp"],
+    fileExtensions: ["c", "h", "cc", "cpp", "cxx", "hpp", "hh", "hxx"],
+    fileNames: [],
+    commands: [{ id: "clangd", label: "clangd", command: "clangd", args: [], installHint: "Install LLVM clangd and ensure `clangd` is on PATH", fallback: false }],
+  },
+  {
+    id: "kotlin",
+    displayName: "Kotlin",
+    documentLanguageIds: ["kotlin"],
+    fileExtensions: ["kt", "kts"],
+    fileNames: [],
+    commands: [{ id: "kotlin-language-server", label: "kotlin-language-server", command: "kotlin-language-server", args: [], installHint: "Install kotlin-language-server and ensure it is on PATH", fallback: false }],
+  },
+  {
+    id: "scala",
+    displayName: "Scala",
+    documentLanguageIds: ["scala"],
+    fileExtensions: ["scala", "sc"],
+    fileNames: [],
+    commands: [{ id: "metals", label: "Metals", command: "metals", args: [], installHint: "Install Metals and ensure `metals` is on PATH", fallback: false }],
+  },
+  {
+    id: "csharp",
+    displayName: "C#",
+    documentLanguageIds: ["csharp"],
+    fileExtensions: ["cs", "csx"],
+    fileNames: [],
+    commands: [
+      { id: "csharp-ls", label: "csharp-ls", command: "csharp-ls", args: [], installHint: "dotnet tool install -g csharp-ls", fallback: false },
+      { id: "omnisharp", label: "OmniSharp", command: "omnisharp", args: ["--languageserver"], installHint: "Install OmniSharp and ensure `omnisharp` is on PATH", fallback: true },
+    ],
+  },
+  {
+    id: "swift",
+    displayName: "Swift",
+    documentLanguageIds: ["swift"],
+    fileExtensions: ["swift"],
+    fileNames: [],
+    commands: [{ id: "sourcekit-lsp", label: "SourceKit-LSP", command: "sourcekit-lsp", args: [], installHint: "Install Swift toolchain and ensure `sourcekit-lsp` is on PATH", fallback: false }],
+  },
+];
+
+function stubLspPresetForPath(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return STUB_LSP_PRESETS.find((preset) => preset.fileExtensions.includes(ext)) ?? null;
+}
+
+function stubLspDocumentStatus(args?: InvokeArgs) {
+  const filePath = (args?.filePath as string | undefined) ?? "";
+  const preset = stubLspPresetForPath(filePath);
+  return {
+    path: filePath,
+    uri: filePath ? `file://${filePath}` : "",
+    presetId: preset?.id ?? null,
+    languageId: preset?.documentLanguageIds[0] ?? null,
+    displayName: preset?.displayName ?? null,
+    available: false,
+    active: false,
+    selectedCommandId: null,
+    selectedCommand: null,
+    installHint: preset?.commands[0]?.installHint ?? null,
+    error: preset ? `${preset.displayName} language server is not available in browser preview` : "No language server preset for this file type",
+  };
+}
+
+function stubLspServerStatuses() {
+  return STUB_LSP_PRESETS.map((preset) => ({
+    presetId: preset.id,
+    displayName: preset.displayName,
+    documentLanguageIds: preset.documentLanguageIds,
+    available: false,
+    active: false,
+    selectedCommandId: null,
+    selectedCommand: null,
+    installHint: preset.commands[0]?.installHint ?? "",
+    error: "Language servers are not available in browser preview",
+    commands: preset.commands.map((command) => ({ ...command, available: false })),
+  }));
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  let hash = 0x811c9dc5;
+  for (const byte of bytes) {
+    hash ^= byte;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 /** No-op plugin-listener shim so plugins that import `addPluginListener`
  *  (e.g. @tauri-apps/plugin-notification) load in browser preview. */
 export class PluginListener {
@@ -588,6 +765,190 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       await vfsMkdir(`${VFS_ROOT}/tmp`).catch(() => undefined);
       await vfsMkdir(dir).catch(() => undefined);
       return `${dir}/${Date.now()}-${defaultName.replace(/[\\/:*?"<>|]/g, "_")}` as T;
+    }
+    case "lsp_list_presets": {
+      return STUB_LSP_PRESETS as T;
+    }
+    case "lsp_detect_servers": {
+      return stubLspServerStatuses() as T;
+    }
+    case "lsp_document_status":
+    case "lsp_open_document":
+    case "lsp_change_document":
+    case "lsp_save_document":
+    case "lsp_close_document": {
+      return stubLspDocumentStatus(args as InvokeArgs) as T;
+    }
+    case "lsp_get_diagnostics": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        diagnostics: [],
+      } as T;
+    }
+    case "lsp_hover": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        contents: null,
+        range: null,
+      } as T;
+    }
+    case "lsp_definition":
+    case "lsp_references": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        locations: [],
+      } as T;
+    }
+    case "workspace_list_dir": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = (args?.path as string) || "";
+      const target = joinWorkspacePath(repoRoot, path);
+      const entries = await vfsList(target);
+      return entries.map((entry) => ({
+        name: entry.name,
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        fileType: entry.fileType === "dir" ? "dir" : entry.fileType === "file" ? "file" : "other",
+        size: entry.size,
+        mtime: entry.mtime,
+        isHidden: entry.isHidden,
+      })) as T;
+    }
+    case "workspace_read_file": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      const target = joinWorkspacePath(repoRoot, path);
+      const [entry, text] = await Promise.all([vfsStat(target), vfsReadText(target)]);
+      return {
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        text,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(text),
+      } as T;
+    }
+    case "workspace_read_loose_file": {
+      const path = args?.path as string;
+      const [entry, text] = await Promise.all([vfsStat(path), vfsReadText(path)]);
+      return {
+        path: entry.path,
+        text,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(text),
+      } as T;
+    }
+    case "workspace_write_file": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
+      if (expectedHash) {
+        const current = await vfsReadText(target);
+        const currentHash = await sha256Hex(current);
+        if (currentHash !== expectedHash) {
+          throw new Error(`File changed on disk; expected hash ${expectedHash}, found ${currentHash}`);
+        }
+      }
+      const contents = (args?.contents as string) ?? "";
+      await vfsWriteText(target, contents);
+      const entry = await vfsStat(target);
+      return {
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        text: contents,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(contents),
+      } as T;
+    }
+    case "workspace_write_loose_file": {
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
+      if (expectedHash) {
+        const current = await vfsReadText(path);
+        const currentHash = await sha256Hex(current);
+        if (currentHash !== expectedHash) {
+          throw new Error(`File changed on disk; expected hash ${expectedHash}, found ${currentHash}`);
+        }
+      }
+      const contents = (args?.contents as string) ?? "";
+      await vfsWriteText(path, contents);
+      const entry = await vfsStat(path);
+      return {
+        path: entry.path,
+        text: contents,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(contents),
+      } as T;
+    }
+    case "workspace_create_file": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      await vfsStat(target)
+        .then(() => {
+          throw new Error(`Path already exists: ${target}`);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.message.startsWith("Path already exists:")) throw err;
+        });
+      const contents = (args?.contents as string | null | undefined) ?? "";
+      await vfsWriteText(target, contents);
+      const entry = await vfsStat(target);
+      return {
+        path: relativeWorkspacePath(repoRoot, entry.path),
+        text: contents,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(contents),
+      } as T;
+    }
+    case "workspace_create_dir": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      await vfsStat(target)
+        .then(() => {
+          throw new Error(`Path already exists: ${target}`);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.message.startsWith("Path already exists:")) throw err;
+        });
+      await vfsMkdir(target);
+      return await workspaceEntryFromVfs(repoRoot, target) as T;
+    }
+    case "workspace_delete_path": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const target = joinWorkspacePath(repoRoot, path);
+      if (relativeWorkspacePath(repoRoot, target) === "") {
+        throw new Error("Cannot delete the workspace root");
+      }
+      await vfsRemove(target, !!args?.recursive);
+      return undefined as T;
+    }
+    case "workspace_rename_path": {
+      const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
+      const fromPath = args?.fromPath as string;
+      const toPath = args?.toPath as string;
+      assertWorkspaceWritablePath(fromPath);
+      assertWorkspaceWritablePath(toPath);
+      const from = joinWorkspacePath(repoRoot, fromPath);
+      const to = joinWorkspacePath(repoRoot, toPath);
+      await vfsStat(to)
+        .then(() => {
+          throw new Error(`Path already exists: ${to}`);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.message.startsWith("Path already exists:")) throw err;
+        });
+      await vfsRename(from, to);
+      return await workspaceEntryFromVfs(repoRoot, to) as T;
     }
     case "create_local_terminal": {
       throw new Error(

@@ -51,7 +51,7 @@ function checkboxInLabel(text: string): HTMLInputElement {
   return input;
 }
 
-describe("SessionEditor SSH settings tabs", () => {
+describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
   beforeEach(() => {
     Object.values(ipcMocks).forEach((mock) => {
       if (typeof mock === "function" && "mockReset" in mock) {

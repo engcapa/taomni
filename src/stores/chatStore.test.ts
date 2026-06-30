@@ -376,6 +376,83 @@ describe("chatStore DB MCP context bridge", () => {
   });
 });
 
+describe("chatStore code workspace context bridge", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    vi.mocked(listen).mockResolvedValue(() => undefined);
+    const thread = makeThread({
+      id: "thread-code",
+      provider_id: "codex",
+      linked_session_id: "code-tab",
+    });
+    useChatStore.setState({
+      threads: [thread],
+      threadsLoaded: true,
+      activeThreadId: thread.id,
+      messages: { [thread.id]: [] },
+      streamingId: {},
+      ccToolCards: {},
+      ccUsage: {},
+      sendingByThreadId: {},
+      sending: false,
+      drawerOpen: true,
+      drawerScope: "tab",
+      drawerTabId: "code-tab",
+      tabDrawerOpenByTabId: { "code-tab": true },
+      activeThreadIdByTabId: { "code-tab": thread.id },
+      drawerWidth: 380,
+      drawerHeight: 420,
+      drawerPosition: "right",
+      drawerPinned: true,
+      pendingComposerText: "",
+    });
+    useAppStore.setState({
+      tabs: [
+        {
+          id: "code-tab",
+          type: "code-workspace",
+          title: "Code · app",
+          closable: true,
+          codeWorkspace: { repoRoot: "/repo/app" },
+        } as Tab,
+      ],
+      activeTabId: "code-tab",
+      codeWorkspaceByTab: {
+        "code-tab": {
+          repoRoot: "/repo/app",
+          activePath: "src/main.ts",
+          openPaths: ["src/main.ts", "src/lib.ts"],
+          dirtyPaths: ["src/main.ts"],
+        },
+      },
+    });
+    invokeMock.mockImplementation((command: string) => {
+      if (command !== "chat_stream") throw new Error(`unexpected command: ${command}`);
+      return Promise.resolve(null);
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends the active code workspace with each bound turn", async () => {
+    await useChatStore.getState().sendMessage("thread-code", "review current edits");
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_stream", {
+      req: expect.objectContaining({
+        thread_id: "thread-code",
+        code_workspace: {
+          repoRoot: "/repo/app",
+          activePath: "src/main.ts",
+          openPaths: ["src/main.ts", "src/lib.ts"],
+          dirtyPaths: ["src/main.ts"],
+        },
+      }),
+    });
+  });
+});
+
 describe("chatStore drawer lifecycle", () => {
   beforeEach(() => {
     invokeMock.mockReset();

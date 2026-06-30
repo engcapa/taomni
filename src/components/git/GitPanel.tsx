@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   AlertTriangle,
+  Braces,
   GitBranch,
   GitCommitHorizontal,
   GitFork,
@@ -87,6 +88,7 @@ import { useAppStore } from "../../stores/appStore";
 interface GitPanelProps {
   repoRoot: string;
   visible?: boolean;
+  onOpenWorkspace?: (repoRoot: string) => void;
 }
 
 type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
@@ -103,7 +105,7 @@ const EMPTY_SETTINGS: GitRepoSettings = {
   commitGpgsign: null,
 };
 
-export function GitPanel({ repoRoot, visible = true }: GitPanelProps) {
+export function GitPanel({ repoRoot, visible = true, onOpenWorkspace }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
@@ -488,6 +490,13 @@ export function GitPanel({ repoRoot, visible = true }: GitPanelProps) {
           </span>
         )}
         <div className="flex-1" />
+        {onOpenWorkspace && (
+          <IconButton
+            label="Open code workspace"
+            icon={<Braces className="w-3.5 h-3.5" />}
+            onClick={() => onOpenWorkspace(repoRoot)}
+          />
+        )}
         <select
           className="taomni-input h-7 w-32"
           value={remoteName}
