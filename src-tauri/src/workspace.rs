@@ -85,6 +85,28 @@ pub fn workspace_read_file(
 }
 
 #[tauri::command]
+pub fn workspace_read_loose_file(
+    path: String,
+    max_bytes: Option<u64>,
+) -> Result<WorkspaceFile, String> {
+    let target = resolve_existing_loose_file_path(&path)?;
+    let meta = fs::metadata(&target).map_err(|e| format!("stat {}: {e}", target.display()))?;
+    if !meta.is_file() {
+        return Err(format!("Not a file: {}", target.display()));
+    }
+    let limit = max_bytes.unwrap_or(DEFAULT_MAX_TEXT_BYTES);
+    if meta.len() > limit {
+        return Err(format!(
+            "File is {} bytes, exceeds text editor limit of {} bytes",
+            meta.len(),
+            limit
+        ));
+    }
+    let bytes = fs::read(&target).map_err(|e| format!("read {}: {e}", target.display()))?;
+    loose_file_from_bytes(&target, bytes, meta)
+}
+
+#[tauri::command]
 pub fn workspace_write_file(
     repo_root: String,
     path: String,
@@ -145,6 +167,67 @@ pub fn workspace_write_file(
     }
 
     workspace_read_file(repo_root, path, None)
+}
+
+#[tauri::command]
+pub fn workspace_write_loose_file(
+    path: String,
+    contents: String,
+    expected_hash: Option<String>,
+) -> Result<WorkspaceFile, String> {
+    let target = resolve_writable_loose_file_path(&path)?;
+    reject_protected_loose_write(&target)?;
+
+    if let Some(expected) = expected_hash
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let current = fs::read(&target).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                format!(
+                    "Cannot compare expected hash; file does not exist: {}",
+                    target.display()
+                )
+            } else {
+                format!("read {}: {e}", target.display())
+            }
+        })?;
+        let current_hash = sha256_hex(&current);
+        if !current_hash.eq_ignore_ascii_case(expected) {
+            return Err(format!(
+                "File changed on disk; expected hash {expected}, found {current_hash}"
+            ));
+        }
+    }
+
+    let parent = target
+        .parent()
+        .ok_or_else(|| format!("Cannot resolve parent for {}", target.display()))?;
+    fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+    let tmp = parent.join(format!(".taomni-write-{}", uuid::Uuid::new_v4().simple()));
+    {
+        use std::io::Write;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)
+            .map_err(|e| format!("open {}: {e}", tmp.display()))?;
+        file.write_all(contents.as_bytes())
+            .map_err(|e| format!("write {}: {e}", tmp.display()))?;
+        file.sync_all()
+            .map_err(|e| format!("sync {}: {e}", tmp.display()))?;
+    }
+    if let Err(e) = replace_file(&tmp, &target) {
+        let _ = fs::remove_file(&tmp);
+        return Err(format!(
+            "rename {} -> {}: {e}",
+            tmp.display(),
+            target.display()
+        ));
+    }
+
+    workspace_read_loose_file(path, None)
 }
 
 #[tauri::command]
@@ -271,6 +354,36 @@ fn resolve_writable_path(root: &Path, relative: &str) -> Result<PathBuf, String>
     Ok(target)
 }
 
+fn resolve_existing_loose_file_path(path: &str) -> Result<PathBuf, String> {
+    let target = loose_file_path(path)?;
+    target
+        .canonicalize()
+        .map_err(|e| format!("resolve {}: {e}", target.display()))
+}
+
+fn resolve_writable_loose_file_path(path: &str) -> Result<PathBuf, String> {
+    let target = loose_file_path(path)?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| format!("Cannot resolve parent for {}", target.display()))?;
+    parent
+        .canonicalize()
+        .map_err(|e| format!("resolve {}: {e}", parent.display()))?;
+    Ok(target)
+}
+
+fn loose_file_path(path: &str) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("Loose file path cannot be empty".into());
+    }
+    let target = PathBuf::from(trimmed);
+    if !target.is_absolute() {
+        return Err("Loose file path must be absolute".into());
+    }
+    Ok(target)
+}
+
 fn sanitize_relative_path(value: &str) -> Result<PathBuf, String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -334,6 +447,16 @@ fn reject_protected_write(root: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn reject_protected_loose_write(target: &Path) -> Result<(), String> {
+    if target
+        .components()
+        .any(|component| matches!(component, Component::Normal(part) if part == ".git"))
+    {
+        return Err("Writing inside .git is not allowed".into());
+    }
+    Ok(())
+}
+
 fn workspace_entry(root: &Path, path: &Path) -> Result<WorkspaceEntry, String> {
     let symlink_meta =
         fs::symlink_metadata(path).map_err(|e| format!("stat {}: {e}", path.display()))?;
@@ -370,6 +493,22 @@ fn file_from_bytes(
         String::from_utf8(bytes.clone()).map_err(|e| format!("File is not valid UTF-8: {e}"))?;
     Ok(WorkspaceFile {
         path: relative_path(root, target)?,
+        text,
+        size: meta.len(),
+        mtime: mtime_secs(&meta),
+        hash: sha256_hex(&bytes),
+    })
+}
+
+fn loose_file_from_bytes(
+    target: &Path,
+    bytes: Vec<u8>,
+    meta: fs::Metadata,
+) -> Result<WorkspaceFile, String> {
+    let text =
+        String::from_utf8(bytes.clone()).map_err(|e| format!("File is not valid UTF-8: {e}"))?;
+    Ok(WorkspaceFile {
+        path: target.to_string_lossy().to_string(),
         text,
         size: meta.len(),
         mtime: mtime_secs(&meta),
@@ -441,6 +580,43 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("changed on disk"));
+    }
+
+    #[test]
+    fn reads_and_writes_loose_file_with_hash_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, "one").unwrap();
+        let path_string = path.to_string_lossy().to_string();
+
+        let file = workspace_read_loose_file(path_string.clone(), None).unwrap();
+        assert_eq!(file.path, path_string);
+        assert_eq!(file.text, "one");
+
+        let saved =
+            workspace_write_loose_file(path_string.clone(), "two".into(), Some(file.hash)).unwrap();
+        assert_eq!(saved.text, "two");
+
+        let err = workspace_write_loose_file(path_string, "three".into(), Some("bad".into()))
+            .unwrap_err();
+        assert!(err.contains("changed on disk"));
+    }
+
+    #[test]
+    fn rejects_dot_git_loose_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_dir = dir.path().join(".git");
+        fs::create_dir(&git_dir).unwrap();
+        let path = git_dir.join("config");
+        fs::write(&path, "x").unwrap();
+
+        let err = workspace_write_loose_file(
+            path.to_string_lossy().to_string(),
+            "y".into(),
+            None,
+        )
+        .unwrap_err();
+        assert!(err.contains(".git"));
     }
 
     #[test]

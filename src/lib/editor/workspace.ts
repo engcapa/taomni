@@ -38,6 +38,16 @@ export function workspaceReadFile(
   });
 }
 
+export function workspaceReadLooseFile(
+  path: string,
+  maxBytes?: number,
+): Promise<WorkspaceFile> {
+  return invoke<WorkspaceFile>("workspace_read_loose_file", {
+    path,
+    maxBytes: maxBytes ?? null,
+  });
+}
+
 export function workspaceWriteFile(
   repoRoot: string,
   path: string,
@@ -46,6 +56,18 @@ export function workspaceWriteFile(
 ): Promise<WorkspaceFile> {
   return invoke<WorkspaceFile>("workspace_write_file", {
     repoRoot,
+    path,
+    contents,
+    expectedHash: expectedHash ?? null,
+  });
+}
+
+export function workspaceWriteLooseFile(
+  path: string,
+  contents: string,
+  expectedHash?: string | null,
+): Promise<WorkspaceFile> {
+  return invoke<WorkspaceFile>("workspace_write_loose_file", {
     path,
     contents,
     expectedHash: expectedHash ?? null,

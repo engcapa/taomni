@@ -660,6 +660,17 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         hash: await sha256Hex(text),
       } as T;
     }
+    case "workspace_read_loose_file": {
+      const path = args?.path as string;
+      const [entry, text] = await Promise.all([vfsStat(path), vfsReadText(path)]);
+      return {
+        path: entry.path,
+        text,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(text),
+      } as T;
+    }
     case "workspace_write_file": {
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
       const path = args?.path as string;
@@ -678,6 +689,28 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const entry = await vfsStat(target);
       return {
         path: relativeWorkspacePath(repoRoot, entry.path),
+        text: contents,
+        size: entry.size,
+        mtime: entry.mtime,
+        hash: await sha256Hex(contents),
+      } as T;
+    }
+    case "workspace_write_loose_file": {
+      const path = args?.path as string;
+      assertWorkspaceWritablePath(path);
+      const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
+      if (expectedHash) {
+        const current = await vfsReadText(path);
+        const currentHash = await sha256Hex(current);
+        if (currentHash !== expectedHash) {
+          throw new Error(`File changed on disk; expected hash ${expectedHash}, found ${currentHash}`);
+        }
+      }
+      const contents = (args?.contents as string) ?? "";
+      await vfsWriteText(path, contents);
+      const entry = await vfsStat(path);
+      return {
+        path: entry.path,
         text: contents,
         size: entry.size,
         mtime: entry.mtime,
