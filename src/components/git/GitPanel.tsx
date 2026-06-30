@@ -86,6 +86,7 @@ import { useAppStore } from "../../stores/appStore";
 
 interface GitPanelProps {
   repoRoot: string;
+  visible?: boolean;
 }
 
 type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
@@ -102,10 +103,11 @@ const EMPTY_SETTINGS: GitRepoSettings = {
   commitGpgsign: null,
 };
 
-export function GitPanel({ repoRoot }: GitPanelProps) {
+export function GitPanel({ repoRoot, visible = true }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
+  const [mountedViews, setMountedViews] = useState<Set<GitView>>(() => new Set(["changes"]));
   const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -165,6 +167,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   );
 
   useEffect(() => {
+    if (!visible) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!event.ctrlKey || event.altKey || event.metaKey) return;
 
@@ -199,9 +202,10 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [setGitUiFontSize]);
+  }, [setGitUiFontSize, visible]);
 
   useEffect(() => {
+    if (!visible) return;
     const el = rootRef.current;
     if (!el) return;
 
@@ -220,7 +224,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
 
     el.addEventListener("wheel", handleWheel, { capture: true, passive: false });
     return () => el.removeEventListener("wheel", handleWheel, { capture: true });
-  }, [setGitUiFontSize]);
+  }, [setGitUiFontSize, visible]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -234,15 +238,19 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
       // Drop unchecked entries that no longer exist; everything else stays checked.
       setUnchecked((current) => new Set([...current].filter((p) => paths.has(p))));
       setSelected((current) => new Set([...current].filter((p) => paths.has(p))));
-      if (!selectedPath || !next.changes.some((change) => change.path === selectedPath)) {
-        setSelectedPath(next.changes[0]?.path ?? null);
-      }
-      if (!selectedBranch || !next.branches.some((branch) => branch.fullName === selectedBranch.fullName)) {
-        setSelectedBranch(next.branches.find((branch) => branch.current) ?? next.branches[0] ?? null);
-      }
-      if (!selectedStash || !next.stashes.some((stash) => stash.selector === selectedStash.selector)) {
-        setSelectedStash(next.stashes[0] ?? null);
-      }
+      setSelectedPath((current) =>
+        current && next.changes.some((change) => change.path === current) ? current : next.changes[0]?.path ?? null,
+      );
+      setSelectedBranch((current) =>
+        current && next.branches.some((branch) => branch.fullName === current.fullName)
+          ? current
+          : next.branches.find((branch) => branch.current) ?? next.branches[0] ?? null,
+      );
+      setSelectedStash((current) =>
+        current && next.stashes.some((stash) => stash.selector === current.selector)
+          ? current
+          : next.stashes[0] ?? null,
+      );
       const remote = selectedRemote(next);
       setRemoteName((current) => current || remote?.name || "");
       try {
@@ -257,7 +265,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [repoRoot, selectedBranch, selectedPath, selectedStash, setStatusMessage]);
+  }, [repoRoot, setStatusMessage]);
 
   useEffect(() => {
     void refresh();
@@ -266,7 +274,10 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   useEffect(() => {
     let cancelled = false;
     async function loadPair() {
-      if (view !== "changes" || !selectedChange) {
+      if (view !== "changes") {
+        return;
+      }
+      if (!selectedChange) {
         setPair(null);
         return;
       }
@@ -300,9 +311,12 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
   useEffect(() => {
     let cancelled = false;
     async function loadDiff() {
+      if (view !== "stash") {
+        return;
+      }
       setDiffLoading(true);
       try {
-        if (view === "stash" && selectedStash) {
+        if (selectedStash) {
           const text = await gitStashShow(repoRoot, selectedStash.selector);
           if (!cancelled) setDiff(text || "(stash has no patch)");
         } else {
@@ -319,6 +333,16 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
       cancelled = true;
     };
   }, [repoRoot, selectedStash, view]);
+
+  const switchView = useCallback((next: GitView) => {
+    setView(next);
+    setMountedViews((current) => {
+      if (current.has(next)) return current;
+      const updated = new Set(current);
+      updated.add(next);
+      return updated;
+    });
+  }, []);
 
   const runAction = useCallback(
     async (label: string, action: () => Promise<void>) => {
@@ -486,7 +510,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
             key={item}
             type="button"
             className={`h-7 px-3 rounded text-[12px] capitalize ${view === item ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
-            onClick={() => setView(item)}
+            onClick={() => switchView(item)}
           >
             {item}
           </button>
@@ -558,7 +582,8 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
           />
         ) : (
         <>
-        {view === "changes" && (
+        {mountedViews.has("changes") && (
+          <div className="h-full min-h-0" style={{ display: view === "changes" ? "block" : "none" }}>
           <ChangesView
             changes={changesList}
             treeMode={treeMode}
@@ -587,16 +612,20 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
             commit={() => doCommit(false)}
             commitAndPush={() => doCommit(true)}
           />
+          </div>
         )}
-        {view === "log" && (
+        {mountedViews.has("log") && (
+          <div className="h-full min-h-0" style={{ display: view === "log" ? "block" : "none" }}>
           <CommitLog
             repoRoot={repoRoot}
             headOid={snapshot?.headOid ?? null}
             busy={busy}
             onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
           />
+          </div>
         )}
-        {view === "branches" && (
+        {mountedViews.has("branches") && (
+          <div className="h-full min-h-0" style={{ display: view === "branches" ? "block" : "none" }}>
           <BranchesView
             snapshot={snapshot}
             selected={selectedBranch}
@@ -630,8 +659,10 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
               setCompare({ refA: selectedBranch.name, refB: snapshot.currentBranch, title: `${selectedBranch.name} → ${snapshot.currentBranch}` });
             }}
           />
+          </div>
         )}
-        {view === "tags" && (
+        {mountedViews.has("tags") && (
+          <div className="h-full min-h-0" style={{ display: view === "tags" ? "block" : "none" }}>
           <TagsView
             snapshot={snapshot}
             busy={busy}
@@ -646,8 +677,10 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
             onDelete={(tag) => void confirmAndRun("Delete tag", `Delete tag ${tag.name}?`, true, () => runAction("Delete tag", () => gitDeleteTag(repoRoot, tag.name)))}
             onPush={(tag) => void runAction("Push tag", () => gitPushTag(repoRoot, remoteName || null, tag.name, false))}
           />
+          </div>
         )}
-        {view === "stash" && (
+        {mountedViews.has("stash") && (
+          <div className="h-full min-h-0" style={{ display: view === "stash" ? "block" : "none" }}>
           <StashView
             snapshot={snapshot}
             selected={selectedStash}
@@ -665,8 +698,10 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
             onPop={() => selectedStash && void runAction("Pop stash", () => gitStashApply(repoRoot, selectedStash.selector, true))}
             onDrop={() => selectedStash && void confirmAndRun("Drop stash", `Drop ${selectedStash.selector}?`, true, () => runAction("Drop stash", () => gitStashDrop(repoRoot, selectedStash.selector)))}
           />
+          </div>
         )}
-        {view === "settings" && (
+        {mountedViews.has("settings") && (
+          <div className="h-full min-h-0" style={{ display: view === "settings" ? "block" : "none" }}>
           <SettingsView
             snapshot={snapshot}
             settings={settingsDraft}
@@ -692,6 +727,7 @@ export function GitPanel({ repoRoot }: GitPanelProps) {
               await runAction("Add remote", () => gitSetRemote(repoRoot, name, url, null));
             }}
           />
+          </div>
         )}
         </>
         )}
