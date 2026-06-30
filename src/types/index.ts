@@ -4,7 +4,7 @@ import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "code-workspace";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";
@@ -295,6 +295,44 @@ export interface GitTabInfo {
   repoRoot: string;
 }
 
+export type CodeWorkspaceRootKind = "git" | "folder";
+
+export interface CodeWorkspaceRootInfo {
+  id: string;
+  name: string;
+  path: string;
+  kind: CodeWorkspaceRootKind;
+}
+
+export interface CodeWorkspaceLooseFileInfo {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export type CodeWorkspaceFileRef =
+  | {
+      kind: "root";
+      rootId: string;
+      path: string;
+    }
+  | {
+      kind: "loose";
+      id: string;
+      path: string;
+    };
+
+export interface CodeWorkspaceTabInfo {
+  /** Legacy primary root. Empty for loose-file-only editor workspaces. */
+  repoRoot: string;
+  initialPath?: string | null;
+  workspaceId?: string;
+  name?: string;
+  roots?: CodeWorkspaceRootInfo[];
+  looseFiles?: CodeWorkspaceLooseFileInfo[];
+  initialFile?: CodeWorkspaceFileRef | null;
+}
+
 export interface Tab {
   id: string;
   /**
@@ -323,6 +361,7 @@ export interface Tab {
   objectStorage?: ObjectStorageTabInfo;
   mail?: MailTabInfo;
   git?: GitTabInfo;
+  codeWorkspace?: CodeWorkspaceTabInfo;
   hasNewOutput?: boolean;
   /**
    * One-shot starting directory for a freshly opened local/SSH terminal tab.

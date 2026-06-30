@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Tab } from "../types";
+import type { CodeWorkspaceRootKind, Tab } from "../types";
 import { t as tr } from "../lib/i18n";
 import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
@@ -23,6 +23,71 @@ export interface DbSelectedObject {
   schema: string | null;
   name: string;
   kind: DbObjectKind;
+}
+
+export interface CodeWorkspaceContext {
+  /** Legacy primary root context kept for compatibility with existing tabs. */
+  repoRoot: string;
+  activePath: string | null;
+  openPaths: string[];
+  dirtyPaths: string[];
+  roots?: CodeWorkspaceRootContext[];
+  looseFiles?: CodeWorkspaceLooseFileContext[];
+  activeFile?: CodeWorkspaceFileContext | null;
+  openFiles?: CodeWorkspaceFileContext[];
+  dirtyFiles?: CodeWorkspaceFileContext[];
+  lsp?: CodeWorkspaceLspContext | null;
+}
+
+export interface CodeWorkspaceRootContext {
+  id: string;
+  name: string;
+  path: string;
+  kind: CodeWorkspaceRootKind;
+}
+
+export interface CodeWorkspaceLooseFileContext {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export type CodeWorkspaceFileContext =
+  | {
+      kind: "root";
+      rootId: string;
+      rootName?: string;
+      rootPath?: string;
+      path: string;
+    }
+  | {
+      kind: "loose";
+      id: string;
+      name?: string;
+      path: string;
+    };
+
+export interface CodeWorkspaceLspContext {
+  activeStatus?: CodeWorkspaceLspStatusContext | null;
+  diagnostics: CodeWorkspaceLspDiagnosticContext[];
+}
+
+export interface CodeWorkspaceLspStatusContext {
+  displayName?: string | null;
+  languageId?: string | null;
+  active: boolean;
+  available: boolean;
+  selectedCommand?: string | null;
+  installHint?: string | null;
+  error?: string | null;
+}
+
+export interface CodeWorkspaceLspDiagnosticContext {
+  file: CodeWorkspaceFileContext;
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+  messages: string[];
 }
 
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
@@ -96,6 +161,12 @@ interface AppState {
   dbSelectedObjectsByTab: Record<string, DbSelectedObject[]>;
 
   /**
+   * Current code-workspace editor state keyed by tab id. Bridged into local
+   * agent turns so Claude Code/Codex app-server know the active repo and files.
+   */
+  codeWorkspaceByTab: Record<string, CodeWorkspaceContext>;
+
+  /**
    * Whether SQL run by the in-app AI/Claude Code agent is echoed into the
    * linked query tab's editor (appended, never auto-run). Toggled from the chat
    * drawer; persisted to localStorage, default on.
@@ -155,6 +226,8 @@ interface AppState {
   setTabDbConn: (tabId: string, connId: string | null) => void;
   /** Record or clear a DB tab's current schema-tree object selection. */
   setTabDbSelectedObjects: (tabId: string, selected: DbSelectedObject[] | null) => void;
+  /** Record or clear a code workspace tab's current editor context. */
+  setTabCodeWorkspaceContext: (tabId: string, context: CodeWorkspaceContext | null) => void;
   /** Toggle SQL echo to the linked query tab (see {@link sqlEcho}). */
   setSqlEcho: (enabled: boolean) => void;
 }
@@ -310,6 +383,15 @@ function dbSelectedObjectsEqual(a: DbSelectedObject[] | undefined, b: DbSelected
   });
 }
 
+function arraysEqual(a: string[] | undefined, b: string[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+}
+
+function jsonEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
 function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
   return !!activeTabId && tabs.some((tab) => tab.id === activeTabId && tab.type === "terminal");
 }
@@ -379,6 +461,7 @@ export const useAppStore = create<AppState>((set) => ({
   cwdByTab: {},
   dbConnByTab: {},
   dbSelectedObjectsByTab: {},
+  codeWorkspaceByTab: {},
   sqlEcho: readSqlEcho(),
   xServerEnabled: false,
   xServerStatus: null,
@@ -730,6 +813,38 @@ export const useAppStore = create<AppState>((set) => ({
         dbSelectedObjectsByTab: {
           ...s.dbSelectedObjectsByTab,
           [tabId]: selected,
+        },
+      };
+    }),
+
+  setTabCodeWorkspaceContext: (tabId, context) =>
+    set((s) => {
+      if (context === null) {
+        if (!(tabId in s.codeWorkspaceByTab)) return s;
+        const next = { ...s.codeWorkspaceByTab };
+        delete next[tabId];
+        return { codeWorkspaceByTab: next };
+      }
+      const current = s.codeWorkspaceByTab[tabId];
+      if (
+        current &&
+        current.repoRoot === context.repoRoot &&
+        current.activePath === context.activePath &&
+        arraysEqual(current.openPaths, context.openPaths) &&
+        arraysEqual(current.dirtyPaths, context.dirtyPaths) &&
+        jsonEqual(current.roots, context.roots) &&
+        jsonEqual(current.looseFiles, context.looseFiles) &&
+        jsonEqual(current.activeFile, context.activeFile) &&
+        jsonEqual(current.openFiles, context.openFiles) &&
+        jsonEqual(current.dirtyFiles, context.dirtyFiles) &&
+        jsonEqual(current.lsp, context.lsp)
+      ) {
+        return s;
+      }
+      return {
+        codeWorkspaceByTab: {
+          ...s.codeWorkspaceByTab,
+          [tabId]: context,
         },
       };
     }),

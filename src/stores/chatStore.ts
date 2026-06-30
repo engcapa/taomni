@@ -3,8 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
 import type { ChatAttachment } from "../lib/chat/attachments";
-import type { DbSelectedObject } from "./appStore";
+import type { CodeWorkspaceContext, DbSelectedObject } from "./appStore";
 import type { LlmProviderCapability } from "./aiStore";
+import type { CodeWorkspaceTabInfo } from "../types";
 
 export type ChatThreadMode = "chat" | "image" | "video";
 
@@ -104,7 +105,41 @@ interface ChatDrawerLayoutPrefs {
 }
 
 function isChatCapableTabType(type: string | null | undefined): boolean {
-  return type === "welcome" || type === "terminal" || type === "rdp" || type === "database" || type === "redis" || type === "mail";
+  return (
+    type === "welcome" ||
+    type === "terminal" ||
+    type === "rdp" ||
+    type === "database" ||
+    type === "redis" ||
+    type === "mail" ||
+    type === "code-workspace"
+  );
+}
+
+function basename(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[\\/]+/);
+  return parts[parts.length - 1] || normalized || "Workspace";
+}
+
+function codeWorkspaceContextFromTab(info: CodeWorkspaceTabInfo): CodeWorkspaceContext {
+  const legacyRoot = info.repoRoot?.trim() ?? "";
+  const roots = info.roots && info.roots.length > 0
+    ? info.roots
+    : legacyRoot
+      ? [{ id: "root-1", name: basename(legacyRoot), path: legacyRoot, kind: "git" as const }]
+      : [];
+  return {
+    repoRoot: legacyRoot || roots[0]?.path || "",
+    activePath: null,
+    openPaths: [],
+    dirtyPaths: [],
+    roots,
+    looseFiles: info.looseFiles ?? [],
+    activeFile: null,
+    openFiles: [],
+    dirtyFiles: [],
+  };
 }
 
 export function normalizeChatThreadMode(mode: string | null | undefined): ChatThreadMode {
@@ -527,6 +562,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // Local terminal facts for Claude Code's appended system prompt. Only set
     // for a live local terminal; SSH/remote tabs deliberately leave this null.
     let localTerminalEnv: LocalTerminalEnv | null = null;
+    // Current code workspace state for Codex/Claude Code turns bound to an
+    // editor tab. This is context only; file writes still go through tools.
+    let codeWorkspace: CodeWorkspaceContext | null = null;
     {
       const tabId = get().threads.find((t) => t.id === threadId)?.linked_session_id ?? null;
       if (tabId) {
@@ -543,6 +581,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             appState.dbSelectedObjectsByTab[tabId] ??
             appState.dbSelectedObjectsByTab[runtimeTabId] ??
             [];
+          codeWorkspace =
+            appState.codeWorkspaceByTab[tabId] ??
+            appState.codeWorkspaceByTab[runtimeTabId] ??
+            (boundTab?.type === "code-workspace" && boundTab.codeWorkspace
+              ? codeWorkspaceContextFromTab(boundTab.codeWorkspace)
+              : null);
           const localEnv = getTerminal(tabId)?.localEnvironment ?? getTerminal(runtimeTabId)?.localEnvironment ?? null;
           if (localEnv) {
             localTerminalEnv = { ...localEnv, cwd };
@@ -684,6 +728,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           local_terminal_env: localTerminalEnv,
           bound_db_connection_id: boundDbConnectionId,
           bound_db_selected_objects: boundDbSelectedObjects,
+          code_workspace: codeWorkspace,
         },
       });
     } catch (e) {
@@ -718,6 +763,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             local_terminal_env: localTerminalEnv,
             bound_db_connection_id: boundDbConnectionId,
             bound_db_selected_objects: boundDbSelectedObjects,
+            code_workspace: codeWorkspace,
           },
         });
         set((s) => ({
