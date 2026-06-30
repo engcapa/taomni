@@ -18,6 +18,12 @@ export interface LspServerPreset {
   commands: LspServerCommandPreset[];
 }
 
+export interface LspCustomServerCommand {
+  label?: string | null;
+  command: string;
+  args: string[];
+}
+
 export interface LspServerCommandStatus extends LspServerCommandPreset {
   available: boolean;
 }
@@ -95,6 +101,7 @@ export interface LspDocumentDescriptor {
   filePath: string;
   languageId?: string | null;
   serverCommandId?: string | null;
+  customServerCommand?: LspCustomServerCommand | null;
 }
 
 function documentArgs(descriptor: LspDocumentDescriptor) {
@@ -104,6 +111,7 @@ function documentArgs(descriptor: LspDocumentDescriptor) {
     filePath: descriptor.filePath,
     languageId: descriptor.languageId ?? null,
     serverCommandId: descriptor.serverCommandId ?? null,
+    customServerCommand: descriptor.customServerCommand ?? null,
   };
 }
 

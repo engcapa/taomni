@@ -1,7 +1,8 @@
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -26,6 +27,16 @@ pub struct LspServerCommandPreset {
     pub install_hint: String,
     #[serde(default)]
     pub fallback: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCustomServerCommand {
+    #[serde(default)]
+    pub label: Option<String>,
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -203,6 +214,7 @@ impl LspManager {
         &self,
         document: &ResolvedDocument,
         preferred_command_id: Option<&str>,
+        custom_command: Option<&LspCustomServerCommand>,
     ) -> LspDocumentStatus {
         let Some(preset) = document.preset.as_ref() else {
             return LspDocumentStatus {
@@ -220,10 +232,15 @@ impl LspManager {
             };
         };
 
-        let command = select_available_command(preset, preferred_command_id);
-        let selected_command_id = command.as_ref().map(|cmd| cmd.id.clone());
+        let configured_command = configured_command(preset, preferred_command_id, custom_command);
+        let command = select_available_command(preset, preferred_command_id, custom_command);
+        let selected_command_id = command
+            .as_ref()
+            .or(configured_command.as_ref())
+            .map(|cmd| cmd.id.clone());
         let selected_command = command
             .as_ref()
+            .or(configured_command.as_ref())
             .map(|cmd| command_line(&cmd.command, &cmd.args));
         let active = if let Some(cmd) = command.as_ref() {
             let key = session_key(document, preset, cmd);
@@ -231,6 +248,7 @@ impl LspManager {
         } else {
             false
         };
+        let using_custom = custom_command_to_preset(custom_command).is_some();
         LspDocumentStatus {
             path: document.path.to_string_lossy().into_owned(),
             uri: document.uri.clone(),
@@ -241,11 +259,23 @@ impl LspManager {
             active,
             selected_command_id,
             selected_command,
-            install_hint: primary_install_hint(preset),
+            install_hint: if using_custom {
+                Some("Check the custom language server command".into())
+            } else {
+                primary_install_hint(preset)
+            },
             error: if command.is_some() {
                 None
+            } else if using_custom {
+                Some(format!(
+                    "Custom {} language server command is not available",
+                    preset.display_name
+                ))
             } else {
-                Some(format!("{} language server is not installed", preset.display_name))
+                Some(format!(
+                    "{} language server is not installed",
+                    preset.display_name
+                ))
             },
         }
     }
@@ -254,12 +284,18 @@ impl LspManager {
         &self,
         document: &ResolvedDocument,
         preferred_command_id: Option<&str>,
+        custom_command: Option<&LspCustomServerCommand>,
     ) -> Result<Arc<LspSession>, LspDocumentStatus> {
         let Some(preset) = document.preset.as_ref() else {
-            return Err(self.document_status(document, preferred_command_id).await);
+            return Err(self
+                .document_status(document, preferred_command_id, custom_command)
+                .await);
         };
-        let Some(command) = select_available_command(preset, preferred_command_id) else {
-            return Err(self.document_status(document, preferred_command_id).await);
+        let Some(command) = select_available_command(preset, preferred_command_id, custom_command)
+        else {
+            return Err(self
+                .document_status(document, preferred_command_id, custom_command)
+                .await);
         };
         let key = session_key(document, preset, &command);
         let map_key = key.map_key();
@@ -305,9 +341,10 @@ impl LspManager {
         &self,
         document: &ResolvedDocument,
         preferred_command_id: Option<&str>,
+        custom_command: Option<&LspCustomServerCommand>,
     ) -> Option<Arc<LspSession>> {
         let preset = document.preset.as_ref()?;
-        let command = select_available_command(preset, preferred_command_id)?;
+        let command = select_available_command(preset, preferred_command_id, custom_command)?;
         let key = session_key(document, preset, &command);
         self.sessions.lock().await.get(&key.map_key()).cloned()
     }
@@ -411,7 +448,8 @@ impl LspSession {
     }
 
     async fn request(&self, method: &str, params: Value) -> Result<Value, String> {
-        self.request_with_timeout(method, params, REQUEST_TIMEOUT_SECS).await
+        self.request_with_timeout(method, params, REQUEST_TIMEOUT_SECS)
+            .await
     }
 
     async fn request_with_timeout(
@@ -447,7 +485,8 @@ impl LspSession {
     }
 
     async fn write_message(&self, payload: &Value) -> Result<(), String> {
-        let body = serde_json::to_vec(payload).map_err(|e| format!("serialize LSP message: {e}"))?;
+        let body =
+            serde_json::to_vec(payload).map_err(|e| format!("serialize LSP message: {e}"))?;
         let header = format!("Content-Length: {}\r\n\r\n", body.len());
         let mut stdin = self.stdin.lock().await;
         stdin
@@ -544,10 +583,7 @@ async fn read_stdout(session: Arc<LspSession>, stdout: ChildStdout) {
         };
         let mut body = vec![0u8; len];
         if let Err(e) = reader.read_exact(&mut body).await {
-            log::warn!(
-                "lsp: body read failed for {}: {e}",
-                session.command.command
-            );
+            log::warn!("lsp: body read failed for {}: {e}", session.command.command);
             return;
         }
         match serde_json::from_slice::<Value>(&body) {
@@ -592,11 +628,16 @@ pub async fn lsp_document_status(
     file_path: String,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     Ok(state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await)
 }
 
@@ -610,11 +651,16 @@ pub async fn lsp_open_document(
     version: i64,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, version)?;
     let session = match state
         .lsp
-        .ensure_session(&document, server_command_id.as_deref())
+        .ensure_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     {
         Ok(session) => session,
@@ -642,7 +688,11 @@ pub async fn lsp_open_document(
         .insert(document.uri.clone());
     Ok(state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await)
 }
 
@@ -656,11 +706,16 @@ pub async fn lsp_change_document(
     version: i64,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, version)?;
     let Some(session) = state
         .lsp
-        .active_session(&document, server_command_id.as_deref())
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     else {
         return lsp_open_document(
@@ -672,10 +727,16 @@ pub async fn lsp_change_document(
             version,
             document.language_id.clone(),
             server_command_id,
+            custom_server_command,
         )
         .await;
     };
-    if !session.opened_documents.read().await.contains(&document.uri) {
+    if !session
+        .opened_documents
+        .read()
+        .await
+        .contains(&document.uri)
+    {
         let language_id = document.language_id.as_deref().unwrap_or("plaintext");
         session
             .notify(
@@ -698,7 +759,11 @@ pub async fn lsp_change_document(
             .insert(document.uri.clone());
         return Ok(state
             .lsp
-            .document_status(&document, server_command_id.as_deref())
+            .document_status(
+                &document,
+                server_command_id.as_deref(),
+                custom_server_command.as_ref(),
+            )
             .await);
     }
     session
@@ -716,7 +781,11 @@ pub async fn lsp_change_document(
         .map_err(|e| format!("LSP didChange failed: {e}"))?;
     Ok(state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await)
 }
 
@@ -730,11 +799,16 @@ pub async fn lsp_save_document(
     version: i64,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, version)?;
     if let Some(session) = state
         .lsp
-        .active_session(&document, server_command_id.as_deref())
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     {
         let mut params = json!({
@@ -750,7 +824,11 @@ pub async fn lsp_save_document(
     }
     Ok(state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await)
 }
 
@@ -762,11 +840,16 @@ pub async fn lsp_close_document(
     file_path: String,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     if let Some(session) = state
         .lsp
-        .active_session(&document, server_command_id.as_deref())
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     {
         session
@@ -776,16 +859,16 @@ pub async fn lsp_close_document(
             )
             .await
             .map_err(|e| format!("LSP didClose failed: {e}"))?;
-        session
-            .opened_documents
-            .write()
-            .await
-            .remove(&document.uri);
+        session.opened_documents.write().await.remove(&document.uri);
         session.diagnostics.write().await.remove(&document.uri);
     }
     Ok(state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await)
 }
 
@@ -797,11 +880,16 @@ pub async fn lsp_get_diagnostics(
     file_path: String,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspDiagnosticsResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let diagnostics = match state
         .lsp
-        .active_session(&document, server_command_id.as_deref())
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     {
         Some(session) => session
@@ -815,7 +903,11 @@ pub async fn lsp_get_diagnostics(
     };
     let status = state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await;
     Ok(LspDiagnosticsResult {
         status,
@@ -833,18 +925,27 @@ pub async fn lsp_hover(
     character: u32,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspHoverResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
         .lsp
-        .active_session(&document, server_command_id.as_deref())
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     {
         Some(session) => session,
         None => {
             let status = state
                 .lsp
-                .document_status(&document, server_command_id.as_deref())
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
                 .await;
             return Ok(LspHoverResult {
                 status,
@@ -865,7 +966,11 @@ pub async fn lsp_hover(
         .unwrap_or(Value::Null);
     let status = state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await;
     Ok(LspHoverResult {
         status,
@@ -884,6 +989,7 @@ pub async fn lsp_definition(
     character: u32,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspLocationsResult, String> {
     lsp_location_request(
         state,
@@ -894,6 +1000,7 @@ pub async fn lsp_definition(
         character,
         language_id,
         server_command_id,
+        custom_server_command,
         "textDocument/definition",
         json!({}),
     )
@@ -911,6 +1018,7 @@ pub async fn lsp_references(
     include_declaration: Option<bool>,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
 ) -> Result<LspLocationsResult, String> {
     lsp_location_request(
         state,
@@ -921,6 +1029,7 @@ pub async fn lsp_references(
         character,
         language_id,
         server_command_id,
+        custom_server_command,
         "textDocument/references",
         json!({
             "context": {
@@ -940,20 +1049,29 @@ async fn lsp_location_request(
     character: u32,
     language_id: Option<String>,
     server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
     method: &str,
     mut extra: Value,
 ) -> Result<LspLocationsResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
         .lsp
-        .active_session(&document, server_command_id.as_deref())
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await
     {
         Some(session) => session,
         None => {
             let status = state
                 .lsp
-                .document_status(&document, server_command_id.as_deref())
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
                 .await;
             return Ok(LspLocationsResult {
                 status,
@@ -966,7 +1084,11 @@ async fn lsp_location_request(
     let result = session.request(method, extra).await.unwrap_or(Value::Null);
     let status = state
         .lsp
-        .document_status(&document, server_command_id.as_deref())
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
         .await;
     Ok(LspLocationsResult {
         status,
@@ -1030,10 +1152,12 @@ fn resolve_root_path(root_path: Option<&str>, file_path: &Path) -> Result<PathBu
     if let Some(root) = root_path.map(str::trim).filter(|root| !root.is_empty()) {
         return Ok(PathBuf::from(root));
     }
-    file_path
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| format!("Cannot resolve parent directory for {}", file_path.display()))
+    file_path.parent().map(Path::to_path_buf).ok_or_else(|| {
+        format!(
+            "Cannot resolve parent directory for {}",
+            file_path.display()
+        )
+    })
 }
 
 fn session_key(
@@ -1055,7 +1179,7 @@ fn server_status(
     active: bool,
     error: Option<String>,
 ) -> LspServerStatus {
-    let command = select_available_command(preset, preferred_command_id);
+    let command = select_available_command(preset, preferred_command_id, None);
     LspServerStatus {
         preset_id: preset.id.clone(),
         display_name: preset.display_name.clone(),
@@ -1096,8 +1220,15 @@ fn primary_install_hint(preset: &LspServerPreset) -> Option<String> {
 fn select_available_command(
     preset: &LspServerPreset,
     preferred_command_id: Option<&str>,
+    custom_command: Option<&LspCustomServerCommand>,
 ) -> Option<LspServerCommandPreset> {
-    if let Some(preferred) = preferred_command_id.map(str::trim).filter(|id| !id.is_empty()) {
+    if let Some(command) = custom_command_to_preset(custom_command) {
+        return command_available(&command.command).then_some(command);
+    }
+    if let Some(preferred) = preferred_command_id
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+    {
         if let Some(command) = preset
             .commands
             .iter()
@@ -1113,7 +1244,70 @@ fn select_available_command(
         .cloned()
 }
 
+fn configured_command(
+    preset: &LspServerPreset,
+    preferred_command_id: Option<&str>,
+    custom_command: Option<&LspCustomServerCommand>,
+) -> Option<LspServerCommandPreset> {
+    if let Some(command) = custom_command_to_preset(custom_command) {
+        return Some(command);
+    }
+    if let Some(preferred) = preferred_command_id
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+    {
+        if let Some(command) = preset.commands.iter().find(|cmd| cmd.id == preferred) {
+            return Some(command.clone());
+        }
+    }
+    preset.commands.first().cloned()
+}
+
+fn custom_command_to_preset(
+    custom_command: Option<&LspCustomServerCommand>,
+) -> Option<LspServerCommandPreset> {
+    let custom = custom_command?;
+    let command = custom.command.trim();
+    if command.is_empty() {
+        return None;
+    }
+    let args: Vec<String> = custom
+        .args
+        .iter()
+        .map(|arg| arg.trim())
+        .filter(|arg| !arg.is_empty())
+        .map(ToString::to_string)
+        .collect();
+    let mut hasher = DefaultHasher::new();
+    command.hash(&mut hasher);
+    args.hash(&mut hasher);
+    let id = format!("custom-{:x}", hasher.finish());
+    let label = custom
+        .label
+        .as_deref()
+        .map(str::trim)
+        .filter(|label| !label.is_empty())
+        .unwrap_or("Custom")
+        .to_string();
+    Some(LspServerCommandPreset {
+        id,
+        label,
+        command: command.to_string(),
+        args,
+        install_hint: "Check the custom language server command".into(),
+        fallback: false,
+    })
+}
+
 fn command_available(command: &str) -> bool {
+    let command = command.trim();
+    if command.is_empty() {
+        return false;
+    }
+    let path = Path::new(command);
+    if path.is_absolute() || command.contains('/') || command.contains('\\') {
+        return path.is_file();
+    }
     which::which(command).is_ok()
 }
 
@@ -1175,7 +1369,10 @@ fn markup_to_string(value: &Value) -> Option<String> {
         return Some(text.to_string());
     }
     if let Some(array) = value.as_array() {
-        let parts = array.iter().filter_map(markup_to_string).collect::<Vec<_>>();
+        let parts = array
+            .iter()
+            .filter_map(markup_to_string)
+            .collect::<Vec<_>>();
         return if parts.is_empty() {
             None
         } else {

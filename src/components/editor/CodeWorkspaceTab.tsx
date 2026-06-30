@@ -90,6 +90,7 @@ import {
   lspOpenDocument,
   lspReferences,
   lspSaveDocument,
+  type LspCustomServerCommand,
   type LspDiagnostic,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
@@ -171,7 +172,14 @@ type TreeSelection =
 type MarkdownViewMode = "edit" | "preview" | "split";
 
 const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
+const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
+const CUSTOM_LSP_COMMAND_ID = "__custom__";
 let mermaidReady = false;
+
+interface LspCustomCommandConfig {
+  command: string;
+  args: string;
+}
 
 const DEFAULT_DIR_STATE: DirectoryState = {
   entries: [],
@@ -416,6 +424,83 @@ function writeLspCommandPrefs(prefs: Record<string, string>): void {
   }
 }
 
+function readLspCustomCommands(): Record<string, LspCustomCommandConfig> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LSP_CUSTOM_COMMANDS_KEY) ?? "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, LspCustomCommandConfig> = {};
+    for (const [presetId, value] of Object.entries(parsed)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      const command = typeof (value as { command?: unknown }).command === "string"
+        ? (value as { command: string }).command
+        : "";
+      const args = typeof (value as { args?: unknown }).args === "string"
+        ? (value as { args: string }).args
+        : "";
+      if (command.trim() || args.trim()) out[presetId] = { command, args };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeLspCustomCommands(commands: Record<string, LspCustomCommandConfig>): void {
+  try {
+    window.localStorage.setItem(LSP_CUSTOM_COMMANDS_KEY, JSON.stringify(commands));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function splitCommandArgs(value: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let quote: "\"" | "'" | null = null;
+  let escaped = false;
+  for (const char of value) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      else current += char;
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += char;
+  }
+  if (escaped) current += "\\";
+  if (current) args.push(current);
+  return args;
+}
+
+function customServerCommandFromConfig(config?: LspCustomCommandConfig): LspCustomServerCommand | null {
+  const command = config?.command.trim() ?? "";
+  if (!command) return null;
+  return {
+    label: "Custom",
+    command,
+    args: splitCommandArgs(config?.args ?? ""),
+  };
+}
+
 function emptyLspFileState(): LspFileState {
   return {
     status: null,
@@ -531,6 +616,7 @@ export function CodeWorkspaceTab({
   const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
   const [referencesPanelOpen, setReferencesPanelOpen] = useState(true);
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
+  const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
   const [referencesResult, setReferencesResult] = useState<ReferencesResultState>({
     loading: false,
@@ -601,10 +687,33 @@ export function CodeWorkspaceTab({
     });
   }, []);
 
+  const updateLspCustomCommand = useCallback((presetId: string, patch: Partial<LspCustomCommandConfig>) => {
+    setLspCustomCommands((current) => {
+      const existing = current[presetId] ?? { command: "", args: "" };
+      const nextConfig = { ...existing, ...patch };
+      const next = { ...current };
+      if (nextConfig.command.trim() || nextConfig.args.trim()) next[presetId] = nextConfig;
+      else delete next[presetId];
+      writeLspCustomCommands(next);
+      return next;
+    });
+    setLspFiles((current) => {
+      const next: Record<string, LspFileState> = {};
+      for (const [key, state] of Object.entries(current)) {
+        next[key] = { ...state, syncedText: null };
+      }
+      return next;
+    });
+  }, []);
+
   const lspDescriptorForFile = useCallback(
     (file: OpenFileState): LspDocumentDescriptor | null => {
       const presetId = lspPresetIdForPath(file.languagePath);
-      const serverCommandId = presetId ? lspCommandPrefs[presetId] ?? null : null;
+      const commandPref = presetId ? lspCommandPrefs[presetId] ?? null : null;
+      const serverCommandId = commandPref && commandPref !== CUSTOM_LSP_COMMAND_ID ? commandPref : null;
+      const customServerCommand = presetId && commandPref === CUSTOM_LSP_COMMAND_ID
+        ? customServerCommandFromConfig(lspCustomCommands[presetId])
+        : null;
       if (file.ref.kind === "root") {
         const root = findRoot(file.ref.rootId);
         if (!root) return null;
@@ -613,6 +722,7 @@ export function CodeWorkspaceTab({
           rootPath: root.path,
           filePath: file.ref.path,
           serverCommandId,
+          customServerCommand,
         };
       }
       return {
@@ -620,9 +730,10 @@ export function CodeWorkspaceTab({
         rootPath: null,
         filePath: file.ref.path,
         serverCommandId,
+        customServerCommand,
       };
     },
-    [findRoot, lspCommandPrefs, workspaceId],
+    [findRoot, lspCommandPrefs, lspCustomCommands, workspaceId],
   );
 
   const nextLspVersion = useCallback((key: string) => {
@@ -1815,9 +1926,11 @@ export function CodeWorkspaceTab({
               statuses={lspServerStatuses}
               activeStatus={activeLspState?.status ?? null}
               commandPrefs={lspCommandPrefs}
+              customCommands={lspCustomCommands}
               onToggle={() => setLanguagePanelOpen((value) => !value)}
               onRefresh={() => void refreshLspServerStatuses()}
               onCommandChange={updateLspCommandPref}
+              onCustomCommandChange={updateLspCustomCommand}
             />
           </aside>
         </Panel>
@@ -2149,7 +2262,7 @@ function MarkdownPreview({
     return () => {
       cancelled = true;
     };
-  }, [file.key, file.title, html]);
+  });
 
   return (
     <div
@@ -2458,17 +2571,21 @@ function LanguageServersPanel({
   statuses,
   activeStatus,
   commandPrefs,
+  customCommands,
   onToggle,
   onRefresh,
   onCommandChange,
+  onCustomCommandChange,
 }: {
   open: boolean;
   statuses: LspServerStatus[];
   activeStatus: LspDocumentStatus | null;
   commandPrefs: Record<string, string>;
+  customCommands: Record<string, LspCustomCommandConfig>;
   onToggle: () => void;
   onRefresh: () => void;
   onCommandChange: (presetId: string, commandId: string) => void;
+  onCustomCommandChange: (presetId: string, patch: Partial<LspCustomCommandConfig>) => void;
 }) {
   const missingCount = statuses.filter((status) => !status.available).length;
   return (
@@ -2514,7 +2631,8 @@ function LanguageServersPanel({
             </div>
           )}
           {statuses.map((status) => {
-            const selected = commandPrefs[status.presetId] ?? status.commands[0]?.id ?? "";
+            const custom = customCommands[status.presetId] ?? { command: "", args: "" };
+            const selected = commandPrefs[status.presetId] ?? status.selectedCommandId ?? status.commands[0]?.id ?? "";
             return (
               <div key={status.presetId} className="px-2 py-1.5 text-[11px]">
                 <div className="flex items-center gap-1.5">
@@ -2525,18 +2643,36 @@ function LanguageServersPanel({
                   <span className="min-w-0 flex-1 truncate">{status.displayName}</span>
                   {status.active && <span className="shrink-0 text-[10px] text-[var(--taomni-accent)]">active</span>}
                 </div>
-                {status.commands.length > 1 && (
-                  <select
-                    value={selected}
-                    className="mt-1 h-6 w-full rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 text-[11px] outline-none"
-                    onChange={(event) => onCommandChange(status.presetId, event.target.value)}
-                  >
-                    {status.commands.map((command) => (
-                      <option key={command.id} value={command.id}>
-                        {command.label}{command.fallback ? " fallback" : ""}
-                      </option>
-                    ))}
-                  </select>
+                <select
+                  value={selected}
+                  className="mt-1 h-6 w-full rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 text-[11px] outline-none"
+                  onChange={(event) => onCommandChange(status.presetId, event.target.value)}
+                  aria-label={`${status.displayName} language server command`}
+                >
+                  {status.commands.map((command) => (
+                    <option key={command.id} value={command.id}>
+                      {command.label}{command.fallback ? " fallback" : ""}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_LSP_COMMAND_ID}>Custom command</option>
+                </select>
+                {selected === CUSTOM_LSP_COMMAND_ID && (
+                  <div className="mt-1 grid grid-cols-1 gap-1">
+                    <input
+                      value={custom.command}
+                      className="h-6 min-w-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 font-mono text-[11px] outline-none"
+                      placeholder="Command or absolute path"
+                      aria-label={`${status.displayName} custom command`}
+                      onChange={(event) => onCustomCommandChange(status.presetId, { command: event.target.value })}
+                    />
+                    <input
+                      value={custom.args}
+                      className="h-6 min-w-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 font-mono text-[11px] outline-none"
+                      placeholder="Args"
+                      aria-label={`${status.displayName} custom args`}
+                      onChange={(event) => onCustomCommandChange(status.presetId, { args: event.target.value })}
+                    />
+                  </div>
                 )}
                 {!status.available && (
                   <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={status.installHint}>
