@@ -8,6 +8,8 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from "react";
+import DOMPurify from "dompurify";
+import mermaid from "mermaid";
 import { EditorState, Compartment, type Extension, type Text } from "@codemirror/state";
 import {
   Decoration,
@@ -169,6 +171,7 @@ type TreeSelection =
 type MarkdownViewMode = "edit" | "preview" | "split";
 
 const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
+let mermaidReady = false;
 
 const DEFAULT_DIR_STATE: DirectoryState = {
   entries: [],
@@ -193,6 +196,62 @@ function hashString(value: string): string {
     hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
   }
   return Math.abs(hash).toString(36);
+}
+
+function ensureMermaidReady(): void {
+  if (mermaidReady) return;
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: "default",
+  });
+  mermaidReady = true;
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportMermaidSvg(svg: SVGSVGElement, fileName: string): void {
+  const text = new XMLSerializer().serializeToString(svg);
+  downloadBlob(new Blob([text], { type: "image/svg+xml;charset=utf-8" }), fileName);
+}
+
+function exportMermaidPng(svg: SVGSVGElement, fileName: string): void {
+  const text = new XMLSerializer().serializeToString(svg);
+  const svgBlob = new Blob([text], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const image = new Image();
+  image.onload = () => {
+    const box = svg.viewBox.baseVal;
+    const rect = svg.getBoundingClientRect();
+    const width = Math.max(1, Math.ceil(box?.width || rect.width || image.width || 960));
+    const height = Math.max(1, Math.ceil(box?.height || rect.height || image.height || 540));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    canvas.toBlob((blob) => {
+      URL.revokeObjectURL(url);
+      if (blob) downloadBlob(blob, fileName);
+    }, "image/png");
+  };
+  image.onerror = () => URL.revokeObjectURL(url);
+  image.src = url;
 }
 
 function pathName(path: string, fallback = "Workspace"): string {
@@ -1999,8 +2058,67 @@ function MarkdownPreview({
   onOpenHref: (href: string) => boolean;
 }) {
   const html = useMemo(() => renderFormatted(file.text, "md") ?? "", [file.text]);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const blocks = Array.from(root.querySelectorAll("pre > code.language-mermaid, pre > code.lang-mermaid"));
+    if (blocks.length === 0) return;
+    let cancelled = false;
+    ensureMermaidReady();
+    blocks.forEach((block, index) => {
+      const source = block.textContent ?? "";
+      const pre = block.parentElement;
+      if (!pre) return;
+      const wrapper = document.createElement("div");
+      wrapper.className = "my-3 border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]";
+      const toolbar = document.createElement("div");
+      toolbar.className = "h-8 flex items-center gap-1 border-b border-[var(--taomni-divider)] px-2";
+      const label = document.createElement("span");
+      label.className = "min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--taomni-text-muted)]";
+      label.textContent = `Mermaid ${index + 1}`;
+      const svgButton = document.createElement("button");
+      svgButton.type = "button";
+      svgButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-hover)]";
+      svgButton.textContent = "SVG";
+      const pngButton = document.createElement("button");
+      pngButton.type = "button";
+      pngButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-hover)]";
+      pngButton.textContent = "PNG";
+      const diagram = document.createElement("div");
+      diagram.className = "overflow-auto p-3";
+      toolbar.append(label, svgButton, pngButton);
+      wrapper.append(toolbar, diagram);
+      pre.replaceWith(wrapper);
+
+      void mermaid
+        .render(`taomni-mermaid-${hashString(file.key)}-${hashString(source)}-${index}`, source)
+        .then((result) => {
+          if (cancelled) return;
+          diagram.innerHTML = DOMPurify.sanitize(result.svg, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+          }) as unknown as string;
+          const svg = diagram.querySelector("svg");
+          if (!(svg instanceof SVGSVGElement)) return;
+          svg.classList.add("max-w-full");
+          svgButton.onclick = () => exportMermaidSvg(svg, `${file.title || "diagram"}-${index + 1}.svg`);
+          pngButton.onclick = () => exportMermaidPng(svg, `${file.title || "diagram"}-${index + 1}.png`);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          diagram.className = "p-3 text-[12px] text-red-500";
+          diagram.textContent = errorMessage(err);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [file.key, file.title, html]);
+
   return (
     <div
+      ref={rootRef}
       data-testid="code-workspace-markdown-preview"
       className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-bg)] px-5 py-4 text-[13px] leading-6"
       onClick={(event) => {
