@@ -5,15 +5,20 @@ import {
   useMemo,
   useRef,
   useState,
+  type MutableRefObject,
   type ReactNode,
 } from "react";
-import { EditorState, Compartment, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, type Extension, type Text } from "@codemirror/state";
 import {
+  Decoration,
+  type DecorationSet,
   EditorView,
+  type Tooltip,
   crosshairCursor,
   drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
+  hoverTooltip,
   keymap,
   lineNumbers,
   rectangularSelection,
@@ -47,6 +52,8 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Info,
+  ListTree,
   Columns2,
   Eye,
   Loader2,
@@ -55,6 +62,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Server,
   Trash2,
   X,
 } from "lucide-react";
@@ -70,6 +78,23 @@ import {
   workspaceWriteLooseFile,
   type WorkspaceEntry,
 } from "../../lib/editor/workspace";
+import {
+  lspChangeDocument,
+  lspCloseDocument,
+  lspDetectServers,
+  lspGetDiagnostics,
+  lspDefinition,
+  lspHover,
+  lspOpenDocument,
+  lspReferences,
+  lspSaveDocument,
+  type LspDiagnostic,
+  type LspDocumentDescriptor,
+  type LspDocumentStatus,
+  type LspLocation,
+  type LspPosition,
+  type LspServerStatus,
+} from "../../lib/editor/lsp";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
@@ -114,12 +139,36 @@ interface OpenFileState {
   error: string | null;
 }
 
+interface LspFileState {
+  status: LspDocumentStatus | null;
+  diagnostics: LspDiagnostic[];
+  syncing: boolean;
+  syncedText: string | null;
+  error: string | null;
+}
+
+interface EditorRevealTarget {
+  key: string;
+  line: number;
+  character: number;
+  nonce: number;
+}
+
+interface ReferencesResultState {
+  loading: boolean;
+  origin: string | null;
+  locations: LspLocation[];
+  error: string | null;
+}
+
 type TreeSelection =
   | { kind: "root"; rootId: string }
   | { kind: "dir"; rootId: string; path: string }
   | { kind: "file"; ref: CodeWorkspaceFileRef };
 
 type MarkdownViewMode = "edit" | "preview" | "split";
+
+const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
 
 const DEFAULT_DIR_STATE: DirectoryState = {
   entries: [],
@@ -209,6 +258,17 @@ function remapRelativePath(path: string, fromPath: string, toPath: string): stri
   return path.startsWith(`${fromPath}/`) ? `${toPath}${path.slice(fromPath.length)}` : path;
 }
 
+function normalizeFsPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function relativePathWithinRoot(rootPath: string, filePath: string): string | null {
+  const root = normalizeFsPath(rootPath);
+  const file = normalizeFsPath(filePath);
+  if (file === root) return "";
+  return file.startsWith(`${root}/`) ? file.slice(root.length + 1) : null;
+}
+
 function rootDirKey(rootId: string, path = ""): string {
   return `${rootId}:${path}`;
 }
@@ -263,6 +323,48 @@ function isRootRef(ref: CodeWorkspaceFileRef, rootId: string, path: string): boo
 function isMarkdownPath(path: string): boolean {
   const lower = path.toLowerCase();
   return lower.endsWith(".md") || lower.endsWith(".markdown");
+}
+
+function lspPresetIdForPath(path: string): string | null {
+  const lower = path.toLowerCase();
+  if (/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/.test(lower)) return "typescript-javascript";
+  if (lower.endsWith(".rs")) return "rust";
+  if (/\.(py|pyi)$/.test(lower)) return "python";
+  if (lower.endsWith(".go")) return "go";
+  if (lower.endsWith(".java")) return "java";
+  if (/\.(c|h|cc|cpp|cxx|hpp|hh|hxx)$/.test(lower)) return "cpp";
+  if (/\.(kt|kts)$/.test(lower)) return "kotlin";
+  if (/\.(scala|sc)$/.test(lower)) return "scala";
+  if (/\.(cs|csx)$/.test(lower)) return "csharp";
+  if (lower.endsWith(".swift")) return "swift";
+  return null;
+}
+
+function readLspCommandPrefs(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LSP_COMMAND_PREFS_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLspCommandPrefs(prefs: Record<string, string>): void {
+  try {
+    window.localStorage.setItem(LSP_COMMAND_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function emptyLspFileState(): LspFileState {
+  return {
+    status: null,
+    diagnostics: [],
+    syncing: false,
+    syncedText: null,
+    error: null,
+  };
 }
 
 function isExternalHref(href: string): boolean {
@@ -365,10 +467,25 @@ export function CodeWorkspaceTab({
   const [openOrder, setOpenOrder] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [markdownModes, setMarkdownModes] = useState<Record<string, MarkdownViewMode>>({});
+  const [lspFiles, setLspFiles] = useState<Record<string, LspFileState>>({});
+  const [lspServerStatuses, setLspServerStatuses] = useState<LspServerStatus[]>([]);
+  const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
+  const [referencesPanelOpen, setReferencesPanelOpen] = useState(true);
+  const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
+  const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
+  const [referencesResult, setReferencesResult] = useState<ReferencesResultState>({
+    loading: false,
+    origin: null,
+    locations: [],
+    error: null,
+  });
   const rootsRef = useRef(roots);
   const looseFilesRef = useRef(looseFiles);
   const openFilesRef = useRef(openFiles);
   const openOrderRef = useRef(openOrder);
+  const lspFilesRef = useRef(lspFiles);
+  const lspVersionRef = useRef<Record<string, number>>({});
+  const revealNonceRef = useRef(0);
   const initialOpenedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -387,7 +504,185 @@ export function CodeWorkspaceTab({
     openOrderRef.current = openOrder;
   }, [openOrder]);
 
+  useEffect(() => {
+    lspFilesRef.current = lspFiles;
+  }, [lspFiles]);
+
+  const workspaceId = useMemo(
+    () => workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
+    [tabId, workspace.repoRoot, workspace.workspaceId],
+  );
+
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
+
+  const refreshLspServerStatuses = useCallback(async () => {
+    try {
+      setLspServerStatuses(await lspDetectServers());
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [setStatusMessage]);
+
+  useEffect(() => {
+    void refreshLspServerStatuses();
+  }, [refreshLspServerStatuses]);
+
+  const updateLspCommandPref = useCallback((presetId: string, commandId: string) => {
+    setLspCommandPrefs((current) => {
+      const next = { ...current, [presetId]: commandId };
+      writeLspCommandPrefs(next);
+      return next;
+    });
+    setLspFiles((current) => {
+      const next: Record<string, LspFileState> = {};
+      for (const [key, state] of Object.entries(current)) {
+        next[key] = { ...state, syncedText: null };
+      }
+      return next;
+    });
+  }, []);
+
+  const lspDescriptorForFile = useCallback(
+    (file: OpenFileState): LspDocumentDescriptor | null => {
+      const presetId = lspPresetIdForPath(file.languagePath);
+      const serverCommandId = presetId ? lspCommandPrefs[presetId] ?? null : null;
+      if (file.ref.kind === "root") {
+        const root = findRoot(file.ref.rootId);
+        if (!root) return null;
+        return {
+          workspaceId,
+          rootPath: root.path,
+          filePath: file.ref.path,
+          serverCommandId,
+        };
+      }
+      return {
+        workspaceId,
+        rootPath: null,
+        filePath: file.ref.path,
+        serverCommandId,
+      };
+    },
+    [findRoot, lspCommandPrefs, workspaceId],
+  );
+
+  const nextLspVersion = useCallback((key: string) => {
+    const next = (lspVersionRef.current[key] ?? 0) + 1;
+    lspVersionRef.current[key] = next;
+    return next;
+  }, []);
+
+  const refreshFileDiagnostics = useCallback(
+    async (file: OpenFileState) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return;
+      try {
+        const result = await lspGetDiagnostics(descriptor);
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            status: result.status,
+            diagnostics: result.diagnostics,
+            syncing: false,
+            error: null,
+          },
+        }));
+      } catch (err) {
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            syncing: false,
+            error: errorMessage(err),
+          },
+        }));
+      }
+    },
+    [lspDescriptorForFile],
+  );
+
+  const syncLspDocument = useCallback(
+    async (file: OpenFileState, mode: "open" | "change") => {
+      if (file.loading) return;
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return;
+      const version = nextLspVersion(file.key);
+      setLspFiles((current) => ({
+        ...current,
+        [file.key]: {
+          ...(current[file.key] ?? emptyLspFileState()),
+          syncing: true,
+          error: null,
+        },
+      }));
+      try {
+        const status = mode === "open"
+          ? await lspOpenDocument(descriptor, file.text, version)
+          : await lspChangeDocument(descriptor, file.text, version);
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            status,
+            diagnostics: current[file.key]?.diagnostics ?? [],
+            syncing: false,
+            syncedText: file.text,
+            error: null,
+          },
+        }));
+        window.setTimeout(() => {
+          const latest = openFilesRef.current[file.key];
+          if (latest) void refreshFileDiagnostics(latest);
+        }, 500);
+      } catch (err) {
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            syncing: false,
+            error: errorMessage(err),
+          },
+        }));
+      }
+    },
+    [lspDescriptorForFile, nextLspVersion, refreshFileDiagnostics],
+  );
+
+  const saveLspDocument = useCallback(
+    async (file: OpenFileState, text: string) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return;
+      try {
+        const status = await lspSaveDocument(descriptor, text, lspVersionRef.current[file.key] ?? 0);
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            status,
+            syncing: false,
+            syncedText: text,
+            error: null,
+          },
+        }));
+        window.setTimeout(() => {
+          const latest = openFilesRef.current[file.key];
+          if (latest) void refreshFileDiagnostics(latest);
+        }, 500);
+      } catch (err) {
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            syncing: false,
+            syncedText: text,
+            error: errorMessage(err),
+          },
+        }));
+      }
+    },
+    [lspDescriptorForFile, refreshFileDiagnostics],
+  );
 
   const loadDir = useCallback(
     async (rootId: string, path: string) => {
@@ -853,6 +1148,7 @@ export function CodeWorkspaceTab({
           };
         });
         setStatusMessage(`Saved ${file.subtitle}`);
+        void saveLspDocument(file, textToSave);
       } catch (err) {
         const message = errorMessage(err);
         setOpenFiles((current) => ({
@@ -866,7 +1162,7 @@ export function CodeWorkspaceTab({
         setStatusMessage(message);
       }
     },
-    [activeKey, findRoot, setStatusMessage],
+    [activeKey, findRoot, saveLspDocument, setStatusMessage],
   );
 
   const reloadFile = useCallback(
@@ -943,6 +1239,10 @@ export function CodeWorkspaceTab({
       const order = openOrderRef.current;
       const index = order.indexOf(key);
       const nextOrder = order.filter((entry) => entry !== key);
+      if (file) {
+        const descriptor = lspDescriptorForFile(file);
+        if (descriptor) void lspCloseDocument(descriptor);
+      }
       setOpenOrder(nextOrder);
       setOpenFiles((current) => {
         const next = { ...current };
@@ -955,18 +1255,39 @@ export function CodeWorkspaceTab({
         delete next[key];
         return next;
       });
+      setLspFiles((current) => {
+        if (!(key in current)) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      delete lspVersionRef.current[key];
       setActiveKey((current) => {
         if (current !== key) return current;
         return nextOrder[Math.min(index, nextOrder.length - 1)] ?? null;
       });
     },
-    [],
+    [lspDescriptorForFile],
   );
 
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
+  const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
   const activeMarkdownMode = activeFile && isMarkdownPath(activeFile.languagePath)
     ? markdownModes[activeFile.key] ?? "edit"
     : "edit";
+
+  useEffect(() => {
+    if (!visible || !activeFile || activeFile.loading) return;
+    const lspState = lspFilesRef.current[activeFile.key];
+    if (lspState?.syncedText === activeFile.text && lspState.status) return;
+    const mode: "open" | "change" = lspState?.status ? "change" : "open";
+    const timer = window.setTimeout(() => {
+      const latest = openFilesRef.current[activeFile.key];
+      if (latest) void syncLspDocument(latest, mode);
+    }, mode === "open" ? 0 : 350);
+    return () => window.clearTimeout(timer);
+  }, [activeFile, syncLspDocument, visible]);
+
   const setActiveMarkdownMode = useCallback((mode: MarkdownViewMode) => {
     if (!activeFile) return;
     setMarkdownModes((current) => ({ ...current, [activeFile.key]: mode }));
@@ -987,6 +1308,128 @@ export function CodeWorkspaceTab({
     },
     [activeFile, addLooseFilePath, openFile],
   );
+
+  const updateLspStatusForFile = useCallback((file: OpenFileState, status: LspDocumentStatus) => {
+    setLspFiles((current) => ({
+      ...current,
+      [file.key]: {
+        ...(current[file.key] ?? emptyLspFileState()),
+        status,
+        syncing: false,
+        error: null,
+      },
+    }));
+  }, []);
+
+  const revealEditorLocation = useCallback((key: string, range: LspLocation["range"]) => {
+    revealNonceRef.current += 1;
+    setRevealTarget({
+      key,
+      line: range.start.line,
+      character: range.start.character,
+      nonce: revealNonceRef.current,
+    });
+  }, []);
+
+  const openLspLocation = useCallback(
+    async (location: LspLocation) => {
+      const path = location.path;
+      if (!path) return false;
+      for (const root of rootsRef.current) {
+        const relative = relativePathWithinRoot(root.path, path);
+        if (relative === null) continue;
+        const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: relative };
+        revealEditorLocation(fileKey(ref), location.range);
+        await openFile(ref);
+        return true;
+      }
+      const loose = makeLooseFile(path);
+      const ref: CodeWorkspaceFileRef = { kind: "loose", id: loose.id, path: loose.path };
+      setLooseFiles((current) => current.some((item) => item.path === loose.path) ? current : [...current, loose]);
+      revealEditorLocation(fileKey(ref), location.range);
+      await openFile(ref);
+      return true;
+    },
+    [openFile, revealEditorLocation],
+  );
+
+  const getLspHover = useCallback(
+    async (file: OpenFileState, position: LspPosition) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return null;
+      try {
+        const result = await lspHover(descriptor, position);
+        updateLspStatusForFile(file, result.status);
+        return result.contents;
+      } catch (err) {
+        setLspFiles((current) => ({
+          ...current,
+          [file.key]: {
+            ...(current[file.key] ?? emptyLspFileState()),
+            error: errorMessage(err),
+          },
+        }));
+        return null;
+      }
+    },
+    [lspDescriptorForFile, updateLspStatusForFile],
+  );
+
+  const goToDefinition = useCallback(
+    async (file: OpenFileState, position: LspPosition) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return false;
+      try {
+        const result = await lspDefinition(descriptor, position);
+        updateLspStatusForFile(file, result.status);
+        const first = result.locations[0];
+        if (!first) {
+          setStatusMessage("No definition found");
+          return false;
+        }
+        await openLspLocation(first);
+        return true;
+      } catch (err) {
+        setStatusMessage(errorMessage(err));
+        return false;
+      }
+    },
+    [lspDescriptorForFile, openLspLocation, setStatusMessage, updateLspStatusForFile],
+  );
+
+  const findReferences = useCallback(
+    async (file: OpenFileState, position: LspPosition) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return;
+      setReferencesPanelOpen(true);
+      setReferencesResult({
+        loading: true,
+        origin: file.subtitle,
+        locations: [],
+        error: null,
+      });
+      try {
+        const result = await lspReferences(descriptor, position, true);
+        updateLspStatusForFile(file, result.status);
+        setReferencesResult({
+          loading: false,
+          origin: file.subtitle,
+          locations: result.locations,
+          error: null,
+        });
+        setStatusMessage(`${result.locations.length} reference${result.locations.length === 1 ? "" : "s"} found`);
+      } catch (err) {
+        setReferencesResult({
+          loading: false,
+          origin: file.subtitle,
+          locations: [],
+          error: errorMessage(err),
+        });
+      }
+    },
+    [lspDescriptorForFile, setStatusMessage, updateLspStatusForFile],
+  );
+
   const dirtyCount = useMemo(
     () => Object.values(openFiles).filter((file) => file.dirty).length,
     [openFiles],
@@ -995,6 +1438,7 @@ export function CodeWorkspaceTab({
     () => openOrder.map((key) => openFiles[key]).filter((file): file is OpenFileState => !!file?.dirty),
     [openFiles, openOrder],
   );
+  const activeDiagnostics = activeLspState?.diagnostics ?? [];
   const title = workspaceTitle(workspace, roots, looseFiles);
 
   useEffect(() => {
@@ -1265,6 +1709,22 @@ export function CodeWorkspaceTab({
                 </div>
               )}
             </div>
+            <ReferencesPanel
+              open={referencesPanelOpen}
+              result={referencesResult}
+              roots={roots}
+              onToggle={() => setReferencesPanelOpen((value) => !value)}
+              onOpenLocation={(location) => void openLspLocation(location)}
+            />
+            <LanguageServersPanel
+              open={languagePanelOpen}
+              statuses={lspServerStatuses}
+              activeStatus={activeLspState?.status ?? null}
+              commandPrefs={lspCommandPrefs}
+              onToggle={() => setLanguagePanelOpen((value) => !value)}
+              onRefresh={() => void refreshLspServerStatuses()}
+              onCommandChange={updateLspCommandPref}
+            />
           </aside>
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
@@ -1315,6 +1775,8 @@ export function CodeWorkspaceTab({
                       <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
                     )}
                     {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {activeLspState?.syncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />
                     {isMarkdownPath(activeFile.languagePath) && (
                       <div className="ml-auto flex items-center gap-0.5">
                         <ModeButton
@@ -1359,8 +1821,13 @@ export function CodeWorkspaceTab({
                             path={activeFile.languagePath}
                             doc={activeFile.text}
                             visible={visible}
+                            diagnostics={activeDiagnostics}
+                            reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                             onChange={(doc) => updateFileText(activeFile.key, doc)}
                             onSave={() => void saveFile(activeFile.key)}
+                            onHover={(position) => getLspHover(activeFile, position)}
+                            onDefinition={(position) => goToDefinition(activeFile, position)}
+                            onReferences={(position) => findReferences(activeFile, position)}
                           />
                         </div>
                         <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
@@ -1371,8 +1838,13 @@ export function CodeWorkspaceTab({
                         path={activeFile.languagePath}
                         doc={activeFile.text}
                         visible={visible}
+                        diagnostics={activeDiagnostics}
+                        reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                         onChange={(doc) => updateFileText(activeFile.key, doc)}
                         onSave={() => void saveFile(activeFile.key)}
+                        onHover={(position) => getLspHover(activeFile, position)}
+                        onDefinition={(position) => goToDefinition(activeFile, position)}
+                        onReferences={(position) => findReferences(activeFile, position)}
                       />
                     )}
                   </div>
@@ -1394,8 +1866,129 @@ interface WorkspaceCodeEditorProps {
   path: string;
   doc: string;
   visible: boolean;
+  diagnostics: LspDiagnostic[];
+  reveal: EditorRevealTarget | null;
   onChange: (doc: string) => void;
   onSave: () => void;
+  onHover: (position: LspPosition) => Promise<string | null>;
+  onDefinition: (position: LspPosition) => Promise<boolean>;
+  onReferences: (position: LspPosition) => Promise<void>;
+}
+
+const LSP_EDITOR_STYLE = EditorView.theme({
+  ".cm-lsp-diagnostic-error": {
+    textDecoration: "underline wavy #ef4444 1px",
+    textUnderlineOffset: "2px",
+  },
+  ".cm-lsp-diagnostic-warning": {
+    textDecoration: "underline wavy #f59e0b 1px",
+    textUnderlineOffset: "2px",
+  },
+  ".cm-lsp-diagnostic-info": {
+    textDecoration: "underline dotted #38bdf8 1px",
+    textUnderlineOffset: "2px",
+  },
+  ".cm-lsp-hover": {
+    maxWidth: "520px",
+    maxHeight: "320px",
+    overflow: "auto",
+    padding: "8px 10px",
+    border: "1px solid var(--taomni-divider)",
+    background: "var(--taomni-bg)",
+    color: "var(--taomni-text)",
+    boxShadow: "0 12px 28px rgba(0, 0, 0, 0.28)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+  },
+});
+
+function offsetFromLspPosition(doc: Text, position: LspPosition): number {
+  if (doc.lines === 0) return 0;
+  const lineNo = Math.min(doc.lines, Math.max(1, position.line + 1));
+  const line = doc.line(lineNo);
+  return Math.min(line.to, line.from + Math.max(0, position.character));
+}
+
+function lspPositionFromOffset(doc: Text, offset: number): LspPosition {
+  const line = doc.lineAt(Math.max(0, Math.min(doc.length, offset)));
+  return {
+    line: line.number - 1,
+    character: offset - line.from,
+  };
+}
+
+function diagnosticClass(severity: number | null): string {
+  if (severity === 1) return "cm-lsp-diagnostic-error";
+  if (severity === 2) return "cm-lsp-diagnostic-warning";
+  return "cm-lsp-diagnostic-info";
+}
+
+function diagnosticDecorations(view: EditorView, diagnostics: LspDiagnostic[]): DecorationSet {
+  const ranges = diagnostics.flatMap((diagnostic) => {
+    const from = offsetFromLspPosition(view.state.doc, diagnostic.range.start);
+    const rawTo = offsetFromLspPosition(view.state.doc, diagnostic.range.end);
+    const to = Math.max(rawTo, Math.min(view.state.doc.length, from + 1));
+    if (from > view.state.doc.length || to < from) return [];
+    return Decoration.mark({
+      class: diagnosticClass(diagnostic.severity),
+      attributes: { title: diagnostic.message },
+    }).range(from, to);
+  });
+  ranges.sort((a, b) => a.from - b.from || a.to - b.to);
+  return Decoration.set(ranges, true);
+}
+
+function lspDiagnosticsExtension(diagnostics: LspDiagnostic[]): Extension {
+  return EditorView.decorations.of((view) => diagnosticDecorations(view, diagnostics));
+}
+
+function lspInteractionExtensions(
+  hoverRef: MutableRefObject<(position: LspPosition) => Promise<string | null>>,
+  definitionRef: MutableRefObject<(position: LspPosition) => Promise<boolean>>,
+  referencesRef: MutableRefObject<(position: LspPosition) => Promise<void>>,
+): Extension[] {
+  const definitionAtSelection = (view: EditorView) => {
+    const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
+    void definitionRef.current(position);
+    return true;
+  };
+  const referencesAtSelection = (view: EditorView) => {
+    const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
+    void referencesRef.current(position);
+    return true;
+  };
+  return [
+    hoverTooltip((view, pos): Promise<Tooltip | null> => {
+      const position = lspPositionFromOffset(view.state.doc, pos);
+      return hoverRef.current(position).then((contents) => {
+        if (!contents) return null;
+        return {
+          pos,
+          above: true,
+          create() {
+            const dom = document.createElement("div");
+            dom.className = "cm-lsp-hover taomni-chat-md";
+            dom.innerHTML = renderFormatted(contents, "md") ?? "";
+            return { dom };
+          },
+        };
+      });
+    }),
+    EditorView.domEventHandlers({
+      mousedown(event, view) {
+        if (event.button !== 0 || (!event.ctrlKey && !event.metaKey)) return false;
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos === null) return false;
+        event.preventDefault();
+        void definitionRef.current(lspPositionFromOffset(view.state.doc, pos));
+        return true;
+      },
+    }),
+    keymap.of([
+      { key: "F12", run: definitionAtSelection },
+      { key: "Shift-F12", run: referencesAtSelection },
+    ]),
+  ];
 }
 
 function MarkdownPreview({
@@ -1430,16 +2023,28 @@ function WorkspaceCodeEditor({
   path,
   doc,
   visible,
+  diagnostics,
+  reveal,
   onChange,
   onSave,
+  onHover,
+  onDefinition,
+  onReferences,
 }: WorkspaceCodeEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartment = useRef(new Compartment());
+  const diagnosticsCompartment = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
+  const onHoverRef = useRef(onHover);
+  const onDefinitionRef = useRef(onDefinition);
+  const onReferencesRef = useRef(onReferences);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
+  onHoverRef.current = onHover;
+  onDefinitionRef.current = onDefinition;
+  onReferencesRef.current = onReferences;
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -1467,8 +2072,11 @@ function WorkspaceCodeEditor({
         indentOnInput(),
         autocompletion(),
         languageCompartment.current.of([]),
+        diagnosticsCompartment.current.of(lspDiagnosticsExtension(diagnostics)),
+        ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
         ...codeViewExtensions(),
         WORKSPACE_EDITOR_STYLE,
+        LSP_EDITOR_STYLE,
         keymap.of([
           { key: "Mod-s", run: saveHandler },
           { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
@@ -1519,6 +2127,14 @@ function WorkspaceCodeEditor({
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    view.dispatch({
+      effects: diagnosticsCompartment.current.reconfigure(lspDiagnosticsExtension(diagnostics)),
+    });
+  }, [diagnostics]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
     const current = view.state.doc.toString();
     if (current === doc) return;
     view.dispatch({
@@ -1530,6 +2146,20 @@ function WorkspaceCodeEditor({
     if (!visible) return;
     viewRef.current?.requestMeasure();
   }, [visible]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !reveal) return;
+    const pos = offsetFromLspPosition(view.state.doc, {
+      line: reveal.line,
+      character: reveal.character,
+    });
+    view.dispatch({
+      selection: { anchor: pos },
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
+    });
+    view.focus();
+  }, [reveal]);
 
   return <div ref={hostRef} className="h-full w-full" />;
 }
@@ -1556,6 +2186,216 @@ function ModeButton({
     >
       {icon}
     </button>
+  );
+}
+
+function LspStatusPill({
+  state,
+  diagnostics,
+}: {
+  state: LspFileState | null;
+  diagnostics: LspDiagnostic[];
+}) {
+  if (!state?.status) {
+    return (
+      <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">
+        LSP idle
+      </span>
+    );
+  }
+  const status = state.status;
+  const errors = diagnostics.filter((item) => item.severity === 1).length;
+  const warnings = diagnostics.filter((item) => item.severity === 2).length;
+  const label = status.active
+    ? `${status.displayName ?? "LSP"}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
+    : status.installHint
+      ? `Install: ${status.installHint}`
+      : status.error ?? "No LSP";
+  return (
+    <span
+      title={label}
+      data-active={status.active || undefined}
+      data-error={!!state.error || (!status.active && !!status.error) || undefined}
+      className="max-w-[38%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
+    >
+      {label}
+    </span>
+  );
+}
+
+function displayLocationPath(location: LspLocation, roots: CodeWorkspaceRootInfo[]): string {
+  const path = location.path ?? location.uri;
+  for (const root of roots) {
+    const relative = location.path ? relativePathWithinRoot(root.path, location.path) : null;
+    if (relative !== null) return `${root.name}/${relative}`;
+  }
+  return path;
+}
+
+function ReferencesPanel({
+  open,
+  result,
+  roots,
+  onToggle,
+  onOpenLocation,
+}: {
+  open: boolean;
+  result: ReferencesResultState;
+  roots: CodeWorkspaceRootInfo[];
+  onToggle: () => void;
+  onOpenLocation: (location: LspLocation) => void;
+}) {
+  return (
+    <section className="shrink-0 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
+      <button
+        type="button"
+        className="h-7 w-full min-w-0 flex items-center gap-1.5 px-2 text-left text-[11px] font-semibold hover:bg-[var(--taomni-hover)]"
+        onClick={onToggle}
+      >
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <ListTree className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+        <span className="min-w-0 flex-1 truncate">References</span>
+        {result.loading ? (
+          <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
+        ) : result.locations.length > 0 ? (
+          <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{result.locations.length}</span>
+        ) : null}
+      </button>
+      {open && (
+        <div className="max-h-52 overflow-auto pb-1 text-[11px]">
+          {result.origin && (
+            <div className="truncate px-2 py-1 text-[10px] text-[var(--taomni-text-muted)]" title={result.origin}>
+              {result.origin}
+            </div>
+          )}
+          {result.error && (
+            <div className="mx-2 mb-1 rounded border border-red-500/30 bg-red-500/10 p-2 text-red-500">
+              {result.error}
+            </div>
+          )}
+          {!result.loading && !result.error && result.locations.length === 0 && (
+            <div className="px-2 py-1.5 text-[var(--taomni-text-muted)]">No references</div>
+          )}
+          {result.locations.map((location, index) => {
+            const label = displayLocationPath(location, roots);
+            return (
+              <button
+                key={`${location.uri}:${location.range.start.line}:${location.range.start.character}:${index}`}
+                type="button"
+                className="w-full min-w-0 flex items-center gap-1.5 px-2 py-1 text-left hover:bg-[var(--taomni-hover)]"
+                title={`${label}:${location.range.start.line + 1}:${location.range.start.character + 1}`}
+                onClick={() => onOpenLocation(location)}
+              >
+                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                  {location.range.start.line + 1}:{location.range.start.character + 1}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LanguageServersPanel({
+  open,
+  statuses,
+  activeStatus,
+  commandPrefs,
+  onToggle,
+  onRefresh,
+  onCommandChange,
+}: {
+  open: boolean;
+  statuses: LspServerStatus[];
+  activeStatus: LspDocumentStatus | null;
+  commandPrefs: Record<string, string>;
+  onToggle: () => void;
+  onRefresh: () => void;
+  onCommandChange: (presetId: string, commandId: string) => void;
+}) {
+  const missingCount = statuses.filter((status) => !status.available).length;
+  return (
+    <section className="shrink-0 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
+      <div className="h-7 flex items-center text-[11px] font-semibold">
+        <button
+          type="button"
+          className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-hover)]"
+          onClick={onToggle}
+        >
+          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          <Server className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+          <span className="min-w-0 flex-1 truncate">Language Servers</span>
+          {missingCount > 0 && (
+            <span className="shrink-0 text-[10px] text-amber-500">{missingCount} missing</span>
+          )}
+        </button>
+        <button
+          type="button"
+          title="Refresh language servers"
+          aria-label="Refresh language servers"
+          className="mr-1 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+          onClick={onRefresh}
+        >
+          <RefreshCw className="w-3 h-3" />
+        </button>
+      </div>
+      {open && (
+        <div className="max-h-56 overflow-auto pb-1">
+          {activeStatus && (
+            <div className="px-2 py-1 border-b border-[var(--taomni-divider)] text-[11px]">
+              <div className="flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                <span className="min-w-0 flex-1 truncate">
+                  Active: {activeStatus.displayName ?? "None"}
+                </span>
+              </div>
+              {!activeStatus.active && activeStatus.installHint && (
+                <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={activeStatus.installHint}>
+                  {activeStatus.installHint}
+                </div>
+              )}
+            </div>
+          )}
+          {statuses.map((status) => {
+            const selected = commandPrefs[status.presetId] ?? status.commands[0]?.id ?? "";
+            return (
+              <div key={status.presetId} className="px-2 py-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    data-available={status.available || undefined}
+                    className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)]"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{status.displayName}</span>
+                  {status.active && <span className="shrink-0 text-[10px] text-[var(--taomni-accent)]">active</span>}
+                </div>
+                {status.commands.length > 1 && (
+                  <select
+                    value={selected}
+                    className="mt-1 h-6 w-full rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 text-[11px] outline-none"
+                    onChange={(event) => onCommandChange(status.presetId, event.target.value)}
+                  >
+                    {status.commands.map((command) => (
+                      <option key={command.id} value={command.id}>
+                        {command.label}{command.fallback ? " fallback" : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!status.available && (
+                  <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={status.installHint}>
+                    {status.installHint}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
