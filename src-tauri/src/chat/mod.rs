@@ -1659,24 +1659,98 @@ fn code_workspace_context_block(
         .code_workspace
         .as_ref()
         .and_then(crate::agent::context::AgentCodeWorkspace::normalized)?;
-    let (repo_root, _) = redact::redact(&workspace.repo_root);
-    let mut lines = vec![format!("Code workspace: {repo_root}")];
-    if let Some(active_path) = workspace.active_path.as_deref() {
+    let mut lines = vec!["Code workspace:".to_string()];
+    if !workspace.roots.is_empty() {
+        lines.push("Roots:".into());
+        for root in &workspace.roots {
+            let (path, _) = redact::redact(&root.path);
+            lines.push(format!(
+                "- {} [{}]: {}",
+                root.name,
+                root.kind.as_deref().unwrap_or("folder"),
+                path
+            ));
+        }
+    } else if !workspace.repo_root.is_empty() {
+        let (repo_root, _) = redact::redact(&workspace.repo_root);
+        lines.push(format!("Root: {repo_root}"));
+    }
+    if !workspace.loose_files.is_empty() {
+        lines.push("Loose files:".into());
+        for file in &workspace.loose_files {
+            let (path, _) = redact::redact(&file.path);
+            let name = file.name.as_deref().unwrap_or(&file.id);
+            lines.push(format!("- {name}: {path}"));
+        }
+    }
+    if let Some(active_file) = workspace.active_file.as_ref() {
+        lines.push(format!(
+            "Code active file: {}",
+            format_code_workspace_file(active_file)
+        ));
+    } else if let Some(active_path) = workspace.active_path.as_deref() {
         lines.push(format!("Code active file: {active_path}"));
     }
-    if !workspace.open_paths.is_empty() {
+    if !workspace.open_files.is_empty() {
+        lines.push(format!(
+            "Code open files: {}",
+            format_code_workspace_files(&workspace.open_files)
+        ));
+    } else if !workspace.open_paths.is_empty() {
         lines.push(format!(
             "Code open files: {}",
             format_code_workspace_paths(&workspace.open_paths)
         ));
     }
-    if !workspace.dirty_paths.is_empty() {
+    if !workspace.dirty_files.is_empty() {
+        lines.push(format!(
+            "Code unsaved files: {}",
+            format_code_workspace_files(&workspace.dirty_files)
+        ));
+    } else if !workspace.dirty_paths.is_empty() {
         lines.push(format!(
             "Code unsaved files: {}",
             format_code_workspace_paths(&workspace.dirty_paths)
         ));
     }
     Some(format!("{}\n", lines.join("\n")))
+}
+
+fn format_code_workspace_file(file: &crate::agent::context::AgentCodeWorkspaceFile) -> String {
+    match file.kind.as_str() {
+        "root" => {
+            let root = file
+                .root_name
+                .as_deref()
+                .or(file.root_id.as_deref())
+                .unwrap_or("root");
+            let path = file.path.as_deref().unwrap_or("");
+            format!("{root}/{path}")
+        }
+        "loose" => {
+            let path = file.path.as_deref().unwrap_or("");
+            let (clean, _) = redact::redact(path);
+            clean
+        }
+        _ => file.path.as_deref().unwrap_or("").to_string(),
+    }
+}
+
+fn format_code_workspace_files(
+    files: &[crate::agent::context::AgentCodeWorkspaceFile],
+) -> String {
+    const MAX_DISPLAY_PATHS: usize = 12;
+    let shown = files
+        .iter()
+        .take(MAX_DISPLAY_PATHS)
+        .map(format_code_workspace_file)
+        .collect::<Vec<_>>()
+        .join(", ");
+    if files.len() > MAX_DISPLAY_PATHS {
+        format!("{shown}, ...")
+    } else {
+        shown
+    }
 }
 
 fn format_code_workspace_paths(paths: &[String]) -> String {

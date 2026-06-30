@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Tab } from "../types";
+import type { CodeWorkspaceRootKind, Tab } from "../types";
 import { t as tr } from "../lib/i18n";
 import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
@@ -26,11 +26,45 @@ export interface DbSelectedObject {
 }
 
 export interface CodeWorkspaceContext {
+  /** Legacy primary root context kept for compatibility with existing tabs. */
   repoRoot: string;
   activePath: string | null;
   openPaths: string[];
   dirtyPaths: string[];
+  roots?: CodeWorkspaceRootContext[];
+  looseFiles?: CodeWorkspaceLooseFileContext[];
+  activeFile?: CodeWorkspaceFileContext | null;
+  openFiles?: CodeWorkspaceFileContext[];
+  dirtyFiles?: CodeWorkspaceFileContext[];
 }
+
+export interface CodeWorkspaceRootContext {
+  id: string;
+  name: string;
+  path: string;
+  kind: CodeWorkspaceRootKind;
+}
+
+export interface CodeWorkspaceLooseFileContext {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export type CodeWorkspaceFileContext =
+  | {
+      kind: "root";
+      rootId: string;
+      rootName?: string;
+      rootPath?: string;
+      path: string;
+    }
+  | {
+      kind: "loose";
+      id: string;
+      name?: string;
+      path: string;
+    };
 
 const UI_FONT_FAMILY_KEY = "taomni.uiFontFamily";
 const UI_FONT_SIZE_KEY = "taomni.uiFontSize";
@@ -328,6 +362,10 @@ function dbSelectedObjectsEqual(a: DbSelectedObject[] | undefined, b: DbSelected
 function arraysEqual(a: string[] | undefined, b: string[]): boolean {
   if (!a || a.length !== b.length) return false;
   return a.every((item, index) => item === b[index]);
+}
+
+function jsonEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
 function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
@@ -769,7 +807,12 @@ export const useAppStore = create<AppState>((set) => ({
         current.repoRoot === context.repoRoot &&
         current.activePath === context.activePath &&
         arraysEqual(current.openPaths, context.openPaths) &&
-        arraysEqual(current.dirtyPaths, context.dirtyPaths)
+        arraysEqual(current.dirtyPaths, context.dirtyPaths) &&
+        jsonEqual(current.roots, context.roots) &&
+        jsonEqual(current.looseFiles, context.looseFiles) &&
+        jsonEqual(current.activeFile, context.activeFile) &&
+        jsonEqual(current.openFiles, context.openFiles) &&
+        jsonEqual(current.dirtyFiles, context.dirtyFiles)
       ) {
         return s;
       }

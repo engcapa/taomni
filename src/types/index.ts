@@ -247,9 +247,42 @@ export interface GitTabInfo {
   repoRoot: string;
 }
 
+export type CodeWorkspaceRootKind = "git" | "folder";
+
+export interface CodeWorkspaceRootInfo {
+  id: string;
+  name: string;
+  path: string;
+  kind: CodeWorkspaceRootKind;
+}
+
+export interface CodeWorkspaceLooseFileInfo {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export type CodeWorkspaceFileRef =
+  | {
+      kind: "root";
+      rootId: string;
+      path: string;
+    }
+  | {
+      kind: "loose";
+      id: string;
+      path: string;
+    };
+
 export interface CodeWorkspaceTabInfo {
+  /** Legacy primary root. Empty for loose-file-only editor workspaces. */
   repoRoot: string;
   initialPath?: string | null;
+  workspaceId?: string;
+  name?: string;
+  roots?: CodeWorkspaceRootInfo[];
+  looseFiles?: CodeWorkspaceLooseFileInfo[];
+  initialFile?: CodeWorkspaceFileRef | null;
 }
 
 export interface Tab {

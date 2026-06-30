@@ -5,6 +5,7 @@ import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
 import type { ChatAttachment } from "../lib/chat/attachments";
 import type { CodeWorkspaceContext, DbSelectedObject } from "./appStore";
 import type { LlmProviderCapability } from "./aiStore";
+import type { CodeWorkspaceTabInfo } from "../types";
 
 export type ChatThreadMode = "chat" | "image" | "video";
 
@@ -112,6 +113,32 @@ function isChatCapableTabType(type: string | null | undefined): boolean {
     type === "redis" ||
     type === "code-workspace"
   );
+}
+
+function basename(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[\\/]+/);
+  return parts[parts.length - 1] || normalized || "Workspace";
+}
+
+function codeWorkspaceContextFromTab(info: CodeWorkspaceTabInfo): CodeWorkspaceContext {
+  const legacyRoot = info.repoRoot?.trim() ?? "";
+  const roots = info.roots && info.roots.length > 0
+    ? info.roots
+    : legacyRoot
+      ? [{ id: "root-1", name: basename(legacyRoot), path: legacyRoot, kind: "git" as const }]
+      : [];
+  return {
+    repoRoot: legacyRoot || roots[0]?.path || "",
+    activePath: null,
+    openPaths: [],
+    dirtyPaths: [],
+    roots,
+    looseFiles: info.looseFiles ?? [],
+    activeFile: null,
+    openFiles: [],
+    dirtyFiles: [],
+  };
 }
 
 export function normalizeChatThreadMode(mode: string | null | undefined): ChatThreadMode {
@@ -557,12 +584,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             appState.codeWorkspaceByTab[tabId] ??
             appState.codeWorkspaceByTab[runtimeTabId] ??
             (boundTab?.type === "code-workspace" && boundTab.codeWorkspace
-              ? {
-                  repoRoot: boundTab.codeWorkspace.repoRoot,
-                  activePath: null,
-                  openPaths: [],
-                  dirtyPaths: [],
-                }
+              ? codeWorkspaceContextFromTab(boundTab.codeWorkspace)
               : null);
           const localEnv = getTerminal(tabId)?.localEnvironment ?? getTerminal(runtimeTabId)?.localEnvironment ?? null;
           if (localEnv) {
