@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MutableRefObject,
   type ReactNode,
 } from "react";
@@ -59,6 +60,7 @@ import {
   Columns2,
   Eye,
   Loader2,
+  Palette,
   Pencil,
   RefreshCw,
   RotateCcw,
@@ -67,6 +69,8 @@ import {
   Server,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   workspaceCreateDir,
@@ -99,6 +103,18 @@ import {
   type LspServerStatus,
 } from "../../lib/editor/lsp";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
+import {
+  CODE_VIEW_THEME_APP,
+  CODE_VIEW_THEME_TERMINAL,
+  DEFAULT_CODE_VIEW_PROFILE,
+  applyCodeViewProfile,
+  loadCodeViewProfile,
+  normalizeCodeViewProfile,
+  saveCodeViewProfile,
+  type CodeViewProfile,
+} from "../../lib/codeViewProfile";
+import { loadGlobalTerminalProfile } from "../../lib/terminalProfile";
+import { TERMINAL_THEME_DEFINITIONS, getTerminalThemeDefinition } from "../../lib/themes";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
@@ -174,6 +190,12 @@ type MarkdownViewMode = "edit" | "preview" | "split";
 const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
 const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
 const CUSTOM_LSP_COMMAND_ID = "__custom__";
+const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
+const CODE_WORKSPACE_MIN_FONT_SIZE = 8;
+const CODE_WORKSPACE_MAX_FONT_SIZE = 32;
+const CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE = 12;
+const CODE_WORKSPACE_MIN_TREE_FONT_SIZE = 10;
+const CODE_WORKSPACE_MAX_TREE_FONT_SIZE = 20;
 let mermaidReady = false;
 
 interface LspCustomCommandConfig {
@@ -501,6 +523,39 @@ function customServerCommandFromConfig(config?: LspCustomCommandConfig): LspCust
   };
 }
 
+function clampCodeWorkspaceFontSize(size: number): number {
+  if (!Number.isFinite(size)) return DEFAULT_CODE_VIEW_PROFILE.fontSize;
+  return Math.min(CODE_WORKSPACE_MAX_FONT_SIZE, Math.max(CODE_WORKSPACE_MIN_FONT_SIZE, Math.round(size)));
+}
+
+function clampCodeWorkspaceTreeFontSize(size: number): number {
+  if (!Number.isFinite(size)) return CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE;
+  return Math.min(CODE_WORKSPACE_MAX_TREE_FONT_SIZE, Math.max(CODE_WORKSPACE_MIN_TREE_FONT_SIZE, Math.round(size)));
+}
+
+function readCodeWorkspaceTreeFontSize(): number {
+  try {
+    const raw = window.localStorage.getItem(TREE_FONT_SIZE_KEY);
+    return raw ? clampCodeWorkspaceTreeFontSize(Number(raw)) : CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE;
+  } catch {
+    return CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE;
+  }
+}
+
+function writeCodeWorkspaceTreeFontSize(size: number): void {
+  try {
+    window.localStorage.setItem(TREE_FONT_SIZE_KEY, String(clampCodeWorkspaceTreeFontSize(size)));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function codeWorkspaceThemeLabel(theme: string, terminalThemeName: string): string {
+  if (theme === CODE_VIEW_THEME_APP) return "App";
+  if (theme === CODE_VIEW_THEME_TERMINAL) return `Terminal · ${terminalThemeName}`;
+  return getTerminalThemeDefinition(theme)?.name ?? theme;
+}
+
 function emptyLspFileState(): LspFileState {
   return {
     status: null,
@@ -600,6 +655,8 @@ export function CodeWorkspaceTab({
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
+  const [codeViewProfile, setCodeViewProfileState] = useState<CodeViewProfile>(() => loadCodeViewProfile());
+  const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
@@ -629,9 +686,27 @@ export function CodeWorkspaceTab({
   const openFilesRef = useRef(openFiles);
   const openOrderRef = useRef(openOrder);
   const lspFilesRef = useRef(lspFiles);
+  const codeViewProfileRef = useRef(codeViewProfile);
+  const treeFontSizeRef = useRef(treeFontSize);
   const lspVersionRef = useRef<Record<string, number>>({});
   const revealNonceRef = useRef(0);
   const initialOpenedKeyRef = useRef<string | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const treePaneRef = useRef<HTMLElement | null>(null);
+  const editorPaneRef = useRef<HTMLElement | null>(null);
+  const terminalProfile = useMemo(() => loadGlobalTerminalProfile(), []);
+  const terminalThemeName = getTerminalThemeDefinition(terminalProfile.theme)?.name ?? terminalProfile.theme;
+  const currentThemeLabel = codeWorkspaceThemeLabel(codeViewProfile.theme, terminalThemeName);
+  const treePaneStyle = useMemo(() => ({
+    "--taomni-code-tree-font-size": `${treeFontSize}px`,
+    "--taomni-code-tree-small-font-size": `${Math.max(10, treeFontSize - 1)}px`,
+    "--taomni-code-tree-row-height": `${Math.max(24, treeFontSize + 15)}px`,
+  }) as CSSProperties, [treeFontSize]);
+  const editorPaneStyle = useMemo(() => ({
+    "--taomni-code-editor-ui-font-size": `${codeViewProfile.fontSize}px`,
+    "--taomni-code-editor-ui-small-font-size": `${Math.max(10, codeViewProfile.fontSize - 2)}px`,
+    "--taomni-code-editor-tab-height": `${Math.max(28, codeViewProfile.fontSize + 15)}px`,
+  }) as CSSProperties, [codeViewProfile.fontSize]);
 
   useEffect(() => {
     rootsRef.current = roots;
@@ -652,6 +727,157 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     lspFilesRef.current = lspFiles;
   }, [lspFiles]);
+
+  useEffect(() => {
+    codeViewProfileRef.current = codeViewProfile;
+  }, [codeViewProfile]);
+
+  useEffect(() => {
+    treeFontSizeRef.current = treeFontSize;
+  }, [treeFontSize]);
+
+  const updateCodeViewProfile = useCallback(
+    (
+      updater: CodeViewProfile | ((current: CodeViewProfile) => CodeViewProfile),
+      statusMessage?: (profile: CodeViewProfile) => string,
+    ) => {
+      const current = codeViewProfileRef.current;
+      const next = normalizeCodeViewProfile(
+        typeof updater === "function" ? updater(current) : updater,
+      );
+      codeViewProfileRef.current = next;
+      setCodeViewProfileState(next);
+      saveCodeViewProfile(next);
+      applyCodeViewProfile(next, loadGlobalTerminalProfile());
+      if (statusMessage) setStatusMessage(statusMessage(next));
+    },
+    [setStatusMessage],
+  );
+
+  const setCodeViewFontSize = useCallback(
+    (size: number) => {
+      updateCodeViewProfile(
+        (current) => ({ ...current, fontSize: clampCodeWorkspaceFontSize(size) }),
+        (next) => `Code workspace zoom ${next.fontSize}px`,
+      );
+    },
+    [updateCodeViewProfile],
+  );
+
+  const stepCodeViewFontSize = useCallback(
+    (delta: number) => {
+      setCodeViewFontSize(codeViewProfileRef.current.fontSize + delta);
+    },
+    [setCodeViewFontSize],
+  );
+
+  const setCodeViewTheme = useCallback(
+    (theme: string) => {
+      updateCodeViewProfile(
+        (current) => ({ ...current, theme }),
+        (next) => `Code workspace theme ${codeWorkspaceThemeLabel(next.theme, terminalThemeName)}`,
+      );
+    },
+    [terminalThemeName, updateCodeViewProfile],
+  );
+
+  const setTreeFontSize = useCallback(
+    (size: number) => {
+      const next = clampCodeWorkspaceTreeFontSize(size);
+      treeFontSizeRef.current = next;
+      setTreeFontSizeState(next);
+      writeCodeWorkspaceTreeFontSize(next);
+      setStatusMessage(`File tree zoom ${next}px`);
+    },
+    [setStatusMessage],
+  );
+
+  const stepTreeFontSize = useCallback(
+    (delta: number) => {
+      setTreeFontSize(treeFontSizeRef.current + delta);
+    },
+    [setTreeFontSize],
+  );
+
+  const zoomTargetForNode = useCallback((target: EventTarget | null): "tree" | "editor" => {
+    const node = target instanceof Node ? target : null;
+    if (node && treePaneRef.current?.contains(node)) return "tree";
+    return "editor";
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || event.altKey || event.metaKey) return;
+
+      const increase =
+        event.key === "+" ||
+        event.key === "=" ||
+        event.code === "NumpadAdd";
+      const decrease =
+        event.key === "-" ||
+        event.key === "_" ||
+        event.code === "NumpadSubtract";
+      const reset =
+        event.key === "0" ||
+        event.code === "Digit0" ||
+        event.code === "Numpad0";
+
+      if (!increase && !decrease && !reset) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const target = zoomTargetForNode(event.target);
+      if (target === "tree") {
+        if (increase) {
+          stepTreeFontSize(1);
+        } else if (decrease) {
+          stepTreeFontSize(-1);
+        } else {
+          setTreeFontSize(CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE);
+        }
+      } else if (increase) {
+        stepCodeViewFontSize(1);
+      } else if (decrease) {
+        stepCodeViewFontSize(-1);
+      } else {
+        setCodeViewFontSize(DEFAULT_CODE_VIEW_PROFILE.fontSize);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [setCodeViewFontSize, setTreeFontSize, stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const el = rootRef.current;
+    if (!el) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const target = zoomTargetForNode(event.target);
+      if (target === "tree") {
+        if (event.deltaY < 0) {
+          stepTreeFontSize(1);
+        } else if (event.deltaY > 0) {
+          stepTreeFontSize(-1);
+        }
+      } else if (event.deltaY < 0) {
+        stepCodeViewFontSize(1);
+      } else if (event.deltaY > 0) {
+        stepCodeViewFontSize(-1);
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+    return () => el.removeEventListener("wheel", handleWheel, { capture: true });
+  }, [stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
 
   const workspaceId = useMemo(
     () => workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
@@ -1691,7 +1917,7 @@ export function CodeWorkspaceTab({
     const filter = treeFilter.trim().toLowerCase();
     if (state.loading && !state.loaded) {
       return (
-        <div className="h-7 flex items-center gap-2 px-2 text-[12px] text-[var(--taomni-text-muted)]">
+        <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-2 text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-muted)]">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           <span>Loading</span>
         </div>
@@ -1711,7 +1937,7 @@ export function CodeWorkspaceTab({
     });
     if (entries.length === 0) {
       return (
-        <div className="px-3 py-2 text-[12px] text-[var(--taomni-text-muted)]">
+        <div className="px-3 py-2 text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-muted)]">
           Empty
         </div>
       );
@@ -1732,7 +1958,7 @@ export function CodeWorkspaceTab({
               data-root-id={root.id}
               data-path={entry.path}
               data-selected={isSelected || undefined}
-              className="h-7 w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] data-[selected=true]:bg-[var(--taomni-hover)]"
+              className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[var(--taomni-code-tree-font-size)] hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
               style={rowStyle}
               title={`${root.name} / ${entry.path}`}
               onClick={() => {
@@ -1741,9 +1967,9 @@ export function CodeWorkspaceTab({
               }}
             >
               {isExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
               )}
               <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
               <span className="truncate">{entry.name}</span>
@@ -1767,7 +1993,7 @@ export function CodeWorkspaceTab({
           data-path={entry.path}
           data-active={active || undefined}
           data-selected={isSelected || undefined}
-          className="h-7 w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)] data-[selected=true]:bg-[var(--taomni-hover)]"
+          className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[var(--taomni-code-tree-font-size)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
           style={rowStyle}
           title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
           onClick={() => {
@@ -1776,7 +2002,7 @@ export function CodeWorkspaceTab({
           }}
         >
           <span className="w-3.5 shrink-0" />
-          <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+          <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
           <span className="truncate">{entry.name}</span>
           {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
         </button>
@@ -1786,24 +2012,74 @@ export function CodeWorkspaceTab({
 
   return (
     <div
+      ref={rootRef}
       data-testid="code-workspace-tab"
-      className="h-full w-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
+      className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)]"
     >
-      <header className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+      <header className="h-10 shrink-0 flex items-center gap-2 overflow-x-auto px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
         <Braces className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="min-w-0">
           <div className="font-semibold leading-4 truncate">Code · {title}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[620px]">
+          <div className="text-[11px] text-[var(--taomni-code-muted)] truncate max-w-[620px]">
             {roots.length ? `${roots.length} root${roots.length === 1 ? "" : "s"}` : "No project roots"}
             {looseFiles.length > 0 ? ` · ${looseFiles.length} loose file${looseFiles.length === 1 ? "" : "s"}` : ""}
           </div>
         </div>
         {dirtyCount > 0 && (
-          <span className="rounded px-1.5 py-0.5 text-[11px] bg-[var(--taomni-selected)] text-[var(--taomni-accent)]">
+          <span className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[11px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-accent)]">
             {dirtyCount} unsaved
           </span>
         )}
         <div className="flex-1" />
+        <div className="flex shrink-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+          <Palette className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
+          <select
+            data-testid="code-workspace-theme-select"
+            aria-label="Code workspace theme"
+            title={`Theme: ${currentThemeLabel}`}
+            className="h-6 w-32 bg-transparent px-1 text-[11px] text-[var(--taomni-code-text)] outline-none sm:w-44"
+            value={codeViewProfile.theme}
+            onChange={(event) => setCodeViewTheme(event.target.value)}
+          >
+            <option value={CODE_VIEW_THEME_APP}>Follow app theme</option>
+            <option value={CODE_VIEW_THEME_TERMINAL}>
+              Use terminal theme ({terminalThemeName})
+            </option>
+            <optgroup label="Terminal themes">
+              {TERMINAL_THEME_DEFINITIONS.map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </div>
+        <div className="flex items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+          <IconButton
+            label="Editor zoom out"
+            testId="code-workspace-zoom-out"
+            icon={<ZoomOut className="w-3.5 h-3.5" />}
+            disabled={codeViewProfile.fontSize <= CODE_WORKSPACE_MIN_FONT_SIZE}
+            onClick={() => stepCodeViewFontSize(-1)}
+          />
+          <button
+            type="button"
+            data-testid="code-workspace-zoom-reset"
+            title="Reset editor zoom"
+            aria-label="Reset editor zoom"
+            className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            onClick={() => setCodeViewFontSize(DEFAULT_CODE_VIEW_PROFILE.fontSize)}
+          >
+            {codeViewProfile.fontSize}px
+          </button>
+          <IconButton
+            label="Editor zoom in"
+            testId="code-workspace-zoom-in"
+            icon={<ZoomIn className="w-3.5 h-3.5" />}
+            disabled={codeViewProfile.fontSize >= CODE_WORKSPACE_MAX_FONT_SIZE}
+            onClick={() => stepCodeViewFontSize(1)}
+          />
+        </div>
         <IconButton
           label="Save"
           icon={activeFile?.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -1829,15 +2105,46 @@ export function CodeWorkspaceTab({
         className="flex-1 min-h-0"
       >
         <Panel id="project" defaultSize="24%" minSize="15%" maxSize="45%" className="min-w-0">
-          <aside className="h-full min-h-0 flex flex-col border-r border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-            <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
-              <Search className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+          <aside
+            ref={treePaneRef}
+            data-testid="code-workspace-tree-pane"
+            className="h-full min-h-0 flex flex-col border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+            style={treePaneStyle}
+          >
+            <div className="h-9 shrink-0 flex items-center gap-2 overflow-x-auto px-2 border-b border-[var(--taomni-code-border)]">
+              <Search className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
               <input
                 value={treeFilter}
                 onChange={(event) => setTreeFilter(event.target.value)}
                 placeholder="Filter"
-                className="min-w-0 flex-1 bg-transparent outline-none text-[12px]"
+                className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
               />
+              <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+                <IconButton
+                  label="Tree zoom out"
+                  testId="code-workspace-tree-zoom-out"
+                  icon={<ZoomOut className="w-3.5 h-3.5" />}
+                  disabled={treeFontSize <= CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
+                  onClick={() => stepTreeFontSize(-1)}
+                />
+                <button
+                  type="button"
+                  data-testid="code-workspace-tree-zoom-reset"
+                  title="Reset tree zoom"
+                  aria-label="Reset tree zoom"
+                  className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                  onClick={() => setTreeFontSize(CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE)}
+                >
+                  {treeFontSize}px
+                </button>
+                <IconButton
+                  label="Tree zoom in"
+                  testId="code-workspace-tree-zoom-in"
+                  icon={<ZoomIn className="w-3.5 h-3.5" />}
+                  disabled={treeFontSize >= CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
+                  onClick={() => stepTreeFontSize(1)}
+                />
+              </div>
               <IconButton label="Open file" icon={<File className="w-3.5 h-3.5" />} onClick={() => void openLooseFile()} />
               <IconButton label="Add folder" icon={<FolderOpen className="w-3.5 h-3.5" />} onClick={() => void addRoot()} />
               <IconButton label="New file" icon={<FilePlus className="w-3.5 h-3.5" />} disabled={!selectedRootDirectory} onClick={() => void createFile()} />
@@ -1847,7 +2154,7 @@ export function CodeWorkspaceTab({
             </div>
             <div data-testid="code-workspace-tree" className="flex-1 min-h-0 overflow-auto py-1">
               {roots.length === 0 && looseFiles.length === 0 && (
-                <div className="px-3 py-2 text-[12px] text-[var(--taomni-text-muted)]">
+                <div className="px-3 py-2 text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-muted)]">
                   Open a file or add a folder
                 </div>
               )}
@@ -1861,18 +2168,18 @@ export function CodeWorkspaceTab({
                       data-testid="code-workspace-tree-root"
                       data-root-id={root.id}
                       data-selected={selectedRoot || undefined}
-                      className="h-7 w-full min-w-0 flex items-center gap-1.5 px-2 text-left text-[12px] font-semibold hover:bg-[var(--taomni-hover)] data-[selected=true]:bg-[var(--taomni-hover)]"
+                      className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left text-[var(--taomni-code-tree-font-size)] font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                       title={root.path}
                       onClick={() => toggleRoot(root.id)}
                     >
                       {expanded ? (
-                        <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                        <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                        <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                       )}
                       <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
                       <span className="truncate">{root.name}</span>
-                      <span className="ml-auto shrink-0 text-[10px] font-normal text-[var(--taomni-text-muted)]">{root.kind}</span>
+                      <span className="ml-auto shrink-0 text-[10px] font-normal text-[var(--taomni-code-muted)]">{root.kind}</span>
                     </button>
                     {expanded && renderEntries(root, "", 1)}
                   </Fragment>
@@ -1880,7 +2187,7 @@ export function CodeWorkspaceTab({
               })}
               {looseFiles.length > 0 && (
                 <div className="mt-1">
-                  <div className="h-6 flex items-center gap-1.5 px-2 text-[11px] font-semibold text-[var(--taomni-text-muted)]">
+                  <div className="h-6 flex items-center gap-1.5 px-2 text-[var(--taomni-code-tree-small-font-size)] font-semibold text-[var(--taomni-code-muted)]">
                     <File className="w-3.5 h-3.5" />
                     <span>Loose Files</span>
                   </div>
@@ -1898,14 +2205,14 @@ export function CodeWorkspaceTab({
                         data-path={file.path}
                         data-active={active || undefined}
                         data-selected={selectedLoose || undefined}
-                        className="h-7 w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)] data-[selected=true]:bg-[var(--taomni-hover)]"
+                        className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left text-[var(--taomni-code-tree-font-size)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                         title={file.path}
                         onClick={() => {
                           setSelected({ kind: "file", ref });
                           void openFile(ref);
                         }}
                       >
-                        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                         <span className="truncate">{file.name}</span>
                         {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
                       </button>
@@ -1934,11 +2241,16 @@ export function CodeWorkspaceTab({
             />
           </aside>
         </Panel>
-        <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
+        <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel id="editor" defaultSize="76%" minSize="35%" className="min-w-0">
-          <main className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]">
+          <main
+            ref={editorPaneRef}
+            data-testid="code-workspace-editor-pane"
+            className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]"
+            style={editorPaneStyle}
+          >
             {openOrder.length > 0 && (
-              <div className="h-8 shrink-0 flex items-end overflow-x-auto border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
+              <div className="h-8 shrink-0 flex items-end overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
                 {openOrder.map((key) => {
                   const file = openFiles[key];
                   if (!file) return null;
@@ -1947,21 +2259,21 @@ export function CodeWorkspaceTab({
                     <div
                       key={key}
                       data-active={active || undefined}
-                      className="h-7 min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-divider)] text-[12px] data-[active=true]:bg-[var(--taomni-code-bg)]"
+                      className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
                     >
                       <button
                         type="button"
-                        className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-hover)]"
+                        className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                         title={file.subtitle}
                         onClick={() => setActiveKey(key)}
                       >
-                        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                         <span className="truncate">{file.title}</span>
                         {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
                       </button>
                       <button
                         type="button"
-                        className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-hover)]"
+                        className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
                         title="Close"
                         onClick={() => void closeFile(key)}
                       >
@@ -1975,7 +2287,7 @@ export function CodeWorkspaceTab({
             <div className="flex-1 min-h-0 relative">
               {activeFile ? (
                 <div className="absolute inset-0 flex flex-col">
-                  <div className="h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[11px] text-[var(--taomni-text-muted)]">
+                  <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
                     <span className="truncate">{activeFile.subtitle}</span>
                     <span className="shrink-0">{formatBytes(activeFile.size)}</span>
                     {formatMtime(activeFile.mtime) && (
@@ -2015,14 +2327,14 @@ export function CodeWorkspaceTab({
                   )}
                   <div data-testid="code-workspace-editor" className="flex-1 min-h-0">
                     {activeFile.loading ? (
-                      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
                         <Loader2 className="w-4 h-4 animate-spin" />
                       </div>
                     ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
                       <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
                     ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
                       <div className="h-full min-h-0 grid grid-cols-2">
-                        <div className="min-w-0 min-h-0 border-r border-[var(--taomni-divider)]">
+                        <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
                           <WorkspaceCodeEditor
                             key={`${activeFile.key}:edit`}
                             path={activeFile.languagePath}
@@ -2057,7 +2369,7 @@ export function CodeWorkspaceTab({
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
                   No file open
                 </div>
               )}
@@ -2100,9 +2412,9 @@ const LSP_EDITOR_STYLE = EditorView.theme({
     maxHeight: "320px",
     overflow: "auto",
     padding: "8px 10px",
-    border: "1px solid var(--taomni-divider)",
-    background: "var(--taomni-bg)",
-    color: "var(--taomni-text)",
+    border: "1px solid var(--taomni-code-border)",
+    background: "var(--taomni-code-tooltip-bg)",
+    color: "var(--taomni-code-text)",
     boxShadow: "0 12px 28px rgba(0, 0, 0, 0.28)",
     fontSize: "12px",
     lineHeight: "1.5",
@@ -2220,19 +2532,19 @@ function MarkdownPreview({
       const pre = block.parentElement;
       if (!pre) return;
       const wrapper = document.createElement("div");
-      wrapper.className = "my-3 border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]";
+      wrapper.className = "my-3 border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)]";
       const toolbar = document.createElement("div");
-      toolbar.className = "h-8 flex items-center gap-1 border-b border-[var(--taomni-divider)] px-2";
+      toolbar.className = "h-8 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-2";
       const label = document.createElement("span");
-      label.className = "min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--taomni-text-muted)]";
+      label.className = "min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--taomni-code-muted)]";
       label.textContent = `Mermaid ${index + 1}`;
       const svgButton = document.createElement("button");
       svgButton.type = "button";
-      svgButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-hover)]";
+      svgButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]";
       svgButton.textContent = "SVG";
       const pngButton = document.createElement("button");
       pngButton.type = "button";
-      pngButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-hover)]";
+      pngButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]";
       pngButton.textContent = "PNG";
       const diagram = document.createElement("div");
       diagram.className = "overflow-auto p-3";
@@ -2268,7 +2580,7 @@ function MarkdownPreview({
     <div
       ref={rootRef}
       data-testid="code-workspace-markdown-preview"
-      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-bg)] px-5 py-4 text-[13px] leading-6"
+      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)]"
       onClick={(event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
@@ -2447,7 +2759,7 @@ function ModeButton({
       title={label}
       aria-label={label}
       data-active={active || undefined}
-      className="h-5 min-w-5 px-1 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
+      className="h-5 min-w-5 px-1 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)]"
       onClick={onClick}
     >
       {icon}
@@ -2464,7 +2776,7 @@ function LspStatusPill({
 }) {
   if (!state?.status) {
     return (
-      <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">
+      <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
         LSP idle
       </span>
     );
@@ -2482,7 +2794,7 @@ function LspStatusPill({
       title={label}
       data-active={status.active || undefined}
       data-error={!!state.error || (!status.active && !!status.error) || undefined}
-      className="max-w-[38%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
+      className="max-w-[38%] shrink-0 truncate rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
     >
       {label}
     </span>
@@ -2512,25 +2824,25 @@ function ReferencesPanel({
   onOpenLocation: (location: LspLocation) => void;
 }) {
   return (
-    <section className="shrink-0 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
+    <section className="shrink-0 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
       <button
         type="button"
-        className="h-7 w-full min-w-0 flex items-center gap-1.5 px-2 text-left text-[11px] font-semibold hover:bg-[var(--taomni-hover)]"
+        className="h-7 w-full min-w-0 flex items-center gap-1.5 px-2 text-left text-[11px] font-semibold hover:bg-[var(--taomni-code-active-line-bg)]"
         onClick={onToggle}
       >
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        <ListTree className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+        <ListTree className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
         <span className="min-w-0 flex-1 truncate">References</span>
         {result.loading ? (
           <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
         ) : result.locations.length > 0 ? (
-          <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{result.locations.length}</span>
+          <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">{result.locations.length}</span>
         ) : null}
       </button>
       {open && (
         <div className="max-h-52 overflow-auto pb-1 text-[11px]">
           {result.origin && (
-            <div className="truncate px-2 py-1 text-[10px] text-[var(--taomni-text-muted)]" title={result.origin}>
+            <div className="truncate px-2 py-1 text-[10px] text-[var(--taomni-code-muted)]" title={result.origin}>
               {result.origin}
             </div>
           )}
@@ -2540,7 +2852,7 @@ function ReferencesPanel({
             </div>
           )}
           {!result.loading && !result.error && result.locations.length === 0 && (
-            <div className="px-2 py-1.5 text-[var(--taomni-text-muted)]">No references</div>
+            <div className="px-2 py-1.5 text-[var(--taomni-code-muted)]">No references</div>
           )}
           {result.locations.map((location, index) => {
             const label = displayLocationPath(location, roots);
@@ -2548,13 +2860,13 @@ function ReferencesPanel({
               <button
                 key={`${location.uri}:${location.range.start.line}:${location.range.start.character}:${index}`}
                 type="button"
-                className="w-full min-w-0 flex items-center gap-1.5 px-2 py-1 text-left hover:bg-[var(--taomni-hover)]"
+                className="w-full min-w-0 flex items-center gap-1.5 px-2 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                 title={`${label}:${location.range.start.line + 1}:${location.range.start.character + 1}`}
                 onClick={() => onOpenLocation(location)}
               >
-                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 <span className="min-w-0 flex-1 truncate">{label}</span>
-                <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
                   {location.range.start.line + 1}:{location.range.start.character + 1}
                 </span>
               </button>
@@ -2589,15 +2901,15 @@ function LanguageServersPanel({
 }) {
   const missingCount = statuses.filter((status) => !status.available).length;
   return (
-    <section className="shrink-0 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
+    <section className="shrink-0 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
       <div className="h-7 flex items-center text-[11px] font-semibold">
         <button
           type="button"
-          className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-hover)]"
+          className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onToggle}
         >
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          <Server className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+          <Server className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
           <span className="min-w-0 flex-1 truncate">Language Servers</span>
           {missingCount > 0 && (
             <span className="shrink-0 text-[10px] text-amber-500">{missingCount} missing</span>
@@ -2607,7 +2919,7 @@ function LanguageServersPanel({
           type="button"
           title="Refresh language servers"
           aria-label="Refresh language servers"
-          className="mr-1 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+          className="mr-1 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onRefresh}
         >
           <RefreshCw className="w-3 h-3" />
@@ -2616,9 +2928,9 @@ function LanguageServersPanel({
       {open && (
         <div className="max-h-56 overflow-auto pb-1">
           {activeStatus && (
-            <div className="px-2 py-1 border-b border-[var(--taomni-divider)] text-[11px]">
+            <div className="px-2 py-1 border-b border-[var(--taomni-code-border)] text-[11px]">
               <div className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+                <Info className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 <span className="min-w-0 flex-1 truncate">
                   Active: {activeStatus.displayName ?? "None"}
                 </span>
@@ -2645,7 +2957,7 @@ function LanguageServersPanel({
                 </div>
                 <select
                   value={selected}
-                  className="mt-1 h-6 w-full rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 text-[11px] outline-none"
+                  className="mt-1 h-6 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[11px] text-[var(--taomni-code-text)] outline-none"
                   onChange={(event) => onCommandChange(status.presetId, event.target.value)}
                   aria-label={`${status.displayName} language server command`}
                 >
@@ -2660,14 +2972,14 @@ function LanguageServersPanel({
                   <div className="mt-1 grid grid-cols-1 gap-1">
                     <input
                       value={custom.command}
-                      className="h-6 min-w-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 font-mono text-[11px] outline-none"
+                      className="h-6 min-w-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
                       placeholder="Command or absolute path"
                       aria-label={`${status.displayName} custom command`}
                       onChange={(event) => onCustomCommandChange(status.presetId, { command: event.target.value })}
                     />
                     <input
                       value={custom.args}
-                      className="h-6 min-w-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-1 font-mono text-[11px] outline-none"
+                      className="h-6 min-w-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
                       placeholder="Args"
                       aria-label={`${status.displayName} custom args`}
                       onChange={(event) => onCustomCommandChange(status.presetId, { args: event.target.value })}
@@ -2692,11 +3004,13 @@ function IconButton({
   label,
   icon,
   disabled,
+  testId,
   onClick,
 }: {
   label: string;
   icon: ReactNode;
   disabled?: boolean;
+  testId?: string;
   onClick?: () => void;
 }) {
   return (
@@ -2704,8 +3018,9 @@ function IconButton({
       type="button"
       title={label}
       aria-label={label}
+      data-testid={testId}
       disabled={disabled}
-      className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-default"
+      className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40 disabled:cursor-default"
       onClick={onClick}
     >
       {icon}

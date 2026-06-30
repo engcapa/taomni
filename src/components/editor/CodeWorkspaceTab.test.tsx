@@ -211,7 +211,7 @@ describe("CodeWorkspaceTab", () => {
     expect(await screen.findByText("C#")).toBeInTheDocument();
     expect(screen.getAllByText("dotnet tool install -g csharp-ls")[0]).toBeInTheDocument();
 
-    const commandSelect = screen.getByRole("combobox");
+    const commandSelect = screen.getByLabelText("C# language server command");
     expect(commandSelect).toHaveValue("csharp-ls");
     expect(within(commandSelect).getByRole("option", { name: "OmniSharp fallback" })).toBeInTheDocument();
 
@@ -288,6 +288,57 @@ describe("CodeWorkspaceTab", () => {
         expect.stringContaining("graph TD"),
       );
     });
+  });
+
+  it("keeps file tree zoom separate from editor zoom and theme controls", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-appearance",
+      name: "Appearance",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "export const answer = 42;"));
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Appearance")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-in"));
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
+    expect(screen.getByTestId("code-workspace-tree-pane").style.getPropertyValue("--taomni-code-tree-font-size")).toBe("13px");
+    expect(window.localStorage.getItem("taomni.codeViewProfile.v1")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("code-workspace-zoom-in"));
+    let saved = JSON.parse(window.localStorage.getItem("taomni.codeViewProfile.v1") ?? "{}");
+    expect(saved.fontSize).toBe(14);
+    expect(document.documentElement.style.getPropertyValue("--taomni-code-font-size")).toBe("14px");
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
+
+    fireEvent.wheel(screen.getByTestId("code-workspace-tree-pane"), { ctrlKey: true, deltaY: -100 });
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("14");
+    saved = JSON.parse(window.localStorage.getItem("taomni.codeViewProfile.v1") ?? "{}");
+    expect(saved.fontSize).toBe(14);
+
+    fireEvent.wheel(screen.getByTestId("code-workspace-editor-pane"), { ctrlKey: true, deltaY: -100 });
+    saved = JSON.parse(window.localStorage.getItem("taomni.codeViewProfile.v1") ?? "{}");
+    expect(saved.fontSize).toBe(15);
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("14");
+
+    fireEvent.click(screen.getByTestId("code-workspace-zoom-out"));
+    saved = JSON.parse(window.localStorage.getItem("taomni.codeViewProfile.v1") ?? "{}");
+    expect(saved.fontSize).toBe(14);
+
+    fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-out"));
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
+
+    fireEvent.change(screen.getByTestId("code-workspace-theme-select"), {
+      target: { value: "kanagawa-wave" },
+    });
+    saved = JSON.parse(window.localStorage.getItem("taomni.codeViewProfile.v1") ?? "{}");
+    expect(saved.theme).toBe("kanagawa-wave");
+    expect(document.documentElement.style.getPropertyValue("--taomni-code-bg")).toBe("#1f1f28");
   });
 
   it("mirrors active files, loose files, and diagnostics into agent workspace context", async () => {
