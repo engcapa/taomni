@@ -47,6 +47,8 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Columns2,
+  Eye,
   Loader2,
   Pencil,
   RefreshCw,
@@ -70,6 +72,7 @@ import {
 } from "../../lib/editor/workspace";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
+import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { languageForPath } from "../git/diffLanguage";
@@ -115,6 +118,8 @@ type TreeSelection =
   | { kind: "root"; rootId: string }
   | { kind: "dir"; rootId: string; path: string }
   | { kind: "file"; ref: CodeWorkspaceFileRef };
+
+type MarkdownViewMode = "edit" | "preview" | "split";
 
 const DEFAULT_DIR_STATE: DirectoryState = {
   entries: [],
@@ -255,6 +260,35 @@ function isRootRef(ref: CodeWorkspaceFileRef, rootId: string, path: string): boo
   return ref.kind === "root" && ref.rootId === rootId && ref.path === path;
 }
 
+function isMarkdownPath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith(".md") || lower.endsWith(".markdown");
+}
+
+function isExternalHref(href: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//") || href.startsWith("#");
+}
+
+function normalizeRelativeLink(path: string): string {
+  const clean = path.split("#", 1)[0].split("?", 1)[0].replace(/\\/g, "/");
+  const parts: string[] = [];
+  for (const part of clean.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") parts.pop();
+    else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+function resolveRootMarkdownLink(currentPath: string, href: string): string {
+  return normalizeRelativeLink(joinRelativePath(parentPath(currentPath), href));
+}
+
+function resolveLooseMarkdownLink(currentPath: string, href: string): string {
+  const normalized = currentPath.replace(/\\/g, "/");
+  return joinRelativePath(parentPath(normalized), href);
+}
+
 function makeLoadingFile(ref: CodeWorkspaceFileRef, roots: CodeWorkspaceRootInfo[], looseFiles: CodeWorkspaceLooseFileInfo[]): OpenFileState {
   const meta = fileMeta(ref, roots, looseFiles);
   return {
@@ -330,6 +364,7 @@ export function CodeWorkspaceTab({
   const [openFiles, setOpenFiles] = useState<Record<string, OpenFileState>>({});
   const [openOrder, setOpenOrder] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [markdownModes, setMarkdownModes] = useState<Record<string, MarkdownViewMode>>({});
   const rootsRef = useRef(roots);
   const looseFilesRef = useRef(looseFiles);
   const openFilesRef = useRef(openFiles);
@@ -483,14 +518,19 @@ export function CodeWorkspaceTab({
     void loadDir(root.id, "");
   }, [loadDir, setStatusMessage]);
 
-  const openLooseFile = useCallback(async () => {
-    const path = await selectFilePath();
+  const addLooseFilePath = useCallback(async (path: string) => {
     if (!path) return;
     const file = makeLooseFile(path);
     setLooseFiles((current) => current.some((item) => item.path === file.path) ? current : [...current, file]);
     setSelected({ kind: "file", ref: { kind: "loose", id: file.id, path: file.path } });
     await openFile({ kind: "loose", id: file.id, path: file.path });
   }, [openFile]);
+
+  const openLooseFile = useCallback(async () => {
+    const path = await selectFilePath();
+    if (!path) return;
+    await addLooseFilePath(path);
+  }, [addLooseFilePath]);
 
   const refreshTree = useCallback(() => {
     setDirectories({});
@@ -909,6 +949,12 @@ export function CodeWorkspaceTab({
         delete next[key];
         return next;
       });
+      setMarkdownModes((current) => {
+        if (!(key in current)) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
       setActiveKey((current) => {
         if (current !== key) return current;
         return nextOrder[Math.min(index, nextOrder.length - 1)] ?? null;
@@ -918,6 +964,29 @@ export function CodeWorkspaceTab({
   );
 
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
+  const activeMarkdownMode = activeFile && isMarkdownPath(activeFile.languagePath)
+    ? markdownModes[activeFile.key] ?? "edit"
+    : "edit";
+  const setActiveMarkdownMode = useCallback((mode: MarkdownViewMode) => {
+    if (!activeFile) return;
+    setMarkdownModes((current) => ({ ...current, [activeFile.key]: mode }));
+  }, [activeFile]);
+  const openMarkdownHref = useCallback(
+    (href: string) => {
+      if (!activeFile || isExternalHref(href)) return false;
+      const target = href.split("#", 1)[0].split("?", 1)[0];
+      if (!target) return false;
+      if (activeFile.ref.kind === "root") {
+        const path = resolveRootMarkdownLink(activeFile.ref.path, target);
+        void openFile({ kind: "root", rootId: activeFile.ref.rootId, path });
+        return true;
+      }
+      const path = resolveLooseMarkdownLink(activeFile.ref.path, target);
+      void addLooseFilePath(path);
+      return true;
+    },
+    [activeFile, addLooseFilePath, openFile],
+  );
   const dirtyCount = useMemo(
     () => Object.values(openFiles).filter((file) => file.dirty).length,
     [openFiles],
@@ -1246,6 +1315,28 @@ export function CodeWorkspaceTab({
                       <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
                     )}
                     {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {isMarkdownPath(activeFile.languagePath) && (
+                      <div className="ml-auto flex items-center gap-0.5">
+                        <ModeButton
+                          label="Edit"
+                          active={activeMarkdownMode === "edit"}
+                          icon={<File className="w-3 h-3" />}
+                          onClick={() => setActiveMarkdownMode("edit")}
+                        />
+                        <ModeButton
+                          label="Preview"
+                          active={activeMarkdownMode === "preview"}
+                          icon={<Eye className="w-3 h-3" />}
+                          onClick={() => setActiveMarkdownMode("preview")}
+                        />
+                        <ModeButton
+                          label="Split"
+                          active={activeMarkdownMode === "split"}
+                          icon={<Columns2 className="w-3 h-3" />}
+                          onClick={() => setActiveMarkdownMode("split")}
+                        />
+                      </div>
+                    )}
                   </div>
                   {activeFile.error && (
                     <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
@@ -1257,6 +1348,22 @@ export function CodeWorkspaceTab({
                     {activeFile.loading ? (
                       <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
                         <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
+                      <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
+                    ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
+                      <div className="h-full min-h-0 grid grid-cols-2">
+                        <div className="min-w-0 min-h-0 border-r border-[var(--taomni-divider)]">
+                          <WorkspaceCodeEditor
+                            key={`${activeFile.key}:edit`}
+                            path={activeFile.languagePath}
+                            doc={activeFile.text}
+                            visible={visible}
+                            onChange={(doc) => updateFileText(activeFile.key, doc)}
+                            onSave={() => void saveFile(activeFile.key)}
+                          />
+                        </div>
+                        <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
                       </div>
                     ) : (
                       <WorkspaceCodeEditor
@@ -1289,6 +1396,34 @@ interface WorkspaceCodeEditorProps {
   visible: boolean;
   onChange: (doc: string) => void;
   onSave: () => void;
+}
+
+function MarkdownPreview({
+  file,
+  onOpenHref,
+}: {
+  file: OpenFileState;
+  onOpenHref: (href: string) => boolean;
+}) {
+  const html = useMemo(() => renderFormatted(file.text, "md") ?? "", [file.text]);
+  return (
+    <div
+      data-testid="code-workspace-markdown-preview"
+      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-bg)] px-5 py-4 text-[13px] leading-6"
+      onClick={(event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const anchor = target.closest("a");
+        const href = anchor?.getAttribute("href");
+        if (!href) return;
+        if (onOpenHref(href)) {
+          event.preventDefault();
+        }
+      }}
+    >
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  );
 }
 
 function WorkspaceCodeEditor({
@@ -1397,6 +1532,31 @@ function WorkspaceCodeEditor({
   }, [visible]);
 
   return <div ref={hostRef} className="h-full w-full" />;
+}
+
+function ModeButton({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      data-active={active || undefined}
+      className="h-5 min-w-5 px-1 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
+      onClick={onClick}
+    >
+      {icon}
+    </button>
+  );
 }
 
 function IconButton({
