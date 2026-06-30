@@ -9,6 +9,13 @@ import {
   saveGlobalTerminalProfile,
   type TerminalProfile,
 } from "../../lib/terminalProfile";
+import {
+  DEFAULT_CODE_VIEW_PROFILE,
+  applyCodeViewProfile,
+  loadCodeViewProfile,
+  saveCodeViewProfile,
+  type CodeViewProfile,
+} from "../../lib/codeViewProfile";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { LanguageSection } from "./LanguageSection";
@@ -30,6 +37,7 @@ import { ChatOutputFormatPanel } from "./ChatOutputFormatPanel";
 import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
 import { useAiStore } from "../../stores/aiStore";
 import { matchingIds } from "./settingsSearch";
+import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -95,6 +103,7 @@ function SettingsAnchor({
 
 export function SettingsPanel() {
   const [profile, setProfile] = useState<TerminalProfile>(() => loadGlobalTerminalProfile());
+  const [codeViewProfile, setCodeViewProfile] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
@@ -168,7 +177,12 @@ export function SettingsPanel() {
 
   useEffect(() => {
     saveGlobalTerminalProfile(profile);
-  }, [profile]);
+    applyCodeViewProfile(codeViewProfile, profile);
+  }, [codeViewProfile, profile]);
+
+  useEffect(() => {
+    saveCodeViewProfile(codeViewProfile);
+  }, [codeViewProfile]);
 
   return (
     <SettingsSearchContext.Provider value={ctxValue}>
@@ -410,6 +424,29 @@ export function SettingsPanel() {
               </button>
             </div>
             <TerminalAppearanceSettings profile={profile} onProfileChange={setProfile} showCustomColors />
+          </SettingsAnchor>
+
+          <SettingsAnchor id="code-view-appearance">
+            <div className="mt-6 mb-4 flex items-center gap-3">
+              <div>
+                <div className="text-[18px] font-semibold">{t("settings.codeViewAppearanceTitle")}</div>
+                <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.codeViewAppearanceSubtitle")}</div>
+              </div>
+              <button
+                data-testid="settings-reset-code-view-profile"
+                className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
+                type="button"
+                onClick={() => setCodeViewProfile(DEFAULT_CODE_VIEW_PROFILE)}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {t("settings.reset")}
+              </button>
+            </div>
+            <CodeViewAppearanceSettings
+              profile={codeViewProfile}
+              terminalProfile={profile}
+              onProfileChange={setCodeViewProfile}
+            />
           </SettingsAnchor>
 
           <SettingsAnchor id="vault">
