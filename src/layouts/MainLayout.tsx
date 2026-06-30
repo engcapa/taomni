@@ -32,6 +32,7 @@ import { StatusBar } from "../components/statusbar/StatusBar";
 import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { GitPanel } from "../components/git/GitPanel";
+import { CodeWorkspaceTab } from "../components/editor/CodeWorkspaceTab";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -1465,6 +1466,25 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
+    const normalized = repoRoot.trim();
+    if (!normalized) return;
+    const existing = tabsRef.current.find(
+      (tab) => tab.type === "code-workspace" && tab.codeWorkspace?.repoRoot === normalized,
+    );
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: `code-workspace-${Date.now()}`,
+      type: "code-workspace",
+      title: `Code · ${gitRepoName(normalized)}`,
+      closable: true,
+      codeWorkspace: { repoRoot: normalized, initialPath: initialPath ?? null },
+    });
+  }, [addTab, setActiveTab]);
+
   const openGitRepository = useCallback(async (path?: string | null) => {
     const target = path ?? await selectFolderPath();
     if (!target) return;
@@ -2422,6 +2442,7 @@ export function MainLayout() {
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
   const gitTabs = tabs.filter((t) => t.type === "git" && t.git);
+  const codeWorkspaceTabs = tabs.filter((t) => t.type === "code-workspace" && t.codeWorkspace);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
   const rdpTabs = tabs.filter((t) => t.type === "rdp" && t.rdp);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
@@ -3027,7 +3048,29 @@ export function MainLayout() {
                       className="absolute inset-0"
                       style={{ display: isActive ? "block" : "none" }}
                     >
-                      <GitPanel repoRoot={tab.git.repoRoot} visible={isActive} />
+                      <GitPanel
+                        repoRoot={tab.git.repoRoot}
+                        visible={isActive}
+                        onOpenWorkspace={openCodeWorkspaceTab}
+                      />
+                    </div>
+                  );
+                })}
+
+                {codeWorkspaceTabs.map((tab) => {
+                  if (!tab.codeWorkspace) return null;
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <CodeWorkspaceTab
+                        repoRoot={tab.codeWorkspace.repoRoot}
+                        initialPath={tab.codeWorkspace.initialPath}
+                        visible={isActive}
+                      />
                     </div>
                   );
                 })}

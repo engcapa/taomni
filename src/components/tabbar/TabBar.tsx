@@ -20,6 +20,7 @@ import {
   History,
   FilePlus,
   GitBranch,
+  Braces,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
@@ -614,6 +615,8 @@ export function TabIcon({ tab }: { tab: Tab }) {
       return <NetworkIcon className="w-3 h-3" style={{ color: "#6b7280" }} />;
     case "git":
       return <GitBranch className="w-3 h-3" style={{ color: "#e05a47" }} />;
+    case "code-workspace":
+      return <Braces className="w-3 h-3" style={{ color: "#2878d4" }} />;
     case "file-browser":
       return <FileText className="w-3 h-3" style={{ color: "var(--taomni-text-muted)" }} />;
     default:
