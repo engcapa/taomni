@@ -13,6 +13,7 @@ use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::hbase::HBaseSession;
 use crate::lanchat::LanChatState;
+use crate::lsp::LspManager;
 use crate::objectstorage::ObjectStorageSession;
 use crate::rdp::ws::RdpSession;
 use crate::servers::ServerRegistry;
@@ -143,6 +144,8 @@ pub struct AppState {
     /// reading frontend UI state directly.
     pub agent_code_workspaces:
         Arc<RwLock<HashMap<String, crate::agent::context::AgentCodeWorkspace>>>,
+    /// Local language-server process registry for code-workspace editor tabs.
+    pub lsp: Arc<LspManager>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -191,6 +194,7 @@ impl AppState {
             agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
             agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
             agent_code_workspaces: Arc::new(RwLock::new(HashMap::new())),
+            lsp: Arc::new(LspManager::new()),
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

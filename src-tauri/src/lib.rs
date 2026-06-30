@@ -10,6 +10,7 @@ mod git;
 mod hbase;
 mod history;
 mod lanchat;
+mod lsp;
 pub mod llm;
 mod migrate;
 pub mod models;
@@ -390,6 +391,17 @@ pub fn run() {
             workspace::workspace_create_dir,
             workspace::workspace_delete_path,
             workspace::workspace_rename_path,
+            lsp::lsp_list_presets,
+            lsp::lsp_detect_servers,
+            lsp::lsp_document_status,
+            lsp::lsp_open_document,
+            lsp::lsp_change_document,
+            lsp::lsp_save_document,
+            lsp::lsp_close_document,
+            lsp::lsp_get_diagnostics,
+            lsp::lsp_hover,
+            lsp::lsp_definition,
+            lsp::lsp_references,
             windowing::open_detached_window,
             windowing::close_current_detached_window,
             appearance::list_system_fonts,
