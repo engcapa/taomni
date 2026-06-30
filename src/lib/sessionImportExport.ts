@@ -2925,7 +2925,7 @@ function mobaBasicToOptions(
     options.compression = basic[6] !== "0";
     const startupCmd = cleanText(mobaUnescape(basic[7] ?? ""), MAX_OPTION_LENGTH);
     if (startupCmd) options.startupCmd = startupCmd;
-    if (basic[11] === "-1") options.doNotExit = true;
+    if (basic[11] === "-1" || basic[11] === "0") options.doNotExit = basic[11] === "-1";
     addMobaJumpOptions(options, basic[8], basic[9], basic[10]);
   } else if (sessionType === "SFTP") {
     options.compression = basic[5] === "-1";

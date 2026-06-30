@@ -1770,7 +1770,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [x11Trusted, setX11Trusted] = useState(() => optionBoolean(initialOptions, "x11Trusted", true));
   const [compression, setCompression] = useState(() => optionBoolean(initialOptions, "compression", false));
   const [startupCmd, setStartupCmd] = useState(() => optionString(initialOptions, "startupCmd", ""));
-  const [doNotExit, setDoNotExit] = useState(() => optionBoolean(initialOptions, "doNotExit", false));
+  const [doNotExit, setDoNotExit] = useState(() => optionBoolean(initialOptions, "doNotExit", true));
   const [remoteEnv, setRemoteEnv] = useState(() => optionString(initialOptions, "remoteEnv", "Interactive shell"));
   const [sshBrowser, setSshBrowser] = useState(() => optionString(initialOptions, "sshBrowser", "SFTP protocol (recommended)"));
   const [usePrivKey, setUsePrivKey] = useState(
@@ -2432,7 +2432,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setX11Trusted(optionBoolean(nextOptions, "x11Trusted", true));
     setCompression(optionBoolean(nextOptions, "compression", false));
     setStartupCmd(optionString(nextOptions, "startupCmd", ""));
-    setDoNotExit(optionBoolean(nextOptions, "doNotExit", false));
+    setDoNotExit(optionBoolean(nextOptions, "doNotExit", true));
     setDisableAiWrite(optionBoolean(nextOptions, "disableAiWrite", false));
     setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
     setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
