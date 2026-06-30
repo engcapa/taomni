@@ -57,6 +57,60 @@
   --taomni-term-text: #f8fafc;
   --taomni-term-prompt: #10b981;
   --taomni-term-path: #3b82f6;
+  --taomni-code-font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace;
+  --taomni-code-font-size: calc(var(--taomni-ui-font-size) + 1px);
+  --taomni-code-line-height: 1.58;
+  --taomni-code-font-features: "liga" 1, "calt" 1;
+  --taomni-mono-font: var(--taomni-code-font-family);
+  --taomni-code-bg: #fbfdff;
+  --taomni-code-gutter-bg: #f4f7fb;
+  --taomni-code-text: #142033;
+  --taomni-code-muted: #6b778c;
+  --taomni-code-line-number: #78859a;
+  --taomni-code-line-number-active: #142033;
+  --taomni-code-border: #d9e2ef;
+  --taomni-code-active-line-bg: rgba(37, 99, 235, 0.07);
+  --taomni-code-active-line-gutter-bg: rgba(37, 99, 235, 0.1);
+  --taomni-code-selection-bg: rgba(37, 99, 235, 0.24);
+  --taomni-code-selection-text: #0f172a;
+  --taomni-code-selection-match-bg: rgba(245, 158, 11, 0.24);
+  --taomni-code-selection-match-border: rgba(245, 158, 11, 0.58);
+  --taomni-code-caret: #1d4ed8;
+  --taomni-code-bracket-match-bg: rgba(34, 197, 94, 0.18);
+  --taomni-code-bracket-match-border: rgba(34, 197, 94, 0.4);
+  --taomni-code-bracket-error-bg: rgba(220, 38, 38, 0.12);
+  --taomni-code-tooltip-bg: #ffffff;
+  --taomni-code-scrollbar-track: #eef3f8;
+  --taomni-code-scrollbar-thumb: #bac6d6;
+  --taomni-code-syntax-keyword: #9a3412;
+  --taomni-code-syntax-variable: #142033;
+  --taomni-code-syntax-property: #6d28d9;
+  --taomni-code-syntax-function: #0369a1;
+  --taomni-code-syntax-type: #0f766e;
+  --taomni-code-syntax-string: #15803d;
+  --taomni-code-syntax-escape: #be123c;
+  --taomni-code-syntax-number: #b45309;
+  --taomni-code-syntax-atom: #a16207;
+  --taomni-code-syntax-comment: #64748b;
+  --taomni-code-syntax-operator: #475569;
+  --taomni-code-syntax-punctuation: #64748b;
+  --taomni-code-syntax-link: #2563eb;
+  --taomni-code-syntax-heading: #1d4ed8;
+  --taomni-code-syntax-inserted: #15803d;
+  --taomni-code-syntax-deleted: #dc2626;
+  --taomni-code-syntax-changed: #b45309;
+  --taomni-code-syntax-invalid: #dc2626;
+  --taomni-code-diff-added-bg: rgba(32, 135, 75, 0.14);
+  --taomni-code-diff-added-word: rgba(32, 135, 75, 0.28);
+  --taomni-code-diff-deleted-bg: rgba(210, 63, 79, 0.12);
+  --taomni-code-diff-deleted-word: rgba(210, 63, 79, 0.26);
+  --taomni-code-diff-deleted-border: #d23f4f;
+  --taomni-code-diff-modified-bg: rgba(42, 111, 201, 0.13);
+  --taomni-code-diff-modified-word: rgba(42, 111, 201, 0.27);
+  --taomni-code-diff-connector-added: rgba(32, 135, 75, 0.2);
+  --taomni-code-diff-connector-deleted: rgba(210, 63, 79, 0.18);
+  --taomni-code-diff-connector-modified: rgba(42, 111, 201, 0.19);
+  --taomni-code-diff-connector-stroke: rgba(91, 111, 140, 0.26);
   --taomni-db-syntax-keyword: #1d4ed8;
   --taomni-db-syntax-name: #0f172a;
   --taomni-db-syntax-function: #0f766e;
@@ -169,6 +223,55 @@ html[data-app-theme="dark"] {
   --taomni-term-text: #e6eaf0;
   --taomni-term-prompt: #5fd58a;
   --taomni-term-path: #6aa6f8;
+  --taomni-code-bg: #1e1f22;
+  --taomni-code-gutter-bg: #1b1c1f;
+  --taomni-code-text: #d4d4d4;
+  --taomni-code-muted: #8b929d;
+  --taomni-code-line-number: #6f7684;
+  --taomni-code-line-number-active: #c6ccd6;
+  --taomni-code-border: #303238;
+  --taomni-code-active-line-bg: #24262b;
+  --taomni-code-active-line-gutter-bg: #24262b;
+  --taomni-code-selection-bg: rgba(38, 79, 120, 0.9);
+  --taomni-code-selection-text: #ffffff;
+  --taomni-code-selection-match-bg: rgba(225, 177, 75, 0.24);
+  --taomni-code-selection-match-border: rgba(225, 177, 75, 0.58);
+  --taomni-code-caret: #aeafad;
+  --taomni-code-bracket-match-bg: rgba(77, 141, 94, 0.28);
+  --taomni-code-bracket-match-border: rgba(128, 185, 138, 0.42);
+  --taomni-code-bracket-error-bg: rgba(224, 108, 117, 0.18);
+  --taomni-code-tooltip-bg: #25272d;
+  --taomni-code-scrollbar-track: #1b1c1f;
+  --taomni-code-scrollbar-thumb: #4a4f59;
+  --taomni-code-syntax-keyword: #cc7832;
+  --taomni-code-syntax-variable: #d4d4d4;
+  --taomni-code-syntax-property: #c678dd;
+  --taomni-code-syntax-function: #61afef;
+  --taomni-code-syntax-type: #4ec9b0;
+  --taomni-code-syntax-string: #6a9955;
+  --taomni-code-syntax-escape: #e06c75;
+  --taomni-code-syntax-number: #b5cea8;
+  --taomni-code-syntax-atom: #d19a66;
+  --taomni-code-syntax-comment: #808080;
+  --taomni-code-syntax-operator: #c6ccd6;
+  --taomni-code-syntax-punctuation: #9da5b4;
+  --taomni-code-syntax-link: #79b8ff;
+  --taomni-code-syntax-heading: #82aaff;
+  --taomni-code-syntax-inserted: #98c379;
+  --taomni-code-syntax-deleted: #e06c75;
+  --taomni-code-syntax-changed: #e5c07b;
+  --taomni-code-syntax-invalid: #ff6b6b;
+  --taomni-code-diff-added-bg: rgba(46, 160, 67, 0.22);
+  --taomni-code-diff-added-word: rgba(63, 185, 80, 0.36);
+  --taomni-code-diff-deleted-bg: rgba(248, 81, 73, 0.19);
+  --taomni-code-diff-deleted-word: rgba(255, 118, 132, 0.32);
+  --taomni-code-diff-deleted-border: #e06c75;
+  --taomni-code-diff-modified-bg: rgba(56, 139, 253, 0.18);
+  --taomni-code-diff-modified-word: rgba(86, 156, 245, 0.32);
+  --taomni-code-diff-connector-added: rgba(46, 160, 67, 0.26);
+  --taomni-code-diff-connector-deleted: rgba(248, 81, 73, 0.22);
+  --taomni-code-diff-connector-modified: rgba(56, 139, 253, 0.23);
+  --taomni-code-diff-connector-stroke: rgba(143, 161, 182, 0.22);
   --taomni-db-syntax-keyword: #8bbcff;
   --taomni-db-syntax-name: #e6eaf0;
   --taomni-db-syntax-function: #78d6e8;
@@ -221,7 +324,7 @@ body {
 }
 
 .font-mono {
-  font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
+  font-family: var(--taomni-code-font-family);
 }
 
 /* Vertical side tabs */
@@ -297,7 +400,7 @@ body {
 }
 
 .taomni-mono {
-  font-family: 'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace;
+  font-family: var(--taomni-code-font-family);
 }
 
 .taomni-titlebar {
@@ -621,7 +724,7 @@ body {
 }
 .taomni-chat-md a:hover { text-decoration-color: var(--taomni-link); }
 .taomni-chat-md code {
-  font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
+  font-family: var(--taomni-code-font-family);
   font-size: 0.92em;
   background: color-mix(in srgb, var(--taomni-divider) 60%, transparent);
   padding: 0.05em 0.35em;

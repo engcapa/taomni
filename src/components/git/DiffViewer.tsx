@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
-import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import {
   MergeView,
   unifiedMergeView,
@@ -11,6 +10,7 @@ import {
 import { ChevronDown, ChevronUp, Columns2, Loader2, RefreshCw, Rows2 } from "lucide-react";
 import type { GitBlobPair } from "../../lib/git";
 import { buildDiffOverride, type WhitespaceMode } from "../../lib/diffWhitespace";
+import { codeSyntaxHighlighting, codeViewTheme } from "../../lib/codeViewTheme";
 import { languageForPath } from "./diffLanguage";
 
 type ViewMode = "split" | "unified";
@@ -45,18 +45,9 @@ function writePref(key: string, value: string) {
 }
 
 const diffTheme = EditorView.theme({
-  "&": { backgroundColor: "transparent", color: "var(--taomni-text)", height: "100%" },
-  ".cm-scroller": {
-    fontFamily: '"JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    fontSize: "var(--taomni-git-diff-font-size)",
-    lineHeight: "1.6",
-  },
-  ".cm-gutters": {
-    backgroundColor: "transparent",
-    color: "var(--taomni-text-muted)",
-    borderRight: "1px solid var(--taomni-divider)",
-  },
+  "&": { backgroundColor: "var(--taomni-code-bg)", color: "var(--taomni-code-text)", height: "100%" },
   ".cm-content": { caretColor: "transparent" },
+  ".cm-cursor": { display: "none" },
 });
 
 function baseExtensions(language: Extension | null): Extension[] {
@@ -64,7 +55,8 @@ function baseExtensions(language: Extension | null): Extension[] {
     lineNumbers(),
     EditorView.editable.of(false),
     EditorState.readOnly.of(true),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    codeSyntaxHighlighting,
+    codeViewTheme,
     diffTheme,
   ];
   if (language) ext.push(language);
@@ -78,49 +70,30 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
   style.id = STYLE_ID;
   style.textContent = `
 .taomni-diff-host {
-  --taomni-git-diff-font-size: calc(var(--taomni-ui-font-size) + 1px);
-  --taomni-diff-editor-bg: #fbfdff;
-  --taomni-diff-gutter-bg: #f4f7fb;
-  --taomni-diff-text: #142033;
-  --taomni-diff-muted: #6b778c;
-  --taomni-diff-border: #d9e2ef;
-  --taomni-diff-scroll-track: #eef3f8;
-  --taomni-diff-scroll-thumb: #bac6d6;
-  --taomni-diff-added-bg: rgba(32, 135, 75, 0.14);
-  --taomni-diff-added-word: rgba(32, 135, 75, 0.28);
-  --taomni-diff-deleted-bg: rgba(210, 63, 79, 0.12);
-  --taomni-diff-deleted-word: rgba(210, 63, 79, 0.26);
-  --taomni-diff-modified-bg: rgba(42, 111, 201, 0.13);
-  --taomni-diff-modified-word: rgba(42, 111, 201, 0.27);
-  --taomni-diff-connector-added: rgba(32, 135, 75, 0.2);
-  --taomni-diff-connector-deleted: rgba(210, 63, 79, 0.18);
-  --taomni-diff-connector-modified: rgba(42, 111, 201, 0.19);
-  --taomni-diff-connector-stroke: rgba(91, 111, 140, 0.26);
+  --taomni-git-diff-font-size: var(--taomni-code-font-size);
+  --taomni-diff-editor-bg: var(--taomni-code-bg);
+  --taomni-diff-gutter-bg: var(--taomni-code-gutter-bg);
+  --taomni-diff-text: var(--taomni-code-text);
+  --taomni-diff-muted: var(--taomni-code-muted);
+  --taomni-diff-border: var(--taomni-code-border);
+  --taomni-diff-scroll-track: var(--taomni-code-scrollbar-track);
+  --taomni-diff-scroll-thumb: var(--taomni-code-scrollbar-thumb);
+  --taomni-diff-added-bg: var(--taomni-code-diff-added-bg);
+  --taomni-diff-added-word: var(--taomni-code-diff-added-word);
+  --taomni-diff-deleted-bg: var(--taomni-code-diff-deleted-bg);
+  --taomni-diff-deleted-word: var(--taomni-code-diff-deleted-word);
+  --taomni-diff-deleted-border: var(--taomni-code-diff-deleted-border);
+  --taomni-diff-modified-bg: var(--taomni-code-diff-modified-bg);
+  --taomni-diff-modified-word: var(--taomni-code-diff-modified-word);
+  --taomni-diff-connector-added: var(--taomni-code-diff-connector-added);
+  --taomni-diff-connector-deleted: var(--taomni-code-diff-connector-deleted);
+  --taomni-diff-connector-modified: var(--taomni-code-diff-connector-modified);
+  --taomni-diff-connector-stroke: var(--taomni-code-diff-connector-stroke);
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-}
-
-html[data-app-theme="dark"] .taomni-diff-host {
-  --taomni-diff-editor-bg: #101720;
-  --taomni-diff-gutter-bg: #0c121a;
-  --taomni-diff-text: #dce6f3;
-  --taomni-diff-muted: #8fa1b6;
-  --taomni-diff-border: #243346;
-  --taomni-diff-scroll-track: #0c121a;
-  --taomni-diff-scroll-thumb: #405067;
-  --taomni-diff-added-bg: rgba(48, 170, 102, 0.24);
-  --taomni-diff-added-word: rgba(64, 205, 125, 0.4);
-  --taomni-diff-deleted-bg: rgba(231, 86, 103, 0.2);
-  --taomni-diff-deleted-word: rgba(255, 118, 132, 0.34);
-  --taomni-diff-modified-bg: rgba(86, 156, 245, 0.22);
-  --taomni-diff-modified-word: rgba(112, 178, 255, 0.36);
-  --taomni-diff-connector-added: rgba(48, 170, 102, 0.28);
-  --taomni-diff-connector-deleted: rgba(231, 86, 103, 0.24);
-  --taomni-diff-connector-modified: rgba(86, 156, 245, 0.26);
-  --taomni-diff-connector-stroke: rgba(143, 161, 182, 0.24);
 }
 
 .taomni-diff-host .cm-mergeView,
@@ -172,9 +145,9 @@ html[data-app-theme="dark"] .taomni-diff-host {
 .taomni-diff-host .cm-editor,
 .taomni-diff-host .cm-mergeView,
 .taomni-diff-host .cm-deletedChunk {
-  font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-family: var(--taomni-code-font-family) !important;
   font-size: var(--taomni-git-diff-font-size) !important;
-  line-height: 1.58 !important;
+  line-height: var(--taomni-code-line-height) !important;
 }
 
 .taomni-diff-host .cm-editor {
@@ -194,12 +167,12 @@ html[data-app-theme="dark"] .taomni-diff-host {
 
 .taomni-diff-host .cm-activeLine,
 .taomni-diff-host .cm-activeLineGutter {
-  background: color-mix(in srgb, var(--taomni-accent) 10%, transparent) !important;
+  background: var(--taomni-code-active-line-bg) !important;
 }
 
 .taomni-diff-host .cm-selectionBackground,
 .taomni-diff-host .cm-focused .cm-selectionBackground {
-  background: var(--taomni-editor-selection-bg) !important;
+  background: var(--taomni-code-selection-bg) !important;
 }
 
 .taomni-diff-host .cm-merge-a .cm-changedLine {
@@ -222,7 +195,7 @@ html[data-app-theme="dark"] .taomni-diff-host {
 
 .taomni-diff-host .cm-deletedChunk {
   background: var(--taomni-diff-deleted-bg) !important;
-  border-left: 3px solid #e04f5f !important;
+  border-left: 3px solid var(--taomni-diff-deleted-border) !important;
   padding-left: 8px !important;
 }
 
