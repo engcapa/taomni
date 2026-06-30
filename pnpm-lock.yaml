@@ -74,6 +74,9 @@ importers:
       '@fontsource/outfit':
         specifier: ^5.2.8
         version: 5.2.8
+      '@lezer/highlight':
+        specifier: 1.2.3
+        version: 1.2.3
       '@tauri-apps/api':
         specifier: ^2.11.0
         version: 2.11.0

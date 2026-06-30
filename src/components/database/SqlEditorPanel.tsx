@@ -33,7 +33,8 @@ import {
   closeBracketsKeymap,
   type CompletionSource,
 } from "@codemirror/autocomplete";
-import { bracketMatching, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import { bracketMatching, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 import type { DbMetadataCache } from "../../lib/dbMetadataCache";
 import { createSqlMetadataCompletionSource } from "../../lib/sqlMetadataCompletions";
 
@@ -78,6 +79,48 @@ function autocompleteFor(
   }
   return autocompletion();
 }
+
+const sqlHighlightStyle = HighlightStyle.define([
+  {
+    tag: tags.keyword,
+    color: "var(--taomni-db-syntax-keyword, #1d4ed8)",
+    fontWeight: "600",
+  },
+  {
+    tag: [tags.definitionKeyword, tags.modifier, tags.operatorKeyword],
+    color: "var(--taomni-db-syntax-keyword, #1d4ed8)",
+    fontWeight: "600",
+  },
+  {
+    tag: [tags.name, tags.variableName, tags.propertyName],
+    color: "var(--taomni-db-syntax-name, var(--taomni-text))",
+  },
+  {
+    tag: [tags.function(tags.variableName), tags.function(tags.propertyName)],
+    color: "var(--taomni-db-syntax-function, #0f766e)",
+  },
+  {
+    tag: [tags.string, tags.special(tags.string)],
+    color: "var(--taomni-db-syntax-string, #047857)",
+  },
+  {
+    tag: [tags.number, tags.integer, tags.float, tags.bool, tags.atom],
+    color: "var(--taomni-db-syntax-atom, #b45309)",
+  },
+  {
+    tag: [tags.comment, tags.lineComment, tags.blockComment],
+    color: "var(--taomni-db-syntax-comment, var(--taomni-text-muted))",
+    fontStyle: "italic",
+  },
+  {
+    tag: [tags.operator, tags.compareOperator, tags.logicOperator, tags.arithmeticOperator],
+    color: "var(--taomni-db-syntax-operator, var(--taomni-text-muted))",
+  },
+  {
+    tag: [tags.punctuation, tags.separator],
+    color: "var(--taomni-db-syntax-punctuation, var(--taomni-text-muted))",
+  },
+]);
 
 function dialectFor(engine: string): SQLDialect {
   switch (engine) {
@@ -202,7 +245,7 @@ export function SqlEditorPanel({
         bracketMatching(),
         closeBrackets(),
         autocompleteCompartment.current.of(autocompleteFor(completionSources, defaultSources)),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        syntaxHighlighting(sqlHighlightStyle),
         langCompartment.current.of(
           sql({ dialect: dialectFor(engine), upperCaseKeywords: true }),
         ),
@@ -267,6 +310,24 @@ export function SqlEditorPanel({
           },
           ".cm-cursor": {
             borderLeftColor: "var(--taomni-accent)",
+          },
+          ".cm-tooltip, .cm-tooltip-autocomplete": {
+            backgroundColor: "var(--taomni-panel-bg)",
+            color: "var(--taomni-text)",
+            border: "1px solid var(--taomni-divider)",
+            boxShadow: "var(--taomni-shadow-md)",
+          },
+          ".cm-tooltip-autocomplete ul li[aria-selected]": {
+            backgroundColor: "var(--taomni-selected)",
+            color: "var(--taomni-text)",
+          },
+          ".cm-completionIcon": {
+            color: "var(--taomni-text-muted)",
+          },
+          ".cm-completionMatchedText": {
+            color: "var(--taomni-accent-soft)",
+            textDecoration: "none",
+            fontWeight: "600",
           },
           "&.cm-focused": { outline: "none" },
         }),
