@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from "react";
 import {
   Group as PanelGroup,
   Panel,
@@ -57,6 +57,7 @@ import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLay
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { DEFAULT_MAIL_TERMINAL_PROFILE, resolveTerminalThemeWithSystem, type TerminalProfile } from "../../lib/terminalProfile";
 import { useSystemPrefersDark } from "../../lib/systemColorScheme";
+import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 
 interface MailClientTabProps {
   tabId: string;
@@ -75,6 +76,18 @@ interface ComposeDraft {
 interface OpenMailMessageTab {
   key: string;
   message: MailMessageHeader;
+}
+
+interface MailDraggableDialogProps {
+  title: string;
+  icon: ReactNode;
+  ariaLabel: string;
+  minWidth: number;
+  minHeight: number;
+  className: string;
+  children: ReactNode;
+  headerActions?: ReactNode;
+  onClose: () => void;
 }
 
 type AiAction = "summarize" | "reply" | "tasks";
@@ -178,6 +191,56 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     fontFamily: terminalProfile.fontFamily,
     zoom: clampMailFontSize(fontSize) / MAIL_BASE_FONT_SIZE,
   } as CSSProperties;
+}
+
+function MailDraggableDialog({
+  title,
+  icon,
+  ariaLabel,
+  minWidth,
+  minHeight,
+  className,
+  children,
+  headerActions,
+  onClose,
+}: MailDraggableDialogProps) {
+  const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth, minHeight });
+
+  return (
+    <div
+      ref={containerRef}
+      className={`relative flex flex-col rounded-md border shadow-2xl overflow-hidden ${className}`}
+      style={{
+        background: "var(--taomni-bg)",
+        borderColor: "var(--taomni-divider)",
+        color: "var(--taomni-text)",
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+    >
+      <div
+        ref={handleRef}
+        className="h-9 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] select-none"
+      >
+        {icon}
+        <span className="text-[12px] font-semibold min-w-0 flex-1 truncate">
+          {title}
+        </span>
+        {headerActions}
+        <button
+          type="button"
+          className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+          onClick={onClose}
+          aria-label="Close dialog"
+          title="Close"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function addressLabel(address: MailAddress | null | undefined): string {
@@ -2070,22 +2133,15 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
       {popupMessage && (
         <div className="absolute inset-0 z-[130] bg-black/35 flex items-center justify-center p-5">
-          <section
-            className="w-[min(1120px,92vw)] h-[min(780px,86vh)] min-h-[480px] flex flex-col rounded-md border shadow-2xl"
-            style={{
-              background: "var(--taomni-bg)",
-              borderColor: "var(--taomni-divider)",
-              color: "var(--taomni-text)",
-            }}
-            role="dialog"
-            aria-modal="true"
-            aria-label={popupMessage.subject || "Mail message"}
-          >
-            <div className="h-9 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
-              <MailOpen className="w-4 h-4 text-[var(--taomni-text-muted)]" />
-              <span className="text-[12px] font-semibold min-w-0 flex-1 truncate">
-                {popupMessage.subject || "(no subject)"}
-              </span>
+          <MailDraggableDialog
+            title={popupMessage.subject || "(no subject)"}
+            icon={<MailOpen className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel={popupMessage.subject || "Mail message"}
+            minWidth={640}
+            minHeight={420}
+            className="w-[min(1120px,92vw)] h-[min(780px,86vh)] min-h-[480px]"
+            onClose={() => setPopupMessageKey(null)}
+            headerActions={(
               <button
                 type="button"
                 className="taomni-btn h-6 px-2 text-[11px]"
@@ -2093,33 +2149,26 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
               >
                 Open tab
               </button>
-              <button
-                type="button"
-                className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-                onClick={() => setPopupMessageKey(null)}
-                aria-label="Close popup"
-                title="Close"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            )}
+          >
             <div className="flex-1 min-h-0">
               {renderReaderSurface(popupMessage, true)}
             </div>
-          </section>
+          </MailDraggableDialog>
         </div>
       )}
 
       {composeOpen && (
         <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4">
-          <div className="w-[760px] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)] flex flex-col rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] shadow-xl">
-            <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
-              <MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />
-              <span className="text-[12px] font-semibold">New message</span>
-              <button type="button" className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ml-auto" onClick={() => setComposeOpen(false)}>
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          <MailDraggableDialog
+            title="New message"
+            icon={<MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="New message"
+            minWidth={520}
+            minHeight={360}
+            className="w-[760px] h-[min(620px,calc(100vh-72px))] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)]"
+            onClose={() => setComposeOpen(false)}
+          >
             <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
               <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-to-${tabId}`}>To</label>
               <input id={`mail-to-${tabId}`} className="taomni-input h-7" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} />
@@ -2145,7 +2194,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                 Send
               </button>
             </div>
-          </div>
+          </MailDraggableDialog>
         </div>
       )}
     </div>
