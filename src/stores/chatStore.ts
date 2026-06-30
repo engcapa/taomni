@@ -111,6 +111,7 @@ function isChatCapableTabType(type: string | null | undefined): boolean {
     type === "rdp" ||
     type === "database" ||
     type === "redis" ||
+    type === "mail" ||
     type === "code-workspace"
   );
 }

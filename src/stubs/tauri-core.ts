@@ -540,6 +540,131 @@ const LANCHAT_MOCK_MESSAGES: Record<string, unknown[]> = {
   ],
 };
 
+const MAIL_STUB_FOLDERS = [
+  { name: "INBOX", displayName: "INBOX", total: 3, unread: 1 },
+  { name: "Sent", displayName: "Sent", total: 1, unread: 0 },
+  { name: "Archive", displayName: "Archive", total: 8, unread: 0 },
+];
+
+function stubMailAccountId(args?: InvokeArgs): string {
+  const config = args?.config as { sessionId?: string } | undefined;
+  return ((args?.accountId as string | undefined) ?? config?.sessionId ?? "stub-mail").trim() || "stub-mail";
+}
+
+function stubMailFolderList(accountId: string) {
+  const now = Math.floor(Date.now() / 1000);
+  return MAIL_STUB_FOLDERS.map((folder) => ({
+    accountId,
+    name: folder.name,
+    displayName: folder.displayName,
+    delimiter: "/",
+    flags: [],
+    uidValidity: 1,
+    uidNext: 100,
+    total: folder.total,
+    unread: folder.unread,
+    updatedAt: now,
+  }));
+}
+
+function stubMailMessages(accountId: string, folder: string) {
+  const now = Math.floor(Date.now() / 1000);
+  const inbox = [
+    {
+      accountId,
+      folder: "INBOX",
+      uid: 91,
+      messageId: "<stub-91@taomni.local>",
+      subject: "Welcome to Taomni Mail",
+      from: { name: "Taomni Mail", address: "mail-preview@taomni.local" },
+      to: [{ name: "Preview User", address: "user@example.com" }],
+      cc: [],
+      dateTs: now - 1800,
+      flags: [],
+      hasAttachments: false,
+      attachmentCount: 0,
+      attachments: [],
+      snippet: "This preview uses IMAP/SMTP-shaped data and the same cache-first reader flow as the desktop backend.",
+      rawSize: 8432,
+      bodyCached: true,
+    },
+    {
+      accountId,
+      folder: "INBOX",
+      uid: 90,
+      messageId: "<stub-90@taomni.local>",
+      subject: "Account-level AI policy",
+      from: { name: "AI Assistant", address: "assistant@taomni.local" },
+      to: [{ name: "Preview User", address: "user@example.com" }],
+      cc: [],
+      dateTs: now - 7200,
+      flags: ["\\Seen"],
+      hasAttachments: true,
+      attachmentCount: 1,
+      attachments: [{ name: "policy.txt", contentType: "text/plain", size: 1240 }],
+      snippet: "Mail AI actions can reuse the existing Taomni chat drawer and skip body confirmation per account config.",
+      rawSize: 12980,
+      bodyCached: true,
+    },
+    {
+      accountId,
+      folder: "INBOX",
+      uid: 89,
+      messageId: "<stub-89@taomni.local>",
+      subject: "HTML newsletter sample",
+      from: { name: "Ops Digest", address: "ops@example.com" },
+      to: [{ name: "Preview User", address: "user@example.com" }],
+      cc: [],
+      dateTs: now - 86400,
+      flags: ["\\Seen"],
+      hasAttachments: false,
+      attachmentCount: 0,
+      attachments: [],
+      snippet: "Remote images are blocked in the reader until explicitly loaded.",
+      rawSize: 33120,
+      bodyCached: true,
+    },
+  ];
+  if (folder === "Sent") {
+    return [{
+      ...inbox[0],
+      folder,
+      uid: 12,
+      subject: "Sent preview message",
+      from: { name: "Preview User", address: "user@example.com" },
+      to: [{ name: "Teammate", address: "team@example.com" }],
+      flags: ["\\Seen"],
+      snippet: "This is a browser-preview sent message.",
+    }];
+  }
+  if (folder === "Archive") return inbox.slice(1).map((message, index) => ({ ...message, folder, uid: 70 - index }));
+  return inbox;
+}
+
+function stubMailBody(accountId: string, folder: string, uid: number) {
+  const header = stubMailMessages(accountId, folder).find((message) => message.uid === uid) ?? stubMailMessages(accountId, folder)[0];
+  const html = uid === 89
+    ? `<h2>Ops Digest</h2><p>The reader sanitizes HTML and blocks tracking images.</p><p><img src="https://example.com/tracker.png" alt="tracker"></p><table><tr><td>Queue</td><td>Healthy</td></tr></table>`
+    : null;
+  const text = html
+    ? null
+    : `Hello from Taomni Mail preview.\n\nThis body is shaped like a cached IMAP message body. Use Sync in the desktop build to fetch live mailbox data.\n\nSubject: ${header.subject}`;
+  return {
+    accountId,
+    folder,
+    uid: header.uid,
+    messageId: header.messageId,
+    subject: header.subject,
+    text,
+    html,
+    snippet: header.snippet,
+    attachments: header.attachments,
+    rawSize: header.rawSize,
+    cachedAt: Math.floor(Date.now() / 1000),
+    source: "cache",
+  };
+}
+
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   switch (cmd) {
     case "list_sessions": {
@@ -1580,6 +1705,80 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         video_id: kind === "video" ? `stub-video-${Date.now()}` : null,
         model,
       } as T;
+    }
+    // ---------- Mail client commands (browser preview stubs) ----------
+    case "mail_list_cached_folders": {
+      return stubMailFolderList(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+    }
+    case "mail_list_cached_messages": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const limit = Math.max(0, Number((invokeArgs?.limit as number | undefined) ?? 200));
+      const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
+      return stubMailMessages(accountId, folder).slice(offset, offset + limit) as T;
+    }
+    case "mail_sync_headers": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
+      const messages = stubMailMessages(accountId, folder);
+      const limit = Math.max(1, Number((invokeArgs?.limit as number | undefined) ?? messages.length));
+      const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
+      const page = messages.slice(offset, offset + limit);
+      return {
+        accountId,
+        folder,
+        folders: stubMailFolderList(accountId),
+        messages: page,
+        fetchedMessages: page.length,
+        cachedBodies: page.filter((message) => message.bodyCached).length,
+        syncedAt: Math.floor(Date.now() / 1000),
+        offset,
+        limit,
+        hasMore: offset + page.length < messages.length,
+      } as T;
+    }
+    case "mail_sync_all_folders": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folders = stubMailFolderList(accountId);
+      const messages = folders.flatMap((folder) => stubMailMessages(accountId, folder.name));
+      return {
+        accountId,
+        folders,
+        fetchedMessages: messages.length,
+        cachedBodies: messages.filter((message) => message.bodyCached).length,
+        syncedAt: Math.floor(Date.now() / 1000),
+      } as T;
+    }
+    case "mail_get_message_body": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number((invokeArgs?.uid as number | undefined) ?? 91);
+      return stubMailBody(accountId, folder, uid) as T;
+    }
+    case "mail_download_attachment": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const targetPath = (invokeArgs?.targetPath as string | undefined) ?? "attachment";
+      return { path: targetPath, name: "policy.txt", contentType: "text/plain", size: 1240 } as T;
+    }
+    case "mail_mark_read": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uids = Array.isArray(invokeArgs?.uids) ? invokeArgs?.uids as unknown[] : [];
+      const all = Boolean(invokeArgs?.all);
+      return { folder, marked: all ? 1 : uids.length } as T;
+    }
+    case "mail_send_message": {
+      return { accepted: true, response: "browser-preview accepted" } as T;
+    }
+    case "mail_test_connection": {
+      return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;
+    }
+    case "mail_clear_cache": {
+      return undefined as T;
     }
     // ---------- Database client commands (desktop-only) ----------
     case "db_connect":

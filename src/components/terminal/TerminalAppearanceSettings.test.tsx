@@ -2,7 +2,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalAppearanceSettings } from "./TerminalAppearanceSettings";
-import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../../lib/terminalProfile";
+import { setAppThemeMode } from "../../lib/appTheme";
+import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME, type TerminalProfile } from "../../lib/terminalProfile";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
@@ -33,6 +34,7 @@ describe("TerminalAppearanceSettings", () => {
     ipcMocks.listSystemFonts.mockResolvedValue(["Arial", "Source Code Pro", "JetBrains Mono"]);
     runtimeMocks.getAppPlatform.mockReset();
     runtimeMocks.getAppPlatform.mockReturnValue("linux");
+    setAppThemeMode("system");
   });
 
   afterEach(() => {
@@ -65,6 +67,21 @@ describe("TerminalAppearanceSettings", () => {
     await user.click(screen.getByRole("button", { name: "Use theme Kanagawa Wave" }));
 
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "kanagawa-wave" }));
+  });
+
+  it("resolves the system terminal theme from the application theme", () => {
+    setAppThemeMode("dark");
+    render(
+      <TerminalAppearanceSettings
+        profile={{ ...DEFAULT_TERMINAL_PROFILE, theme: SYSTEM_TERMINAL_THEME }}
+        onProfileChange={vi.fn()}
+        showCustomColors
+        allowSystemTheme
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Use system theme" })).toHaveAttribute("data-selected", "true");
+    expect(screen.getByText("Currently using Termius Dark")).toBeInTheDocument();
   });
 
   it("merges successive edits before the parent rerenders", async () => {

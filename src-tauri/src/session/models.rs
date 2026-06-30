@@ -46,6 +46,9 @@ pub enum SessionType {
     Redis,
     HBaseShell,
     Proxy,
+    /// Generic IMAP + SMTP email account. Endpoint, cache, and AI policy
+    /// options live in `options_json`; credentials are stored as vault refs.
+    Mail,
     /// S3 and any S3-compatible object storage (AWS S3, Alibaba OSS via its
     /// S3-compatible endpoint, MinIO, Cloudflare R2, Backblaze B2, Wasabi,
     /// Tencent COS, Ceph, ...). The concrete provider + endpoint + addressing
@@ -82,6 +85,7 @@ impl SessionType {
             Self::Redis => "Redis",
             Self::HBaseShell => "HBaseShell",
             Self::Proxy => "Proxy",
+            Self::Mail => "Mail",
             Self::S3 => "S3",
             Self::AzureBlob => "AzureBlob",
         }
@@ -110,6 +114,7 @@ impl SessionType {
             "Redis" => Self::Redis,
             "HBaseShell" => Self::HBaseShell,
             "Proxy" => Self::Proxy,
+            "Mail" => Self::Mail,
             "S3" => Self::S3,
             "AzureBlob" => Self::AzureBlob,
             _ => Self::SSH,
@@ -134,6 +139,7 @@ impl SessionType {
             Self::Redis => 6379,
             Self::HBaseShell => 8080,
             Self::Proxy => 3128,
+            Self::Mail => 993,
             // Object storage speaks HTTPS; the real endpoint lives in options_json.
             Self::S3 | Self::AzureBlob => 443,
             Self::Serial | Self::LocalShell | Self::File | Self::Browser => 0,
@@ -193,6 +199,7 @@ mod tests {
             ("Rlogin", 513),
             ("Mosh", 60001),
             ("Browser", 0),
+            ("Mail", 993),
         ] {
             let ty = SessionType::from_str(raw);
             assert_eq!(ty.as_str(), raw);

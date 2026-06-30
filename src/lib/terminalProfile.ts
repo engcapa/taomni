@@ -44,6 +44,10 @@ export interface TerminalProfile {
   commonCommandsShortcut: string;
 }
 
+export const SYSTEM_TERMINAL_THEME = "system";
+export const SYSTEM_DARK_TERMINAL_THEME = "termius-dark";
+export const SYSTEM_LIGHT_TERMINAL_THEME = "termius-light";
+
 export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   fontFamily: makeTerminalFontFamily(SOURCE_CODE_PRO),
   fontSize: 14,
@@ -70,6 +74,11 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   aiInlineQqRender: false,
   commonCommands: [],
   commonCommandsShortcut: "Ctrl+Shift+P",
+};
+
+export const DEFAULT_MAIL_TERMINAL_PROFILE: TerminalProfile = {
+  ...DEFAULT_TERMINAL_PROFILE,
+  theme: SYSTEM_TERMINAL_THEME,
 };
 
 const TERMINAL_PROFILE_STORAGE_KEY = "taomni.terminalProfile.v1";
@@ -206,6 +215,14 @@ export function terminalProfileThemeColors(profile: TerminalProfile): { backgrou
     background: theme.background ?? terminalThemes.classic.background ?? "#1d1f21",
     foreground: theme.foreground ?? terminalThemes.classic.foreground ?? "#eaeaea",
   };
+}
+
+export function resolveSystemTerminalThemeId(prefersDark: boolean): string {
+  return prefersDark ? SYSTEM_DARK_TERMINAL_THEME : SYSTEM_LIGHT_TERMINAL_THEME;
+}
+
+export function resolveTerminalThemeWithSystem(theme: string, prefersDark: boolean): ITheme {
+  return resolveTerminalTheme(theme === SYSTEM_TERMINAL_THEME ? resolveSystemTerminalThemeId(prefersDark) : theme);
 }
 
 export function resolveTerminalTheme(theme: string): ITheme {

@@ -11,6 +11,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   Serial: 0,
   Browser: 0,
   Mosh: 60001,
+  Mail: 993,
   LocalShell: 0,
 };
 
@@ -27,6 +28,8 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   browser: "Browser",
   http: "Browser",
   https: "Browser",
+  mail: "Mail",
+  imap: "Mail",
   shell: "LocalShell",
   local: "LocalShell",
   bash: "LocalShell",
@@ -105,9 +108,30 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
   const port = sessionType === "Serial" ? 0 : (parsed.port ?? DEFAULT_PORTS[sessionType] ?? 22);
   const username = parsed.username ?? (sessionType === "SSH" || sessionType === "SFTP" ? "root" : null);
   const authMethod: AuthMethod =
-    sessionType === "SSH" || sessionType === "RDP" ? "Password" : "None";
+    sessionType === "SSH" || sessionType === "RDP" || sessionType === "Mail" ? "Password" : "None";
   const titlePrefix = username ? `${username}@` : "";
-  const optionsJson = serialBaud ? JSON.stringify({ serialBaud: String(serialBaud) }) : "{}";
+  const optionsJson = sessionType === "Mail"
+    ? JSON.stringify({
+        mailSignature: "",
+        mailImapSecurity: "TLS",
+        mailSmtpHost: "",
+        mailSmtpPort: "465",
+        mailSmtpSecurity: "TLS",
+        mailSmtpUseImapAuth: true,
+        mailCacheEnabled: true,
+        mailSaveDirectory: "",
+        mailHeaderRetentionDays: "30",
+        mailHeaderLimitPerFolder: "2000",
+        mailBodyRecentLimit: "200",
+        mailBodyMaxBytes: "262144",
+        mailAttachmentCache: false,
+        mailSyncOnOpen: true,
+        mailSyncIntervalMinutes: "5",
+        mailMaxFetchPerSync: "200",
+        mailAiEnabled: true,
+        mailAiSkipBodyConfirm: false,
+      })
+    : serialBaud ? JSON.stringify({ serialBaud: String(serialBaud) }) : "{}";
 
   return {
     transient: true,

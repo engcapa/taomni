@@ -21,6 +21,7 @@ import {
   Database,
   Globe,
   Server,
+  Mail,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
@@ -1828,6 +1829,8 @@ function sessionIcon(type: string) {
       return <Database className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />;
     case "Redis":
       return <Database className="w-3.5 h-3.5" style={{ color: "#d82c20" }} />;
+    case "Mail":
+      return <Mail className="w-3.5 h-3.5" style={{ color: "#256f6a" }} />;
     case "File":
       return <FileText className="w-3.5 h-3.5" style={{ color: "var(--taomni-text-muted)" }} />;
     default:
