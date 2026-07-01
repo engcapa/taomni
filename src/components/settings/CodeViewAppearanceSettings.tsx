@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import {
   CODE_VIEW_THEME_APP,
+  CODE_VIEW_THEME_SYSTEM,
   CODE_VIEW_THEME_TERMINAL,
-  codeThemeVariables,
-  resolveCodeViewTerminalTheme,
+  resolveCodeThemeVars,
   type CodeViewProfile,
 } from "../../lib/codeViewProfile";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import { TERMINAL_THEME_DEFINITIONS, getTerminalThemeDefinition } from "../../lib/themes";
+import { CODE_THEME_DEFINITIONS } from "../../lib/codeThemes";
+import { useAppTheme } from "../../lib/appTheme";
 import {
   getPrimaryFontName,
   isMonospaceFont,
@@ -175,10 +177,25 @@ export function CodeViewAppearanceSettings({
             value={profile.theme}
             onChange={(event) => updateProfile({ theme: event.target.value })}
           >
+            <option value={CODE_VIEW_THEME_SYSTEM}>{t("codeViewAppearance.themeFollowSystem")}</option>
             <option value={CODE_VIEW_THEME_APP}>{t("codeViewAppearance.themeFollowApp")}</option>
             <option value={CODE_VIEW_THEME_TERMINAL}>
               {t("codeViewAppearance.themeFollowTerminal", { name: terminalThemeName })}
             </option>
+            <optgroup label={t("codeViewAppearance.themeEditorDarkGroup")}>
+              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "dark").map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label={t("codeViewAppearance.themeEditorLightGroup")}>
+              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "light").map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </optgroup>
             <optgroup label={t("codeViewAppearance.themeTerminalGroup")}>
               {TERMINAL_THEME_DEFINITIONS.map((definition) => (
                 <option key={definition.id} value={definition.id}>
@@ -208,8 +225,8 @@ function CodeViewPreview({
   terminalProfile: TerminalProfile;
   fontFamily: string;
 }) {
-  const terminalTheme = resolveCodeViewTerminalTheme(profile, terminalProfile);
-  const vars = terminalTheme ? codeThemeVariables(terminalTheme) : null;
+  const { resolvedTheme } = useAppTheme();
+  const vars = resolveCodeThemeVars(profile, { resolvedAppTheme: resolvedTheme, terminalProfile });
   const style = {
     background: vars?.["--taomni-code-bg"] ?? "var(--taomni-code-bg)",
     color: vars?.["--taomni-code-text"] ?? "var(--taomni-code-text)",

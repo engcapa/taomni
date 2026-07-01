@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import mermaid from "mermaid";
 import { useAppStore } from "../../stores/appStore";
+import { DEFAULT_CODE_VIEW_PROFILE, saveCodeViewProfile } from "../../lib/codeViewProfile";
 import type { CodeWorkspaceTabInfo } from "../../types";
 import type {
   LspDocumentStatus,
@@ -290,7 +291,7 @@ describe("CodeWorkspaceTab", () => {
     });
   });
 
-  it("keeps file tree zoom separate from editor zoom and theme controls", async () => {
+  it("keeps file tree zoom separate from editor zoom", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-appearance",
@@ -304,6 +305,12 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
 
     expect(await screen.findByText("Code · Appearance")).toBeInTheDocument();
+
+    // The tree's font size must be bound to the zoom variable (not just row
+    // height), so zooming the left pane actually resizes its text.
+    expect(screen.getByTestId("code-workspace-tree").style.fontSize).toBe(
+      "var(--taomni-code-tree-font-size)",
+    );
 
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-in"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
@@ -332,13 +339,33 @@ describe("CodeWorkspaceTab", () => {
 
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-out"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
+  });
 
-    fireEvent.change(screen.getByTestId("code-workspace-theme-select"), {
-      target: { value: "kanagawa-wave" },
+  it("has no theme picker and follows the shared Code View Appearance profile", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-theme-follow",
+      name: "Theme",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "export const answer = 42;"));
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Theme")).toBeInTheDocument();
+    // The workspace no longer owns a theme selector; theme is set in Settings.
+    expect(screen.queryByTestId("code-workspace-theme-select")).toBeNull();
+
+    // A Settings edit (persisted via saveCodeViewProfile) is picked up live and
+    // applied to the shared code-view CSS variables the workspace renders with.
+    act(() => {
+      saveCodeViewProfile({ ...DEFAULT_CODE_VIEW_PROFILE, theme: "kanagawa-wave" });
     });
-    saved = JSON.parse(window.localStorage.getItem("taomni.codeViewProfile.v1") ?? "{}");
-    expect(saved.theme).toBe("kanagawa-wave");
-    expect(document.documentElement.style.getPropertyValue("--taomni-code-bg")).toBe("#1f1f28");
+    await waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue("--taomni-code-bg")).toBe("#1f1f28");
+    });
   });
 
   it("mirrors active files, loose files, and diagnostics into agent workspace context", async () => {

@@ -2,9 +2,20 @@ import type { ITheme } from "@xterm/xterm";
 import { DEFAULT_TERMINAL_PROFILE, resolveTerminalTheme, type TerminalProfile } from "./terminalProfile";
 import { makeTerminalFontFamily } from "./systemFonts";
 import { resolveThemeId, terminalThemes } from "./themes";
+import { getAppThemeMode, resolveAppThemeMode, type ResolvedAppTheme } from "./appTheme";
+import {
+  CODE_THEME_COLOR_VARS,
+  CODE_VIEW_THEME_SYSTEM,
+  codeThemeVariablesFromPalette,
+  getCodeThemeDefinition,
+  isCodeThemeId,
+  resolveSystemCodeThemeId,
+  type CodeThemeVars,
+} from "./codeThemes";
 
 export const CODE_VIEW_THEME_APP = "app";
 export const CODE_VIEW_THEME_TERMINAL = "terminal";
+export { CODE_VIEW_THEME_SYSTEM } from "./codeThemes";
 
 export interface CodeViewProfile {
   fontFamily: string;
@@ -17,62 +28,11 @@ export const DEFAULT_CODE_VIEW_PROFILE: CodeViewProfile = {
   fontFamily: makeTerminalFontFamily("JetBrains Mono"),
   fontSize: 13,
   fontLigatures: true,
-  theme: CODE_VIEW_THEME_APP,
+  theme: CODE_VIEW_THEME_SYSTEM,
 };
 
 const CODE_VIEW_PROFILE_STORAGE_KEY = "taomni.codeViewProfile.v1";
-
-const CODE_THEME_COLOR_VARS = [
-  "--taomni-code-bg",
-  "--taomni-code-gutter-bg",
-  "--taomni-code-text",
-  "--taomni-code-muted",
-  "--taomni-code-line-number",
-  "--taomni-code-line-number-active",
-  "--taomni-code-border",
-  "--taomni-code-active-line-bg",
-  "--taomni-code-active-line-gutter-bg",
-  "--taomni-code-selection-bg",
-  "--taomni-code-selection-text",
-  "--taomni-code-selection-match-bg",
-  "--taomni-code-selection-match-border",
-  "--taomni-code-caret",
-  "--taomni-code-bracket-match-bg",
-  "--taomni-code-bracket-match-border",
-  "--taomni-code-bracket-error-bg",
-  "--taomni-code-tooltip-bg",
-  "--taomni-code-scrollbar-track",
-  "--taomni-code-scrollbar-thumb",
-  "--taomni-code-syntax-keyword",
-  "--taomni-code-syntax-variable",
-  "--taomni-code-syntax-property",
-  "--taomni-code-syntax-function",
-  "--taomni-code-syntax-type",
-  "--taomni-code-syntax-string",
-  "--taomni-code-syntax-escape",
-  "--taomni-code-syntax-number",
-  "--taomni-code-syntax-atom",
-  "--taomni-code-syntax-comment",
-  "--taomni-code-syntax-operator",
-  "--taomni-code-syntax-punctuation",
-  "--taomni-code-syntax-link",
-  "--taomni-code-syntax-heading",
-  "--taomni-code-syntax-inserted",
-  "--taomni-code-syntax-deleted",
-  "--taomni-code-syntax-changed",
-  "--taomni-code-syntax-invalid",
-  "--taomni-code-diff-added-bg",
-  "--taomni-code-diff-added-word",
-  "--taomni-code-diff-deleted-bg",
-  "--taomni-code-diff-deleted-word",
-  "--taomni-code-diff-deleted-border",
-  "--taomni-code-diff-modified-bg",
-  "--taomni-code-diff-modified-word",
-  "--taomni-code-diff-connector-added",
-  "--taomni-code-diff-connector-deleted",
-  "--taomni-code-diff-connector-modified",
-  "--taomni-code-diff-connector-stroke",
-] as const;
+const CODE_VIEW_PROFILE_EVENT = "taomni:code-view-profile-changed";
 
 export function loadCodeViewProfile(): CodeViewProfile {
   if (typeof window === "undefined") return DEFAULT_CODE_VIEW_PROFILE;
@@ -86,14 +46,51 @@ export function loadCodeViewProfile(): CodeViewProfile {
 
 export function saveCodeViewProfile(profile: CodeViewProfile): void {
   if (typeof window === "undefined") return;
+  const normalized = normalizeCodeViewProfile(profile);
   try {
-    window.localStorage.setItem(
-      CODE_VIEW_PROFILE_STORAGE_KEY,
-      JSON.stringify(normalizeCodeViewProfile(profile)),
-    );
+    window.localStorage.setItem(CODE_VIEW_PROFILE_STORAGE_KEY, JSON.stringify(normalized));
   } catch {
     // localStorage can be unavailable in restricted webviews.
   }
+  try {
+    window.dispatchEvent(new CustomEvent(CODE_VIEW_PROFILE_EVENT, { detail: normalized }));
+  } catch {
+    // CustomEvent may be unavailable in exotic environments.
+  }
+}
+
+/**
+ * Subscribe to code-view profile changes. Fires when {@link saveCodeViewProfile}
+ * runs in this window (via a CustomEvent) and when another window mutates the
+ * shared localStorage key (via the native `storage` event). Returns an
+ * unsubscribe function. This lets views that stay mounted (e.g. the Code
+ * Workspace) follow edits made in Settings without owning their own copy.
+ */
+export function subscribeCodeViewProfile(listener: (profile: CodeViewProfile) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onCustom = (event: Event) => {
+    const detail = (event as CustomEvent<CodeViewProfile>).detail;
+    listener(normalizeCodeViewProfile(detail));
+  };
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== null && event.key !== CODE_VIEW_PROFILE_STORAGE_KEY) return;
+    listener(loadCodeViewProfile());
+  };
+  window.addEventListener(CODE_VIEW_PROFILE_EVENT, onCustom as EventListener);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(CODE_VIEW_PROFILE_EVENT, onCustom as EventListener);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function sameCodeViewProfile(a: CodeViewProfile, b: CodeViewProfile): boolean {
+  return (
+    a.fontFamily === b.fontFamily &&
+    a.fontSize === b.fontSize &&
+    a.fontLigatures === b.fontLigatures &&
+    a.theme === b.theme
+  );
 }
 
 export function normalizeCodeViewProfile(input: unknown): CodeViewProfile {
@@ -106,20 +103,70 @@ export function normalizeCodeViewProfile(input: unknown): CodeViewProfile {
   };
 }
 
+function currentResolvedAppTheme(): ResolvedAppTheme {
+  return resolveAppThemeMode(getAppThemeMode());
+}
+
+/**
+ * Legacy helper: resolves the profile to an xterm `ITheme` only for the
+ * terminal-mirroring paths. App/system/editor themes return `null` — callers
+ * that need full colours for those should use {@link resolveCodeThemeVars}.
+ */
 export function resolveCodeViewTerminalTheme(
   profile: CodeViewProfile,
   terminalProfile: TerminalProfile = DEFAULT_TERMINAL_PROFILE,
 ): ITheme | null {
-  if (profile.theme === CODE_VIEW_THEME_APP) return null;
   if (profile.theme === CODE_VIEW_THEME_TERMINAL) return resolveTerminalTheme(terminalProfile.theme);
+  if (
+    profile.theme === CODE_VIEW_THEME_APP ||
+    profile.theme === CODE_VIEW_THEME_SYSTEM ||
+    isCodeThemeId(profile.theme)
+  ) {
+    return null;
+  }
   return resolveTerminalTheme(profile.theme);
+}
+
+/**
+ * Resolves the profile to the full `--taomni-code-*` variable set consumed by
+ * both the Code Workspace and the Git diff view. Returns `null` for the "app"
+ * theme, which defers to the values declared in `index.css`.
+ */
+export function resolveCodeThemeVars(
+  profile: CodeViewProfile,
+  options: { resolvedAppTheme?: ResolvedAppTheme; terminalProfile?: TerminalProfile } = {},
+): CodeThemeVars | null {
+  const terminalProfile = options.terminalProfile ?? DEFAULT_TERMINAL_PROFILE;
+  const resolvedAppTheme = options.resolvedAppTheme ?? currentResolvedAppTheme();
+  const theme = profile.theme;
+
+  if (theme === CODE_VIEW_THEME_APP) return null;
+  if (theme === CODE_VIEW_THEME_SYSTEM) {
+    const def = getCodeThemeDefinition(resolveSystemCodeThemeId(resolvedAppTheme));
+    return def ? codeThemeVariablesFromPalette(def.palette) : null;
+  }
+  if (theme === CODE_VIEW_THEME_TERMINAL) {
+    return codeThemeVariables(resolveTerminalTheme(terminalProfile.theme));
+  }
+  if (isCodeThemeId(theme)) {
+    const def = getCodeThemeDefinition(theme);
+    return def ? codeThemeVariablesFromPalette(def.palette) : null;
+  }
+  // Back-compat: profiles that stored a terminal-theme id (e.g. "kanagawa-wave").
+  return codeThemeVariables(resolveTerminalTheme(theme));
 }
 
 export function applyCodeViewProfile(
   profile: CodeViewProfile,
   terminalProfile: TerminalProfile = DEFAULT_TERMINAL_PROFILE,
-  root: HTMLElement | null = typeof document === "undefined" ? null : document.documentElement,
+  options: { resolvedAppTheme?: ResolvedAppTheme; root?: HTMLElement | null } = {},
 ): void {
+  const root =
+    options.root !== undefined
+      ? options.root
+      : typeof document === "undefined"
+        ? null
+        : document.documentElement;
   if (!root) return;
   const normalized = normalizeCodeViewProfile(profile);
   root.style.setProperty("--taomni-code-font-family", normalized.fontFamily);
@@ -130,21 +177,23 @@ export function applyCodeViewProfile(
   );
   root.style.setProperty("--taomni-mono-font", "var(--taomni-code-font-family)");
 
-  const theme = resolveCodeViewTerminalTheme(normalized, terminalProfile);
-  if (!theme) {
+  const colors = resolveCodeThemeVars(normalized, {
+    resolvedAppTheme: options.resolvedAppTheme,
+    terminalProfile,
+  });
+  if (!colors) {
     for (const variable of CODE_THEME_COLOR_VARS) {
       root.style.removeProperty(variable);
     }
     return;
   }
 
-  const colors = codeThemeVariables(theme);
   for (const [variable, value] of Object.entries(colors)) {
     root.style.setProperty(variable, value);
   }
 }
 
-export function codeThemeVariables(theme: ITheme): Record<(typeof CODE_THEME_COLOR_VARS)[number], string> {
+export function codeThemeVariables(theme: ITheme): CodeThemeVars {
   const bg = color(theme.background, "#1d1f21");
   const fg = color(theme.foreground, "#eaeaea");
   const black = color(theme.black, bg);
@@ -214,7 +263,14 @@ export function codeThemeVariables(theme: ITheme): Record<(typeof CODE_THEME_COL
 function readTheme(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const theme = value.trim();
-  if (theme === CODE_VIEW_THEME_APP || theme === CODE_VIEW_THEME_TERMINAL) return theme;
+  if (
+    theme === CODE_VIEW_THEME_APP ||
+    theme === CODE_VIEW_THEME_SYSTEM ||
+    theme === CODE_VIEW_THEME_TERMINAL
+  ) {
+    return theme;
+  }
+  if (isCodeThemeId(theme)) return theme;
   return terminalThemes[resolveThemeId(theme)] ? theme : fallback;
 }
 

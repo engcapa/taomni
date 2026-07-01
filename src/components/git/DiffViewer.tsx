@@ -10,7 +10,7 @@ import {
 import { ChevronDown, ChevronUp, Columns2, Loader2, RefreshCw, Rows2 } from "lucide-react";
 import type { GitBlobPair } from "../../lib/git";
 import { buildDiffOverride, type WhitespaceMode } from "../../lib/diffWhitespace";
-import { codeSyntaxHighlighting, codeViewTheme } from "../../lib/codeViewTheme";
+import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { languageForPath } from "./diffLanguage";
 
 type ViewMode = "split" | "unified";
@@ -55,8 +55,7 @@ function baseExtensions(language: Extension | null): Extension[] {
     lineNumbers(),
     EditorView.editable.of(false),
     EditorState.readOnly.of(true),
-    codeSyntaxHighlighting,
-    codeViewTheme,
+    ...codeViewExtensions(),
     diffTheme,
   ];
   if (language) ext.push(language);
