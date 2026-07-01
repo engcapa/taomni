@@ -159,7 +159,8 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   loadTags: async () => {
     try {
-      set({ tags: await listTags() });
+      const tags = await listTags();
+      set({ tags: Array.isArray(tags) ? tags : [] });
     } catch (e) {
       console.error("notes_list_tags failed:", e);
     }
@@ -273,7 +274,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   refreshAlerts: async () => {
     try {
       const alerts = await listAlerts(nowSecs());
-      set({ alerts });
+      set({ alerts: Array.isArray(alerts) ? alerts : [] });
     } catch (e) {
       console.error("notes_list_alerts failed:", e);
     }

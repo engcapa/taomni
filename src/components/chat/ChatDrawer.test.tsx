@@ -297,7 +297,7 @@ describe("ChatDrawer layout resizing", () => {
   });
 
   it("dismisses a floating drawer on outside pointer down", () => {
-    useChatStore.setState({ drawerPosition: "top" });
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: false });
     render(<ChatDrawer />);
 
     fireEvent.pointerDown(document.body);
@@ -330,6 +330,36 @@ describe("ChatDrawer layout resizing", () => {
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 400, clientY: 320 });
 
     expect(useChatStore.getState().drawerHeight).toBe(520);
+  });
+
+  it("pins the drawer to the top edge as a full-width inline band", () => {
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: true });
+    render(<ChatDrawer />);
+    const drawer = screen.getByTestId("ai-chat-drawer");
+    expect(drawer).toHaveAttribute("data-position", "top");
+    expect(drawer).toHaveAttribute("data-pinned", "true");
+    expect(drawer.className).toContain("w-full");
+    const pin = screen.getByTestId("ai-chat-drawer-pin");
+    expect(pin).toHaveAttribute("aria-pressed", "true");
+    expect(pin).not.toBeDisabled();
+  });
+
+  it("does not dismiss a pinned top drawer on outside pointer down", () => {
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: true });
+    render(<ChatDrawer />);
+    fireEvent.pointerDown(document.body);
+    expect(useChatStore.getState().drawerOpen).toBe(true);
+  });
+
+  it("keeps left/right pin as a side column (no regression)", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1280, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 900, configurable: true });
+    useChatStore.setState({ drawerPosition: "right", drawerPinned: true });
+    render(<ChatDrawer />);
+    const drawer = screen.getByTestId("ai-chat-drawer");
+    expect(drawer.className).toContain("relative");
+    expect(drawer.className).not.toContain("w-full");
+    expect(screen.getByTestId("ai-chat-drawer-pin")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows the Tao Hub tab strip with Chat and Notes tabs", () => {

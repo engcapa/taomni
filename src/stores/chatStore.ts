@@ -193,7 +193,10 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
         : fallback.ribbonOffsetRatio;
     return {
       position,
-      pinned: position === "left" || position === "right" ? parsed.pinned !== false : false,
+      pinned:
+        typeof parsed.pinned === "boolean"
+          ? parsed.pinned
+          : position === "left" || position === "right",
       width: clampDrawerWidth(Number(parsed.width) || fallback.width),
       height: clampDrawerHeight(Number(parsed.height) || fallback.height),
       ribbonOffsetRatio,
@@ -877,12 +880,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ drawerPosition: position, drawerPinned: pinned });
   },
   setDrawerPinned: (pinned) => {
-    const s = get();
-    const nextPinned = s.drawerPosition === "left" || s.drawerPosition === "right"
-      ? pinned
-      : false;
-    writeDrawerLayoutPrefs({ pinned: nextPinned });
-    set({ drawerPinned: nextPinned });
+    // Any edge can now be pinned (top/bottom dock as a horizontal band; §8).
+    writeDrawerLayoutPrefs({ pinned });
+    set({ drawerPinned: pinned });
   },
   setRibbonPlacement: (position, offsetRatio) => {
     const pinned = position === "left" || position === "right";

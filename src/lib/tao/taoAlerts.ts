@@ -74,8 +74,8 @@ export function noteAlertToTao(alert: NoteAlert): TaoAlert {
  * list (highest severity first, then earliest fire time).
  */
 export function buildTaoAlerts(noteAlerts: NoteAlert[], aiDone: TaoAlert[]): TaoAlert[] {
-  const fromNotes = noteAlerts.filter((a) => a.state === "pending").map(noteAlertToTao);
-  const merged = [...fromNotes, ...aiDone];
+  const fromNotes = (noteAlerts ?? []).filter((a) => a.state === "pending").map(noteAlertToTao);
+  const merged = [...fromNotes, ...(aiDone ?? [])];
   merged.sort((a, b) => {
     const pa = taoAlertPriority(a.kind);
     const pb = taoAlertPriority(b.kind);

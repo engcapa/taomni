@@ -99,6 +99,8 @@ import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { TaoRibbon } from "../components/tao/TaoRibbon";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
 import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
+import { resolveChatDock } from "../lib/chat/chatDock";
+import { useViewportSize } from "../hooks/useViewportSize";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
@@ -2740,11 +2742,15 @@ export function MainLayout() {
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
-  const chatDrawerInline =
-    chatDrawerOpen &&
-    !aiFullyDisabled &&
-    chatDrawerPinned &&
-    (chatDrawerPosition === "left" || chatDrawerPosition === "right");
+  const chatDockViewport = useViewportSize();
+  const chatDockMode =
+    chatDrawerOpen && !aiFullyDisabled
+      ? resolveChatDock(chatDrawerPosition, chatDrawerPinned, chatDockViewport.width, chatDockViewport.height)
+      : "floating";
+  const chatDrawerInline = chatDockMode === "side-inline";
+  const chatDrawerTopPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "top";
+  const chatDrawerBottomPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "bottom";
+  const chatDrawerFloating = chatDrawerOpen && !aiFullyDisabled && chatDockMode === "floating";
 
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
@@ -2776,6 +2782,8 @@ export function MainLayout() {
           onHome={() => setActiveTab("welcome")}
         />
       )}
+
+      {chatDrawerTopPinned && <ChatDrawer />}
 
       <div className="flex-1 flex min-h-0">
         {sidebarCollapsed && (
@@ -3447,11 +3455,13 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
-        {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
+        {chatDrawerFloating && <ChatDrawer />}
         {!aiFullyDisabled && <TaoRibbon />}
         <FloatingNotesPanel />
         <TaoAlertPoller />
       </div>
+
+      {chatDrawerBottomPinned && <ChatDrawer />}
 
       <StatusBar />
 

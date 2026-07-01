@@ -49,6 +49,8 @@ import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
+import { resolveChatDock } from "../../lib/chat/chatDock";
+import { useViewportSize } from "../../hooks/useViewportSize";
 import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
@@ -428,8 +430,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   };
 
   const isHorizontalDock = drawerPosition === "left" || drawerPosition === "right";
-  const sideBySide = isHorizontalDock && drawerPinned;
-  const floating = !sideBySide;
+  const viewport = useViewportSize();
+  const dockMode = resolveChatDock(drawerPosition, drawerPinned, viewport.width, viewport.height);
+  const sideBySide = dockMode === "side-inline";
+  const stackedInline = dockMode === "stacked-inline";
+  const floating = dockMode === "floating";
+  const pinnedActive = sideBySide || stackedInline;
 
   useEffect(() => {
     if (!drawerOpen || !floating) return;
@@ -507,12 +513,16 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const PositionIcon = positionIcon(drawerPosition);
   const containerClass = [
     "ai-z-drawer",
-    sideBySide ? "relative h-full shrink-0" : "absolute shadow-2xl",
+    sideBySide ? "relative h-full shrink-0" : "",
+    stackedInline ? "relative w-full shrink-0" : "",
+    !sideBySide && !stackedInline ? "absolute shadow-2xl" : "",
     drawerPosition === "left" ? "order-first" : "",
     floating ? "rounded-md" : "",
   ].filter(Boolean).join(" ");
   const containerStyle: CSSProperties = sideBySide
     ? { width: drawerWidth }
+    : stackedInline
+    ? { height: drawerHeight, width: "100%" }
     : isHorizontalDock
     ? {
         width: drawerWidth,
@@ -537,6 +547,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     ? drawerPosition === "left"
       ? "border-r"
       : "border-l"
+    : stackedInline
+    ? drawerPosition === "top"
+      ? "border-b"
+      : "border-t"
     : "border";
   const providerIds = activeThread ? activeProviderIds : draftProviderIds;
   const selectedProviderId = activeThread
@@ -644,22 +658,19 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           <button
             type="button"
             className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${
-              sideBySide ? "text-[var(--taomni-accent)]" : ""
+              pinnedActive ? "text-[var(--taomni-accent)]" : ""
             }`}
             onClick={() => setDrawerPinned(!drawerPinned)}
-            disabled={!isHorizontalDock}
             title={
-              !isHorizontalDock
-                ? t("chat.drawerPinUnavailable")
-                : drawerPinned
+              pinnedActive
                 ? t("chat.drawerUnpinTitle")
                 : t("chat.drawerPinTitle")
             }
-            aria-label={drawerPinned ? t("chat.drawerUnpinTitle") : t("chat.drawerPinTitle")}
-            aria-pressed={sideBySide}
+            aria-label={pinnedActive ? t("chat.drawerUnpinTitle") : t("chat.drawerPinTitle")}
+            aria-pressed={pinnedActive}
             data-testid="ai-chat-drawer-pin"
           >
-            {sideBySide ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+            {pinnedActive ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
           </button>
           {hubTab === "chat" && (
             <>
