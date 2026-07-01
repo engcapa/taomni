@@ -92,6 +92,9 @@ pub struct AppState {
     pub ssh_auth_responders: Arc<Mutex<HashMap<String, SshAuthResponder>>>,
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
+    /// Dedicated connection to the standalone Tao Notes database (`notes.db`),
+    /// kept separate from `taomni.db` so note storage can evolve independently.
+    pub notes_db: Mutex<rusqlite::Connection>,
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
@@ -158,6 +161,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(
         db: rusqlite::Connection,
+        notes_db: rusqlite::Connection,
         vault: Arc<Vault>,
         ai_ctx: AppAiCtx,
         lanchat: Arc<LanChatState>,
@@ -179,6 +183,7 @@ impl AppState {
             ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
+            notes_db: Mutex::new(notes_db),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
             codex_processes: tokio::sync::Mutex::new(HashMap::new()),

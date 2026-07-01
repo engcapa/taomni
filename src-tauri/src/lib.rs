@@ -16,6 +16,7 @@ mod mail;
 mod migrate;
 pub mod models;
 mod nettools;
+mod notes;
 mod objectstorage;
 pub mod perf;
 mod proxy;
@@ -86,6 +87,14 @@ pub fn run() {
             mail::init_mail_tables(&conn).expect("failed to init mail cache tables");
             servers::db::init_server_tables(&conn).expect("init server tables");
 
+            // Tao Notes lives in its own SQLite file (notes.db), deliberately
+            // separate from taomni.db so its data model / backup / encryption can
+            // evolve independently (see tao-notes-feature-plan.md §5).
+            let notes_db_path = app_data.join("notes.db");
+            let notes_conn =
+                rusqlite::Connection::open(&notes_db_path).expect("failed to open notes database");
+            notes::init_db(&notes_conn).expect("failed to init notes database");
+
             let vault_path = vault::default_vault_path(app.handle());
             let v = vault::Vault::open(&vault_path).expect("failed to open vault");
             let vault_arc = Arc::new(v);
@@ -101,7 +110,7 @@ pub fn run() {
             // Decentralized LAN messenger state (separate lanchat.sqlite).
             let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
 
-            app.manage(AppState::new(conn, vault_arc, ai_ctx, lanchat_state));
+            app.manage(AppState::new(conn, notes_conn, vault_arc, ai_ctx, lanchat_state));
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -648,6 +657,20 @@ pub fn run() {
             lanchat::commands::lanchat_clear_all_history,
             lanchat::commands::lanchat_list_pinned,
             lanchat::commands::lanchat_retrust_peer,
+            notes::commands::notes_list,
+            notes::commands::notes_get,
+            notes::commands::notes_create,
+            notes::commands::notes_update,
+            notes::commands::notes_delete,
+            notes::commands::notes_toggle_complete,
+            notes::commands::notes_archive,
+            notes::commands::notes_list_tags,
+            notes::commands::notes_upsert_tags,
+            notes::commands::notes_set_steps,
+            notes::commands::notes_get_prefs,
+            notes::commands::notes_set_prefs,
+            notes::commands::notes_list_alerts,
+            notes::commands::notes_ack_alert,
             exit_app,
         ])
         .run(tauri::generate_context!())
