@@ -1,0 +1,34 @@
+id: TC-NOTES-006
+title: Chat drawer pins to the top edge as a stacked band
+description: |
+  Verifies top/bottom pinned Chat (F-TAO-1, plan §8): moving the drawer to the
+  top edge and pinning it docks it as a full-width band (data-position=top,
+  data-pinned=true) that a click outside does not dismiss. Left/right side-column
+  pinning and the narrow-window floating fallback are unit-tested in
+  src/lib/chat/chatDock.test.ts and the ChatDrawer suite.
+covers: [F-TAO-1]
+tags: [notes, tao, chat, pin, p2]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - click: '[data-testid="ai-chat-drawer-ribbon"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  # Move the drawer to the top edge via the position menu.
+  - click: '[data-testid="ai-chat-drawer-position"]'
+  - click: '[data-testid="ai-chat-drawer"] >> text="Top"'
+  - wait: 0.3
+  - assert_attribute: { selector: '[data-testid="ai-chat-drawer"]', name: 'data-position', equals: 'top' }
+  # Pin it → it becomes a stacked band that stays put.
+  - click: '[data-testid="ai-chat-drawer-pin"]'
+  - wait: 0.3
+  - assert_attribute: { selector: '[data-testid="ai-chat-drawer"]', name: 'data-pinned', equals: 'true' }
+  - assert_attribute: { selector: '[data-testid="ai-chat-drawer"]', name: 'data-position', equals: 'top' }
+  # A click on the status bar (outside the drawer) must NOT dismiss a pinned drawer.
+  - click: '[data-testid="status-bar"]'
+  - wait: 0.3
+  - assert_visible: '[data-testid="ai-chat-drawer"]'
+  - screenshot: notes-006-chat-top-pin.png

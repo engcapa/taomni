@@ -3380,6 +3380,126 @@ controls:
 - `RedisNewKeyDialog` 模态：Key name / type / 初始值 / TTL 等字段（均 aria-label）
 - **e2e 测试限制**：实际 key 操作需活的 Redis fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 Redis proto → 保存 → 打开标签 → redis-key-browser / redis-cli 挂载」的路由路径，真实 SCAN/读写留待配置 Redis fixture 的手动/native 回归
 
+## 15. Tao Notes 与 Tao Hub
+
+### 15.1 Tao Notes（便签 / 备忘 / 任务）与统一 Tao Ribbon ✅
+
+<!-- feature
+id: F-TAO-1
+status: done
+area: notes
+components: [TaoRibbon, NotesPanel, NotesList, NoteEditor, NoteFilters, NoteThemeSettings, FloatingNotesPanel, TaoAlertInbox, TaoAlertPoller]
+files:
+  - src-tauri/src/notes/db.rs
+  - src-tauri/src/notes/commands.rs
+  - src/lib/notes.ts
+  - src/stores/notesStore.ts
+  - src/stores/taoHubStore.ts
+  - src/stores/taoAlertStore.ts
+  - src/lib/tao/ribbonPlacement.ts
+  - src/lib/tao/taoAlerts.ts
+  - src/lib/notes/notesTheme.ts
+  - src/lib/chat/chatDock.ts
+  - src/components/notes/NotesPanel.tsx
+  - src/components/notes/NotesList.tsx
+  - src/components/notes/NoteEditor.tsx
+  - src/components/notes/NoteFilters.tsx
+  - src/components/notes/NoteThemeSettings.tsx
+  - src/components/notes/FloatingNotesPanel.tsx
+  - src/components/tao/TaoRibbon.tsx
+  - src/components/tao/TaoAlertInbox.tsx
+  - src/components/tao/TaoAlertPoller.tsx
+controls:
+  - id: tao-hub-tab-chat
+    selector: '[data-testid="tao-hub-tab-chat"]'
+    kind: interactive
+    optional: true
+  - id: tao-hub-tab-notes
+    selector: '[data-testid="tao-hub-tab-notes"]'
+    kind: interactive
+    optional: true
+  - id: notes-panel
+    selector: '[data-testid="notes-panel"]'
+    kind: display
+    optional: true
+  - id: notes-new
+    selector: '[data-testid="notes-new"]'
+    kind: interactive
+    optional: true
+  - id: notes-search
+    selector: '[data-testid="notes-search"]'
+    kind: interactive
+    optional: true
+  - id: notes-list-item
+    selector: '[data-testid="notes-list-item"]'
+    kind: interactive
+    optional: true
+  - id: notes-list
+    selector: '[data-testid="notes-list"]'
+    kind: display
+    optional: true
+  - id: notes-toggle-complete
+    selector: '[data-testid="notes-toggle-complete"]'
+    kind: interactive
+    optional: true
+  - id: notes-filter-recent
+    selector: '[data-testid="notes-filter-recent_incomplete"]'
+    kind: interactive
+    optional: true
+  - id: notes-filter-completed
+    selector: '[data-testid="notes-filter-completed"]'
+    kind: interactive
+    optional: true
+  - id: note-editor
+    selector: '[data-testid="note-editor"]'
+    kind: display
+    optional: true
+  - id: note-editor-title
+    selector: '[data-testid="note-editor-title"]'
+    kind: interactive
+    optional: true
+  - id: note-editor-back
+    selector: '[data-testid="note-editor-back"]'
+    kind: interactive
+    optional: true
+  - id: notes-settings-toggle
+    selector: '[data-testid="notes-settings-toggle"]'
+    kind: interactive
+    optional: true
+  - id: note-theme-settings
+    selector: '[data-testid="note-theme-settings"]'
+    kind: display
+    optional: true
+  - id: note-theme-paper
+    selector: '[data-testid="note-theme-paper"]'
+    kind: interactive
+    optional: true
+  - id: note-panel-mode-floating
+    selector: '[data-testid="note-panel-mode-floating"]'
+    kind: interactive
+    optional: true
+  - id: floating-notes-panel
+    selector: '[data-testid="floating-notes-panel"]'
+    kind: display
+    optional: true
+  - id: floating-notes-dock
+    selector: '[data-testid="floating-notes-dock"]'
+    kind: interactive
+    optional: true
+  - id: tao-ribbon-badge
+    selector: '[data-testid="tao-ribbon-badge"]'
+    kind: display
+    optional: true
+-->
+
+- 统一 `TaoRibbon` 四边任意位置悬浮入口，拖动落点决定 edge + offsetRatio（`localStorage: taomni.chatDrawer.layout.v1`），带节制的临期/过期/AI 完成 badge 与跳动提示
+- `Tao Hub`：单一抽屉两个主 tab（`Chat` / `便签`），记住上次 tab（`localStorage: taomni.taoHub.lastTab.v1`）
+- `便签`：独立 `notes.db` + 统一便签模型（完成 / 置顶 / 归档 / 颜色 / 优先级 / due / reminder / 步骤 / 标签）；默认「最近未完成」视图；搜索、过滤视图；主题 taomni/system/light/dark/paper/compact
+- 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
+- `TaoAlertInbox` + `TaoAlertPoller`：便签临期(黄)/过期(红) + AI 后台完成(ai_done) 汇聚，点击跳转目标或打开事件列表
+- Chat 抽屉四边可 pinned：左右为侧栏、上/下为横向条（窄窗自动回退浮动，见 `resolveChatDock`）
+- **e2e 测试限制**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；真实持久化、跨进程提醒调度、原生窗口置顶不在浏览器冒烟覆盖，由 Rust / Vitest 单测承担。Ribbon 拖动、上/下 pin、告警优先级与跳转的判定逻辑分别由 `ribbonPlacement`/`chatDock`/`taoAlerts` 单测覆盖
+
 ---
 
 

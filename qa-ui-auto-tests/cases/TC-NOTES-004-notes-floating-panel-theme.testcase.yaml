@@ -1,0 +1,36 @@
+id: TC-NOTES-004
+title: Notes floating panel and theme
+description: |
+  Verifies notes theming + the singleton floating panel (F-TAO-1): the settings
+  gear opens the theme/panel controls, selecting the "paper" theme re-themes the
+  notes root instantly (data-notes-theme=paper) and persists to note prefs,
+  switching to floating mode pops the single FloatingNotesPanel out of the hub,
+  and docking returns it to the hub.
+covers: [F-TAO-1]
+tags: [notes, tao, theme, p2]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - click: '[data-testid="ai-chat-drawer-ribbon"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  - click: '[data-testid="tao-hub-tab-notes"]'
+  - wait_for: '[data-testid="notes-panel"]'
+  - click: '[data-testid="notes-settings-toggle"]'
+  - wait_for: '[data-testid="note-theme-settings"]'
+  - click: '[data-testid="note-theme-paper"]'
+  - wait: 0.3
+  - assert_attribute: { selector: '[data-testid="notes-panel"]', name: 'data-notes-theme', equals: 'paper' }
+  # Pop out into the single floating panel.
+  - click: '[data-testid="note-panel-mode-floating"]'
+  - wait_for: '[data-testid="floating-notes-panel"]'
+  - assert_count: { selector: '[data-testid="floating-notes-panel"]', equal: 1 }
+  - assert_localstorage: { key: "taomni.stub.notePrefs.v1", contains: "paper" }
+  # Dock back to the hub.
+  - click: '[data-testid="floating-notes-dock"]'
+  - wait: 0.3
+  - assert_not_visible: '[data-testid="floating-notes-panel"]'
+  - screenshot: notes-004-floating-theme.png
