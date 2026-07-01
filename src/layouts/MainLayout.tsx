@@ -102,7 +102,7 @@ import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
 import { resolveChatDock } from "../lib/chat/chatDock";
 import { useViewportSize } from "../hooks/useViewportSize";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
-import { useChatStore } from "../stores/chatStore";
+import { useChatStore, isChatCapableTabType } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
@@ -136,18 +136,9 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
-const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>([
-  "welcome",
-  "terminal",
-  "rdp",
-  "database",
-  "redis",
-  "mail",
-  "code-workspace",
-]);
 
 function chatBindingIdForTab(tab: Tab | null | undefined): string | null {
-  if (!tab || !CHAT_CAPABLE_TAB_TYPES.has(tab.type)) return null;
+  if (!tab || !isChatCapableTabType(tab.type)) return null;
   return tab.chatTabId ?? tab.id;
 }
 

@@ -106,7 +106,7 @@ interface ChatDrawerLayoutPrefs {
   ribbonOffsetRatio: number;
 }
 
-function isChatCapableTabType(type: string | null | undefined): boolean {
+export function isChatCapableTabType(type: string | null | undefined): boolean {
   return (
     type === "welcome" ||
     type === "terminal" ||

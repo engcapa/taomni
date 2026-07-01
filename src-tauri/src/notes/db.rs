@@ -384,6 +384,16 @@ pub fn update_note(
     patch: &UpdateNoteInput,
 ) -> SqlResult<Option<NoteItem>> {
     let ts = now();
+    // Capture the prior schedule so we only invalidate acknowledgements when the
+    // fields that drive alert qualification actually change (a plain title/body
+    // edit must not resurface an alert the user already acknowledged).
+    let prev_schedule: Option<(Option<i64>, Option<i64>)> = conn
+        .query_row(
+            "SELECT due_at, reminder_at FROM notes WHERE id = ?1",
+            params![id],
+            |r| Ok((r.get::<_, Option<i64>>(0)?, r.get::<_, Option<i64>>(1)?)),
+        )
+        .optional()?;
     let affected = conn.execute(
         "UPDATE notes SET
             title = ?1, body = ?2, pinned = ?3, color = ?4, priority = ?5,
@@ -414,8 +424,17 @@ pub fn update_note(
     if let Some(tag_ids) = &patch.tag_ids {
         set_note_tags(conn, id, tag_ids)?;
     }
-    // Editing due/reminder invalidates prior alert acknowledgements.
-    conn.execute("DELETE FROM note_alert_events WHERE note_id = ?1", params![id])?;
+    // Only editing due/reminder invalidates prior alert acknowledgements; other
+    // edits keep them so the same alert stays acknowledged (list_alerts then
+    // re-derives fresh pending events from the new schedule).
+    let schedule_changed = prev_schedule
+        .map(|(prev_due, prev_reminder)| {
+            prev_due != patch.due_at || prev_reminder != patch.reminder_at
+        })
+        .unwrap_or(true);
+    if schedule_changed {
+        conn.execute("DELETE FROM note_alert_events WHERE note_id = ?1", params![id])?;
+    }
     get_note(conn, id)
 }
 
@@ -1070,6 +1089,56 @@ mod tests {
         toggle_complete(&conn, &overdue.id, true).unwrap();
         let after = list_alerts(&conn, base, DEFAULT_DUE_SOON_SECS).unwrap();
         assert!(after.iter().all(|a| a.note_id != overdue.id));
+    }
+
+    #[test]
+    fn edit_preserves_ack_but_reschedule_clears_it() {
+        let conn = mem();
+        let base = now();
+        let note = create(&conn, "pay rent");
+        update_note(
+            &conn,
+            &note.id,
+            &UpdateNoteInput { title: "pay rent".into(), due_at: Some(base - 100), ..Default::default() },
+        )
+        .unwrap();
+
+        // Fire + acknowledge the overdue alert.
+        let alerts = list_alerts(&conn, base, DEFAULT_DUE_SOON_SECS).unwrap();
+        let alert = alerts.iter().find(|a| a.note_id == note.id).unwrap();
+        ack_alert(&conn, &alert.id).unwrap();
+
+        // A plain title/body edit (same schedule) must keep the acknowledgement.
+        update_note(
+            &conn,
+            &note.id,
+            &UpdateNoteInput {
+                title: "pay the rent".into(),
+                body: "before the 1st".into(),
+                due_at: Some(base - 100),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let after_edit = list_alerts(&conn, base, DEFAULT_DUE_SOON_SECS).unwrap();
+        let still = after_edit.iter().find(|a| a.note_id == note.id).unwrap();
+        assert_eq!(still.state, "acknowledged", "plain edit keeps the ack");
+
+        // Changing due_at re-qualifies the alert as pending.
+        update_note(
+            &conn,
+            &note.id,
+            &UpdateNoteInput {
+                title: "pay the rent".into(),
+                body: "before the 1st".into(),
+                due_at: Some(base - 50),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let after_reschedule = list_alerts(&conn, base, DEFAULT_DUE_SOON_SECS).unwrap();
+        let repending = after_reschedule.iter().find(|a| a.note_id == note.id).unwrap();
+        assert_eq!(repending.state, "pending", "rescheduling clears the ack");
     }
 
     #[test]

@@ -109,6 +109,11 @@ interface NotesStore {
   refreshAlerts: () => Promise<void>;
   ackAlert: (id: string) => Promise<void>;
 
+  /// One-shot panel bootstrap: apply persisted prefs (which may restore a
+  /// non-default filter) BEFORE the first list load, so the visible list and
+  /// the filter chip agree on first paint. Holds `loading` across both fetches
+  /// to avoid an empty→loading→empty flicker.
+  initPanel: () => Promise<void>;
   loadPrefs: () => Promise<void>;
   setPanelMode: (mode: NotesPanelMode) => void;
   setPanelPosition: (position: NotesPanelPosition) => void;
@@ -291,6 +296,16 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     } catch (e) {
       console.error("notes_ack_alert failed:", e);
     }
+  },
+
+  initPanel: async () => {
+    const { prefsLoaded, notesLoaded } = get();
+    if (prefsLoaded && notesLoaded) return;
+    // Keep the loading indicator up while prefs resolve so the empty state
+    // never flashes before the (possibly filter-adjusted) list arrives.
+    set({ loading: true });
+    if (!prefsLoaded) await get().loadPrefs();
+    await get().loadNotes();
   },
 
   loadPrefs: async () => {

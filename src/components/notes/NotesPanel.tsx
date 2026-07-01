@@ -21,11 +21,8 @@ export function NotesPanel() {
   const filter = useNotesStore((s) => s.filter);
   const tagFilterId = useNotesStore((s) => s.tagFilterId);
   const tags = useNotesStore((s) => s.tags);
-  const notesLoaded = useNotesStore((s) => s.notesLoaded);
-  const prefsLoaded = useNotesStore((s) => s.prefsLoaded);
-  const loadNotes = useNotesStore((s) => s.loadNotes);
+  const initPanel = useNotesStore((s) => s.initPanel);
   const loadTags = useNotesStore((s) => s.loadTags);
-  const loadPrefs = useNotesStore((s) => s.loadPrefs);
   const setSearch = useNotesStore((s) => s.setSearch);
   const setFilter = useNotesStore((s) => s.setFilter);
   const setTagFilter = useNotesStore((s) => s.setTagFilter);
@@ -37,8 +34,9 @@ export function NotesPanel() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    if (!prefsLoaded) void loadPrefs();
-    if (!notesLoaded) void loadNotes();
+    // Bootstrap prefs → list in order (prefs may restore a non-default filter),
+    // holding the loading state across both so the list matches the filter chip.
+    void initPanel();
     void loadTags();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

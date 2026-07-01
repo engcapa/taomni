@@ -24,6 +24,7 @@ import {
 import {
   normalizeChatThreadMode,
   useChatStore,
+  isChatCapableTabType,
   type ChatDrawerPosition,
   type ChatThreadMode,
 } from "../../stores/chatStore";
@@ -58,7 +59,6 @@ import { NotesPanel } from "../notes/NotesPanel";
 import { TaoAlertInbox } from "../tao/TaoAlertInbox";
 import { alertColorBucket, buildTaoAlerts, topAlertKind, type TaoAlert } from "../../lib/tao/taoAlerts";
 
-const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
 const CHAT_THREAD_MODES: ChatThreadMode[] = ["chat", "image", "video"];
 const SIDE_RIBBON_HOVER_OPEN_DELAY_MS = 260;
@@ -114,7 +114,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   );
   const activeTabId = activeTab?.id ?? null;
   const activeTabType = activeTab?.type ?? null;
-  const activeChatTabId = CHAT_CAPABLE_TAB_TYPES.has(activeTabType ?? "")
+  const activeChatTabId = isChatCapableTabType(activeTabType)
     ? activeTab?.chatTabId ?? activeTabId
     : null;
   // SQL echo toggle (Phase 6) — appended to the linked query tab when CC runs
@@ -1083,7 +1083,7 @@ export function ChatDrawerRibbon() {
     bumpRef.current = taoAlerts.length;
   }, [taoAlerts.length]);
 
-  if (drawerOpen || !activeTab || !CHAT_CAPABLE_TAB_TYPES.has(activeTab.type)) return null;
+  if (drawerOpen || !activeTab || !isChatCapableTabType(activeTab.type)) return null;
 
   const chatTabId = activeTab.chatTabId ?? activeTab.id;
   const placementClass = ribbonPlacementClass(drawerPosition);

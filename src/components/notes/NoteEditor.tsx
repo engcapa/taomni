@@ -3,6 +3,7 @@ import { ArrowLeft, Archive, ArchiveRestore, CheckCircle2, Circle, Pin, Plus, Tr
 import type { NoteItem, StepInput, UpdateNoteInput } from "../../lib/notes";
 import { localInputToSeconds, secondsToLocalInput } from "../../lib/notes";
 import { useNotesStore } from "../../stores/notesStore";
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useT } from "../../lib/i18n";
 
 const COLOR_SWATCHES = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
@@ -156,10 +157,17 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
           type="button"
           className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center hover:text-red-400"
           onClick={() => {
-            if (window.confirm(t("notes.deleteConfirm"))) {
-              void deleteNote(note.id);
-              onClose();
-            }
+            void (async () => {
+              const confirmed = await confirmAppDialog({
+                message: t("notes.deleteConfirm"),
+                confirmLabel: t("notes.delete"),
+                danger: true,
+              });
+              if (confirmed) {
+                await deleteNote(note.id);
+                onClose();
+              }
+            })();
           }}
           title={t("notes.delete")}
           aria-label={t("notes.delete")}
