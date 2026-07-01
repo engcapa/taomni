@@ -18,10 +18,15 @@ describe("notesTheme", () => {
     expect(light["--taomni-bg"]).toBe("#ffffff");
     expect(dark["--taomni-bg"]).toBe("#0f172a");
     expect(paper["--taomni-bg"]).toBe("#fdf6e3");
-    // Every palette must define text + background so nothing is unreadable.
+    // The local theme must cover generic controls inside the Tao pane too.
     for (const p of [light, dark, paper]) {
       expect(p["--taomni-text"]).toBeTruthy();
       expect(p["--taomni-bg"]).toBeTruthy();
+      expect(p["--taomni-input-bg"]).toBeTruthy();
+      expect(p["--taomni-input-border"]).toBeTruthy();
+      expect(p["--taomni-button-from"]).toBeTruthy();
+      expect(p["--taomni-card-bg"]).toBeTruthy();
+      expect(p["--taomni-selected-border"]).toBeTruthy();
     }
   });
 

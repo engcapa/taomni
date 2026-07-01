@@ -56,6 +56,7 @@ import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { NotesPanel } from "../notes/NotesPanel";
+import { notesThemeStyle } from "../../lib/notes/notesTheme";
 import { TaoAlertInbox } from "../tao/TaoAlertInbox";
 import { alertColorBucket, buildTaoAlerts, topAlertKind, type TaoAlert } from "../../lib/tao/taoAlerts";
 
@@ -89,6 +90,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const setHubTab = useTaoHubStore((s) => s.setHubTab);
   const notesPanelMode = useNotesStore((s) => s.panelMode);
   const setNotesPanelMode = useNotesStore((s) => s.setPanelMode);
+  const notesTheme = useNotesStore((s) => s.theme);
   const [error, setError] = useState<string | null>(null);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
@@ -538,6 +540,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         transform: "translateX(-50%)",
         [drawerPosition]: 0,
       };
+  const themedContainerStyle: CSSProperties = hubTab === "notes"
+    ? { ...containerStyle, ...notesThemeStyle(notesTheme) }
+    : containerStyle;
   const resizeHandleClass = isHorizontalDock
     ? `absolute ${drawerPosition === "left" ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"} top-0 bottom-0 w-2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`
     : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0 translate-y-1/2" : "top-0 -translate-y-1/2"} h-2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`;
@@ -575,7 +580,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   return (
     <div
       className={containerClass}
-      style={containerStyle}
+      style={themedContainerStyle}
       data-testid="ai-chat-drawer"
       data-position={drawerPosition}
       data-pinned={drawerPinned || undefined}
@@ -603,7 +608,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
       <div
         className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)] ${floating ? "rounded-md overflow-hidden" : ""}`}
-        style={{ background: "var(--taomni-sidebar-bg)" }}
+        style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}
       >
         {/* Header */}
         <div

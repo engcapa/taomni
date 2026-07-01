@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Archive, ArchiveRestore, CheckCircle2, Circle, Pin, Plus, Trash2, X } from "lucide-react";
 import type { NoteItem, StepInput, UpdateNoteInput } from "../../lib/notes";
-import { localInputToSeconds, secondsToLocalInput } from "../../lib/notes";
 import { useNotesStore } from "../../stores/notesStore";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useT } from "../../lib/i18n";
+import { NoteDateTimeField } from "./NoteDateTimeField";
 
 const COLOR_SWATCHES = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
 const PRIORITIES = [0, 1, 2, 3] as const;
@@ -216,28 +216,18 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
               ))}
             </select>
           </label>
-          <label className="inline-flex items-center gap-1">
-            <span className="text-[var(--taomni-text-muted)]">{t("notes.dueAt")}</span>
-            <input
-              type="datetime-local"
-              className="taomni-input h-6 text-[11px] px-1"
-              value={secondsToLocalInput(note.due_at)}
-              onChange={(e) => commit({ due_at: localInputToSeconds(e.target.value) })}
-              data-testid="note-editor-due"
-              aria-label={t("notes.dueAt")}
-            />
-          </label>
-          <label className="inline-flex items-center gap-1">
-            <span className="text-[var(--taomni-text-muted)]">{t("notes.reminderAt")}</span>
-            <input
-              type="datetime-local"
-              className="taomni-input h-6 text-[11px] px-1"
-              value={secondsToLocalInput(note.reminder_at)}
-              onChange={(e) => commit({ reminder_at: localInputToSeconds(e.target.value) })}
-              data-testid="note-editor-reminder"
-              aria-label={t("notes.reminderAt")}
-            />
-          </label>
+          <NoteDateTimeField
+            label={t("notes.dueAt")}
+            value={note.due_at}
+            onChange={(due_at) => commit({ due_at })}
+            testId="note-editor-due"
+          />
+          <NoteDateTimeField
+            label={t("notes.reminderAt")}
+            value={note.reminder_at}
+            onChange={(reminder_at) => commit({ reminder_at })}
+            testId="note-editor-reminder"
+          />
         </div>
 
         {/* Color */}
