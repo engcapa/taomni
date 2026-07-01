@@ -74,7 +74,7 @@ import {
   type MailMessageHeader,
 } from "../../lib/mail";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
-import { temporaryFilePath } from "../../lib/ipc";
+import { openLocalPath, temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -152,6 +152,7 @@ const MAILBOX_EXPANDED_SIZE = 14;
 const MAIL_BASE_FONT_SIZE = DEFAULT_MAIL_TERMINAL_PROFILE.fontSize;
 const MAIL_MIN_FONT_SIZE = 8;
 const MAIL_MAX_FONT_SIZE = 32;
+const ALL_ATTACHMENTS_INDEX = -1;
 
 function messageKey(message: MailMessageHeader): string {
   return `${message.folder}:${message.uid}`;
@@ -454,6 +455,33 @@ function suggestedAttachmentName(attachment: MailAttachmentInfo, index: number, 
     .replace(/\s+/g, " ")
     .trim();
   return (cleaned || `attachment-${index + 1}`).slice(0, 160);
+}
+
+function splitAttachmentName(name: string): { stem: string; ext: string } {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0 || dot === name.length - 1) return { stem: name, ext: "" };
+  return { stem: name.slice(0, dot), ext: name.slice(dot) };
+}
+
+function uniqueAttachmentName(name: string, usedNames: Set<string>): string {
+  const { stem, ext } = splitAttachmentName(name);
+  let candidate = name;
+  let suffix = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    candidate = `${stem} (${suffix})${ext}`;
+    suffix += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
+function joinLocalPath(dir: string, name: string): string {
+  const base = dir.trim();
+  if (!base) return name;
+  if (base.endsWith("/") || base.endsWith("\\")) return `${base}${name}`;
+  if (/^[A-Za-z]:$/.test(base)) return `${base}\\${name}`;
+  const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
+  return `${base}${sep}${name}`;
 }
 
 function splitRecipients(value: string): string[] {
@@ -1380,23 +1408,22 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   };
 
-  const handleDownloadAttachment = async (attachment: MailAttachmentInfo, index: number) => {
-    if (!selectedMessage) return;
+  const handleDownloadAttachment = async (message: MailMessageHeader, attachment: MailAttachmentInfo, index: number) => {
     setDownloadingAttachmentIndex(index);
     setError(null);
     try {
       const { save } = await import("@tauri-apps/plugin-dialog");
-      const defaultPath = suggestedAttachmentName(attachment, index, selectedMessage.subject);
+      const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
       const targetPath = await save({
         title: "Save attachment",
         defaultPath,
       });
       if (typeof targetPath !== "string" || !targetPath.trim()) {
-        setStatus("Attachment download cancelled");
+        setStatus("Attachment save cancelled");
         return;
       }
-      const result = await mailDownloadAttachment(info, selectedMessage.folder, selectedMessage.uid, index, targetPath);
-      setStatus(`Downloaded attachment to ${result.path}`);
+      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
+      setStatus(`Saved attachment to ${result.path}`);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -1404,16 +1431,14 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   };
 
-  const handleOpenAttachment = async (attachment: MailAttachmentInfo, index: number) => {
-    if (!selectedMessage) return;
+  const handleOpenAttachment = async (message: MailMessageHeader, attachment: MailAttachmentInfo, index: number) => {
     setDownloadingAttachmentIndex(index);
     setError(null);
     try {
-      const defaultPath = suggestedAttachmentName(attachment, index, selectedMessage.subject);
+      const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
       const targetPath = await temporaryFilePath(defaultPath);
-      const result = await mailDownloadAttachment(info, selectedMessage.folder, selectedMessage.uid, index, targetPath);
-      const { open } = await import("@tauri-apps/plugin-shell");
-      await open(result.path);
+      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
+      await openLocalPath(result.path);
       setStatus(`Opened attachment ${result.name || defaultPath}`);
     } catch (e) {
       setError(String(e));
@@ -1422,25 +1447,82 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   };
 
-  const attachmentMenuItems = (attachment: MailAttachmentInfo, index: number): MenuItem[] => [
-    {
-      label: "Save attachment as...",
-      icon: <Download className="w-3.5 h-3.5" />,
-      onClick: () => void handleDownloadAttachment(attachment, index),
-    },
-    {
-      label: "Open with default app",
-      icon: <ExternalLink className="w-3.5 h-3.5" />,
-      onClick: () => void handleOpenAttachment(attachment, index),
-    },
-  ];
+  const handleSaveAllAttachments = async (message: MailMessageHeader, attachments: MailAttachmentInfo[]) => {
+    if (attachments.length === 0) return;
+    setDownloadingAttachmentIndex(ALL_ATTACHMENTS_INDEX);
+    setError(null);
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const targetDir = await open({
+        title: "Save all attachments",
+        directory: true,
+        multiple: false,
+      });
+      if (typeof targetDir !== "string" || !targetDir.trim()) {
+        setStatus("Save all attachments cancelled");
+        return;
+      }
+      const usedNames = new Set<string>();
+      let saved = 0;
+      for (const [index, attachment] of attachments.entries()) {
+        const fileName = uniqueAttachmentName(
+          suggestedAttachmentName(attachment, index, message.subject),
+          usedNames,
+        );
+        await mailDownloadAttachment(info, message.folder, message.uid, index, joinLocalPath(targetDir, fileName));
+        saved += 1;
+      }
+      setStatus(`Saved ${saved} attachment${saved === 1 ? "" : "s"} to ${targetDir}`);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDownloadingAttachmentIndex(null);
+    }
+  };
+
+  const attachmentMenuItems = (
+    message: MailMessageHeader,
+    attachments: MailAttachmentInfo[],
+    attachment: MailAttachmentInfo,
+    index: number,
+  ): MenuItem[] => {
+    const busy = downloadingAttachmentIndex !== null;
+    const items: MenuItem[] = [
+      {
+        label: "Open with default app",
+        icon: <ExternalLink className="w-3.5 h-3.5" />,
+        disabled: busy,
+        onClick: () => void handleOpenAttachment(message, attachment, index),
+      },
+      {
+        label: "Save attachment as...",
+        icon: <Download className="w-3.5 h-3.5" />,
+        disabled: busy,
+        onClick: () => void handleDownloadAttachment(message, attachment, index),
+      },
+    ];
+    if (attachments.length > 1) {
+      items.push(
+        { label: "", separator: true },
+        {
+          label: "Save all attachments...",
+          icon: <Download className="w-3.5 h-3.5" />,
+          disabled: busy,
+          onClick: () => void handleSaveAllAttachments(message, attachments),
+        },
+      );
+    }
+    return items;
+  };
 
   const handleAttachmentContextMenu = (
     event: ReactMouseEvent,
+    message: MailMessageHeader,
+    attachments: MailAttachmentInfo[],
     attachment: MailAttachmentInfo,
     index: number,
   ) => {
-    attachmentMenu.show(event, attachmentMenuItems(attachment, index));
+    attachmentMenu.show(event, attachmentMenuItems(message, attachments, attachment, index));
   };
 
   const copyText = (label: string, value: string | null | undefined) => {
@@ -2055,20 +2137,38 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
               </div>
               {currentAttachments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {currentAttachments.length > 1 && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
+                      title="Save all attachments"
+                      onClick={() => void handleSaveAllAttachments(message, currentAttachments)}
+                      disabled={downloadingAttachmentIndex !== null}
+                    >
+                      {downloadingAttachmentIndex === ALL_ATTACHMENTS_INDEX ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                      <span>Save all</span>
+                    </button>
+                  )}
                   {currentAttachments.map((attachment, index) => {
                     const downloading = downloadingAttachmentIndex === index;
+                    const savingAll = downloadingAttachmentIndex === ALL_ATTACHMENTS_INDEX;
                     const name = attachment.name || `attachment-${index + 1}`;
                     return (
                       <button
                         key={`${name}-${index}`}
                         type="button"
                         className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
-                        title={`Download ${name}; right-click for more actions`}
-                        onClick={() => void handleDownloadAttachment(attachment, index)}
-                        onContextMenu={(event) => handleAttachmentContextMenu(event, attachment, index)}
-                        disabled={downloading}
+                        title={`Double-click to open ${name}; right-click to save`}
+                        onDoubleClick={() => void handleOpenAttachment(message, attachment, index)}
+                        onContextMenu={(event) => handleAttachmentContextMenu(event, message, currentAttachments, attachment, index)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          void handleOpenAttachment(message, attachment, index);
+                        }}
+                        disabled={downloading || savingAll}
                       >
-                        {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
                         <span className="max-w-[360px] truncate">{name}</span>
                         {attachment.size ? <span>{formatBytes(attachment.size)}</span> : null}
                       </button>
@@ -2566,20 +2666,38 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                     </div>
                     {visibleAttachments.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
+                        {visibleAttachments.length > 1 && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
+                            title="Save all attachments"
+                            onClick={() => void handleSaveAllAttachments(selectedMessage, visibleAttachments)}
+                            disabled={downloadingAttachmentIndex !== null}
+                          >
+                            {downloadingAttachmentIndex === ALL_ATTACHMENTS_INDEX ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            <span>Save all</span>
+                          </button>
+                        )}
                         {visibleAttachments.map((attachment, index) => {
                           const downloading = downloadingAttachmentIndex === index;
+                          const savingAll = downloadingAttachmentIndex === ALL_ATTACHMENTS_INDEX;
                           const name = attachment.name || `attachment-${index + 1}`;
                           return (
                             <button
                               key={`${name}-${index}`}
                               type="button"
                               className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
-                              title={`Download ${name}; right-click for more actions`}
-                              onClick={() => void handleDownloadAttachment(attachment, index)}
-                              onContextMenu={(event) => handleAttachmentContextMenu(event, attachment, index)}
-                              disabled={downloading}
+                              title={`Double-click to open ${name}; right-click to save`}
+                              onDoubleClick={() => void handleOpenAttachment(selectedMessage, attachment, index)}
+                              onContextMenu={(event) => handleAttachmentContextMenu(event, selectedMessage, visibleAttachments, attachment, index)}
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") return;
+                                event.preventDefault();
+                                void handleOpenAttachment(selectedMessage, attachment, index);
+                              }}
+                              disabled={downloading || savingAll}
                             >
-                              {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                              {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
                               <span className="max-w-[260px] truncate">{name}</span>
                               {attachment.size ? <span>{formatBytes(attachment.size)}</span> : null}
                             </button>

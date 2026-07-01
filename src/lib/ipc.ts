@@ -592,6 +592,10 @@ export async function temporaryFilePath(defaultName: string): Promise<string> {
   return invoke<string>("temporary_file_path", { defaultName });
 }
 
+export async function openLocalPath(path: string): Promise<void> {
+  return invoke("sftp_open_path", { path });
+}
+
 // --- Command history ────────────────────────────────────────────────
 
 export async function historyAppend(
