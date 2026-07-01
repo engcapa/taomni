@@ -47,6 +47,7 @@ import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
@@ -948,8 +949,9 @@ export function ChatDrawerRibbon() {
   const drawerOpen = useChatStore((s) => s.drawerOpen);
   const drawerPosition = useChatStore((s) => s.drawerPosition);
   const drawerPinned = useChatStore((s) => s.drawerPinned);
+  const ribbonOffsetRatio = useChatStore((s) => s.ribbonOffsetRatio);
   const openTabChat = useChatStore((s) => s.openTabChat);
-  const setDrawerPosition = useChatStore((s) => s.setDrawerPosition);
+  const setRibbonPlacement = useChatStore((s) => s.setRibbonPlacement);
   const activeTab = useAppStore((s) =>
     s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
@@ -987,7 +989,7 @@ export function ChatDrawerRibbon() {
           top: dragPreview.y,
           transform: "translate(-50%, -50%)",
         }
-      : {}),
+      : ribbonPositionStyle({ edge: drawerPosition, offsetRatio: ribbonOffsetRatio })),
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1026,7 +1028,13 @@ export function ChatDrawerRibbon() {
     event.preventDefault();
     event.stopPropagation();
     suppressClickRef.current = true;
-    setDrawerPosition(nearestRibbonPosition(event.clientX, event.clientY));
+    const placement = placementFromPoint(
+      event.clientX,
+      event.clientY,
+      window.innerWidth || 1,
+      window.innerHeight || 1,
+    );
+    setRibbonPlacement(placement.edge, placement.offsetRatio);
     window.setTimeout(() => {
       suppressClickRef.current = false;
     }, 0);
@@ -1126,15 +1134,17 @@ function positionIcon(position: ChatDrawerPosition) {
 }
 
 function ribbonPlacementClass(position: ChatDrawerPosition): string {
+  // Shape only (size / rounding / open border side); the position along the
+  // edge is applied via inline style from ribbonPositionStyle().
   switch (position) {
     case "left":
-      return "left-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-r-full border-l-0";
+      return "h-10 w-5 rounded-r-full border-l-0";
     case "right":
-      return "right-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-l-full border-r-0";
+      return "h-10 w-5 rounded-l-full border-r-0";
     case "top":
-      return "top-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-b-full border-t-0";
+      return "h-5 w-10 rounded-b-full border-t-0";
     case "bottom":
-      return "bottom-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-t-full border-b-0";
+      return "h-5 w-10 rounded-t-full border-b-0";
   }
 }
 
@@ -1148,17 +1158,4 @@ function ribbonTextClass(position: ChatDrawerPosition): string {
     case "bottom":
       return "leading-none";
   }
-}
-
-function nearestRibbonPosition(clientX: number, clientY: number): ChatDrawerPosition {
-  const width = window.innerWidth || 1;
-  const height = window.innerHeight || 1;
-  const distances: Array<[ChatDrawerPosition, number]> = [
-    ["left", clientX],
-    ["right", width - clientX],
-    ["top", clientY],
-    ["bottom", height - clientY],
-  ];
-  distances.sort((a, b) => a[1] - b[1]);
-  return distances[0][0];
 }

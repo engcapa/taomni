@@ -95,7 +95,8 @@ import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
-import { ChatDrawer, ChatDrawerRibbon } from "../components/chat/ChatDrawer";
+import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { TaoRibbon } from "../components/tao/TaoRibbon";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
@@ -3445,7 +3446,7 @@ export function MainLayout() {
           </Panel>
         </PanelGroup>
         {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
-        {!aiFullyDisabled && <ChatDrawerRibbon />}
+        {!aiFullyDisabled && <TaoRibbon />}
       </div>
 
       <StatusBar />
