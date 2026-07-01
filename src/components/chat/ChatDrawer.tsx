@@ -31,6 +31,7 @@ import {
   DEFAULT_CLAUDE_CODE_MODEL,
   DEFAULT_CODEX_MODEL,
   providerGroupIdFromRoute,
+  rememberChatDrawerProviderPreference,
   useAiStore,
   type AiConfig,
   type LlmProviderCapability,
@@ -258,6 +259,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     const ids = chatDrawerProviderIds(aiConfig, capabilityForMode(mode));
     if (preferredProviderId && ids.includes(preferredProviderId)) return preferredProviderId;
     return ids[0] ?? null;
+  };
+
+  const rememberProviderForMode = (mode: ChatThreadMode, providerId: string) => {
+    rememberChatDrawerProviderPreference(providerId, capabilityForMode(mode));
   };
 
   const handleNewThread = async () => {
@@ -751,10 +756,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               value={selectedProviderId}
               aria-label={t("chat.threadProviderAria")}
               onChange={(e) => {
+                const providerId = e.target.value;
+                rememberProviderForMode(currentMode, providerId);
+                setDraftProviderId(providerId);
                 if (activeThread) {
-                  void setThreadProvider(activeThread.id, e.target.value);
-                } else {
-                  setDraftProviderId(e.target.value);
+                  void setThreadProvider(activeThread.id, providerId);
                 }
               }}
             >

@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "./appStore";
 import { useChatStore, type ChatThread } from "./chatStore";
-import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "./aiStore";
+import {
+  DEFAULT_CLAUDE_CODE_MODEL,
+  DEFAULT_CODEX_MODEL,
+  rememberChatDrawerProviderPreference,
+  useAiStore,
+  type AiConfig,
+} from "./aiStore";
 import type { Tab } from "../types";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -102,6 +108,7 @@ function makeThread(overrides: Partial<ChatThread> = {}): ChatThread {
 describe("chatStore new thread provider selection", () => {
   beforeEach(() => {
     invokeMock.mockReset();
+    window.localStorage.clear();
     useAiStore.setState({
       config: makeConfig(),
       loading: false,
@@ -142,14 +149,27 @@ describe("chatStore new thread provider selection", () => {
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     vi.clearAllMocks();
   });
 
-  it("uses Claude Code as the default provider when it is enabled", async () => {
+  it("uses the active LLM provider as the default even when Claude Code is enabled", async () => {
     await useChatStore.getState().newThread(undefined, "term-1");
 
     expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", {
-      providerId: "claude-code",
+      providerId: "deepseek",
+      linkedSessionId: "term-1",
+      mode: "chat",
+    });
+  });
+
+  it("uses the remembered chat provider before the active LLM provider", async () => {
+    rememberChatDrawerProviderPreference("local", "chat");
+
+    await useChatStore.getState().newThread(undefined, "term-1");
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", {
+      providerId: "local",
       linkedSessionId: "term-1",
       mode: "chat",
     });
