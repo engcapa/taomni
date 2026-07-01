@@ -95,9 +95,14 @@ import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type { LocalShellSelection } from "../types";
-import { ChatDrawer, ChatDrawerRibbon } from "../components/chat/ChatDrawer";
+import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { TaoRibbon } from "../components/tao/TaoRibbon";
+import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
+import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
+import { resolveChatDock } from "../lib/chat/chatDock";
+import { useViewportSize } from "../hooks/useViewportSize";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
-import { useChatStore } from "../stores/chatStore";
+import { useChatStore, isChatCapableTabType } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
@@ -131,18 +136,9 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 const MIN_SPLIT_WEIGHT = 0.35;
 const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
 const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
-const CHAT_CAPABLE_TAB_TYPES = new Set<Tab["type"]>([
-  "welcome",
-  "terminal",
-  "rdp",
-  "database",
-  "redis",
-  "mail",
-  "code-workspace",
-]);
 
 function chatBindingIdForTab(tab: Tab | null | undefined): string | null {
-  if (!tab || !CHAT_CAPABLE_TAB_TYPES.has(tab.type)) return null;
+  if (!tab || !isChatCapableTabType(tab.type)) return null;
   return tab.chatTabId ?? tab.id;
 }
 
@@ -2737,11 +2733,15 @@ export function MainLayout() {
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
-  const chatDrawerInline =
-    chatDrawerOpen &&
-    !aiFullyDisabled &&
-    chatDrawerPinned &&
-    (chatDrawerPosition === "left" || chatDrawerPosition === "right");
+  const chatDockViewport = useViewportSize();
+  const chatDockMode =
+    chatDrawerOpen && !aiFullyDisabled
+      ? resolveChatDock(chatDrawerPosition, chatDrawerPinned, chatDockViewport.width, chatDockViewport.height)
+      : "floating";
+  const chatDrawerInline = chatDockMode === "side-inline";
+  const chatDrawerTopPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "top";
+  const chatDrawerBottomPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "bottom";
+  const chatDrawerFloating = chatDrawerOpen && !aiFullyDisabled && chatDockMode === "floating";
 
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
@@ -2773,6 +2773,8 @@ export function MainLayout() {
           onHome={() => setActiveTab("welcome")}
         />
       )}
+
+      {chatDrawerTopPinned && <ChatDrawer />}
 
       <div className="flex-1 flex min-h-0">
         {sidebarCollapsed && (
@@ -3444,9 +3446,13 @@ export function MainLayout() {
             </div>
           </Panel>
         </PanelGroup>
-        {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
-        {!aiFullyDisabled && <ChatDrawerRibbon />}
+        {chatDrawerFloating && <ChatDrawer />}
+        {!aiFullyDisabled && <TaoRibbon />}
+        <FloatingNotesPanel />
+        <TaoAlertPoller />
       </div>
+
+      {chatDrawerBottomPinned && <ChatDrawer />}
 
       <StatusBar />
 

@@ -16,6 +16,7 @@ import {
   PinOff,
   Plus,
   RefreshCw,
+  StickyNote,
   TerminalSquare,
   Video,
   X,
@@ -23,6 +24,7 @@ import {
 import {
   normalizeChatThreadMode,
   useChatStore,
+  isChatCapableTabType,
   type ChatDrawerPosition,
   type ChatThreadMode,
 } from "../../stores/chatStore";
@@ -48,8 +50,17 @@ import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
+import { resolveChatDock } from "../../lib/chat/chatDock";
+import { useViewportSize } from "../../hooks/useViewportSize";
+import { useTaoHubStore } from "../../stores/taoHubStore";
+import { useNotesStore } from "../../stores/notesStore";
+import { useTaoAlertStore } from "../../stores/taoAlertStore";
+import { NotesPanel } from "../notes/NotesPanel";
+import { notesThemeStyle } from "../../lib/notes/notesTheme";
+import { TaoAlertInbox } from "../tao/TaoAlertInbox";
+import { alertColorBucket, buildTaoAlerts, topAlertKind, type TaoAlert } from "../../lib/tao/taoAlerts";
 
-const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
 const CHAT_THREAD_MODES: ChatThreadMode[] = ["chat", "image", "video"];
 const SIDE_RIBBON_HOVER_OPEN_DELAY_MS = 260;
@@ -76,6 +87,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   const [showHistory, setShowHistory] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
+  const hubTab = useTaoHubStore((s) => s.hubTab);
+  const setHubTab = useTaoHubStore((s) => s.setHubTab);
+  const notesPanelMode = useNotesStore((s) => s.panelMode);
+  const setNotesPanelMode = useNotesStore((s) => s.setPanelMode);
+  const notesTheme = useNotesStore((s) => s.theme);
   const [error, setError] = useState<string | null>(null);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
@@ -101,7 +117,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   );
   const activeTabId = activeTab?.id ?? null;
   const activeTabType = activeTab?.type ?? null;
-  const activeChatTabId = CHAT_CAPABLE_TAB_TYPES.has(activeTabType ?? "")
+  const activeChatTabId = isChatCapableTabType(activeTabType)
     ? activeTab?.chatTabId ?? activeTabId
     : null;
   // SQL echo toggle (Phase 6) — appended to the linked query tab when CC runs
@@ -421,8 +437,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   };
 
   const isHorizontalDock = drawerPosition === "left" || drawerPosition === "right";
-  const sideBySide = isHorizontalDock && drawerPinned;
-  const floating = !sideBySide;
+  const viewport = useViewportSize();
+  const dockMode = resolveChatDock(drawerPosition, drawerPinned, viewport.width, viewport.height);
+  const sideBySide = dockMode === "side-inline";
+  const stackedInline = dockMode === "stacked-inline";
+  const floating = dockMode === "floating";
+  const pinnedActive = sideBySide || stackedInline;
 
   useEffect(() => {
     if (!drawerOpen || !floating) return;
@@ -500,12 +520,16 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const PositionIcon = positionIcon(drawerPosition);
   const containerClass = [
     "ai-z-drawer",
-    sideBySide ? "relative h-full shrink-0" : "absolute shadow-2xl",
+    sideBySide ? "relative h-full shrink-0" : "",
+    stackedInline ? "relative w-full shrink-0" : "",
+    !sideBySide && !stackedInline ? "absolute shadow-2xl" : "",
     drawerPosition === "left" ? "order-first" : "",
     floating ? "rounded-md" : "",
   ].filter(Boolean).join(" ");
   const containerStyle: CSSProperties = sideBySide
     ? { width: drawerWidth }
+    : stackedInline
+    ? { height: drawerHeight, width: "100%" }
     : isHorizontalDock
     ? {
         width: drawerWidth,
@@ -521,6 +545,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         transform: "translateX(-50%)",
         [drawerPosition]: 0,
       };
+  const themedContainerStyle: CSSProperties = hubTab === "notes"
+    ? { ...containerStyle, ...notesThemeStyle(notesTheme) }
+    : containerStyle;
   const resizeHandleClass = isHorizontalDock
     ? `absolute ${drawerPosition === "left" ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"} top-0 bottom-0 w-2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`
     : `absolute left-0 right-0 ${drawerPosition === "top" ? "bottom-0 translate-y-1/2" : "top-0 -translate-y-1/2"} h-2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/35 transition-colors z-20`;
@@ -530,6 +557,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     ? drawerPosition === "left"
       ? "border-r"
       : "border-l"
+    : stackedInline
+    ? drawerPosition === "top"
+      ? "border-b"
+      : "border-t"
     : "border";
   const providerIds = activeThread ? activeProviderIds : draftProviderIds;
   const selectedProviderId = activeThread
@@ -554,7 +585,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   return (
     <div
       className={containerClass}
-      style={containerStyle}
+      style={themedContainerStyle}
       data-testid="ai-chat-drawer"
       data-position={drawerPosition}
       data-pinned={drawerPinned || undefined}
@@ -582,7 +613,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
       <div
         className={`flex flex-col w-full h-full ${panelBorderClass} border-[var(--taomni-divider)] ${floating ? "rounded-md overflow-hidden" : ""}`}
-        style={{ background: "var(--taomni-sidebar-bg)" }}
+        style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}
       >
         {/* Header */}
         <div
@@ -591,7 +622,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         >
           <Bot className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
           <span className="text-[13px] font-semibold flex-1 truncate">
-            {activeThread?.title ?? t("chat.drawerTitle")}
+            {hubTab === "notes"
+              ? t("notes.title")
+              : activeThread?.title ?? t("chat.drawerTitle")}
           </span>
           <div className="relative">
             <button
@@ -635,54 +668,55 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           <button
             type="button"
             className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${
-              sideBySide ? "text-[var(--taomni-accent)]" : ""
+              pinnedActive ? "text-[var(--taomni-accent)]" : ""
             }`}
             onClick={() => setDrawerPinned(!drawerPinned)}
-            disabled={!isHorizontalDock}
             title={
-              !isHorizontalDock
-                ? t("chat.drawerPinUnavailable")
-                : drawerPinned
+              pinnedActive
                 ? t("chat.drawerUnpinTitle")
                 : t("chat.drawerPinTitle")
             }
-            aria-label={drawerPinned ? t("chat.drawerUnpinTitle") : t("chat.drawerPinTitle")}
-            aria-pressed={sideBySide}
+            aria-label={pinnedActive ? t("chat.drawerUnpinTitle") : t("chat.drawerPinTitle")}
+            aria-pressed={pinnedActive}
             data-testid="ai-chat-drawer-pin"
           >
-            {sideBySide ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+            {pinnedActive ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
           </button>
-          <button
-            type="button"
-            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-            onClick={copyAllToClipboard}
-            disabled={!activeThreadId || activeMessages.length === 0}
-            title={t("chat.copyAllTitle")}
-            aria-label={t("chat.copyAllAria")}
-          >
-            {copiedAll ? (
-              <Check className="w-3.5 h-3.5 text-green-400" />
-            ) : (
-              <Copy className="w-3.5 h-3.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-            onClick={handleNewThread}
-            title={t("chat.newChatTitle")}
-            aria-label={t("chat.newChatAria")}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--taomni-selected)]" : ""}`}
-            onClick={() => setShowHistory((v) => !v)}
-            title={t("chat.historyTitle")}
-          >
-            <History className="w-3.5 h-3.5" />
-          </button>
+          {hubTab === "chat" && (
+            <>
+              <button
+                type="button"
+                className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+                onClick={copyAllToClipboard}
+                disabled={!activeThreadId || activeMessages.length === 0}
+                title={t("chat.copyAllTitle")}
+                aria-label={t("chat.copyAllAria")}
+              >
+                {copiedAll ? (
+                  <Check className="w-3.5 h-3.5 text-green-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+                onClick={handleNewThread}
+                title={t("chat.newChatTitle")}
+                aria-label={t("chat.newChatAria")}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--taomni-selected)]" : ""}`}
+                onClick={() => setShowHistory((v) => !v)}
+                title={t("chat.historyTitle")}
+              >
+                <History className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
@@ -695,6 +729,65 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
         </div>
 
+        {/* Tao Hub tab strip — one drawer, two tabs (Chat | 便签). */}
+        <div
+          className="flex items-stretch border-b border-[var(--taomni-divider)] shrink-0 text-[11px]"
+          role="tablist"
+          aria-label={t("tao.hubTitle")}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={hubTab === "chat"}
+            data-testid="tao-hub-tab-chat"
+            className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
+              hubTab === "chat"
+                ? "border-[var(--taomni-accent)] text-[var(--taomni-accent)]"
+                : "border-transparent text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            }`}
+            onClick={() => setHubTab("chat")}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>{t("tao.tabChat")}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={hubTab === "notes"}
+            data-testid="tao-hub-tab-notes"
+            className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
+              hubTab === "notes"
+                ? "border-[var(--taomni-accent)] text-[var(--taomni-accent)]"
+                : "border-transparent text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            }`}
+            onClick={() => setHubTab("notes")}
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+            <span>{t("tao.tabNotes")}</span>
+          </button>
+        </div>
+
+        {hubTab === "notes" ? (
+          notesPanelMode === "floating" ? (
+            <div
+              className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-[12px] text-[var(--taomni-text-muted)]"
+              data-testid="notes-floating-placeholder"
+            >
+              <span>{t("notes.panelModeFloating")}</span>
+              <button
+                type="button"
+                className="taomni-btn h-6 px-2 text-[11px]"
+                onClick={() => setNotesPanelMode("hub")}
+                data-testid="notes-dock-from-hub"
+              >
+                {t("notes.dock")}
+              </button>
+            </div>
+          ) : (
+            <NotesPanel />
+          )
+        ) : (
+        <>
         {/* History panel */}
         {showHistory && (
           <div className="h-48 shrink-0 border-b border-[var(--taomni-divider)] overflow-hidden">
@@ -944,6 +1037,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           // without a `terminalContext` prop (the production case).
           resolveTerminalContext={currentMode === "chat" ? resolveTerminalText : undefined}
         />
+        </>
+        )}
       </div>
     </div>
   );
@@ -954,8 +1049,19 @@ export function ChatDrawerRibbon() {
   const drawerOpen = useChatStore((s) => s.drawerOpen);
   const drawerPosition = useChatStore((s) => s.drawerPosition);
   const drawerPinned = useChatStore((s) => s.drawerPinned);
+  const ribbonOffsetRatio = useChatStore((s) => s.ribbonOffsetRatio);
   const openTabChat = useChatStore((s) => s.openTabChat);
-  const setDrawerPosition = useChatStore((s) => s.setDrawerPosition);
+  const setActiveThread = useChatStore((s) => s.setActiveThread);
+  const setRibbonPlacement = useChatStore((s) => s.setRibbonPlacement);
+  const setHubTab = useTaoHubStore((s) => s.setHubTab);
+  const noteAlerts = useNotesStore((s) => s.alerts);
+  const setActiveNote = useNotesStore((s) => s.setActiveNote);
+  const ackNoteAlert = useNotesStore((s) => s.ackAlert);
+  const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
+  const ackAiDone = useTaoAlertStore((s) => s.ack);
+  const [showInbox, setShowInbox] = useState(false);
+  const bumpRef = useRef(0);
+  const [bumping, setBumping] = useState(false);
   const activeTab = useAppStore((s) =>
     s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
@@ -972,7 +1078,23 @@ export function ChatDrawerRibbon() {
     };
   }, []);
 
-  if (drawerOpen || !activeTab || !CHAT_CAPABLE_TAB_TYPES.has(activeTab.type)) return null;
+  // Unified Tao alerts (notes due/overdue/reminder + chat ai_done), priority-sorted.
+  const taoAlerts = useMemo(
+    () => buildTaoAlerts(noteAlerts, aiDoneAlerts),
+    [noteAlerts, aiDoneAlerts],
+  );
+  // Bump the ribbon 2-3 times when a new alert appears (§7.2).
+  useEffect(() => {
+    if (taoAlerts.length > bumpRef.current) {
+      setBumping(true);
+      const id = window.setTimeout(() => setBumping(false), 1200);
+      bumpRef.current = taoAlerts.length;
+      return () => window.clearTimeout(id);
+    }
+    bumpRef.current = taoAlerts.length;
+  }, [taoAlerts.length]);
+
+  if (drawerOpen || !activeTab || !isChatCapableTabType(activeTab.type)) return null;
 
   const chatTabId = activeTab.chatTabId ?? activeTab.id;
   const placementClass = ribbonPlacementClass(drawerPosition);
@@ -993,7 +1115,53 @@ export function ChatDrawerRibbon() {
           top: dragPreview.y,
           transform: "translate(-50%, -50%)",
         }
-      : {}),
+      : ribbonPositionStyle({ edge: drawerPosition, offsetRatio: ribbonOffsetRatio })),
+  };
+
+  // Alert glow: recolor the ribbon by highest-severity pending alert.
+  const topKind = topAlertKind(taoAlerts);
+  const colorBucket = alertColorBucket(topKind);
+  const alertColor =
+    colorBucket === "red"
+      ? "#ef4444"
+      : colorBucket === "amber"
+        ? "#f59e0b"
+        : colorBucket === "accent"
+          ? "var(--taomni-accent)"
+          : null;
+  if (alertColor && !dragPreview) {
+    ribbonStyle.borderColor = alertColor;
+    ribbonStyle.boxShadow = `0 0 0 2px ${alertColor}66`;
+  }
+  const badgeBg =
+    colorBucket === "red"
+      ? "bg-red-500 text-white"
+      : colorBucket === "amber"
+        ? "bg-amber-400 text-black"
+        : "bg-[var(--taomni-accent)] text-white";
+
+  const jumpToAlert = (alert: TaoAlert) => {
+    setShowInbox(false);
+    void openTabChat(chatTabId);
+    if (alert.source === "notes") {
+      setHubTab("notes");
+      if (alert.noteId) setActiveNote(alert.noteId);
+      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
+      void ackNoteAlert(rawId);
+    } else {
+      setHubTab("chat");
+      if (alert.threadId) setActiveThread(alert.threadId);
+      ackAiDone(alert.id);
+    }
+  };
+
+  const ackAlert = (alert: TaoAlert) => {
+    if (alert.source === "notes") {
+      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
+      void ackNoteAlert(rawId);
+    } else {
+      ackAiDone(alert.id);
+    }
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1032,7 +1200,13 @@ export function ChatDrawerRibbon() {
     event.preventDefault();
     event.stopPropagation();
     suppressClickRef.current = true;
-    setDrawerPosition(nearestRibbonPosition(event.clientX, event.clientY));
+    const placement = placementFromPoint(
+      event.clientX,
+      event.clientY,
+      window.innerWidth || 1,
+      window.innerHeight || 1,
+    );
+    setRibbonPlacement(placement.edge, placement.offsetRatio);
     window.setTimeout(() => {
       suppressClickRef.current = false;
     }, 0);
@@ -1066,33 +1240,81 @@ export function ChatDrawerRibbon() {
   };
 
   return (
-    <button
-      type="button"
-      data-testid="ai-chat-drawer-ribbon"
-      data-position={drawerPosition}
-      data-dragging={dragging || undefined}
-      className={`${ribbonClass} z-40 flex items-center justify-center overflow-hidden text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing`}
-      style={ribbonStyle}
-      title={t("chat.ribbonOpenTitle", { title: activeTab.title })}
-      aria-label={t("chat.ribbonOpenTitle", { title: activeTab.title })}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      onMouseEnter={scheduleHoverOpen}
-      onMouseLeave={clearHoverOpen}
-      onClick={(event) => {
-        if (suppressClickRef.current) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        void openTabChat(chatTabId);
-      }}
-    >
-      <span className={textClass}>Tao</span>
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid="ai-chat-drawer-ribbon"
+        data-position={drawerPosition}
+        data-dragging={dragging || undefined}
+        data-alert-count={taoAlerts.length || undefined}
+        className={`${ribbonClass} z-40 flex items-center justify-center text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
+        style={ribbonStyle}
+        title={taoAlerts.length > 0 ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: activeTab.title })}
+        aria-label={taoAlerts.length > 0 ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: activeTab.title })}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onMouseEnter={scheduleHoverOpen}
+        onMouseLeave={clearHoverOpen}
+        onClick={(event) => {
+          if (suppressClickRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          if (taoAlerts.length === 1) {
+            jumpToAlert(taoAlerts[0]);
+            return;
+          }
+          if (taoAlerts.length > 1) {
+            setShowInbox((v) => !v);
+            return;
+          }
+          void openTabChat(chatTabId);
+        }}
+      >
+        <span className={textClass}>Tao</span>
+        {taoAlerts.length > 0 && (
+          <span
+            className={`absolute -top-1 -right-1 min-w-[13px] h-[13px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center ${badgeBg}`}
+            data-testid="tao-ribbon-badge"
+          >
+            {taoAlerts.length}
+          </span>
+        )}
+      </button>
+      {showInbox && taoAlerts.length > 0 && (
+        <div
+          className="absolute z-50"
+          style={ribbonInboxStyle(drawerPosition, ribbonOffsetRatio)}
+          data-testid="tao-ribbon-inbox-anchor"
+        >
+          <TaoAlertInbox
+            alerts={taoAlerts}
+            onJump={jumpToAlert}
+            onAck={ackAlert}
+            onClose={() => setShowInbox(false)}
+          />
+        </div>
+      )}
+    </>
   );
+}
+
+/** Position the alert inbox popover just inside the ribbon's docked edge. */
+function ribbonInboxStyle(edge: ChatDrawerPosition, offsetRatio: number): CSSProperties {
+  const pct = `${(Math.min(0.88, Math.max(0.12, offsetRatio)) * 100).toFixed(2)}%`;
+  switch (edge) {
+    case "left":
+      return { left: 12, top: pct, transform: "translateY(-50%)" };
+    case "right":
+      return { right: 12, top: pct, transform: "translateY(-50%)" };
+    case "top":
+      return { top: 12, left: pct, transform: "translateX(-50%)" };
+    case "bottom":
+      return { bottom: 12, left: pct, transform: "translateX(-50%)" };
+  }
 }
 
 function capabilityForMode(mode: ChatThreadMode): LlmProviderCapability {
@@ -1132,15 +1354,17 @@ function positionIcon(position: ChatDrawerPosition) {
 }
 
 function ribbonPlacementClass(position: ChatDrawerPosition): string {
+  // Shape only (size / rounding / open border side); the position along the
+  // edge is applied via inline style from ribbonPositionStyle().
   switch (position) {
     case "left":
-      return "left-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-r-full border-l-0";
+      return "h-10 w-5 rounded-r-full border-l-0";
     case "right":
-      return "right-0 top-1/2 -translate-y-1/2 h-10 w-5 rounded-l-full border-r-0";
+      return "h-10 w-5 rounded-l-full border-r-0";
     case "top":
-      return "top-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-b-full border-t-0";
+      return "h-5 w-10 rounded-b-full border-t-0";
     case "bottom":
-      return "bottom-0 left-1/2 -translate-x-1/2 h-5 w-10 rounded-t-full border-b-0";
+      return "h-5 w-10 rounded-t-full border-b-0";
   }
 }
 
@@ -1154,17 +1378,4 @@ function ribbonTextClass(position: ChatDrawerPosition): string {
     case "bottom":
       return "leading-none";
   }
-}
-
-function nearestRibbonPosition(clientX: number, clientY: number): ChatDrawerPosition {
-  const width = window.innerWidth || 1;
-  const height = window.innerHeight || 1;
-  const distances: Array<[ChatDrawerPosition, number]> = [
-    ["left", clientX],
-    ["right", width - clientX],
-    ["top", clientY],
-    ["bottom", height - clientY],
-  ];
-  distances.sort((a, b) => a[1] - b[1]);
-  return distances[0][0];
 }

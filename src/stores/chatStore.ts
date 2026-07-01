@@ -102,9 +102,11 @@ interface ChatDrawerLayoutPrefs {
   pinned: boolean;
   width: number;
   height: number;
+  /** Tao Ribbon offset along its docked edge, 0..1. */
+  ribbonOffsetRatio: number;
 }
 
-function isChatCapableTabType(type: string | null | undefined): boolean {
+export function isChatCapableTabType(type: string | null | undefined): boolean {
   return (
     type === "welcome" ||
     type === "terminal" ||
@@ -174,6 +176,7 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
     pinned: true,
     width: 380,
     height: 420,
+    ribbonOffsetRatio: 0.5,
   };
   if (typeof window === "undefined") return fallback;
   try {
@@ -184,11 +187,19 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
       parsed.position === "left" || parsed.position === "right" || parsed.position === "top" || parsed.position === "bottom"
         ? parsed.position
         : fallback.position;
+    const ribbonOffsetRatio =
+      typeof parsed.ribbonOffsetRatio === "number" && Number.isFinite(parsed.ribbonOffsetRatio)
+        ? Math.min(1, Math.max(0, parsed.ribbonOffsetRatio))
+        : fallback.ribbonOffsetRatio;
     return {
       position,
-      pinned: position === "left" || position === "right" ? parsed.pinned !== false : false,
+      pinned:
+        typeof parsed.pinned === "boolean"
+          ? parsed.pinned
+          : position === "left" || position === "right",
       width: clampDrawerWidth(Number(parsed.width) || fallback.width),
       height: clampDrawerHeight(Number(parsed.height) || fallback.height),
+      ribbonOffsetRatio,
     };
   } catch {
     return fallback;
@@ -255,6 +266,9 @@ interface ChatStore {
   drawerHeight: number;
   drawerPosition: ChatDrawerPosition;
   drawerPinned: boolean;
+  /// Tao Ribbon offset along its docked edge (0..1); the edge itself mirrors
+  /// `drawerPosition`.
+  ribbonOffsetRatio: number;
   /// Text the Composer should pick up next render (e.g. `@selection ...`).
   /// Cleared by the Composer once consumed.
   pendingComposerText: string;
@@ -297,6 +311,9 @@ interface ChatStore {
   setDrawerHeight: (h: number) => void;
   setDrawerPosition: (position: ChatDrawerPosition) => void;
   setDrawerPinned: (pinned: boolean) => void;
+  /// Set the Tao Ribbon's docked edge + offset in one shot. The edge updates
+  /// `drawerPosition` (and pinned defaults) so the drawer opens from that edge.
+  setRibbonPlacement: (position: ChatDrawerPosition, offsetRatio: number) => void;
 }
 
 function latestTabThread(threads: ChatThread[], tabId: string): ChatThread | undefined {
@@ -386,6 +403,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerHeight: initialDrawerLayoutPrefs.height,
   drawerPosition: initialDrawerLayoutPrefs.position,
   drawerPinned: initialDrawerLayoutPrefs.pinned,
+  ribbonOffsetRatio: initialDrawerLayoutPrefs.ribbonOffsetRatio,
   pendingComposerText: "",
 
   loadThreads: async () => {
@@ -657,6 +675,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 };
               });
             }
+            // Tao Ribbon: if this reply landed while its Chat panel wasn't the
+            // visible surface, raise an `ai_done` alert so the user is notified
+            // and can jump back to the thread (§10.2).
+            void (async () => {
+              try {
+                const { useTaoAlertStore } = await import("./taoAlertStore");
+                const { useTaoHubStore } = await import("./taoHubStore");
+                const s = get();
+                const visible =
+                  s.drawerOpen &&
+                  s.activeThreadId === threadId &&
+                  useTaoHubStore.getState().hubTab === "chat";
+                if (!visible) {
+                  const thread = s.threads.find((th) => th.id === threadId);
+                  useTaoAlertStore.getState().pushAiDone(threadId, thread?.title ?? "AI");
+                }
+              } catch {
+                /* alert bridge is best-effort */
+              }
+            })();
             break;
           }
           case "error": {
@@ -842,12 +880,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ drawerPosition: position, drawerPinned: pinned });
   },
   setDrawerPinned: (pinned) => {
-    const s = get();
-    const nextPinned = s.drawerPosition === "left" || s.drawerPosition === "right"
-      ? pinned
-      : false;
-    writeDrawerLayoutPrefs({ pinned: nextPinned });
-    set({ drawerPinned: nextPinned });
+    // Any edge can now be pinned (top/bottom dock as a horizontal band; §8).
+    writeDrawerLayoutPrefs({ pinned });
+    set({ drawerPinned: pinned });
+  },
+  setRibbonPlacement: (position, offsetRatio) => {
+    const pinned = position === "left" || position === "right";
+    const ribbonOffsetRatio = Math.min(1, Math.max(0, offsetRatio));
+    writeDrawerLayoutPrefs({ position, pinned, ribbonOffsetRatio });
+    set({ drawerPosition: position, drawerPinned: pinned, ribbonOffsetRatio });
   },
 
   openTabChat: async (tabId: string) => {
@@ -872,6 +913,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: true },
       activeThreadIdByTabId: { ...s.activeThreadIdByTabId, [tabId]: thread.id },
     }));
+    // Opening the thread clears any pending "AI reply ready" ribbon alert.
+    void import("./taoAlertStore")
+      .then((m) => m.useTaoAlertStore.getState().clearThread(thread.id))
+      .catch(() => {});
   },
 
   toggleTabChat: async (tabId: string) => {

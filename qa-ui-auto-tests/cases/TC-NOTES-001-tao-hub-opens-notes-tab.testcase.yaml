@@ -1,0 +1,27 @@
+id: TC-NOTES-001
+title: Tao Hub opens the Notes tab and remembers the last-used tab
+description: |
+  Verifies the unified Tao Hub (F-TAO-1): the Tao Ribbon opens the drawer, the
+  header exposes the Chat | 便签 tab strip, switching to the Notes tab mounts the
+  notes panel (new-note + search toolbar), and the choice persists to
+  localStorage so the ribbon reopens the last-used tab. UI plumbing only.
+covers: [F-TAO-1]
+tags: [notes, tao, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  # On the Welcome tab the drawer is collapsed to the Tao Ribbon.
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - click: '[data-testid="ai-chat-drawer-ribbon"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  - assert_visible: '[data-testid="tao-hub-tab-chat"]'
+  - assert_visible: '[data-testid="tao-hub-tab-notes"]'
+  - click: '[data-testid="tao-hub-tab-notes"]'
+  - wait_for: '[data-testid="notes-panel"]'
+  - assert_visible: '[data-testid="notes-new"]'
+  - assert_visible: '[data-testid="notes-search"]'
+  - assert_localstorage: { key: "taomni.taoHub.lastTab.v1", equals: "notes" }
+  - screenshot: notes-001-hub-notes-tab.png

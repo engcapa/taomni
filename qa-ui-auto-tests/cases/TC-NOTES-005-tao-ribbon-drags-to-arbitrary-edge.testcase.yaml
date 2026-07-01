@@ -1,0 +1,28 @@
+id: TC-NOTES-005
+title: Tao Ribbon drags to an arbitrary edge and persists
+description: |
+  Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging the
+  edge-docked ribbon toward the bottom of the window re-docks it to the bottom
+  edge and persists the placement (edge + offsetRatio) to localStorage so it
+  survives reload. The offset math + clamping are unit-tested in
+  src/lib/tao/ribbonPlacement.test.ts; this case exercises the live drag.
+covers: [F-TAO-1]
+tags: [notes, tao, ribbon, p2]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  # Drag the ribbon down onto the status bar → nearest edge is the bottom.
+  - drag_to:
+      from: '[data-testid="ai-chat-drawer-ribbon"]'
+      to: '[data-testid="status-bar"]'
+  - wait: 0.5
+  - assert_attribute: { selector: '[data-testid="ai-chat-drawer-ribbon"]', name: 'data-position', equals: 'bottom' }
+  - assert_localstorage: { key: "taomni.chatDrawer.layout.v1", contains: "bottom" }
+  - reload: null
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - assert_attribute: { selector: '[data-testid="ai-chat-drawer-ribbon"]', name: 'data-position', equals: 'bottom' }
+  - screenshot: notes-005-ribbon-drag.png

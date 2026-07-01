@@ -1,0 +1,34 @@
+id: TC-NOTES-002
+title: Notes create, edit title, and complete
+description: |
+  Verifies the notes CRUD surface (F-TAO-1): New note opens the editor, the
+  title commits on blur, the note appears in the recent-incomplete list, and
+  toggling it complete removes it from the default view (completed notes leave
+  the recent-incomplete view). Browser preview persists via the localStorage
+  notes.db stub.
+covers: [F-TAO-1]
+tags: [notes, tao, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - click: '[data-testid="ai-chat-drawer-ribbon"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  - click: '[data-testid="tao-hub-tab-notes"]'
+  - wait_for: '[data-testid="notes-panel"]'
+  # Create → the editor opens for the new (untitled) note.
+  - click: '[data-testid="notes-new"]'
+  - wait_for: '[data-testid="note-editor"]'
+  - fill: { selector: '[data-testid="note-editor-title"]', value: "QA note alpha" }
+  # Leaving the editor commits the title on blur.
+  - click: '[data-testid="note-editor-back"]'
+  - wait_for: '[data-testid="notes-panel"]'
+  - assert_text: { selector: '[data-testid="notes-list"]', contains: "QA note alpha" }
+  # Completing it drops the note from the recent-incomplete view.
+  - click: '[data-testid="notes-toggle-complete"]'
+  - wait: 0.5
+  - assert_not_visible: '[data-testid="notes-list"] >> text="QA note alpha"'
+  - screenshot: notes-002-create-complete.png

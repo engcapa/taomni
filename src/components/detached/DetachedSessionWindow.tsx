@@ -51,7 +51,8 @@ import { useAppStore } from "../../stores/appStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
 import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
-import { ChatDrawer, ChatDrawerRibbon } from "../chat/ChatDrawer";
+import { ChatDrawer } from "../chat/ChatDrawer";
+import { TaoRibbon } from "../tao/TaoRibbon";
 import { CcAgentBridge } from "../agent/CcAgentBridge";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
@@ -440,7 +441,7 @@ export default function DetachedSessionWindow({
           <div className="flex-1 relative min-h-0">
             {inner}
             {detachedChatTab && chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
-            {detachedChatTab && !aiFullyDisabled && <ChatDrawerRibbon />}
+            {detachedChatTab && !aiFullyDisabled && <TaoRibbon />}
           </div>
           {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
         </div>

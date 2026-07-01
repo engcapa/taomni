@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
+import { useTaoHubStore } from "../../stores/taoHubStore";
+import { useNotesStore } from "../../stores/notesStore";
+import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -93,6 +96,10 @@ describe("ChatDrawer provider and echo controls", () => {
       if (command === "chat_purge_old") return Promise.resolve(0);
       if (command === "get_ai_config") return Promise.resolve(makeConfig());
       if (command === "save_ai_config") return Promise.resolve(null);
+      if (command === "notes_list") return Promise.resolve([]);
+      if (command === "notes_get_prefs") return Promise.resolve({});
+      if (command === "notes_list_alerts") return Promise.resolve([]);
+      if (command === "notes_list_tags") return Promise.resolve([]);
       return Promise.resolve(null);
     });
 
@@ -307,7 +314,7 @@ describe("ChatDrawer layout resizing", () => {
   });
 
   it("dismisses a floating drawer on outside pointer down", () => {
-    useChatStore.setState({ drawerPosition: "top" });
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: false });
     render(<ChatDrawer />);
 
     fireEvent.pointerDown(document.body);
@@ -341,12 +348,67 @@ describe("ChatDrawer layout resizing", () => {
 
     expect(useChatStore.getState().drawerHeight).toBe(520);
   });
+
+  it("pins the drawer to the top edge as a full-width inline band", () => {
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: true });
+    render(<ChatDrawer />);
+    const drawer = screen.getByTestId("ai-chat-drawer");
+    expect(drawer).toHaveAttribute("data-position", "top");
+    expect(drawer).toHaveAttribute("data-pinned", "true");
+    expect(drawer.className).toContain("w-full");
+    const pin = screen.getByTestId("ai-chat-drawer-pin");
+    expect(pin).toHaveAttribute("aria-pressed", "true");
+    expect(pin).not.toBeDisabled();
+  });
+
+  it("does not dismiss a pinned top drawer on outside pointer down", () => {
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: true });
+    render(<ChatDrawer />);
+    fireEvent.pointerDown(document.body);
+    expect(useChatStore.getState().drawerOpen).toBe(true);
+  });
+
+  it("keeps left/right pin as a side column (no regression)", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1280, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 900, configurable: true });
+    useChatStore.setState({ drawerPosition: "right", drawerPinned: true });
+    render(<ChatDrawer />);
+    const drawer = screen.getByTestId("ai-chat-drawer");
+    expect(drawer.className).toContain("relative");
+    expect(drawer.className).not.toContain("w-full");
+    expect(screen.getByTestId("ai-chat-drawer-pin")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the Tao Hub tab strip with Chat and Notes tabs", () => {
+    useTaoHubStore.setState({ hubTab: "chat" });
+    render(<ChatDrawer />);
+    expect(screen.getByTestId("tao-hub-tab-chat")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-hub-tab-notes")).toBeInTheDocument();
+    // Chat tab active by default → composer present, notes panel absent.
+    expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
+  });
+
+  it("switches to the Notes tab and back without losing the chat view", () => {
+    useTaoHubStore.setState({ hubTab: "chat" });
+    render(<ChatDrawer />);
+
+    fireEvent.click(screen.getByTestId("tao-hub-tab-notes"));
+    expect(useTaoHubStore.getState().hubTab).toBe("notes");
+    expect(screen.getByTestId("notes-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("notes-new")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tao-hub-tab-chat"));
+    expect(useTaoHubStore.getState().hubTab).toBe("chat");
+    expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
+  });
 });
 
 describe("ChatDrawerRibbon", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    useNotesStore.setState({ alerts: [] });
+    useTaoAlertStore.setState({ aiDone: [] });
   });
 
   it("shows only Tao and opens the stable chat tab id", () => {
@@ -445,5 +507,71 @@ describe("ChatDrawerRibbon", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("badges pending alerts and jumps to the overdue note on click", () => {
+    const openTabChat = vi.fn().mockResolvedValue(undefined);
+    const setActiveNote = vi.fn();
+    const ackAlert = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({
+      tabs: [{ id: "term-1", chatTabId: "stable-chat", type: "terminal", title: "T", closable: true }],
+      activeTabId: "term-1",
+    });
+    useChatStore.setState({ drawerOpen: false, drawerPosition: "left", drawerPinned: true, openTabChat });
+    useTaoHubStore.setState({ hubTab: "chat" });
+    useNotesStore.setState({
+      alerts: [
+        {
+          id: "evt-1",
+          note_id: "note-7",
+          kind: "overdue",
+          state: "pending",
+          fire_at: 1,
+          acknowledged_at: null,
+          note_title: "Pay invoice",
+          due_at: 1,
+          reminder_at: null,
+        },
+      ],
+      setActiveNote,
+      ackAlert,
+    });
+    useTaoAlertStore.setState({ aiDone: [] });
+
+    render(
+      <div className="relative h-32 w-32">
+        <ChatDrawerRibbon />
+      </div>,
+    );
+
+    expect(screen.getByTestId("tao-ribbon-badge")).toHaveTextContent("1");
+    fireEvent.click(screen.getByTestId("ai-chat-drawer-ribbon"));
+    expect(openTabChat).toHaveBeenCalledWith("stable-chat");
+    expect(setActiveNote).toHaveBeenCalledWith("note-7");
+    expect(ackAlert).toHaveBeenCalledWith("evt-1");
+    expect(useTaoHubStore.getState().hubTab).toBe("notes");
+  });
+
+  it("opens the alert inbox when multiple alerts are pending", () => {
+    useAppStore.setState({
+      tabs: [{ id: "term-1", chatTabId: "stable-chat", type: "terminal", title: "T", closable: true }],
+      activeTabId: "term-1",
+    });
+    useChatStore.setState({ drawerOpen: false, drawerPosition: "left", drawerPinned: true });
+    useNotesStore.setState({
+      alerts: [
+        { id: "a", note_id: "n1", kind: "overdue", state: "pending", fire_at: 1, acknowledged_at: null, note_title: "A", due_at: 1, reminder_at: null },
+        { id: "b", note_id: "n2", kind: "due_soon", state: "pending", fire_at: 2, acknowledged_at: null, note_title: "B", due_at: 2, reminder_at: null },
+      ],
+    });
+    render(
+      <div className="relative h-32 w-32">
+        <ChatDrawerRibbon />
+      </div>,
+    );
+    expect(screen.getByTestId("tao-ribbon-badge")).toHaveTextContent("2");
+    fireEvent.click(screen.getByTestId("ai-chat-drawer-ribbon"));
+    expect(screen.getByTestId("tao-alert-inbox")).toBeInTheDocument();
+    expect(screen.getAllByTestId("tao-alert-inbox-item")).toHaveLength(2);
   });
 });
