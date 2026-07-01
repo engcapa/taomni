@@ -32,6 +32,7 @@ export const DEFAULT_CODE_VIEW_PROFILE: CodeViewProfile = {
 };
 
 const CODE_VIEW_PROFILE_STORAGE_KEY = "taomni.codeViewProfile.v1";
+const CODE_VIEW_PROFILE_EVENT = "taomni:code-view-profile-changed";
 
 export function loadCodeViewProfile(): CodeViewProfile {
   if (typeof window === "undefined") return DEFAULT_CODE_VIEW_PROFILE;
@@ -45,14 +46,51 @@ export function loadCodeViewProfile(): CodeViewProfile {
 
 export function saveCodeViewProfile(profile: CodeViewProfile): void {
   if (typeof window === "undefined") return;
+  const normalized = normalizeCodeViewProfile(profile);
   try {
-    window.localStorage.setItem(
-      CODE_VIEW_PROFILE_STORAGE_KEY,
-      JSON.stringify(normalizeCodeViewProfile(profile)),
-    );
+    window.localStorage.setItem(CODE_VIEW_PROFILE_STORAGE_KEY, JSON.stringify(normalized));
   } catch {
     // localStorage can be unavailable in restricted webviews.
   }
+  try {
+    window.dispatchEvent(new CustomEvent(CODE_VIEW_PROFILE_EVENT, { detail: normalized }));
+  } catch {
+    // CustomEvent may be unavailable in exotic environments.
+  }
+}
+
+/**
+ * Subscribe to code-view profile changes. Fires when {@link saveCodeViewProfile}
+ * runs in this window (via a CustomEvent) and when another window mutates the
+ * shared localStorage key (via the native `storage` event). Returns an
+ * unsubscribe function. This lets views that stay mounted (e.g. the Code
+ * Workspace) follow edits made in Settings without owning their own copy.
+ */
+export function subscribeCodeViewProfile(listener: (profile: CodeViewProfile) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onCustom = (event: Event) => {
+    const detail = (event as CustomEvent<CodeViewProfile>).detail;
+    listener(normalizeCodeViewProfile(detail));
+  };
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== null && event.key !== CODE_VIEW_PROFILE_STORAGE_KEY) return;
+    listener(loadCodeViewProfile());
+  };
+  window.addEventListener(CODE_VIEW_PROFILE_EVENT, onCustom as EventListener);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(CODE_VIEW_PROFILE_EVENT, onCustom as EventListener);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function sameCodeViewProfile(a: CodeViewProfile, b: CodeViewProfile): boolean {
+  return (
+    a.fontFamily === b.fontFamily &&
+    a.fontSize === b.fontSize &&
+    a.fontLigatures === b.fontLigatures &&
+    a.theme === b.theme
+  );
 }
 
 export function normalizeCodeViewProfile(input: unknown): CodeViewProfile {

@@ -60,7 +60,6 @@ import {
   Columns2,
   Eye,
   Loader2,
-  Palette,
   Pencil,
   RefreshCw,
   RotateCcw,
@@ -104,19 +103,16 @@ import {
 } from "../../lib/editor/lsp";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import {
-  CODE_VIEW_THEME_APP,
-  CODE_VIEW_THEME_SYSTEM,
-  CODE_VIEW_THEME_TERMINAL,
   DEFAULT_CODE_VIEW_PROFILE,
   applyCodeViewProfile,
   loadCodeViewProfile,
   normalizeCodeViewProfile,
+  sameCodeViewProfile,
   saveCodeViewProfile,
+  subscribeCodeViewProfile,
   type CodeViewProfile,
 } from "../../lib/codeViewProfile";
 import { loadGlobalTerminalProfile } from "../../lib/terminalProfile";
-import { TERMINAL_THEME_DEFINITIONS, getTerminalThemeDefinition } from "../../lib/themes";
-import { CODE_THEME_DEFINITIONS, getCodeThemeDefinition } from "../../lib/codeThemes";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
@@ -552,13 +548,6 @@ function writeCodeWorkspaceTreeFontSize(size: number): void {
   }
 }
 
-function codeWorkspaceThemeLabel(theme: string, terminalThemeName: string): string {
-  if (theme === CODE_VIEW_THEME_SYSTEM) return "System";
-  if (theme === CODE_VIEW_THEME_APP) return "App";
-  if (theme === CODE_VIEW_THEME_TERMINAL) return `Terminal · ${terminalThemeName}`;
-  return getCodeThemeDefinition(theme)?.name ?? getTerminalThemeDefinition(theme)?.name ?? theme;
-}
-
 function emptyLspFileState(): LspFileState {
   return {
     status: null,
@@ -697,9 +686,6 @@ export function CodeWorkspaceTab({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
-  const terminalProfile = useMemo(() => loadGlobalTerminalProfile(), []);
-  const terminalThemeName = getTerminalThemeDefinition(terminalProfile.theme)?.name ?? terminalProfile.theme;
-  const currentThemeLabel = codeWorkspaceThemeLabel(codeViewProfile.theme, terminalThemeName);
   const treePaneStyle = useMemo(() => ({
     "--taomni-code-tree-font-size": `${treeFontSize}px`,
     "--taomni-code-tree-small-font-size": `${Math.max(10, treeFontSize - 1)}px`,
@@ -744,7 +730,10 @@ export function CodeWorkspaceTab({
       updater: CodeViewProfile | ((current: CodeViewProfile) => CodeViewProfile),
       statusMessage?: (profile: CodeViewProfile) => string,
     ) => {
-      const current = codeViewProfileRef.current;
+      // Base the change on the freshly-persisted profile rather than local state
+      // so a zoom here never clobbers a theme/font the user just picked in
+      // Settings → Code View Appearance.
+      const current = loadCodeViewProfile();
       const next = normalizeCodeViewProfile(
         typeof updater === "function" ? updater(current) : updater,
       );
@@ -756,6 +745,18 @@ export function CodeWorkspaceTab({
     },
     [setStatusMessage],
   );
+
+  // Follow code-view appearance edits made elsewhere (Settings, another window)
+  // so the workspace shares one theme/font with the Git diff view instead of
+  // owning its own copy.
+  useEffect(() => {
+    return subscribeCodeViewProfile((incoming) => {
+      if (sameCodeViewProfile(incoming, codeViewProfileRef.current)) return;
+      codeViewProfileRef.current = incoming;
+      setCodeViewProfileState(incoming);
+      applyCodeViewProfile(incoming, loadGlobalTerminalProfile());
+    });
+  }, []);
 
   const setCodeViewFontSize = useCallback(
     (size: number) => {
@@ -772,16 +773,6 @@ export function CodeWorkspaceTab({
       setCodeViewFontSize(codeViewProfileRef.current.fontSize + delta);
     },
     [setCodeViewFontSize],
-  );
-
-  const setCodeViewTheme = useCallback(
-    (theme: string) => {
-      updateCodeViewProfile(
-        (current) => ({ ...current, theme }),
-        (next) => `Code workspace theme ${codeWorkspaceThemeLabel(next.theme, terminalThemeName)}`,
-      );
-    },
-    [terminalThemeName, updateCodeViewProfile],
   );
 
   const setTreeFontSize = useCallback(
@@ -1920,7 +1911,7 @@ export function CodeWorkspaceTab({
     const filter = treeFilter.trim().toLowerCase();
     if (state.loading && !state.loaded) {
       return (
-        <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-2 text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-muted)]">
+        <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-2 text-[var(--taomni-code-muted)]">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           <span>Loading</span>
         </div>
@@ -1940,7 +1931,7 @@ export function CodeWorkspaceTab({
     });
     if (entries.length === 0) {
       return (
-        <div className="px-3 py-2 text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-muted)]">
+        <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
           Empty
         </div>
       );
@@ -1961,7 +1952,7 @@ export function CodeWorkspaceTab({
               data-root-id={root.id}
               data-path={entry.path}
               data-selected={isSelected || undefined}
-              className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[var(--taomni-code-tree-font-size)] hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
+              className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
               style={rowStyle}
               title={`${root.name} / ${entry.path}`}
               onClick={() => {
@@ -1996,7 +1987,7 @@ export function CodeWorkspaceTab({
           data-path={entry.path}
           data-active={active || undefined}
           data-selected={isSelected || undefined}
-          className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left text-[var(--taomni-code-tree-font-size)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
+          className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
           style={rowStyle}
           title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
           onClick={() => {
@@ -2034,44 +2025,6 @@ export function CodeWorkspaceTab({
           </span>
         )}
         <div className="flex-1" />
-        <div className="flex shrink-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
-          <Palette className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
-          <select
-            data-testid="code-workspace-theme-select"
-            aria-label="Code workspace theme"
-            title={`Theme: ${currentThemeLabel}`}
-            className="h-6 w-32 bg-transparent px-1 text-[11px] text-[var(--taomni-code-text)] outline-none sm:w-44"
-            value={codeViewProfile.theme}
-            onChange={(event) => setCodeViewTheme(event.target.value)}
-          >
-            <option value={CODE_VIEW_THEME_SYSTEM}>Follow system (Dracula / GitHub Light)</option>
-            <option value={CODE_VIEW_THEME_APP}>Match app theme</option>
-            <option value={CODE_VIEW_THEME_TERMINAL}>
-              Use terminal theme ({terminalThemeName})
-            </option>
-            <optgroup label="Editor themes · Dark">
-              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "dark").map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Editor themes · Light">
-              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "light").map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Terminal themes">
-              {TERMINAL_THEME_DEFINITIONS.map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </div>
         <div className="flex items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
           <IconButton
             label="Editor zoom out"
@@ -2135,7 +2088,8 @@ export function CodeWorkspaceTab({
                 value={treeFilter}
                 onChange={(event) => setTreeFilter(event.target.value)}
                 placeholder="Filter"
-                className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
+                className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
+                style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
               />
               <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
                 <IconButton
@@ -2170,9 +2124,13 @@ export function CodeWorkspaceTab({
               <IconButton label="Rename" icon={<Pencil className="w-3.5 h-3.5" />} disabled={!selected} onClick={() => void renameSelected()} />
               <IconButton label="Delete or remove" icon={<Trash2 className="w-3.5 h-3.5" />} disabled={!selected} onClick={() => void deleteSelected()} />
             </div>
-            <div data-testid="code-workspace-tree" className="flex-1 min-h-0 overflow-auto py-1">
+            <div
+              data-testid="code-workspace-tree"
+              className="flex-1 min-h-0 overflow-auto py-1"
+              style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
+            >
               {roots.length === 0 && looseFiles.length === 0 && (
-                <div className="px-3 py-2 text-[var(--taomni-code-tree-font-size)] text-[var(--taomni-code-muted)]">
+                <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
                   Open a file or add a folder
                 </div>
               )}
@@ -2186,7 +2144,7 @@ export function CodeWorkspaceTab({
                       data-testid="code-workspace-tree-root"
                       data-root-id={root.id}
                       data-selected={selectedRoot || undefined}
-                      className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left text-[var(--taomni-code-tree-font-size)] font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
+                      className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                       title={root.path}
                       onClick={() => toggleRoot(root.id)}
                     >
@@ -2205,7 +2163,10 @@ export function CodeWorkspaceTab({
               })}
               {looseFiles.length > 0 && (
                 <div className="mt-1">
-                  <div className="h-6 flex items-center gap-1.5 px-2 text-[var(--taomni-code-tree-small-font-size)] font-semibold text-[var(--taomni-code-muted)]">
+                  <div
+                    className="h-6 flex items-center gap-1.5 px-2 font-semibold text-[var(--taomni-code-muted)]"
+                    style={{ fontSize: "var(--taomni-code-tree-small-font-size)" }}
+                  >
                     <File className="w-3.5 h-3.5" />
                     <span>Loose Files</span>
                   </div>
@@ -2223,7 +2184,7 @@ export function CodeWorkspaceTab({
                         data-path={file.path}
                         data-active={active || undefined}
                         data-selected={selectedLoose || undefined}
-                        className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left text-[var(--taomni-code-tree-font-size)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
+                        className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                         title={file.path}
                         onClick={() => {
                           setSelected({ kind: "file", ref });
@@ -2277,7 +2238,7 @@ export function CodeWorkspaceTab({
                     <div
                       key={key}
                       data-active={active || undefined}
-                      className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+                      className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
                     >
                       <button
                         type="button"
@@ -2305,7 +2266,7 @@ export function CodeWorkspaceTab({
             <div className="flex-1 min-h-0 relative">
               {activeFile ? (
                 <div className="absolute inset-0 flex flex-col">
-                  <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
+                  <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
                     <span className="truncate">{activeFile.subtitle}</span>
                     <span className="shrink-0">{formatBytes(activeFile.size)}</span>
                     {formatMtime(activeFile.mtime) && (
@@ -2598,7 +2559,7 @@ function MarkdownPreview({
     <div
       ref={rootRef}
       data-testid="code-workspace-markdown-preview"
-      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)]"
+      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)]"
       onClick={(event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
