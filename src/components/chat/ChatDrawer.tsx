@@ -50,6 +50,7 @@ import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
 import { useTaoHubStore } from "../../stores/taoHubStore";
+import { useNotesStore } from "../../stores/notesStore";
 import { NotesPanel } from "../notes/NotesPanel";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
@@ -81,6 +82,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const [showPositionMenu, setShowPositionMenu] = useState(false);
   const hubTab = useTaoHubStore((s) => s.hubTab);
   const setHubTab = useTaoHubStore((s) => s.setHubTab);
+  const notesPanelMode = useNotesStore((s) => s.panelMode);
+  const setNotesPanelMode = useNotesStore((s) => s.setPanelMode);
   const [error, setError] = useState<string | null>(null);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
@@ -741,7 +744,24 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         </div>
 
         {hubTab === "notes" ? (
-          <NotesPanel />
+          notesPanelMode === "floating" ? (
+            <div
+              className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-[12px] text-[var(--taomni-text-muted)]"
+              data-testid="notes-floating-placeholder"
+            >
+              <span>{t("notes.panelModeFloating")}</span>
+              <button
+                type="button"
+                className="taomni-btn h-6 px-2 text-[11px]"
+                onClick={() => setNotesPanelMode("hub")}
+                data-testid="notes-dock-from-hub"
+              >
+                {t("notes.dock")}
+              </button>
+            </div>
+          ) : (
+            <NotesPanel />
+          )
         ) : (
         <>
         {/* History panel */}
