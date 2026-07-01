@@ -86,6 +86,7 @@ function makeConfig(): AiConfig {
 describe("ChatDrawer provider and echo controls", () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
+    window.localStorage.clear();
     invokeMock.mockReset();
     invokeMock.mockImplementation((command: string) => {
       if (command === "chat_list_threads") return Promise.resolve([]);
@@ -143,17 +144,18 @@ describe("ChatDrawer provider and echo controls", () => {
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
     vi.clearAllMocks();
   });
 
-  it("puts Claude Code before the active LLM provider", () => {
+  it("puts the active LLM provider before local agents", () => {
     render(<ChatDrawer />);
 
     const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
     expect(Array.from(provider.options).map((option) => option.value)).toEqual([
-      "claude-code",
       "deepseek",
       "local",
+      "claude-code",
     ]);
   });
 
@@ -172,12 +174,27 @@ describe("ChatDrawer provider and echo controls", () => {
 
     const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
     expect(Array.from(provider.options).map((option) => option.value)).toEqual([
-      "claude-code",
-      "group:balanced",
       "deepseek",
       "local",
+      "group:balanced",
+      "claude-code",
     ]);
     expect(Array.from(provider.options).map((option) => option.textContent)).toContain("Group: Balanced");
+  });
+
+  it("remembers provider changes from the thread picker", () => {
+    render(<ChatDrawer />);
+
+    const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
+    fireEvent.change(provider, { target: { value: "deepseek" } });
+
+    expect(JSON.parse(window.localStorage.getItem("taomni.chatDrawer.provider.v1") ?? "{}")).toMatchObject({
+      chat: "deepseek",
+    });
+    expect(invokeMock).toHaveBeenCalledWith("chat_set_thread_provider", {
+      threadId: "thread-1",
+      providerId: "deepseek",
+    });
   });
 
   it("renders terminal echo as the same compact button style as echo toggles", () => {

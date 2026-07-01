@@ -162,12 +162,11 @@ export function isCodexAvailableForChat(config: AiConfig | null | undefined): bo
 }
 
 export function defaultChatProviderId(config: AiConfig | null | undefined): string | undefined {
-  if (isClaudeCodeAvailableForChat(config)) return "claude-code";
-  if (isCodexAvailableForChat(config)) return "codex";
-  return undefined;
+  return chatDrawerProviderIds(config, "chat")[0];
 }
 
 export const PROVIDER_GROUP_PREFIX = "group:";
+const CHAT_DRAWER_PROVIDER_PREF_STORAGE_KEY = "taomni.chatDrawer.provider.v1";
 
 export function providerGroupRouteId(groupId: string): string {
   return groupId.startsWith(PROVIDER_GROUP_PREFIX) ? groupId : `${PROVIDER_GROUP_PREFIX}${groupId}`;
@@ -180,6 +179,40 @@ export function providerGroupIdFromRoute(routeId: string): string | null {
 }
 
 export type LlmProviderCapability = "chat" | "image_generation" | "video_generation";
+
+type ChatDrawerProviderPreference = Partial<Record<LlmProviderCapability, string>>;
+
+export function readChatDrawerProviderPreference(
+  capability: LlmProviderCapability = "chat",
+): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CHAT_DRAWER_PROVIDER_PREF_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ChatDrawerProviderPreference;
+    const providerId = parsed?.[capability];
+    return typeof providerId === "string" && providerId.trim() ? providerId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberChatDrawerProviderPreference(
+  providerId: string,
+  capability: LlmProviderCapability = "chat",
+) {
+  if (typeof window === "undefined" || !providerId.trim()) return;
+  try {
+    const raw = window.localStorage.getItem(CHAT_DRAWER_PROVIDER_PREF_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) as ChatDrawerProviderPreference : {};
+    window.localStorage.setItem(
+      CHAT_DRAWER_PROVIDER_PREF_STORAGE_KEY,
+      JSON.stringify({ ...parsed, [capability]: providerId }),
+    );
+  } catch {
+    // Best-effort UI preference persistence.
+  }
+}
 
 export function llmProviderSupports(provider: LlmProviderConfig | null | undefined, capability: LlmProviderCapability): boolean {
   if (!provider) return false;
@@ -209,7 +242,13 @@ export function chatDrawerProviderIds(
   const localAgentIds: string[] = [];
   if (capability === "chat" && isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
   if (capability === "chat" && isCodexAvailableForChat(config)) localAgentIds.push("codex");
-  return [...localAgentIds, ...groups, ...orderedLlmIds];
+  const orderedIds = [...orderedLlmIds, ...groups, ...localAgentIds];
+  const preferred = readChatDrawerProviderPreference(capability);
+  return Array.from(new Set(
+    preferred && orderedIds.includes(preferred)
+      ? [preferred, ...orderedIds]
+      : orderedIds,
+  ));
 }
 
 interface AiStore {
