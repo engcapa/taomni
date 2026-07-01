@@ -152,6 +152,48 @@ describe("WelcomePanel", () => {
     fireEvent.click(screen.getByTestId("context-menu-item-edit"));
     expect(editSession).toHaveBeenCalledWith(recentSessions[1]);
   });
+
+  it("hides the mail card when there are no mail sessions", async () => {
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={vi.fn()}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("welcome-mail-card")).not.toBeInTheDocument();
+  });
+
+  it("shows configured mailboxes in the mail card and opens the clicked one", async () => {
+    const mailSessions: SessionConfig[] = [
+      { ...session("mail-work", "Work Mail", "Mail", "imap.example.com", 993, 0), username: "me@example.com" },
+      { ...session("mail-personal", "Personal", "Mail", "imap.personal.com", 993, 0), username: "me@personal.com" },
+    ];
+    const openMail = vi.fn();
+
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={vi.fn()}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+        mailSessions={mailSessions}
+        onOpenMailSession={openMail}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
+    });
+
+    const card = screen.getByTestId("welcome-mail-card");
+    expect(within(card).getAllByTestId("welcome-mail-session")).toHaveLength(2);
+
+    fireEvent.click(within(card).getByRole("button", { name: "Open mailbox Work Mail" }));
+    expect(openMail).toHaveBeenCalledWith(mailSessions[0]);
+  });
 });
 
 function session(

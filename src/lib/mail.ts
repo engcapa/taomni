@@ -92,6 +92,22 @@ export interface MailMarkReadResult {
   marked: number;
 }
 
+export interface MailFlagResult {
+  folder: string;
+  updated: number;
+}
+
+export interface MailMoveResult {
+  folder: string;
+  target: string;
+  count: number;
+}
+
+export interface MailDeleteResult {
+  folder: string;
+  deleted: number;
+}
+
 export interface MailTestConnectionResult {
   imapOk: boolean;
   smtpOk: boolean;
@@ -227,4 +243,92 @@ export function mailTestConnection(config: MailTabInfo): Promise<MailTestConnect
 
 export function mailClearCache(accountId: string): Promise<void> {
   return invoke("mail_clear_cache", { accountId });
+}
+
+export function mailSetFlags(
+  config: MailTabInfo,
+  folder: string,
+  uids: number[],
+  add: string[],
+  remove: string[],
+): Promise<MailFlagResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFlagResult>("mail_set_flags", { config, folder, uids, add, remove }),
+  );
+}
+
+export function mailMoveMessages(
+  config: MailTabInfo,
+  folder: string,
+  uids: number[],
+  targetFolder: string,
+): Promise<MailMoveResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailMoveResult>("mail_move_messages", { config, folder, uids, targetFolder }),
+  );
+}
+
+export function mailCopyMessages(
+  config: MailTabInfo,
+  folder: string,
+  uids: number[],
+  targetFolder: string,
+): Promise<MailMoveResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailMoveResult>("mail_copy_messages", { config, folder, uids, targetFolder }),
+  );
+}
+
+export function mailDeleteMessages(
+  config: MailTabInfo,
+  folder: string,
+  uids: number[],
+  all = false,
+): Promise<MailDeleteResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailDeleteResult>("mail_delete_messages", { config, folder, uids, all }),
+  );
+}
+
+export function mailFetchRaw(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+): Promise<string> {
+  return withVaultLockedNotice(() =>
+    invoke<string>("mail_fetch_raw", { config, folder, uid }),
+  );
+}
+
+export function mailSaveRaw(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  targetPath: string,
+): Promise<MailDownloadAttachmentResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailDownloadAttachmentResult>("mail_save_raw", { config, folder, uid, targetPath }),
+  );
+}
+
+export function mailCreateFolder(config: MailTabInfo, name: string): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolder[]>("mail_create_folder", { config, name }),
+  );
+}
+
+export function mailRenameFolder(
+  config: MailTabInfo,
+  from: string,
+  to: string,
+): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolder[]>("mail_rename_folder", { config, from, to }),
+  );
+}
+
+export function mailDeleteFolder(config: MailTabInfo, name: string): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolder[]>("mail_delete_folder", { config, name }),
+  );
 }

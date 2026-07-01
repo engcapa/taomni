@@ -9,24 +9,38 @@ import {
 import {
   AlertTriangle,
   Archive,
+  Ban,
   Bot,
   CheckCircle2,
   ChevronDown,
+  Code,
+  Copy,
   Download,
   ExternalLink,
   FileText,
   Folder,
+  FolderInput,
+  FolderPlus,
+  FolderSymlink,
+  FolderX,
+  Forward,
+  ImageOff,
   Inbox,
+  Link as LinkIcon,
   Loader2,
   Mail as MailIcon,
   MailOpen,
   MessageSquareReply,
   Paperclip,
+  PenLine,
+  Printer,
   RefreshCw,
+  Save,
   Search,
   Send,
   ShieldCheck,
   Sparkles,
+  Star,
   Trash2,
   X,
   ZoomIn,
@@ -35,12 +49,21 @@ import {
 import type { MailTabInfo } from "../../types";
 import {
   mailClearCache,
+  mailCopyMessages,
+  mailCreateFolder,
+  mailDeleteFolder,
+  mailDeleteMessages,
   mailDownloadAttachment,
+  mailFetchRaw,
   mailGetMessageBody,
   mailListCachedFolders,
   mailListCachedMessages,
   mailMarkRead,
+  mailMoveMessages,
+  mailRenameFolder,
+  mailSaveRaw,
   mailSendMessage,
+  mailSetFlags,
   mailSyncAllFolders,
   mailSyncHeaders,
   mailTestConnection,
@@ -55,6 +78,7 @@ import { temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
 import { DEFAULT_MAIL_TERMINAL_PROFILE, resolveTerminalThemeWithSystem, type TerminalProfile } from "../../lib/terminalProfile";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useAppTheme } from "../../lib/appTheme";
@@ -326,6 +350,42 @@ function withSeenFlag(message: MailMessageHeader): MailMessageHeader {
   return { ...message, flags: [...message.flags, "\\Seen"] };
 }
 
+type SpecialFolderKind = "trash" | "junk" | "archive" | "sent";
+
+const SPECIAL_FOLDER_MATCHERS: Record<SpecialFolderKind, { flag: string; names: string[] }> = {
+  trash: { flag: "trash", names: ["trash", "deleted", "已删除", "已刪除", "垃圾桶", "废件箱", "廢件匣"] },
+  junk: { flag: "junk", names: ["junk", "spam", "bulk", "垃圾邮件", "垃圾郵件"] },
+  archive: { flag: "archive", names: ["archive", "归档", "封存", "歸檔"] },
+  sent: { flag: "sent", names: ["sent", "已发送", "已傳送", "寄件"] },
+};
+
+function folderMatchesSpecial(folder: MailFolder, kind: SpecialFolderKind): boolean {
+  const matcher = SPECIAL_FOLDER_MATCHERS[kind];
+  if (folder.flags.some((flag) => flag.toLowerCase().includes(matcher.flag))) return true;
+  const haystack = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
+  return matcher.names.some((name) => haystack.includes(name));
+}
+
+function isFlagged(message: MailMessageHeader): boolean {
+  return message.flags.some((flag) => flag.toLowerCase().includes("flagged"));
+}
+
+function withFlagsMutation(
+  message: MailMessageHeader,
+  add: string[],
+  remove: string[],
+): MailMessageHeader {
+  let flags = message.flags.filter(
+    (flag) => !remove.some((candidate) => flag.toLowerCase() === candidate.toLowerCase()),
+  );
+  for (const candidate of add) {
+    if (!flags.some((flag) => flag.toLowerCase() === candidate.toLowerCase())) {
+      flags = [...flags, candidate];
+    }
+  }
+  return { ...message, flags };
+}
+
 function formatShortDate(ts: number | null | undefined): string {
   if (!ts) return "";
   const date = new Date(ts * 1000);
@@ -401,6 +461,41 @@ function splitRecipients(value: string): string[] {
     .split(/[;,\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function dedupeMessages(messages: readonly MailMessageHeader[]): MailMessageHeader[] {
+  const seen = new Set<string>();
+  const unique: MailMessageHeader[] = [];
+  for (const message of messages) {
+    const key = messageKey(message);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(message);
+  }
+  return unique;
+}
+
+function groupMessagesByFolder(messages: readonly MailMessageHeader[]): Map<string, MailMessageHeader[]> {
+  const map = new Map<string, MailMessageHeader[]>();
+  for (const message of messages) {
+    const list = map.get(message.folder) ?? [];
+    list.push(message);
+    map.set(message.folder, list);
+  }
+  return map;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function forwardSubject(subject: string): string {
+  const trimmed = subject.trim();
+  return /^fwd?:/i.test(trimmed) ? trimmed : `Fwd: ${trimmed || "(no subject)"}`;
 }
 
 function normalizedMailAddress(value: string | null | undefined): string {
@@ -502,6 +597,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   );
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
+  const confirmDialog = useConfirmDialog();
+  const textInputDialog = useTextInputDialog();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [sourceView, setSourceView] = useState<{ subject: string; content: string } | null>(null);
+  const [busyAction, setBusyAction] = useState(false);
   const { resolvedTheme } = useAppTheme();
   const systemPrefersDark = resolvedTheme === "dark";
 
@@ -1032,8 +1132,15 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   }, [messageTabs, messages, selectedMessageKey]);
 
+  const autoReadKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!selectedMessage) return;
+    const key = messageKey(selectedMessage);
+    // Only load the body + auto-mark-read once per distinct selection. Without
+    // this guard, mutating the open message's flags (e.g. "Mark unread")
+    // re-runs the effect and immediately flips it back to read.
+    if (autoReadKeyRef.current === key) return;
+    autoReadKeyRef.current = key;
     let cancelled = false;
     setAllowRemoteImages(false);
     void (async () => {
@@ -1344,94 +1451,454 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       .catch((e) => setError(String(e)));
   };
 
-  const messageMenuItems = (message: MailMessageHeader): MenuItem[] => [
-    {
-      label: "Open",
-      icon: <MailOpen className="w-3.5 h-3.5" />,
-      onClick: () => selectMessage(message, "mailbox"),
-    },
-    {
-      label: "Open in mail tab",
-      icon: <FileText className="w-3.5 h-3.5" />,
-      onClick: () => openMessageTab(message),
-    },
-    {
-      label: "Open in popup window",
-      icon: <ExternalLink className="w-3.5 h-3.5" />,
-      onClick: () => openMessagePopup(message),
-    },
-    { label: "", separator: true },
-    {
-      label: "Reply",
-      icon: <MessageSquareReply className="w-3.5 h-3.5" />,
-      onClick: () => openReply(message),
-    },
-    {
-      label: "Reply all",
-      icon: <MessageSquareReply className="w-3.5 h-3.5" />,
-      onClick: () => openReplyAll(message),
-    },
-    {
-      label: "Forward",
-      icon: <Send className="w-3.5 h-3.5" />,
-      disabled: true,
-      onClick: () => undefined,
-    },
-    { label: "", separator: true },
-    {
-      label: "Mark as read",
-      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-      disabled: !isUnread(message) || markingRead,
-      onClick: () => void handleMarkSingleRead(message),
-    },
-    {
-      label: "Mark folder read",
-      icon: <MailOpen className="w-3.5 h-3.5" />,
-      disabled: markingRead,
-      onClick: () => void handleMarkFolderRead(message.folder),
-    },
-    { label: "", separator: true },
-    {
-      label: "Copy subject",
-      icon: <FileText className="w-3.5 h-3.5" />,
-      onClick: () => copyText("subject", message.subject || "(no subject)"),
-    },
-    {
-      label: "Copy sender",
-      icon: <MailIcon className="w-3.5 h-3.5" />,
-      onClick: () => copyText("sender", addressLabel(message.from)),
-    },
-  ];
+  const applyFlagsLocally = (folder: string, uids: number[], add: string[], remove: string[], unreadDelta: number) => {
+    const uidSet = new Set(uids);
+    const applies = (message: MailMessageHeader) => message.folder === folder && uidSet.has(message.uid);
+    setMessages((current) => current.map((message) => (applies(message) ? withFlagsMutation(message, add, remove) : message)));
+    setMessageTabs((current) => current.map((tab) => (applies(tab.message) ? { ...tab, message: withFlagsMutation(tab.message, add, remove) } : tab)));
+    if (unreadDelta !== 0) {
+      setFolders((current) => current.map((entry) => {
+        if (entry.name !== folder || entry.unread === null || entry.unread === undefined) return entry;
+        return { ...entry, unread: Math.max(0, entry.unread + unreadDelta), updatedAt: Math.floor(Date.now() / 1000) };
+      }));
+    }
+  };
 
-  const folderMenuItems = (folder: MailFolder): MenuItem[] => [
-    {
-      label: "Open folder",
+  const removeMessagesLocally = (folder: string, uids: number[], unreadRemoved: number) => {
+    const removedKeys = new Set(uids.map((uid) => `${folder}:${uid}`));
+    setMessages((current) => current.filter((message) => !removedKeys.has(messageKey(message))));
+    setMessageTabs((current) => current.filter((tab) => !removedKeys.has(tab.key)));
+    setCheckedMessageKeys((current) => {
+      if (current.size === 0) return current;
+      const next = new Set(current);
+      for (const key of removedKeys) next.delete(key);
+      return next.size === current.size ? current : next;
+    });
+    setMailViewKey((current) => (removedKeys.has(current) ? "mailbox" : current));
+    setSelectedMessageKey((current) => (current && removedKeys.has(current) ? null : current));
+    setPopupMessageKey((current) => (current && removedKeys.has(current) ? null : current));
+    setFolders((current) => current.map((entry) => {
+      if (entry.name !== folder) return entry;
+      const nextTotal = entry.total !== null && entry.total !== undefined ? Math.max(0, entry.total - uids.length) : entry.total;
+      const nextUnread = entry.unread !== null && entry.unread !== undefined ? Math.max(0, entry.unread - unreadRemoved) : entry.unread;
+      return { ...entry, total: nextTotal, unread: nextUnread, updatedAt: Math.floor(Date.now() / 1000) };
+    }));
+  };
+
+  const runMailAction = async (action: () => Promise<void>) => {
+    setBusyAction(true);
+    setError(null);
+    try {
+      await action();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const resolveSpecialFolder = (kind: SpecialFolderKind): string | null =>
+    displayFolders.find((folder) => folderMatchesSpecial(folder, kind))?.name ?? null;
+
+  const resolveInboxFolder = (): string =>
+    displayFolders.find((folder) => folder.name.toUpperCase() === "INBOX")?.name
+    ?? displayFolders.find((folder) => `${folder.name} ${folderLabel(folder)}`.toLowerCase().includes("inbox"))?.name
+    ?? "INBOX";
+
+  const handleToggleFlagged = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const unique = dedupeMessages(targets);
+    if (unique.length === 0) return;
+    const allFlagged = unique.every(isFlagged);
+    const add = allFlagged ? [] : ["\\Flagged"];
+    const remove = allFlagged ? ["\\Flagged"] : [];
+    for (const [folder, group] of groupMessagesByFolder(unique)) {
+      const uids = group.map((message) => message.uid);
+      await mailSetFlags(info, folder, uids, add, remove);
+      applyFlagsLocally(folder, uids, add, remove, 0);
+    }
+    setStatus(allFlagged ? "Removed star" : `Starred ${unique.length} message${unique.length === 1 ? "" : "s"}`);
+  });
+
+  const handleMarkUnread = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const unique = dedupeMessages(targets).filter((message) => !isUnread(message));
+    if (unique.length === 0) {
+      setStatus("Selected messages are already unread");
+      return;
+    }
+    for (const [folder, group] of groupMessagesByFolder(unique)) {
+      const uids = group.map((message) => message.uid);
+      await mailSetFlags(info, folder, uids, [], ["\\Seen"]);
+      applyFlagsLocally(folder, uids, [], ["\\Seen"], group.length);
+    }
+    setStatus(`Marked ${unique.length} message${unique.length === 1 ? "" : "s"} as unread`);
+  });
+
+  const moveTargetsTo = async (targets: MailMessageHeader[], target: string): Promise<number> => {
+    let moved = 0;
+    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+      if (folder === target) continue;
+      const uids = group.map((message) => message.uid);
+      await mailMoveMessages(info, folder, uids, target);
+      removeMessagesLocally(folder, uids, group.filter(isUnread).length);
+      moved += uids.length;
+    }
+    return moved;
+  };
+
+  const handleMoveMessages = (targets: MailMessageHeader[], target: string) => runMailAction(async () => {
+    const moved = await moveTargetsTo(targets, target);
+    setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to ${target}` : "Nothing to move");
+  });
+
+  const handleCopyMessages = (targets: MailMessageHeader[], target: string) => runMailAction(async () => {
+    let copied = 0;
+    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+      const uids = group.map((message) => message.uid);
+      await mailCopyMessages(info, folder, uids, target);
+      copied += uids.length;
+    }
+    setStatus(copied > 0 ? `Copied ${copied} message${copied === 1 ? "" : "s"} to ${target}` : "Nothing to copy");
+  });
+
+  const handleArchiveMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const target = resolveSpecialFolder("archive");
+    if (!target) {
+      setError("No Archive folder found for this account.");
+      return;
+    }
+    const moved = await moveTargetsTo(targets, target);
+    setStatus(moved > 0 ? `Archived ${moved} message${moved === 1 ? "" : "s"}` : "Already archived");
+  });
+
+  const handleJunkMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const target = resolveSpecialFolder("junk");
+    if (!target) {
+      setError("No Junk folder found for this account.");
+      return;
+    }
+    const moved = await moveTargetsTo(targets, target);
+    setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Junk` : "Already in Junk");
+  });
+
+  const handleNotJunkMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const target = resolveInboxFolder();
+    const moved = await moveTargetsTo(targets, target);
+    setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Inbox` : "Already in Inbox");
+  });
+
+  const handleDeleteMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const unique = dedupeMessages(targets);
+    if (unique.length === 0) return;
+    const trash = resolveSpecialFolder("trash");
+    const allInTrash = trash !== null && unique.every((message) => message.folder === trash);
+    if (!trash || allInTrash) {
+      const confirmed = await confirmDialog.confirm({
+        title: "Delete permanently",
+        message: `Permanently delete ${unique.length} message${unique.length === 1 ? "" : "s"}? This cannot be undone.`,
+        confirmLabel: "Delete",
+        danger: true,
+      });
+      if (!confirmed) return;
+      for (const [folder, group] of groupMessagesByFolder(unique)) {
+        const uids = group.map((message) => message.uid);
+        await mailDeleteMessages(info, folder, uids, false);
+        removeMessagesLocally(folder, uids, group.filter(isUnread).length);
+      }
+      setStatus(`Deleted ${unique.length} message${unique.length === 1 ? "" : "s"}`);
+      return;
+    }
+    const moved = await moveTargetsTo(unique, trash);
+    setStatus(`Moved ${moved} message${moved === 1 ? "" : "s"} to Trash`);
+  });
+
+  const buildForwardBody = (target: MailMessageHeader): string => {
+    const currentBody = body && body.uid === target.uid && body.folder === target.folder
+      ? body
+      : {
+          accountId: target.accountId,
+          folder: target.folder,
+          uid: target.uid,
+          messageId: target.messageId,
+          subject: target.subject,
+          text: target.snippet ?? "",
+          html: null,
+          snippet: target.snippet,
+          attachments: [],
+          rawSize: target.rawSize,
+          cachedAt: null,
+          source: "header",
+        } satisfies MailMessageBody;
+    const header = [
+      "---------- Forwarded message ----------",
+      `From: ${addressLabel(target.from) || "(unknown sender)"}`,
+      target.dateTs ? `Date: ${formatFullDate(target.dateTs)}` : "",
+      `Subject: ${target.subject || "(no subject)"}`,
+      `To: ${target.to.map(addressLabel).filter(Boolean).join(", ") || "(none)"}`,
+    ].filter(Boolean).join("\n");
+    return `\n\n${header}\n\n${bodyTextForAi(currentBody)}`;
+  };
+
+  const openForward = (target = selectedMessage) => {
+    if (!target) return;
+    openCompose({
+      subject: forwardSubject(target.subject),
+      body: buildForwardBody(target),
+    });
+  };
+
+  const handlePrintMessage = (message = selectedMessage) => {
+    if (!message) return;
+    const currentBody = body && body.uid === message.uid && body.folder === message.folder ? body : null;
+    const bodyHtml = currentBody?.html
+      ? sanitizeMailHtml(currentBody.html, true)
+      : `<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit">${escapeHtml(currentBody?.text ?? message.snippet ?? "")}</pre>`;
+    const headerHtml = `
+      <h2 style="margin:0 0 8px">${escapeHtml(message.subject || "(no subject)")}</h2>
+      <div style="font-size:12px;color:#555;margin-bottom:4px">From: ${escapeHtml(addressLabel(message.from) || "(unknown)")}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:4px">To: ${escapeHtml(message.to.map(addressLabel).filter(Boolean).join(", ") || "(none)")}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Date: ${escapeHtml(formatFullDate(message.dateTs) || "(unknown)")}</div>
+      <hr style="border:none;border-top:1px solid #ccc;margin-bottom:12px" />`;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      setError("Unable to prepare the message for printing.");
+      return;
+    }
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(message.subject || "Message")}</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">${headerHtml}${bodyHtml}</body></html>`);
+    doc.close();
+    const cleanup = () => {
+      window.setTimeout(() => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }, 500);
+    };
+    window.setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        cleanup();
+      }
+    }, 150);
+  };
+
+  const handleViewSource = (message = selectedMessage) => runMailAction(async () => {
+    if (!message) return;
+    const raw = await mailFetchRaw(info, message.folder, message.uid);
+    setSourceView({ subject: message.subject || "(no subject)", content: raw });
+  });
+
+  const handleSaveEml = (message = selectedMessage) => runMailAction(async () => {
+    if (!message) return;
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const base = suggestedAttachmentName({ name: `${message.subject || "message"}.eml` }, 0, message.subject);
+    const defaultPath = base.toLowerCase().endsWith(".eml") ? base : `${base}.eml`;
+    const targetPath = await save({ title: "Save message as .eml", defaultPath });
+    if (typeof targetPath !== "string" || !targetPath.trim()) {
+      setStatus("Save cancelled");
+      return;
+    }
+    const result = await mailSaveRaw(info, message.folder, message.uid, targetPath);
+    setStatus(`Saved message to ${result.path}`);
+  });
+
+  const handleSearchInFolder = (folder: MailFolder) => {
+    handleFolderSelect(folder);
+    window.setTimeout(() => searchInputRef.current?.focus(), 0);
+  };
+
+  const handleCreateFolder = (parent?: MailFolder) => runMailAction(async () => {
+    const name = await textInputDialog.promptText({
+      title: parent ? `New subfolder in ${folderLabel(parent)}` : "New folder",
+      label: "Folder name",
+      placeholder: "Folder name",
+    });
+    if (!name || !name.trim()) return;
+    const delimiter = parent?.delimiter || "/";
+    const fullName = parent ? `${parent.name}${delimiter}${name.trim()}` : name.trim();
+    await mailCreateFolder(info, fullName);
+    await loadCachedFolders();
+    setStatus(`Created folder ${name.trim()}`);
+  });
+
+  const handleRenameFolder = (folder: MailFolder) => runMailAction(async () => {
+    const label = folderLabel(folder);
+    const next = await textInputDialog.promptText({
+      title: `Rename ${label}`,
+      label: "New folder name",
+      initialValue: label,
+    });
+    const trimmed = next?.trim();
+    if (!trimmed || trimmed === label) return;
+    const delimiter = folder.delimiter || "/";
+    const idx = folder.name.lastIndexOf(delimiter);
+    const parentPath = idx >= 0 ? folder.name.slice(0, idx + delimiter.length) : "";
+    const target = `${parentPath}${trimmed}`;
+    await mailRenameFolder(info, folder.name, target);
+    if (selectedFolder === folder.name) setSelectedFolder(target);
+    await loadCachedFolders();
+    setStatus(`Renamed folder to ${trimmed}`);
+  });
+
+  const handleDeleteFolder = (folder: MailFolder) => runMailAction(async () => {
+    const confirmed = await confirmDialog.confirm({
+      title: "Delete folder",
+      message: `Delete folder "${folderLabel(folder)}" and its cached messages? This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
+    await mailDeleteFolder(info, folder.name);
+    if (selectedFolder === folder.name) {
+      setSelectedMessageKey(null);
+      setBody(null);
+    }
+    await loadCachedFolders();
+    setStatus(`Deleted folder ${folderLabel(folder)}`);
+  });
+
+  const handleEmptyFolder = (folder: MailFolder) => runMailAction(async () => {
+    const confirmed = await confirmDialog.confirm({
+      title: "Empty folder",
+      message: `Permanently delete all messages in "${folderLabel(folder)}"? This cannot be undone.`,
+      confirmLabel: "Empty",
+      danger: true,
+    });
+    if (!confirmed) return;
+    const result = await mailDeleteMessages(info, folder.name, [], true);
+    if (selectedFolder === folder.name) {
+      setMessages([]);
+      setSelectedMessageKey(null);
+      setBody(null);
+      setCheckedMessageKeys(new Set());
+    }
+    setFolders((current) => current.map((entry) => (
+      entry.name === folder.name
+        ? { ...entry, total: 0, unread: 0, updatedAt: Math.floor(Date.now() / 1000) }
+        : entry
+    )));
+    setStatus(`Emptied ${result.deleted} message${result.deleted === 1 ? "" : "s"} from ${folderLabel(folder)}`);
+  });
+
+  const openExternalUrl = async (url: string) => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-shell");
+      await open(url);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const folderTargetChildren = (
+    targets: MailMessageHeader[],
+    action: (targets: MailMessageHeader[], target: string) => void,
+  ): MenuItem[] => {
+    const sources = new Set(targets.map((message) => message.folder));
+    const options = displayFolders.filter(
+      (folder) => !(sources.size === 1 && sources.has(folder.name)),
+    );
+    if (options.length === 0) return [{ label: "No other folders", disabled: true }];
+    return options.map((folder) => ({
+      label: folderLabel(folder),
       icon: folderIcon(folder),
-      onClick: () => handleFolderSelect(folder),
-    },
-    {
-      label: "Sync all folders",
-      icon: <RefreshCw className="w-3.5 h-3.5" />,
-      disabled: syncing,
-      onClick: () => void syncAllFolders(false, {
-        limit: batchSize,
-        includeBodies: true,
-        indicator: "sync",
-      }),
-    },
-    {
-      label: "Mark folder read",
-      icon: <MailOpen className="w-3.5 h-3.5" />,
-      disabled: markingRead || (folder.unread ?? 0) === 0,
-      onClick: () => void handleMarkFolderRead(folder.name),
-    },
-    { label: "", separator: true },
-    {
-      label: "Copy folder name",
-      icon: <Folder className="w-3.5 h-3.5" />,
-      onClick: () => copyText("folder name", folder.name),
-    },
-  ];
+      onClick: () => action(targets, folder.name),
+    }));
+  };
+
+  const messageMenuItems = (message: MailMessageHeader): MenuItem[] => {
+    const targets = checkedMessageKeys.has(messageKey(message)) && checkedMessages.length > 0
+      ? checkedMessages
+      : [message];
+    const count = dedupeMessages(targets).length;
+    const suffix = count > 1 ? ` (${count})` : "";
+    const many = count > 1;
+    const allFlagged = targets.every(isFlagged);
+    const anyUnread = targets.some(isUnread);
+    const allUnread = targets.every(isUnread);
+    return [
+      { label: "Open", icon: <MailOpen className="w-3.5 h-3.5" />, onClick: () => selectMessage(message, "mailbox") },
+      { label: "Open in mail tab", icon: <FileText className="w-3.5 h-3.5" />, onClick: () => openMessageTab(message) },
+      { label: "Open in popup window", icon: <ExternalLink className="w-3.5 h-3.5" />, onClick: () => openMessagePopup(message) },
+      { label: "", separator: true },
+      { label: "Reply", icon: <MessageSquareReply className="w-3.5 h-3.5" />, onClick: () => openReply(message) },
+      { label: "Reply all", icon: <MessageSquareReply className="w-3.5 h-3.5" />, onClick: () => openReplyAll(message) },
+      { label: "Forward", icon: <Forward className="w-3.5 h-3.5" />, onClick: () => openForward(message) },
+      { label: "", separator: true },
+      {
+        label: `Mark as read${suffix}`,
+        icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+        disabled: !anyUnread || markingRead || busyAction,
+        onClick: () => void (many ? handleMarkSelectedRead() : handleMarkSingleRead(message)),
+      },
+      {
+        label: `Mark as unread${suffix}`,
+        icon: <MailIcon className="w-3.5 h-3.5" />,
+        disabled: allUnread || busyAction,
+        onClick: () => void handleMarkUnread(targets),
+      },
+      {
+        label: allFlagged ? `Remove star${suffix}` : `Add star${suffix}`,
+        icon: <Star className="w-3.5 h-3.5" />,
+        disabled: busyAction,
+        onClick: () => void handleToggleFlagged(targets),
+      },
+      { label: "Mark folder read", icon: <MailOpen className="w-3.5 h-3.5" />, disabled: markingRead, onClick: () => void handleMarkFolderRead(message.folder) },
+      { label: "", separator: true },
+      { label: `Archive${suffix}`, icon: <Archive className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleArchiveMessages(targets) },
+      { label: `Move to${suffix}`, icon: <FolderInput className="w-3.5 h-3.5" />, children: folderTargetChildren(targets, (t, folder) => void handleMoveMessages(t, folder)) },
+      { label: `Copy to${suffix}`, icon: <FolderSymlink className="w-3.5 h-3.5" />, children: folderTargetChildren(targets, (t, folder) => void handleCopyMessages(t, folder)) },
+      { label: `Mark as junk${suffix}`, icon: <Ban className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleJunkMessages(targets) },
+      { label: `Not junk${suffix}`, icon: <Inbox className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleNotJunkMessages(targets) },
+      { label: `Delete${suffix}`, icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, disabled: busyAction, onClick: () => void handleDeleteMessages(targets) },
+      { label: "", separator: true },
+      { label: "Save as .eml", icon: <Save className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleSaveEml(message) },
+      { label: "View source", icon: <Code className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleViewSource(message) },
+      { label: "Print", icon: <Printer className="w-3.5 h-3.5" />, onClick: () => handlePrintMessage(message) },
+      { label: "", separator: true },
+      { label: "Copy subject", icon: <FileText className="w-3.5 h-3.5" />, onClick: () => copyText("subject", message.subject || "(no subject)") },
+      { label: "Copy sender", icon: <MailIcon className="w-3.5 h-3.5" />, onClick: () => copyText("sender", addressLabel(message.from)) },
+      { label: "Copy recipients", icon: <Copy className="w-3.5 h-3.5" />, onClick: () => copyText("recipients", message.to.map(addressLabel).filter(Boolean).join(", ")) },
+    ];
+  };
+
+
+  const folderMenuItems = (folder: MailFolder): MenuItem[] => {
+    const isTrashLike = folderMatchesSpecial(folder, "trash") || folderMatchesSpecial(folder, "junk");
+    return [
+      { label: "Open folder", icon: folderIcon(folder), onClick: () => handleFolderSelect(folder) },
+      { label: "Search in this folder", icon: <Search className="w-3.5 h-3.5" />, onClick: () => handleSearchInFolder(folder) },
+      {
+        label: "Sync all folders",
+        icon: <RefreshCw className="w-3.5 h-3.5" />,
+        disabled: syncing,
+        onClick: () => void syncAllFolders(false, { limit: batchSize, includeBodies: true, indicator: "sync" }),
+      },
+      {
+        label: "Mark folder read",
+        icon: <MailOpen className="w-3.5 h-3.5" />,
+        disabled: markingRead || (folder.unread ?? 0) === 0,
+        onClick: () => void handleMarkFolderRead(folder.name),
+      },
+      { label: "", separator: true },
+      { label: "New subfolder…", icon: <FolderPlus className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleCreateFolder(folder) },
+      { label: "Rename folder…", icon: <PenLine className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleRenameFolder(folder) },
+      {
+        label: isTrashLike ? "Empty folder" : "Delete folder",
+        icon: isTrashLike ? <Trash2 className="w-3.5 h-3.5" /> : <FolderX className="w-3.5 h-3.5" />,
+        danger: true,
+        disabled: busyAction,
+        onClick: () => void (isTrashLike ? handleEmptyFolder(folder) : handleDeleteFolder(folder)),
+      },
+      { label: "", separator: true },
+      { label: "Copy folder name", icon: <Folder className="w-3.5 h-3.5" />, onClick: () => copyText("folder name", folder.name) },
+    ];
+  };
 
   const messageListMenuItems = (): MenuItem[] => [
     {
@@ -1458,6 +1925,37 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     },
   ];
 
+  const showReaderMenu = (event: ReactMouseEvent, message: MailMessageHeader | null) => {
+    const targetEl = event.target as HTMLElement | null;
+    const anchor = targetEl?.closest("a") as HTMLAnchorElement | null;
+    const image = (targetEl?.tagName === "IMG" ? targetEl : targetEl?.closest("img")) as HTMLImageElement | null;
+    const selection = typeof window !== "undefined" ? (window.getSelection()?.toString().trim() ?? "") : "";
+    const currentBody = message && body?.uid === message.uid && body.folder === message.folder ? body : null;
+    const items: MenuItem[] = [];
+    if (selection) {
+      items.push({ label: "Copy", icon: <Copy className="w-3.5 h-3.5" />, onClick: () => copyText("selection", selection) });
+    }
+    if (anchor?.href) {
+      const href = anchor.href;
+      items.push({ label: "Copy link address", icon: <LinkIcon className="w-3.5 h-3.5" />, onClick: () => copyText("link", href) });
+      items.push({ label: "Open link in browser", icon: <ExternalLink className="w-3.5 h-3.5" />, onClick: () => void openExternalUrl(href) });
+    }
+    if (image) {
+      const src = image.getAttribute("src") || image.src;
+      if (src) items.push({ label: "Copy image address", icon: <Copy className="w-3.5 h-3.5" />, onClick: () => copyText("image address", src) });
+    }
+    if (currentBody?.html) {
+      items.push({
+        label: allowRemoteImages ? "Block remote images" : "Load remote images",
+        icon: <ImageOff className="w-3.5 h-3.5" />,
+        onClick: () => setAllowRemoteImages((value) => !value),
+      });
+    }
+    if (items.length > 0) items.push({ label: "", separator: true });
+    items.push(...(message ? messageMenuItems(message) : messageListMenuItems()));
+    mailMenu.show(event, items);
+  };
+
   const activeFolder = displayFolders.find((folder) => folder.name === selectedFolder) ?? displayFolders[0];
   const cacheLine = info.cache.enabled
     ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
@@ -1471,13 +1969,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     return (
       <main
         className="h-full min-w-0 flex flex-col"
-        onContextMenu={(event) => {
-          if (message) {
-            mailMenu.show(event, messageMenuItems(message));
-          } else {
-            mailMenu.show(event, messageListMenuItems());
-          }
-        }}
+        onContextMenu={(event) => showReaderMenu(event, message)}
       >
         <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
           <span className="text-[12px] font-semibold min-w-0 truncate">
@@ -1670,6 +2162,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         <div className="relative w-[320px] max-w-[40vw]">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
+            ref={searchInputRef}
             className="taomni-input h-7 w-full pl-7 text-[12px]"
             placeholder="Search cached headers"
             aria-label="Search cached mail headers"
@@ -1958,13 +2451,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           <Panel id="reader" defaultSize="52%" minSize="25%" className="min-w-0">
             <main
               className="h-full min-w-0 flex flex-col"
-              onContextMenu={(event) => {
-                if (selectedMessage) {
-                  mailMenu.show(event, messageMenuItems(selectedMessage));
-                } else {
-                  mailMenu.show(event, messageListMenuItems());
-                }
-              }}
+              onContextMenu={(event) => showReaderMenu(event, selectedMessage)}
             >
               <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
                 <span className="text-[12px] font-semibold min-w-0 truncate">
@@ -2131,6 +2618,37 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
       {attachmentMenu.render}
       {mailMenu.render}
+      {confirmDialog.render}
+      {textInputDialog.render}
+
+      {sourceView && (
+        <div className="absolute inset-0 z-[140] bg-black/35 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title={`Source — ${sourceView.subject}`}
+            icon={<Code className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Message source"
+            minWidth={560}
+            minHeight={360}
+            className="w-[min(1000px,92vw)] h-[min(720px,86vh)] min-h-[420px]"
+            onClose={() => setSourceView(null)}
+            headerActions={(
+              <button
+                type="button"
+                className="taomni-btn h-6 px-2 text-[11px]"
+                onClick={() => copyText("message source", sourceView.content)}
+              >
+                Copy all
+              </button>
+            )}
+          >
+            <div className="flex-1 min-h-0 overflow-auto bg-[var(--taomni-bg)]">
+              <pre className="p-3 text-[12px] leading-5 whitespace-pre-wrap break-words taomni-mono">
+                {sourceView.content}
+              </pre>
+            </div>
+          </MailDraggableDialog>
+        </div>
+      )}
 
       {popupMessage && (
         <div className="absolute inset-0 z-[130] bg-black/35 flex items-center justify-center p-5">
