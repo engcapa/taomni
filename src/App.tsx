@@ -38,8 +38,10 @@ function App() {
   }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => {
-    applyCodeViewProfile(loadCodeViewProfile(), loadGlobalTerminalProfile());
-  }, []);
+    applyCodeViewProfile(loadCodeViewProfile(), loadGlobalTerminalProfile(), {
+      resolvedAppTheme: resolvedTheme,
+    });
+  }, [resolvedTheme]);
 
   // In production builds (the shipped binary, not `pnpm dev` / `tauri dev`),
   // suppress the WebView's native right-click menu. On WebView2/WKWebView that

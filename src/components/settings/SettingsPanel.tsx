@@ -177,8 +177,8 @@ export function SettingsPanel() {
 
   useEffect(() => {
     saveGlobalTerminalProfile(profile);
-    applyCodeViewProfile(codeViewProfile, profile);
-  }, [codeViewProfile, profile]);
+    applyCodeViewProfile(codeViewProfile, profile, { resolvedAppTheme: resolvedTheme });
+  }, [codeViewProfile, profile, resolvedTheme]);
 
   useEffect(() => {
     saveCodeViewProfile(codeViewProfile);

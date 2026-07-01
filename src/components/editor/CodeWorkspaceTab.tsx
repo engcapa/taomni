@@ -105,6 +105,7 @@ import {
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import {
   CODE_VIEW_THEME_APP,
+  CODE_VIEW_THEME_SYSTEM,
   CODE_VIEW_THEME_TERMINAL,
   DEFAULT_CODE_VIEW_PROFILE,
   applyCodeViewProfile,
@@ -115,6 +116,7 @@ import {
 } from "../../lib/codeViewProfile";
 import { loadGlobalTerminalProfile } from "../../lib/terminalProfile";
 import { TERMINAL_THEME_DEFINITIONS, getTerminalThemeDefinition } from "../../lib/themes";
+import { CODE_THEME_DEFINITIONS, getCodeThemeDefinition } from "../../lib/codeThemes";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
@@ -551,9 +553,10 @@ function writeCodeWorkspaceTreeFontSize(size: number): void {
 }
 
 function codeWorkspaceThemeLabel(theme: string, terminalThemeName: string): string {
+  if (theme === CODE_VIEW_THEME_SYSTEM) return "System";
   if (theme === CODE_VIEW_THEME_APP) return "App";
   if (theme === CODE_VIEW_THEME_TERMINAL) return `Terminal · ${terminalThemeName}`;
-  return getTerminalThemeDefinition(theme)?.name ?? theme;
+  return getCodeThemeDefinition(theme)?.name ?? getTerminalThemeDefinition(theme)?.name ?? theme;
 }
 
 function emptyLspFileState(): LspFileState {
@@ -2041,10 +2044,25 @@ export function CodeWorkspaceTab({
             value={codeViewProfile.theme}
             onChange={(event) => setCodeViewTheme(event.target.value)}
           >
-            <option value={CODE_VIEW_THEME_APP}>Follow app theme</option>
+            <option value={CODE_VIEW_THEME_SYSTEM}>Follow system (Dracula / GitHub Light)</option>
+            <option value={CODE_VIEW_THEME_APP}>Match app theme</option>
             <option value={CODE_VIEW_THEME_TERMINAL}>
               Use terminal theme ({terminalThemeName})
             </option>
+            <optgroup label="Editor themes · Dark">
+              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "dark").map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Editor themes · Light">
+              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "light").map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </optgroup>
             <optgroup label="Terminal themes">
               {TERMINAL_THEME_DEFINITIONS.map((definition) => (
                 <option key={definition.id} value={definition.id}>
