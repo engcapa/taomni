@@ -3,22 +3,30 @@ import { Plus, Search } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useT } from "../../lib/i18n";
 import { NotesList } from "./NotesList";
+import { NoteFilters } from "./NoteFilters";
+import { NoteEditor } from "./NoteEditor";
 
 /**
- * NotesPanel — the 便签 tab content inside the Tao Hub. Phase 4 provides the
- * toolbar (new note + search) and the list; Phase 5 layers the full editor,
- * filter views, tags, steps, and due/reminder controls on top.
+ * NotesPanel — the 便签 tab content inside the Tao Hub. A master/detail surface
+ * sized for the narrow drawer: toolbar + filter chips over the list, with the
+ * editor replacing the list when a note is selected (§4.2).
  */
 export function NotesPanel() {
   const t = useT();
   const notes = useNotesStore((s) => s.notes);
   const loading = useNotesStore((s) => s.loading);
   const search = useNotesStore((s) => s.search);
+  const filter = useNotesStore((s) => s.filter);
+  const tagFilterId = useNotesStore((s) => s.tagFilterId);
+  const tags = useNotesStore((s) => s.tags);
   const notesLoaded = useNotesStore((s) => s.notesLoaded);
-  const loadNotes = useNotesStore((s) => s.loadNotes);
-  const loadPrefs = useNotesStore((s) => s.loadPrefs);
   const prefsLoaded = useNotesStore((s) => s.prefsLoaded);
+  const loadNotes = useNotesStore((s) => s.loadNotes);
+  const loadTags = useNotesStore((s) => s.loadTags);
+  const loadPrefs = useNotesStore((s) => s.loadPrefs);
   const setSearch = useNotesStore((s) => s.setSearch);
+  const setFilter = useNotesStore((s) => s.setFilter);
+  const setTagFilter = useNotesStore((s) => s.setTagFilter);
   const createNote = useNotesStore((s) => s.createNote);
   const toggleComplete = useNotesStore((s) => s.toggleComplete);
   const setActiveNote = useNotesStore((s) => s.setActiveNote);
@@ -27,7 +35,15 @@ export function NotesPanel() {
   useEffect(() => {
     if (!prefsLoaded) void loadPrefs();
     if (!notesLoaded) void loadNotes();
-  }, [prefsLoaded, notesLoaded, loadPrefs, loadNotes]);
+    void loadTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activeNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) ?? null : null;
+
+  if (activeNote) {
+    return <NoteEditor note={activeNote} onClose={() => setActiveNote(null)} />;
+  }
 
   return (
     <div
@@ -62,6 +78,14 @@ export function NotesPanel() {
         </div>
       </div>
 
+      <NoteFilters
+        filter={filter}
+        tagFilterId={tagFilterId}
+        tags={tags}
+        onSelectFilter={setFilter}
+        onSelectTag={setTagFilter}
+      />
+
       {/* List */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading && notes.length === 0 ? (
@@ -70,8 +94,10 @@ export function NotesPanel() {
           </div>
         ) : notes.length === 0 ? (
           <div className="p-6 text-center text-[12px] text-[var(--taomni-text-muted)]">
-            <div>{search ? t("notes.emptyFiltered") : t("notes.empty")}</div>
-            {!search && <div className="mt-1 text-[11px]">{t("notes.emptyHint")}</div>}
+            <div>{search || filter !== "recent_incomplete" || tagFilterId ? t("notes.emptyFiltered") : t("notes.empty")}</div>
+            {!search && filter === "recent_incomplete" && !tagFilterId && (
+              <div className="mt-1 text-[11px]">{t("notes.emptyHint")}</div>
+            )}
           </div>
         ) : (
           <NotesList

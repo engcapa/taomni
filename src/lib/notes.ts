@@ -130,6 +130,22 @@ export function nowSecs(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+/** Unix seconds → a value for <input type="datetime-local"> in local time. */
+export function secondsToLocalInput(secs: number | null | undefined): string {
+  if (secs == null) return "";
+  const d = new Date(secs * 1000);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** <input type="datetime-local"> value (local time) → Unix seconds, or null. */
+export function localInputToSeconds(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+}
+
 export async function listNotes(query: NoteQuery = {}): Promise<NoteItem[]> {
   return invoke<NoteItem[]>("notes_list", { query });
 }
