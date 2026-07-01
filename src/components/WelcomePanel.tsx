@@ -4,6 +4,7 @@ import {
   Shield,
   FolderOpen,
   Folder,
+  Mail as MailIcon,
   MessageCircle,
   History,
   ArrowUpDown,
@@ -45,6 +46,8 @@ interface WelcomePanelProps {
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
   onOpenLanChat?: () => void;
   recentSessions?: SessionConfig[];
+  mailSessions?: SessionConfig[];
+  onOpenMailSession?: (session: SessionConfig) => void;
   onOpenRecentSession?: (session: SessionConfig) => void;
   onOpenRecentSessions?: (sessions: SessionConfig[]) => void;
   onEditRecentSession?: (session: SessionConfig) => void;
@@ -69,6 +72,8 @@ export function WelcomePanel({
   onOpenLocalPath,
   onOpenLanChat,
   recentSessions = EMPTY_RECENT_SESSIONS,
+  mailSessions = EMPTY_RECENT_SESSIONS,
+  onOpenMailSession,
   onOpenRecentSession,
   onOpenRecentSessions,
   onEditRecentSession,
@@ -312,6 +317,13 @@ export function WelcomePanel({
               desc={t("welcome.lanChatDesc")}
               kbd=""
               onClick={onOpenLanChat}
+            />
+          ) : null}
+          {mailSessions.length > 0 ? (
+            <MailSessionsCard
+              translate={t}
+              sessions={mailSessions}
+              onOpen={onOpenMailSession}
             />
           ) : null}
         </div>
@@ -1042,6 +1054,57 @@ function WslCard({
             {t("welcome.openWslButton")}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MailSessionsCard({
+  translate: t,
+  sessions,
+  onOpen,
+}: {
+  translate: TranslateFn;
+  sessions: SessionConfig[];
+  onOpen?: (session: SessionConfig) => void;
+}) {
+  return (
+    <div
+      data-testid="welcome-mail-card"
+      className="text-left p-4 min-h-[138px] h-full rounded-md border taomni-card-hover flex flex-col"
+      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span style={{ color: "var(--taomni-accent)" }}><MailIcon className="w-5 h-5" /></span>
+        <span className="font-semibold">{t("welcome.mailTitle")}</span>
+        <span className="ml-auto text-[11px] taomni-mono text-[var(--taomni-text-muted)]">{sessions.length}</span>
+      </div>
+      <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("welcome.mailDesc")}</div>
+      <div className="mt-3 flex-1 min-h-0 max-h-[132px] overflow-auto space-y-1">
+        {sessions.map((session) => {
+          const title = session.name || session.username || session.host || "Mailbox";
+          const detail = session.username || session.host || "";
+          return (
+            <button
+              key={session.id}
+              data-testid="welcome-mail-session"
+              className="w-full text-left rounded border px-2 py-1.5 flex items-center gap-2 hover:bg-[var(--taomni-control-hover)]"
+              style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-input-bg)" }}
+              type="button"
+              disabled={!onOpen}
+              aria-label={t("welcome.mailOpenAria", { name: title })}
+              onClick={() => onOpen?.(session)}
+            >
+              <MailIcon className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-medium text-[var(--taomni-accent)]">{title}</span>
+                {detail && detail !== title ? (
+                  <span className="block truncate text-[11px] text-[var(--taomni-text-muted)]">{detail}</span>
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

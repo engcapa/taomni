@@ -545,6 +545,14 @@ export function MainLayout() {
         .slice(0, welcomeRecentSessionLimit),
     [sessions, welcomeRecentSessionLimit],
   );
+  const welcomeMailSessions = useMemo(
+    () =>
+      sessions
+        .filter((session) => session.session_type === "Mail")
+        .slice()
+        .sort((a, b) => (a.name || a.host || "").localeCompare(b.name || b.host || "")),
+    [sessions],
+  );
   const tabsRef = useRef(tabs);
   const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
   const seenControlToolCallsRef = useRef<Set<string>>(new Set());
@@ -2858,6 +2866,8 @@ export function MainLayout() {
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}
                     recentSessions={welcomeRecentSessions}
+                    mailSessions={welcomeMailSessions}
+                    onOpenMailSession={handleConnectSession}
                     onOpenRecentSession={handleConnectSession}
                     onOpenRecentSessions={handleConnectSessions}
                     onEditRecentSession={handleEditSession}

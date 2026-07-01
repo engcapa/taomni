@@ -333,6 +333,28 @@ pub struct MailDownloadAttachmentResult {
     pub size: usize,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailFlagResult {
+    pub folder: String,
+    pub updated: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailMoveResult {
+    pub folder: String,
+    pub target: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailDeleteResult {
+    pub folder: String,
+    pub deleted: usize,
+}
+
 enum ActiveImapSession {
     Tls(imap::Session<native_tls::TlsStream<TcpStream>>),
     Plain(imap::Session<TcpStream>),
@@ -420,6 +442,80 @@ impl ActiveImapSession {
             Self::Plain(session) => {
                 imap_download_attachment(session, account, folder, uid, attachment_index, target_path)
             }
+        }
+    }
+
+    fn set_flags(
+        &mut self,
+        folder: &str,
+        uids: &[u32],
+        add: &[String],
+        remove: &[String],
+    ) -> Result<usize, String> {
+        match self {
+            Self::Tls(session) => imap_set_flags(session, folder, uids, add, remove),
+            Self::Plain(session) => imap_set_flags(session, folder, uids, add, remove),
+        }
+    }
+
+    fn move_messages(&mut self, folder: &str, uids: &[u32], target: &str) -> Result<usize, String> {
+        match self {
+            Self::Tls(session) => imap_move_messages(session, folder, uids, target),
+            Self::Plain(session) => imap_move_messages(session, folder, uids, target),
+        }
+    }
+
+    fn copy_messages(&mut self, folder: &str, uids: &[u32], target: &str) -> Result<usize, String> {
+        match self {
+            Self::Tls(session) => imap_copy_messages(session, folder, uids, target),
+            Self::Plain(session) => imap_copy_messages(session, folder, uids, target),
+        }
+    }
+
+    fn delete_messages(&mut self, folder: &str, uids: &[u32], all: bool) -> Result<usize, String> {
+        match self {
+            Self::Tls(session) => imap_delete_messages(session, folder, uids, all),
+            Self::Plain(session) => imap_delete_messages(session, folder, uids, all),
+        }
+    }
+
+    fn fetch_raw(&mut self, folder: &str, uid: u32) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Tls(session) => imap_fetch_raw(session, folder, uid),
+            Self::Plain(session) => imap_fetch_raw(session, folder, uid),
+        }
+    }
+
+    fn create_folder(&mut self, name: &str) -> Result<(), String> {
+        match self {
+            Self::Tls(session) => session
+                .create(name)
+                .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
+            Self::Plain(session) => session
+                .create(name)
+                .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
+        }
+    }
+
+    fn rename_folder(&mut self, from: &str, to: &str) -> Result<(), String> {
+        match self {
+            Self::Tls(session) => session
+                .rename(from, to)
+                .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
+            Self::Plain(session) => session
+                .rename(from, to)
+                .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
+        }
+    }
+
+    fn delete_folder(&mut self, name: &str) -> Result<(), String> {
+        match self {
+            Self::Tls(session) => session
+                .delete(name)
+                .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
+            Self::Plain(session) => session
+                .delete(name)
+                .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
         }
     }
 
@@ -806,6 +902,350 @@ pub async fn mail_clear_cache(
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn mail_set_flags(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Vec<u32>,
+    add: Option<Vec<String>>,
+    remove: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<MailFlagResult, String> {
+    let folder = folder.trim().to_string();
+    if folder.is_empty() {
+        return Err("mail folder is required".into());
+    }
+    let add = add.unwrap_or_default();
+    let remove = remove.unwrap_or_default();
+    let target_uids = uids.into_iter().filter(|uid| *uid > 0).collect::<Vec<_>>();
+    if target_uids.is_empty() || (add.is_empty() && remove.is_empty()) {
+        return Ok(MailFlagResult { folder, updated: 0 });
+    }
+
+    let account_id = config.session_id.clone();
+    let account = resolve_config(&state, config)?;
+    let folder_for_task = folder.clone();
+    let uids_for_task = target_uids.clone();
+    let add_for_task = add.clone();
+    let remove_for_task = remove.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result = imap.set_flags(&folder_for_task, &uids_for_task, &add_for_task, &remove_for_task);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail set flags task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    update_cached_flags(&db, &account_id, &folder, &target_uids, &add, &remove)
+        .map_err(|e| e.to_string())?;
+    Ok(MailFlagResult {
+        folder,
+        updated: target_uids.len(),
+    })
+}
+
+#[tauri::command]
+pub async fn mail_move_messages(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Vec<u32>,
+    target_folder: String,
+    state: State<'_, AppState>,
+) -> Result<MailMoveResult, String> {
+    let folder = folder.trim().to_string();
+    let target_folder = target_folder.trim().to_string();
+    if folder.is_empty() || target_folder.is_empty() {
+        return Err("source and target folders are required".into());
+    }
+    if folder == target_folder {
+        return Err("source and target folders must differ".into());
+    }
+    let target_uids = uids.into_iter().filter(|uid| *uid > 0).collect::<Vec<_>>();
+    if target_uids.is_empty() {
+        return Ok(MailMoveResult {
+            folder,
+            target: target_folder,
+            count: 0,
+        });
+    }
+
+    let account_id = config.session_id.clone();
+    let account = resolve_config(&state, config)?;
+    let folder_for_task = folder.clone();
+    let target_for_task = target_folder.clone();
+    let uids_for_task = target_uids.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result = imap.move_messages(&folder_for_task, &uids_for_task, &target_for_task);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail move task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    remove_cached_messages(&db, &account_id, &folder, &target_uids).map_err(|e| e.to_string())?;
+    Ok(MailMoveResult {
+        folder,
+        target: target_folder,
+        count: target_uids.len(),
+    })
+}
+
+#[tauri::command]
+pub async fn mail_copy_messages(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Vec<u32>,
+    target_folder: String,
+    state: State<'_, AppState>,
+) -> Result<MailMoveResult, String> {
+    let folder = folder.trim().to_string();
+    let target_folder = target_folder.trim().to_string();
+    if folder.is_empty() || target_folder.is_empty() {
+        return Err("source and target folders are required".into());
+    }
+    let target_uids = uids.into_iter().filter(|uid| *uid > 0).collect::<Vec<_>>();
+    if target_uids.is_empty() {
+        return Ok(MailMoveResult {
+            folder,
+            target: target_folder,
+            count: 0,
+        });
+    }
+
+    let account = resolve_config(&state, config)?;
+    let folder_for_task = folder.clone();
+    let target_for_task = target_folder.clone();
+    let uids_for_task = target_uids.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result = imap.copy_messages(&folder_for_task, &uids_for_task, &target_for_task);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail copy task failed: {e}"))??;
+
+    Ok(MailMoveResult {
+        folder,
+        target: target_folder,
+        count: target_uids.len(),
+    })
+}
+
+#[tauri::command]
+pub async fn mail_delete_messages(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Option<Vec<u32>>,
+    all: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<MailDeleteResult, String> {
+    let folder = folder.trim().to_string();
+    if folder.is_empty() {
+        return Err("mail folder is required".into());
+    }
+    let all = all.unwrap_or(false);
+    let target_uids = uids
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|uid| *uid > 0)
+        .collect::<Vec<_>>();
+    if !all && target_uids.is_empty() {
+        return Ok(MailDeleteResult { folder, deleted: 0 });
+    }
+
+    let account_id = config.session_id.clone();
+    let account = resolve_config(&state, config)?;
+    let folder_for_task = folder.clone();
+    let uids_for_task = target_uids.clone();
+    let deleted = tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result = imap.delete_messages(&folder_for_task, &uids_for_task, all);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail delete task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    if all {
+        db.execute(
+            "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
+            params![account_id, folder],
+        )
+        .map_err(|e| e.to_string())?;
+    } else {
+        remove_cached_messages(&db, &account_id, &folder, &target_uids)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(MailDeleteResult { folder, deleted })
+}
+
+#[tauri::command]
+pub async fn mail_fetch_raw(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let folder = folder.trim().to_string();
+    if folder.is_empty() {
+        return Err("mail folder is required".into());
+    }
+    let account = resolve_config(&state, config)?;
+    let raw = tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let result = imap.fetch_raw(&folder, uid);
+        imap.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("mail fetch raw task failed: {e}"))??;
+    Ok(String::from_utf8_lossy(&raw).to_string())
+}
+
+#[tauri::command]
+pub async fn mail_save_raw(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    target_path: String,
+    state: State<'_, AppState>,
+) -> Result<MailDownloadAttachmentResult, String> {
+    let folder = folder.trim().to_string();
+    if folder.is_empty() {
+        return Err("mail folder is required".into());
+    }
+    if target_path.trim().is_empty() {
+        return Err("target path is required".into());
+    }
+    let account = resolve_config(&state, config)?;
+    tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        let raw = imap.fetch_raw(&folder, uid);
+        imap.logout();
+        let raw = raw?;
+        let path = std::path::PathBuf::from(&target_path);
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("failed to create folder: {e}"))?;
+        }
+        std::fs::write(&path, &raw).map_err(|e| format!("failed to write .eml file: {e}"))?;
+        Ok(MailDownloadAttachmentResult {
+            path: path.to_string_lossy().to_string(),
+            name: path.file_name().map(|n| n.to_string_lossy().to_string()),
+            content_type: Some("message/rfc822".to_string()),
+            size: raw.len(),
+        })
+    })
+    .await
+    .map_err(|e| format!("mail save raw task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn mail_create_folder(
+    config: MailAccountConfig,
+    name: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<MailFolder>, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("folder name is required".into());
+    }
+    let account = resolve_config(&state, config)?;
+    let name_for_task = name.clone();
+    let folders = tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        imap.create_folder(&name_for_task)?;
+        let folders = imap.list_folders(&account.config.session_id)?;
+        imap.logout();
+        Ok::<_, String>(folders)
+    })
+    .await
+    .map_err(|e| format!("mail create folder task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    for folder in &folders {
+        upsert_folder(&db, folder).map_err(|e| e.to_string())?;
+    }
+    Ok(folders)
+}
+
+#[tauri::command]
+pub async fn mail_rename_folder(
+    config: MailAccountConfig,
+    from: String,
+    to: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<MailFolder>, String> {
+    let from = from.trim().to_string();
+    let to = to.trim().to_string();
+    if from.is_empty() || to.is_empty() {
+        return Err("current and new folder names are required".into());
+    }
+    let account_id = config.session_id.clone();
+    let account = resolve_config(&state, config)?;
+    let from_for_task = from.clone();
+    let to_for_task = to.clone();
+    let folders = tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        imap.rename_folder(&from_for_task, &to_for_task)?;
+        let folders = imap.list_folders(&account.config.session_id)?;
+        imap.logout();
+        Ok::<_, String>(folders)
+    })
+    .await
+    .map_err(|e| format!("mail rename folder task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    purge_cached_folder(&db, &account_id, &from).map_err(|e| e.to_string())?;
+    for folder in &folders {
+        upsert_folder(&db, folder).map_err(|e| e.to_string())?;
+    }
+    Ok(folders)
+}
+
+#[tauri::command]
+pub async fn mail_delete_folder(
+    config: MailAccountConfig,
+    name: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<MailFolder>, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("folder name is required".into());
+    }
+    let account_id = config.session_id.clone();
+    let account = resolve_config(&state, config)?;
+    let name_for_task = name.clone();
+    let folders = tokio::task::spawn_blocking(move || {
+        let mut imap = connect_imap(&account)?;
+        imap.delete_folder(&name_for_task)?;
+        let folders = imap.list_folders(&account.config.session_id)?;
+        imap.logout();
+        Ok::<_, String>(folders)
+    })
+    .await
+    .map_err(|e| format!("mail delete folder task failed: {e}"))??;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    purge_cached_folder(&db, &account_id, &name).map_err(|e| e.to_string())?;
+    for folder in &folders {
+        upsert_folder(&db, folder).map_err(|e| e.to_string())?;
+    }
+    Ok(folders)
 }
 
 fn resolve_config(
@@ -1306,6 +1746,141 @@ fn imap_mark_read<T: Read + Write>(
         .uid_store(uid_set, "+FLAGS.SILENT (\\Seen)")
         .map_err(|e| format!("IMAP UID STORE \\Seen failed: {e}"))?;
     Ok(uids.len())
+}
+
+fn imap_set_flags<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uids: &[u32],
+    add: &[String],
+    remove: &[String],
+) -> Result<usize, String> {
+    if uids.is_empty() || (add.is_empty() && remove.is_empty()) {
+        return Ok(0);
+    }
+    session
+        .select(folder)
+        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
+    let uid_set = uid_set_string(uids);
+    if !add.is_empty() {
+        let query = format!("+FLAGS.SILENT ({})", add.join(" "));
+        session
+            .uid_store(&uid_set, &query)
+            .map_err(|e| format!("IMAP UID STORE +FLAGS failed: {e}"))?;
+    }
+    if !remove.is_empty() {
+        let query = format!("-FLAGS.SILENT ({})", remove.join(" "));
+        session
+            .uid_store(&uid_set, &query)
+            .map_err(|e| format!("IMAP UID STORE -FLAGS failed: {e}"))?;
+    }
+    Ok(uids.len())
+}
+
+fn imap_move_messages<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uids: &[u32],
+    target: &str,
+) -> Result<usize, String> {
+    if uids.is_empty() {
+        return Ok(0);
+    }
+    session
+        .select(folder)
+        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
+    let uid_set = uid_set_string(uids);
+    // Prefer server-side MOVE (RFC 6851). Servers without the MOVE capability
+    // fall back to COPY + \Deleted + EXPUNGE. uid_expunge (UIDPLUS) only removes
+    // the copied UIDs; plain EXPUNGE is the last resort and clears every
+    // \Deleted message in the mailbox.
+    if let Err(move_err) = session.uid_mv(&uid_set, target) {
+        session
+            .uid_copy(&uid_set, target)
+            .map_err(|e| format!("IMAP UID COPY to {target} failed: {e} (after MOVE error: {move_err})"))?;
+        session
+            .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
+            .map_err(|e| format!("IMAP UID STORE \\Deleted failed: {e}"))?;
+        if session.uid_expunge(&uid_set).is_err() {
+            session
+                .expunge()
+                .map_err(|e| format!("IMAP EXPUNGE failed: {e}"))?;
+        }
+    }
+    Ok(uids.len())
+}
+
+fn imap_copy_messages<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uids: &[u32],
+    target: &str,
+) -> Result<usize, String> {
+    if uids.is_empty() {
+        return Ok(0);
+    }
+    session
+        .select(folder)
+        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
+    let uid_set = uid_set_string(uids);
+    session
+        .uid_copy(&uid_set, target)
+        .map_err(|e| format!("IMAP UID COPY to {target} failed: {e}"))?;
+    Ok(uids.len())
+}
+
+fn imap_delete_messages<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uids: &[u32],
+    all: bool,
+) -> Result<usize, String> {
+    session
+        .select(folder)
+        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
+    let uid_list: Vec<u32> = if all {
+        session
+            .uid_search("ALL")
+            .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
+            .into_iter()
+            .collect()
+    } else {
+        uids.to_vec()
+    };
+    if uid_list.is_empty() {
+        return Ok(0);
+    }
+    let uid_set = uid_set_string(&uid_list);
+    session
+        .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
+        .map_err(|e| format!("IMAP UID STORE \\Deleted failed: {e}"))?;
+    if session.uid_expunge(&uid_set).is_err() {
+        session
+            .expunge()
+            .map_err(|e| format!("IMAP EXPUNGE failed: {e}"))?;
+    }
+    Ok(uid_list.len())
+}
+
+fn imap_fetch_raw<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uid: u32,
+) -> Result<Vec<u8>, String> {
+    session
+        .examine(folder)
+        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+    let fetches = session
+        .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
+        .map_err(|e| format!("IMAP UID FETCH raw failed: {e}"))?;
+    let fetch = fetches
+        .iter()
+        .next()
+        .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
+    let body = fetch
+        .body()
+        .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
+    Ok(body.to_vec())
 }
 
 fn imap_download_attachment<T: Read + Write>(
@@ -2023,6 +2598,79 @@ fn flags_include_seen(flags: &[String]) -> bool {
     flags.iter().any(|flag| flag.eq_ignore_ascii_case("\\Seen"))
 }
 
+fn update_cached_flags(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: &[u32],
+    add: &[String],
+    remove: &[String],
+) -> SqlResult<()> {
+    if uids.is_empty() || (add.is_empty() && remove.is_empty()) {
+        return Ok(());
+    }
+    for uid in uids {
+        let flags_json: Option<String> = conn
+            .query_row(
+                "SELECT flags_json
+                 FROM mail_messages
+                 WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+                params![account_id, folder, *uid as i64],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(flags_json) = flags_json else {
+            continue;
+        };
+        let mut flags: Vec<String> = serde_json::from_str(&flags_json).unwrap_or_default();
+        flags.retain(|flag| !remove.iter().any(|r| flag.eq_ignore_ascii_case(r)));
+        for flag in add {
+            if !flags.iter().any(|existing| existing.eq_ignore_ascii_case(flag)) {
+                flags.push(flag.clone());
+            }
+        }
+        let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
+        conn.execute(
+            "UPDATE mail_messages
+             SET flags_json = ?4, updated_at = ?5
+             WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+            params![account_id, folder, *uid as i64, next_flags_json, now_ts()],
+        )?;
+    }
+    Ok(())
+}
+
+fn remove_cached_messages(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: &[u32],
+) -> SqlResult<()> {
+    for uid in uids {
+        conn.execute(
+            "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+            params![account_id, folder, *uid as i64],
+        )?;
+    }
+    Ok(())
+}
+
+fn purge_cached_folder(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<()> {
+    // Remove the folder and its messages, plus any nested subfolders addressed
+    // with the common IMAP hierarchy delimiters.
+    conn.execute(
+        "DELETE FROM mail_messages
+         WHERE account_id = ?1 AND (folder = ?2 OR folder LIKE ?3 OR folder LIKE ?4)",
+        params![account_id, folder, format!("{folder}/%"), format!("{folder}.%")],
+    )?;
+    conn.execute(
+        "DELETE FROM mail_folders
+         WHERE account_id = ?1 AND (name = ?2 OR name LIKE ?3 OR name LIKE ?4)",
+        params![account_id, folder, format!("{folder}/%"), format!("{folder}.%")],
+    )?;
+    Ok(())
+}
+
 fn get_cached_body(
     conn: &Connection,
     account_id: &str,
@@ -2405,5 +3053,81 @@ mod tests {
             .unwrap();
         assert_eq!(body.source, "cache");
         assert!(body.text.unwrap().contains("Taomni Mail"));
+    }
+
+    #[test]
+    fn update_and_remove_cache_helpers_mutate_rows() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_mail_tables(&conn).unwrap();
+        let mut first = parse_body_message("acct", "INBOX", 1, Some(10), &sample_message(), 4096);
+        first.header.flags = vec!["\\Seen".into()];
+        let mut second = parse_body_message("acct", "INBOX", 2, Some(10), &sample_message(), 4096);
+        second.header.flags = vec!["\\Seen".into()];
+        upsert_message(&conn, &first).unwrap();
+        upsert_message(&conn, &second).unwrap();
+
+        update_cached_flags(
+            &conn,
+            "acct",
+            "INBOX",
+            &[1],
+            &["\\Flagged".into()],
+            &["\\Seen".into()],
+        )
+        .unwrap();
+        let messages = list_cached_messages(&conn, "acct", "INBOX", 20, 0).unwrap();
+        let one = messages.iter().find(|m| m.uid == 1).unwrap();
+        assert!(one.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Flagged")));
+        assert!(!one.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")));
+        let two = messages.iter().find(|m| m.uid == 2).unwrap();
+        assert!(two.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")));
+
+        remove_cached_messages(&conn, "acct", "INBOX", &[1]).unwrap();
+        let after = list_cached_messages(&conn, "acct", "INBOX", 20, 0).unwrap();
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].uid, 2);
+    }
+
+    #[test]
+    fn purge_cached_folder_removes_folder_and_subfolders_only() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_mail_tables(&conn).unwrap();
+        for name in ["Parent", "Parent/Child", "ParentX"] {
+            upsert_message(
+                &conn,
+                &parse_body_message("acct", name, 1, Some(10), &sample_message(), 4096),
+            )
+            .unwrap();
+            upsert_folder(
+                &conn,
+                &MailFolder {
+                    account_id: "acct".into(),
+                    name: name.into(),
+                    display_name: name.into(),
+                    delimiter: Some("/".into()),
+                    flags: vec![],
+                    uid_validity: None,
+                    uid_next: None,
+                    total: None,
+                    unread: None,
+                    updated_at: now_ts(),
+                },
+            )
+            .unwrap();
+        }
+
+        purge_cached_folder(&conn, "acct", "Parent").unwrap();
+
+        let names = list_cached_folders(&conn, "acct")
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name)
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"ParentX".to_string()));
+        assert!(!names.contains(&"Parent".to_string()));
+        assert!(!names.contains(&"Parent/Child".to_string()));
+        assert_eq!(list_cached_messages(&conn, "acct", "Parent", 20, 0).unwrap().len(), 0);
+        assert_eq!(list_cached_messages(&conn, "acct", "Parent/Child", 20, 0).unwrap().len(), 0);
+        assert_eq!(list_cached_messages(&conn, "acct", "ParentX", 20, 0).unwrap().len(), 1);
     }
 }
