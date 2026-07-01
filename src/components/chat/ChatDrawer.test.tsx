@@ -4,6 +4,8 @@ import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
+import { useNotesStore } from "../../stores/notesStore";
+import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -358,6 +360,8 @@ describe("ChatDrawerRibbon", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    useNotesStore.setState({ alerts: [] });
+    useTaoAlertStore.setState({ aiDone: [] });
   });
 
   it("shows only Tao and opens the stable chat tab id", () => {
@@ -456,5 +460,71 @@ describe("ChatDrawerRibbon", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("badges pending alerts and jumps to the overdue note on click", () => {
+    const openTabChat = vi.fn().mockResolvedValue(undefined);
+    const setActiveNote = vi.fn();
+    const ackAlert = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({
+      tabs: [{ id: "term-1", chatTabId: "stable-chat", type: "terminal", title: "T", closable: true }],
+      activeTabId: "term-1",
+    });
+    useChatStore.setState({ drawerOpen: false, drawerPosition: "left", drawerPinned: true, openTabChat });
+    useTaoHubStore.setState({ hubTab: "chat" });
+    useNotesStore.setState({
+      alerts: [
+        {
+          id: "evt-1",
+          note_id: "note-7",
+          kind: "overdue",
+          state: "pending",
+          fire_at: 1,
+          acknowledged_at: null,
+          note_title: "Pay invoice",
+          due_at: 1,
+          reminder_at: null,
+        },
+      ],
+      setActiveNote,
+      ackAlert,
+    });
+    useTaoAlertStore.setState({ aiDone: [] });
+
+    render(
+      <div className="relative h-32 w-32">
+        <ChatDrawerRibbon />
+      </div>,
+    );
+
+    expect(screen.getByTestId("tao-ribbon-badge")).toHaveTextContent("1");
+    fireEvent.click(screen.getByTestId("ai-chat-drawer-ribbon"));
+    expect(openTabChat).toHaveBeenCalledWith("stable-chat");
+    expect(setActiveNote).toHaveBeenCalledWith("note-7");
+    expect(ackAlert).toHaveBeenCalledWith("evt-1");
+    expect(useTaoHubStore.getState().hubTab).toBe("notes");
+  });
+
+  it("opens the alert inbox when multiple alerts are pending", () => {
+    useAppStore.setState({
+      tabs: [{ id: "term-1", chatTabId: "stable-chat", type: "terminal", title: "T", closable: true }],
+      activeTabId: "term-1",
+    });
+    useChatStore.setState({ drawerOpen: false, drawerPosition: "left", drawerPinned: true });
+    useNotesStore.setState({
+      alerts: [
+        { id: "a", note_id: "n1", kind: "overdue", state: "pending", fire_at: 1, acknowledged_at: null, note_title: "A", due_at: 1, reminder_at: null },
+        { id: "b", note_id: "n2", kind: "due_soon", state: "pending", fire_at: 2, acknowledged_at: null, note_title: "B", due_at: 2, reminder_at: null },
+      ],
+    });
+    render(
+      <div className="relative h-32 w-32">
+        <ChatDrawerRibbon />
+      </div>,
+    );
+    expect(screen.getByTestId("tao-ribbon-badge")).toHaveTextContent("2");
+    fireEvent.click(screen.getByTestId("ai-chat-drawer-ribbon"));
+    expect(screen.getByTestId("tao-alert-inbox")).toBeInTheDocument();
+    expect(screen.getAllByTestId("tao-alert-inbox-item")).toHaveLength(2);
   });
 });

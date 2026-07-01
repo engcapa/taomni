@@ -672,6 +672,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 };
               });
             }
+            // Tao Ribbon: if this reply landed while its Chat panel wasn't the
+            // visible surface, raise an `ai_done` alert so the user is notified
+            // and can jump back to the thread (§10.2).
+            void (async () => {
+              try {
+                const { useTaoAlertStore } = await import("./taoAlertStore");
+                const { useTaoHubStore } = await import("./taoHubStore");
+                const s = get();
+                const visible =
+                  s.drawerOpen &&
+                  s.activeThreadId === threadId &&
+                  useTaoHubStore.getState().hubTab === "chat";
+                if (!visible) {
+                  const thread = s.threads.find((th) => th.id === threadId);
+                  useTaoAlertStore.getState().pushAiDone(threadId, thread?.title ?? "AI");
+                }
+              } catch {
+                /* alert bridge is best-effort */
+              }
+            })();
             break;
           }
           case "error": {
@@ -893,6 +913,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: true },
       activeThreadIdByTabId: { ...s.activeThreadIdByTabId, [tabId]: thread.id },
     }));
+    // Opening the thread clears any pending "AI reply ready" ribbon alert.
+    void import("./taoAlertStore")
+      .then((m) => m.useTaoAlertStore.getState().clearThread(thread.id))
+      .catch(() => {});
   },
 
   toggleTabChat: async (tabId: string) => {

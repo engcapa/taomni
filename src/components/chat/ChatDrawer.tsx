@@ -51,7 +51,10 @@ import { useT, type TranslateFn } from "../../lib/i18n";
 import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
 import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
+import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { NotesPanel } from "../notes/NotesPanel";
+import { TaoAlertInbox } from "../tao/TaoAlertInbox";
+import { alertColorBucket, buildTaoAlerts, topAlertKind, type TaoAlert } from "../../lib/tao/taoAlerts";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
@@ -1026,7 +1029,17 @@ export function ChatDrawerRibbon() {
   const drawerPinned = useChatStore((s) => s.drawerPinned);
   const ribbonOffsetRatio = useChatStore((s) => s.ribbonOffsetRatio);
   const openTabChat = useChatStore((s) => s.openTabChat);
+  const setActiveThread = useChatStore((s) => s.setActiveThread);
   const setRibbonPlacement = useChatStore((s) => s.setRibbonPlacement);
+  const setHubTab = useTaoHubStore((s) => s.setHubTab);
+  const noteAlerts = useNotesStore((s) => s.alerts);
+  const setActiveNote = useNotesStore((s) => s.setActiveNote);
+  const ackNoteAlert = useNotesStore((s) => s.ackAlert);
+  const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
+  const ackAiDone = useTaoAlertStore((s) => s.ack);
+  const [showInbox, setShowInbox] = useState(false);
+  const bumpRef = useRef(0);
+  const [bumping, setBumping] = useState(false);
   const activeTab = useAppStore((s) =>
     s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
@@ -1042,6 +1055,22 @@ export function ChatDrawerRibbon() {
       }
     };
   }, []);
+
+  // Unified Tao alerts (notes due/overdue/reminder + chat ai_done), priority-sorted.
+  const taoAlerts = useMemo(
+    () => buildTaoAlerts(noteAlerts, aiDoneAlerts),
+    [noteAlerts, aiDoneAlerts],
+  );
+  // Bump the ribbon 2-3 times when a new alert appears (§7.2).
+  useEffect(() => {
+    if (taoAlerts.length > bumpRef.current) {
+      setBumping(true);
+      const id = window.setTimeout(() => setBumping(false), 1200);
+      bumpRef.current = taoAlerts.length;
+      return () => window.clearTimeout(id);
+    }
+    bumpRef.current = taoAlerts.length;
+  }, [taoAlerts.length]);
 
   if (drawerOpen || !activeTab || !CHAT_CAPABLE_TAB_TYPES.has(activeTab.type)) return null;
 
@@ -1065,6 +1094,52 @@ export function ChatDrawerRibbon() {
           transform: "translate(-50%, -50%)",
         }
       : ribbonPositionStyle({ edge: drawerPosition, offsetRatio: ribbonOffsetRatio })),
+  };
+
+  // Alert glow: recolor the ribbon by highest-severity pending alert.
+  const topKind = topAlertKind(taoAlerts);
+  const colorBucket = alertColorBucket(topKind);
+  const alertColor =
+    colorBucket === "red"
+      ? "#ef4444"
+      : colorBucket === "amber"
+        ? "#f59e0b"
+        : colorBucket === "accent"
+          ? "var(--taomni-accent)"
+          : null;
+  if (alertColor && !dragPreview) {
+    ribbonStyle.borderColor = alertColor;
+    ribbonStyle.boxShadow = `0 0 0 2px ${alertColor}66`;
+  }
+  const badgeBg =
+    colorBucket === "red"
+      ? "bg-red-500 text-white"
+      : colorBucket === "amber"
+        ? "bg-amber-400 text-black"
+        : "bg-[var(--taomni-accent)] text-white";
+
+  const jumpToAlert = (alert: TaoAlert) => {
+    setShowInbox(false);
+    void openTabChat(chatTabId);
+    if (alert.source === "notes") {
+      setHubTab("notes");
+      if (alert.noteId) setActiveNote(alert.noteId);
+      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
+      void ackNoteAlert(rawId);
+    } else {
+      setHubTab("chat");
+      if (alert.threadId) setActiveThread(alert.threadId);
+      ackAiDone(alert.id);
+    }
+  };
+
+  const ackAlert = (alert: TaoAlert) => {
+    if (alert.source === "notes") {
+      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
+      void ackNoteAlert(rawId);
+    } else {
+      ackAiDone(alert.id);
+    }
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1143,33 +1218,81 @@ export function ChatDrawerRibbon() {
   };
 
   return (
-    <button
-      type="button"
-      data-testid="ai-chat-drawer-ribbon"
-      data-position={drawerPosition}
-      data-dragging={dragging || undefined}
-      className={`${ribbonClass} z-40 flex items-center justify-center overflow-hidden text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing`}
-      style={ribbonStyle}
-      title={t("chat.ribbonOpenTitle", { title: activeTab.title })}
-      aria-label={t("chat.ribbonOpenTitle", { title: activeTab.title })}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      onMouseEnter={scheduleHoverOpen}
-      onMouseLeave={clearHoverOpen}
-      onClick={(event) => {
-        if (suppressClickRef.current) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        void openTabChat(chatTabId);
-      }}
-    >
-      <span className={textClass}>Tao</span>
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid="ai-chat-drawer-ribbon"
+        data-position={drawerPosition}
+        data-dragging={dragging || undefined}
+        data-alert-count={taoAlerts.length || undefined}
+        className={`${ribbonClass} z-40 flex items-center justify-center text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
+        style={ribbonStyle}
+        title={taoAlerts.length > 0 ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: activeTab.title })}
+        aria-label={taoAlerts.length > 0 ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: activeTab.title })}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onMouseEnter={scheduleHoverOpen}
+        onMouseLeave={clearHoverOpen}
+        onClick={(event) => {
+          if (suppressClickRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          if (taoAlerts.length === 1) {
+            jumpToAlert(taoAlerts[0]);
+            return;
+          }
+          if (taoAlerts.length > 1) {
+            setShowInbox((v) => !v);
+            return;
+          }
+          void openTabChat(chatTabId);
+        }}
+      >
+        <span className={textClass}>Tao</span>
+        {taoAlerts.length > 0 && (
+          <span
+            className={`absolute -top-1 -right-1 min-w-[13px] h-[13px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center ${badgeBg}`}
+            data-testid="tao-ribbon-badge"
+          >
+            {taoAlerts.length}
+          </span>
+        )}
+      </button>
+      {showInbox && taoAlerts.length > 0 && (
+        <div
+          className="absolute z-50"
+          style={ribbonInboxStyle(drawerPosition, ribbonOffsetRatio)}
+          data-testid="tao-ribbon-inbox-anchor"
+        >
+          <TaoAlertInbox
+            alerts={taoAlerts}
+            onJump={jumpToAlert}
+            onAck={ackAlert}
+            onClose={() => setShowInbox(false)}
+          />
+        </div>
+      )}
+    </>
   );
+}
+
+/** Position the alert inbox popover just inside the ribbon's docked edge. */
+function ribbonInboxStyle(edge: ChatDrawerPosition, offsetRatio: number): CSSProperties {
+  const pct = `${(Math.min(0.88, Math.max(0.12, offsetRatio)) * 100).toFixed(2)}%`;
+  switch (edge) {
+    case "left":
+      return { left: 12, top: pct, transform: "translateY(-50%)" };
+    case "right":
+      return { right: 12, top: pct, transform: "translateY(-50%)" };
+    case "top":
+      return { top: 12, left: pct, transform: "translateX(-50%)" };
+    case "bottom":
+      return { bottom: 12, left: pct, transform: "translateX(-50%)" };
+  }
 }
 
 function capabilityForMode(mode: ChatThreadMode): LlmProviderCapability {

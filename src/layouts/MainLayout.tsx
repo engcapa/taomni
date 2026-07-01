@@ -98,6 +98,7 @@ import type { LocalShellSelection } from "../types";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { TaoRibbon } from "../components/tao/TaoRibbon";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
+import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
@@ -3449,6 +3450,7 @@ export function MainLayout() {
         {chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
         {!aiFullyDisabled && <TaoRibbon />}
         <FloatingNotesPanel />
+        <TaoAlertPoller />
       </div>
 
       <StatusBar />
