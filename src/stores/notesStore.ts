@@ -150,7 +150,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         tag_id: tagFilterId ?? undefined,
         now: nowSecs(),
       });
-      set({ notes, notesLoaded: true, loading: false });
+      set({ notes: Array.isArray(notes) ? notes : [], notesLoaded: true, loading: false });
     } catch (e) {
       console.error("notes_list failed:", e);
       set({ notesLoaded: true, loading: false });

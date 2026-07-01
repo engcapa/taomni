@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
+import { useTaoHubStore } from "../../stores/taoHubStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -92,6 +93,10 @@ describe("ChatDrawer provider and echo controls", () => {
       if (command === "chat_purge_old") return Promise.resolve(0);
       if (command === "get_ai_config") return Promise.resolve(makeConfig());
       if (command === "save_ai_config") return Promise.resolve(null);
+      if (command === "notes_list") return Promise.resolve([]);
+      if (command === "notes_get_prefs") return Promise.resolve({});
+      if (command === "notes_list_alerts") return Promise.resolve([]);
+      if (command === "notes_list_tags") return Promise.resolve([]);
       return Promise.resolve(null);
     });
 
@@ -323,6 +328,29 @@ describe("ChatDrawer layout resizing", () => {
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 400, clientY: 320 });
 
     expect(useChatStore.getState().drawerHeight).toBe(520);
+  });
+
+  it("shows the Tao Hub tab strip with Chat and Notes tabs", () => {
+    useTaoHubStore.setState({ hubTab: "chat" });
+    render(<ChatDrawer />);
+    expect(screen.getByTestId("tao-hub-tab-chat")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-hub-tab-notes")).toBeInTheDocument();
+    // Chat tab active by default → composer present, notes panel absent.
+    expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
+  });
+
+  it("switches to the Notes tab and back without losing the chat view", () => {
+    useTaoHubStore.setState({ hubTab: "chat" });
+    render(<ChatDrawer />);
+
+    fireEvent.click(screen.getByTestId("tao-hub-tab-notes"));
+    expect(useTaoHubStore.getState().hubTab).toBe("notes");
+    expect(screen.getByTestId("notes-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("notes-new")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tao-hub-tab-chat"));
+    expect(useTaoHubStore.getState().hubTab).toBe("chat");
+    expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
   });
 });
 

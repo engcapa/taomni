@@ -16,6 +16,7 @@ import {
   PinOff,
   Plus,
   RefreshCw,
+  StickyNote,
   TerminalSquare,
   Video,
   X,
@@ -48,6 +49,8 @@ import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
+import { useTaoHubStore } from "../../stores/taoHubStore";
+import { NotesPanel } from "../notes/NotesPanel";
 
 const CHAT_CAPABLE_TAB_TYPES = new Set(["welcome", "terminal", "rdp", "database", "redis"]);
 const DRAWER_POSITIONS: ChatDrawerPosition[] = ["left", "right", "top", "bottom"];
@@ -76,6 +79,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   const [showHistory, setShowHistory] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
+  const hubTab = useTaoHubStore((s) => s.hubTab);
+  const setHubTab = useTaoHubStore((s) => s.setHubTab);
   const [error, setError] = useState<string | null>(null);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
@@ -587,7 +592,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         >
           <Bot className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
           <span className="text-[13px] font-semibold flex-1 truncate">
-            {activeThread?.title ?? t("chat.drawerTitle")}
+            {hubTab === "notes"
+              ? t("notes.title")
+              : activeThread?.title ?? t("chat.drawerTitle")}
           </span>
           <div className="relative">
             <button
@@ -648,37 +655,41 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           >
             {sideBySide ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
           </button>
-          <button
-            type="button"
-            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-            onClick={copyAllToClipboard}
-            disabled={!activeThreadId || activeMessages.length === 0}
-            title={t("chat.copyAllTitle")}
-            aria-label={t("chat.copyAllAria")}
-          >
-            {copiedAll ? (
-              <Check className="w-3.5 h-3.5 text-green-400" />
-            ) : (
-              <Copy className="w-3.5 h-3.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-            onClick={handleNewThread}
-            title={t("chat.newChatTitle")}
-            aria-label={t("chat.newChatAria")}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--taomni-selected)]" : ""}`}
-            onClick={() => setShowHistory((v) => !v)}
-            title={t("chat.historyTitle")}
-          >
-            <History className="w-3.5 h-3.5" />
-          </button>
+          {hubTab === "chat" && (
+            <>
+              <button
+                type="button"
+                className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+                onClick={copyAllToClipboard}
+                disabled={!activeThreadId || activeMessages.length === 0}
+                title={t("chat.copyAllTitle")}
+                aria-label={t("chat.copyAllAria")}
+              >
+                {copiedAll ? (
+                  <Check className="w-3.5 h-3.5 text-green-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+                onClick={handleNewThread}
+                title={t("chat.newChatTitle")}
+                aria-label={t("chat.newChatAria")}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--taomni-selected)]" : ""}`}
+                onClick={() => setShowHistory((v) => !v)}
+                title={t("chat.historyTitle")}
+              >
+                <History className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
@@ -691,6 +702,48 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
         </div>
 
+        {/* Tao Hub tab strip — one drawer, two tabs (Chat | 便签). */}
+        <div
+          className="flex items-stretch border-b border-[var(--taomni-divider)] shrink-0 text-[11px]"
+          role="tablist"
+          aria-label={t("tao.hubTitle")}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={hubTab === "chat"}
+            data-testid="tao-hub-tab-chat"
+            className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
+              hubTab === "chat"
+                ? "border-[var(--taomni-accent)] text-[var(--taomni-accent)]"
+                : "border-transparent text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            }`}
+            onClick={() => setHubTab("chat")}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>{t("tao.tabChat")}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={hubTab === "notes"}
+            data-testid="tao-hub-tab-notes"
+            className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
+              hubTab === "notes"
+                ? "border-[var(--taomni-accent)] text-[var(--taomni-accent)]"
+                : "border-transparent text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            }`}
+            onClick={() => setHubTab("notes")}
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+            <span>{t("tao.tabNotes")}</span>
+          </button>
+        </div>
+
+        {hubTab === "notes" ? (
+          <NotesPanel />
+        ) : (
+        <>
         {/* History panel */}
         {showHistory && (
           <div className="h-48 shrink-0 border-b border-[var(--taomni-divider)] overflow-hidden">
@@ -939,6 +992,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           // without a `terminalContext` prop (the production case).
           resolveTerminalContext={currentMode === "chat" ? resolveTerminalText : undefined}
         />
+        </>
+        )}
       </div>
     </div>
   );
