@@ -168,6 +168,7 @@ picky = { path = "vendor/picky" }
 picky-krb = { path = "vendor/picky-krb" }
 portable-pty = { path = "vendor/portable-pty" }
 sspi = { path = "vendor/sspi" }
+tauri-utils = { path = "vendor/tauri-utils" }
 winscard = { path = "vendor/winscard" }
 
 [features]
