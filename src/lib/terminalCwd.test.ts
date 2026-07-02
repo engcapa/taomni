@@ -19,6 +19,15 @@ describe("normalizeLocalStartCwd", () => {
     );
   });
 
+  it("preserves native Windows paths passed directly by local shortcuts", () => {
+    expect(normalizeLocalStartCwd("C:\\Users\\Jo Bloggs\\dev", "windows")).toBe(
+      "C:\\Users\\Jo Bloggs\\dev",
+    );
+    expect(normalizeLocalStartCwd("\\\\server\\share\\repo", "windows")).toBe(
+      "\\\\server\\share\\repo",
+    );
+  });
+
   it("returns null for MSYS/WSL paths with no Windows drive", () => {
     expect(normalizeLocalStartCwd("/home/user", "windows")).toBeNull();
     expect(normalizeLocalStartCwd("/usr/local/bin", "windows")).toBeNull();

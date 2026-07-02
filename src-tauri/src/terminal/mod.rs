@@ -50,6 +50,28 @@ pub fn list_local_shells() -> Vec<pty::LocalShellOption> {
     pty::list_local_shells()
 }
 
+#[tauri::command]
+pub fn list_common_local_directories(
+    state: State<'_, AppState>,
+) -> Result<Vec<pty::LocalDirectoryShortcut>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut stmt = db
+        .prepare(
+            "SELECT command FROM command_history
+             WHERE host_key = 'local'
+             ORDER BY use_count DESC, last_used_at DESC
+             LIMIT 500",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let commands = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(pty::list_common_local_directories(&commands))
+}
+
 /// Probe the local system X server (Xorg / XQuartz / VcXsrv / WSLg) and report
 /// whether X11 forwarding has somewhere to display. Drives the X-server status
 /// pill and the "install XQuartz/VcXsrv" hints in the UI.
