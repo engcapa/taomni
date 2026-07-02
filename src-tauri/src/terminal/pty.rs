@@ -216,13 +216,13 @@ fn directory_from_history_command(command: &str, home: Option<&Path>) -> Option<
 
 fn leading_directory_command(command: &str) -> Option<(&str, &str)> {
     for keyword in ["set-location", "pushd", "chdir", "cd", "sl"] {
-        if command.len() < keyword.len() {
+        let Some(head) = command.get(..keyword.len()) else {
             continue;
-        }
-        let (head, tail) = command.split_at(keyword.len());
+        };
         if !head.eq_ignore_ascii_case(keyword) {
             continue;
         }
+        let tail = command.get(keyword.len()..).unwrap_or_default();
         if tail.is_empty() || tail.chars().next().is_some_and(char::is_whitespace) {
             return Some((head, tail.trim_start()));
         }
@@ -951,6 +951,11 @@ mod directory_shortcut_tests {
             directory_from_history_command("cd ..", Some(home.as_path())),
             None,
         );
+    }
+
+    #[test]
+    fn skips_prompt_glyph_history_without_utf8_boundary_panic() {
+        assert_eq!(directory_from_history_command("› cd /tmp", None), None);
     }
 
     #[test]
