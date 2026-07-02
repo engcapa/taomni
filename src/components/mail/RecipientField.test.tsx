@@ -34,6 +34,23 @@ describe("RecipientField", () => {
     vi.clearAllMocks();
   });
 
+  it("does not publish empty search queries while idle", () => {
+    const onQueryChange = vi.fn();
+    const { rerender } = render(<Harness onQueryChange={onQueryChange} />);
+
+    expect(onQueryChange).not.toHaveBeenCalled();
+
+    rerender(<Harness onQueryChange={onQueryChange} suggestions={[{
+      name: "Ops",
+      email: "ops@example.com",
+      source: "history",
+      score: 100,
+      lastSeenAt: null,
+    }]} />);
+
+    expect(onQueryChange).not.toHaveBeenCalled();
+  });
+
   it("accepts a cached contact suggestion with Enter", () => {
     render(<Harness suggestions={[{
       name: "Si Li",

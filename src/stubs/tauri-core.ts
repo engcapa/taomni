@@ -52,6 +52,7 @@ const NOTES_STORAGE_KEY = "taomni.stub.notes.v1";
 const NOTE_TAGS_STORAGE_KEY = "taomni.stub.noteTags.v1";
 const NOTE_PREFS_STORAGE_KEY = "taomni.stub.notePrefs.v1";
 const NOTE_ALERT_ACK_STORAGE_KEY = "taomni.stub.noteAlertAcks.v1";
+const MAIL_DRAFTS_STORAGE_KEY = "taomni.stub.mailDrafts.v1";
 
 interface StubTunnelStatus {
   id: string;
@@ -857,6 +858,86 @@ function stubMailContacts(accountId: string, query: string, limit: number) {
   return Array.from(byEmail.values())
     .sort((a, b) => b.score - a.score || a.email.localeCompare(b.email))
     .slice(0, limit);
+}
+
+interface StubMailDraft {
+  id: string;
+  accountId: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  textBody: string;
+  htmlBody: string;
+  attachments: Array<{
+    path: string;
+    name?: string | null;
+    contentType?: string | null;
+    size?: number | null;
+    modifiedAt?: number | null;
+  }>;
+  replyContext?: Record<string, unknown> | null;
+  remoteDraftFolder?: string | null;
+  remoteDraftUid?: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+function loadMailDrafts(): StubMailDraft[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MAIL_DRAFTS_STORAGE_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMailDrafts(drafts: StubMailDraft[]): void {
+  localStorage.setItem(MAIL_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+}
+
+function stubSaveMailDraft(accountId: string, draft: Record<string, unknown>): StubMailDraft {
+  const drafts = loadMailDrafts();
+  const id = typeof draft.id === "string" && draft.id.trim()
+    ? draft.id.trim()
+    : `stub-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const existing = drafts.find((item) => item.accountId === accountId && item.id === id);
+  const now = Math.floor(Date.now() / 1000);
+  const attachments = Array.isArray(draft.attachments)
+    ? draft.attachments
+        .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+        .filter((item) => typeof item.path === "string" && item.path.trim().length > 0)
+        .map((item) => ({
+          path: String(item.path),
+          name: typeof item.name === "string" ? item.name : null,
+          contentType: typeof item.contentType === "string" ? item.contentType : null,
+          size: typeof item.size === "number" ? item.size : null,
+          modifiedAt: typeof item.modifiedAt === "number" ? item.modifiedAt : null,
+        }))
+    : [];
+  const saved: StubMailDraft = {
+    id,
+    accountId,
+    to: Array.isArray(draft.to) ? draft.to.map(String) : [],
+    cc: Array.isArray(draft.cc) ? draft.cc.map(String) : [],
+    bcc: Array.isArray(draft.bcc) ? draft.bcc.map(String) : [],
+    subject: typeof draft.subject === "string" ? draft.subject : "",
+    textBody: typeof draft.textBody === "string" ? draft.textBody : "",
+    htmlBody: typeof draft.htmlBody === "string" ? draft.htmlBody : "",
+    attachments,
+    replyContext: draft.replyContext && typeof draft.replyContext === "object"
+      ? draft.replyContext as Record<string, unknown>
+      : null,
+    remoteDraftFolder: typeof draft.remoteDraftFolder === "string" ? draft.remoteDraftFolder : null,
+    remoteDraftUid: typeof draft.remoteDraftUid === "number" ? draft.remoteDraftUid : null,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  saveMailDrafts([
+    saved,
+    ...drafts.filter((item) => !(item.accountId === accountId && item.id === id)),
+  ]);
+  return saved;
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
@@ -1975,6 +2056,25 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "mail_send_message": {
       return { accepted: true, response: "browser-preview accepted" } as T;
+    }
+    case "mail_list_drafts": {
+      const accountId = stubMailAccountId(args as InvokeArgs | undefined);
+      return loadMailDrafts()
+        .filter((draft) => draft.accountId === accountId)
+        .sort((a, b) => b.updatedAt - a.updatedAt) as T;
+    }
+    case "mail_save_draft": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const draft = (invokeArgs?.draft as Record<string, unknown> | undefined) ?? {};
+      return stubSaveMailDraft(accountId, draft) as T;
+    }
+    case "mail_delete_draft": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const draftId = (invokeArgs?.draftId as string | undefined) ?? "";
+      saveMailDrafts(loadMailDrafts().filter((draft) => !(draft.accountId === accountId && draft.id === draftId)));
+      return undefined as T;
     }
     case "mail_index_cached_contacts": {
       return stubMailContacts(stubMailAccountId(args as InvokeArgs | undefined), "", 100).length as T;
