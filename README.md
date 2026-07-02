@@ -6,119 +6,179 @@
 
 # Taomni
 
-Taomni 是一款为开发者打造的 AI 原生远程工作台，基于 Tauri 2 + React 19 + TypeScript 构建，跨 Linux / macOS / Windows 运行。功能齐全却小巧精致：本地终端、SSH、SFTP、RDP/VNC、隧道、数据库客户端一应俱全，并将 AI 能力贯穿日常工作流。
+Taomni is an AI-native remote workspace for developers. It is built with Tauri 2, React 19, TypeScript, and Rust, and is designed to run across Linux, macOS, and Windows. The app brings local terminals, SSH, SFTP, RDP/VNC, tunnels, database clients, mail, and AI-assisted workflows into one compact desktop workspace.
 
-## 功能
+## Screenshots
 
-- **终端**：本地终端（PTY）、SSH 终端（russh），支持代理与单级 SSH 跳板机
-- **会话管理**：会话/分组持久化，支持从 PuTTY / WSL / Tabby / OpenSSH 配置导入
-- **文件传输**：SFTP 浏览与上传/下载传输队列
-- **远程桌面**：RDP 客户端、VNC（RFB）查看器，并内置可作为服务端的 RDP server
-- **隧道**：本地/远程/动态端口转发，支持开机自启
-- **数据库客户端**：MySQL / PostgreSQL（sqlx）、ClickHouse、Redis，以及原生 HBase RPC 客户端；连接可经代理 / SSH 跳板机路由
-- **AI 能力**：LLM 驱动的 Shell 命令生成（含安全审计）、Agent 工具执行与 Web 搜索、聊天、Tab 智能补全、语音输入（ASR）
-- **凭据库**：argon2 + aes-gcm + 系统 keyring 的加密凭据存储
+Dark-mode slide gallery captured from local dev builds, including the `5000` browser preview and the desktop app window. Account names, email addresses, LAN addresses, and SSH user fields are redacted. Slides are kept compact for easier README scanning.
 
-## 技术栈
+<div align="center">
 
-- 前端：React 19、TypeScript、Vite、Tailwind CSS、xterm.js、CodeMirror 6
-- 桌面端：Tauri 2、Rust（tokio 异步）
-- 终端与协议：portable-pty、russh、russh-sftp、ironrdp（RDP）、自实现 RFB（VNC）
-- 数据库：sqlx（MySQL/PostgreSQL）、redis-rs、原生 HBase（prost + ZooKeeper）
-- AI：rig-core、llama.cpp sidecar、可选 sherpa-onnx 语音转写
-- 状态与存储：Zustand、SQLite（rusqlite）
+<p><strong>Slide 01 - Welcome and Recent Sessions</strong></p>
 
-## 环境要求
+<img src=".github/assets/readme/slide-dark-welcome-recent.png" alt="Taomni dark welcome page with recent sessions" width="760">
+
+<p><strong>Slide 02 - u80 SSH Session</strong></p>
+
+<img src=".github/assets/readme/slide-dark-ssh-u80.png" alt="Taomni dark u80 SSH session with redacted account information" width="760">
+
+<p><strong>Slide 03 - Tao AI Chat Bound to u80 SSH</strong></p>
+
+<img src=".github/assets/readme/slide-dark-tao-ssh-chat.png" alt="Taomni dark Tao AI chat drawer bound to a redacted u80 SSH session" width="760">
+
+<p><strong>Slide 04 - SFTP Browser</strong></p>
+
+<img src=".github/assets/readme/slide-dark-sftp-u80.png" alt="Taomni dark SFTP browser with redacted remote account information" width="760">
+
+<p><strong>Slide 05 - LAN Messenger</strong></p>
+
+<img src=".github/assets/readme/slide-dark-lanchat.png" alt="Taomni dark LAN messenger with redacted LAN address" width="760">
+
+<p><strong>Slide 06 - Mail Workspace</strong></p>
+
+<img src=".github/assets/readme/slide-dark-mail.png" alt="Taomni dark mail workspace with redacted mailbox information" width="760">
+
+<p><strong>Slide 07 - Tao Notes</strong></p>
+
+<img src=".github/assets/readme/slide-dark-notes.png" alt="Taomni dark Tao notes drawer" width="760">
+
+<p><strong>Slide 08 - Local Shell</strong></p>
+
+<img src=".github/assets/readme/slide-dark-local-shell.png" alt="Taomni dark local shell tab with redacted user path" width="760">
+
+<p><strong>Slide 09 - Git UI</strong></p>
+
+<img src=".github/assets/readme/slide-dark-git.png" alt="Taomni dark Git UI for the local repository" width="760">
+
+<p><strong>Slide 10 - Local Servers</strong></p>
+
+<img src=".github/assets/readme/slide-dark-ssh-server.png" alt="Taomni dark SSH and SFTP server settings" width="760">
+
+</div>
+
+## Features
+
+- **Terminal**: local PTY terminals, SSH terminals through `russh`, proxy support, and single-hop SSH jump hosts.
+- **Session management**: persisted sessions and groups, with import support for PuTTY, WSL, Tabby, and OpenSSH configuration.
+- **File transfer**: SFTP browsing plus upload and download transfer queues.
+- **Remote desktop**: RDP client, VNC/RFB viewer, and a built-in RDP server mode.
+- **Tunnels**: local, remote, and dynamic port forwarding with optional startup behavior.
+- **Database clients**: MySQL, PostgreSQL, SQL Server, StarRocks, ClickHouse, Presto, Redis, and a native HBase shell/RPC client, with proxy and SSH jump-host routing.
+- **Mail workspace**: IMAP/SMTP session profiles and mail-oriented workflows.
+- **AI workflows**: LLM-powered shell command generation with safety review, agent tool execution, web search, chat, tab completion, and ASR voice input.
+- **Credential vault**: encrypted credential storage using `argon2`, `aes-gcm`, and the system keyring.
+
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, xterm.js, CodeMirror 6.
+- **Desktop/backend**: Tauri 2 and Rust with async `tokio`.
+- **Terminal and protocols**: `portable-pty`, `russh`, `russh-sftp`, `ironrdp`, and a custom RFB/VNC implementation.
+- **Databases**: `sqlx`, `redis-rs`, and native HBase support with `prost` and ZooKeeper.
+- **AI**: `rig-core`, a `llama.cpp` sidecar, and optional `sherpa-onnx` speech transcription.
+- **State and storage**: Zustand and SQLite through `rusqlite`.
+
+## Requirements
 
 - Node.js 18+
 - pnpm
 - Rust 1.94+
-- protoc（Protocol Buffers 编译器，原生 HBase 客户端构建需要）
-- Tauri 所需系统依赖（Windows 上的 WebView2、Linux 上的 webkit2gtk）
+- `protoc` for Protocol Buffers, required by the native HBase client build
+- Tauri system dependencies, including WebView2 on Windows and WebKitGTK on Linux
 
-安装依赖：
+Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-## 开发
+## Development
 
-启动桌面应用开发模式：
-
-```bash
-pnpm tauri dev
-```
-
-仅启动前端 Vite 服务：
+Run the browser-only Vite preview:
 
 ```bash
 pnpm dev
 ```
 
-Tauri 开发模式下 Vite 使用 `1420` 端口；仅启动前端（`pnpm dev`）时使用 `5000` 端口，并以 `src/stubs/` 中的桩实现替代 Tauri API。
+The browser preview listens on `http://localhost:5000` and uses the Tauri API stubs in `src/stubs/`.
 
-## 构建与打包
+Run the full desktop app:
 
-构建前端静态资源：
+```bash
+pnpm tauri dev
+```
+
+Tauri dev mode uses `http://localhost:1980` as configured in `src-tauri/tauri.conf.json` and `vite.config.ts`.
+
+## Build and Package
+
+Build frontend assets into `dist/`:
 
 ```bash
 pnpm build
 ```
 
-构建产物输出到：
-
-```text
-dist/
-```
-
-打包 Tauri 桌面应用：
+Build and package the desktop app:
 
 ```bash
 pnpm tauri build
 ```
 
-该命令会先执行 `pnpm build`，再按当前平台生成桌面应用安装包/可执行文件。打包产物通常位于：
+The Tauri command runs the frontend build first, then generates desktop bundles for the current platform. Bundle artifacts are usually written under:
 
 ```text
 src-tauri/target/release/bundle/
 ```
 
-直接运行 release 可执行文件时，可在：
+Release executables can also be found under:
 
 ```text
 src-tauri/target/release/
 ```
 
-## 版本与发布
+## Versioning and Releases
 
-应用版本号统一维护在根目录 `package.json` 的 `version` 字段。`src-tauri/tauri.conf.json` 通过 `../package.json` 读取同一个版本，避免 Tauri bundle 版本与前端包版本分叉。
+The application version is maintained in the root `package.json` `version` field. `src-tauri/tauri.conf.json` reads the same version from `../package.json`, so the frontend package and Tauri bundle stay aligned.
 
-`src-tauri/Cargo.toml` 中的 `version` 是 Rust crate 元数据；除非需要发布 Rust crate 或在后端代码中使用 `CARGO_PKG_VERSION`，否则应用发布版本以 `package.json` 为准。
+The `version` field in `src-tauri/Cargo.toml` is Rust crate metadata. Unless the Rust crate itself is being published or backend code needs `CARGO_PKG_VERSION`, application releases should use the root `package.json` version.
 
-发布 tag 使用 `v<version>` 格式，需与 `package.json` 的 `version` 保持一致。例如版本 `0.2.10` 对应：
+Release tags use the `v<version>` format and must match `package.json`. For example, version `0.3.9` maps to:
 
 ```bash
-git tag v0.2.10
-git push origin v0.2.10
+git tag v0.3.9
+git push origin v0.3.9
 ```
 
-GitHub Actions 会在推送 `v*` tag、发布 GitHub Release，或手动运行 `Release Bundle` workflow 时构建桌面 bundle。发布触发时 workflow 会校验 tag 是否等于 `v` + `package.json` 版本；手动运行时不填 tag 只生成 workflow artifacts，填写 tag 则会上传到对应 Release。
+GitHub Actions builds desktop bundles when a `v*` tag is pushed, a GitHub Release is published, or the `Release Bundle` workflow is run manually. Release-triggered builds validate that the tag equals `v` plus the `package.json` version. Manual runs without a tag only produce workflow artifacts; manual runs with a tag upload artifacts to the matching Release.
 
-## 测试
+## Testing
+
+Run frontend and unit tests:
 
 ```bash
 pnpm test
 ```
 
-## 目录结构
+Run Rust tests:
+
+```bash
+cd src-tauri
+cargo test
+```
+
+UI workflow coverage lives in `qa-ui-auto-tests/`, with YAML cases under `qa-ui-auto-tests/cases/`.
+
+## Project Layout
 
 ```text
-src/                 React 前端代码
-src/components/      UI 组件
-src/layouts/         主布局
-src/lib/             IPC 与工具函数
-src/stores/          前端状态管理
-src-tauri/           Tauri/Rust 后端代码
-src-tauri/src/       Rust 模块
+src/                    React frontend code
+src/components/         UI components
+src/layouts/            Application shells
+src/lib/                IPC clients and shared utilities
+src/stores/             Frontend state stores
+src/stubs/              Browser-only Tauri API stubs
+src/test/               Vitest setup
+src-tauri/              Tauri/Rust backend
+src-tauri/src/          Rust modules
+src-tauri/tests/        Rust integration tests
+qa-ui-auto-tests/       UI automation assets and testcase YAML
 ```
