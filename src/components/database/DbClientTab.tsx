@@ -1759,6 +1759,7 @@ export default function DbClientTab({
                 <Panel minSize="15%">
                   <ResultArea
                     panel={activePanel}
+                    sqlEngine={info.engine}
                     onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}
                     onSheetClose={(sheetId) => closeResultSheet(activePanel.id, sheetId)}
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
@@ -1943,6 +1944,7 @@ function HistoryDropdown({
 
 function ResultArea({
   panel,
+  sqlEngine,
   onSheetSelect,
   onSheetClose,
   onTabChange,
@@ -1952,6 +1954,7 @@ function ResultArea({
   onStatus,
 }: {
   panel: PanelState;
+  sqlEngine: string;
   onSheetSelect: (sheetId: string) => void;
   onSheetClose: (sheetId: string) => void;
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
@@ -2052,6 +2055,7 @@ function ResultArea({
               <QueryResultGrid
                 result={sheet.result}
                 sourceSql={sheet.sql}
+                sqlEngine={sqlEngine}
                 running={sheet.running}
                 cancelling={sheet.cancelling}
                 onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}

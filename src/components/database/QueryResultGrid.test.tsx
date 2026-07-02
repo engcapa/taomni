@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryResultGrid } from "./QueryResultGrid";
 import type { DbQueryResult } from "../../lib/ipc";
@@ -106,14 +106,41 @@ describe("QueryResultGrid", () => {
     fireEvent.click(screen.getByLabelText("Filter column name"));
     fireEvent.change(screen.getByLabelText("Filter name"), { target: { value: "Ann" } });
 
-    expect(screen.getByText("Ann")).toBeInTheDocument();
-    expect(screen.getByText("Anne")).toBeInTheDocument();
-    expect(screen.queryByText("Bob")).not.toBeInTheDocument();
+    const body = within(screen.getByTestId("query-result-grid-scroll"));
+    expect(body.getByText("Ann")).toBeInTheDocument();
+    expect(body.getByText("Anne")).toBeInTheDocument();
+    expect(body.queryByText("Bob")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Exact" }));
 
-    expect(screen.getByText("Ann")).toBeInTheDocument();
-    expect(screen.queryByText("Anne")).not.toBeInTheDocument();
+    expect(body.getByText("Ann")).toBeInTheDocument();
+    expect(body.queryByText("Anne")).not.toBeInTheDocument();
+  });
+
+  it("filters by distinct column values and previews the generated SQL", () => {
+    render(
+      <QueryResultGrid
+        result={filterResult()}
+        sourceSql="select id, name, status from users"
+        sqlEngine="MySQL"
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Filter column status"));
+
+    expect(screen.getByText("Distinct values")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Select active for status"));
+
+    const body = within(screen.getByTestId("query-result-grid-scroll"));
+    expect(body.getByText("Ann")).toBeInTheDocument();
+    expect(body.getByText("Bob")).toBeInTheDocument();
+    expect(body.queryByText("Anne")).not.toBeInTheDocument();
+    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("WHERE `status` = 'active'");
+
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+
+    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
   });
 
   it("copies only the rectangular cell block selected with Alt drag", () => {
