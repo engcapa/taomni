@@ -219,10 +219,12 @@ fn leading_directory_command(command: &str) -> Option<(&str, &str)> {
         let Some(head) = command.get(..keyword.len()) else {
             continue;
         };
+        let Some(tail) = command.get(keyword.len()..) else {
+            continue;
+        };
         if !head.eq_ignore_ascii_case(keyword) {
             continue;
         }
-        let tail = command.get(keyword.len()..).unwrap_or_default();
         if tail.is_empty() || tail.chars().next().is_some_and(char::is_whitespace) {
             return Some((head, tail.trim_start()));
         }
@@ -954,8 +956,10 @@ mod directory_shortcut_tests {
     }
 
     #[test]
-    fn skips_prompt_glyph_history_without_utf8_boundary_panic() {
+    fn skips_non_ascii_history_prefixes_without_panicking() {
+        assert_eq!(directory_from_history_command("›", None), None);
         assert_eq!(directory_from_history_command("› cd /tmp", None), None);
+        assert_eq!(directory_from_history_command("c› /tmp", None), None);
     }
 
     #[test]

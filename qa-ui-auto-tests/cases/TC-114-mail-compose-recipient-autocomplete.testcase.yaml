@@ -1,0 +1,62 @@
+id: TC-114
+title: Mail compose recipient autocomplete and current-domain completion
+description: |
+  Opens a browser-stub Mail tab through QuickConnect, opens the compose dialog,
+  accepts one cached contact suggestion, then verifies that an unmatched
+  local-part ending in @ offers the current account domain and accepts it with
+  Tab.
+covers: [F-MAIL-1]
+tags: [mail, smoke, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - click: '[data-testid="menu-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="quick-connect"]'
+  - fill:
+      selector: '[data-testid="qc-input"]'
+      value: 'mail://san.zhang%40yourmail.com@imap.yourmail.com:993'
+  - click: '[data-testid="qc-submit"]'
+  - wait_for: '[data-testid="mail-client-tab"]'
+  - click: '[data-testid="mail-compose-open"]'
+  - wait_for: '[data-testid="mail-compose-dialog"]'
+  - assert_visible: '[data-testid="mail-recipient-to"]'
+  - assert_visible: '[data-testid="mail-recipient-cc"]'
+  - assert_visible: '[data-testid="mail-recipient-bcc"]'
+  - fill:
+      selector: '[data-testid="mail-recipient-to"] input'
+      value: 'ops'
+  - wait_for: '[data-testid="mail-recipient-suggestion"]'
+  - assert_text:
+      selector: '[data-testid="mail-recipient-suggestions"]'
+      contains: 'ops@example.com'
+  - click: '[data-testid="mail-recipient-suggestion"]'
+  - assert_visible: '[data-testid="mail-recipient-chip"]'
+  - assert_text:
+      selector: '[data-testid="mail-recipient-to"]'
+      contains: 'ops@example.com'
+  - fill:
+      selector: '[data-testid="mail-recipient-cc"] input'
+      value: 'si.li@'
+  - wait_for: '[data-testid="mail-recipient-suggestion"]'
+  - assert_text:
+      selector: '[data-testid="mail-recipient-suggestions"]'
+      contains: 'si.li@yourmail.com'
+  - assert_text:
+      selector: '[data-testid="mail-recipient-suggestions"]'
+      contains: 'current domain'
+  - press: Tab
+  - assert_text:
+      selector: '[data-testid="mail-recipient-cc"]'
+      contains: 'si.li@yourmail.com'
+  - fill:
+      selector: '[data-testid="mail-recipient-bcc"] input'
+      value: 'audit@example.com'
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="mail-recipient-bcc"]'
+      contains: 'audit@example.com'
+  - screenshot: mail-114-recipient-autocomplete.png

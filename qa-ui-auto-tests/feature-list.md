@@ -3506,6 +3506,175 @@ controls:
 
 ---
 
+## 13. Mail 客户端
+
+### 13.1 写邮件联系人自动提示 ✅
+
+<!-- feature
+id: F-MAIL-1
+status: done
+area: mail/compose
+components: [MailClientTab, RecipientField]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/mail/RecipientField.tsx
+  - src/lib/mailRecipients.ts
+  - src/lib/mail.ts
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: mail-client-tab
+    selector: '[data-testid="mail-client-tab"]'
+    kind: display
+  - id: compose-open
+    selector: '[data-testid="mail-compose-open"]'
+    kind: interactive
+  - id: compose-dialog
+    selector: '[data-testid="mail-compose-dialog"]'
+    kind: display
+  - id: recipient-to
+    selector: '[data-testid="mail-recipient-to"]'
+    kind: interactive
+  - id: recipient-cc
+    selector: '[data-testid="mail-recipient-cc"]'
+    kind: interactive
+  - id: recipient-bcc
+    selector: '[data-testid="mail-recipient-bcc"]'
+    kind: interactive
+  - id: recipient-chip
+    selector: '[data-testid="mail-recipient-chip"]'
+    kind: display
+  - id: recipient-suggestions
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    kind: display
+  - id: recipient-suggestion
+    selector: '[data-testid="mail-recipient-suggestion"]'
+    kind: interactive
+  - id: compose-send
+    selector: '[data-testid="mail-compose-send"]'
+    kind: interactive
+    optional: true       # send success/failure depends on SMTP config; recipient autocomplete is covered before send
+-->
+
+- `To` / `Cc` / `Bcc` 使用 chip 输入，支持粘贴多联系人、回车/Tab 接受建议、退格删除 chip。
+- 联系人建议来自本地邮件缓存联系人索引（`mail_contacts`）和当前已加载邮件头，发送成功后提升 sent 联系人权重。
+- 当缓存没有命中且当前输入形如 `si.li@` / `si.li@y` 时，基于当前账号邮箱域名自动提示 `si.li@yourmail.com`，Tab 可完成。
+- 前端发送前会拦截空收件人和明显非法邮箱；后端 `lettre` 地址解析继续作为最终校验。
+
+---
+
+### 13.2 富文本写信、附件和本地草稿 ✅
+
+<!-- feature
+id: F-MAIL-2
+status: done
+area: mail/compose
+components: [MailClientTab, RichMailEditor, RecipientField]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/mail/RichMailEditor.tsx
+  - src/components/mail/RecipientField.tsx
+  - src/lib/mailHtml.ts
+  - src/lib/mail.ts
+  - src/stubs/tauri-core.ts
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: drafts-open
+    selector: '[data-testid="mail-drafts-open"]'
+    kind: interactive
+  - id: drafts-dialog
+    selector: '[data-testid="mail-drafts-dialog"]'
+    kind: display
+  - id: draft-row
+    selector: '[data-testid="mail-draft-row"]'
+    kind: interactive
+  - id: compose-menu-bar
+    selector: '[data-testid="mail-compose-menu-bar"]'
+    kind: display
+  - id: compose-subject
+    selector: '[data-testid="mail-compose-subject"]'
+    kind: interactive
+  - id: format-toolbar
+    selector: '[data-testid="mail-compose-format-toolbar"]'
+    kind: display
+  - id: format-block
+    selector: '[data-testid="mail-compose-format-block"]'
+    kind: interactive
+  - id: font-family
+    selector: '[data-testid="mail-compose-font-family"]'
+    kind: interactive
+  - id: font-size
+    selector: '[data-testid="mail-compose-font-size"]'
+    kind: interactive
+  - id: text-color
+    selector: '[data-testid="mail-compose-text-color"]'
+    kind: interactive
+    optional: true       # native color picker behavior is browser/OS dependent; component test covers the callback
+  - id: bold
+    selector: '[data-testid="mail-compose-bold"]'
+    kind: interactive
+  - id: italic
+    selector: '[data-testid="mail-compose-italic"]'
+    kind: interactive
+  - id: underline
+    selector: '[data-testid="mail-compose-underline"]'
+    kind: interactive
+  - id: clear-format
+    selector: '[data-testid="mail-compose-clear-format"]'
+    kind: interactive
+  - id: bullet-list
+    selector: '[data-testid="mail-compose-bullet-list"]'
+    kind: interactive
+  - id: number-list
+    selector: '[data-testid="mail-compose-number-list"]'
+    kind: interactive
+  - id: outdent
+    selector: '[data-testid="mail-compose-outdent"]'
+    kind: interactive
+  - id: indent
+    selector: '[data-testid="mail-compose-indent"]'
+    kind: interactive
+  - id: align-left
+    selector: '[data-testid="mail-compose-align-left"]'
+    kind: interactive
+  - id: align-center
+    selector: '[data-testid="mail-compose-align-center"]'
+    kind: interactive
+  - id: align-right
+    selector: '[data-testid="mail-compose-align-right"]'
+    kind: interactive
+  - id: link
+    selector: '[data-testid="mail-compose-link"]'
+    kind: interactive
+    optional: true       # opens a URL prompt; covered by component tests to avoid prompt timing in smoke
+  - id: emoji
+    selector: '[data-testid="mail-compose-emoji"]'
+    kind: interactive
+  - id: compose-editor
+    selector: '[data-testid="mail-compose-editor"]'
+    kind: interactive
+  - id: compose-attach
+    selector: '[data-testid="mail-compose-attach"]'
+    kind: interactive
+  - id: compose-attachments
+    selector: '[data-testid="mail-compose-attachments"]'
+    kind: display
+  - id: compose-attachment-chip
+    selector: '[data-testid="mail-compose-attachment-chip"]'
+    kind: display
+  - id: compose-save-draft
+    selector: '[data-testid="mail-compose-save-draft"]'
+    kind: interactive
+-->
+
+- 写信窗口改为 HTML + 纯文本 fallback 双轨草稿，默认发送模式为 `auto`：只有使用富文本格式或检测到富文本结构时才发送 HTML body。
+- 正文使用 `RichMailEditor` contenteditable 编辑器，提供段落、字体、字号、颜色、加粗/斜体/下划线、清除格式、列表、缩进、对齐、链接、表情和附件入口。
+- 展示和编辑都经过 `mailHtml` 清洗；远程图片默认阻断，用户显式加载后才显示。
+- 回复和转发保留原始 HTML 内容，回复按 Thunderbird 风格生成 `blockquote type="cite"` 引用和纯文本引用 fallback。
+- 附件元数据随本地草稿保存，发送时后端以 multipart/mixed MIME 附加本地文件。
+- 本地草稿存入邮件缓存库（浏览器模式用 localStorage stub），支持手动保存、自动保存、Drafts 列表重开、丢弃和发送后删除。
+
+---
+
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

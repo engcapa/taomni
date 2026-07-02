@@ -1,0 +1,107 @@
+id: TC-115
+title: Mail rich compose draft and attachment flow
+description: |
+  Opens a browser-stub Mail tab, uses the rich compose toolbar, adds an
+  attachment through the browser VFS prompt, saves the message as a local draft,
+  reopens it from Drafts, and sends it through the mail_send_message stub.
+covers: [F-MAIL-2]
+tags: [mail, smoke, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="quick-connect"]'
+  - fill:
+      selector: '[data-testid="qc-input"]'
+      value: 'mail://san.zhang%40yourmail.com@imap.yourmail.com:993'
+  - click: '[data-testid="qc-submit"]'
+  - wait_for: '[data-testid="mail-client-tab"]'
+  - click: '[data-testid="mail-compose-open"]'
+  - wait_for: '[data-testid="mail-compose-dialog"]'
+  - assert_visible: '[data-testid="mail-compose-menu-bar"]'
+  - assert_visible: '[data-testid="mail-compose-format-toolbar"]'
+  - assert_visible: '[data-testid="mail-compose-editor"]'
+  - fill:
+      selector: '[data-testid="mail-recipient-to"] input'
+      value: 'rich@example.com'
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="mail-recipient-to"]'
+      contains: 'rich@example.com'
+  - fill:
+      selector: '[data-testid="mail-compose-subject"]'
+      value: 'Quarterly HTML draft'
+  - fill:
+      selector: '[data-testid="mail-compose-editor"]'
+      value: "Rich draft body\nAttachment follows"
+  - select_option:
+      selector: '[data-testid="mail-compose-format-block"]'
+      value: 'h2'
+  - select_option:
+      selector: '[data-testid="mail-compose-font-family"]'
+      value: 'Georgia'
+  - select_option:
+      selector: '[data-testid="mail-compose-font-size"]'
+      value: '5'
+  - click: '[data-testid="mail-compose-bold"]'
+  - click: '[data-testid="mail-compose-italic"]'
+  - click: '[data-testid="mail-compose-underline"]'
+  - click: '[data-testid="mail-compose-clear-format"]'
+  - click: '[data-testid="mail-compose-bullet-list"]'
+  - click: '[data-testid="mail-compose-number-list"]'
+  - click: '[data-testid="mail-compose-indent"]'
+  - click: '[data-testid="mail-compose-outdent"]'
+  - click: '[data-testid="mail-compose-align-center"]'
+  - click: '[data-testid="mail-compose-align-right"]'
+  - click: '[data-testid="mail-compose-align-left"]'
+  - click: '[data-testid="mail-compose-emoji"]'
+  - click: '[data-testid="mail-compose-attach"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: '/workspace/quarterly-brief.pdf'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="mail-compose-attachment-chip"]'
+  - assert_text:
+      selector: '[data-testid="mail-compose-attachments"]'
+      contains: 'quarterly-brief.pdf'
+  - click: '[data-testid="mail-compose-save-draft"]'
+  - assert_text:
+      selector: '[data-testid="mail-compose-menu-bar"]'
+      contains: 'Draft saved locally'
+      timeout_sec: 10
+  - assert_localstorage:
+      key: 'taomni.stub.mailDrafts.v1'
+      contains: 'Quarterly HTML draft'
+  - click: '[data-testid="mail-compose-dialog"] [aria-label="Close dialog"]'
+  - wait_for:
+      selector: '[data-testid="mail-compose-dialog"]'
+      state: hidden
+  - click: '[data-testid="mail-drafts-open"]'
+  - wait_for: '[data-testid="mail-drafts-dialog"]'
+  - assert_text:
+      selector: '[data-testid="mail-drafts-dialog"]'
+      contains: 'Quarterly HTML draft'
+  - click: '[data-testid="mail-draft-row"]'
+  - wait_for: '[data-testid="mail-compose-dialog"]'
+  - assert_attribute:
+      selector: '[data-testid="mail-compose-subject"]'
+      name: 'value'
+      equals: 'Quarterly HTML draft'
+  - assert_text:
+      selector: '[data-testid="mail-compose-attachments"]'
+      contains: 'quarterly-brief.pdf'
+  - click: '[data-testid="mail-compose-send"]'
+  - wait_for:
+      selector: '[data-testid="mail-compose-dialog"]'
+      state: hidden
+  - assert_text:
+      selector: '[data-testid="mail-client-tab"]'
+      contains: 'Message sent'
+      timeout_sec: 10
+  - screenshot: mail-115-rich-compose-draft.png

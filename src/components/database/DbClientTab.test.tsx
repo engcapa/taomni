@@ -269,4 +269,19 @@ describe("DbClientTab connection lifecycle", () => {
       );
     });
   });
+
+  it("shows the execution start time on result sheets", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    vi.spyOn(Date, "now").mockReturnValue(new Date(2026, 6, 2, 11, 12, 13).getTime());
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+
+    await waitFor(() => {
+      expect(screen.getByText("11:12:13")).toBeInTheDocument();
+      expect(screen.getAllByTitle(/Started: 2026-07-02 11:12:13/).length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -121,6 +121,13 @@ export interface MailSendRequest {
   subject: string;
   textBody?: string | null;
   htmlBody?: string | null;
+  attachments?: MailSendAttachment[];
+}
+
+export interface MailSendAttachment {
+  path: string;
+  name?: string | null;
+  contentType?: string | null;
 }
 
 export interface MailSendResult {
@@ -128,11 +135,66 @@ export interface MailSendResult {
   response: string;
 }
 
+export interface MailContactSuggestion {
+  name?: string | null;
+  email: string;
+  source: "history" | "sent" | "typed";
+  score: number;
+  lastSeenAt?: number | null;
+}
+
 export interface MailDownloadAttachmentResult {
   path: string;
   name?: string | null;
   contentType?: string | null;
   size: number;
+}
+
+export interface MailDraftAttachment {
+  path: string;
+  name?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  modifiedAt?: number | null;
+}
+
+export interface MailDraftContext {
+  kind?: string | null;
+  folder?: string | null;
+  uid?: number | null;
+  messageId?: string | null;
+  subject?: string | null;
+}
+
+export interface MailDraft {
+  id: string;
+  accountId: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  textBody: string;
+  htmlBody: string;
+  attachments: MailDraftAttachment[];
+  replyContext?: MailDraftContext | null;
+  remoteDraftFolder?: string | null;
+  remoteDraftUid?: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MailDraftSaveRequest {
+  id?: string | null;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  textBody?: string;
+  htmlBody?: string;
+  attachments?: MailDraftAttachment[];
+  replyContext?: MailDraftContext | null;
+  remoteDraftFolder?: string | null;
+  remoteDraftUid?: number | null;
 }
 
 export function mailListCachedFolders(accountId: string): Promise<MailFolder[]> {
@@ -233,6 +295,33 @@ export function mailSendMessage(
   return withVaultLockedNotice(() =>
     invoke<MailSendResult>("mail_send_message", { config, request }),
   );
+}
+
+export function mailListDrafts(accountId: string): Promise<MailDraft[]> {
+  return invoke<MailDraft[]>("mail_list_drafts", { accountId });
+}
+
+export function mailSaveDraft(
+  accountId: string,
+  draft: MailDraftSaveRequest,
+): Promise<MailDraft> {
+  return invoke<MailDraft>("mail_save_draft", { accountId, draft });
+}
+
+export function mailDeleteDraft(accountId: string, draftId: string): Promise<void> {
+  return invoke("mail_delete_draft", { accountId, draftId });
+}
+
+export function mailIndexCachedContacts(accountId: string): Promise<number> {
+  return invoke<number>("mail_index_cached_contacts", { accountId });
+}
+
+export function mailSearchContacts(
+  accountId: string,
+  query: string,
+  limit = 8,
+): Promise<MailContactSuggestion[]> {
+  return invoke<MailContactSuggestion[]>("mail_search_contacts", { accountId, query, limit });
 }
 
 export function mailTestConnection(config: MailTabInfo): Promise<MailTestConnectionResult> {
