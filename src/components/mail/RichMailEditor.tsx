@@ -1,20 +1,26 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  Anchor,
   Bold,
+  ChevronDown,
   Eraser,
+  Image as ImageIcon,
   IndentDecrease,
   IndentIncrease,
   Italic,
   Link as LinkIcon,
   List,
   ListOrdered,
+  Minus,
+  Table2,
   Smile,
   Underline,
 } from "lucide-react";
 import { mailHtmlToPlainText, sanitizeMailComposeHtml } from "../../lib/mailHtml";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
 
 interface RichMailEditorProps {
   html: string;
@@ -22,6 +28,7 @@ interface RichMailEditorProps {
   onChange: (html: string, text: string) => void;
   onRichFormatUsed?: () => void;
   onAttach?: () => void;
+  onInlineImage?: () => string | null | Promise<string | null>;
 }
 
 const PARAGRAPH_OPTIONS = [
@@ -47,15 +54,36 @@ const SIZE_OPTIONS = [
   { value: "5", label: "24" },
 ];
 
+const EMOJI_OPTIONS = [
+  { id: "smile", label: "微笑", value: "🙂" },
+  { id: "frown", label: "皱眉", value: "🙁" },
+  { id: "wink", label: "眨眼", value: "😉" },
+  { id: "tongue", label: "吐舌", value: "😛" },
+  { id: "laugh", label: "大笑", value: "😂" },
+  { id: "blush", label: "窘迫", value: "😳" },
+  { id: "unsure", label: "迟疑", value: "😕" },
+  { id: "surprise", label: "惊讶", value: "😮" },
+  { id: "kiss", label: "亲吻", value: "😘" },
+  { id: "shout", label: "大叫", value: "😱" },
+  { id: "cool", label: "酷", value: "😎" },
+  { id: "money", label: "爱财", value: "🤑" },
+  { id: "sealed", label: "失言", value: "😶" },
+  { id: "innocent", label: "无辜", value: "😇" },
+  { id: "cry", label: "哭泣", value: "😭" },
+  { id: "silent", label: "缄默", value: "🤐" },
+];
+
 export function RichMailEditor({
   html,
   disabled = false,
   onChange,
   onRichFormatUsed,
   onAttach,
+  onInlineImage,
 }: RichMailEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [color, setColor] = useState("#1f2937");
+  const editorMenu = useContextMenu();
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -107,6 +135,76 @@ export function RichMailEditor({
     if (!href?.trim()) return;
     exec("createLink", href.trim());
   };
+
+  const handleAnchor = () => {
+    const name = window.prompt("Anchor name");
+    const cleaned = name?.trim().replace(/\s+/g, "-");
+    if (!cleaned) return;
+    insertHtml(`<a name="${escapeHtml(cleaned)}"></a>`, true);
+  };
+
+  const handleInlineImage = async () => {
+    const imageHtml = await onInlineImage?.();
+    if (!imageHtml) return;
+    insertHtml(imageHtml, true);
+  };
+
+  const handleTable = () => {
+    const raw = window.prompt("Table size (columns x rows)", "2x2");
+    if (!raw) return;
+    const match = /^\s*(\d{1,2})\s*[x*,]\s*(\d{1,2})\s*$/i.exec(raw);
+    const cols = Math.max(1, Math.min(12, Number(match?.[1] ?? 2)));
+    const rows = Math.max(1, Math.min(20, Number(match?.[2] ?? 2)));
+    insertHtml(buildTableHtml(cols, rows), true);
+  };
+
+  const showMenu = (event: ReactMouseEvent<HTMLButtonElement>, items: MenuItem[]) => {
+    if (disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    editorMenu.showAt(rect.left, rect.bottom + 4, items);
+  };
+
+  const emojiMenuItems = (): MenuItem[] => EMOJI_OPTIONS.map((emoji) => ({
+    label: `${emoji.value} ${emoji.label}`,
+    testId: `mail-compose-emoji-${emoji.id}`,
+    onClick: () => insertHtml(emoji.value, false),
+  }));
+
+  const insertMenuItems = (): MenuItem[] => [
+    {
+      label: "链接",
+      testId: "mail-compose-insert-link",
+      icon: <LinkIcon className="w-3.5 h-3.5" />,
+      onClick: handleLink,
+    },
+    {
+      label: "锚标",
+      testId: "mail-compose-insert-anchor",
+      icon: <Anchor className="w-3.5 h-3.5" />,
+      onClick: handleAnchor,
+    },
+    {
+      label: "图像",
+      testId: "mail-compose-insert-image",
+      icon: <ImageIcon className="w-3.5 h-3.5" />,
+      disabled: !onInlineImage,
+      onClick: () => void handleInlineImage(),
+    },
+    {
+      label: "水平线",
+      testId: "mail-compose-insert-hr",
+      icon: <Minus className="w-3.5 h-3.5" />,
+      onClick: () => insertHtml("<hr>", true),
+    },
+    {
+      label: "表格",
+      testId: "mail-compose-insert-table",
+      icon: <Table2 className="w-3.5 h-3.5" />,
+      onClick: handleTable,
+    },
+  ];
 
   return (
     <div className="mx-3 mb-3 min-h-0 flex-1 flex flex-col border border-[var(--taomni-input-border)] rounded-md overflow-hidden bg-[var(--taomni-input-bg)]">
@@ -172,7 +270,12 @@ export function RichMailEditor({
         <ToolbarButton label="Align center" testId="mail-compose-align-center" disabled={disabled} onClick={() => exec("justifyCenter")}><AlignCenter className="w-3.5 h-3.5" /></ToolbarButton>
         <ToolbarButton label="Align right" testId="mail-compose-align-right" disabled={disabled} onClick={() => exec("justifyRight")}><AlignRight className="w-3.5 h-3.5" /></ToolbarButton>
         <ToolbarButton label="Insert link" testId="mail-compose-link" disabled={disabled} onClick={handleLink}><LinkIcon className="w-3.5 h-3.5" /></ToolbarButton>
-        <ToolbarButton label="Insert smile" testId="mail-compose-emoji" disabled={disabled} onClick={() => insertHtml("🙂", false)}><Smile className="w-3.5 h-3.5" /></ToolbarButton>
+        <MenuButton label="Insert" testId="mail-compose-insert-menu" disabled={disabled} onClick={(event) => showMenu(event, insertMenuItems())}>
+          <ImageIcon className="w-3.5 h-3.5" />
+        </MenuButton>
+        <MenuButton label="Insert emoticon" testId="mail-compose-emoji" disabled={disabled} onClick={(event) => showMenu(event, emojiMenuItems())}>
+          <Smile className="w-3.5 h-3.5" />
+        </MenuButton>
         {onAttach && (
           <button
             type="button"
@@ -186,6 +289,7 @@ export function RichMailEditor({
           </button>
         )}
       </div>
+      {editorMenu.render}
       <div
         ref={editorRef}
         className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-[13px] leading-6 outline-none bg-[var(--taomni-input-bg)] empty:before:content-['']"
@@ -227,6 +331,43 @@ function ToolbarButton({
       {children}
     </button>
   );
+}
+
+function MenuButton({
+  label,
+  testId,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  testId: string;
+  disabled?: boolean;
+  onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className="taomni-btn h-7 px-1.5 inline-flex items-center justify-center gap-0.5"
+      aria-label={label}
+      title={label}
+      data-testid={testId}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+      <ChevronDown className="w-3 h-3" />
+    </button>
+  );
+}
+
+function buildTableHtml(cols: number, rows: number): string {
+  const cells = Array.from({ length: cols }, () => (
+    '<td style="border: 1px solid #9ca3af; padding: 4px 8px;">&nbsp;</td>'
+  )).join("");
+  const body = Array.from({ length: rows }, () => `<tr>${cells}</tr>`).join("");
+  return `<table style="border-collapse: collapse;"><tbody>${body}</tbody></table><p><br></p>`;
 }
 
 function escapeHtml(value: string): string {

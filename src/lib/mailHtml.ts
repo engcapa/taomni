@@ -21,16 +21,20 @@ const MAIL_PURIFY_CONFIG: DomPurifyConfig = {
   FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus"],
   ALLOW_DATA_ATTR: false,
   ADD_ATTR: ["target"],
+  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|cid):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
 };
 
 const SAFE_STYLE_PROPS = new Set([
   "background-color",
+  "border",
+  "border-collapse",
   "color",
   "font-family",
   "font-size",
   "font-style",
   "font-weight",
   "margin-left",
+  "padding",
   "text-align",
   "text-decoration",
   "text-decoration-line",
@@ -88,6 +92,13 @@ function isSafeStyleValue(prop: string, value: string): boolean {
   if (prop === "font-family") return /^[\w\s,"'-]+$/.test(value);
   if (prop === "font-size" || prop === "margin-left") {
     return /^-?\d+(\.\d+)?(px|pt|em|rem|%)$/.test(lower);
+  }
+  if (prop === "padding") {
+    return /^\d+(\.\d+)?(px|pt|em|rem|%)(\s+\d+(\.\d+)?(px|pt|em|rem|%)){0,3}$/.test(lower);
+  }
+  if (prop === "border-collapse") return /^(collapse|separate)$/.test(lower);
+  if (prop === "border") {
+    return /^(\d+(\.\d+)?(px|pt|em|rem)\s+)?(solid|dashed|dotted|double)\s+(#[0-9a-f]{3,8}|[a-z]+|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*(0|1|0?\.\d+))?\s*\))$/.test(lower);
   }
   if (prop === "color" || prop === "background-color") return isSafeCssColor(value);
   return false;

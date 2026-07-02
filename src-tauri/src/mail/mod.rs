@@ -327,6 +327,10 @@ pub struct MailSendAttachment {
     pub name: Option<String>,
     #[serde(default)]
     pub content_type: Option<String>,
+    #[serde(default)]
+    pub inline: bool,
+    #[serde(default)]
+    pub content_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -344,6 +348,10 @@ pub struct MailDraftAttachment {
     pub name: Option<String>,
     #[serde(default)]
     pub content_type: Option<String>,
+    #[serde(default)]
+    pub inline: bool,
+    #[serde(default)]
+    pub content_id: Option<String>,
     #[serde(default)]
     pub size: Option<u64>,
     #[serde(default)]
@@ -761,7 +769,7 @@ pub async fn mail_sync_headers(
         .unwrap_or(account.config.sync.max_fetch_per_sync)
         .max(1)
         .min(2000);
-    let include_bodies = include_bodies.unwrap_or(true);
+    let include_bodies = include_bodies.unwrap_or(false);
 
     let mut result = tokio::task::spawn_blocking(move || {
         let mut imap = connect_imap(&account)?;
@@ -821,7 +829,7 @@ pub async fn mail_sync_all_folders(
         .unwrap_or(account.config.sync.max_fetch_per_sync)
         .max(1)
         .min(2000);
-    let include_bodies = include_bodies.unwrap_or(true);
+    let include_bodies = include_bodies.unwrap_or(false);
     let sync_states = if cache_enabled {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         init_mail_tables(&db).map_err(|e| e.to_string())?;
@@ -2420,40 +2428,46 @@ fn build_send_message(
         builder = builder.bcc(parse_mailbox(bcc)?);
     }
 
-    if !request.attachments.is_empty() {
-        let attachments = read_send_attachments(&request.attachments)?;
-        let mut mixed = match (&request.text_body, &request.html_body) {
-            (Some(text), Some(html)) => MultiPart::mixed().multipart(
-                MultiPart::alternative_plain_html(text.clone(), html.clone()),
-            ),
-            (Some(text), None) => MultiPart::mixed().singlepart(SinglePart::plain(text.clone())),
-            (None, Some(html)) => MultiPart::mixed().singlepart(SinglePart::html(html.clone())),
-            (None, None) => return Err("email body is required".into()),
-        };
-        for attachment in attachments {
-            mixed = mixed.singlepart(
-                Attachment::new(attachment.name).body(attachment.bytes, attachment.content_type),
-            );
-        }
-        return builder
-            .multipart(mixed)
-            .map_err(|e| format!("failed to build email body: {e}"));
-    }
+    let body = build_send_body_part(request)?;
+    let attachments = read_send_attachments(&request.attachments)?;
+    let has_inline = attachments.iter().any(|attachment| attachment.inline);
+    let has_regular = attachments.iter().any(|attachment| !attachment.inline);
 
-    match (&request.text_body, &request.html_body) {
-        (Some(text), Some(html)) => builder
-            .multipart(MultiPart::alternative_plain_html(
-                text.clone(),
-                html.clone(),
-            ))
-            .map_err(|e| format!("failed to build email body: {e}")),
-        (Some(text), None) => builder
-            .singlepart(SinglePart::plain(text.clone()))
-            .map_err(|e| format!("failed to build email body: {e}")),
-        (None, Some(html)) => builder
-            .singlepart(SinglePart::html(html.clone()))
-            .map_err(|e| format!("failed to build email body: {e}")),
-        (None, None) => Err("email body is required".into()),
+    if has_inline {
+        let related = build_related_body(
+            body,
+            attachments.iter().filter(|attachment| attachment.inline),
+        )?;
+        if has_regular {
+            let mut mixed = MultiPart::mixed().multipart(related);
+            for attachment in attachments.iter().filter(|attachment| !attachment.inline) {
+                mixed = mixed.singlepart(regular_attachment_part(attachment));
+            }
+            builder
+                .multipart(mixed)
+                .map_err(|e| format!("failed to build email body: {e}"))
+        } else {
+            builder
+                .multipart(related)
+                .map_err(|e| format!("failed to build email body: {e}"))
+        }
+    } else if has_regular {
+        let mut mixed = add_body_part_to_multipart(MultiPart::mixed().build(), body);
+        for attachment in &attachments {
+            mixed = mixed.singlepart(regular_attachment_part(attachment));
+        }
+        builder
+            .multipart(mixed)
+            .map_err(|e| format!("failed to build email body: {e}"))
+    } else {
+        match body {
+            SendBodyPart::Single(part) => builder
+                .singlepart(part)
+                .map_err(|e| format!("failed to build email body: {e}")),
+            SendBodyPart::Multi(part) => builder
+                .multipart(part)
+                .map_err(|e| format!("failed to build email body: {e}")),
+        }
     }
 }
 
@@ -2461,6 +2475,57 @@ struct ResolvedSendAttachment {
     name: String,
     content_type: ContentType,
     bytes: Vec<u8>,
+    inline: bool,
+    content_id: Option<String>,
+}
+
+enum SendBodyPart {
+    Single(SinglePart),
+    Multi(MultiPart),
+}
+
+fn build_send_body_part(request: &MailSendRequest) -> Result<SendBodyPart, String> {
+    match (&request.text_body, &request.html_body) {
+        (Some(text), Some(html)) => Ok(SendBodyPart::Multi(MultiPart::alternative_plain_html(
+            text.clone(),
+            html.clone(),
+        ))),
+        (Some(text), None) => Ok(SendBodyPart::Single(SinglePart::plain(text.clone()))),
+        (None, Some(html)) => Ok(SendBodyPart::Single(SinglePart::html(html.clone()))),
+        (None, None) => Err("email body is required".into()),
+    }
+}
+
+fn add_body_part_to_multipart(multipart: MultiPart, body: SendBodyPart) -> MultiPart {
+    match body {
+        SendBodyPart::Single(part) => multipart.singlepart(part),
+        SendBodyPart::Multi(part) => multipart.multipart(part),
+    }
+}
+
+fn build_related_body<'a>(
+    body: SendBodyPart,
+    inline_attachments: impl Iterator<Item = &'a ResolvedSendAttachment>,
+) -> Result<MultiPart, String> {
+    let mut related = add_body_part_to_multipart(MultiPart::related().build(), body);
+    for attachment in inline_attachments {
+        let content_id = attachment.content_id.as_deref().ok_or_else(|| {
+            format!(
+                "inline attachment {} is missing a Content-ID",
+                attachment.name
+            )
+        })?;
+        related = related.singlepart(
+            Attachment::new_inline_with_name(content_id.to_string(), attachment.name.clone())
+                .body(attachment.bytes.clone(), attachment.content_type.clone()),
+        );
+    }
+    Ok(related)
+}
+
+fn regular_attachment_part(attachment: &ResolvedSendAttachment) -> SinglePart {
+    Attachment::new(attachment.name.clone())
+        .body(attachment.bytes.clone(), attachment.content_type.clone())
 }
 
 fn read_send_attachments(
@@ -2493,6 +2558,13 @@ fn read_send_attachments(
                 name,
                 content_type: attachment_content_type(attachment.content_type.as_deref()),
                 bytes,
+                inline: attachment.inline,
+                content_id: attachment
+                    .content_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToOwned::to_owned),
             })
         })
         .collect()
@@ -2541,6 +2613,43 @@ fn validate_send_request(request: &MailSendRequest) -> Result<(), String> {
     for (index, attachment) in request.attachments.iter().enumerate() {
         if attachment.path.trim().is_empty() {
             return Err(format!("attachment #{} path is required", index + 1));
+        }
+        if attachment.inline {
+            let content_id = attachment
+                .content_id
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or("");
+            if content_id.is_empty() {
+                return Err(format!(
+                    "inline attachment #{} Content-ID is required",
+                    index + 1
+                ));
+            }
+            if content_id
+                .chars()
+                .any(|ch| matches!(ch, '<' | '>' | '\r' | '\n' | '\0'))
+            {
+                return Err(format!(
+                    "inline attachment #{} Content-ID contains invalid characters",
+                    index + 1
+                ));
+            }
+            let content_type = attachment
+                .content_type
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or("");
+            if !content_type
+                .get(..content_type.len().min(6))
+                .unwrap_or("")
+                .eq_ignore_ascii_case("image/")
+            {
+                return Err(format!(
+                    "inline attachment #{} must have an image/* content type",
+                    index + 1
+                ));
+            }
         }
     }
     Ok(())
@@ -3823,6 +3932,8 @@ mod tests {
                 path: path.to_string_lossy().into_owned(),
                 name: Some("report.txt".into()),
                 content_type: Some("text/plain".into()),
+                inline: false,
+                content_id: None,
             }],
         };
 
@@ -3831,6 +3942,78 @@ mod tests {
 
         assert!(raw.contains("multipart/mixed"));
         assert!(raw.contains("multipart/alternative"));
+        assert!(raw.contains("filename=\"report.txt\""));
+    }
+
+    #[test]
+    fn build_send_message_embeds_inline_images_in_related_mime() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("logo.png");
+        std::fs::write(&path, b"png body").unwrap();
+        let request = MailSendRequest {
+            to: vec!["Receiver <receiver@example.com>".into()],
+            cc: vec![],
+            bcc: vec![],
+            subject: "Hello".into(),
+            text_body: Some("Plain body".into()),
+            html_body: Some("<p><img src=\"cid:logo-1@inline.local\"></p>".into()),
+            attachments: vec![MailSendAttachment {
+                path: path.to_string_lossy().into_owned(),
+                name: Some("logo.png".into()),
+                content_type: Some("image/png".into()),
+                inline: true,
+                content_id: Some("logo-1@inline.local".into()),
+            }],
+        };
+
+        let message = build_send_message(&sample_resolved_account(), &request).unwrap();
+        let raw = String::from_utf8(message.formatted()).unwrap();
+
+        assert!(raw.contains("multipart/related"));
+        assert!(raw.contains("multipart/alternative"));
+        assert!(raw.contains("Content-ID: <logo-1@inline.local>"));
+        assert!(raw.contains("Content-Disposition: inline; filename=\"logo.png\""));
+    }
+
+    #[test]
+    fn build_send_message_nests_related_body_inside_mixed_when_inline_and_regular_attachments_exist(
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let image_path = dir.path().join("logo.png");
+        let report_path = dir.path().join("report.txt");
+        std::fs::write(&image_path, b"png body").unwrap();
+        std::fs::write(&report_path, b"report body").unwrap();
+        let request = MailSendRequest {
+            to: vec!["Receiver <receiver@example.com>".into()],
+            cc: vec![],
+            bcc: vec![],
+            subject: "Hello".into(),
+            text_body: Some("Plain body".into()),
+            html_body: Some("<p><img src=\"cid:logo-1@inline.local\"></p>".into()),
+            attachments: vec![
+                MailSendAttachment {
+                    path: image_path.to_string_lossy().into_owned(),
+                    name: Some("logo.png".into()),
+                    content_type: Some("image/png".into()),
+                    inline: true,
+                    content_id: Some("logo-1@inline.local".into()),
+                },
+                MailSendAttachment {
+                    path: report_path.to_string_lossy().into_owned(),
+                    name: Some("report.txt".into()),
+                    content_type: Some("text/plain".into()),
+                    inline: false,
+                    content_id: None,
+                },
+            ],
+        };
+
+        let message = build_send_message(&sample_resolved_account(), &request).unwrap();
+        let raw = String::from_utf8(message.formatted()).unwrap();
+
+        assert!(raw.contains("multipart/mixed"));
+        assert!(raw.contains("multipart/related"));
+        assert!(raw.contains("Content-ID: <logo-1@inline.local>"));
         assert!(raw.contains("filename=\"report.txt\""));
     }
 
@@ -3853,6 +4036,8 @@ mod tests {
                     path: "/tmp/report.txt".into(),
                     name: Some("report.txt".into()),
                     content_type: Some("text/plain".into()),
+                    inline: false,
+                    content_id: None,
                     size: Some(12),
                     modified_at: Some(123),
                 }],

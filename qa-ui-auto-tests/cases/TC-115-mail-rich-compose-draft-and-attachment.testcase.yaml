@@ -60,6 +60,18 @@ steps:
   - click: '[data-testid="mail-compose-align-right"]'
   - click: '[data-testid="mail-compose-align-left"]'
   - click: '[data-testid="mail-compose-emoji"]'
+  - click: '[data-testid="mail-compose-emoji-laugh"]'
+  - click: '[data-testid="mail-compose-insert-menu"]'
+  - click: '[data-testid="mail-compose-insert-image"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: '/workspace/inline-logo.png'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="mail-compose-attachment-chip"]'
+  - assert_text:
+      selector: '[data-testid="mail-compose-attachments"]'
+      contains: 'Inline inline-logo.png'
   - click: '[data-testid="mail-compose-attach"]'
   - wait_for: '[data-testid="text-input-dialog"]'
   - fill:
@@ -70,6 +82,9 @@ steps:
   - assert_text:
       selector: '[data-testid="mail-compose-attachments"]'
       contains: 'quarterly-brief.pdf'
+  - assert_text:
+      selector: '[data-testid="mail-compose-attachments"]'
+      contains: 'inline-logo.png'
   - click: '[data-testid="mail-compose-save-draft"]'
   - assert_text:
       selector: '[data-testid="mail-compose-menu-bar"]'

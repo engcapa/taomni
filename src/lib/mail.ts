@@ -128,6 +128,8 @@ export interface MailSendAttachment {
   path: string;
   name?: string | null;
   contentType?: string | null;
+  inline?: boolean;
+  contentId?: string | null;
 }
 
 export interface MailSendResult {
@@ -154,6 +156,8 @@ export interface MailDraftAttachment {
   path: string;
   name?: string | null;
   contentType?: string | null;
+  inline?: boolean;
+  contentId?: string | null;
   size?: number | null;
   modifiedAt?: number | null;
 }
