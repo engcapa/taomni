@@ -57,8 +57,11 @@ import {
   mailFetchRaw,
   mailGetMessageBody,
   mailIndexCachedContacts,
+  mailDeleteDraft,
+  mailListDrafts,
   mailListCachedFolders,
   mailListCachedMessages,
+  mailSaveDraft,
   mailMarkRead,
   mailMoveMessages,
   mailRenameFolder,
@@ -72,11 +75,15 @@ import {
   type MailAddress,
   type MailAttachmentInfo,
   type MailContactSuggestion,
+  type MailDraft,
+  type MailDraftAttachment,
+  type MailDraftContext,
   type MailFolder,
   type MailMessageBody,
   type MailMessageHeader,
 } from "../../lib/mail";
 import { RecipientField } from "./RecipientField";
+import { RichMailEditor } from "./RichMailEditor";
 import {
   extractDefaultMailDomain,
   formatRecipientForSend,
@@ -88,8 +95,18 @@ import {
   type ComposeRecipient,
   type RecipientSuggestion,
 } from "../../lib/mailRecipients";
-import { renderFormatted } from "../../lib/chat/renderFormatted";
-import { openLocalPath, temporaryFilePath } from "../../lib/ipc";
+import {
+  buildForwardHtml,
+  buildReplyHtml,
+  hasRichMailFormatting,
+  mailHtmlToPlainText,
+  plainTextToMailHtml,
+  quotePlainText,
+  sanitizeMailComposeHtml,
+  sanitizeMailDisplayHtml,
+  signatureToMailHtml,
+} from "../../lib/mailHtml";
+import { openLocalPath, selectUploadFile, temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -105,11 +122,16 @@ interface MailClientTabProps {
 }
 
 interface ComposeDraft {
+  id?: string | null;
   to: ComposeRecipient[];
   cc: ComposeRecipient[];
   bcc: ComposeRecipient[];
   subject: string;
-  body: string;
+  htmlBody: string;
+  textBody: string;
+  attachments: MailDraftAttachment[];
+  replyContext?: MailDraftContext | null;
+  richFormatUsed: boolean;
 }
 
 type RecipientFieldKey = "to" | "cc" | "bcc";
@@ -163,20 +185,30 @@ const DEFAULT_FOLDER: MailFolder = {
 
 function emptyComposeDraft(): ComposeDraft {
   return {
+    id: null,
     to: [],
     cc: [],
     bcc: [],
     subject: "",
-    body: "",
+    htmlBody: "<p><br></p>",
+    textBody: "",
+    attachments: [],
+    replyContext: null,
+    richFormatUsed: false,
   };
 }
 
 const EMPTY_DRAFT: ComposeDraft = {
+  id: null,
   to: [],
   cc: [],
   bcc: [],
   subject: "",
-  body: "",
+  htmlBody: "<p><br></p>",
+  textBody: "",
+  attachments: [],
+  replyContext: null,
+  richFormatUsed: false,
 };
 
 const MAIL_MESSAGE_PAGE_SIZE = 200;
@@ -473,13 +505,56 @@ function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader
   return sortMessages(Array.from(byKey.values()));
 }
 
-function draftBodyWithSignature(body: string | undefined, signature: string | null | undefined): string {
-  const cleanSignature = signature?.trimEnd();
-  const cleanBody = body ?? "";
-  if (!cleanSignature) return cleanBody;
-  if (!cleanBody.trim()) return `\n\n${cleanSignature}`;
-  if (cleanBody.includes(cleanSignature)) return cleanBody;
-  return `${cleanBody.trimEnd()}\n\n${cleanSignature}`;
+function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
+  const base = { ...emptyComposeDraft(), ...draft };
+  if (!signature?.trim()) return base;
+  const signatureHtml = signatureToMailHtml(signature);
+  const signatureText = `\n\n-- \n${signature.trimEnd()}`;
+  const htmlBody = base.htmlBody?.trim() && base.htmlBody !== "<p><br></p>"
+    ? base.htmlBody
+    : `<p><br></p>${signatureHtml}`;
+  const textBody = base.textBody?.trim() ? base.textBody : signatureText.trimStart();
+  return { ...base, htmlBody, textBody };
+}
+
+function draftHasContent(draft: ComposeDraft): boolean {
+  return !!(
+    draft.to.length ||
+    draft.cc.length ||
+    draft.bcc.length ||
+    draft.subject.trim() ||
+    draft.textBody.trim() ||
+    mailHtmlToPlainText(draft.htmlBody).trim() ||
+    draft.attachments.length
+  );
+}
+
+function serializeDraftContent(draft: ComposeDraft): string {
+  return JSON.stringify({
+    to: draft.to.map(formatRecipientForSend),
+    cc: draft.cc.map(formatRecipientForSend),
+    bcc: draft.bcc.map(formatRecipientForSend),
+    subject: draft.subject,
+    textBody: draft.textBody,
+    htmlBody: draft.htmlBody,
+    attachments: draft.attachments,
+    replyContext: draft.replyContext ?? null,
+  });
+}
+
+function draftFromSaved(saved: MailDraft): ComposeDraft {
+  return {
+    id: saved.id,
+    to: parseRecipientsText(saved.to.join(", ")),
+    cc: parseRecipientsText(saved.cc.join(", ")),
+    bcc: parseRecipientsText(saved.bcc.join(", ")),
+    subject: saved.subject,
+    htmlBody: saved.htmlBody || plainTextToMailHtml(saved.textBody),
+    textBody: saved.textBody,
+    attachments: saved.attachments ?? [],
+    replyContext: saved.replyContext ?? null,
+    richFormatUsed: hasRichMailFormatting(saved.htmlBody),
+  };
 }
 
 function suggestedAttachmentName(attachment: MailAttachmentInfo, index: number, subject?: string): string {
@@ -516,6 +591,23 @@ function joinLocalPath(dir: string, name: string): string {
   if (/^[A-Za-z]:$/.test(base)) return `${base}\\${name}`;
   const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
   return `${base}${sep}${name}`;
+}
+
+function basename(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() || path || "attachment";
+}
+
+function guessContentType(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg"].includes(ext)) return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  if (ext === "pdf") return "application/pdf";
+  if (ext === "html" || ext === "htm") return "text/html";
+  if (ext === "csv") return "text/csv";
+  if (ext === "json") return "application/json";
+  if (ext === "txt" || ext === "log" || ext === "md") return "text/plain";
+  return "application/octet-stream";
 }
 
 function dedupeMessages(messages: readonly MailMessageHeader[]): MailMessageHeader[] {
@@ -566,28 +658,11 @@ function appendUniqueAddress(target: string[], seen: Set<string>, address: MailA
 }
 
 function sanitizeMailHtml(html: string, allowImages: boolean): string {
-  const sanitized = renderFormatted(html, "html") ?? "";
-  if (allowImages) return sanitized;
-  if (typeof DOMParser === "undefined") {
-    return sanitized.replace(/<img\b[^>]*>/gi, "[image blocked]");
-  }
-  const doc = new DOMParser().parseFromString(sanitized, "text/html");
-  doc.querySelectorAll("img").forEach((img) => {
-    const placeholder = doc.createElement("span");
-    placeholder.textContent = "[image blocked]";
-    img.replaceWith(placeholder);
-  });
-  return doc.body.innerHTML;
+  return sanitizeMailDisplayHtml(html, allowImages);
 }
 
 function htmlToText(html: string): string {
-  const sanitized = renderFormatted(html, "html") ?? html;
-  if (typeof document === "undefined") {
-    return sanitized.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  }
-  const node = document.createElement("div");
-  node.innerHTML = sanitized;
-  return (node.textContent ?? "").replace(/\s+/g, " ").trim();
+  return mailHtmlToPlainText(html);
 }
 
 function bodyTextForAi(body: MailMessageBody): string {
@@ -640,6 +715,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [markingRead, setMarkingRead] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
+  const [drafts, setDrafts] = useState<MailDraft[]>([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState<RecipientSearchState>({
     field: null,
     query: "",
@@ -652,6 +731,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const initialSyncDoneRef = useRef(false);
   const contactIndexAccountRef = useRef<string | null>(null);
   const contactSearchSeqRef = useRef(0);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const lastSavedDraftJsonRef = useRef("");
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
@@ -1380,14 +1461,97 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   }, [loadMoreMessages]);
 
-  const openCompose = (nextDraft: Partial<ComposeDraft> = {}) => {
-    setDraft({
-      ...emptyComposeDraft(),
-      ...nextDraft,
-      body: draftBodyWithSignature(nextDraft.body, info.signature),
-    });
+  const refreshDrafts = async () => {
+    setDraftsLoading(true);
+    try {
+      setDrafts(await mailListDrafts(info.sessionId));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDraftsLoading(false);
+    }
+  };
+
+  const openCompose = (nextDraft: Partial<ComposeDraft> = {}, includeSignature = true) => {
+    const next = includeSignature ? draftWithSignature(nextDraft, info.signature) : { ...emptyComposeDraft(), ...nextDraft };
+    setDraft(next);
+    lastSavedDraftJsonRef.current = serializeDraftContent(next);
     setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
     setComposeOpen(true);
+  };
+
+  const saveCurrentDraft = async (mode: "manual" | "auto" = "manual") => {
+    if (!draftHasContent(draft)) return null;
+    const serialized = serializeDraftContent(draft);
+    if (mode === "auto" && serialized === lastSavedDraftJsonRef.current) return null;
+    setSavingDraft(true);
+    try {
+      const saved = await mailSaveDraft(info.sessionId, {
+        id: draft.id ?? null,
+        to: draft.to.map(formatRecipientForSend),
+        cc: draft.cc.map(formatRecipientForSend),
+        bcc: draft.bcc.map(formatRecipientForSend),
+        subject: draft.subject,
+        textBody: draft.textBody || mailHtmlToPlainText(draft.htmlBody),
+        htmlBody: sanitizeMailComposeHtml(draft.htmlBody),
+        attachments: draft.attachments,
+        replyContext: draft.replyContext ?? null,
+      });
+      lastSavedDraftJsonRef.current = serialized;
+      setDraft((current) => ({ ...current, id: saved.id }));
+      setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      if (mode === "manual") setStatus("Draft saved");
+      return saved;
+    } catch (e) {
+      if (mode === "manual") setError(String(e));
+      return null;
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const openSavedDraft = (saved: MailDraft) => {
+    const next = draftFromSaved(saved);
+    setDraft(next);
+    lastSavedDraftJsonRef.current = serializeDraftContent(next);
+    setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
+    setDraftsOpen(false);
+    setComposeOpen(true);
+  };
+
+  const deleteSavedDraft = async (saved: MailDraft) => {
+    try {
+      await mailDeleteDraft(info.sessionId, saved.id);
+      setDrafts((current) => current.filter((item) => item.id !== saved.id));
+      if (draft.id === saved.id) setDraft(emptyComposeDraft());
+      setStatus("Draft deleted");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const fallbackBodyFor = (target: MailMessageHeader): MailMessageBody => ({
+    accountId: target.accountId,
+    folder: target.folder,
+    uid: target.uid,
+    messageId: target.messageId,
+    subject: target.subject,
+    text: target.snippet ?? "",
+    html: null,
+    snippet: target.snippet,
+    attachments: [],
+    rawSize: target.rawSize,
+    cachedAt: null,
+    source: "header",
+  });
+
+  const replyDraftBody = (target: MailMessageHeader, currentBody: MailMessageBody) => {
+    const intro = `On ${formatFullDate(target.dateTs) || "an unknown date"}, ${addressLabel(target.from) || "(unknown sender)"} wrote:`;
+    const originalText = currentBody.text?.trim() || currentBody.snippet || "";
+    return {
+      htmlBody: buildReplyHtml(intro, { html: currentBody.html, text: originalText }, info.signature),
+      textBody: `\n\n${info.signature?.trim() ? `-- \n${info.signature.trimEnd()}\n\n` : ""}${intro}\n${quotePlainText(originalText)}`,
+    };
   };
 
   const openReply = (target = selectedMessage) => {
@@ -1395,27 +1559,18 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     const from = target.from?.address ?? addressLabel(target.from);
     const replyBody = body && body.uid === target.uid && body.folder === target.folder
       ? body
-      : {
-          accountId: target.accountId,
-          folder: target.folder,
-          uid: target.uid,
-          messageId: target.messageId,
-          subject: target.subject,
-          text: target.snippet ?? "",
-          html: null,
-          snippet: target.snippet,
-          attachments: [],
-          rawSize: target.rawSize,
-          cachedAt: null,
-          source: "header",
-        } satisfies MailMessageBody;
+      : fallbackBodyFor(target);
+    const replyBodyDraft = replyDraftBody(target, replyBody);
     openCompose({
       to: parseRecipientsText(from),
       subject: target.subject.toLowerCase().startsWith("re:")
         ? target.subject
         : `Re: ${target.subject || "(no subject)"}`,
-      body: bodyTextForAi(replyBody),
-    });
+      htmlBody: replyBodyDraft.htmlBody,
+      textBody: replyBodyDraft.textBody,
+      replyContext: { kind: "reply", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      richFormatUsed: true,
+    }, false);
   };
 
   const openReplyAll = (target = selectedMessage) => {
@@ -1438,38 +1593,37 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
     const replyBody = body && body.uid === target.uid && body.folder === target.folder
       ? body
-      : {
-          accountId: target.accountId,
-          folder: target.folder,
-          uid: target.uid,
-          messageId: target.messageId,
-          subject: target.subject,
-          text: target.snippet ?? "",
-          html: null,
-          snippet: target.snippet,
-          attachments: [],
-          rawSize: target.rawSize,
-          cachedAt: null,
-          source: "header",
-        } satisfies MailMessageBody;
+      : fallbackBodyFor(target);
+    const replyBodyDraft = replyDraftBody(target, replyBody);
     openCompose({
       to: parseRecipientsText(to.join(", ")),
       cc: parseRecipientsText(cc.join(", ")),
       subject: target.subject.toLowerCase().startsWith("re:")
         ? target.subject
         : `Re: ${target.subject || "(no subject)"}`,
-      body: bodyTextForAi(replyBody),
-    });
+      htmlBody: replyBodyDraft.htmlBody,
+      textBody: replyBodyDraft.textBody,
+      replyContext: { kind: "replyAll", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      richFormatUsed: true,
+    }, false);
   };
 
   const handleSendDraft = async () => {
+    const htmlBody = sanitizeMailComposeHtml(draft.htmlBody);
+    const textBody = draft.textBody.trim() || mailHtmlToPlainText(htmlBody);
+    const sendHtml = draft.richFormatUsed || hasRichMailFormatting(htmlBody);
     const request = {
       to: draft.to.map(formatRecipientForSend),
       cc: draft.cc.map(formatRecipientForSend),
       bcc: draft.bcc.map(formatRecipientForSend),
       subject: draft.subject.trim(),
-      textBody: draft.body,
-      htmlBody: null,
+      textBody,
+      htmlBody: sendHtml ? htmlBody : null,
+      attachments: draft.attachments.map((attachment) => ({
+        path: attachment.path,
+        name: attachment.name ?? null,
+        contentType: attachment.contentType ?? null,
+      })),
     };
     const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
     if (recipients.length === 0) {
@@ -1485,6 +1639,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setError(null);
     try {
       const result = await mailSendMessage(info, request);
+      if (draft.id) {
+        await mailDeleteDraft(info.sessionId, draft.id).catch(() => undefined);
+        setDrafts((current) => current.filter((item) => item.id !== draft.id));
+      }
       setStatus(result.accepted ? "Message sent" : result.response || "SMTP send returned no acceptance");
       setComposeOpen(false);
       setDraft(emptyComposeDraft());
@@ -1494,6 +1652,69 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setSending(false);
     }
   };
+
+  const handleAddDraftAttachments = async () => {
+    try {
+      const paths = await selectUploadFile();
+      if (!paths.length) return;
+      setDraft((current) => {
+        const existing = new Set(current.attachments.map((attachment) => attachment.path));
+        const nextAttachments = paths
+          .filter((path) => !existing.has(path))
+          .map((path) => {
+            const name = basename(path);
+            return {
+              path,
+              name,
+              contentType: guessContentType(name),
+              size: null,
+              modifiedAt: null,
+            } satisfies MailDraftAttachment;
+          });
+        return { ...current, attachments: [...current.attachments, ...nextAttachments] };
+      });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const removeDraftAttachment = (index: number) => {
+    setDraft((current) => ({
+      ...current,
+      attachments: current.attachments.filter((_, i) => i !== index),
+    }));
+  };
+
+  const discardCurrentDraft = async () => {
+    const draftId = draft.id;
+    setComposeOpen(false);
+    setDraft(emptyComposeDraft());
+    lastSavedDraftJsonRef.current = "";
+    if (!draftId) return;
+    try {
+      await mailDeleteDraft(info.sessionId, draftId);
+      setDrafts((current) => current.filter((item) => item.id !== draftId));
+      setStatus("Draft discarded");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  useEffect(() => {
+    if (!composeOpen || sending || savingDraft || !draftHasContent(draft)) return;
+    const serialized = serializeDraftContent(draft);
+    if (serialized === lastSavedDraftJsonRef.current) return;
+    if (autoSaveTimerRef.current !== null) window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void saveCurrentDraft("auto");
+    }, 1800);
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [composeOpen, draft, savingDraft, sending]);
 
   const handleAiAction = async (action: AiAction) => {
     if (!selectedMessage) return;
@@ -1806,39 +2027,33 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setStatus(`Moved ${moved} message${moved === 1 ? "" : "s"} to Trash`);
   });
 
-  const buildForwardBody = (target: MailMessageHeader): string => {
+  const buildForwardBody = (target: MailMessageHeader): { htmlBody: string; textBody: string } => {
     const currentBody = body && body.uid === target.uid && body.folder === target.folder
       ? body
-      : {
-          accountId: target.accountId,
-          folder: target.folder,
-          uid: target.uid,
-          messageId: target.messageId,
-          subject: target.subject,
-          text: target.snippet ?? "",
-          html: null,
-          snippet: target.snippet,
-          attachments: [],
-          rawSize: target.rawSize,
-          cachedAt: null,
-          source: "header",
-        } satisfies MailMessageBody;
-    const header = [
-      "---------- Forwarded message ----------",
+      : fallbackBodyFor(target);
+    const headerLines = [
       `From: ${addressLabel(target.from) || "(unknown sender)"}`,
       target.dateTs ? `Date: ${formatFullDate(target.dateTs)}` : "",
       `Subject: ${target.subject || "(no subject)"}`,
       `To: ${target.to.map(addressLabel).filter(Boolean).join(", ") || "(none)"}`,
-    ].filter(Boolean).join("\n");
-    return `\n\n${header}\n\n${bodyTextForAi(currentBody)}`;
+    ].filter(Boolean);
+    const originalText = currentBody.text?.trim() || currentBody.snippet || "";
+    return {
+      htmlBody: buildForwardHtml(headerLines, { html: currentBody.html, text: originalText }, info.signature),
+      textBody: `\n\n${info.signature?.trim() ? `-- \n${info.signature.trimEnd()}\n\n` : ""}---------- Forwarded message ----------\n${headerLines.join("\n")}\n\n${originalText}`,
+    };
   };
 
   const openForward = (target = selectedMessage) => {
     if (!target) return;
+    const forwardBody = buildForwardBody(target);
     openCompose({
       subject: forwardSubject(target.subject),
-      body: buildForwardBody(target),
-    });
+      htmlBody: forwardBody.htmlBody,
+      textBody: forwardBody.textBody,
+      replyContext: { kind: "forward", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      richFormatUsed: true,
+    }, false);
   };
 
   const handlePrintMessage = (message = selectedMessage) => {
@@ -2327,6 +2542,19 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" data-testid="mail-compose-open" onClick={() => openCompose()}>
           <MailIcon className="w-3.5 h-3.5" />
           Compose
+        </button>
+        <button
+          type="button"
+          className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
+          data-testid="mail-drafts-open"
+          onClick={() => {
+            setDraftsOpen(true);
+            void refreshDrafts();
+          }}
+          title="Open local drafts"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Drafts
         </button>
         <button
           type="button"
@@ -2908,17 +3136,85 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         </div>
       )}
 
+      {draftsOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Local drafts"
+            icon={<FileText className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Local drafts"
+            minWidth={420}
+            minHeight={300}
+            className="w-[min(680px,90vw)] h-[min(520px,78vh)] min-h-[340px]"
+            onClose={() => setDraftsOpen(false)}
+          >
+            <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
+              <button type="button" className="taomni-btn h-7 px-2 text-[12px]" onClick={() => void refreshDrafts()} disabled={draftsLoading}>
+                {draftsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              </button>
+              <span className="text-[12px] text-[var(--taomni-text-muted)]">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto p-2" data-testid="mail-drafts-dialog">
+              {drafts.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                  No saved drafts
+                </div>
+              ) : drafts.map((saved) => (
+                <div
+                  key={saved.id}
+                  className="min-h-14 px-2 py-1.5 rounded border border-transparent hover:border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-2"
+                  data-testid="mail-draft-row"
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => openSavedDraft(saved)}
+                  >
+                    <div className="text-[12px] font-semibold truncate">{saved.subject || "(no subject)"}</div>
+                    <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                      {[...saved.to, ...saved.cc, ...saved.bcc].join(", ") || "(no recipients)"}
+                    </div>
+                    <div className="text-[10px] text-[var(--taomni-text-muted)]">
+                      {formatShortDate(saved.updatedAt)}
+                      {saved.attachments.length > 0 ? ` · ${saved.attachments.length} attachment${saved.attachments.length === 1 ? "" : "s"}` : ""}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
+                    title="Delete draft"
+                    onClick={() => void deleteSavedDraft(saved)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </MailDraggableDialog>
+        </div>
+      )}
+
       {composeOpen && (
         <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4" data-testid="mail-compose-dialog">
           <MailDraggableDialog
-            title="New message"
+            title={draft.id ? "Edit draft" : draft.replyContext?.kind ? "Reply" : "New message"}
             icon={<MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
             ariaLabel="New message"
             minWidth={520}
             minHeight={360}
-            className="w-[760px] h-[min(620px,calc(100vh-72px))] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)]"
+            className="w-[min(920px,calc(100vw-48px))] h-[min(760px,calc(100vh-72px))] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)]"
             onClose={() => setComposeOpen(false)}
           >
+            <div className="h-8 px-3 flex items-center gap-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] text-[12px]" data-testid="mail-compose-menu-bar">
+              <button type="button" className="taomni-btn h-6 px-2" onClick={() => void saveCurrentDraft("manual")} disabled={savingDraft || sending}>File</button>
+              <button type="button" className="taomni-btn h-6 px-2" onClick={() => document.execCommand("undo")} disabled={sending}>Edit</button>
+              <button type="button" className="taomni-btn h-6 px-2" onClick={() => void handleAddDraftAttachments()} disabled={sending}>Insert</button>
+              <button type="button" className="taomni-btn h-6 px-2" onClick={() => setDraft((current) => ({ ...current, richFormatUsed: true }))} disabled={sending}>Format</button>
+              <button type="button" className="taomni-btn h-6 px-2" disabled={sending}>Options</button>
+              <button type="button" className="taomni-btn h-6 px-2" disabled={sending}>Tools</button>
+              <span className="ml-auto text-[11px] text-[var(--taomni-text-muted)]">
+                {savingDraft ? "Saving draft..." : draft.id ? "Draft saved locally" : "Auto draft"}
+              </span>
+            </div>
             <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
               <RecipientField
                 id={`mail-to-${tabId}`}
@@ -2959,14 +3255,47 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
               <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-subject-${tabId}`}>Subject</label>
               <input id={`mail-subject-${tabId}`} className="taomni-input h-7" value={draft.subject} onChange={(event) => setDraft((current) => ({ ...current, subject: event.target.value }))} />
             </div>
-            <textarea
-              className="taomni-input mx-3 mb-3 min-h-[260px] flex-1 resize-none font-sans text-[13px] leading-6"
-              value={draft.body}
-              onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}
-              aria-label="Message body"
+            <RichMailEditor
+              html={draft.htmlBody}
+              disabled={sending}
+              onAttach={() => void handleAddDraftAttachments()}
+              onRichFormatUsed={() => setDraft((current) => ({ ...current, richFormatUsed: true }))}
+              onChange={(htmlBody, textBody) => setDraft((current) => ({ ...current, htmlBody, textBody }))}
             />
+            {draft.attachments.length > 0 && (
+              <div className="mx-3 mb-3 flex flex-wrap gap-1.5" data-testid="mail-compose-attachments">
+                {draft.attachments.map((attachment, index) => (
+                  <span
+                    key={`${attachment.path}-${index}`}
+                    className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-2 py-1 text-[11px] text-[var(--taomni-text-muted)] bg-[var(--taomni-sidebar-bg)]"
+                    data-testid="mail-compose-attachment-chip"
+                    title={attachment.path}
+                  >
+                    <Paperclip className="w-3 h-3" />
+                    <span className="max-w-[280px] truncate">{attachment.name || basename(attachment.path)}</span>
+                    <button
+                      type="button"
+                      className="ml-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
+                      aria-label={`Remove ${attachment.name || "attachment"}`}
+                      onClick={() => removeDraftAttachment(index)}
+                      disabled={sending}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => setComposeOpen(false)} disabled={sending}>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
+                <Paperclip className="w-3.5 h-3.5" />
+                Attach
+              </button>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" data-testid="mail-compose-save-draft" onClick={() => void saveCurrentDraft("manual")} disabled={savingDraft || sending || !draftHasContent(draft)}>
+                {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save draft
+              </button>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => void discardCurrentDraft()} disabled={sending}>
                 Discard
               </button>
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={handleSendDraft} disabled={sending}>
