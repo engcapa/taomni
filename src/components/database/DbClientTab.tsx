@@ -226,6 +226,42 @@ function defaultQueryCacheName(info: DbConnectInfo, ordinal: number): string {
   return `${stem}-query-${ordinal}.sql`;
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function formatClockTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
+
+function formatFullDateTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${formatClockTime(timestamp)}`;
+}
+
+function formatDurationMs(durationMs: number | null | undefined): string | null {
+  if (durationMs === null || durationMs === undefined || !Number.isFinite(durationMs)) return null;
+  const ms = Math.max(0, Math.round(durationMs));
+  if (ms < 1000) return `${ms} ms`;
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
+  return `${Math.round(ms / 1000)} s`;
+}
+
+function resultSheetTimingTitle(sheet: ResultSheet): string {
+  const lines = [`Started: ${formatFullDateTime(sheet.createdAt)}`];
+  const duration = sheet.running
+    ? formatDurationMs(sheet.elapsedMs)
+    : formatDurationMs(sheet.result?.durationMs);
+  if (duration) {
+    lines.push(`${sheet.running ? "Elapsed" : "Duration"}: ${duration}`);
+  }
+  if (sheet.sql.trim()) {
+    lines.push("", sheet.sql);
+  }
+  return lines.join("\n");
+}
+
 function readWorkspaceCache(sessionId: string): QueryWorkspaceCache | null {
   try {
     const raw = localStorage.getItem(workspaceKey(sessionId));
@@ -718,6 +754,7 @@ export default function DbClientTab({
           } else {
             sawDone = true;
             const warnings = event.warnings ?? [];
+            const elapsedMs = Date.now() - started;
             updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
               return {
@@ -731,6 +768,7 @@ export default function DbClientTab({
                 warnings,
                 running: false,
                 cancelling: false,
+                elapsedMs,
                 error: null,
                 resultTab: warnings.length > 0 ? "messages" : "results",
               };
@@ -738,7 +776,7 @@ export default function DbClientTab({
           }
         });
         if (!sawDone) {
-          patchSheet(panelId, sheetId, { running: false, cancelling: false });
+          patchSheet(panelId, sheetId, { running: false, cancelling: false, elapsedMs: Date.now() - started });
         }
         metadataCache?.invalidateSql(sql, {
           engine: info.engine,
@@ -750,6 +788,7 @@ export default function DbClientTab({
         patchSheet(panelId, sheetId, {
           running: false,
           cancelling: false,
+          elapsedMs: Date.now() - started,
           error: String(err),
           warnings: [],
           resultTab: "messages",
@@ -975,6 +1014,7 @@ export default function DbClientTab({
         running: true,
         cancelling: false,
         elapsedMs: 0,
+        createdAt: Date.now(),
         rowLimit: effectiveLimit,
         resultTab: "results",
       });
@@ -1985,7 +2025,7 @@ function ResultArea({
               <button
                 key={resultSheet.id}
                 type="button"
-                className="h-6 max-w-[170px] px-2 inline-flex items-center gap-1 text-[11px]"
+                className="h-6 max-w-[220px] min-w-0 px-2 inline-flex items-center gap-1 overflow-hidden text-[11px]"
                 style={{
                   background: active ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
                   color: active ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
@@ -1995,9 +2035,12 @@ function ResultArea({
                   borderTopRightRadius: 4,
                 }}
                 onClick={() => onSheetSelect(resultSheet.id)}
-                title={resultSheet.sql}
+                title={resultSheetTimingTitle(resultSheet)}
               >
                 <span className="truncate">{resultSheet.title}</span>
+                <span className="shrink-0 font-mono text-[10px] opacity-80">
+                  {formatClockTime(resultSheet.createdAt)}
+                </span>
                 {resultSheet.running && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
                 {(resultSheet.error || resultSheet.warnings.length > 0) && (
                   <span className="text-[10px] shrink-0">●</span>
@@ -2032,6 +2075,18 @@ function ResultArea({
           >
             Messages{(sheet.error || sheet.warnings.length > 0) ? " ●" : ""}
           </button>
+          <span
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 text-[10px] text-[var(--taomni-text-muted)] font-mono"
+            title={resultSheetTimingTitle(sheet)}
+          >
+            <Clock className="w-3 h-3" />
+            {formatFullDateTime(sheet.createdAt)}
+            {sheet.running
+              ? ` | ${formatDurationMs(sheet.elapsedMs) ?? "0 ms"}`
+              : sheet.result
+                ? ` | ${formatDurationMs(sheet.result.durationMs) ?? "0 ms"}`
+                : ""}
+          </span>
           <span className="ml-auto truncate px-2 text-[10px] text-[var(--taomni-text-muted)] font-mono" title={sheet.sql}>
             {sheet.sql.replace(/\s+/g, " ")}
           </span>
