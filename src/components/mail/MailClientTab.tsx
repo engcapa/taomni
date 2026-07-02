@@ -219,9 +219,22 @@ const MAIL_BASE_FONT_SIZE = DEFAULT_MAIL_TERMINAL_PROFILE.fontSize;
 const MAIL_MIN_FONT_SIZE = 8;
 const MAIL_MAX_FONT_SIZE = 32;
 const ALL_ATTACHMENTS_INDEX = -1;
+const MAIL_READER_HTML_CLASS =
+  "max-w-none text-[13px] leading-6 [&_img]:max-w-full [&_img]:h-auto [&_a]:text-[var(--taomni-accent)]";
 
 function messageKey(message: MailMessageHeader): string {
   return `${message.folder}:${message.uid}`;
+}
+
+function bodyMatchesMessage(
+  body: MailMessageBody | null,
+  message: MailMessageHeader | null | undefined,
+): body is MailMessageBody {
+  return !!body
+    && !!message
+    && body.accountId === message.accountId
+    && body.folder === message.folder
+    && body.uid === message.uid;
 }
 
 function clampMailFontSize(value: number): number {
@@ -279,7 +292,7 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     "--taomni-accent": accent,
     "--taomni-text": foreground,
     "--taomni-text-muted": mixColor(foreground, background, 62),
-    fontFamily: terminalProfile.fontFamily,
+    fontFamily: "var(--taomni-ui-font-family)",
     zoom: clampMailFontSize(fontSize) / MAIL_BASE_FONT_SIZE,
   } as CSSProperties;
 }
@@ -503,6 +516,11 @@ function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader
   for (const message of current) byKey.set(messageKey(message), message);
   for (const message of next) byKey.set(messageKey(message), message);
   return sortMessages(Array.from(byKey.values()));
+}
+
+function folderHasMoreMessages(folders: readonly MailFolder[], folderName: string, loadedCount: number): boolean {
+  const total = folders.find((folder) => folder.name === folderName)?.total;
+  return typeof total === "number" && total > loadedCount;
 }
 
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
@@ -733,12 +751,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const contactSearchSeqRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
+  const foldersRef = useRef<MailFolder[]>([]);
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
-  const [mailFontSize, setMailFontSize] = useState(() =>
-    clampMailFontSize(info.terminalProfile?.fontSize ?? MAIL_BASE_FONT_SIZE),
-  );
+  const [mailFontSize, setMailFontSize] = useState(MAIL_BASE_FONT_SIZE);
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
   const confirmDialog = useConfirmDialog();
@@ -796,6 +813,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     [messages],
   );
 
+  useEffect(() => {
+    foldersRef.current = folders;
+  }, [folders]);
+
   const filteredMessages = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return messages;
@@ -811,15 +832,19 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [messages, query]);
   const allFilteredMessagesChecked = filteredMessages.length > 0
     && filteredMessages.every((message) => checkedMessageKeys.has(messageKey(message)));
+  const selectedBody = useMemo(
+    () => (bodyMatchesMessage(body, selectedMessage) ? body : null),
+    [body, selectedMessage],
+  );
 
   const readerHtml = useMemo(() => {
-    if (!body?.html) return null;
-    return sanitizeMailHtml(body.html, allowRemoteImages);
-  }, [allowRemoteImages, body?.html]);
+    if (!selectedBody?.html) return null;
+    return sanitizeMailHtml(selectedBody.html, allowRemoteImages);
+  }, [allowRemoteImages, selectedBody?.html]);
 
   const visibleAttachments = useMemo(
-    () => (body?.attachments.length ? body.attachments : selectedMessage?.attachments ?? []),
-    [body?.attachments, selectedMessage?.attachments],
+    () => (selectedBody?.attachments.length ? selectedBody.attachments : selectedMessage?.attachments ?? []),
+    [selectedBody?.attachments, selectedMessage?.attachments],
   );
   const activeRecipientSuggestions = useMemo<RecipientSuggestion[]>(() => {
     const { field, query: recipientQuery, suggestions } = recipientSearch;
@@ -855,12 +880,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, []);
 
   const resetFontSize = useCallback(() => {
-    setMailFontSize(clampMailFontSize(info.terminalProfile?.fontSize ?? MAIL_BASE_FONT_SIZE));
-  }, [info.terminalProfile?.fontSize]);
+    setMailFontSize(MAIL_BASE_FONT_SIZE);
+  }, []);
 
   useEffect(() => {
-    setMailFontSize(clampMailFontSize(info.terminalProfile?.fontSize ?? MAIL_BASE_FONT_SIZE));
-  }, [info.sessionId, info.terminalProfile?.fontSize]);
+    setMailFontSize(MAIL_BASE_FONT_SIZE);
+  }, [info.sessionId]);
 
   useEffect(() => {
     if (!composeOpen || contactIndexAccountRef.current === info.sessionId) return;
@@ -982,6 +1007,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setError(null);
     try {
       const cached = await mailListCachedFolders(info.sessionId);
+      foldersRef.current = cached;
       setFolders(cached);
       setSelectedFolder((current) =>
         cached.length > 0 && !cached.some((folder) => folder.name === current)
@@ -1006,7 +1032,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     try {
       const cached = await mailListCachedMessages(info.sessionId, folder, pageSize + 1, offset);
       const page = cached.slice(0, pageSize);
-      const hasMore = cached.length > pageSize;
+      const loadedCount = offset + page.length;
+      const hasMore = cached.length > pageSize || folderHasMoreMessages(foldersRef.current, folder, loadedCount);
       setHasMoreMessages(hasMore);
       setMessages((current) => append ? mergeMessagePages(current, page) : sortMessages(page));
       if (!quiet) {
@@ -1050,13 +1077,17 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
     try {
       const result = await mailSyncHeaders(info, folder, { limit, offset, includeBodies });
+      foldersRef.current = result.folders;
       setFolders(result.folders);
       setSelectedFolder(result.folder);
       setMessages((current) => mergeMessagePages(
         current.filter((message) => message.folder === result.folder),
         result.messages,
       ));
-      setHasMoreMessages(result.hasMore);
+      setHasMoreMessages(
+        result.hasMore
+        || folderHasMoreMessages(result.folders, result.folder, offset + result.messages.length),
+      );
       if (indicator !== "none") {
         setStatus(
           append
@@ -1094,6 +1125,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
     try {
       const result = await mailSyncAllFolders(info, { limit, includeBodies });
+      foldersRef.current = result.folders;
       setFolders(result.folders);
       const nextFolder = result.folders.some((folder) => folder.name === activeBeforeSync)
         ? activeBeforeSync
@@ -1230,10 +1262,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [filteredMessages]);
 
   const selectMessage = useCallback((message: MailMessageHeader, viewKey = "mailbox") => {
+    const key = messageKey(message);
     setSelectedFolder(message.folder);
-    setSelectedMessageKey(messageKey(message));
+    setSelectedMessageKey(key);
     setMailViewKey(viewKey);
-    setBody(null);
+    setBody((current) => (bodyMatchesMessage(current, message) ? current : null));
   }, []);
 
   const openMessageTab = useCallback((message: MailMessageHeader) => {
@@ -1285,6 +1318,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   useEffect(() => {
     initialSyncDoneRef.current = false;
+    foldersRef.current = [];
     setFolders([]);
     setMessages([]);
     setSelectedMessageKey(null);
@@ -1348,19 +1382,19 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [messageTabs, messages, selectedMessageKey]);
 
   const autoReadKeyRef = useRef<string | null>(null);
+  const remoteImagesMessageKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!selectedMessage) return;
     const key = messageKey(selectedMessage);
-    // Only load the body + auto-mark-read once per distinct selection. Without
-    // this guard, mutating the open message's flags (e.g. "Mark unread")
-    // re-runs the effect and immediately flips it back to read.
-    if (autoReadKeyRef.current === key) return;
-    autoReadKeyRef.current = key;
     let cancelled = false;
-    setAllowRemoteImages(false);
+    if (remoteImagesMessageKeyRef.current !== key) {
+      remoteImagesMessageKeyRef.current = key;
+      setAllowRemoteImages(false);
+    }
     void (async () => {
-      await loadBody(selectedMessage);
-      if (cancelled || !isUnread(selectedMessage)) return;
+      const currentBody = selectedBody ?? await loadBody(selectedMessage);
+      if (cancelled || !currentBody || autoReadKeyRef.current === key || !isUnread(selectedMessage)) return;
+      autoReadKeyRef.current = key;
       try {
         const result = await mailMarkRead(info, selectedMessage.folder, [selectedMessage.uid], false);
         if (!cancelled && result.marked > 0) {
@@ -1373,7 +1407,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [info, loadBody, markMessagesReadLocally, selectedMessage]);
+  }, [info, loadBody, markMessagesReadLocally, selectedBody, selectedMessage]);
 
   useEffect(() => {
     setCheckedMessageKeys((current) => {
@@ -1557,7 +1591,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const openReply = (target = selectedMessage) => {
     if (!target) return;
     const from = target.from?.address ?? addressLabel(target.from);
-    const replyBody = body && body.uid === target.uid && body.folder === target.folder
+    const replyBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
     const replyBodyDraft = replyDraftBody(target, replyBody);
@@ -1591,7 +1625,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       if (seenTo.has(mail)) continue;
       appendUniqueAddress(cc, seenCc, recipient, ownAddresses);
     }
-    const replyBody = body && body.uid === target.uid && body.folder === target.folder
+    const replyBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
     const replyBodyDraft = replyDraftBody(target, replyBody);
@@ -2028,7 +2062,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   });
 
   const buildForwardBody = (target: MailMessageHeader): { htmlBody: string; textBody: string } => {
-    const currentBody = body && body.uid === target.uid && body.folder === target.folder
+    const currentBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
     const headerLines = [
@@ -2058,7 +2092,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   const handlePrintMessage = (message = selectedMessage) => {
     if (!message) return;
-    const currentBody = body && body.uid === message.uid && body.folder === message.folder ? body : null;
+    const currentBody = bodyMatchesMessage(body, message) ? body : null;
     const bodyHtml = currentBody?.html
       ? sanitizeMailHtml(currentBody.html, true)
       : `<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit">${escapeHtml(currentBody?.text ?? message.snippet ?? "")}</pre>`;
@@ -2340,7 +2374,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     const anchor = targetEl?.closest("a") as HTMLAnchorElement | null;
     const image = (targetEl?.tagName === "IMG" ? targetEl : targetEl?.closest("img")) as HTMLImageElement | null;
     const selection = typeof window !== "undefined" ? (window.getSelection()?.toString().trim() ?? "") : "";
-    const currentBody = message && body?.uid === message.uid && body.folder === message.folder ? body : null;
+    const currentBody = bodyMatchesMessage(body, message) ? body : null;
     const items: MenuItem[] = [];
     if (selection) {
       items.push({ label: "Copy", icon: <Copy className="w-3.5 h-3.5" />, onClick: () => copyText("selection", selection) });
@@ -2371,7 +2405,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
     : "cache off";
   const renderReaderSurface = (message: MailMessageHeader | null, popup = false) => {
-    const currentBody = message && body?.uid === message.uid && body.folder === message.folder ? body : null;
+    const currentBody = bodyMatchesMessage(body, message) ? body : null;
     const currentHtml = currentBody?.html ? sanitizeMailHtml(currentBody.html, allowRemoteImages) : null;
     const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
     const loadingThisBody = !!message && bodyLoading && selectedMessageKey === messageKey(message);
@@ -2514,7 +2548,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                 </div>
               ) : currentHtml ? (
                 <div
-                  className="max-w-none text-[13px] leading-6 [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--taomni-divider)] [&_td]:px-2 [&_td]:py-1 [&_a]:text-[var(--taomni-accent)]"
+                  className={MAIL_READER_HTML_CLASS}
+                  data-testid="mail-reader-html"
                   dangerouslySetInnerHTML={{ __html: currentHtml }}
                 />
               ) : currentBody?.text ? (
@@ -2826,17 +2861,13 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                           tabIndex={0}
                           aria-pressed={active}
                           className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active ? "bg-[var(--taomni-selected)]" : ""}`}
-                          onClick={() => {
-                            setSelectedMessageKey(messageKey(message));
-                            setBody(null);
-                          }}
+                          onClick={() => selectMessage(message, "mailbox")}
                           onDoubleClick={() => openMessageTab(message)}
                           onContextMenu={(event) => mailMenu.show(event, messageMenuItems(message))}
                           onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
                             event.preventDefault();
-                            setSelectedMessageKey(messageKey(message));
-                            setBody(null);
+                            selectMessage(message, "mailbox");
                           }}
                         >
                           <div className="flex items-start gap-2">
@@ -2992,10 +3023,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                       <span>{formatFullDate(selectedMessage.dateTs) || "(unknown)"}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-                      <span>{body?.source === "cache" ? "cached body" : body?.source === "remote" ? "remote body" : "header cached"}</span>
+                      <span>{selectedBody?.source === "cache" ? "cached body" : selectedBody?.source === "remote" ? "remote body" : "header cached"}</span>
                       {selectedMessage.rawSize ? <span>{formatBytes(selectedMessage.rawSize)}</span> : null}
                       {info.ai.enabled && <span>AI confirm {info.ai.skipBodyConfirm ? "skipped" : "required"}</span>}
-                      {body?.html && (
+                      {selectedBody?.html && (
                         <button
                           type="button"
                           className="taomni-btn h-5 px-2 text-[10px]"
@@ -3049,18 +3080,19 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                   </div>
 
                   <div className="p-4 text-[13px] leading-6">
-                    {bodyLoading && !body ? (
+                    {bodyLoading && !selectedBody ? (
                       <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Loading message body
                       </div>
                     ) : readerHtml ? (
                       <div
-                        className="max-w-none text-[13px] leading-6 [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--taomni-divider)] [&_td]:px-2 [&_td]:py-1 [&_a]:text-[var(--taomni-accent)]"
+                        className={MAIL_READER_HTML_CLASS}
+                        data-testid="mail-reader-html"
                         dangerouslySetInnerHTML={{ __html: readerHtml }}
                       />
-                    ) : body?.text ? (
-                      <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{body.text}</pre>
+                    ) : selectedBody?.text ? (
+                      <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{selectedBody.text}</pre>
                     ) : (
                       <div className="text-[12px] text-[var(--taomni-text-muted)]">
                         {selectedMessage.snippet || "No cached body content."}
