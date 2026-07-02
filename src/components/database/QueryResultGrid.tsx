@@ -54,6 +54,12 @@ import { writeText } from "../../lib/clipboard";
 import { isTauriRuntime } from "../../lib/runtime";
 import { sftpOpenPath } from "../../lib/sftp";
 import { getActiveQueryTab, listQueryTabs } from "../../lib/queryRegistry";
+import {
+  asSqlEngine,
+  quoteIdent as dialectQuoteIdent,
+  sqlLiteral as dialectSqlLiteral,
+  type SqlEngine,
+} from "../../lib/sqlDialect";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 
@@ -82,6 +88,7 @@ export interface QueryGridCommitPayload {
 interface QueryResultGridProps {
   result: DbQueryResult;
   sourceSql?: string;
+  sqlEngine?: string;
   running?: boolean;
   cancelling?: boolean;
   onRefresh?: (mode: QueryRefreshMode) => void;
@@ -116,6 +123,38 @@ interface GridRow {
 interface ColumnFilterConfig {
   text: string;
   mode: ColumnFilterMode;
+  selectedValues: (string | null)[];
+}
+
+interface ActiveColumnFilter {
+  columnIndex: number;
+  text: string;
+  mode: ColumnFilterMode;
+  selectedValues: (string | null)[];
+}
+
+interface DistinctColumnValue {
+  key: string;
+  value: string | null;
+  label: string;
+  count: number;
+}
+
+interface DistinctColumnSummary {
+  values: DistinctColumnValue[];
+  total: number;
+  truncated: boolean;
+}
+
+interface GeneratedResultSqlOptions {
+  sourceSql?: string;
+  sqlEngine?: string;
+  columns: DbColumn[];
+  visibleColumnIndexes: number[];
+  globalFilterText: string;
+  columnFilters: ActiveColumnFilter[];
+  sortCol: number | null;
+  sortDir: SortDir;
 }
 
 interface OpenColumnFilter {
@@ -277,7 +316,8 @@ const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   jsonStyle: "array",
 };
 
-const DEFAULT_COLUMN_FILTER: ColumnFilterConfig = { text: "", mode: "fuzzy" };
+const DEFAULT_COLUMN_FILTER: ColumnFilterConfig = { text: "", mode: "fuzzy", selectedValues: [] };
+const DISTINCT_FILTER_VALUE_LIMIT = 100;
 
 const EXPORT_DEFAULTS_KEY = "taomni.db.exportGrid.defaults.v1";
 const EXPORT_HISTORY_KEY = "taomni.db.exportGrid.fileHistory.v1";
@@ -340,6 +380,152 @@ function nextRowId(prefix: string): string {
 function isNumeric(value: string | null): boolean {
   if (value === null || value === "") return false;
   return !Number.isNaN(Number(value));
+}
+
+function filterValueKey(value: string | null): string {
+  return value === null ? "__taomni_null__" : `value:${value}`;
+}
+
+function filterValueLabel(value: string | null): string {
+  if (value === null) return "NULL";
+  if (value === "") return "(empty)";
+  return value;
+}
+
+function isColumnFilterActive(config: ColumnFilterConfig): boolean {
+  return config.text.trim().length > 0 || config.selectedValues.length > 0;
+}
+
+function distinctValuesForColumn(rows: GridRow[], columnIndex: number): DistinctColumnSummary {
+  const counts = new Map<string, { value: string | null; count: number }>();
+  for (const row of rows) {
+    if (row.status === "deleted") continue;
+    const value = row.values[columnIndex] ?? null;
+    const key = filterValueKey(value);
+    const current = counts.get(key);
+    if (current) current.count += 1;
+    else counts.set(key, { value, count: 1 });
+  }
+  const entries = Array.from(counts.entries())
+    .map(([key, item]) => ({ key, value: item.value, label: filterValueLabel(item.value), count: item.count }))
+    .sort((a, b) => {
+      if (a.value === null && b.value === null) return 0;
+      if (a.value === null) return 1;
+      if (b.value === null) return -1;
+      if (isNumeric(a.value) && isNumeric(b.value)) return Number(a.value) - Number(b.value);
+      return a.value.localeCompare(b.value, undefined, { numeric: true, sensitivity: "base" });
+    });
+  return {
+    values: entries.slice(0, DISTINCT_FILTER_VALUE_LIMIT),
+    total: entries.length,
+    truncated: entries.length > DISTINCT_FILTER_VALUE_LIMIT,
+  };
+}
+
+function stripSqlTerminator(sql: string): string {
+  return sql.trim().replace(/;+\s*$/, "");
+}
+
+function indentSql(sql: string): string {
+  return sql.split(/\r?\n/).map((line) => `  ${line}`).join("\n");
+}
+
+function sqlTextExpression(engine: SqlEngine, expression: string): string {
+  switch (engine) {
+    case "MySQL":
+    case "StarRocks":
+      return `CAST(${expression} AS CHAR)`;
+    case "PostgreSQL":
+      return `${expression}::text`;
+    case "SQLServer":
+      return `CAST(${expression} AS NVARCHAR(MAX))`;
+    case "ClickHouse":
+      return `toString(${expression})`;
+    case "Presto":
+      return `CAST(${expression} AS VARCHAR)`;
+  }
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[!%_]/g, (char) => `!${char}`);
+}
+
+function sqlLikeCondition(expression: string, value: string): string {
+  return `${expression} LIKE ${dialectSqlLiteral(`%${escapeLikePattern(value)}%`)} ESCAPE '!'`;
+}
+
+function uniqueFilterValues(values: (string | null)[]): (string | null)[] {
+  const seen = new Set<string>();
+  const unique: (string | null)[] = [];
+  for (const value of values) {
+    const key = filterValueKey(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(value);
+  }
+  return unique;
+}
+
+function selectedValuesCondition(columnSql: string, values: (string | null)[]): string | null {
+  const unique = uniqueFilterValues(values);
+  const nonNull = unique.filter((value): value is string => value !== null);
+  const clauses: string[] = [];
+  if (nonNull.length === 1) {
+    clauses.push(`${columnSql} = ${dialectSqlLiteral(nonNull[0])}`);
+  } else if (nonNull.length > 1) {
+    clauses.push(`${columnSql} IN (${nonNull.map((value) => dialectSqlLiteral(value)).join(", ")})`);
+  }
+  if (unique.some((value) => value === null)) clauses.push(`${columnSql} IS NULL`);
+  if (clauses.length === 0) return null;
+  return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
+}
+
+function buildGeneratedResultSql({
+  sourceSql,
+  sqlEngine,
+  columns,
+  visibleColumnIndexes,
+  globalFilterText,
+  columnFilters,
+  sortCol,
+  sortDir,
+}: GeneratedResultSqlOptions): string | null {
+  const baseSql = stripSqlTerminator(sourceSql ?? "");
+  if (!baseSql || !sqlEngine) return null;
+  const engine = asSqlEngine(sqlEngine);
+  const whereClauses: string[] = [];
+  const columnSql = (columnIndex: number) =>
+    dialectQuoteIdent(engine, columns[columnIndex]?.name || `column_${columnIndex + 1}`);
+  const globalNeedle = globalFilterText.trim();
+  if (globalNeedle && visibleColumnIndexes.length > 0) {
+    whereClauses.push(
+      `(${visibleColumnIndexes
+        .map((columnIndex) => sqlLikeCondition(sqlTextExpression(engine, columnSql(columnIndex)), globalNeedle))
+        .join(" OR ")})`,
+    );
+  }
+  for (const filter of columnFilters) {
+    const column = columnSql(filter.columnIndex);
+    if (filter.text) {
+      whereClauses.push(
+        filter.mode === "exact"
+          ? `${column} = ${dialectSqlLiteral(filter.text)}`
+          : sqlLikeCondition(sqlTextExpression(engine, column), filter.text),
+      );
+    }
+    const selectedCondition = selectedValuesCondition(column, filter.selectedValues);
+    if (selectedCondition) whereClauses.push(selectedCondition);
+  }
+  const orderBy = sortCol !== null && sortDir ? `ORDER BY ${columnSql(sortCol)} ${sortDir.toUpperCase()}` : "";
+  if (whereClauses.length === 0 && !orderBy) return null;
+  const lines = ["SELECT *", "FROM (", indentSql(baseSql), ") AS taomni_result"];
+  if (whereClauses.length > 0) lines.push(`WHERE ${whereClauses.join("\n  AND ")}`);
+  if (orderBy) lines.push(orderBy);
+  return `${lines.join("\n")};`;
+}
+
+function compactSqlForDisplay(sql: string): string {
+  return sql.replace(/\s+/g, " ").trim();
 }
 
 function csvEscape(value: string | null): string {
@@ -758,6 +944,7 @@ function isGridBlockSelectionMouseEvent(event: Pick<MouseEvent<HTMLElement>, "bu
 export function QueryResultGrid({
   result,
   sourceSql,
+  sqlEngine,
   running = false,
   cancelling = false,
   onRefresh,
@@ -863,18 +1050,33 @@ export function QueryResultGrid({
           columnIndex: Number(rawIndex),
           text: config.text.trim(),
           mode: config.mode,
+          selectedValues: config.selectedValues,
         }))
         .filter(
           (filter) =>
             Number.isInteger(filter.columnIndex) &&
             filter.columnIndex >= 0 &&
             filter.columnIndex < result.columns.length &&
-            filter.text.length > 0,
+            (filter.text.length > 0 || filter.selectedValues.length > 0),
         ),
     [columnFilters, result.columns.length],
   );
 
   const activeColumnFilterCount = activeColumnFilters.length;
+  const generatedSql = useMemo(
+    () =>
+      buildGeneratedResultSql({
+        sourceSql,
+        sqlEngine,
+        columns: result.columns,
+        visibleColumnIndexes,
+        globalFilterText: filterText,
+        columnFilters: activeColumnFilters,
+        sortCol,
+        sortDir,
+      }),
+    [activeColumnFilters, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
+  );
 
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
@@ -883,7 +1085,13 @@ export function QueryResultGrid({
         return false;
       }
       return activeColumnFilters.every((filter) => {
-        const value = (row.values[filter.columnIndex] ?? "").toLowerCase();
+        const rawValue = row.values[filter.columnIndex] ?? null;
+        if (filter.selectedValues.length > 0) {
+          const selected = new Set(filter.selectedValues.map(filterValueKey));
+          if (!selected.has(filterValueKey(rawValue))) return false;
+        }
+        if (!filter.text) return true;
+        const value = (rawValue ?? "").toLowerCase();
         const columnNeedle = filter.text.toLowerCase();
         return filter.mode === "exact" ? value === columnNeedle : value.includes(columnNeedle);
       });
@@ -990,6 +1198,17 @@ export function QueryResultGrid({
     });
   };
 
+  const toggleColumnFilterValue = (columnIndex: number, value: string | null) => {
+    setColumnFilters((current) => {
+      const previous = current[columnIndex] ?? DEFAULT_COLUMN_FILTER;
+      const key = filterValueKey(value);
+      const selected = previous.selectedValues.some((item) => filterValueKey(item) === key)
+        ? previous.selectedValues.filter((item) => filterValueKey(item) !== key)
+        : [...previous.selectedValues, value];
+      return { ...current, [columnIndex]: { ...previous, selectedValues: selected } };
+    });
+  };
+
   const clearColumnFilter = (columnIndex: number) => {
     setColumnFilters((current) => {
       const next = { ...current };
@@ -1007,9 +1226,9 @@ export function QueryResultGrid({
   const openColumnFilterPanel = (event: MouseEvent<HTMLButtonElement>, columnIndex: number) => {
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
-    const width = 240;
+    const width = 280;
     const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
-    const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 162));
+    const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 360));
     setOpenColumnFilter({ columnIndex, left, top });
   };
 
@@ -1426,6 +1645,27 @@ export function QueryResultGrid({
     }
   };
 
+  const copyGeneratedSql = async () => {
+    if (!generatedSql) return;
+    try {
+      await writeText(generatedSql);
+      setStatus("Copied generated SQL.");
+    } catch (err) {
+      setStatus(`Copy generated SQL failed: ${String(err)}`);
+    }
+  };
+
+  const insertGeneratedSql = () => {
+    if (!generatedSql) return;
+    const targetTab = getActiveQueryTab() ?? listQueryTabs().find((entry) => entry.engine === sqlEngine);
+    if (!targetTab) {
+      setStatus("No SQL Commander editor is available.");
+      return;
+    }
+    targetTab.insertQuery(generatedSql, { destination: "current", position: "last" });
+    setStatus("Inserted generated SQL in SQL Commander.");
+  };
+
   const handleGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (editingCell) return;
     if (
@@ -1531,10 +1771,19 @@ export function QueryResultGrid({
   const endRow = Math.min(total, Math.ceil((scrollTop + viewportH) / ROW_HEIGHT) + OVERSCAN);
   const visible = order.slice(startRow, endRow);
   const searchNeedle = searchText.trim().toLowerCase();
-  const openFilterColumn = openColumnFilter ? result.columns[openColumnFilter.columnIndex] : null;
-  const openFilterConfig = openColumnFilter
-    ? columnFilters[openColumnFilter.columnIndex] ?? DEFAULT_COLUMN_FILTER
+  const openFilterColumnIndex = openColumnFilter?.columnIndex ?? null;
+  const openFilterColumn = openFilterColumnIndex !== null ? result.columns[openFilterColumnIndex] : null;
+  const openFilterConfig = openFilterColumnIndex !== null
+    ? columnFilters[openFilterColumnIndex] ?? DEFAULT_COLUMN_FILTER
     : DEFAULT_COLUMN_FILTER;
+  const openFilterDistinctValues = useMemo(
+    () =>
+      openFilterColumnIndex === null
+        ? { values: [], total: 0, truncated: false }
+        : distinctValuesForColumn(rows, openFilterColumnIndex),
+    [openFilterColumnIndex, rows],
+  );
+  const openFilterSelectedKeys = new Set(openFilterConfig.selectedValues.map(filterValueKey));
   const filterModeButtonStyle = (active: boolean): CSSProperties | undefined =>
     active
       ? {
@@ -1802,6 +2051,44 @@ export function QueryResultGrid({
         )}
       </div>
 
+      {generatedSql && (
+        <div
+          className="min-h-7 shrink-0 flex items-center gap-1.5 px-2 py-1 text-[11px]"
+          style={{ background: "var(--taomni-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
+        >
+          <FileText className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+          <span className="shrink-0 font-semibold text-[var(--taomni-text-muted)]">SQL</span>
+          <code
+            data-testid="query-result-generated-sql"
+            className="min-w-0 flex-1 truncate rounded px-1.5 py-0.5 font-mono text-[10px]"
+            style={{ background: "var(--taomni-quick-bg)", border: "1px solid var(--taomni-divider)" }}
+            title={generatedSql}
+          >
+            {compactSqlForDisplay(generatedSql)}
+          </code>
+          <button
+            type="button"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            title="Copy generated SQL"
+            aria-label="Copy generated SQL"
+            onClick={() => void copyGeneratedSql()}
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copy
+          </button>
+          <button
+            type="button"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            title="Insert generated SQL"
+            aria-label="Insert generated SQL"
+            onClick={insertGeneratedSql}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Insert
+          </button>
+        </div>
+      )}
+
       {showStats && (
         <div
           className="max-h-[132px] shrink-0 overflow-auto taomni-scroll-y text-[11px]"
@@ -1847,7 +2134,7 @@ export function QueryResultGrid({
               {visibleColumnIndexes.map((columnIndex) => {
                 const col = result.columns[columnIndex];
                 const columnFilter = columnFilters[columnIndex] ?? DEFAULT_COLUMN_FILTER;
-                const columnFiltered = columnFilter.text.trim().length > 0;
+                const columnFiltered = isColumnFilterActive(columnFilter);
                 return (
                   <div
                     key={columnIndex}
@@ -2100,7 +2387,7 @@ export function QueryResultGrid({
       {openColumnFilter && openFilterColumn && (
         <div
           ref={columnFilterPopoverRef}
-          className="fixed z-[10000] w-[240px] rounded shadow-xl p-2 text-[12px]"
+          className="fixed z-[10000] w-[280px] rounded shadow-xl p-2 text-[12px]"
           style={{
             left: openColumnFilter.left,
             top: openColumnFilter.top,
@@ -2155,7 +2442,57 @@ export function QueryResultGrid({
               Exact
             </button>
           </div>
+          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+            <span>Distinct values</span>
+            <span className="shrink-0">
+              {openFilterConfig.selectedValues.length > 0
+                ? `${openFilterConfig.selectedValues.length} selected`
+                : `${openFilterDistinctValues.total} distinct`}
+            </span>
+          </div>
+          <div
+            className="mt-1 max-h-[154px] overflow-auto rounded taomni-scroll-y"
+            style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-bg)" }}
+          >
+            {openFilterDistinctValues.values.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[11px] text-[var(--taomni-text-muted)]">
+                No values
+              </div>
+            ) : (
+              openFilterDistinctValues.values.map((item) => (
+                <label
+                  key={item.key}
+                  className="flex h-7 items-center gap-2 px-2 text-[11px] hover:bg-[var(--taomni-hover)]"
+                  title={item.value === null ? "NULL" : item.value}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3 shrink-0"
+                    checked={openFilterSelectedKeys.has(item.key)}
+                    onChange={() => toggleColumnFilterValue(openColumnFilter.columnIndex, item.value)}
+                    aria-label={`Select ${item.label} for ${openFilterColumn.name}`}
+                  />
+                  <span className="min-w-0 flex-1 truncate font-mono">{item.label}</span>
+                  <span className="shrink-0 text-[var(--taomni-text-muted)]">{item.count}</span>
+                </label>
+              ))
+            )}
+          </div>
+          {openFilterDistinctValues.truncated && (
+            <div className="mt-1 text-[10px] text-[var(--taomni-text-muted)]">
+              Showing first {DISTINCT_FILTER_VALUE_LIMIT} values
+            </div>
+          )}
           <div className="mt-2 flex items-center justify-end gap-1">
+            {openFilterConfig.selectedValues.length > 0 && (
+              <button
+                type="button"
+                className="taomni-btn h-7 px-2"
+                onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { selectedValues: [] })}
+              >
+                Clear values
+              </button>
+            )}
             <button type="button" className="taomni-btn h-7 px-2" onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}>
               Clear
             </button>

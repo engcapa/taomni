@@ -216,9 +216,6 @@ fn directory_from_history_command(command: &str, home: Option<&Path>) -> Option<
 
 fn leading_directory_command(command: &str) -> Option<(&str, &str)> {
     for keyword in ["set-location", "pushd", "chdir", "cd", "sl"] {
-        if command.len() < keyword.len() {
-            continue;
-        }
         let Some(head) = command.get(..keyword.len()) else {
             continue;
         };
