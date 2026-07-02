@@ -27,6 +27,7 @@ import {
 
 export type NotesPanelMode = "hub" | "floating";
 export type NotesTheme = "taomni" | "system" | "light" | "dark" | "paper" | "compact";
+export type NotesFont = "inherit" | "inter" | "outfit" | "system" | "mono";
 
 export interface NotesPanelPosition {
   x: number;
@@ -40,7 +41,9 @@ const PREF_PANEL_MODE = "notes.panel.mode";
 const PREF_PANEL_POSITION = "notes.panel.position";
 const PREF_PANEL_ALWAYS_ON_TOP = "notes.panel.alwaysOnTopInApp";
 const PREF_PANEL_THEME = "notes.panel.theme";
+const PREF_PANEL_FONT = "notes.panel.font";
 const PREF_LAST_FILTER = "notes.lastFilter";
+const PREF_STATUS_FILTERS = "notes.statusFilters";
 
 export const DEFAULT_NOTES_PANEL_POSITION: NotesPanelPosition = {
   x: 120,
@@ -59,6 +62,12 @@ function coerceTheme(value: unknown): NotesTheme {
     : "taomni";
 }
 
+function coerceFont(value: unknown): NotesFont {
+  return value === "inter" || value === "outfit" || value === "system" || value === "mono"
+    ? value
+    : "inherit";
+}
+
 function coerceFilter(value: unknown): NoteFilter {
   const filters: NoteFilter[] = [
     "recent_incomplete",
@@ -74,12 +83,25 @@ function coerceFilter(value: unknown): NoteFilter {
   return filters.includes(value as NoteFilter) ? (value as NoteFilter) : "recent_incomplete";
 }
 
+function normalizeStatusFilters(values: unknown): NoteFilter[] {
+  const raw = Array.isArray(values) ? values : [values];
+  const next: NoteFilter[] = [];
+  for (const value of raw) {
+    const filter = coerceFilter(value);
+    if (filter === "tag" || next.includes(filter)) continue;
+    if (filter === "all") return ["all"];
+    next.push(filter);
+  }
+  return next.length > 0 ? next : ["recent_incomplete"];
+}
+
 interface NotesStore {
   notes: NoteItem[];
   notesLoaded: boolean;
   loading: boolean;
   activeNoteId: string | null;
   filter: NoteFilter;
+  statusFilters: NoteFilter[];
   search: string;
   tagFilterId: string | null;
   tags: NoteTag[];
@@ -90,6 +112,7 @@ interface NotesStore {
   panelPosition: NotesPanelPosition;
   alwaysOnTopInApp: boolean;
   theme: NotesTheme;
+  font: NotesFont;
   prefsLoaded: boolean;
 
   loadNotes: () => Promise<void>;
@@ -103,6 +126,8 @@ interface NotesStore {
   upsertTags: (tags: TagInput[]) => Promise<NoteTag[]>;
   setActiveNote: (id: string | null) => void;
   setFilter: (filter: NoteFilter) => void;
+  setStatusFilters: (filters: NoteFilter[]) => void;
+  toggleStatusFilter: (filter: NoteFilter) => void;
   setSearch: (search: string) => void;
   setTagFilter: (tagId: string | null) => void;
 
@@ -119,6 +144,7 @@ interface NotesStore {
   setPanelPosition: (position: NotesPanelPosition) => void;
   setAlwaysOnTop: (value: boolean) => void;
   setTheme: (theme: NotesTheme) => void;
+  setFont: (font: NotesFont) => void;
 }
 
 async function persistPref(key: string, value: unknown): Promise<void> {
@@ -135,6 +161,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   loading: false,
   activeNoteId: null,
   filter: "recent_incomplete",
+  statusFilters: ["recent_incomplete"],
   search: "",
   tagFilterId: null,
   tags: [],
@@ -143,14 +170,16 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   panelPosition: DEFAULT_NOTES_PANEL_POSITION,
   alwaysOnTopInApp: false,
   theme: "taomni",
+  font: "inherit",
   prefsLoaded: false,
 
   loadNotes: async () => {
-    const { filter, search, tagFilterId } = get();
+    const { filter, statusFilters, search, tagFilterId } = get();
     set({ loading: true });
     try {
       const notes = await listNotes({
         filter,
+        filters: statusFilters,
         search: search.trim() || undefined,
         tag_id: tagFilterId ?? undefined,
         now: nowSecs(),
@@ -261,9 +290,31 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   setActiveNote: (id) => set({ activeNoteId: id }),
 
   setFilter: (filter) => {
-    set({ filter, tagFilterId: filter === "tag" ? get().tagFilterId : null });
+    const statusFilters = normalizeStatusFilters(filter);
+    set({ filter: statusFilters[0], statusFilters, tagFilterId: null });
     void persistPref(PREF_LAST_FILTER, filter);
+    void persistPref(PREF_STATUS_FILTERS, statusFilters);
     void get().loadNotes();
+  },
+
+  setStatusFilters: (filters) => {
+    const statusFilters = normalizeStatusFilters(filters);
+    set({ statusFilters, filter: statusFilters[0] });
+    void persistPref(PREF_STATUS_FILTERS, statusFilters);
+    void persistPref(PREF_LAST_FILTER, statusFilters[0]);
+    void get().loadNotes();
+  },
+
+  toggleStatusFilter: (filter) => {
+    const { statusFilters } = get();
+    if (filter === "tag") return;
+    if (filter === "all") {
+      get().setStatusFilters(["all"]);
+      return;
+    }
+    const base = statusFilters.filter((f) => f !== "all");
+    const next = base.includes(filter) ? base.filter((f) => f !== filter) : [...base, filter];
+    get().setStatusFilters(next);
   },
 
   setSearch: (search) => {
@@ -272,7 +323,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   },
 
   setTagFilter: (tagId) => {
-    set({ tagFilterId: tagId, filter: tagId ? "tag" : "recent_incomplete" });
+    set({ tagFilterId: tagId });
     void get().loadNotes();
   },
 
@@ -321,6 +372,8 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         }
       };
       const position = parse<NotesPanelPosition>(PREF_PANEL_POSITION, DEFAULT_NOTES_PANEL_POSITION);
+      const lastFilter = coerceFilter(parse<string>(PREF_LAST_FILTER, "recent_incomplete"));
+      const statusFilters = normalizeStatusFilters(parse<NoteFilter[] | NoteFilter>(PREF_STATUS_FILTERS, lastFilter));
       set({
         panelMode: parse<string>(PREF_PANEL_MODE, "hub") === "floating" ? "floating" : "hub",
         panelPosition: {
@@ -331,7 +384,9 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         },
         alwaysOnTopInApp: parse<boolean>(PREF_PANEL_ALWAYS_ON_TOP, false) === true,
         theme: coerceTheme(parse<string>(PREF_PANEL_THEME, "taomni")),
-        filter: coerceFilter(parse<string>(PREF_LAST_FILTER, "recent_incomplete")),
+        font: coerceFont(parse<string>(PREF_PANEL_FONT, "inherit")),
+        filter: statusFilters[0],
+        statusFilters,
         prefsLoaded: true,
       });
     } catch (e) {
@@ -358,6 +413,11 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   setTheme: (theme) => {
     set({ theme });
     void persistPref(PREF_PANEL_THEME, theme);
+  },
+
+  setFont: (font) => {
+    set({ font });
+    void persistPref(PREF_PANEL_FONT, font);
   },
 }));
 

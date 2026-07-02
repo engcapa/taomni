@@ -238,42 +238,45 @@ function stubNoteToItem(note: StubNote): Record<string, unknown> {
 
 function stubFilterNotes(notes: StubNote[], query: Record<string, unknown>): StubNote[] {
   const filter = (query.filter as string | undefined) ?? "recent_incomplete";
+  const filters = Array.isArray(query.filters) && query.filters.length > 0 ? query.filters.map(String) : [filter];
   const now = Number(query.now) || nowSecsStub();
   const dueSoon = Number(query.due_soon_secs) || NOTE_DUE_SOON_SECS;
   const search = ((query.search as string | undefined) ?? "").trim().toLowerCase();
   const tagId = (query.tag_id as string | undefined) ?? null;
   const allTags = loadNoteTags();
 
-  let list = notes.filter((n) => {
-    switch (filter) {
-      case "all":
-        return n.archived_at === null;
-      case "pinned":
-        return n.archived_at === null && n.pinned;
-      case "completed":
-        return n.archived_at === null && n.completed_at !== null;
-      case "archived":
-        return n.archived_at !== null;
-      case "today": {
-        if (n.archived_at !== null || n.completed_at !== null || n.due_at === null) return false;
-        const d = new Date(now * 1000);
-        const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000;
-        return n.due_at >= start && n.due_at < start + 86400;
+  let list = notes.filter((n) =>
+    filters.some((status) => {
+      switch (status) {
+        case "all":
+          return n.archived_at === null;
+        case "pinned":
+          return n.archived_at === null && n.pinned;
+        case "completed":
+          return n.archived_at === null && n.completed_at !== null;
+        case "archived":
+          return n.archived_at !== null;
+        case "today": {
+          if (n.archived_at !== null || n.completed_at !== null || n.due_at === null) return false;
+          const d = new Date(now * 1000);
+          const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000;
+          return n.due_at >= start && n.due_at < start + 86400;
+        }
+        case "due_soon":
+          return (
+            n.archived_at === null &&
+            n.completed_at === null &&
+            n.due_at !== null &&
+            n.due_at > now &&
+            n.due_at <= now + dueSoon
+          );
+        case "overdue":
+          return n.archived_at === null && n.completed_at === null && n.due_at !== null && n.due_at <= now;
+        default: // recent_incomplete
+          return n.archived_at === null && n.completed_at === null;
       }
-      case "due_soon":
-        return (
-          n.archived_at === null &&
-          n.completed_at === null &&
-          n.due_at !== null &&
-          n.due_at > now &&
-          n.due_at <= now + dueSoon
-        );
-      case "overdue":
-        return n.archived_at === null && n.completed_at === null && n.due_at !== null && n.due_at <= now;
-      default: // recent_incomplete
-        return n.archived_at === null && n.completed_at === null;
-    }
-  });
+    }),
+  );
 
   if (tagId) list = list.filter((n) => n.tag_ids.includes(tagId));
   if (search) {

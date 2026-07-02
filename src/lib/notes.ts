@@ -56,6 +56,7 @@ export type NoteFilter =
 
 export interface NoteQuery {
   filter?: NoteFilter;
+  filters?: NoteFilter[];
   search?: string;
   tag_id?: string;
   limit?: number;

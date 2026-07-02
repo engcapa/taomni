@@ -94,6 +94,9 @@ pub struct NoteQuery {
     /// "recent_incomplete" (default) | "all" | "pinned" | "today" | "due_soon"
     /// | "overdue" | "completed" | "archived" | "tag"
     pub filter: Option<String>,
+    /// Multi-select status filters. When present, filters are OR-combined.
+    #[serde(default)]
+    pub filters: Option<Vec<String>>,
     pub search: Option<String>,
     pub tag_id: Option<String>,
     pub limit: Option<i64>,
@@ -458,51 +461,61 @@ fn local_day_bounds(ts: i64) -> (i64, i64) {
     (start, start + 86_400)
 }
 
+fn note_filter_condition(
+    filter: &str,
+    now_ts: i64,
+    due_soon: i64,
+    sql_params: &mut Vec<Box<dyn rusqlite::ToSql>>,
+) -> String {
+    match filter {
+        "all" => "archived_at IS NULL".into(),
+        "pinned" => "archived_at IS NULL AND pinned = 1".into(),
+        "completed" => "archived_at IS NULL AND completed_at IS NOT NULL".into(),
+        "archived" => "archived_at IS NOT NULL".into(),
+        "today" => {
+            let (start, end) = local_day_bounds(now_ts);
+            sql_params.push(Box::new(start));
+            sql_params.push(Box::new(end));
+            "archived_at IS NULL AND completed_at IS NULL AND due_at IS NOT NULL \
+             AND due_at >= ?p AND due_at < ?p"
+                .into()
+        }
+        "due_soon" => {
+            sql_params.push(Box::new(now_ts));
+            sql_params.push(Box::new(now_ts + due_soon));
+            "archived_at IS NULL AND completed_at IS NULL AND due_at IS NOT NULL \
+             AND due_at > ?p AND due_at <= ?p"
+                .into()
+        }
+        "overdue" => {
+            sql_params.push(Box::new(now_ts));
+            "archived_at IS NULL AND completed_at IS NULL AND due_at IS NOT NULL \
+             AND due_at <= ?p"
+                .into()
+        }
+        // "recent_incomplete" (default), and the legacy "tag" pseudo-filter.
+        _ => "archived_at IS NULL AND completed_at IS NULL".into(),
+    }
+}
+
 pub fn list_notes(conn: &Connection, query: &NoteQuery) -> SqlResult<Vec<NoteItem>> {
-    let filter = query.filter.as_deref().unwrap_or("recent_incomplete");
+    let filters = query
+        .filters
+        .as_ref()
+        .filter(|values| !values.is_empty())
+        .cloned()
+        .unwrap_or_else(|| vec![query.filter.clone().unwrap_or_else(|| "recent_incomplete".into())]);
     let now_ts = query.now.unwrap_or_else(now);
     let due_soon = query.due_soon_secs.unwrap_or(DEFAULT_DUE_SOON_SECS);
 
     let mut where_parts: Vec<String> = Vec::new();
     let mut sql_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-    match filter {
-        "all" => where_parts.push("archived_at IS NULL".into()),
-        "pinned" => where_parts.push("archived_at IS NULL AND pinned = 1".into()),
-        "completed" => {
-            where_parts.push("archived_at IS NULL AND completed_at IS NOT NULL".into())
-        }
-        "archived" => where_parts.push("archived_at IS NOT NULL".into()),
-        "today" => {
-            let (start, end) = local_day_bounds(now_ts);
-            where_parts.push(
-                "archived_at IS NULL AND completed_at IS NULL AND due_at IS NOT NULL \
-                 AND due_at >= ?p AND due_at < ?p"
-                    .into(),
-            );
-            sql_params.push(Box::new(start));
-            sql_params.push(Box::new(end));
-        }
-        "due_soon" => {
-            where_parts.push(
-                "archived_at IS NULL AND completed_at IS NULL AND due_at IS NOT NULL \
-                 AND due_at > ?p AND due_at <= ?p"
-                    .into(),
-            );
-            sql_params.push(Box::new(now_ts));
-            sql_params.push(Box::new(now_ts + due_soon));
-        }
-        "overdue" => {
-            where_parts.push(
-                "archived_at IS NULL AND completed_at IS NULL AND due_at IS NOT NULL \
-                 AND due_at <= ?p"
-                    .into(),
-            );
-            sql_params.push(Box::new(now_ts));
-        }
-        // "recent_incomplete" (default)
-        _ => where_parts.push("archived_at IS NULL AND completed_at IS NULL".into()),
-    }
+    let filter_parts = filters
+        .iter()
+        .map(|filter| format!("({})", note_filter_condition(filter, now_ts, due_soon, &mut sql_params)))
+        .collect::<Vec<_>>();
+    where_parts.push(format!("({})", filter_parts.join(" OR ")));
 
     if let Some(tag_id) = query.tag_id.as_deref().filter(|s| !s.is_empty()) {
         where_parts.push(
@@ -910,6 +923,28 @@ mod tests {
         let notes = list_notes(&conn, &NoteQuery::default()).unwrap();
         let ids: Vec<&str> = notes.iter().map(|n| n.id.as_str()).collect();
         assert_eq!(ids, vec![a.id.as_str()]);
+    }
+
+    #[test]
+    fn multi_status_filter_unions_completed_and_archived() {
+        let conn = mem();
+        let active = create(&conn, "A");
+        let completed = create(&conn, "B");
+        let archived = create(&conn, "C");
+        toggle_complete(&conn, &completed.id, true).unwrap();
+        archive_note(&conn, &archived.id, true).unwrap();
+        let notes = list_notes(
+            &conn,
+            &NoteQuery {
+                filters: Some(vec!["completed".into(), "archived".into()]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let ids: Vec<&str> = notes.iter().map(|n| n.id.as_str()).collect();
+        assert!(ids.contains(&completed.id.as_str()));
+        assert!(ids.contains(&archived.id.as_str()));
+        assert!(!ids.contains(&active.id.as_str()));
     }
 
     #[test]

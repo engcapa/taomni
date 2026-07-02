@@ -6,7 +6,7 @@ import { NotesList } from "./NotesList";
 import { NoteFilters } from "./NoteFilters";
 import { NoteEditor } from "./NoteEditor";
 import { NoteThemeSettings } from "./NoteThemeSettings";
-import { notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
+import { notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
 
 /**
  * NotesPanel — the 便签 tab content inside the Tao Hub. A master/detail surface
@@ -19,18 +19,20 @@ export function NotesPanel() {
   const loading = useNotesStore((s) => s.loading);
   const search = useNotesStore((s) => s.search);
   const filter = useNotesStore((s) => s.filter);
+  const statusFilters = useNotesStore((s) => s.statusFilters);
   const tagFilterId = useNotesStore((s) => s.tagFilterId);
   const tags = useNotesStore((s) => s.tags);
   const initPanel = useNotesStore((s) => s.initPanel);
   const loadTags = useNotesStore((s) => s.loadTags);
   const setSearch = useNotesStore((s) => s.setSearch);
-  const setFilter = useNotesStore((s) => s.setFilter);
+  const toggleStatusFilter = useNotesStore((s) => s.toggleStatusFilter);
   const setTagFilter = useNotesStore((s) => s.setTagFilter);
   const createNote = useNotesStore((s) => s.createNote);
   const toggleComplete = useNotesStore((s) => s.toggleComplete);
   const setActiveNote = useNotesStore((s) => s.setActiveNote);
   const activeNoteId = useNotesStore((s) => s.activeNoteId);
   const theme = useNotesStore((s) => s.theme);
+  const font = useNotesStore((s) => s.font);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function NotesPanel() {
 
   const activeNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) ?? null : null;
   const themeStyle = notesThemeStyle(theme);
+  const fontStyle = notesFontStyle(font);
   const density = notesThemeDensity(theme);
 
   return (
@@ -51,7 +54,7 @@ export function NotesPanel() {
       data-testid="notes-panel"
       data-notes-theme={theme}
       data-density={density}
-      style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle }}
+      style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle, ...fontStyle }}
     >
       {activeNote ? (
         <NoteEditor note={activeNote} onClose={() => setActiveNote(null)} />
@@ -98,10 +101,10 @@ export function NotesPanel() {
           {showSettings && <NoteThemeSettings />}
 
           <NoteFilters
-            filter={filter}
+            filters={statusFilters}
             tagFilterId={tagFilterId}
             tags={tags}
-            onSelectFilter={setFilter}
+            onToggleFilter={toggleStatusFilter}
             onSelectTag={setTagFilter}
           />
 
@@ -114,11 +117,11 @@ export function NotesPanel() {
             ) : notes.length === 0 ? (
               <div className="p-6 text-center text-[12px] text-[var(--taomni-text-muted)]">
                 <div>
-                  {search || filter !== "recent_incomplete" || tagFilterId
+                  {search || filter !== "recent_incomplete" || statusFilters.length !== 1 || tagFilterId
                     ? t("notes.emptyFiltered")
                     : t("notes.empty")}
                 </div>
-                {!search && filter === "recent_incomplete" && !tagFilterId && (
+                {!search && filter === "recent_incomplete" && statusFilters.length === 1 && !tagFilterId && (
                   <div className="mt-1 text-[11px]">{t("notes.emptyHint")}</div>
                 )}
               </div>

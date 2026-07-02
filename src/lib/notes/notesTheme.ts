@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { NotesTheme } from "../../stores/notesStore";
+import type { NotesFont, NotesTheme } from "../../stores/notesStore";
 
 /**
  * Notes theme system (see tao-notes-feature-plan.md §9). A theme re-maps a
@@ -137,3 +137,21 @@ export function notesThemeDensity(theme: NotesTheme): "comfortable" | "compact" 
 }
 
 export const NOTES_THEMES: NotesTheme[] = ["taomni", "system", "light", "dark", "paper", "compact"];
+
+export function notesFontStyle(font: NotesFont): CSSProperties {
+  switch (font) {
+    case "inter":
+      return { fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' };
+    case "outfit":
+      return { fontFamily: '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' };
+    case "system":
+      return { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' };
+    case "mono":
+      return { fontFamily: 'var(--taomni-code-font-family)' };
+    case "inherit":
+    default:
+      return { fontFamily: "var(--taomni-ui-font-family)" };
+  }
+}
+
+export const NOTES_FONTS: NotesFont[] = ["inherit", "inter", "outfit", "system", "mono"];

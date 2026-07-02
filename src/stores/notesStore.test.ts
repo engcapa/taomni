@@ -37,17 +37,22 @@ let seq = 0;
 
 function filterNotes(query: Record<string, unknown>): FakeNote[] {
   const filter = (query.filter as string) ?? "recent_incomplete";
+  const filters = Array.isArray(query.filters) && query.filters.length > 0 ? query.filters.map(String) : [filter];
   const search = ((query.search as string) ?? "").toLowerCase();
-  let list = store.filter((n) => {
-    switch (filter) {
-      case "all":
-        return n.archived_at === null;
-      case "completed":
-        return n.archived_at === null && n.completed_at !== null;
-      default:
-        return n.archived_at === null && n.completed_at === null;
-    }
-  });
+  let list = store.filter((n) =>
+    filters.some((status) => {
+      switch (status) {
+        case "all":
+          return n.archived_at === null;
+        case "completed":
+          return n.archived_at === null && n.completed_at !== null;
+        case "archived":
+          return n.archived_at !== null;
+        default:
+          return n.archived_at === null && n.completed_at === null;
+      }
+    }),
+  );
   if (search) {
     list = list.filter(
       (n) => n.title.toLowerCase().includes(search) || n.body.toLowerCase().includes(search),
@@ -65,9 +70,14 @@ beforeEach(() => {
     notesLoaded: false,
     activeNoteId: null,
     filter: "recent_incomplete",
+    statusFilters: ["recent_incomplete"],
     search: "",
     tagFilterId: null,
     alerts: [],
+    panelMode: "hub",
+    theme: "taomni",
+    font: "inherit",
+    prefsLoaded: false,
   });
   invokeMock.mockReset();
   invokeMock.mockImplementation(async (cmd: string, args: Record<string, unknown> = {}) => {
@@ -193,16 +203,28 @@ describe("notesStore", () => {
     expect(titles).not.toContain("grocery list");
   });
 
+  it("toggles multiple status filters and sends them to notes_list", async () => {
+    const done = await useNotesStore.getState().createNote({ title: "done" });
+    await useNotesStore.getState().toggleComplete(done!.id, true);
+    useNotesStore.getState().toggleStatusFilter("completed");
+    await useNotesStore.getState().loadNotes();
+    expect(useNotesStore.getState().statusFilters).toEqual(["recent_incomplete", "completed"]);
+    expect(useNotesStore.getState().notes.map((n) => n.title)).toContain("done");
+  });
+
   it("persists floating panel prefs", async () => {
     useNotesStore.getState().setPanelMode("floating");
     useNotesStore.getState().setTheme("paper");
+    useNotesStore.getState().setFont("outfit");
     await Promise.resolve();
     expect(prefs["notes.panel.mode"]).toBe(JSON.stringify("floating"));
     expect(prefs["notes.panel.theme"]).toBe(JSON.stringify("paper"));
+    expect(prefs["notes.panel.font"]).toBe(JSON.stringify("outfit"));
     // Reload picks the persisted values back up.
     await useNotesStore.getState().loadPrefs();
     expect(useNotesStore.getState().panelMode).toBe("floating");
     expect(useNotesStore.getState().theme).toBe("paper");
+    expect(useNotesStore.getState().font).toBe("outfit");
   });
 });
 

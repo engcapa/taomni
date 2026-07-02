@@ -26,7 +26,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
               data-testid="notes-list-item"
               data-note-id={note.id}
               aria-current={activeNoteId === note.id || undefined}
-              className={`group flex items-start gap-2 px-2 py-1.5 border-b border-[var(--taomni-divider)] cursor-pointer hover:bg-[var(--taomni-hover)] ${
+              className={`group flex items-stretch gap-2 px-2 py-1.5 border-b border-[var(--taomni-divider)] cursor-pointer hover:bg-[var(--taomni-hover)] ${
                 activeNoteId === note.id ? "bg-[var(--taomni-selected)]" : ""
               }`}
               onClick={() => onSelect(note.id)}
@@ -37,6 +37,11 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
                 }
               }}
             >
+              <div
+                className="w-1 shrink-0 self-stretch rounded-full"
+                style={{ background: note.color ?? "transparent" }}
+                data-testid="notes-list-color"
+              />
               <button
                 type="button"
                 className="mt-0.5 shrink-0 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-accent)]"

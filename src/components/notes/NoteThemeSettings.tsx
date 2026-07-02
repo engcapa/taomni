@@ -1,6 +1,6 @@
-import { Monitor, PanelRightClose, Pin } from "lucide-react";
-import { useNotesStore, type NotesTheme } from "../../stores/notesStore";
-import { NOTES_THEMES } from "../../lib/notes/notesTheme";
+import { Monitor, PanelRightClose, Pin, Type } from "lucide-react";
+import { useNotesStore, type NotesFont, type NotesTheme } from "../../stores/notesStore";
+import { NOTES_FONTS, NOTES_THEMES } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 
 /**
@@ -12,6 +12,8 @@ export function NoteThemeSettings() {
   const t = useT();
   const theme = useNotesStore((s) => s.theme);
   const setTheme = useNotesStore((s) => s.setTheme);
+  const font = useNotesStore((s) => s.font);
+  const setFont = useNotesStore((s) => s.setFont);
   const panelMode = useNotesStore((s) => s.panelMode);
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
@@ -44,6 +46,27 @@ export function NoteThemeSettings() {
           ))}
         </div>
       </div>
+
+      {/* Font */}
+      <label className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 text-[var(--taomni-text-muted)]">
+          <Type className="w-3 h-3" />
+          {t("notes.font")}
+        </span>
+        <select
+          className="taomni-input h-6 flex-1 min-w-0 text-[11px]"
+          value={font}
+          onChange={(event) => setFont(event.target.value as NotesFont)}
+          data-testid="note-font-select"
+          aria-label={t("notes.font")}
+        >
+          {NOTES_FONTS.map((value: NotesFont) => (
+            <option key={value} value={value}>
+              {t(`notes.font_${value}`)}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/* Panel mode */}
       <div className="flex items-center gap-2">

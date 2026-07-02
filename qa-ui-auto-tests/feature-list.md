@@ -3442,6 +3442,10 @@ controls:
     selector: '[data-testid="notes-toggle-complete"]'
     kind: interactive
     optional: true
+  - id: notes-filter-menu
+    selector: '[data-testid="notes-filter-menu"]'
+    kind: interactive
+    optional: true
   - id: notes-filter-recent
     selector: '[data-testid="notes-filter-recent_incomplete"]'
     kind: interactive
