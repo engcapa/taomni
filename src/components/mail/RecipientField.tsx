@@ -63,7 +63,7 @@ export function RecipientField({
 
   useEffect(() => {
     if (!focused) {
-      onQueryChange?.("");
+      if (query) onQueryChange?.("");
       return;
     }
     onQueryChange?.(query);
