@@ -22,8 +22,20 @@ interface NoteFiltersProps {
   onSelectTag: (tagId: string | null) => void;
 }
 
-/** Status dropdown + tag chips for the notes views (§4.2). */
-export function NoteFilters({ filters, tagFilterId, tags, onToggleFilter, onSelectTag }: NoteFiltersProps) {
+interface NoteStatusFilterProps {
+  filters: NoteFilter[];
+  onToggleFilter: (filter: NoteFilter) => void;
+  className?: string;
+}
+
+interface NoteTagFiltersProps {
+  tagFilterId: string | null;
+  tags: NoteTag[];
+  onSelectTag: (tagId: string | null) => void;
+  className?: string;
+}
+
+export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: NoteStatusFilterProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -52,27 +64,27 @@ export function NoteFilters({ filters, tagFilterId, tags, onToggleFilter, onSele
   return (
     <div
       ref={rootRef}
-      className="relative flex flex-wrap items-center gap-1 px-2 py-1 border-b border-[var(--taomni-divider)] shrink-0"
+      className={`relative shrink-0 ${className}`}
       data-testid="notes-filters"
       aria-label={t("notes.title")}
     >
       <button
         type="button"
-        className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+        className="taomni-btn h-6 max-w-[150px] px-2 inline-flex items-center gap-1 text-[11px]"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="notes-filter-menu"
       >
         <ListFilter className="w-3.5 h-3.5" />
-        <span className="max-w-[160px] truncate">
+        <span className="max-w-[112px] truncate">
           {t("notes.status")}: {summary}
         </span>
         <ChevronDown className="w-3 h-3" />
       </button>
       {open && (
         <div
-          className="absolute left-2 top-[34px] z-20 w-44 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
+          className="absolute left-0 top-[30px] z-20 w-44 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
           role="menu"
           data-testid="notes-filter-dropdown"
         >
@@ -97,6 +109,20 @@ export function NoteFilters({ filters, tagFilterId, tags, onToggleFilter, onSele
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+export function NoteTagFilters({
+  tagFilterId,
+  tags,
+  onSelectTag,
+  className = "flex flex-wrap items-center gap-1 px-2 py-1 border-b border-[var(--taomni-divider)] shrink-0",
+}: NoteTagFiltersProps) {
+  if (tags.length === 0) return null;
+
+  return (
+    <div className={className}>
       {tags.map((tag) => {
         const active = tagFilterId === tag.id;
         return (
@@ -118,6 +144,16 @@ export function NoteFilters({ filters, tagFilterId, tags, onToggleFilter, onSele
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Status dropdown + tag chips for the notes views (§4.2). */
+export function NoteFilters({ filters, tagFilterId, tags, onToggleFilter, onSelectTag }: NoteFiltersProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-1 px-2 py-1 border-b border-[var(--taomni-divider)] shrink-0">
+      <NoteStatusFilter filters={filters} onToggleFilter={onToggleFilter} />
+      <NoteTagFilters tagFilterId={tagFilterId} tags={tags} onSelectTag={onSelectTag} className="contents" />
     </div>
   );
 }

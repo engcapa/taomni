@@ -139,6 +139,16 @@ describe("NotesPanel", () => {
     expect(await screen.findByText("No notes yet")).toBeInTheDocument();
   });
 
+  it("keeps the status filter in the top toolbar", async () => {
+    render(<NotesPanel />);
+    await screen.findByTestId("notes-new");
+
+    const toolbar = screen.getByTestId("notes-toolbar");
+    expect(toolbar).toContainElement(screen.getByTestId("notes-new"));
+    expect(toolbar).toContainElement(screen.getByTestId("notes-filter-menu"));
+    expect(toolbar).toContainElement(screen.getByTestId("notes-search"));
+  });
+
   it("creates a new note that defaults to incomplete and opens the editor", async () => {
     render(<NotesPanel />);
     await screen.findByTestId("notes-new");

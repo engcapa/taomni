@@ -3,7 +3,7 @@ import { Plus, Search, Settings } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useT } from "../../lib/i18n";
 import { NotesList } from "./NotesList";
-import { NoteFilters } from "./NoteFilters";
+import { NoteStatusFilter, NoteTagFilters } from "./NoteFilters";
 import { NoteEditor } from "./NoteEditor";
 import { NoteThemeSettings } from "./NoteThemeSettings";
 import { notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
@@ -61,7 +61,10 @@ export function NotesPanel() {
       ) : (
         <>
           {/* Toolbar */}
-          <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0">
+          <div
+            className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0"
+            data-testid="notes-toolbar"
+          >
             <button
               type="button"
               className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
@@ -73,6 +76,7 @@ export function NotesPanel() {
               <Plus className="w-3.5 h-3.5" />
               <span>{t("notes.newNote")}</span>
             </button>
+            <NoteStatusFilter filters={statusFilters} onToggleFilter={toggleStatusFilter} />
             <div className="relative flex-1 min-w-0">
               <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
               <input
@@ -100,11 +104,9 @@ export function NotesPanel() {
 
           {showSettings && <NoteThemeSettings />}
 
-          <NoteFilters
-            filters={statusFilters}
+          <NoteTagFilters
             tagFilterId={tagFilterId}
             tags={tags}
-            onToggleFilter={toggleStatusFilter}
             onSelectTag={setTagFilter}
           />
 
