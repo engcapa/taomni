@@ -1,13 +1,12 @@
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Serialize;
+use std::collections::HashSet;
 #[cfg(target_os = "macos")]
 use std::ffi::OsStr;
 use std::io::Read;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
-#[cfg(windows)]
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct PtyHandle {
     pub writer: Box<dyn std::io::Write + Send>,
@@ -25,6 +24,14 @@ pub struct LocalShellOption {
     pub args: Vec<String>,
     pub is_default: bool,
     pub can_elevate: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalDirectoryShortcut {
+    pub label: String,
+    pub path: String,
+    pub kind: String,
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +62,262 @@ pub fn list_local_shells() -> Vec<LocalShellOption> {
     }
 
     shells
+}
+
+pub fn list_common_local_directories(history_commands: &[String]) -> Vec<LocalDirectoryShortcut> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    let home = dirs::home_dir();
+
+    push_directory_shortcut(&mut out, &mut seen, "system", "Home", home.clone());
+    push_directory_shortcut(
+        &mut out,
+        &mut seen,
+        "system",
+        "Desktop",
+        dirs::desktop_dir(),
+    );
+    push_directory_shortcut(
+        &mut out,
+        &mut seen,
+        "system",
+        "Documents",
+        dirs::document_dir(),
+    );
+    push_directory_shortcut(
+        &mut out,
+        &mut seen,
+        "system",
+        "Downloads",
+        dirs::download_dir(),
+    );
+    push_directory_shortcut(
+        &mut out,
+        &mut seen,
+        "system",
+        "Pictures",
+        dirs::picture_dir(),
+    );
+    push_directory_shortcut(&mut out, &mut seen, "system", "Music", dirs::audio_dir());
+    push_directory_shortcut(&mut out, &mut seen, "system", "Videos", dirs::video_dir());
+
+    for command in history_commands {
+        if out.len() >= 24 {
+            break;
+        }
+        if let Some(path) = directory_from_history_command(command, home.as_deref()) {
+            push_directory_shortcut(
+                &mut out,
+                &mut seen,
+                "personal",
+                path_display_label(&path, "Directory"),
+                Some(path),
+            );
+        }
+    }
+
+    if let Some(home_dir) = home.as_deref() {
+        for name in [
+            "Code",
+            "code",
+            "Projects",
+            "projects",
+            "Workspace",
+            "workspace",
+            "work",
+            "dev",
+            "Developer",
+            "src",
+        ] {
+            if out.len() >= 24 {
+                break;
+            }
+            let candidate = home_dir.join(name);
+            push_directory_shortcut(
+                &mut out,
+                &mut seen,
+                "personal",
+                path_display_label(&candidate, name),
+                Some(candidate),
+            );
+        }
+    }
+
+    out
+}
+
+fn push_directory_shortcut(
+    out: &mut Vec<LocalDirectoryShortcut>,
+    seen: &mut HashSet<String>,
+    kind: &str,
+    label: impl Into<String>,
+    path: Option<PathBuf>,
+) {
+    let Some(path) = path else {
+        return;
+    };
+    if !path.is_dir() {
+        return;
+    }
+    let key = directory_shortcut_key(&path);
+    if !seen.insert(key) {
+        return;
+    }
+    out.push(LocalDirectoryShortcut {
+        label: label.into(),
+        path: path_to_string(path),
+        kind: kind.to_string(),
+    });
+}
+
+fn directory_shortcut_key(path: &Path) -> String {
+    let normalized = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let key = normalized.to_string_lossy().replace('\\', "/");
+    if cfg!(windows) {
+        key.to_ascii_lowercase()
+    } else {
+        key
+    }
+}
+
+fn path_display_label(path: &Path, fallback: &str) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn directory_from_history_command(command: &str, home: Option<&Path>) -> Option<PathBuf> {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let (keyword, mut rest) = leading_directory_command(trimmed)?;
+    if keyword.eq_ignore_ascii_case("cd") && rest.is_empty() {
+        return home.map(PathBuf::from);
+    }
+    if cfg!(windows)
+        && (keyword.eq_ignore_ascii_case("cd") || keyword.eq_ignore_ascii_case("chdir"))
+    {
+        let lower = rest.to_ascii_lowercase();
+        if lower == "/d" {
+            return home.map(PathBuf::from);
+        }
+        if lower.starts_with("/d ") || lower.starts_with("/d\t") {
+            rest = rest[2..].trim_start();
+        }
+    }
+
+    let arg = first_shell_argument(rest)?;
+    expand_common_directory_path(&arg, home)
+}
+
+fn leading_directory_command(command: &str) -> Option<(&str, &str)> {
+    for keyword in ["set-location", "pushd", "chdir", "cd", "sl"] {
+        if command.len() < keyword.len() {
+            continue;
+        }
+        let (head, tail) = command.split_at(keyword.len());
+        if !head.eq_ignore_ascii_case(keyword) {
+            continue;
+        }
+        if tail.is_empty() || tail.chars().next().is_some_and(char::is_whitespace) {
+            return Some((head, tail.trim_start()));
+        }
+    }
+    None
+}
+
+fn first_shell_argument(input: &str) -> Option<String> {
+    let mut chars = input.trim_start().chars().peekable();
+    let mut out = String::new();
+    let quote = match chars.peek().copied() {
+        Some('"') | Some('\'') => chars.next(),
+        _ => None,
+    };
+
+    while let Some(ch) = chars.next() {
+        if let Some(q) = quote {
+            if ch == q {
+                break;
+            }
+            if ch == '\\' {
+                if let Some(next) = chars.peek().copied() {
+                    if next == q || next == '\\' {
+                        out.push(next);
+                        chars.next();
+                        continue;
+                    }
+                }
+            }
+            out.push(ch);
+            continue;
+        }
+
+        if ch.is_whitespace() || ch == ';' {
+            break;
+        }
+        if ch == '&' && chars.peek() == Some(&'&') {
+            break;
+        }
+        if ch == '\\' {
+            if let Some(next) = chars.peek().copied() {
+                if next.is_whitespace() || next == '\\' || next == '\'' || next == '"' {
+                    out.push(next);
+                    chars.next();
+                    continue;
+                }
+            }
+        }
+        out.push(ch);
+    }
+
+    let trimmed = out.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn expand_common_directory_path(raw: &str, home: Option<&Path>) -> Option<PathBuf> {
+    let path = raw.trim();
+    if path.is_empty() || path == "-" || path == "." || path == ".." {
+        return None;
+    }
+    if path == "~" {
+        return home.map(PathBuf::from);
+    }
+    if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
+        return home.map(|home| home.join(rest));
+    }
+    if let Some(rest) = path
+        .strip_prefix("$HOME/")
+        .or_else(|| path.strip_prefix("$HOME\\"))
+        .or_else(|| path.strip_prefix("${HOME}/"))
+        .or_else(|| path.strip_prefix("${HOME}\\"))
+    {
+        return home.map(|home| home.join(rest));
+    }
+
+    let candidate = PathBuf::from(path);
+    if candidate.is_absolute() || looks_like_windows_absolute_path(path) {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+fn looks_like_windows_absolute_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    (bytes.len() >= 3
+        && bytes[1] == b':'
+        && bytes[0].is_ascii_alphabetic()
+        && (bytes[2] == b'\\' || bytes[2] == b'/'))
+        || path.starts_with("\\\\")
+        || path.starts_with("//")
 }
 
 pub fn resolve_shell(shell: Option<String>) -> ShellLaunch {
@@ -539,8 +802,11 @@ pub fn create_pty(
     cwd: Option<String>,
 ) -> Result<(PtyHandle, Box<dyn Read + Send>, String), String> {
     let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
-    let integration =
-        super::shell_integration::integration_for(&shell_launch.program, &shell_id, &shell_launch.args);
+    let integration = super::shell_integration::integration_for(
+        &shell_launch.program,
+        &shell_id,
+        &shell_launch.args,
+    );
     let (handle, reader) = create_pty_for_launch(
         cols,
         rows,
@@ -651,6 +917,49 @@ pub fn resize_pty(
             pixel_height: 0,
         })
         .map_err(|e| format!("Failed to resize PTY: {}", e))
+}
+
+#[cfg(test)]
+mod directory_shortcut_tests {
+    use super::*;
+
+    #[test]
+    fn parses_tilde_cd_from_history() {
+        let home = PathBuf::from("/home/ada");
+        assert_eq!(
+            directory_from_history_command("cd ~/work", Some(home.as_path())),
+            Some(PathBuf::from("/home/ada/work")),
+        );
+    }
+
+    #[test]
+    fn parses_quoted_pushd_path_from_history() {
+        assert_eq!(
+            directory_from_history_command(r#"pushd "/tmp/my app""#, None),
+            Some(PathBuf::from("/tmp/my app")),
+        );
+    }
+
+    #[test]
+    fn skips_relative_history_paths() {
+        let home = PathBuf::from("/home/ada");
+        assert_eq!(
+            directory_from_history_command("cd projects", Some(home.as_path())),
+            None,
+        );
+        assert_eq!(
+            directory_from_history_command("cd ..", Some(home.as_path())),
+            None,
+        );
+    }
+
+    #[test]
+    fn parses_windows_absolute_history_paths() {
+        assert_eq!(
+            directory_from_history_command(r#"Set-Location "C:\Users\ada\work""#, None),
+            Some(PathBuf::from(r"C:\Users\ada\work")),
+        );
+    }
 }
 
 #[cfg(test)]

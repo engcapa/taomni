@@ -25,6 +25,10 @@ export function normalizeLocalStartCwd(cwd: string, platform: AppPlatform): stri
   if (!cwd) return null;
   if (platform !== "windows") return cwd;
 
+  // Native Windows paths are already valid for CreateProcess cwd. This path
+  // shape comes from local directory shortcuts rather than OSC 7 reports.
+  if (/^[A-Za-z]:[\\/]/.test(cwd) || cwd.startsWith("\\\\")) return cwd;
+
   // `/D:/code/app` (PowerShell / cmd via OSC 7) → `D:\code\app`.
   const drive = /^\/([A-Za-z]:)(.*)$/.exec(cwd);
   if (drive) {

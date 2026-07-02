@@ -290,6 +290,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             terminal::list_local_shells,
+            terminal::list_common_local_directories,
             terminal::detect_x_server,
             wsl::list_wsl_distros,
             terminal::open_local_shell_as_administrator,

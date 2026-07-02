@@ -6,12 +6,14 @@ import { useSessionStore } from "../stores/sessionStore";
 import type { SessionConfig } from "../lib/ipc";
 
 const ipcMocks = vi.hoisted(() => ({
+  listCommonLocalDirectories: vi.fn(),
   listLocalShells: vi.fn(),
   listWslDistros: vi.fn(),
   openLocalShellAsAdministrator: vi.fn(),
 }));
 
 vi.mock("../lib/ipc", () => ({
+  listCommonLocalDirectories: ipcMocks.listCommonLocalDirectories,
   listLocalShells: ipcMocks.listLocalShells,
   listWslDistros: ipcMocks.listWslDistros,
   openLocalShellAsAdministrator: ipcMocks.openLocalShellAsAdministrator,
@@ -35,6 +37,10 @@ describe("WelcomePanel", () => {
         isDefault: true,
         canElevate: true,
       },
+    ]);
+    ipcMocks.listCommonLocalDirectories.mockResolvedValue([
+      { label: "Home", path: "/home/test", kind: "system" },
+      { label: "Projects", path: "/home/test/projects", kind: "personal" },
     ]);
     ipcMocks.listWslDistros.mockResolvedValue([]);
     ipcMocks.openLocalShellAsAdministrator.mockResolvedValue(undefined);
@@ -79,6 +85,32 @@ describe("WelcomePanel", () => {
     await waitFor(() => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
+  });
+
+  it("shows local directory shortcuts and starts a terminal in the clicked directory", async () => {
+    const startLocalTerminal = vi.fn();
+
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={startLocalTerminal}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("welcome-local-directories")).toBeInTheDocument();
+    });
+
+    const rows = screen.getAllByTestId("welcome-local-directory");
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toHaveAttribute("data-directory-path", "/home/test/projects");
+
+    fireEvent.click(within(rows[1]).getByText("Projects"));
+    expect(startLocalTerminal).toHaveBeenCalledWith(
+      { id: "powershell.exe", name: "PowerShell" },
+      "/home/test/projects",
+    );
   });
 
   it("shows recent sessions with filter, select, bulk open, and single open actions", async () => {

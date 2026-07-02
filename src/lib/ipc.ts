@@ -27,8 +27,18 @@ export interface LocalShellOption {
   canElevate: boolean;
 }
 
+export interface LocalDirectoryShortcut {
+  label: string;
+  path: string;
+  kind: "system" | "personal";
+}
+
 export async function listLocalShells(): Promise<LocalShellOption[]> {
   return invoke<LocalShellOption[]>("list_local_shells", {});
+}
+
+export async function listCommonLocalDirectories(): Promise<LocalDirectoryShortcut[]> {
+  return invoke<LocalDirectoryShortcut[]>("list_common_local_directories", {});
 }
 
 export async function openLocalShellAsAdministrator(shell?: string): Promise<void> {

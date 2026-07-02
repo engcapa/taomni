@@ -1289,6 +1289,7 @@ export function MainLayout() {
     sessionId?: string,
     terminalProfile?: TerminalProfile,
     localShell?: LocalShellSelection,
+    initialCwd?: string,
   ) => {
     const id = `local-${Date.now()}`;
     const requestedTitle = title || tr("tabs.localTerminal");
@@ -1305,6 +1306,7 @@ export function MainLayout() {
       sessionId,
       localShell,
       terminalProfile,
+      terminalInitialCwd: initialCwd,
       closable: true,
     });
     if (sessionId) void markConnected(sessionId);
@@ -2863,7 +2865,7 @@ export function MainLayout() {
                 {/* Welcome panel */}
                 {(activeTab?.type === "welcome" || !activeTab) && (
                   <WelcomePanel
-                    onStartLocalTerminal={(localShell) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)}
+                    onStartLocalTerminal={(localShell, cwd) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell, cwd)}
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}

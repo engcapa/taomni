@@ -315,6 +315,7 @@ vi.mock("../lib/ipc", () => ({
   exitApp: vi.fn(async () => undefined),
   listSessionGroups: vi.fn(async () => []),
   listSessions: vi.fn(async () => []),
+  listCommonLocalDirectories: vi.fn(async () => []),
   listLocalShells: vi.fn(async () => []),
   listWslDistros: vi.fn(async () => []),
   markSessionConnected: vi.fn(async () => 0),

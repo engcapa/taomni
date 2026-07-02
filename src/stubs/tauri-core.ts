@@ -1,4 +1,4 @@
-import type { SessionConfig, SessionGroup, LocalShellOption } from "../lib/ipc";
+import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut } from "../lib/ipc";
 import {
   isSshSession,
   sshClose,
@@ -903,6 +903,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         },
       ];
       return shells as T;
+    }
+    case "list_common_local_directories": {
+      const home = await vfsHome();
+      const dirs: LocalDirectoryShortcut[] = [
+        { label: "Home", path: home, kind: "system" },
+        { label: "Workspace", path: VFS_ROOT, kind: "personal" },
+      ];
+      return dirs as T;
     }
     case "list_system_fonts": {
       return [] as T;

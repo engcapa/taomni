@@ -22,9 +22,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
+  listCommonLocalDirectories,
   listLocalShells,
   listWslDistros,
   openLocalShellAsAdministrator,
+  type LocalDirectoryShortcut,
   type LocalShellOption,
   type SessionConfig,
   type WslDistro,
@@ -41,7 +43,7 @@ import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { useConfirmDialog } from "./sidebar/ConfirmDialog";
 
 interface WelcomePanelProps {
-  onStartLocalTerminal: (shell?: LocalShellSelection) => void;
+  onStartLocalTerminal: (shell?: LocalShellSelection, cwd?: string) => void;
   onNewSession: () => void;
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean }) => void;
   onOpenLanChat?: () => void;
@@ -83,6 +85,7 @@ export function WelcomePanel({
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [localDirectories, setLocalDirectories] = useState<LocalDirectoryShortcut[]>([]);
   const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
   const [selectedDistro, setSelectedDistro] = useState("");
   const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">("loading");
@@ -108,6 +111,17 @@ export function WelcomePanel({
         if (cancelled) return;
         setShellStatus("error");
         setStatusMessage(t("status.localShellDetectionFailed", { error: String(error) }));
+      });
+
+    listCommonLocalDirectories()
+      .then((directories) => {
+        if (cancelled) return;
+        setLocalDirectories(Array.isArray(directories) ? directories : []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLocalDirectories([]);
+        setStatusMessage(t("welcome.localDirectoriesLoadFailed", { error: String(error) }));
       });
 
     if (getAppPlatform() === "windows") {
@@ -269,22 +283,16 @@ export function WelcomePanel({
             onSelectShell={setSelectedShellId}
             kbd="Ctrl+Shift+T"
             onStart={() => {
-              if (!selectedShell) {
-                onStartLocalTerminal();
-                return;
-              }
-              onStartLocalTerminal({
-                // Real shells have id === path; virtual WSL entries map id="wsl:<distro>"
-                // to path="wsl.exe" — pass the executable path so the backend can resolve it.
-                id: selectedShell.path,
-                name: selectedShell.name,
-                ...(selectedShell.args && selectedShell.args.length > 0
-                  ? { args: selectedShell.args }
-                  : {}),
-              });
+              onStartLocalTerminal(localShellSelectionFromOption(selectedShell));
             }}
             onStartAsAdministrator={handleStartAsAdministrator}
             onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
+            directories={localDirectories}
+            onStartInDirectory={(directory) => {
+              const shell = localShellSelectionFromOption(selectedShell, directory.path);
+              const cwd = selectedShell?.id.startsWith("wsl:") ? undefined : directory.path;
+              onStartLocalTerminal(shell, cwd);
+            }}
           />
           {wslStatus === "ready" && wslDistros.length > 0 && (
             <WslCard
@@ -390,6 +398,24 @@ export function WelcomePanel({
       </div>
     </div>
   );
+}
+
+function localShellSelectionFromOption(
+  shell: LocalShellOption | undefined,
+  cwd?: string,
+): LocalShellSelection | undefined {
+  if (!shell) return undefined;
+  const args = shell.args && shell.args.length > 0 ? [...shell.args] : [];
+  if (cwd && shell.id.startsWith("wsl:") && !args.includes("--cd")) {
+    args.push("--cd", cwd);
+  }
+  return {
+    // Real shells have id === path; virtual WSL entries map id="wsl:<distro>"
+    // to path="wsl.exe" — pass the executable path so the backend can resolve it.
+    id: shell.path,
+    name: shell.name,
+    ...(args.length > 0 ? { args } : {}),
+  };
 }
 
 function RecentSessionsPanel({
@@ -894,6 +920,8 @@ function LocalTerminalCard({
   onStart,
   onStartAsAdministrator,
   onOpenHomeFolder,
+  directories,
+  onStartInDirectory,
 }: {
   translate: TranslateFn;
   shells: LocalShellOption[];
@@ -905,6 +933,8 @@ function LocalTerminalCard({
   onStart: () => void;
   onStartAsAdministrator: () => void;
   onOpenHomeFolder?: () => void;
+  directories: LocalDirectoryShortcut[];
+  onStartInDirectory: (directory: LocalDirectoryShortcut) => void;
 }) {
   const hasChoices = shells.length > 1;
   const canElevate = selectedShell?.canElevate ?? false;
@@ -991,6 +1021,47 @@ function LocalTerminalCard({
           )}
         </div>
       </div>
+      {directories.length > 0 ? (
+        <div
+          data-testid="welcome-local-directories"
+          className="mt-3 pt-3 border-t min-h-0"
+          style={{ borderColor: "var(--taomni-divider)" }}
+        >
+          <div className="flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+            <Folder className="w-3.5 h-3.5" />
+            <span className="font-medium text-[var(--taomni-text)]">{t("welcome.localDirectoriesHeading")}</span>
+            <span className="truncate">{t("welcome.localDirectoriesHint")}</span>
+          </div>
+          <div className="mt-2 max-h-[132px] overflow-y-auto pr-1 space-y-1">
+            {directories.map((directory) => (
+              <button
+                key={`${directory.kind}:${directory.path}`}
+                data-testid="welcome-local-directory"
+                data-directory-path={directory.path}
+                className="w-full min-w-0 rounded border bg-[var(--taomni-input-bg)] px-2 py-1.5 text-left hover:bg-[var(--taomni-control-hover)] focus-visible:bg-[var(--taomni-control-hover)]"
+                style={{ borderColor: "var(--taomni-divider)" }}
+                type="button"
+                title={directory.path}
+                aria-label={t("welcome.localDirectoryOpenAria", { label: directory.label, path: directory.path })}
+                onClick={() => onStartInDirectory(directory)}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <FolderOpen className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--taomni-text)]">
+                    {directory.label}
+                  </span>
+                  <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] taomni-mono text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+                    {directory.kind === "personal" ? t("welcome.localDirectoryPersonal") : t("welcome.localDirectorySystem")}
+                  </span>
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+                  {directory.path}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
