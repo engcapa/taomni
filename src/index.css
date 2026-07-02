@@ -381,7 +381,6 @@ body {
 .taomni-input {
   height: 22px;
   font-size: var(--taomni-ui-font-size);
-  padding: 0 6px;
   border: 1px solid var(--taomni-input-border);
   background: var(--taomni-input-bg);
   color: var(--taomni-text);
@@ -649,6 +648,13 @@ body {
 .taomni-divider-v { width: 1px; background: var(--taomni-divider); }
 
 @layer components {
+  :where(.taomni-input) {
+    padding: 0 6px;
+  }
+  :where(.relative) > :where(svg.absolute) + :where(.taomni-input) {
+    padding-left: 1.75rem;
+  }
+
   .taomni-btn {
     display: inline-flex;
     align-items: center;

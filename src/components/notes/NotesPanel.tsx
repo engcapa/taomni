@@ -3,10 +3,10 @@ import { Plus, Search, Settings } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useT } from "../../lib/i18n";
 import { NotesList } from "./NotesList";
-import { NoteFilters } from "./NoteFilters";
+import { NoteStatusFilter, NoteTagFilters } from "./NoteFilters";
 import { NoteEditor } from "./NoteEditor";
 import { NoteThemeSettings } from "./NoteThemeSettings";
-import { notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
+import { notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
 
 /**
  * NotesPanel — the 便签 tab content inside the Tao Hub. A master/detail surface
@@ -19,18 +19,20 @@ export function NotesPanel() {
   const loading = useNotesStore((s) => s.loading);
   const search = useNotesStore((s) => s.search);
   const filter = useNotesStore((s) => s.filter);
+  const statusFilters = useNotesStore((s) => s.statusFilters);
   const tagFilterId = useNotesStore((s) => s.tagFilterId);
   const tags = useNotesStore((s) => s.tags);
   const initPanel = useNotesStore((s) => s.initPanel);
   const loadTags = useNotesStore((s) => s.loadTags);
   const setSearch = useNotesStore((s) => s.setSearch);
-  const setFilter = useNotesStore((s) => s.setFilter);
+  const toggleStatusFilter = useNotesStore((s) => s.toggleStatusFilter);
   const setTagFilter = useNotesStore((s) => s.setTagFilter);
   const createNote = useNotesStore((s) => s.createNote);
   const toggleComplete = useNotesStore((s) => s.toggleComplete);
   const setActiveNote = useNotesStore((s) => s.setActiveNote);
   const activeNoteId = useNotesStore((s) => s.activeNoteId);
   const theme = useNotesStore((s) => s.theme);
+  const font = useNotesStore((s) => s.font);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function NotesPanel() {
 
   const activeNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) ?? null : null;
   const themeStyle = notesThemeStyle(theme);
+  const fontStyle = notesFontStyle(font);
   const density = notesThemeDensity(theme);
 
   return (
@@ -51,14 +54,17 @@ export function NotesPanel() {
       data-testid="notes-panel"
       data-notes-theme={theme}
       data-density={density}
-      style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle }}
+      style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle, ...fontStyle }}
     >
       {activeNote ? (
         <NoteEditor note={activeNote} onClose={() => setActiveNote(null)} />
       ) : (
         <>
           {/* Toolbar */}
-          <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0">
+          <div
+            className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0"
+            data-testid="notes-toolbar"
+          >
             <button
               type="button"
               className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
@@ -70,6 +76,7 @@ export function NotesPanel() {
               <Plus className="w-3.5 h-3.5" />
               <span>{t("notes.newNote")}</span>
             </button>
+            <NoteStatusFilter filters={statusFilters} onToggleFilter={toggleStatusFilter} />
             <div className="relative flex-1 min-w-0">
               <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
               <input
@@ -97,11 +104,9 @@ export function NotesPanel() {
 
           {showSettings && <NoteThemeSettings />}
 
-          <NoteFilters
-            filter={filter}
+          <NoteTagFilters
             tagFilterId={tagFilterId}
             tags={tags}
-            onSelectFilter={setFilter}
             onSelectTag={setTagFilter}
           />
 
@@ -114,11 +119,11 @@ export function NotesPanel() {
             ) : notes.length === 0 ? (
               <div className="p-6 text-center text-[12px] text-[var(--taomni-text-muted)]">
                 <div>
-                  {search || filter !== "recent_incomplete" || tagFilterId
+                  {search || filter !== "recent_incomplete" || statusFilters.length !== 1 || tagFilterId
                     ? t("notes.emptyFiltered")
                     : t("notes.empty")}
                 </div>
-                {!search && filter === "recent_incomplete" && !tagFilterId && (
+                {!search && filter === "recent_incomplete" && statusFilters.length === 1 && !tagFilterId && (
                   <div className="mt-1 text-[11px]">{t("notes.emptyHint")}</div>
                 )}
               </div>

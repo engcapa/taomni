@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { PanelRightClose } from "lucide-react";
 import { useNotesStore, type NotesPanelPosition } from "../../stores/notesStore";
-import { notesThemeStyle } from "../../lib/notes/notesTheme";
+import { notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 import { NotesPanel } from "./NotesPanel";
 
@@ -32,6 +32,7 @@ export function FloatingNotesPanel() {
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
   const theme = useNotesStore((s) => s.theme);
+  const font = useNotesStore((s) => s.font);
 
   const [pos, setPos] = useState<NotesPanelPosition>(() => clampPosition(panelPosition));
   const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; base: NotesPanelPosition } | null>(null);
@@ -83,6 +84,7 @@ export function FloatingNotesPanel() {
     width: pos.width,
     height: pos.height,
     ...notesThemeStyle(theme),
+    ...notesFontStyle(font),
   };
 
   return (

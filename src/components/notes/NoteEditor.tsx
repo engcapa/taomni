@@ -176,6 +176,11 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
+      <div
+        className="h-1 shrink-0"
+        style={{ background: note.color ?? "transparent" }}
+        data-testid="note-editor-color-strip"
+      />
 
       {/* Editable fields */}
       <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
@@ -237,7 +242,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
             type="button"
             className={`w-4 h-4 rounded-full border border-[var(--taomni-divider)] inline-flex items-center justify-center ${note.color === null ? "ring-1 ring-[var(--taomni-accent)]" : ""}`}
             onClick={() => commit({ color: null })}
-            title={t("notes.clearDate")}
+            title={t("notes.clearColor")}
             aria-label={`${t("notes.color")} none`}
           >
             <X className="w-2.5 h-2.5" />

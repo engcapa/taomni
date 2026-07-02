@@ -3,7 +3,7 @@ title: Notes filter — recent-incomplete vs completed
 description: |
   Verifies the notes filter views (F-TAO-1): a completed note is hidden by the
   default "recent-incomplete" filter, appears under the "Completed" filter, and
-  disappears again when switching back to "recent". Exercises NoteFilters chips.
+  disappears again when removing the "Completed" status. Exercises NoteFilters.
 covers: [F-TAO-1]
 tags: [notes, tao, p2]
 modes: [browser]
@@ -26,12 +26,13 @@ steps:
   - click: '[data-testid="notes-toggle-complete"]'
   - wait: 0.5
   - assert_not_visible: '[data-testid="notes-list"] >> text="QA finish me"'
-  # The Completed filter reveals it again.
+  # Adding the Completed status reveals it again.
+  - click: '[data-testid="notes-filter-menu"]'
   - click: '[data-testid="notes-filter-completed"]'
   - wait: 0.5
   - assert_text: { selector: '[data-testid="notes-list"]', contains: "QA finish me" }
-  # Back to recent-incomplete hides it once more.
-  - click: '[data-testid="notes-filter-recent_incomplete"]'
+  # Removing Completed leaves recent-incomplete selected and hides it once more.
+  - click: '[data-testid="notes-filter-completed"]'
   - wait: 0.5
   - assert_not_visible: '[data-testid="notes-list"] >> text="QA finish me"'
   - screenshot: notes-003-filter-recent-incomplete.png

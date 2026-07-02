@@ -59,17 +59,20 @@ function blank(title: string): FakeNote {
 
 function filterNotes(q: Record<string, unknown>): FakeNote[] {
   const filter = (q.filter as string) ?? "recent_incomplete";
+  const filters = Array.isArray(q.filters) && q.filters.length > 0 ? q.filters.map(String) : [filter];
   const search = ((q.search as string) ?? "").toLowerCase();
-  let list = store.filter((n) => {
-    switch (filter) {
-      case "all":
-        return n.archived_at === null;
-      case "completed":
-        return n.archived_at === null && n.completed_at !== null;
-      default:
-        return n.archived_at === null && n.completed_at === null;
-    }
-  });
+  let list = store.filter((n) =>
+    filters.some((status) => {
+      switch (status) {
+        case "all":
+          return n.archived_at === null;
+        case "completed":
+          return n.archived_at === null && n.completed_at !== null;
+        default:
+          return n.archived_at === null && n.completed_at === null;
+      }
+    }),
+  );
   if (search) list = list.filter((n) => n.title.toLowerCase().includes(search) || n.body.toLowerCase().includes(search));
   return list;
 }
@@ -83,10 +86,14 @@ beforeEach(() => {
     prefsLoaded: false,
     activeNoteId: null,
     filter: "recent_incomplete",
+    statusFilters: ["recent_incomplete"],
     search: "",
     tagFilterId: null,
     tags: [],
     alerts: [],
+    panelMode: "hub",
+    theme: "taomni",
+    font: "inherit",
   });
   invokeMock.mockReset();
   invokeMock.mockImplementation(async (cmd: string, args: Record<string, unknown> = {}) => {
@@ -132,6 +139,16 @@ describe("NotesPanel", () => {
     expect(await screen.findByText("No notes yet")).toBeInTheDocument();
   });
 
+  it("keeps the status filter in the top toolbar", async () => {
+    render(<NotesPanel />);
+    await screen.findByTestId("notes-new");
+
+    const toolbar = screen.getByTestId("notes-toolbar");
+    expect(toolbar).toContainElement(screen.getByTestId("notes-new"));
+    expect(toolbar).toContainElement(screen.getByTestId("notes-filter-menu"));
+    expect(toolbar).toContainElement(screen.getByTestId("notes-search"));
+  });
+
   it("creates a new note that defaults to incomplete and opens the editor", async () => {
     render(<NotesPanel />);
     await screen.findByTestId("notes-new");
@@ -161,6 +178,7 @@ describe("NotesPanel", () => {
     // Not visible under the default recent-incomplete view.
     await waitFor(() => expect(screen.queryByText("finished")).not.toBeInTheDocument());
 
+    fireEvent.click(screen.getByTestId("notes-filter-menu"));
     fireEvent.click(screen.getByTestId("notes-filter-completed"));
     expect(await screen.findByText("finished")).toBeInTheDocument();
   });
