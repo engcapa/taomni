@@ -522,6 +522,8 @@ pub fn run() {
             mail::mail_get_message_body,
             mail::mail_download_attachment,
             mail::mail_send_message,
+            mail::mail_index_cached_contacts,
+            mail::mail_search_contacts,
             mail::mail_mark_read,
             mail::mail_set_flags,
             mail::mail_move_messages,

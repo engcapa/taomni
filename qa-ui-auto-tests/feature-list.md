@@ -3506,6 +3506,62 @@ controls:
 
 ---
 
+## 13. Mail 客户端
+
+### 13.1 写邮件联系人自动提示 ✅
+
+<!-- feature
+id: F-MAIL-1
+status: done
+area: mail/compose
+components: [MailClientTab, RecipientField]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/mail/RecipientField.tsx
+  - src/lib/mailRecipients.ts
+  - src/lib/mail.ts
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: mail-client-tab
+    selector: '[data-testid="mail-client-tab"]'
+    kind: display
+  - id: compose-open
+    selector: '[data-testid="mail-compose-open"]'
+    kind: interactive
+  - id: compose-dialog
+    selector: '[data-testid="mail-compose-dialog"]'
+    kind: display
+  - id: recipient-to
+    selector: '[data-testid="mail-recipient-to"]'
+    kind: interactive
+  - id: recipient-cc
+    selector: '[data-testid="mail-recipient-cc"]'
+    kind: interactive
+  - id: recipient-bcc
+    selector: '[data-testid="mail-recipient-bcc"]'
+    kind: interactive
+  - id: recipient-chip
+    selector: '[data-testid="mail-recipient-chip"]'
+    kind: display
+  - id: recipient-suggestions
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    kind: display
+  - id: recipient-suggestion
+    selector: '[data-testid="mail-recipient-suggestion"]'
+    kind: interactive
+  - id: compose-send
+    selector: '[data-testid="mail-compose-send"]'
+    kind: interactive
+    optional: true       # send success/failure depends on SMTP config; recipient autocomplete is covered before send
+-->
+
+- `To` / `Cc` / `Bcc` 使用 chip 输入，支持粘贴多联系人、回车/Tab 接受建议、退格删除 chip。
+- 联系人建议来自本地邮件缓存联系人索引（`mail_contacts`）和当前已加载邮件头，发送成功后提升 sent 联系人权重。
+- 当缓存没有命中且当前输入形如 `si.li@` / `si.li@y` 时，基于当前账号邮箱域名自动提示 `si.li@yourmail.com`，Tab 可完成。
+- 前端发送前会拦截空收件人和明显非法邮箱；后端 `lettre` 地址解析继续作为最终校验。
+
+---
+
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

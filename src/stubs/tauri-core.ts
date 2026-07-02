@@ -826,6 +826,39 @@ function stubMailBody(accountId: string, folder: string, uid: number) {
   };
 }
 
+function stubMailContacts(accountId: string, query: string, limit: number) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const byEmail = new Map<string, { name: string | null; email: string; source: "history" | "sent"; score: number; lastSeenAt: number | null }>();
+  for (const folder of MAIL_STUB_FOLDERS) {
+    for (const message of stubMailMessages(accountId, folder.name)) {
+      const sent = folder.name === "Sent";
+      const addresses = [message.from, ...message.to, ...message.cc];
+      for (const address of addresses) {
+        const email = address.address;
+        const haystack = `${address.name ?? ""} ${email}`.toLowerCase();
+        if (!email || !haystack.includes(needle)) continue;
+        const score = (email.toLowerCase().startsWith(needle) ? 300 : 0)
+          + ((address.name ?? "").toLowerCase().startsWith(needle) ? 180 : 0)
+          + (sent ? 80 : 20);
+        const existing = byEmail.get(email.toLowerCase());
+        if (!existing || score > existing.score) {
+          byEmail.set(email.toLowerCase(), {
+            name: address.name ?? null,
+            email,
+            source: sent ? "sent" : "history",
+            score,
+            lastSeenAt: message.dateTs ?? null,
+          });
+        }
+      }
+    }
+  }
+  return Array.from(byEmail.values())
+    .sort((a, b) => b.score - a.score || a.email.localeCompare(b.email))
+    .slice(0, limit);
+}
+
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   switch (cmd) {
     case "list_sessions": {
@@ -1942,6 +1975,16 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "mail_send_message": {
       return { accepted: true, response: "browser-preview accepted" } as T;
+    }
+    case "mail_index_cached_contacts": {
+      return stubMailContacts(stubMailAccountId(args as InvokeArgs | undefined), "", 100).length as T;
+    }
+    case "mail_search_contacts": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const query = (invokeArgs?.query as string | undefined) ?? "";
+      const limit = Math.max(1, Math.min(20, Number((invokeArgs?.limit as number | undefined) ?? 8)));
+      return stubMailContacts(accountId, query, limit) as T;
     }
     case "mail_test_connection": {
       return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;

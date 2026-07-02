@@ -4,7 +4,7 @@
 //! resolves credentials, performs one bounded IMAP/SMTP operation on a blocking
 //! worker thread, then writes the result to the local SQLite header/body cache.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
@@ -326,6 +326,16 @@ pub struct MailSendResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MailContactSuggestion {
+    pub name: Option<String>,
+    pub email: String,
+    pub source: String,
+    pub score: i64,
+    pub last_seen_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MailDownloadAttachmentResult {
     pub path: String,
     pub name: Option<String>,
@@ -572,7 +582,23 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
         CREATE INDEX IF NOT EXISTS idx_mail_messages_folder_date
             ON mail_messages(account_id, folder, date_ts DESC, uid DESC);
         CREATE INDEX IF NOT EXISTS idx_mail_messages_message_id
-            ON mail_messages(account_id, message_id);",
+            ON mail_messages(account_id, message_id);
+
+        CREATE TABLE IF NOT EXISTS mail_contacts (
+            account_id TEXT NOT NULL,
+            email TEXT NOT NULL COLLATE NOCASE,
+            name TEXT,
+            first_seen_at INTEGER NOT NULL,
+            last_seen_at INTEGER NOT NULL,
+            message_count INTEGER NOT NULL DEFAULT 0,
+            sent_count INTEGER NOT NULL DEFAULT 0,
+            received_count INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (account_id, email)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mail_contacts_search
+            ON mail_contacts(account_id, email, name);",
     )
 }
 
@@ -830,9 +856,40 @@ pub async fn mail_send_message(
 ) -> Result<MailSendResult, String> {
     let account = resolve_config(&state, config)?;
     validate_send_request(&request)?;
-    tokio::task::spawn_blocking(move || send_smtp(&account, &request))
+    let account_id = account.config.session_id.clone();
+    let sent_request = request.clone();
+    let result = tokio::task::spawn_blocking(move || send_smtp(&account, &request))
         .await
-        .map_err(|e| format!("mail send task failed: {e}"))?
+        .map_err(|e| format!("mail send task failed: {e}"))??;
+    if result.accepted {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        init_mail_tables(&db).map_err(|e| e.to_string())?;
+        upsert_sent_contacts(&db, &account_id, &sent_request).map_err(|e| e.to_string())?;
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn mail_index_cached_contacts(
+    account_id: String,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    reindex_cached_contacts(&db, &account_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn mail_search_contacts(
+    account_id: String,
+    query: String,
+    limit: Option<u32>,
+    state: State<'_, AppState>,
+) -> Result<Vec<MailContactSuggestion>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    search_contacts(&db, &account_id, &query, limit.unwrap_or(8).clamp(1, 20))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2255,6 +2312,7 @@ fn cache_sync_result(
         upsert_message(conn, message)?;
     }
     prune_mail_cache(conn, account_id, folder, cache)?;
+    reindex_cached_contacts(conn, account_id)?;
     Ok(())
 }
 
@@ -2275,6 +2333,7 @@ fn cache_sync_all_result(
     for folder in folders {
         prune_mail_cache(conn, account_id, &folder.name, cache)?;
     }
+    reindex_cached_contacts(conn, account_id)?;
     Ok(())
 }
 
@@ -2393,6 +2452,227 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
         ],
     )?;
     Ok(())
+}
+
+fn contact_email(address: &MailAddress) -> Option<String> {
+    let email = address.address.as_deref()?.trim().to_lowercase();
+    if email.contains('@')
+        && !email
+            .chars()
+            .any(|ch| matches!(ch, ' ' | '<' | '>' | ',' | ';'))
+    {
+        Some(email)
+    } else {
+        None
+    }
+}
+
+fn clean_contact_name(address: &MailAddress) -> Option<String> {
+    address
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(|name| name.to_string())
+}
+
+fn upsert_contact(
+    conn: &Connection,
+    account_id: &str,
+    address: &MailAddress,
+    seen_at: i64,
+    message_count: i64,
+    sent_count: i64,
+    received_count: i64,
+) -> SqlResult<bool> {
+    let Some(email) = contact_email(address) else {
+        return Ok(false);
+    };
+    let name = clean_contact_name(address);
+    let now = now_ts();
+    conn.execute(
+        "INSERT INTO mail_contacts
+         (account_id, email, name, first_seen_at, last_seen_at, message_count,
+          sent_count, received_count, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(account_id, email) DO UPDATE SET
+            name = CASE
+              WHEN excluded.name IS NOT NULL AND excluded.name != '' THEN excluded.name
+              ELSE mail_contacts.name
+            END,
+            first_seen_at = MIN(mail_contacts.first_seen_at, excluded.first_seen_at),
+            last_seen_at = MAX(mail_contacts.last_seen_at, excluded.last_seen_at),
+            message_count = mail_contacts.message_count + excluded.message_count,
+            sent_count = mail_contacts.sent_count + excluded.sent_count,
+            received_count = mail_contacts.received_count + excluded.received_count,
+            updated_at = excluded.updated_at",
+        params![
+            account_id,
+            email,
+            name,
+            seen_at,
+            message_count,
+            sent_count,
+            received_count,
+            now,
+        ],
+    )?;
+    Ok(true)
+}
+
+fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult<usize> {
+    conn.execute(
+        "DELETE FROM mail_contacts WHERE account_id = ?1",
+        params![account_id],
+    )?;
+
+    let rows = {
+        let mut stmt = conn.prepare(
+            "SELECT from_name, from_addr, to_json, cc_json, date_ts
+             FROM mail_messages
+             WHERE account_id = ?1",
+        )?;
+        let mapped = stmt.query_map(params![account_id], |row| {
+            let from_name: Option<String> = row.get(0)?;
+            let from_addr: Option<String> = row.get(1)?;
+            let from = if from_name.is_some() || from_addr.is_some() {
+                Some(MailAddress {
+                    name: from_name,
+                    address: from_addr,
+                })
+            } else {
+                None
+            };
+            let to_json: String = row.get(2)?;
+            let cc_json: String = row.get(3)?;
+            let date_ts: Option<i64> = row.get(4)?;
+            Ok((
+                from,
+                serde_json::from_str::<Vec<MailAddress>>(&to_json).unwrap_or_default(),
+                serde_json::from_str::<Vec<MailAddress>>(&cc_json).unwrap_or_default(),
+                date_ts,
+            ))
+        })?;
+        mapped.collect::<SqlResult<Vec<_>>>()?
+    };
+
+    for (from, to, cc, date_ts) in rows {
+        let seen_at = date_ts.unwrap_or_else(now_ts);
+        let mut seen = HashSet::new();
+        for address in from.into_iter().chain(to.into_iter()).chain(cc.into_iter()) {
+            let Some(email) = contact_email(&address) else {
+                continue;
+            };
+            if !seen.insert(email) {
+                continue;
+            }
+            upsert_contact(conn, account_id, &address, seen_at, 1, 0, 1)?;
+        }
+    }
+
+    conn.query_row(
+        "SELECT COUNT(*) FROM mail_contacts WHERE account_id = ?1",
+        params![account_id],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count as usize)
+}
+
+fn mailbox_to_contact(mailbox: Mailbox) -> MailAddress {
+    MailAddress {
+        name: mailbox.name,
+        address: Some(mailbox.email.to_string()),
+    }
+}
+
+fn upsert_sent_contacts(
+    conn: &Connection,
+    account_id: &str,
+    request: &MailSendRequest,
+) -> SqlResult<usize> {
+    let mut changed = 0;
+    let now = now_ts();
+    let mut seen = HashSet::new();
+    for raw in request
+        .to
+        .iter()
+        .chain(request.cc.iter())
+        .chain(request.bcc.iter())
+    {
+        let Ok(mailbox) = parse_mailbox(raw) else {
+            continue;
+        };
+        let address = mailbox_to_contact(mailbox);
+        let Some(email) = contact_email(&address) else {
+            continue;
+        };
+        if !seen.insert(email) {
+            continue;
+        }
+        if upsert_contact(conn, account_id, &address, now, 1, 1, 0)? {
+            changed += 1;
+        }
+    }
+    Ok(changed)
+}
+
+fn escape_like(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+fn search_contacts(
+    conn: &Connection,
+    account_id: &str,
+    query: &str,
+    limit: u32,
+) -> SqlResult<Vec<MailContactSuggestion>> {
+    let normalized = query.trim().to_lowercase();
+    if normalized.is_empty() {
+        return Ok(Vec::new());
+    }
+    let like = format!("%{}%", escape_like(&normalized));
+    let prefix = format!("{}%", escape_like(&normalized));
+    let recent_cutoff = now_ts() - 90 * 86_400;
+    let mut stmt = conn.prepare(
+        "SELECT name, email, last_seen_at, sent_count, received_count, message_count,
+                (CASE WHEN lower(email) = ?3 THEN 400 ELSE 0 END
+                 + CASE WHEN lower(email) LIKE ?4 ESCAPE '\\' THEN 260 ELSE 0 END
+                 + CASE WHEN lower(COALESCE(name, '')) LIKE ?4 ESCAPE '\\' THEN 180 ELSE 0 END
+                 + CASE WHEN last_seen_at >= ?5 THEN 40 ELSE 0 END
+                 + sent_count * 20
+                 + received_count * 6
+                 + message_count * 4) AS score
+         FROM mail_contacts
+         WHERE account_id = ?1
+           AND (lower(email) LIKE ?2 ESCAPE '\\'
+                OR lower(COALESCE(name, '')) LIKE ?2 ESCAPE '\\')
+         ORDER BY score DESC, last_seen_at DESC, email ASC
+         LIMIT ?6",
+    )?;
+    let rows = stmt.query_map(
+        params![
+            account_id,
+            like,
+            normalized,
+            prefix,
+            recent_cutoff,
+            limit as i64,
+        ],
+        |row| {
+            let sent_count: i64 = row.get(3)?;
+            Ok(MailContactSuggestion {
+                name: row.get(0)?,
+                email: row.get(1)?,
+                last_seen_at: row.get(2)?,
+                source: if sent_count > 0 { "sent" } else { "history" }.into(),
+                score: row.get(6)?,
+            })
+        },
+    )?;
+    rows.collect()
 }
 
 fn prune_mail_cache(
@@ -3053,6 +3333,42 @@ mod tests {
             .unwrap();
         assert_eq!(body.source, "cache");
         assert!(body.text.unwrap().contains("Taomni Mail"));
+    }
+
+    #[test]
+    fn contact_index_searches_cached_headers() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_mail_tables(&conn).unwrap();
+        let message = parse_body_message("acct", "INBOX", 10, Some(512), &sample_message(), 4096);
+        upsert_message(&conn, &message).unwrap();
+
+        assert_eq!(reindex_cached_contacts(&conn, "acct").unwrap(), 2);
+        let contacts = search_contacts(&conn, "acct", "sender", 8).unwrap();
+
+        assert_eq!(contacts.len(), 1);
+        assert_eq!(contacts[0].email, "sender@example.com");
+        assert_eq!(contacts[0].source, "history");
+    }
+
+    #[test]
+    fn sent_contacts_raise_sent_source() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_mail_tables(&conn).unwrap();
+        let request = MailSendRequest {
+            to: vec!["Receiver <receiver@example.com>".into()],
+            cc: vec![],
+            bcc: vec![],
+            subject: "Hello".into(),
+            text_body: Some("Body".into()),
+            html_body: None,
+        };
+
+        assert_eq!(upsert_sent_contacts(&conn, "acct", &request).unwrap(), 1);
+        let contacts = search_contacts(&conn, "acct", "receiver", 8).unwrap();
+
+        assert_eq!(contacts.len(), 1);
+        assert_eq!(contacts[0].name.as_deref(), Some("Receiver"));
+        assert_eq!(contacts[0].source, "sent");
     }
 
     #[test]
