@@ -24,6 +24,7 @@ import {
   FolderSymlink,
   FolderX,
   Forward,
+  Image as ImageIcon,
   ImageOff,
   Inbox,
   Link as LinkIcon,
@@ -146,6 +147,13 @@ interface RecipientSearchState {
 interface OpenMailMessageTab {
   key: string;
   message: MailMessageHeader;
+}
+
+interface BodyWarmState {
+  active: boolean;
+  done: number;
+  total: number;
+  folder?: string | null;
 }
 
 interface MailDraggableDialogProps {
@@ -615,6 +623,21 @@ function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() || path || "attachment";
 }
 
+function makeInlineImageContentId(name: string): string {
+  const stem = name
+    .replace(/\.[^.]+$/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32) || "image";
+  const random = Math.random().toString(36).slice(2, 10);
+  return `taomni-${stem}-${Date.now()}-${random}@inline.local`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function guessContentType(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   if (["jpg", "jpeg"].includes(ext)) return "image/jpeg";
@@ -725,7 +748,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [bodyLoading, setBodyLoading] = useState(false);
+  const [bodyCache, setBodyCache] = useState<Map<string, MailMessageBody>>(() => new Map());
+  const [bodyLoadingKey, setBodyLoadingKey] = useState<string | null>(null);
+  const [bodyWarming, setBodyWarming] = useState<BodyWarmState>({ active: false, done: 0, total: 0 });
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -749,6 +774,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const initialSyncDoneRef = useRef(false);
   const contactIndexAccountRef = useRef<string | null>(null);
   const contactSearchSeqRef = useRef(0);
+  const bodyCacheRef = useRef<Map<string, MailMessageBody>>(new Map());
+  const bodyRequestsRef = useRef<Map<string, Promise<MailMessageBody>>>(new Map());
+  const bodyLoadSeqRef = useRef(0);
+  const bodyWarmSeqRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
   const foldersRef = useRef<MailFolder[]>([]);
@@ -832,10 +861,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [messages, query]);
   const allFilteredMessagesChecked = filteredMessages.length > 0
     && filteredMessages.every((message) => checkedMessageKeys.has(messageKey(message)));
-  const selectedBody = useMemo(
-    () => (bodyMatchesMessage(body, selectedMessage) ? body : null),
-    [body, selectedMessage],
-  );
+  const selectedBody = useMemo(() => {
+    if (!selectedMessage) return null;
+    const cached = bodyCache.get(messageKey(selectedMessage));
+    if (cached && bodyMatchesMessage(cached, selectedMessage)) return cached;
+    return bodyMatchesMessage(body, selectedMessage) ? body : null;
+  }, [body, bodyCache, selectedMessage]);
 
   const readerHtml = useMemo(() => {
     if (!selectedBody?.html) return null;
@@ -1025,7 +1056,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     if (append) {
       setLoadingMoreMessages(true);
     } else {
-      setLoadingMessages(true);
+      if (!quiet) setLoadingMessages(true);
       setHasMoreMessages(false);
     }
     setError(null);
@@ -1051,10 +1082,128 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       if (append) {
         setLoadingMoreMessages(false);
       } else {
-        setLoadingMessages(false);
+        if (!quiet) setLoadingMessages(false);
       }
     }
   }, [info.sessionId, pageSize]);
+
+  const rememberBody = useCallback((nextBody: MailMessageBody) => {
+    const key = `${nextBody.folder}:${nextBody.uid}`;
+    const nextCache = new Map(bodyCacheRef.current);
+    nextCache.set(key, nextBody);
+    bodyCacheRef.current = nextCache;
+    setBodyCache(nextCache);
+    setBody(nextBody);
+
+    const enrichHeader = (message: MailMessageHeader): MailMessageHeader => {
+      if (messageKey(message) !== key) return message;
+      const attachmentCount = nextBody.attachments.length;
+      return {
+        ...message,
+        messageId: nextBody.messageId ?? message.messageId,
+        subject: nextBody.subject || message.subject,
+        snippet: nextBody.snippet ?? message.snippet,
+        rawSize: nextBody.rawSize ?? message.rawSize,
+        bodyCached: true,
+        hasAttachments: message.hasAttachments || attachmentCount > 0,
+        attachmentCount: Math.max(message.attachmentCount, attachmentCount),
+        attachments: attachmentCount > 0 ? nextBody.attachments : message.attachments,
+      };
+    };
+
+    setMessages((current) => current.map(enrichHeader));
+    setMessageTabs((current) => current.map((tab) => ({
+      ...tab,
+      message: enrichHeader(tab.message),
+    })));
+  }, []);
+
+  const fetchBodyForMessage = useCallback((message: MailMessageHeader): Promise<MailMessageBody> => {
+    const key = messageKey(message);
+    const cached = bodyCacheRef.current.get(key);
+    if (cached && bodyMatchesMessage(cached, message)) {
+      rememberBody(cached);
+      return Promise.resolve(cached);
+    }
+    const inflight = bodyRequestsRef.current.get(key);
+    if (inflight) return inflight;
+
+    const request = mailGetMessageBody(info, message.folder, message.uid)
+      .then((nextBody) => {
+        rememberBody(nextBody);
+        return nextBody;
+      })
+      .finally(() => {
+        bodyRequestsRef.current.delete(key);
+      });
+    bodyRequestsRef.current.set(key, request);
+    return request;
+  }, [info, rememberBody]);
+
+  const warmRecentBodies = useCallback(async (foldersToWarm: MailFolder[], preferredFolder: string) => {
+    if (!info.cache.enabled || info.cache.bodyRecentLimit <= 0) {
+      setBodyWarming({ active: false, done: 0, total: 0 });
+      return;
+    }
+    const seq = bodyWarmSeqRef.current + 1;
+    bodyWarmSeqRef.current = seq;
+    const limit = Math.max(1, Math.min(1000, info.cache.bodyRecentLimit));
+    const orderedFolders = foldersToWarm.slice().sort((a, b) => {
+      if (a.name === preferredFolder) return -1;
+      if (b.name === preferredFolder) return 1;
+      return 0;
+    });
+    const seen = new Set<string>();
+    const candidates: MailMessageHeader[] = [];
+    setBodyWarming({ active: true, done: 0, total: 0 });
+
+    try {
+      for (const folder of orderedFolders) {
+        if (bodyWarmSeqRef.current !== seq) return;
+        const page = await mailListCachedMessages(info.sessionId, folder.name, limit, 0);
+        for (const message of page) {
+          const key = messageKey(message);
+          if (seen.has(key) || message.bodyCached || bodyCacheRef.current.has(key)) continue;
+          seen.add(key);
+          candidates.push(message);
+        }
+      }
+
+      if (bodyWarmSeqRef.current !== seq) return;
+      if (candidates.length === 0) {
+        setBodyWarming({ active: false, done: 0, total: 0 });
+        return;
+      }
+
+      setBodyWarming({ active: true, done: 0, total: candidates.length, folder: candidates[0]?.folder ?? null });
+      let done = 0;
+      for (const message of candidates) {
+        if (bodyWarmSeqRef.current !== seq) return;
+        try {
+          await fetchBodyForMessage(message);
+        } catch {
+          // Body warming is opportunistic; direct message open still reports errors.
+        }
+        done += 1;
+        if (bodyWarmSeqRef.current !== seq) return;
+        setBodyWarming({
+          active: done < candidates.length,
+          done,
+          total: candidates.length,
+          folder: message.folder,
+        });
+      }
+    } finally {
+      if (bodyWarmSeqRef.current === seq) {
+        setBodyWarming((current) => ({
+          active: false,
+          done: current.total > 0 ? current.done : 0,
+          total: current.total,
+          folder: current.folder,
+        }));
+      }
+    }
+  }, [fetchBodyForMessage, info.cache.bodyRecentLimit, info.cache.enabled, info.sessionId]);
 
   const syncFolder = useCallback(async (
     folder = selectedFolder,
@@ -1065,7 +1214,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     const append = options.append ?? false;
     const offset = Math.max(0, options.offset ?? 0);
     const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
-    const includeBodies = options.includeBodies ?? offset === 0;
+    const includeBodies = options.includeBodies ?? false;
 
     if (indicator === "more") {
       setLoadingMoreMessages(true);
@@ -1092,7 +1241,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         setStatus(
           append
             ? result.fetchedMessages > 0 ? `Loaded ${result.fetchedMessages} older messages` : "No more messages"
-            : `Synced ${result.fetchedMessages} messages, cached ${result.cachedBodies} bodies`,
+            : `Synced ${result.fetchedMessages} headers`,
         );
       }
       return result;
@@ -1114,7 +1263,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   ) => {
     const indicator = options.indicator ?? "sync";
     const limit = Math.max(1, options.limit ?? batchSize);
-    const includeBodies = options.includeBodies ?? true;
+    const includeBodies = options.includeBodies ?? false;
     const activeBeforeSync = selectedFolder;
 
     if (indicator === "sync") {
@@ -1136,9 +1285,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none");
       if (indicator !== "none") {
         setStatus(
-          `Synced ${result.fetchedMessages} new messages across ${result.folders.length} folders, cached ${result.cachedBodies} bodies`,
+          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`,
         );
       }
+      void warmRecentBodies(result.folders, nextFolder);
       return result;
     } catch (e) {
       if (indicator !== "none") setError(String(e));
@@ -1148,23 +1298,32 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         setSyncing(false);
       }
     }
-  }, [batchSize, info, loadCachedMessages, selectedFolder]);
+  }, [batchSize, info, loadCachedMessages, selectedFolder, warmRecentBodies]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
-    setBodyLoading(true);
+    const key = messageKey(message);
+    const cached = bodyCacheRef.current.get(key);
+    if (cached && bodyMatchesMessage(cached, message)) {
+      rememberBody(cached);
+      return cached;
+    }
+    const seq = bodyLoadSeqRef.current + 1;
+    bodyLoadSeqRef.current = seq;
+    setBodyLoadingKey(key);
     setError(null);
     try {
-      const nextBody = await mailGetMessageBody(info, message.folder, message.uid);
-      setBody(nextBody);
-      setStatus(nextBody.source === "cache" ? "Loaded body from cache" : "Loaded body from server");
+      const nextBody = await fetchBodyForMessage(message);
+      if (bodyLoadSeqRef.current === seq) {
+        setStatus(nextBody.source === "cache" ? "Loaded body from cache" : "Loaded body from server");
+      }
       return nextBody;
     } catch (e) {
       setError(String(e));
       return null;
     } finally {
-      setBodyLoading(false);
+      setBodyLoadingKey((current) => (current === key ? null : current));
     }
-  }, [info]);
+  }, [fetchBodyForMessage, rememberBody]);
 
   const markMessagesReadLocally = useCallback((folder: string, uids: number[] | null, markedCount: number) => {
     if (markedCount <= 0) return;
@@ -1266,7 +1425,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setSelectedFolder(message.folder);
     setSelectedMessageKey(key);
     setMailViewKey(viewKey);
-    setBody((current) => (bodyMatchesMessage(current, message) ? current : null));
+    const cached = bodyCacheRef.current.get(key);
+    setBody((current) => (
+      cached && bodyMatchesMessage(cached, message)
+        ? cached
+        : bodyMatchesMessage(current, message) ? current : null
+    ));
   }, []);
 
   const openMessageTab = useCallback((message: MailMessageHeader) => {
@@ -1319,6 +1483,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   useEffect(() => {
     initialSyncDoneRef.current = false;
     foldersRef.current = [];
+    bodyWarmSeqRef.current += 1;
+    bodyLoadSeqRef.current += 1;
+    bodyCacheRef.current = new Map();
+    bodyRequestsRef.current.clear();
     setFolders([]);
     setMessages([]);
     setSelectedMessageKey(null);
@@ -1327,6 +1495,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setPopupMessageKey(null);
     setCheckedMessageKeys(new Set());
     setBody(null);
+    setBodyCache(new Map());
+    setBodyLoadingKey(null);
+    setBodyWarming({ active: false, done: 0, total: 0 });
     setHasMoreMessages(false);
     setLoadingMoreMessages(false);
     setDownloadingAttachmentIndex(null);
@@ -1343,7 +1514,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     initialSyncDoneRef.current = true;
     void syncAllFolders(true, {
       limit: batchSize,
-      includeBodies: true,
+      includeBodies: false,
       indicator: "sync",
     });
   }, [batchSize, info.sync.onOpen, syncAllFolders, visible]);
@@ -1354,7 +1525,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     const id = window.setInterval(() => {
       void syncAllFolders(true, {
         limit: batchSize,
-        includeBodies: true,
+        includeBodies: false,
         indicator: "none",
       });
     }, intervalMs);
@@ -1391,10 +1562,16 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       remoteImagesMessageKeyRef.current = key;
       setAllowRemoteImages(false);
     }
+    if (!selectedBody) {
+      void loadBody(selectedMessage);
+    }
+    if (autoReadKeyRef.current === key || !isUnread(selectedMessage)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    autoReadKeyRef.current = key;
     void (async () => {
-      const currentBody = selectedBody ?? await loadBody(selectedMessage);
-      if (cancelled || !currentBody || autoReadKeyRef.current === key || !isUnread(selectedMessage)) return;
-      autoReadKeyRef.current = key;
       try {
         const result = await mailMarkRead(info, selectedMessage.folder, [selectedMessage.uid], false);
         if (!cancelled && result.marked > 0) {
@@ -1446,9 +1623,16 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     setError(null);
     try {
       await mailClearCache(info.sessionId);
+      bodyWarmSeqRef.current += 1;
+      bodyLoadSeqRef.current += 1;
+      bodyCacheRef.current = new Map();
+      bodyRequestsRef.current.clear();
       setFolders([]);
       setMessages([]);
       setBody(null);
+      setBodyCache(new Map());
+      setBodyLoadingKey(null);
+      setBodyWarming({ active: false, done: 0, total: 0 });
       setSelectedMessageKey(null);
       setMailViewKey("mailbox");
       setMessageTabs([]);
@@ -1657,6 +1841,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         path: attachment.path,
         name: attachment.name ?? null,
         contentType: attachment.contentType ?? null,
+        inline: attachment.inline ?? false,
+        contentId: attachment.contentId ?? null,
       })),
     };
     const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
@@ -1712,11 +1898,58 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     }
   };
 
+  const handleInsertInlineImage = async (): Promise<string | null> => {
+    try {
+      const paths = await selectUploadFile();
+      const path = paths[0];
+      if (!path) return null;
+      const name = basename(path);
+      const contentType = guessContentType(name);
+      if (!contentType.toLowerCase().startsWith("image/")) {
+        setError("Inline image must be a local image file.");
+        return null;
+      }
+      const contentId = makeInlineImageContentId(name);
+      const attachment: MailDraftAttachment = {
+        path,
+        name,
+        contentType,
+        inline: true,
+        contentId,
+        size: null,
+        modifiedAt: null,
+      };
+      setDraft((current) => ({
+        ...current,
+        richFormatUsed: true,
+        attachments: [...current.attachments, attachment],
+      }));
+      return `<img src="cid:${escapeHtml(contentId)}" alt="${escapeHtml(name)}">`;
+    } catch (e) {
+      setError(String(e));
+      return null;
+    }
+  };
+
   const removeDraftAttachment = (index: number) => {
-    setDraft((current) => ({
-      ...current,
-      attachments: current.attachments.filter((_, i) => i !== index),
-    }));
+    setDraft((current) => {
+      const removed = current.attachments[index];
+      const attachments = current.attachments.filter((_, i) => i !== index);
+      if (!removed?.inline || !removed.contentId) {
+        return { ...current, attachments };
+      }
+      const cid = escapeRegExp(removed.contentId);
+      const htmlBody = current.htmlBody.replace(
+        new RegExp(`<img\\b[^>]*\\bsrc=["']cid:${cid}["'][^>]*>`, "gi"),
+        "",
+      );
+      return {
+        ...current,
+        attachments,
+        htmlBody,
+        textBody: mailHtmlToPlainText(htmlBody),
+      };
+    });
   };
 
   const discardCurrentDraft = async () => {
@@ -2321,7 +2554,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         label: "Sync all folders",
         icon: <RefreshCw className="w-3.5 h-3.5" />,
         disabled: syncing,
-        onClick: () => void syncAllFolders(false, { limit: batchSize, includeBodies: true, indicator: "sync" }),
+        onClick: () => void syncAllFolders(false, { limit: batchSize, includeBodies: false, indicator: "sync" }),
       },
       {
         label: "Mark folder read",
@@ -2351,7 +2584,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       disabled: syncing,
       onClick: () => void syncAllFolders(false, {
         limit: batchSize,
-        includeBodies: true,
+        includeBodies: false,
         indicator: "sync",
       }),
     },
@@ -2405,10 +2638,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
     : "cache off";
   const renderReaderSurface = (message: MailMessageHeader | null, popup = false) => {
-    const currentBody = bodyMatchesMessage(body, message) ? body : null;
+    const currentBody = message
+      ? bodyCache.get(messageKey(message)) ?? (bodyMatchesMessage(body, message) ? body : null)
+      : null;
     const currentHtml = currentBody?.html ? sanitizeMailHtml(currentBody.html, allowRemoteImages) : null;
     const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
-    const loadingThisBody = !!message && bodyLoading && selectedMessageKey === messageKey(message);
+    const loadingThisBody = !!message && bodyLoadingKey === messageKey(message);
 
     return (
       <main
@@ -2596,7 +2831,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
           onClick={() => void syncAllFolders(false, {
             limit: batchSize,
-            includeBodies: true,
+            includeBodies: false,
             indicator: "sync",
           })}
           disabled={syncing}
@@ -2605,6 +2840,16 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Sync
         </button>
+        {bodyWarming.active && (
+          <span
+            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-body-warming-progress"
+            title={bodyWarming.folder ? `Warming ${bodyWarming.folder}` : "Warming recent message bodies"}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Bodies {bodyWarming.total > 0 ? `${bodyWarming.done}/${bodyWarming.total}` : "warming"}
+          </span>
+        )}
         <button
           type="button"
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
@@ -2929,7 +3174,9 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                 <span className="text-[12px] font-semibold min-w-0 truncate">
                   {selectedMessage?.subject || "Message"}
                 </span>
-                {bodyLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-text-muted)]" />}
+                {selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-text-muted)]" />
+                )}
                 <div className="ml-auto flex items-center gap-1">
                   <button
                     type="button"
@@ -3080,7 +3327,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                   </div>
 
                   <div className="p-4 text-[13px] leading-6">
-                    {bodyLoading && !selectedBody ? (
+                    {selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && !selectedBody ? (
                       <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Loading message body
@@ -3297,6 +3544,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
               html={draft.htmlBody}
               disabled={sending}
               onAttach={() => void handleAddDraftAttachments()}
+              onInlineImage={() => handleInsertInlineImage()}
               onRichFormatUsed={() => setDraft((current) => ({ ...current, richFormatUsed: true }))}
               onChange={(htmlBody, textBody) => setDraft((current) => ({ ...current, htmlBody, textBody }))}
             />
@@ -3309,8 +3557,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                     data-testid="mail-compose-attachment-chip"
                     title={attachment.path}
                   >
-                    <Paperclip className="w-3 h-3" />
-                    <span className="max-w-[280px] truncate">{attachment.name || basename(attachment.path)}</span>
+                    {attachment.inline ? <ImageIcon className="w-3 h-3" /> : <Paperclip className="w-3 h-3" />}
+                    <span className="max-w-[280px] truncate">
+                      {attachment.inline ? "Inline " : ""}{attachment.name || basename(attachment.path)}
+                    </span>
                     <button
                       type="button"
                       className="ml-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"

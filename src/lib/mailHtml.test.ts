@@ -38,6 +38,22 @@ describe("mailHtml", () => {
     expect(allowed).toContain("https://example.com/a.png");
   });
 
+  it("preserves compose CID images and safe inserted table styles", () => {
+    const html = sanitizeMailComposeHtml(`
+      <p><img src="cid:logo-1@inline.local" alt="logo"></p>
+      <table style="border-collapse: collapse; position: fixed">
+        <tbody><tr><td style="border: 1px solid #9ca3af; padding: 4px 8px; background-image: url(javascript:alert(1))">Cell</td></tr></tbody>
+      </table>
+    `);
+
+    expect(html).toContain("src=\"cid:logo-1@inline.local\"");
+    expect(html).toContain("border-collapse: collapse");
+    expect(html).toContain("border: 1px solid #9ca3af");
+    expect(html).toContain("padding: 4px 8px");
+    expect(html).not.toContain("position");
+    expect(html).not.toContain("background-image");
+  });
+
   it("round-trips plain text through mail HTML and extracts readable text from lists and paragraphs", () => {
     expect(plainTextToMailHtml("Hello\nWorld")).toBe("<p>Hello<br>World</p>");
 

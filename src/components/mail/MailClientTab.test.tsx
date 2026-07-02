@@ -141,6 +141,15 @@ const messageBody: MailMessageBody = {
   source: "cache",
 };
 
+const uncachedMessage: MailMessageHeader = {
+  ...message,
+  uid: 102,
+  messageId: "message-102@example.com",
+  subject: "Fresh header",
+  snippet: "Header arrived before the body cache is warm.",
+  bodyCached: false,
+};
+
 function renderMailbox() {
   return render(<MailClientTab tabId="mail-tab" info={info} visible />);
 }
@@ -258,5 +267,44 @@ describe("MailClientTab", () => {
     expect(html.className).not.toContain("_td]:border");
     expect(html.className).not.toContain("_td]:px");
     expect(html.className).not.toContain("_td]:py");
+  });
+
+  it("syncs headers first and shows body warming as separate progress", async () => {
+    let resolveWarmBody!: (body: MailMessageBody) => void;
+    const warmBodyPromise = new Promise<MailMessageBody>((resolve) => {
+      resolveWarmBody = resolve;
+    });
+    mailMocks.mailListCachedMessages.mockReset();
+    mailMocks.mailListCachedMessages
+      .mockResolvedValueOnce([message])
+      .mockResolvedValueOnce([uncachedMessage])
+      .mockResolvedValueOnce([uncachedMessage]);
+    mailMocks.mailGetMessageBody.mockImplementation((_config: MailTabInfo, _folder: string, uid: number) => {
+      if (uid === uncachedMessage.uid) return warmBodyPromise;
+      return Promise.resolve(messageBody);
+    });
+
+    renderMailbox();
+
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+
+    await waitFor(() => expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledWith(
+      info,
+      { limit: 50, includeBodies: false },
+    ));
+    expect(await screen.findByText(/Header arrived before the body cache is warm/)).toBeInTheDocument();
+    expect(await screen.findByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/1");
+
+    resolveWarmBody({
+      ...messageBody,
+      uid: uncachedMessage.uid,
+      messageId: uncachedMessage.messageId,
+      subject: uncachedMessage.subject,
+      snippet: uncachedMessage.snippet,
+      source: "remote",
+    });
+
+    await waitFor(() => expect(screen.queryByTestId("mail-body-warming-progress")).not.toBeInTheDocument());
   });
 });

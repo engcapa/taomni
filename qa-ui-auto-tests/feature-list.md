@@ -3646,8 +3646,25 @@ controls:
     selector: '[data-testid="mail-compose-link"]'
     kind: interactive
     optional: true       # opens a URL prompt; covered by component tests to avoid prompt timing in smoke
+  - id: insert-menu
+    selector: '[data-testid="mail-compose-insert-menu"]'
+    kind: interactive
+  - id: insert-image
+    selector: '[data-testid="mail-compose-insert-image"]'
+    kind: interactive
+  - id: insert-hr
+    selector: '[data-testid="mail-compose-insert-hr"]'
+    kind: interactive
+    optional: true
+  - id: insert-table
+    selector: '[data-testid="mail-compose-insert-table"]'
+    kind: interactive
+    optional: true       # opens a table-size prompt; covered by component tests
   - id: emoji
     selector: '[data-testid="mail-compose-emoji"]'
+    kind: interactive
+  - id: emoji-laugh
+    selector: '[data-testid="mail-compose-emoji-laugh"]'
     kind: interactive
   - id: compose-editor
     selector: '[data-testid="mail-compose-editor"]'
@@ -3667,11 +3684,39 @@ controls:
 -->
 
 - 写信窗口改为 HTML + 纯文本 fallback 双轨草稿，默认发送模式为 `auto`：只有使用富文本格式或检测到富文本结构时才发送 HTML body。
-- 正文使用 `RichMailEditor` contenteditable 编辑器，提供段落、字体、字号、颜色、加粗/斜体/下划线、清除格式、列表、缩进、对齐、链接、表情和附件入口。
+- 正文使用 `RichMailEditor` contenteditable 编辑器，提供段落、字体、字号、颜色、加粗/斜体/下划线、清除格式、列表、缩进、对齐、链接、Thunderbird 式表情菜单、插入菜单和附件入口。
+- 插入菜单第一期支持本地图片内联 CID：正文写入 `<img src="cid:...">`，附件元数据保存 `inline/contentId`，发送时生成 `multipart/related`；普通附件同时存在时外层使用 `multipart/mixed`。
 - 展示和编辑都经过 `mailHtml` 清洗；远程图片默认阻断，用户显式加载后才显示。
 - 回复和转发保留原始 HTML 内容，回复按 Thunderbird 风格生成 `blockquote type="cite"` 引用和纯文本引用 fallback。
-- 附件元数据随本地草稿保存，发送时后端以 multipart/mixed MIME 附加本地文件。
+- 附件元数据随本地草稿保存，发送时后端按普通附件和内联 CID 图片分别生成 MIME。
 - 本地草稿存入邮件缓存库（浏览器模式用 localStorage stub），支持手动保存、自动保存、Drafts 列表重开、丢弃和发送后删除。
+
+---
+
+### 13.3 邮箱刷新与正文预热 ✅
+
+<!-- feature
+id: F-MAIL-3
+status: done
+area: mail/sync
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mail.ts
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: sync-button
+    selector: '[data-testid="mail-sync-button"]'
+    kind: interactive
+  - id: body-warming-progress
+    selector: '[data-testid="mail-body-warming-progress"]'
+    kind: display
+    optional: true       # only visible while recent uncached bodies are warming
+-->
+
+- 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
+- 最近正文缓存改为前端后台 warming：按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_get_message_body`，并用独立进度显示。
+- 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
 
 ---
 

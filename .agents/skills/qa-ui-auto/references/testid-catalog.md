@@ -148,12 +148,22 @@
 - `[data-testid="mail-compose-align-center"]` — interactive — F-MAIL-2.align-center
 - `[data-testid="mail-compose-align-right"]` — interactive — F-MAIL-2.align-right
 - `[data-testid="mail-compose-link"]` — interactive [optional] — F-MAIL-2.link
+- `[data-testid="mail-compose-insert-menu"]` — interactive — F-MAIL-2.insert-menu
+- `[data-testid="mail-compose-insert-image"]` — interactive — F-MAIL-2.insert-image
+- `[data-testid="mail-compose-insert-hr"]` — interactive [optional] — F-MAIL-2.insert-hr
+- `[data-testid="mail-compose-insert-table"]` — interactive [optional] — F-MAIL-2.insert-table
 - `[data-testid="mail-compose-emoji"]` — interactive — F-MAIL-2.emoji
+- `[data-testid="mail-compose-emoji-laugh"]` — interactive — F-MAIL-2.emoji-laugh
 - `[data-testid="mail-compose-editor"]` — interactive — F-MAIL-2.compose-editor
 - `[data-testid="mail-compose-attach"]` — interactive — F-MAIL-2.compose-attach
 - `[data-testid="mail-compose-attachments"]` — display — F-MAIL-2.compose-attachments
 - `[data-testid="mail-compose-attachment-chip"]` — display — F-MAIL-2.compose-attachment-chip
 - `[data-testid="mail-compose-save-draft"]` — interactive — F-MAIL-2.compose-save-draft
+
+## mail/sync (F-MAIL-3)
+
+- `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
+- `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
 
 ## main (F1.2)
 

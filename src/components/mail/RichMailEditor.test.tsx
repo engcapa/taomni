@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RichMailEditor } from "./RichMailEditor";
 
@@ -60,5 +60,47 @@ describe("RichMailEditor", () => {
     expect(execCommand).toHaveBeenCalledWith("bold", false, undefined);
     expect(onRichFormatUsed).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith("<p>Hello</p>", "Hello");
+  });
+
+  it("opens the Thunderbird-style emoticon menu and inserts the selected emoticon", async () => {
+    const execCommand = vi.fn();
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+
+    render(<RichMailEditor html="<p>Hello</p>" onChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("mail-compose-emoji"));
+    fireEvent.click(await screen.findByTestId("mail-compose-emoji-laugh"));
+
+    expect(execCommand).toHaveBeenCalledWith("insertHTML", false, "😂");
+  });
+
+  it("inserts inline CID image HTML returned by the parent compose window", async () => {
+    const execCommand = vi.fn();
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+
+    render(
+      <RichMailEditor
+        html="<p>Hello</p>"
+        onChange={vi.fn()}
+        onInlineImage={vi.fn(async () => "<img src=\"cid:logo-1@inline.local\" alt=\"logo\">")}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("mail-compose-insert-menu"));
+    fireEvent.click(await screen.findByTestId("mail-compose-insert-image"));
+
+    await waitFor(() => {
+      expect(execCommand).toHaveBeenCalledWith(
+        "insertHTML",
+        false,
+        "<img src=\"cid:logo-1@inline.local\" alt=\"logo\">",
+      );
+    });
   });
 });

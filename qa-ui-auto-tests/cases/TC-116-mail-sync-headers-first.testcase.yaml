@@ -1,0 +1,29 @@
+id: TC-116
+title: Mail sync headers-first refresh
+description: |
+  Opens a browser-stub Mail tab and runs the mailbox Sync action. The browser
+  stub verifies the visible headers-first refresh path; body warming progress is
+  optional because the stub messages already include cached bodies.
+covers: [F-MAIL-3]
+tags: [mail, smoke, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="quick-connect"]'
+  - fill:
+      selector: '[data-testid="qc-input"]'
+      value: 'mail://san.zhang%40yourmail.com@imap.yourmail.com:993'
+  - click: '[data-testid="qc-submit"]'
+  - wait_for: '[data-testid="mail-client-tab"]'
+  - click: '[data-testid="mail-sync-button"]'
+  - assert_text:
+      selector: '[data-testid="mail-client-tab"]'
+      contains: 'Synced'
+      timeout_sec: 10
+  - screenshot: mail-116-sync-headers-first.png

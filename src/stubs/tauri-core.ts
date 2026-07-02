@@ -873,6 +873,8 @@ interface StubMailDraft {
     path: string;
     name?: string | null;
     contentType?: string | null;
+    inline?: boolean;
+    contentId?: string | null;
     size?: number | null;
     modifiedAt?: number | null;
   }>;
@@ -911,6 +913,8 @@ function stubSaveMailDraft(accountId: string, draft: Record<string, unknown>): S
           path: String(item.path),
           name: typeof item.name === "string" ? item.name : null,
           contentType: typeof item.contentType === "string" ? item.contentType : null,
+          inline: item.inline === true,
+          contentId: typeof item.contentId === "string" ? item.contentId : null,
           size: typeof item.size === "number" ? item.size : null,
           modifiedAt: typeof item.modifiedAt === "number" ? item.modifiedAt : null,
         }))
