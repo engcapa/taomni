@@ -124,6 +124,37 @@
 - `[data-testid="mail-recipient-suggestion"]` — interactive — F-MAIL-1.recipient-suggestion
 - `[data-testid="mail-compose-send"]` — interactive [optional] — F-MAIL-1.compose-send
 
+## mail/compose (F-MAIL-2)
+
+- `[data-testid="mail-drafts-open"]` — interactive — F-MAIL-2.drafts-open
+- `[data-testid="mail-drafts-dialog"]` — display — F-MAIL-2.drafts-dialog
+- `[data-testid="mail-draft-row"]` — interactive — F-MAIL-2.draft-row
+- `[data-testid="mail-compose-menu-bar"]` — display — F-MAIL-2.compose-menu-bar
+- `[data-testid="mail-compose-subject"]` — interactive — F-MAIL-2.compose-subject
+- `[data-testid="mail-compose-format-toolbar"]` — display — F-MAIL-2.format-toolbar
+- `[data-testid="mail-compose-format-block"]` — interactive — F-MAIL-2.format-block
+- `[data-testid="mail-compose-font-family"]` — interactive — F-MAIL-2.font-family
+- `[data-testid="mail-compose-font-size"]` — interactive — F-MAIL-2.font-size
+- `[data-testid="mail-compose-text-color"]` — interactive [optional] — F-MAIL-2.text-color
+- `[data-testid="mail-compose-bold"]` — interactive — F-MAIL-2.bold
+- `[data-testid="mail-compose-italic"]` — interactive — F-MAIL-2.italic
+- `[data-testid="mail-compose-underline"]` — interactive — F-MAIL-2.underline
+- `[data-testid="mail-compose-clear-format"]` — interactive — F-MAIL-2.clear-format
+- `[data-testid="mail-compose-bullet-list"]` — interactive — F-MAIL-2.bullet-list
+- `[data-testid="mail-compose-number-list"]` — interactive — F-MAIL-2.number-list
+- `[data-testid="mail-compose-outdent"]` — interactive — F-MAIL-2.outdent
+- `[data-testid="mail-compose-indent"]` — interactive — F-MAIL-2.indent
+- `[data-testid="mail-compose-align-left"]` — interactive — F-MAIL-2.align-left
+- `[data-testid="mail-compose-align-center"]` — interactive — F-MAIL-2.align-center
+- `[data-testid="mail-compose-align-right"]` — interactive — F-MAIL-2.align-right
+- `[data-testid="mail-compose-link"]` — interactive [optional] — F-MAIL-2.link
+- `[data-testid="mail-compose-emoji"]` — interactive — F-MAIL-2.emoji
+- `[data-testid="mail-compose-editor"]` — interactive — F-MAIL-2.compose-editor
+- `[data-testid="mail-compose-attach"]` — interactive — F-MAIL-2.compose-attach
+- `[data-testid="mail-compose-attachments"]` — display — F-MAIL-2.compose-attachments
+- `[data-testid="mail-compose-attachment-chip"]` — display — F-MAIL-2.compose-attachment-chip
+- `[data-testid="mail-compose-save-draft"]` — interactive — F-MAIL-2.compose-save-draft
+
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail

@@ -3253,7 +3253,13 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
                 onQueryChange={(nextQuery) => handleRecipientQueryChange("bcc", nextQuery)}
               />
               <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-subject-${tabId}`}>Subject</label>
-              <input id={`mail-subject-${tabId}`} className="taomni-input h-7" value={draft.subject} onChange={(event) => setDraft((current) => ({ ...current, subject: event.target.value }))} />
+              <input
+                id={`mail-subject-${tabId}`}
+                className="taomni-input h-7"
+                data-testid="mail-compose-subject"
+                value={draft.subject}
+                onChange={(event) => setDraft((current) => ({ ...current, subject: event.target.value }))}
+              />
             </div>
             <RichMailEditor
               html={draft.htmlBody}
