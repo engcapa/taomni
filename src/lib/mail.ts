@@ -128,6 +128,14 @@ export interface MailSendResult {
   response: string;
 }
 
+export interface MailContactSuggestion {
+  name?: string | null;
+  email: string;
+  source: "history" | "sent" | "typed";
+  score: number;
+  lastSeenAt?: number | null;
+}
+
 export interface MailDownloadAttachmentResult {
   path: string;
   name?: string | null;
@@ -233,6 +241,18 @@ export function mailSendMessage(
   return withVaultLockedNotice(() =>
     invoke<MailSendResult>("mail_send_message", { config, request }),
   );
+}
+
+export function mailIndexCachedContacts(accountId: string): Promise<number> {
+  return invoke<number>("mail_index_cached_contacts", { accountId });
+}
+
+export function mailSearchContacts(
+  accountId: string,
+  query: string,
+  limit = 8,
+): Promise<MailContactSuggestion[]> {
+  return invoke<MailContactSuggestion[]>("mail_search_contacts", { accountId, query, limit });
 }
 
 export function mailTestConnection(config: MailTabInfo): Promise<MailTestConnectionResult> {

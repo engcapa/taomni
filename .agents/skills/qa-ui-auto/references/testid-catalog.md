@@ -111,6 +111,19 @@
 - `[data-testid="db-maximize"]` — interactive [optional] — F-DB-1.maximize
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
+## mail/compose (F-MAIL-1)
+
+- `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab
+- `[data-testid="mail-compose-open"]` — interactive — F-MAIL-1.compose-open
+- `[data-testid="mail-compose-dialog"]` — display — F-MAIL-1.compose-dialog
+- `[data-testid="mail-recipient-to"]` — interactive — F-MAIL-1.recipient-to
+- `[data-testid="mail-recipient-cc"]` — interactive — F-MAIL-1.recipient-cc
+- `[data-testid="mail-recipient-bcc"]` — interactive — F-MAIL-1.recipient-bcc
+- `[data-testid="mail-recipient-chip"]` — display — F-MAIL-1.recipient-chip
+- `[data-testid="mail-recipient-suggestions"]` — display — F-MAIL-1.recipient-suggestions
+- `[data-testid="mail-recipient-suggestion"]` — interactive — F-MAIL-1.recipient-suggestion
+- `[data-testid="mail-compose-send"]` — interactive [optional] — F-MAIL-1.compose-send
+
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
@@ -227,6 +240,30 @@
 - `[data-testid="compact-main-menu"]` — interactive — F1.4.main-menu
 - `[data-testid="compact-sidebar-drawer-toggle"]` — interactive — F1.4.sidebar-drawer-toggle
   ↳ `[aria-label="Show sessions drawer"]` — alias
+
+## notes (F-TAO-1)
+
+- `[data-testid="tao-hub-tab-chat"]` — interactive [optional] — F-TAO-1.tao-hub-tab-chat
+- `[data-testid="tao-hub-tab-notes"]` — interactive [optional] — F-TAO-1.tao-hub-tab-notes
+- `[data-testid="notes-panel"]` — display [optional] — F-TAO-1.notes-panel
+- `[data-testid="notes-new"]` — interactive [optional] — F-TAO-1.notes-new
+- `[data-testid="notes-search"]` — interactive [optional] — F-TAO-1.notes-search
+- `[data-testid="notes-list-item"]` — interactive [optional] — F-TAO-1.notes-list-item
+- `[data-testid="notes-list"]` — display [optional] — F-TAO-1.notes-list
+- `[data-testid="notes-toggle-complete"]` — interactive [optional] — F-TAO-1.notes-toggle-complete
+- `[data-testid="notes-filter-menu"]` — interactive [optional] — F-TAO-1.notes-filter-menu
+- `[data-testid="notes-filter-recent_incomplete"]` — interactive [optional] — F-TAO-1.notes-filter-recent
+- `[data-testid="notes-filter-completed"]` — interactive [optional] — F-TAO-1.notes-filter-completed
+- `[data-testid="note-editor"]` — display [optional] — F-TAO-1.note-editor
+- `[data-testid="note-editor-title"]` — interactive [optional] — F-TAO-1.note-editor-title
+- `[data-testid="note-editor-back"]` — interactive [optional] — F-TAO-1.note-editor-back
+- `[data-testid="notes-settings-toggle"]` — interactive [optional] — F-TAO-1.notes-settings-toggle
+- `[data-testid="note-theme-settings"]` — display [optional] — F-TAO-1.note-theme-settings
+- `[data-testid="note-theme-paper"]` — interactive [optional] — F-TAO-1.note-theme-paper
+- `[data-testid="note-panel-mode-floating"]` — interactive [optional] — F-TAO-1.note-panel-mode-floating
+- `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
+- `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
+- `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
 
 ## rdp (F9.7)
 

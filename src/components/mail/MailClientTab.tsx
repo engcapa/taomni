@@ -56,6 +56,7 @@ import {
   mailDownloadAttachment,
   mailFetchRaw,
   mailGetMessageBody,
+  mailIndexCachedContacts,
   mailListCachedFolders,
   mailListCachedMessages,
   mailMarkRead,
@@ -64,15 +65,29 @@ import {
   mailSaveRaw,
   mailSendMessage,
   mailSetFlags,
+  mailSearchContacts,
   mailSyncAllFolders,
   mailSyncHeaders,
   mailTestConnection,
   type MailAddress,
   type MailAttachmentInfo,
+  type MailContactSuggestion,
   type MailFolder,
   type MailMessageBody,
   type MailMessageHeader,
 } from "../../lib/mail";
+import { RecipientField } from "./RecipientField";
+import {
+  extractDefaultMailDomain,
+  formatRecipientForSend,
+  isValidEmailAddress,
+  mergeRecipientSuggestions,
+  parseRecipientsText,
+  recipientLabel,
+  searchCachedMessageContacts,
+  type ComposeRecipient,
+  type RecipientSuggestion,
+} from "../../lib/mailRecipients";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { openLocalPath, temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
@@ -90,11 +105,20 @@ interface MailClientTabProps {
 }
 
 interface ComposeDraft {
-  to: string;
-  cc: string;
-  bcc: string;
+  to: ComposeRecipient[];
+  cc: ComposeRecipient[];
+  bcc: ComposeRecipient[];
   subject: string;
   body: string;
+}
+
+type RecipientFieldKey = "to" | "cc" | "bcc";
+
+interface RecipientSearchState {
+  field: RecipientFieldKey | null;
+  query: string;
+  suggestions: MailContactSuggestion[];
+  loading: boolean;
 }
 
 interface OpenMailMessageTab {
@@ -137,10 +161,20 @@ const DEFAULT_FOLDER: MailFolder = {
   updatedAt: 0,
 };
 
+function emptyComposeDraft(): ComposeDraft {
+  return {
+    to: [],
+    cc: [],
+    bcc: [],
+    subject: "",
+    body: "",
+  };
+}
+
 const EMPTY_DRAFT: ComposeDraft = {
-  to: "",
-  cc: "",
-  bcc: "",
+  to: [],
+  cc: [],
+  bcc: [],
   subject: "",
   body: "",
 };
@@ -484,13 +518,6 @@ function joinLocalPath(dir: string, name: string): string {
   return `${base}${sep}${name}`;
 }
 
-function splitRecipients(value: string): string[] {
-  return value
-    .split(/[;,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function dedupeMessages(messages: readonly MailMessageHeader[]): MailMessageHeader[] {
   const seen = new Set<string>();
   const unique: MailMessageHeader[] = [];
@@ -613,10 +640,18 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [markingRead, setMarkingRead] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
+  const [recipientSearch, setRecipientSearch] = useState<RecipientSearchState>({
+    field: null,
+    query: "",
+    suggestions: [],
+    loading: false,
+  });
   const [sending, setSending] = useState(false);
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
   const [allowRemoteImages, setAllowRemoteImages] = useState(false);
   const initialSyncDoneRef = useRef(false);
+  const contactIndexAccountRef = useRef<string | null>(null);
+  const contactSearchSeqRef = useRef(0);
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
@@ -639,6 +674,10 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
+  const defaultMailDomain = useMemo(
+    () => extractDefaultMailDomain([info.emailAddress, info.imap.username, info.smtp.username]),
+    [info.emailAddress, info.imap.username, info.smtp.username],
+  );
   const mailAppearance = useMemo(
     () => mailAppearanceStyle(info.terminalProfile, mailFontSize, systemPrefersDark),
     [info.terminalProfile, mailFontSize, systemPrefersDark],
@@ -701,6 +740,30 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     () => (body?.attachments.length ? body.attachments : selectedMessage?.attachments ?? []),
     [body?.attachments, selectedMessage?.attachments],
   );
+  const activeRecipientSuggestions = useMemo<RecipientSuggestion[]>(() => {
+    const { field, query: recipientQuery, suggestions } = recipientSearch;
+    if (!field || !recipientQuery.trim()) return [];
+    const selected = draft[field];
+    const remote = suggestions.map((suggestion) => ({ ...suggestion }));
+    const local = searchCachedMessageContacts(messages, recipientQuery, selected, 8);
+    return mergeRecipientSuggestions(remote, local, selected, 8);
+  }, [draft, messages, recipientSearch]);
+
+  const recipientSuggestionsFor = useCallback((field: RecipientFieldKey): RecipientSuggestion[] => {
+    return recipientSearch.field === field ? activeRecipientSuggestions : [];
+  }, [activeRecipientSuggestions, recipientSearch.field]);
+
+  const handleRecipientQueryChange = useCallback((field: RecipientFieldKey, nextQuery: string) => {
+    setRecipientSearch((current) => {
+      if (current.field === field && current.query === nextQuery) return current;
+      return {
+        field,
+        query: nextQuery,
+        suggestions: [],
+        loading: !!nextQuery.trim(),
+      };
+    });
+  }, []);
 
   const increaseFontSize = useCallback(() => {
     setMailFontSize((size) => clampMailFontSize(size + 1));
@@ -717,6 +780,49 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   useEffect(() => {
     setMailFontSize(clampMailFontSize(info.terminalProfile?.fontSize ?? MAIL_BASE_FONT_SIZE));
   }, [info.sessionId, info.terminalProfile?.fontSize]);
+
+  useEffect(() => {
+    if (!composeOpen || contactIndexAccountRef.current === info.sessionId) return;
+    contactIndexAccountRef.current = info.sessionId;
+    mailIndexCachedContacts(info.sessionId).catch(() => undefined);
+  }, [composeOpen, info.sessionId]);
+
+  useEffect(() => {
+    const field = recipientSearch.field;
+    const recipientQuery = recipientSearch.query.trim();
+    if (!composeOpen || !field || !recipientQuery) {
+      setRecipientSearch((current) => (
+        current.loading || current.suggestions.length > 0
+          ? { ...current, suggestions: [], loading: false }
+          : current
+      ));
+      return;
+    }
+
+    const seq = contactSearchSeqRef.current + 1;
+    contactSearchSeqRef.current = seq;
+    const timer = window.setTimeout(() => {
+      mailSearchContacts(info.sessionId, recipientQuery, 8)
+        .then((suggestions) => {
+          if (contactSearchSeqRef.current !== seq) return;
+          setRecipientSearch((current) => (
+            current.field === field && current.query.trim() === recipientQuery
+              ? { ...current, suggestions, loading: false }
+              : current
+          ));
+        })
+        .catch(() => {
+          if (contactSearchSeqRef.current !== seq) return;
+          setRecipientSearch((current) => (
+            current.field === field && current.query.trim() === recipientQuery
+              ? { ...current, suggestions: [], loading: false }
+              : current
+          ));
+        });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [composeOpen, info.sessionId, recipientSearch.field, recipientSearch.query]);
 
   useEffect(() => {
     if (!visible) return;
@@ -1276,10 +1382,11 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   const openCompose = (nextDraft: Partial<ComposeDraft> = {}) => {
     setDraft({
-      ...EMPTY_DRAFT,
+      ...emptyComposeDraft(),
       ...nextDraft,
       body: draftBodyWithSignature(nextDraft.body, info.signature),
     });
+    setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
     setComposeOpen(true);
   };
 
@@ -1303,7 +1410,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           source: "header",
         } satisfies MailMessageBody;
     openCompose({
-      to: from,
+      to: parseRecipientsText(from),
       subject: target.subject.toLowerCase().startsWith("re:")
         ? target.subject
         : `Re: ${target.subject || "(no subject)"}`,
@@ -1346,8 +1453,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           source: "header",
         } satisfies MailMessageBody;
     openCompose({
-      to: to.join(", "),
-      cc: cc.join(", "),
+      to: parseRecipientsText(to.join(", ")),
+      cc: parseRecipientsText(cc.join(", ")),
       subject: target.subject.toLowerCase().startsWith("re:")
         ? target.subject
         : `Re: ${target.subject || "(no subject)"}`,
@@ -1357,15 +1464,21 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   const handleSendDraft = async () => {
     const request = {
-      to: splitRecipients(draft.to),
-      cc: splitRecipients(draft.cc),
-      bcc: splitRecipients(draft.bcc),
+      to: draft.to.map(formatRecipientForSend),
+      cc: draft.cc.map(formatRecipientForSend),
+      bcc: draft.bcc.map(formatRecipientForSend),
       subject: draft.subject.trim(),
       textBody: draft.body,
       htmlBody: null,
     };
-    if (request.to.length === 0) {
+    const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
+    if (recipients.length === 0) {
       setError("At least one recipient is required.");
+      return;
+    }
+    const invalidRecipient = recipients.find((recipient) => !isValidEmailAddress(recipient.email));
+    if (invalidRecipient) {
+      setError(`Invalid recipient: ${recipientLabel(invalidRecipient)}`);
       return;
     }
     setSending(true);
@@ -1374,7 +1487,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       const result = await mailSendMessage(info, request);
       setStatus(result.accepted ? "Message sent" : result.response || "SMTP send returned no acceptance");
       setComposeOpen(false);
-      setDraft(EMPTY_DRAFT);
+      setDraft(emptyComposeDraft());
     } catch (e) {
       setError(String(e));
     } finally {
@@ -2211,7 +2324,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       data-testid="mail-client-tab"
     >
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
-        <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" onClick={() => openCompose()}>
+        <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" data-testid="mail-compose-open" onClick={() => openCompose()}>
           <MailIcon className="w-3.5 h-3.5" />
           Compose
         </button>
@@ -2796,7 +2909,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       )}
 
       {composeOpen && (
-        <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4" data-testid="mail-compose-dialog">
           <MailDraggableDialog
             title="New message"
             icon={<MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -2807,12 +2920,42 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
             onClose={() => setComposeOpen(false)}
           >
             <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
-              <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-to-${tabId}`}>To</label>
-              <input id={`mail-to-${tabId}`} className="taomni-input h-7" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} />
-              <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-cc-${tabId}`}>Cc</label>
-              <input id={`mail-cc-${tabId}`} className="taomni-input h-7" value={draft.cc} onChange={(event) => setDraft((current) => ({ ...current, cc: event.target.value }))} />
-              <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-bcc-${tabId}`}>Bcc</label>
-              <input id={`mail-bcc-${tabId}`} className="taomni-input h-7" value={draft.bcc} onChange={(event) => setDraft((current) => ({ ...current, bcc: event.target.value }))} />
+              <RecipientField
+                id={`mail-to-${tabId}`}
+                label="To"
+                recipients={draft.to}
+                suggestions={recipientSuggestionsFor("to")}
+                defaultDomain={defaultMailDomain}
+                loading={recipientSearch.field === "to" && recipientSearch.loading}
+                disabled={sending}
+                dataTestId="mail-recipient-to"
+                onChange={(to) => setDraft((current) => ({ ...current, to }))}
+                onQueryChange={(nextQuery) => handleRecipientQueryChange("to", nextQuery)}
+              />
+              <RecipientField
+                id={`mail-cc-${tabId}`}
+                label="Cc"
+                recipients={draft.cc}
+                suggestions={recipientSuggestionsFor("cc")}
+                defaultDomain={defaultMailDomain}
+                loading={recipientSearch.field === "cc" && recipientSearch.loading}
+                disabled={sending}
+                dataTestId="mail-recipient-cc"
+                onChange={(cc) => setDraft((current) => ({ ...current, cc }))}
+                onQueryChange={(nextQuery) => handleRecipientQueryChange("cc", nextQuery)}
+              />
+              <RecipientField
+                id={`mail-bcc-${tabId}`}
+                label="Bcc"
+                recipients={draft.bcc}
+                suggestions={recipientSuggestionsFor("bcc")}
+                defaultDomain={defaultMailDomain}
+                loading={recipientSearch.field === "bcc" && recipientSearch.loading}
+                disabled={sending}
+                dataTestId="mail-recipient-bcc"
+                onChange={(bcc) => setDraft((current) => ({ ...current, bcc }))}
+                onQueryChange={(nextQuery) => handleRecipientQueryChange("bcc", nextQuery)}
+              />
               <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-subject-${tabId}`}>Subject</label>
               <input id={`mail-subject-${tabId}`} className="taomni-input h-7" value={draft.subject} onChange={(event) => setDraft((current) => ({ ...current, subject: event.target.value }))} />
             </div>
@@ -2826,7 +2969,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
               <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => setComposeOpen(false)} disabled={sending}>
                 Discard
               </button>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" onClick={handleSendDraft} disabled={sending}>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={handleSendDraft} disabled={sending}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Send
               </button>
