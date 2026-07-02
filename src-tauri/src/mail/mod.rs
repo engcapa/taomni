@@ -11,7 +11,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use lettre::message::{Mailbox, MultiPart, SinglePart};
+use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{Message, SmtpTransport, Transport};
@@ -315,6 +315,18 @@ pub struct MailSendRequest {
     pub text_body: Option<String>,
     #[serde(default)]
     pub html_body: Option<String>,
+    #[serde(default)]
+    pub attachments: Vec<MailSendAttachment>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailSendAttachment {
+    pub path: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub content_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -322,6 +334,84 @@ pub struct MailSendRequest {
 pub struct MailSendResult {
     pub accepted: bool,
     pub response: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MailDraftAttachment {
+    pub path: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub content_type: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
+    #[serde(default)]
+    pub modified_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MailDraftContext {
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub folder: Option<String>,
+    #[serde(default)]
+    pub uid: Option<u32>,
+    #[serde(default)]
+    pub message_id: Option<String>,
+    #[serde(default)]
+    pub subject: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MailDraft {
+    pub id: String,
+    pub account_id: String,
+    pub to: Vec<String>,
+    pub cc: Vec<String>,
+    pub bcc: Vec<String>,
+    pub subject: String,
+    pub text_body: String,
+    pub html_body: String,
+    pub attachments: Vec<MailDraftAttachment>,
+    #[serde(default)]
+    pub reply_context: Option<MailDraftContext>,
+    #[serde(default)]
+    pub remote_draft_folder: Option<String>,
+    #[serde(default)]
+    pub remote_draft_uid: Option<u32>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailDraftSaveRequest {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub to: Vec<String>,
+    #[serde(default)]
+    pub cc: Vec<String>,
+    #[serde(default)]
+    pub bcc: Vec<String>,
+    #[serde(default)]
+    pub subject: String,
+    #[serde(default)]
+    pub text_body: String,
+    #[serde(default)]
+    pub html_body: String,
+    #[serde(default)]
+    pub attachments: Vec<MailDraftAttachment>,
+    #[serde(default)]
+    pub reply_context: Option<MailDraftContext>,
+    #[serde(default)]
+    pub remote_draft_folder: Option<String>,
+    #[serde(default)]
+    pub remote_draft_uid: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -426,11 +516,7 @@ impl ActiveImapSession {
         }
     }
 
-    fn mark_read(
-        &mut self,
-        folder: &str,
-        uids: &[u32],
-    ) -> Result<usize, String> {
+    fn mark_read(&mut self, folder: &str, uids: &[u32]) -> Result<usize, String> {
         match self {
             Self::Tls(session) => imap_mark_read(session, folder, uids),
             Self::Plain(session) => imap_mark_read(session, folder, uids),
@@ -446,12 +532,22 @@ impl ActiveImapSession {
         target_path: &str,
     ) -> Result<MailDownloadAttachmentResult, String> {
         match self {
-            Self::Tls(session) => {
-                imap_download_attachment(session, account, folder, uid, attachment_index, target_path)
-            }
-            Self::Plain(session) => {
-                imap_download_attachment(session, account, folder, uid, attachment_index, target_path)
-            }
+            Self::Tls(session) => imap_download_attachment(
+                session,
+                account,
+                folder,
+                uid,
+                attachment_index,
+                target_path,
+            ),
+            Self::Plain(session) => imap_download_attachment(
+                session,
+                account,
+                folder,
+                uid,
+                attachment_index,
+                target_path,
+            ),
         }
     }
 
@@ -598,7 +694,28 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_mail_contacts_search
-            ON mail_contacts(account_id, email, name);",
+            ON mail_contacts(account_id, email, name);
+
+        CREATE TABLE IF NOT EXISTS mail_drafts (
+            account_id TEXT NOT NULL,
+            id TEXT NOT NULL,
+            to_json TEXT NOT NULL DEFAULT '[]',
+            cc_json TEXT NOT NULL DEFAULT '[]',
+            bcc_json TEXT NOT NULL DEFAULT '[]',
+            subject TEXT NOT NULL DEFAULT '',
+            text_body TEXT NOT NULL DEFAULT '',
+            html_body TEXT NOT NULL DEFAULT '',
+            attachments_json TEXT NOT NULL DEFAULT '[]',
+            reply_context_json TEXT,
+            remote_draft_folder TEXT,
+            remote_draft_uid INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (account_id, id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mail_drafts_updated
+            ON mail_drafts(account_id, updated_at DESC);",
     )
 }
 
@@ -732,7 +849,10 @@ pub async fn mail_sync_all_folders(
             }
         }
         imap.logout();
-        let cached_bodies = messages.iter().filter(|m| m.body_cached_at.is_some()).count();
+        let cached_bodies = messages
+            .iter()
+            .filter(|m| m.body_cached_at.is_some())
+            .count();
         Ok::<_, String>((folders, messages, cached_bodies))
     })
     .await
@@ -870,6 +990,50 @@ pub async fn mail_send_message(
 }
 
 #[tauri::command]
+pub async fn mail_list_drafts(
+    account_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<MailDraft>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    list_mail_drafts(&db, &account_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn mail_save_draft(
+    account_id: String,
+    draft: MailDraftSaveRequest,
+    state: State<'_, AppState>,
+) -> Result<MailDraft, String> {
+    let account_id = account_id.trim();
+    if account_id.is_empty() {
+        return Err("mail account id is required".into());
+    }
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    save_mail_draft(&db, account_id, draft).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn mail_delete_draft(
+    account_id: String,
+    draft_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let account_id = account_id.trim();
+    let draft_id = draft_id.trim();
+    if account_id.is_empty() {
+        return Err("mail account id is required".into());
+    }
+    if draft_id.is_empty() {
+        return Err("mail draft id is required".into());
+    }
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    delete_mail_draft(&db, account_id, draft_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn mail_index_cached_contacts(
     account_id: String,
     state: State<'_, AppState>,
@@ -989,7 +1153,12 @@ pub async fn mail_set_flags(
     let remove_for_task = remove.clone();
     tokio::task::spawn_blocking(move || {
         let mut imap = connect_imap(&account)?;
-        let result = imap.set_flags(&folder_for_task, &uids_for_task, &add_for_task, &remove_for_task);
+        let result = imap.set_flags(
+            &folder_for_task,
+            &uids_for_task,
+            &add_for_task,
+            &remove_for_task,
+        );
         imap.logout();
         result
     })
@@ -1193,8 +1362,7 @@ pub async fn mail_save_raw(
         let raw = raw?;
         let path = std::path::PathBuf::from(&target_path);
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("failed to create folder: {e}"))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("failed to create folder: {e}"))?;
         }
         std::fs::write(&path, &raw).map_err(|e| format!("failed to write .eml file: {e}"))?;
         Ok(MailDownloadAttachmentResult {
@@ -1536,7 +1704,8 @@ fn imap_sync_folder<T: Read + Write>(
         return Ok((folder_info, Vec::new(), false));
     }
 
-    let mut messages = imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
+    let mut messages =
+        imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
     messages.sort_by(|a, b| {
         b.header
             .date_ts
@@ -1605,7 +1774,8 @@ fn imap_sync_folder_incremental<T: Read + Write>(
         return Ok((folder_info, Vec::new()));
     }
 
-    let mut messages = imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
+    let mut messages =
+        imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
     messages.sort_by(|a, b| {
         b.header
             .date_ts
@@ -1750,8 +1920,11 @@ fn save_raw_message(
 
     let folder_component = sanitize_path_component(folder);
     let account_component = sanitize_path_component(&account.config.session_id);
-    let dir = Path::new(root).join(account_component).join(folder_component);
-    std::fs::create_dir_all(&dir).map_err(|e| format!("failed to create mail save directory: {e}"))?;
+    let dir = Path::new(root)
+        .join(account_component)
+        .join(folder_component);
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("failed to create mail save directory: {e}"))?;
     let path = dir.join(format!("{uid}.eml"));
     if path.exists() {
         return Ok(());
@@ -1852,9 +2025,9 @@ fn imap_move_messages<T: Read + Write>(
     // the copied UIDs; plain EXPUNGE is the last resort and clears every
     // \Deleted message in the mailbox.
     if let Err(move_err) = session.uid_mv(&uid_set, target) {
-        session
-            .uid_copy(&uid_set, target)
-            .map_err(|e| format!("IMAP UID COPY to {target} failed: {e} (after MOVE error: {move_err})"))?;
+        session.uid_copy(&uid_set, target).map_err(|e| {
+            format!("IMAP UID COPY to {target} failed: {e} (after MOVE error: {move_err})")
+        })?;
         session
             .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
             .map_err(|e| format!("IMAP UID STORE \\Deleted failed: {e}"))?;
@@ -2247,6 +2420,26 @@ fn build_send_message(
         builder = builder.bcc(parse_mailbox(bcc)?);
     }
 
+    if !request.attachments.is_empty() {
+        let attachments = read_send_attachments(&request.attachments)?;
+        let mut mixed = match (&request.text_body, &request.html_body) {
+            (Some(text), Some(html)) => MultiPart::mixed().multipart(
+                MultiPart::alternative_plain_html(text.clone(), html.clone()),
+            ),
+            (Some(text), None) => MultiPart::mixed().singlepart(SinglePart::plain(text.clone())),
+            (None, Some(html)) => MultiPart::mixed().singlepart(SinglePart::html(html.clone())),
+            (None, None) => return Err("email body is required".into()),
+        };
+        for attachment in attachments {
+            mixed = mixed.singlepart(
+                Attachment::new(attachment.name).body(attachment.bytes, attachment.content_type),
+            );
+        }
+        return builder
+            .multipart(mixed)
+            .map_err(|e| format!("failed to build email body: {e}"));
+    }
+
     match (&request.text_body, &request.html_body) {
         (Some(text), Some(html)) => builder
             .multipart(MultiPart::alternative_plain_html(
@@ -2262,6 +2455,58 @@ fn build_send_message(
             .map_err(|e| format!("failed to build email body: {e}")),
         (None, None) => Err("email body is required".into()),
     }
+}
+
+struct ResolvedSendAttachment {
+    name: String,
+    content_type: ContentType,
+    bytes: Vec<u8>,
+}
+
+fn read_send_attachments(
+    attachments: &[MailSendAttachment],
+) -> Result<Vec<ResolvedSendAttachment>, String> {
+    attachments
+        .iter()
+        .enumerate()
+        .map(|(index, attachment)| {
+            let raw_path = attachment.path.trim();
+            if raw_path.is_empty() {
+                return Err(format!("attachment #{} path is required", index + 1));
+            }
+            let path = Path::new(raw_path);
+            let bytes = std::fs::read(path)
+                .map_err(|e| format!("failed to read attachment {}: {e}", path.display()))?;
+            let name = attachment
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .or_else(|| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .map(ToOwned::to_owned)
+                })
+                .unwrap_or_else(|| format!("attachment-{}", index + 1));
+            Ok(ResolvedSendAttachment {
+                name,
+                content_type: attachment_content_type(attachment.content_type.as_deref()),
+                bytes,
+            })
+        })
+        .collect()
+}
+
+fn attachment_content_type(value: Option<&str>) -> ContentType {
+    let fallback = "application/octet-stream";
+    let candidate = value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback);
+    ContentType::parse(candidate).unwrap_or_else(|_| {
+        ContentType::parse(fallback).expect("application/octet-stream content type is valid")
+    })
 }
 
 fn parse_mailbox(input: &str) -> Result<Mailbox, String> {
@@ -2292,6 +2537,11 @@ fn validate_send_request(request: &MailSendRequest) -> Result<(), String> {
             .is_empty()
     {
         return Err("email body is required".into());
+    }
+    for (index, attachment) in request.attachments.iter().enumerate() {
+        if attachment.path.trim().is_empty() {
+            return Err(format!("attachment #{} path is required", index + 1));
+        }
     }
     Ok(())
 }
@@ -2616,6 +2866,138 @@ fn upsert_sent_contacts(
     Ok(changed)
 }
 
+fn list_mail_drafts(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailDraft>> {
+    let mut stmt = conn.prepare(
+        "SELECT account_id, id, to_json, cc_json, bcc_json, subject, text_body, html_body,
+                attachments_json, reply_context_json, remote_draft_folder, remote_draft_uid,
+                created_at, updated_at
+         FROM mail_drafts
+         WHERE account_id = ?1
+         ORDER BY updated_at DESC",
+    )?;
+    let rows = stmt.query_map(params![account_id], mail_draft_from_row)?;
+    rows.collect()
+}
+
+fn save_mail_draft(
+    conn: &Connection,
+    account_id: &str,
+    draft: MailDraftSaveRequest,
+) -> SqlResult<MailDraft> {
+    let id = draft
+        .id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let now = now_ts();
+    let created_at = conn
+        .query_row(
+            "SELECT created_at FROM mail_drafts WHERE account_id = ?1 AND id = ?2",
+            params![account_id, id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+        .unwrap_or(now);
+    let saved = MailDraft {
+        id,
+        account_id: account_id.to_string(),
+        to: draft.to,
+        cc: draft.cc,
+        bcc: draft.bcc,
+        subject: draft.subject,
+        text_body: draft.text_body,
+        html_body: draft.html_body,
+        attachments: draft.attachments,
+        reply_context: draft.reply_context,
+        remote_draft_folder: draft.remote_draft_folder,
+        remote_draft_uid: draft.remote_draft_uid,
+        created_at,
+        updated_at: now,
+    };
+    let to_json = serde_json::to_string(&saved.to).unwrap_or_else(|_| "[]".into());
+    let cc_json = serde_json::to_string(&saved.cc).unwrap_or_else(|_| "[]".into());
+    let bcc_json = serde_json::to_string(&saved.bcc).unwrap_or_else(|_| "[]".into());
+    let attachments_json =
+        serde_json::to_string(&saved.attachments).unwrap_or_else(|_| "[]".into());
+    let reply_context_json = saved
+        .reply_context
+        .as_ref()
+        .and_then(|context| serde_json::to_string(context).ok());
+    conn.execute(
+        "INSERT INTO mail_drafts
+         (account_id, id, to_json, cc_json, bcc_json, subject, text_body, html_body,
+          attachments_json, reply_context_json, remote_draft_folder, remote_draft_uid,
+          created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+         ON CONFLICT(account_id, id) DO UPDATE SET
+            to_json = excluded.to_json,
+            cc_json = excluded.cc_json,
+            bcc_json = excluded.bcc_json,
+            subject = excluded.subject,
+            text_body = excluded.text_body,
+            html_body = excluded.html_body,
+            attachments_json = excluded.attachments_json,
+            reply_context_json = excluded.reply_context_json,
+            remote_draft_folder = excluded.remote_draft_folder,
+            remote_draft_uid = excluded.remote_draft_uid,
+            updated_at = excluded.updated_at",
+        params![
+            saved.account_id,
+            saved.id,
+            to_json,
+            cc_json,
+            bcc_json,
+            saved.subject,
+            saved.text_body,
+            saved.html_body,
+            attachments_json,
+            reply_context_json,
+            saved.remote_draft_folder,
+            saved.remote_draft_uid,
+            saved.created_at,
+            saved.updated_at,
+        ],
+    )?;
+    Ok(saved)
+}
+
+fn delete_mail_draft(conn: &Connection, account_id: &str, draft_id: &str) -> SqlResult<()> {
+    conn.execute(
+        "DELETE FROM mail_drafts WHERE account_id = ?1 AND id = ?2",
+        params![account_id, draft_id],
+    )?;
+    Ok(())
+}
+
+fn mail_draft_from_row(row: &rusqlite::Row<'_>) -> SqlResult<MailDraft> {
+    let to_json: String = row.get(2)?;
+    let cc_json: String = row.get(3)?;
+    let bcc_json: String = row.get(4)?;
+    let attachments_json: String = row.get(8)?;
+    let reply_context_json: Option<String> = row.get(9)?;
+    let remote_draft_uid: Option<i64> = row.get(11)?;
+    Ok(MailDraft {
+        account_id: row.get(0)?,
+        id: row.get(1)?,
+        to: serde_json::from_str(&to_json).unwrap_or_default(),
+        cc: serde_json::from_str(&cc_json).unwrap_or_default(),
+        bcc: serde_json::from_str(&bcc_json).unwrap_or_default(),
+        subject: row.get(5)?,
+        text_body: row.get(6)?,
+        html_body: row.get(7)?,
+        attachments: serde_json::from_str(&attachments_json).unwrap_or_default(),
+        reply_context: reply_context_json
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok()),
+        remote_draft_folder: row.get(10)?,
+        remote_draft_uid: remote_draft_uid.map(|value| value.max(0) as u32),
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
 fn escape_like(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -2905,7 +3287,10 @@ fn update_cached_flags(
         let mut flags: Vec<String> = serde_json::from_str(&flags_json).unwrap_or_default();
         flags.retain(|flag| !remove.iter().any(|r| flag.eq_ignore_ascii_case(r)));
         for flag in add {
-            if !flags.iter().any(|existing| existing.eq_ignore_ascii_case(flag)) {
+            if !flags
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(flag))
+            {
                 flags.push(flag.clone());
             }
         }
@@ -2941,12 +3326,22 @@ fn purge_cached_folder(conn: &Connection, account_id: &str, folder: &str) -> Sql
     conn.execute(
         "DELETE FROM mail_messages
          WHERE account_id = ?1 AND (folder = ?2 OR folder LIKE ?3 OR folder LIKE ?4)",
-        params![account_id, folder, format!("{folder}/%"), format!("{folder}.%")],
+        params![
+            account_id,
+            folder,
+            format!("{folder}/%"),
+            format!("{folder}.%")
+        ],
     )?;
     conn.execute(
         "DELETE FROM mail_folders
          WHERE account_id = ?1 AND (name = ?2 OR name LIKE ?3 OR name LIKE ?4)",
-        params![account_id, folder, format!("{folder}/%"), format!("{folder}.%")],
+        params![
+            account_id,
+            folder,
+            format!("{folder}/%"),
+            format!("{folder}.%")
+        ],
     )?;
     Ok(())
 }
@@ -3081,7 +3476,10 @@ fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInfo {
     }
 }
 
-fn extract_attachment(body: &[u8], attachment_index: usize) -> Result<DownloadedMailAttachment, String> {
+fn extract_attachment(
+    body: &[u8],
+    attachment_index: usize,
+) -> Result<DownloadedMailAttachment, String> {
     let message = MessageParser::default()
         .parse(body)
         .ok_or_else(|| "failed to parse message attachments".to_string())?;
@@ -3243,6 +3641,40 @@ mod tests {
             .to_vec()
     }
 
+    fn sample_resolved_account() -> ResolvedMailAccount {
+        ResolvedMailAccount {
+            config: MailAccountConfig {
+                session_id: "acct".into(),
+                email_address: "sender@example.com".into(),
+                display_name: Some("Sender".into()),
+                reply_to: None,
+                signature: None,
+                imap: MailServerConfig {
+                    host: "imap.example.com".into(),
+                    port: 993,
+                    username: Some("sender@example.com".into()),
+                    password: Some("secret".into()),
+                    security: MailConnectionSecurity::Tls,
+                },
+                smtp: MailSmtpConfig {
+                    host: "smtp.example.com".into(),
+                    port: 465,
+                    username: Some("sender@example.com".into()),
+                    password: Some("secret".into()),
+                    security: MailConnectionSecurity::Tls,
+                    use_imap_auth: true,
+                },
+                sync: MailSyncSettings::default(),
+                cache: MailCacheSettings::default(),
+                ai: MailAiSettings::default(),
+            },
+            imap_username: "sender@example.com".into(),
+            imap_password: "secret".into(),
+            smtp_username: "sender@example.com".into(),
+            smtp_password: "secret".into(),
+        }
+    }
+
     #[test]
     fn decode_imap_modified_utf7_mailbox_names() {
         assert_eq!(decode_imap_modified_utf7("INBOX"), "INBOX");
@@ -3282,7 +3714,10 @@ mod tests {
         let parsed = parse_body_message("acct", "INBOX", 8, Some(raw.len() as u32), &raw, 4096);
         assert!(parsed.header.has_attachments);
         assert_eq!(parsed.header.attachment_count, 1);
-        assert_eq!(parsed.header.attachments[0].name.as_deref(), Some("report.txt"));
+        assert_eq!(
+            parsed.header.attachments[0].name.as_deref(),
+            Some("report.txt")
+        );
 
         let attachment = extract_attachment(&raw, 0).unwrap();
         assert_eq!(attachment.name.as_deref(), Some("report.txt"));
@@ -3361,6 +3796,7 @@ mod tests {
             subject: "Hello".into(),
             text_body: Some("Body".into()),
             html_body: None,
+            attachments: vec![],
         };
 
         assert_eq!(upsert_sent_contacts(&conn, "acct", &request).unwrap(), 1);
@@ -3369,6 +3805,81 @@ mod tests {
         assert_eq!(contacts.len(), 1);
         assert_eq!(contacts[0].name.as_deref(), Some("Receiver"));
         assert_eq!(contacts[0].source, "sent");
+    }
+
+    #[test]
+    fn build_send_message_wraps_attachments_in_mixed_mime() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("report.txt");
+        std::fs::write(&path, b"attachment body").unwrap();
+        let request = MailSendRequest {
+            to: vec!["Receiver <receiver@example.com>".into()],
+            cc: vec![],
+            bcc: vec![],
+            subject: "Hello".into(),
+            text_body: Some("Plain body".into()),
+            html_body: Some("<p><strong>HTML body</strong></p>".into()),
+            attachments: vec![MailSendAttachment {
+                path: path.to_string_lossy().into_owned(),
+                name: Some("report.txt".into()),
+                content_type: Some("text/plain".into()),
+            }],
+        };
+
+        let message = build_send_message(&sample_resolved_account(), &request).unwrap();
+        let raw = String::from_utf8(message.formatted()).unwrap();
+
+        assert!(raw.contains("multipart/mixed"));
+        assert!(raw.contains("multipart/alternative"));
+        assert!(raw.contains("filename=\"report.txt\""));
+    }
+
+    #[test]
+    fn local_drafts_roundtrip_and_delete() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_mail_tables(&conn).unwrap();
+        let saved = save_mail_draft(
+            &conn,
+            "acct",
+            MailDraftSaveRequest {
+                id: None,
+                to: vec!["Receiver <receiver@example.com>".into()],
+                cc: vec![],
+                bcc: vec![],
+                subject: "Draft subject".into(),
+                text_body: "Plain".into(),
+                html_body: "<p>Plain</p>".into(),
+                attachments: vec![MailDraftAttachment {
+                    path: "/tmp/report.txt".into(),
+                    name: Some("report.txt".into()),
+                    content_type: Some("text/plain".into()),
+                    size: Some(12),
+                    modified_at: Some(123),
+                }],
+                reply_context: Some(MailDraftContext {
+                    kind: Some("reply".into()),
+                    folder: Some("INBOX".into()),
+                    uid: Some(42),
+                    message_id: Some("msg@example.com".into()),
+                    subject: Some("Original".into()),
+                }),
+                remote_draft_folder: None,
+                remote_draft_uid: None,
+            },
+        )
+        .unwrap();
+
+        let drafts = list_mail_drafts(&conn, "acct").unwrap();
+        assert_eq!(drafts.len(), 1);
+        assert_eq!(drafts[0].id, saved.id);
+        assert_eq!(drafts[0].attachments[0].name.as_deref(), Some("report.txt"));
+        assert_eq!(
+            drafts[0].reply_context.as_ref().and_then(|ctx| ctx.uid),
+            Some(42)
+        );
+
+        delete_mail_draft(&conn, "acct", &saved.id).unwrap();
+        assert!(list_mail_drafts(&conn, "acct").unwrap().is_empty());
     }
 
     #[test]
@@ -3393,7 +3904,10 @@ mod tests {
         .unwrap();
         let messages = list_cached_messages(&conn, "acct", "INBOX", 20, 0).unwrap();
         let one = messages.iter().find(|m| m.uid == 1).unwrap();
-        assert!(one.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Flagged")));
+        assert!(one
+            .flags
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case("\\Flagged")));
         assert!(!one.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")));
         let two = messages.iter().find(|m| m.uid == 2).unwrap();
         assert!(two.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")));
@@ -3442,8 +3956,23 @@ mod tests {
         assert!(names.contains(&"ParentX".to_string()));
         assert!(!names.contains(&"Parent".to_string()));
         assert!(!names.contains(&"Parent/Child".to_string()));
-        assert_eq!(list_cached_messages(&conn, "acct", "Parent", 20, 0).unwrap().len(), 0);
-        assert_eq!(list_cached_messages(&conn, "acct", "Parent/Child", 20, 0).unwrap().len(), 0);
-        assert_eq!(list_cached_messages(&conn, "acct", "ParentX", 20, 0).unwrap().len(), 1);
+        assert_eq!(
+            list_cached_messages(&conn, "acct", "Parent", 20, 0)
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            list_cached_messages(&conn, "acct", "Parent/Child", 20, 0)
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            list_cached_messages(&conn, "acct", "ParentX", 20, 0)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }
