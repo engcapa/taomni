@@ -219,7 +219,12 @@ fn leading_directory_command(command: &str) -> Option<(&str, &str)> {
         if command.len() < keyword.len() {
             continue;
         }
-        let (head, tail) = command.split_at(keyword.len());
+        let Some(head) = command.get(..keyword.len()) else {
+            continue;
+        };
+        let Some(tail) = command.get(keyword.len()..) else {
+            continue;
+        };
         if !head.eq_ignore_ascii_case(keyword) {
             continue;
         }
@@ -951,6 +956,13 @@ mod directory_shortcut_tests {
             directory_from_history_command("cd ..", Some(home.as_path())),
             None,
         );
+    }
+
+    #[test]
+    fn skips_non_ascii_history_prefixes_without_panicking() {
+        assert_eq!(directory_from_history_command("›", None), None);
+        assert_eq!(directory_from_history_command("› cd /tmp", None), None);
+        assert_eq!(directory_from_history_command("c› /tmp", None), None);
     }
 
     #[test]
