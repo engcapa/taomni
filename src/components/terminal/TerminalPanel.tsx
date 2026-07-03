@@ -1785,12 +1785,13 @@ export function TerminalPanel({
             testId: "terminal-context-set-local-default-theme",
             onClick: () => {
               const currentDefault = loadLocalTerminalDefaultProfile();
+              const currentProfile = currentTerminalProfileRef.current;
               saveLocalTerminalDefaultProfile({
                 ...currentDefault,
-                theme: themeName,
-                fontFamily,
-                fontSize,
-                fontLigatures,
+                theme: currentProfile.theme,
+                fontFamily: currentProfile.fontFamily,
+                fontSize: currentProfile.fontSize,
+                fontLigatures: currentProfile.fontLigatures,
               });
               setStatusMessage("Default appearance for new local terminals updated");
             },
