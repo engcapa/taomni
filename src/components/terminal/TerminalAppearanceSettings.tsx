@@ -11,9 +11,8 @@ import {
   type TerminalRightClickBehavior,
   type UserCommonCommand,
 } from "../../lib/terminalProfile";
-import { normalizeMailThemeSelectValue, resolveMailTheme } from "../../lib/mailTheme";
 import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
-import { buildMailThemeOptions, buildTerminalThemeOptions } from "../theme/themePreviews";
+import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import {
   getPrimaryFontName,
   isMonospaceFont,
@@ -34,7 +33,6 @@ interface TerminalAppearanceSettingsProps {
   showCustomColors?: boolean;
   showPreview?: boolean;
   allowSystemTheme?: boolean;
-  themeSelector?: "terminal-gallery" | "mail-combined-select";
   className?: string;
 }
 
@@ -63,7 +61,6 @@ export function TerminalAppearanceSettings({
   showCustomColors = false,
   showPreview = true,
   allowSystemTheme = false,
-  themeSelector = "terminal-gallery",
   className = "",
 }: TerminalAppearanceSettingsProps) {
   const t = useT();
@@ -97,12 +94,9 @@ export function TerminalAppearanceSettings({
   }, [primaryFont, profile.fontFamily]);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
   const systemPrefersDark = resolvedAppTheme === "dark";
-  const mailCombinedThemeSelect = themeSelector === "mail-combined-select";
   const terminalSystemThemeSelected = allowSystemTheme && profile.theme === "system";
   const resolvedThemeId = terminalSystemThemeSelected ? resolveSystemTerminalThemeId(systemPrefersDark) : profile.theme;
-  const resolvedTheme = mailCombinedThemeSelect
-    ? resolveMailTheme(profile.theme, systemPrefersDark)
-    : resolveTerminalTheme(resolvedThemeId);
+  const resolvedTheme = resolveTerminalTheme(resolvedThemeId);
   const colors = useMemo(
     () => ({
       background: themeColor(resolvedTheme.background, "#1d1f21"),
@@ -156,32 +150,18 @@ export function TerminalAppearanceSettings({
   };
 
   const customTheme = isCustomTerminalTheme(profile.theme) ? resolveTerminalTheme(profile.theme) : null;
-  const themeSelectValue = mailCombinedThemeSelect
-    ? normalizeMailThemeSelectValue(profile.theme)
-    : customTheme
-      ? profile.theme
-      : resolveThemeId(profile.theme);
-  const themeOptions = useMemo(() => (
-    mailCombinedThemeSelect
-      ? buildMailThemeOptions({
-          systemLabel: t("terminalAppearance.themeSystemName"),
-          codeDarkGroup: t("codeViewAppearance.themeEditorDarkGroup"),
-          codeLightGroup: t("codeViewAppearance.themeEditorLightGroup"),
-          terminalGroup: t("codeViewAppearance.themeTerminalGroup"),
-          customValue: customTheme ? profile.theme : undefined,
-          customTheme,
-          customLabel: t("terminalAppearance.themeCustomName"),
-        })
-      : buildTerminalThemeOptions({
-          includeSystem: allowSystemTheme,
-          systemLabel: t("terminalAppearance.themeSystemName"),
-          customValue: customTheme ? profile.theme : undefined,
-          customTheme,
-          customLabel: t("terminalAppearance.themeCustomName"),
-          darkGroup: t("terminalAppearance.themeVariantDark"),
-          lightGroup: t("terminalAppearance.themeVariantLight"),
-        })
-  ), [allowSystemTheme, customTheme, mailCombinedThemeSelect, profile.theme, systemPrefersDark, t]);
+  const themeSelectValue = customTheme
+    ? profile.theme
+    : resolveThemeId(profile.theme);
+  const themeOptions = useMemo(() => buildTerminalThemeOptions({
+    includeSystem: allowSystemTheme,
+    systemLabel: t("terminalAppearance.themeSystemName"),
+    customValue: customTheme ? profile.theme : undefined,
+    customTheme,
+    customLabel: t("terminalAppearance.themeCustomName"),
+    darkGroup: t("terminalAppearance.themeVariantDark"),
+    lightGroup: t("terminalAppearance.themeVariantLight"),
+  }), [allowSystemTheme, customTheme, profile.theme, t]);
   const selectedCursor = cursorOptions.find((option) =>
     option.style === profile.cursorStyle && option.blink === profile.cursorBlink
   )?.label ?? cursorOptions[0].label;
@@ -291,9 +271,9 @@ export function TerminalAppearanceSettings({
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="block">
           <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.themeHeading")}</span>
-          <ThemePreviewSelect
+            <ThemePreviewSelect
             ariaLabel={t("terminalAppearance.themeSelectAria")}
-            testId={mailCombinedThemeSelect ? "mail-theme-select" : "terminal-theme-select"}
+            testId="terminal-theme-select"
             value={themeSelectValue}
             options={themeOptions}
             onChange={(theme) => updateProfile({ theme })}

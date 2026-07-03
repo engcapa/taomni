@@ -1271,6 +1271,11 @@ controls:
   - id: section-terminal
     selector: '[data-testid="session-section-terminal"]'
     kind: interactive
+    optional: true        # absent for Mail and RDP
+  - id: section-appearance
+    selector: '[data-testid="session-section-appearance"]'
+    kind: interactive
+    optional: true        # Mail uses a mail-specific Appearance tab
   - id: section-network
     selector: '[data-testid="session-section-network"]'
     kind: interactive
@@ -1285,6 +1290,11 @@ controls:
   - id: terminal-body
     selector: '[data-testid="terminal-settings"]'
     kind: display
+    optional: true        # not used by Mail Appearance
+  - id: mail-appearance-body
+    selector: '[data-testid="mail-appearance-settings"]'
+    kind: display
+    optional: true        # only visible for Mail Appearance
   - id: network-body
     selector: '[data-testid="network-settings"]'
     kind: display
@@ -1372,7 +1382,7 @@ controls:
 - 协议选择：SSH、SFTP、RDP、VNC、Browser、FTP、Telnet、Rlogin、Mosh、Serial、Shell（SSH/SFTP 原生；VNC/RDP 接入基础 client；Browser 打开系统浏览器；FTP/Telnet/Rlogin/Mosh/Serial 启动本地命令行 client；Shell 启动本地终端）
 - 基础设置：host、port、username、auth method
 - Advanced SSH：SSH-browser type、Auto-inject OSC 7、Execute command、跳板机/代理
-- Terminal：复用 `TerminalAppearanceSettings` 全套外观控件
+- Terminal：复用 `TerminalAppearanceSettings` 全套外观控件；Mail 使用独立的邮件外观控件
 - Network：Keep-alive、proxy 配置、隧道转发列表（local/remote/dynamic 添加）
 - Bookmark：name、group、tags、描述备注
 - 顶部主题快速切换条
@@ -3798,6 +3808,45 @@ controls:
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
 - 最近正文缓存改为前端后台 warming：按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_get_message_body`，并用独立进度显示。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+
+---
+
+### 13.4 邮件会话外观主题 ✅
+
+<!-- feature
+id: F-MAIL-4
+status: done
+area: mail/settings
+components: [SessionEditor, MailAppearanceSettings]
+files:
+  - src/components/session/SessionEditor.tsx
+  - src/components/mail/MailAppearanceSettings.tsx
+  - src/components/theme/themePreviews.tsx
+controls:
+  - id: mail-appearance-settings
+    selector: '[data-testid="mail-appearance-settings"]'
+    kind: display
+  - id: mail-theme-select
+    selector: '[data-testid="mail-theme-select"]'
+    kind: interactive
+  - id: mail-theme-options
+    selector: '[data-testid^="mail-theme-option-"]'
+    kind: interactive
+    optional: true       # only visible while the preview dropdown is open
+  - id: mail-appearance-preview
+    selector: '[data-testid="mail-appearance-preview"]'
+    kind: display
+  - id: mail-background
+    selector: 'input[aria-label="Mail background hex"]'
+    kind: interactive
+  - id: mail-foreground
+    selector: 'input[aria-label="Mail foreground hex"]'
+    kind: interactive
+-->
+
+- Mail session 的 Appearance 使用邮件专用主题面板，不再复用 Terminal behavior / cursor / scrollback 控件。
+- 主题下拉整合 Follow system、Code View 色板与 Terminal color themes，但预览统一使用邮件正文语义。
+- 底部预览展示邮件列表 + HTML 正文片段。
 
 ---
 

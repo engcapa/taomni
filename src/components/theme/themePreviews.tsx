@@ -64,6 +64,42 @@ export function CodeThemeLinePreview({ vars }: { vars: CodeThemeVars | null }) {
   );
 }
 
+export function MailThemeLinePreview({ theme }: { theme: ITheme }) {
+  const bg = valueOr(theme.background, "#1d1f21");
+  const fg = valueOr(theme.foreground, "#eaeaea");
+  const accent = valueOr(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
+  const border = valueOr(theme.selectionBackground, bg);
+  return (
+    <span
+      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-[11px]"
+      style={{ background: bg, color: fg, borderColor: border }}
+    >
+      <span className="font-semibold truncate">Subject</span>
+      <span className="opacity-70 truncate">Hello, <b>team</b></span>
+      <span className="truncate" style={{ color: accent }}>View brief</span>
+    </span>
+  );
+}
+
+export function SplitMailThemeLinePreview({
+  light,
+  dark,
+}: {
+  light: ITheme;
+  dark: ITheme;
+}) {
+  return (
+    <span className="h-7 min-w-0 rounded border border-[var(--taomni-divider)] inline-flex overflow-hidden text-[11px]">
+      <span className="w-1/2 min-w-0 overflow-hidden">
+        <MailThemeLinePreview theme={light} />
+      </span>
+      <span className="w-1/2 min-w-0 overflow-hidden">
+        <MailThemeLinePreview theme={dark} />
+      </span>
+    </span>
+  );
+}
+
 export function SplitThemeLinePreview({
   left,
   right,
@@ -270,15 +306,9 @@ export function buildMailThemeOptions({
       value: SYSTEM_TERMINAL_THEME,
       label: systemLabel,
       preview: (
-        <SplitThemeLinePreview
-          left={{
-            background: getTerminalThemeDefinition(SYSTEM_LIGHT_TERMINAL_THEME)?.theme.background ?? "#eef3f7",
-            color: getTerminalThemeDefinition(SYSTEM_LIGHT_TERMINAL_THEME)?.theme.foreground ?? "#1d2633",
-          }}
-          right={{
-            background: getTerminalThemeDefinition(SYSTEM_DARK_TERMINAL_THEME)?.theme.background ?? "#101420",
-            color: getTerminalThemeDefinition(SYSTEM_DARK_TERMINAL_THEME)?.theme.foreground ?? "#d7dde8",
-          }}
+        <SplitMailThemeLinePreview
+          light={getTerminalThemeDefinition(SYSTEM_LIGHT_TERMINAL_THEME)?.theme ?? { background: "#eef3f7", foreground: "#1d2633" }}
+          dark={getTerminalThemeDefinition(SYSTEM_DARK_TERMINAL_THEME)?.theme ?? { background: "#101420", foreground: "#d7dde8" }}
         />
       ),
       testId: "mail-theme-option-system",
@@ -287,7 +317,7 @@ export function buildMailThemeOptions({
       ? [{
           value: customValue,
           label: customLabel,
-          preview: <TerminalThemeLinePreview theme={customTheme} />,
+          preview: <MailThemeLinePreview theme={customTheme} />,
           testId: "mail-theme-option-custom",
         }]
       : []),
@@ -295,17 +325,29 @@ export function buildMailThemeOptions({
       value: mailCodeThemeValue(definition.id),
       label: definition.name,
       group: definition.variant === "light" ? codeLightGroup : codeDarkGroup,
-      preview: <CodeThemeLinePreview vars={codeThemeVarsForDefinition(definition)} />,
+      preview: <MailThemeLinePreview theme={terminalThemeFromCodeTheme(definition)} />,
       testId: `mail-theme-option-code-${definition.id}`,
     })),
     ...TERMINAL_THEME_DEFINITIONS.map((definition) => ({
       value: definition.id,
       label: definition.name,
       group: terminalGroup,
-      preview: <TerminalThemeLinePreview theme={definition.theme} />,
+      preview: <MailThemeLinePreview theme={definition.theme} />,
       testId: `mail-theme-option-terminal-${definition.id}`,
     })),
   ];
+}
+
+function terminalThemeFromCodeTheme(definition: CodeThemeDefinition): ITheme {
+  const palette = definition.palette;
+  return {
+    background: palette.background,
+    foreground: palette.foreground,
+    cursor: palette.cursor ?? palette.foreground,
+    selectionBackground: palette.selection ?? palette.background,
+    blue: palette.modified ?? palette.function,
+    cyan: palette.type,
+  };
 }
 
 export function resolvedAppThemeForMode(mode: AppThemeMode, resolvedTheme: ResolvedAppTheme): ResolvedAppTheme {

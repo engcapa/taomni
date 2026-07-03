@@ -24,6 +24,7 @@ import {
   Database,
   Info,
   Mail,
+  Palette,
 } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
@@ -101,6 +102,7 @@ import { engineForProvider } from "../../types/objectStorage";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
+import { MailAppearanceSettings } from "../mail/MailAppearanceSettings";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import {
   PathMappingsEditor,
@@ -118,7 +120,7 @@ type Proto =
   | "MySQL" | "PostgreSQL" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
   | "Proxy" | "Mail";
 
-type SectionTab = "advanced" | "terminal" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage" | "mail";
+type SectionTab = "advanced" | "terminal" | "appearance" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage" | "mail";
 type MailSecurityMode = "TLS" | "STARTTLS" | "None";
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
@@ -525,13 +527,9 @@ function AdvancedSshSettings({
 function TerminalSettings({
   profile,
   onProfileChange,
-  allowSystemTheme = false,
-  themeSelector = "terminal-gallery",
 }: {
   profile: TerminalProfile;
   onProfileChange: (profile: TerminalProfile) => void;
-  allowSystemTheme?: boolean;
-  themeSelector?: "terminal-gallery" | "mail-combined-select";
 }) {
   return (
     <div data-testid="terminal-settings" className="text-[12px]">
@@ -539,8 +537,6 @@ function TerminalSettings({
         profile={profile}
         onProfileChange={onProfileChange}
         showCustomColors
-        allowSystemTheme={allowSystemTheme}
-        themeSelector={themeSelector}
       />
     </div>
   );
@@ -3343,7 +3339,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     : isMail
     ? [
         { id: "mail", label: "Mail account", icon: <Mail className="w-3 h-3 inline -mt-0.5 mr-1" /> },
-        { id: "terminal", label: "Appearance", icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "appearance", label: "Appearance", icon: <Palette className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
     : [
@@ -3374,7 +3370,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         : isObjectStorage
         ? (section === "objectstorage" || section === "bookmark" || section === "network" ? section : "objectstorage")
         : isMail
-        ? (section === "mail" || section === "bookmark" || section === "terminal" ? section : "mail")
+        ? (section === "mail" || section === "bookmark" || section === "appearance" ? section : "mail")
         : isDb || isHBase
         ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
@@ -3387,7 +3383,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               ? "rdp"
               : section === "database"
                 ? "terminal"
-                : section;
+                : section === "appearance"
+                  ? "terminal"
+                  : section;
 
   const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth: 600, minHeight: 400 });
 
@@ -3839,12 +3837,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             />
           )}
 
-          {activeSection === "terminal" && (
+          {activeSection === "terminal" && !isMail && (
             <TerminalSettings
               profile={terminalProfile}
               onProfileChange={setTerminalProfile}
-              allowSystemTheme={isMail}
-              themeSelector={isMail ? "mail-combined-select" : "terminal-gallery"}
+            />
+          )}
+          {activeSection === "appearance" && isMail && (
+            <MailAppearanceSettings
+              profile={terminalProfile}
+              onProfileChange={setTerminalProfile}
             />
           )}
           {activeSection === "rdp" && (
