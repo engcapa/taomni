@@ -15,7 +15,6 @@ vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
 }));
 
-const STORAGE_KEY = "taomni.terminalProfile.v1";
 const CODE_VIEW_STORAGE_KEY = "taomni.codeViewProfile.v1";
 const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
 
@@ -47,42 +46,24 @@ describe("SettingsPanel", () => {
     cleanup();
   });
 
-  it("persists global terminal appearance settings", async () => {
-    const user = userEvent.setup();
+  it("does not expose global terminal appearance settings", () => {
     render(<SettingsPanel />);
 
-    const terminalFontSelect = screen.getByLabelText("Terminal font");
-    await waitFor(() => expect(within(terminalFontSelect).getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-
-    await user.selectOptions(terminalFontSelect, "JetBrains Mono");
-    const fontSize = screen.getByLabelText("Terminal font size");
-    await user.clear(fontSize);
-    await user.type(fontSize, "18");
-    await user.click(screen.getByLabelText("Enable font ligatures"));
-    await user.click(screen.getByRole("button", { name: "Use theme Kanagawa Wave" }));
-    await user.selectOptions(screen.getByLabelText("Terminal cursor"), "Underline (steady)");
-    await user.click(screen.getByLabelText("Enable keyword highlighting"));
-
-    await waitFor(() => {
-      const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}");
-      expect(saved.fontFamily).toContain("JetBrains Mono");
-      expect(saved.fontSize).toBe(18);
-      expect(saved.fontLigatures).toBe(true);
-      expect(saved.theme).toBe("kanagawa-wave");
-      expect(saved.cursorStyle).toBe("underline");
-      expect(saved.cursorBlink).toBe(false);
-      expect(saved.syntaxMode).toBe("keywords");
-    });
-  }, 10_000);
+    expect(screen.queryByText("Terminal Appearance")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-appearance-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-theme-select")).not.toBeInTheDocument();
+  });
 
   it("persists the global application theme mode", async () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
-    await user.click(screen.getByRole("button", { name: "Dark" }));
+    await user.click(screen.getByTestId("app-theme-select"));
+    await user.click(screen.getByTestId("app-theme-dark"));
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("dark");
 
-    await user.click(screen.getByRole("button", { name: "Follow system" }));
+    await user.click(screen.getByTestId("app-theme-select"));
+    await user.click(screen.getByTestId("app-theme-system"));
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("system");
   });
 
@@ -120,14 +101,15 @@ describe("SettingsPanel", () => {
     await user.clear(fontSize);
     await user.type(fontSize, "15");
     await user.click(screen.getByLabelText("Enable code font ligatures"));
-    await user.selectOptions(screen.getByLabelText("Code theme"), "kanagawa-wave");
+    await user.click(screen.getByTestId("code-theme-select"));
+    await user.click(screen.getByTestId("code-theme-option-terminal-kanagawa-wave"));
 
     await waitFor(() => {
       const saved = JSON.parse(window.localStorage.getItem(CODE_VIEW_STORAGE_KEY) ?? "{}");
       expect(saved.fontFamily).toContain("JetBrains Mono");
       expect(saved.fontSize).toBe(15);
       expect(saved.fontLigatures).toBe(false);
-      expect(saved.theme).toBe("kanagawa-wave");
+      expect(saved.theme).toBe("terminal:kanagawa-wave");
     });
   }, 10_000);
 

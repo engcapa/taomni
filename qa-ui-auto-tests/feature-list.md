@@ -970,7 +970,7 @@ controls: []   # font enumeration is consumed by F4.2/F5.2 UI controls
 - 前端 IPC 拉取系统字体列表，加载失败时使用安全 fallback
 - Source Code Pro 在可用时作为默认字体
 
-### 5.2 终端主题画廊（Termius 风格）✅
+### 5.2 终端主题预览下拉（Termius 风格）✅
 
 <!-- feature
 id: F5.2
@@ -983,9 +983,17 @@ controls:
   - id: appearance-root
     selector: '[data-testid="terminal-appearance-settings"]'
     kind: display
-  - id: theme-gallery
-    selector: '[data-testid="terminal-theme-gallery"]'
-    kind: display
+  - id: theme-select
+    selector: '[data-testid="terminal-theme-select"]'
+    kind: interactive
+  - id: theme-options
+    selector: '[data-testid^="terminal-theme-option-"]'
+    kind: interactive
+    optional: true       # only visible while the preview dropdown is open
+  - id: local-default-theme
+    selector: '[data-testid="terminal-context-set-local-default-theme"]'
+    kind: interactive
+    optional: true       # only visible in the local terminal context menu
   - id: preview
     selector: '[data-testid="terminal-preview"]'
     kind: display
@@ -1033,15 +1041,15 @@ controls:
 - 终端右键菜单可快速切换主题（无需重连重挂载）
 
 ### 5.3 共享外观控件 `TerminalAppearanceSettings` ✅
-- 字体选择器、字号 stepper、主题画廊、底部预览
+- 字体选择器、字号 stepper、主题预览下拉、底部预览
 - 光标样式（block / underline / bar）+ 闪烁
 - Scrollback 行数、日志、关键字高亮、显示项、剪贴板/粘贴策略
-- 同一控件复用于全局设置面板与会话编辑器
+- 同一控件复用于终端类会话编辑器与终端上下文菜单相关设置
 - 实时预览反映光标样式与闪烁状态
 
 ### 5.4 配置持久化 ✅
-- 全局终端配置：`localStorage`（默认值，未保存会话使用）
-- 每会话 override：`session.options_json.terminalProfile`
+- 临时本地终端默认配置：`localStorage` 的 `taomni.localTerminalProfile.v1`（用于 `+` 号新开本地终端）
+- 保存会话 override：`session.options_json.terminalProfile`
 - 活跃终端可在不重启的情况下应用主题/字体/字号/连字变化
 
 ### 5.5 应用整体主题（Light / Dark / Follow system）✅
@@ -1055,20 +1063,14 @@ files:
   - src/components/settings/AppThemeSwitcher.tsx
 controls:
   # Title-bar quick-cycle theme button is owned by F1.3 (theme-cycle).
-  # F5.5 owns the in-Settings switcher: 3-button group + compact <select> + standalone icon button.
-  - id: theme-light
-    selector: '[data-testid="app-theme-light"]'
+  # F5.5 owns the in-Settings preview dropdown + standalone icon button.
+  - id: theme-select
+    selector: '[data-testid="app-theme-select"]'
     kind: interactive
-  - id: theme-dark
-    selector: '[data-testid="app-theme-dark"]'
+  - id: theme-options
+    selector: '[data-testid^="app-theme-"]'
     kind: interactive
-  - id: theme-system
-    selector: '[data-testid="app-theme-system"]'
-    kind: interactive
-  - id: theme-compact-select
-    selector: 'select[aria-label="Application theme"]'
-    kind: interactive
-    optional: true       # only renders in compact mode of AppThemeSwitcher
+    optional: true       # light/dark/system rows only render while the dropdown is open
   - id: theme-icon-button
     selector: 'button[aria-label="Cycle application theme"]'
     kind: interactive
@@ -1138,12 +1140,20 @@ controls:
   - id: session-delete
     selector: '[data-testid="session-delete"]'
     kind: interactive
+  - id: context-set-terminal-theme
+    selector: '[data-testid="context-menu-item-set-terminal-theme"]'
+    kind: interactive
+    optional: true       # visible from a saved session context menu
+  - id: context-terminal-theme-options
+    selector: '[data-testid^="session-terminal-theme-option-"]'
+    kind: interactive
+    optional: true       # visible while the terminal theme flyout is open
 -->
 
 - 分组树（展开 / 折叠 / 拖拽到分组）
 - 搜索框 `session-search`
 - 双击 → 触发连接
-- 右键菜单：Connect / Edit / Duplicate / Move to folder / Delete
+- 右键菜单：Connect / Edit / Duplicate / Move to folder / Set terminal theme / Delete
 - 「最近连接」区域
 
 ### 6.3 会话编辑器 `SessionEditor` ✅
@@ -1273,6 +1283,11 @@ controls:
   - id: section-terminal
     selector: '[data-testid="session-section-terminal"]'
     kind: interactive
+    optional: true        # absent for Mail and RDP
+  - id: section-appearance
+    selector: '[data-testid="session-section-appearance"]'
+    kind: interactive
+    optional: true        # Mail uses a mail-specific Appearance tab
   - id: section-network
     selector: '[data-testid="session-section-network"]'
     kind: interactive
@@ -1287,6 +1302,11 @@ controls:
   - id: terminal-body
     selector: '[data-testid="terminal-settings"]'
     kind: display
+    optional: true        # not used by Mail Appearance
+  - id: mail-appearance-body
+    selector: '[data-testid="mail-appearance-settings"]'
+    kind: display
+    optional: true        # only visible for Mail Appearance
   - id: network-body
     selector: '[data-testid="network-settings"]'
     kind: display
@@ -1374,7 +1394,7 @@ controls:
 - 协议选择：SSH、SFTP、RDP、VNC、Browser、FTP、Telnet、Rlogin、Mosh、Serial、Shell（SSH/SFTP 原生；VNC/RDP 接入基础 client；Browser 打开系统浏览器；FTP/Telnet/Rlogin/Mosh/Serial 启动本地命令行 client；Shell 启动本地终端）
 - 基础设置：host、port、username、auth method
 - Advanced SSH：SSH-browser type、Auto-inject OSC 7、Execute command、跳板机/代理
-- Terminal：复用 `TerminalAppearanceSettings` 全套外观控件
+- Terminal：复用 `TerminalAppearanceSettings` 全套外观控件；Mail 使用独立的邮件外观控件
 - Network：Keep-alive、proxy 配置、隧道转发列表（local/remote/dynamic 添加）
 - Bookmark：name、group、tags、描述备注
 - 顶部主题快速切换条
@@ -2171,18 +2191,13 @@ controls:
   - id: panel-root
     selector: '[data-testid="settings-panel"]'
     kind: display
-  - id: reset-terminal-profile
-    selector: '[data-testid="settings-reset-terminal-profile"]'
-    kind: interactive
   - id: welcome-recent-session-limit
     selector: '[data-testid="settings-welcome-recent-session-limit"]'
     kind: interactive
 -->
 
 - Application Theme 切换（Light / Dark / Follow system）
-- Terminal Appearance 区块（与会话编辑器 Terminal 段一致的完整外观与行为控件）
 - Welcome 最近会话历史数量设置（默认 20）
-- 终端预览
 - 设置项即时持久化
 
 ---
@@ -2914,12 +2929,21 @@ files:
   - src/components/sidebar/SessionTree.tsx
   - src/components/sidebar/Sidebar.tsx
   - src/layouts/MainLayout.tsx
-controls: []   # selection state is exposed via [data-selected] / [aria-selected] on existing session-tree-item rows; no new dedicated testids
+controls:
+  - id: set-terminal-theme
+    selector: '[data-testid="context-menu-item-set-terminal-theme"]'
+    kind: interactive
+    optional: true       # visible after opening a selected saved-session context menu
+  - id: terminal-theme-options
+    selector: '[data-testid^="session-terminal-theme-option-"]'
+    kind: interactive
+    optional: true       # visible while the terminal theme flyout is open
 -->
 
 - 在 SessionTree 中按住 Ctrl / Meta 单击会话条目可累加选中
 - 选中状态通过 `data-selected` / `aria-selected` 属性暴露
 - 右键菜单首项变成 `Connect selected sessions (N)`，一次性把所有选中会话作为新 tab 打开
+- 右键菜单提供 `Set terminal theme...` 预览 flyout，可批量写入所选非 Mail 保存会话的 `terminalProfile.theme`
 - 普通点击仍然回到单选语义
 
 ---
@@ -3558,10 +3582,14 @@ controls:
     selector: '[data-testid="note-theme-settings"]'
     kind: display
     optional: true
+  - id: note-theme-select
+    selector: '[data-testid="note-theme-select"]'
+    kind: interactive
+    optional: true
   - id: note-theme-paper
     selector: '[data-testid="note-theme-paper"]'
     kind: interactive
-    optional: true
+    optional: true       # only visible while the preview dropdown is open
   - id: note-panel-mode-floating
     selector: '[data-testid="note-panel-mode-floating"]'
     kind: interactive
@@ -3801,6 +3829,45 @@ controls:
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
 - 最近正文缓存改为前端后台 warming：按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_get_message_body`，并用独立进度显示。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+
+---
+
+### 13.4 邮件会话外观主题 ✅
+
+<!-- feature
+id: F-MAIL-4
+status: done
+area: mail/settings
+components: [SessionEditor, MailAppearanceSettings]
+files:
+  - src/components/session/SessionEditor.tsx
+  - src/components/mail/MailAppearanceSettings.tsx
+  - src/components/theme/themePreviews.tsx
+controls:
+  - id: mail-appearance-settings
+    selector: '[data-testid="mail-appearance-settings"]'
+    kind: display
+  - id: mail-theme-select
+    selector: '[data-testid="mail-theme-select"]'
+    kind: interactive
+  - id: mail-theme-options
+    selector: '[data-testid^="mail-theme-option-"]'
+    kind: interactive
+    optional: true       # only visible while the preview dropdown is open
+  - id: mail-appearance-preview
+    selector: '[data-testid="mail-appearance-preview"]'
+    kind: display
+  - id: mail-background
+    selector: 'input[aria-label="Mail background hex"]'
+    kind: interactive
+  - id: mail-foreground
+    selector: 'input[aria-label="Mail foreground hex"]'
+    kind: interactive
+-->
+
+- Mail session 的 Appearance 使用邮件专用主题面板，不再复用 Terminal behavior / cursor / scrollback 控件。
+- 主题下拉整合 Follow system、Code View 色板与 Terminal color themes，但预览统一使用邮件正文语义。
+- 底部预览展示邮件列表 + HTML 正文片段。
 
 ---
 

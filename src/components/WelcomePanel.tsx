@@ -39,8 +39,10 @@ import type { LocalShellSelection } from "../types";
 import { useT, type TranslateFn } from "../lib/i18n";
 import { sessionTypeLabel } from "../lib/terminalProfile";
 import { SESSION_ROOT_LABEL, collectFolderPaths, folderOptionLabel } from "../lib/sessionPaths";
+import type { SessionTerminalAppearancePatch } from "../lib/sessionTerminalTheme";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { useConfirmDialog } from "./sidebar/ConfirmDialog";
+import { buildSessionTerminalThemeMenuItem } from "./session/SessionTerminalThemeMenu";
 
 interface WelcomePanelProps {
   onStartLocalTerminal: (shell?: LocalShellSelection, cwd?: string) => void;
@@ -477,6 +479,7 @@ function RecentSessionsPanel({
     duplicateSessions,
     moveSessionsToGroup,
     removeSessions,
+    updateSessionsTerminalAppearance,
   } = useSessionStore();
   const { setStatusMessage } = useAppStore();
   const folderPaths = useMemo(
@@ -515,6 +518,17 @@ function RecentSessionsPanel({
     );
     if (!confirmed) return;
     await removeSessions(uniqueSessions.map((session) => session.id));
+  };
+
+  const setTerminalAppearance = async (
+    patch: SessionTerminalAppearancePatch,
+    targetSessions: readonly SessionConfig[],
+  ) => {
+    const updatedCount = await updateSessionsTerminalAppearance(
+      uniqueRecentSessionsById(targetSessions).map((session) => session.id),
+      patch,
+    );
+    setStatusMessage(t("sessionTree.terminalAppearanceUpdated", { count: updatedCount }));
   };
 
   return (
@@ -716,6 +730,7 @@ function RecentSessionsPanel({
                       onEditSession,
                       onDuplicateSessions: duplicateSessions,
                       onMoveSessionsToGroup: moveSessionsToGroup,
+                      onSetTerminalAppearance: setTerminalAppearance,
                       onDeleteSessions: confirmDeleteSessions,
                       onConnectMenuSessions: connectMenuSessions,
                     }));
@@ -783,6 +798,7 @@ function recentSessionMenuItems({
   onEditSession,
   onDuplicateSessions,
   onMoveSessionsToGroup,
+  onSetTerminalAppearance,
   onDeleteSessions,
   onConnectMenuSessions,
 }: {
@@ -795,6 +811,7 @@ function recentSessionMenuItems({
   onEditSession?: (session: SessionConfig) => void;
   onDuplicateSessions: (ids: string[]) => Promise<void>;
   onMoveSessionsToGroup: (ids: string[], groupPath: string | null) => Promise<void>;
+  onSetTerminalAppearance: (patch: SessionTerminalAppearancePatch, sessions: readonly SessionConfig[]) => Promise<void>;
   onDeleteSessions: (sessions: readonly SessionConfig[]) => Promise<void>;
   onConnectMenuSessions: (sessions: readonly SessionConfig[], sourceLabel: string) => void;
 }): MenuItem[] {
@@ -850,6 +867,11 @@ function recentSessionMenuItems({
       icon: <Folder className="w-3 h-3" />,
       children: moveChildren,
     },
+    buildSessionTerminalThemeMenuItem({
+      sessions: uniqueSessions,
+      t,
+      onSelectAppearance: onSetTerminalAppearance,
+    }),
     { label: "", separator: true },
     {
       label: hasMultiSelection

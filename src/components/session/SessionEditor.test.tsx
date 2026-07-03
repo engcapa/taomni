@@ -190,7 +190,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
 
     await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("Source Code Pro");
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("monospace");
 
     const background = screen.getByLabelText("Terminal background hex");
     await user.clear(background);
@@ -862,7 +862,8 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     const fontSize = screen.getByLabelText("Terminal font size");
     await user.clear(fontSize);
     await user.type(fontSize, "18");
-    await user.click(screen.getByRole("button", { name: /use theme termius dark/i }));
+    await user.click(screen.getByTestId("terminal-theme-select"));
+    await user.click(screen.getByTestId("terminal-theme-option-termius-dark"));
     await user.click(screen.getByRole("button", { name: "OK" }));
 
     expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
@@ -898,11 +899,16 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.type(screen.getByLabelText("Mail save directory"), "D:\\mail-cache");
 
     await user.click(screen.getByRole("button", { name: /appearance/i }));
-    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-    const fontSize = screen.getByLabelText("Terminal font size");
-    await user.clear(fontSize);
-    await user.type(fontSize, "16");
-    await user.click(screen.getByRole("button", { name: /use theme termius dark/i }));
+    expect(screen.getByTestId("mail-appearance-settings")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Terminal font size")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Terminal cursor")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Scrollback lines")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mail-appearance-preview")).toBeInTheDocument();
+    const themeSelect = screen.getByTestId("mail-theme-select");
+    await user.click(themeSelect);
+    expect(screen.getByTestId("mail-theme-option-code-dracula")).toBeInTheDocument();
+    expect(screen.getByTestId("mail-theme-option-terminal-termius-dark")).toBeInTheDocument();
+    await user.click(screen.getByTestId("mail-theme-option-code-dracula"));
     await user.click(screen.getByRole("button", { name: "OK" }));
 
     expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
@@ -921,8 +927,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(savedOptions.mailSaveDirectory).toBe("D:\\mail-cache");
     expect(savedOptions.passwordRef).toBe("vault:pwd");
     expect(savedOptions.terminalProfile).toMatchObject({
-      fontSize: 16,
-      theme: "termius-dark",
+      theme: "code:dracula",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -937,8 +942,9 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.type(screen.getByLabelText("SMTP server"), "smtp.example.com");
 
     await user.click(screen.getByRole("button", { name: /appearance/i }));
-    const systemTheme = await screen.findByRole("button", { name: /use system theme/i });
-    expect(systemTheme).toHaveAttribute("data-selected", "true");
+    expect(await screen.findByTestId("mail-appearance-settings")).toBeInTheDocument();
+    const systemTheme = await screen.findByTestId("mail-theme-select");
+    expect(systemTheme).toHaveTextContent("Follow system theme");
 
     await user.click(screen.getByRole("button", { name: "OK" }));
 

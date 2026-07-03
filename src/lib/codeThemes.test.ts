@@ -8,7 +8,11 @@ import {
   isCodeThemeId,
   resolveSystemCodeThemeId,
 } from "./codeThemes";
-import { resolveCodeThemeVars, type CodeViewProfile } from "./codeViewProfile";
+import {
+  CODE_VIEW_TERMINAL_THEME_PREFIX,
+  resolveCodeThemeVars,
+  type CodeViewProfile,
+} from "./codeViewProfile";
 
 const baseProfile: CodeViewProfile = {
   fontFamily: "monospace",
@@ -64,5 +68,13 @@ describe("resolveCodeThemeVars", () => {
   it("keeps back-compat with saved terminal-theme ids", () => {
     const vars = resolveCodeThemeVars({ ...baseProfile, theme: "kanagawa-wave" }, { resolvedAppTheme: "dark" });
     expect(vars?.["--taomni-code-bg"]).toBe("#1f1f28");
+  });
+
+  it("resolves explicit prefixed terminal-theme ids", () => {
+    const vars = resolveCodeThemeVars(
+      { ...baseProfile, theme: `${CODE_VIEW_TERMINAL_THEME_PREFIX}night-owl` },
+      { resolvedAppTheme: "dark" },
+    );
+    expect(vars?.["--taomni-code-bg"]).toBe("#011627");
   });
 });

@@ -1,9 +1,9 @@
 id: TC-auto-F5-5
-title: Application theme switcher exposes Light / Dark / System buttons in settings
+title: Application theme switcher exposes Light / Dark / System preview options in settings
 description: |
   Auto-generated focused coverage for F5.5 (application theme). The
-  AppThemeSwitcher renders three discrete buttons in the settings panel
-  (data-testid="app-theme-{light,dark,system}"). TC-015 already exercises
+  AppThemeSwitcher renders a preview dropdown in the settings panel with
+  option rows (data-testid="app-theme-{light,dark,system}"). TC-015 already exercises
   the title-bar tray cycle button — this case drives the explicit picker
   used inside the settings tab and verifies each click is honored by the
   document attribute and persisted to localStorage.
@@ -17,6 +17,8 @@ steps:
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: '[data-testid="settings-panel"]'
+  - assert_visible: '[data-testid="app-theme-select"]'
+  - click: '[data-testid="app-theme-select"]'
   - assert_visible: '[data-testid="app-theme-light"]'
   - assert_visible: '[data-testid="app-theme-dark"]'
   - assert_visible: '[data-testid="app-theme-system"]'
@@ -27,12 +29,14 @@ steps:
       expression: 'document.documentElement.getAttribute("data-app-theme")'
       contains: light
 
+  - click: '[data-testid="app-theme-select"]'
   - click: '[data-testid="app-theme-dark"]'
   - wait: 0.5
   - eval_readonly:
       expression: 'document.documentElement.getAttribute("data-app-theme")'
       contains: dark
 
+  - click: '[data-testid="app-theme-select"]'
   - click: '[data-testid="app-theme-system"]'
   - wait: 0.5
   - assert_localstorage: { key: "taomni.appTheme.v1", exists: true }

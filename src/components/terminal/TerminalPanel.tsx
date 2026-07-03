@@ -14,9 +14,13 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {
-  loadGlobalTerminalProfile,
+  DEFAULT_TERMINAL_PROFILE,
+  isCustomTerminalTheme,
+  loadLocalTerminalDefaultProfile,
   parseSessionOptions,
   resolveTerminalTheme,
+  resolveTerminalThemeWithSystem,
+  saveLocalTerminalDefaultProfile,
   type TerminalProfile,
   type TerminalSyntaxMode,
   type UserCommonCommand,
@@ -25,7 +29,8 @@ import {
   getSessionNetworkSettings,
   toNetworkSettingsPayload,
 } from "../../lib/networkSettings";
-import { TERMINAL_THEME_DEFINITIONS, resolveThemeId } from "../../lib/themes";
+import { resolveThemeId } from "../../lib/themes";
+import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import {
   findFontName,
   getPrimaryFontName,
@@ -35,6 +40,7 @@ import {
   useSystemFonts,
 } from "../../lib/systemFonts";
 import { FontPickerPanel } from "./FontPickerPanel";
+import { TerminalAppearanceMenuPanel } from "./TerminalAppearanceMenuPanel";
 import {
   attachTerminalImeGuard,
   shouldUseLinuxImeGuard,
@@ -54,6 +60,7 @@ import {
   type XtermCaptureTheme,
 } from "../../lib/capture";
 import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { useAppTheme } from "../../lib/appTheme";
 import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
@@ -186,6 +193,7 @@ interface TerminalPanelProps {
     args?: string[];
   };
   terminalProfile?: TerminalProfile;
+  persistLocalProfile?: boolean;
   adoptedTerminal?: AdoptedTerminalSession;
   /**
    * One-shot working directory for the initial connect. Local terminals launch
@@ -289,6 +297,7 @@ export function TerminalPanel({
   commandTerminal,
   localShell,
   terminalProfile,
+  persistLocalProfile,
   adoptedTerminal,
   initialCwd,
   preserveSessionOnUnmount = false,
@@ -357,14 +366,17 @@ export function TerminalPanel({
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
   const attachToComposer = useChatStore((s) => s.attachToComposer);
   const explainSelection = useChatStore((s) => s.explainSelection);
+  const isLocal = !ssh && !commandTerminal;
+  const shouldPersistLocalProfile = persistLocalProfile ?? (isLocal && !terminalProfile && !adoptedTerminal);
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
-    initialProfileRef.current = terminalProfile ?? loadGlobalTerminalProfile();
+    initialProfileRef.current = terminalProfile ?? (isLocal ? loadLocalTerminalDefaultProfile() : DEFAULT_TERMINAL_PROFILE);
   }
   const initialProfile = initialProfileRef.current;
   const appliedTerminalProfileSignatureRef = useRef<string | null>(
     terminalProfile ? terminalProfileSignature(terminalProfile) : null,
   );
+  const lastAutoSavedLocalProfileSignatureRef = useRef<string | null>(null);
 
   const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
   const [fontSize, setFontSize] = useState(initialProfile.fontSize);
@@ -373,6 +385,12 @@ export function TerminalPanel({
   const [webglRenderer, setWebglRenderer] = useState(initialProfile.webglRenderer);
   const [readOnly, setReadOnly] = useState(initialProfile.readOnly);
   const [themeName, setThemeName] = useState(initialProfile.theme || theme);
+  const { resolvedTheme: resolvedAppTheme } = useAppTheme();
+  const systemPrefersDark = resolvedAppTheme === "dark";
+  const resolvePanelTheme = useCallback(
+    (name: string) => resolveTerminalThemeWithSystem(name, systemPrefersDark),
+    [systemPrefersDark],
+  );
   const [cursorStyle, setCursorStyle] = useState(initialProfile.cursorStyle);
   const [cursorBlink, setCursorBlink] = useState(initialProfile.cursorBlink);
   const [scrollback, setScrollback] = useState(initialProfile.scrollback);
@@ -572,7 +590,6 @@ export function TerminalPanel({
       : makeHostKey(ssh),
     [commandTerminal, ssh],
   );
-  const isLocal = !ssh && !commandTerminal;
   // Tracks which local shell the backend actually launched. Lets us suppress
   // inline history suggestions on shells that already provide their own
   // (PSReadLine on PowerShell). Resolved on connect — the prop only carries
@@ -1062,7 +1079,7 @@ export function TerminalPanel({
       return;
     }
 
-    const resolvedTheme = resolveTerminalTheme(themeName);
+    const resolvedTheme = resolvePanelTheme(themeName);
     const html = `<pre style="margin:0;font-family:${escapeHtml(fontFamily)};font-size:${fontSize}px;background:${resolvedTheme.background ?? "#1d1f21"};color:${resolvedTheme.foreground ?? "#eaeaea"};white-space:pre-wrap;">${escapeHtml(text)}</pre>`;
 
     try {
@@ -1073,7 +1090,7 @@ export function TerminalPanel({
     } finally {
       focusTerminal();
     }
-  }, [focusTerminal, fontFamily, fontSize, getActiveTerminalSelectionText, setStatusMessage, themeName, writeClipboardText]);
+  }, [focusTerminal, fontFamily, fontSize, getActiveTerminalSelectionText, resolvePanelTheme, setStatusMessage, themeName, writeClipboardText]);
 
   const pasteTextIntoTerminal = useCallback(async (text: string): Promise<boolean> => {
     if (readOnlyRef.current) {
@@ -1604,8 +1621,8 @@ export function TerminalPanel({
     extendTerminalBlockSelectionByKeyboard,
     getActiveTerminalSelectionText,
     increaseFontSize,
-    isMac,
     isLocal,
+    isMac,
     openSearch,
     pasteFromClipboard,
     resetFontSize,
@@ -1618,6 +1635,20 @@ export function TerminalPanel({
     const hasSelection = !!getActiveTerminalSelectionText();
     const copyShortcut = isMac ? "Cmd+C" : "Ctrl+Shift+C";
     const pasteShortcut = isMac ? "Cmd+V" : "Ctrl+Shift+V / Shift+Insert";
+    const customTheme = isCustomTerminalTheme(themeName) ? resolveTerminalTheme(themeName) : null;
+    const themeMenuValue = customTheme ? themeName : resolveThemeId(themeName);
+    const themeOptions = buildTerminalThemeOptions({
+      includeSystem: true,
+      systemLabel: "Follow system theme",
+      customValue: customTheme ? themeName : undefined,
+      customTheme,
+      customLabel: "Custom colors",
+      darkGroup: "Dark",
+      lightGroup: "Light",
+    }).map((option) => ({
+      ...option,
+      testId: `terminal-context-theme-option-${option.value.replace(/[^a-zA-Z0-9_-]+/g, "-")}`,
+    }));
 
     return [
       { label: "Copy", shortcut: copyShortcut, onClick: () => void copySelection(), disabled: !hasSelection },
@@ -1666,12 +1697,38 @@ export function TerminalPanel({
       },
       {
         label: "Theme",
-        children: TERMINAL_THEME_DEFINITIONS.map((definition) => ({
-          label: definition.name,
-          checked: resolveThemeId(themeName) === definition.id,
-          onClick: () => setThemeName(definition.id),
-        })),
+        customPanel: (
+          <TerminalAppearanceMenuPanel
+            themeValue={themeMenuValue}
+            themeOptions={themeOptions}
+            fonts={fontState.fonts}
+            fontFamily={fontFamily}
+            fontSize={fontSize}
+            fontSelectTestId="terminal-context-font-select"
+            fontSizeTestId="terminal-context-font-size"
+            onChangeTheme={setThemeName}
+            onChangeFontFamily={setFontFamily}
+            onChangeFontSize={setFontSize}
+          />
+        ),
       },
+      ...(isLocal
+        ? [{
+            label: "Set current appearance as default for new local terminals",
+            testId: "terminal-context-set-local-default-theme",
+            onClick: () => {
+              const currentDefault = loadLocalTerminalDefaultProfile();
+              saveLocalTerminalDefaultProfile({
+                ...currentDefault,
+                theme: themeName,
+                fontFamily,
+                fontSize,
+                fontLigatures,
+              });
+              setStatusMessage("Default appearance for new local terminals updated");
+            },
+          }]
+        : []),
       {
         label: "Terminal display",
         children: [
@@ -1747,13 +1804,16 @@ export function TerminalPanel({
     copySelection,
     decreaseFontSize,
     executeMacro,
+    fontSize,
     fontFamily,
     fontLigatures,
+    fontState.fonts,
     fullscreen,
     getActiveTerminalSelectionText,
     gitState.kind,
     gitToggle,
     increaseFontSize,
+    isLocal,
     isMac,
     openSearch,
     pasteFromClipboard,
@@ -1765,6 +1825,7 @@ export function TerminalPanel({
     resetOutput,
     saveBufferToFile,
     showScrollbar,
+    setStatusMessage,
     syntaxMode,
     setSyntaxModeAndFocus,
     themeName,
@@ -1975,6 +2036,21 @@ export function TerminalPanel({
   }, [terminalProfile, theme]);
 
   useEffect(() => {
+    if (!shouldPersistLocalProfile) return;
+    const nextProfile = {
+      ...loadLocalTerminalDefaultProfile(),
+      theme: themeName,
+      fontFamily,
+      fontSize,
+      fontLigatures,
+    };
+    const signature = terminalProfileSignature(nextProfile);
+    if (lastAutoSavedLocalProfileSignatureRef.current === signature) return;
+    lastAutoSavedLocalProfileSignatureRef.current = signature;
+    saveLocalTerminalDefaultProfile(nextProfile);
+  }, [fontFamily, fontLigatures, fontSize, shouldPersistLocalProfile, themeName]);
+
+  useEffect(() => {
     macroRecordingRef.current = macroRecording;
   }, [macroRecording]);
 
@@ -2000,7 +2076,7 @@ export function TerminalPanel({
     const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : makeTerminalFontFamily("Source Code Pro");
 
     const term = new Terminal({
-      theme: resolveTerminalTheme(themeName),
+      theme: resolvePanelTheme(themeName),
       fontFamily: safeFontFamily,
       fontSize,
       cursorBlink,
@@ -2731,14 +2807,14 @@ export function TerminalPanel({
     term.options = {
       fontFamily: safeFontFamily,
       fontSize,
-      theme: resolveTerminalTheme(themeName),
+      theme: resolvePanelTheme(themeName),
       cursorBlink,
       cursorStyle,
       scrollback,
       macOptionIsMeta: false,
     };
     window.setTimeout(() => requestAnimationFrame(() => fitVisibleTerminal()), 0);
-  }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, scrollback, themeName]);
+  }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, resolvePanelTheme, scrollback, themeName]);
 
   // When a hidden tab becomes visible again, re-measure xterm. Focus is
   // reserved for the active pane so split view does not race visible panes.
@@ -2906,7 +2982,7 @@ export function TerminalPanel({
     showScrollbar ? "" : "terminal-hide-scrollbar",
     fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");
-  const resolvedTheme = resolveTerminalTheme(themeName);
+  const resolvedTheme = resolvePanelTheme(themeName);
   // Latest theme/font for capture, read lazily so the registration effect below
   // doesn't churn on every render (resolvedTheme is a fresh object each time).
   const captureThemeRef = useRef({ resolvedTheme, fontFamily, fontSize });

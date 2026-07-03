@@ -1,6 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
 import { terminalThemes } from "./themes";
-import { makeTerminalFontFamily, SOURCE_CODE_PRO } from "./systemFonts";
+import { makeTerminalFontFamily, SYSTEM_MONOSPACE_FONT } from "./systemFonts";
 
 export type TerminalCursorStyle = "block" | "underline" | "bar";
 export type TerminalRightClickBehavior = "menu" | "paste" | "copy-or-paste";
@@ -49,10 +49,10 @@ export const SYSTEM_DARK_TERMINAL_THEME = "termius-dark";
 export const SYSTEM_LIGHT_TERMINAL_THEME = "termius-light";
 
 export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
-  fontFamily: makeTerminalFontFamily(SOURCE_CODE_PRO),
+  fontFamily: makeTerminalFontFamily(SYSTEM_MONOSPACE_FONT),
   fontSize: 14,
   fontLigatures: false,
-  theme: "classic",
+  theme: SYSTEM_TERMINAL_THEME,
   scrollback: 10000,
   cursorStyle: "block",
   cursorBlink: true,
@@ -76,12 +76,17 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   commonCommandsShortcut: "Ctrl+Shift+P",
 };
 
+export const DEFAULT_LOCAL_TERMINAL_PROFILE: TerminalProfile = {
+  ...DEFAULT_TERMINAL_PROFILE,
+  theme: "classic",
+};
+
 export const DEFAULT_MAIL_TERMINAL_PROFILE: TerminalProfile = {
   ...DEFAULT_TERMINAL_PROFILE,
   theme: SYSTEM_TERMINAL_THEME,
 };
 
-const TERMINAL_PROFILE_STORAGE_KEY = "taomni.terminalProfile.v1";
+const LOCAL_TERMINAL_PROFILE_STORAGE_KEY = "taomni.localTerminalProfile.v1";
 
 export function parseSessionOptions(optionsJson: string | null | undefined): Record<string, unknown> {
   if (!optionsJson?.trim()) return {};
@@ -114,21 +119,25 @@ export function getSessionTerminalProfile(optionsJson: string | null | undefined
   return normalizeTerminalProfile(options.terminalProfile);
 }
 
-export function loadGlobalTerminalProfile(): TerminalProfile {
-  if (typeof window === "undefined") return DEFAULT_TERMINAL_PROFILE;
+export function loadLocalTerminalDefaultProfile(): TerminalProfile {
+  if (typeof window === "undefined") return DEFAULT_LOCAL_TERMINAL_PROFILE;
   try {
-    const raw = window.localStorage.getItem(TERMINAL_PROFILE_STORAGE_KEY);
-    return normalizeTerminalProfile(raw ? JSON.parse(raw) : undefined);
+    const raw = window.localStorage.getItem(LOCAL_TERMINAL_PROFILE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : DEFAULT_LOCAL_TERMINAL_PROFILE;
+    return normalizeTerminalProfile({
+      ...DEFAULT_LOCAL_TERMINAL_PROFILE,
+      ...(isRecord(parsed) ? parsed : {}),
+    });
   } catch {
-    return DEFAULT_TERMINAL_PROFILE;
+    return DEFAULT_LOCAL_TERMINAL_PROFILE;
   }
 }
 
-export function saveGlobalTerminalProfile(profile: TerminalProfile): void {
+export function saveLocalTerminalDefaultProfile(profile: TerminalProfile): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      TERMINAL_PROFILE_STORAGE_KEY,
+      LOCAL_TERMINAL_PROFILE_STORAGE_KEY,
       JSON.stringify(normalizeTerminalProfile(profile)),
     );
   } catch {
