@@ -1,6 +1,7 @@
-//! Database client backend: MySQL / PostgreSQL / StarRocks (via `sqlx`), SQL
-//! Server (via `tiberius`), ClickHouse and Presto (via the existing `reqwest`
-//! HTTP client), and Redis (via `redis-rs`).
+//! Database client backend: MySQL / PostgreSQL / StarRocks (via `sqlx`),
+//! PanWeiDB (via the native openGauss connector), SQL Server (via `tiberius`),
+//! ClickHouse and Presto (via the existing `reqwest` HTTP client), and Redis
+//! (via `redis-rs`).
 //!
 //! SQL engines surface a single Tauri command surface (`db_*`, with
 //! `redis_*` for Redis). Live connections are cached in
@@ -10,6 +11,7 @@
 
 pub mod clickhouse;
 pub mod forward;
+pub mod panwei;
 pub mod presto;
 pub mod redis_ops;
 pub mod sql;
@@ -39,7 +41,7 @@ use crate::state::AppState;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DbConfig {
-    /// Backend engine: "MySQL" | "PostgreSQL" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis".
+    /// Backend engine: "MySQL" | "PostgreSQL" | "PanWeiDB" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis".
     pub engine: String,
     pub host: String,
     pub port: u16,
@@ -226,6 +228,7 @@ pub struct DbObject {
 pub enum DbHandle {
     MySql(Pool<MySql>),
     Postgres(Pool<Postgres>),
+    PanWeiDB(panwei::PanWeiClient),
     SqlServer(Arc<AsyncMutex<sql::SqlServerClient>>),
     StarRocks(Pool<MySql>),
     ClickHouse(clickhouse::ClickHouseClient),
@@ -320,6 +323,22 @@ fn start_keepalive(handle: &DbHandle, shutdown: CancellationToken) -> Option<Joi
                 }
             }))
         }
+        DbHandle::PanWeiDB(client) => {
+            let client = client.clone();
+            Some(tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(Duration::from_secs(KEEPALIVE_INTERVAL_SECS));
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        _ = shutdown.cancelled() => break,
+                        _ = interval.tick() => {
+                            let _ = panwei::ping(&client).await;
+                        }
+                    }
+                }
+            }))
+        }
         DbHandle::SqlServer(client) => {
             let client = client.clone();
             Some(tokio::spawn(async move {
@@ -385,7 +404,8 @@ async fn close_session(session: Arc<DbSession>) {
         DbHandle::MySql(pool) => pool.close().await,
         DbHandle::StarRocks(pool) => pool.close().await,
         DbHandle::Postgres(pool) => pool.close().await,
-        DbHandle::SqlServer(_)
+        DbHandle::PanWeiDB(_)
+        | DbHandle::SqlServer(_)
         | DbHandle::ClickHouse(_)
         | DbHandle::Presto(_)
         | DbHandle::Redis(_) => {}
@@ -447,6 +467,7 @@ pub async fn db_connect(
     let handle = match config.engine.as_str() {
         "MySQL" => sql::connect_mysql(&config, password.as_deref()).await?,
         "PostgreSQL" => sql::connect_postgres(&config, password.as_deref()).await?,
+        "PanWeiDB" => panwei::connect(&config, password.as_deref()).await?,
         "SQLServer" => sql::connect_sqlserver(&config, password.as_deref()).await?,
         "StarRocks" => sql::connect_starrocks(&config, password.as_deref()).await?,
         "ClickHouse" => clickhouse::connect(&config, password.as_deref()).await?,
@@ -526,6 +547,7 @@ pub async fn db_ping(state: State<'_, AppState>, session_id: String) -> Result<S
     match &session.handle {
         DbHandle::MySql(pool) => sql::ping_mysql(pool).await,
         DbHandle::Postgres(pool) => sql::ping_postgres(pool).await,
+        DbHandle::PanWeiDB(client) => panwei::ping(client).await,
         DbHandle::SqlServer(client) => sql::ping_sqlserver(client).await,
         DbHandle::StarRocks(pool) => sql::ping_starrocks(pool).await,
         DbHandle::ClickHouse(client) => clickhouse::ping(client).await,
@@ -560,6 +582,7 @@ pub async fn db_list_catalogs(
         DbHandle::Presto(client) => presto::list_catalogs(client).await,
         DbHandle::MySql(_)
         | DbHandle::Postgres(_)
+        | DbHandle::PanWeiDB(_)
         | DbHandle::SqlServer(_)
         | DbHandle::StarRocks(_)
         | DbHandle::ClickHouse(_)
@@ -578,6 +601,7 @@ pub async fn db_list_schemas(
         DbHandle::MySql(pool) => sql::list_schemas_mysql(pool).await,
         DbHandle::StarRocks(pool) => sql::list_schemas_mysql(pool).await,
         DbHandle::Postgres(pool) => sql::list_schemas_postgres(pool).await,
+        DbHandle::PanWeiDB(client) => panwei::list_schemas(client).await,
         DbHandle::SqlServer(client) => sql::list_schemas_sqlserver(client).await,
         DbHandle::ClickHouse(client) => clickhouse::list_schemas(client).await,
         DbHandle::Presto(client) => presto::list_schemas(client, catalog.as_deref()).await,
@@ -597,6 +621,7 @@ pub async fn db_list_tables(
         DbHandle::MySql(pool) => sql::list_tables_mysql(pool, schema.as_deref()).await,
         DbHandle::StarRocks(pool) => sql::list_tables_mysql(pool, schema.as_deref()).await,
         DbHandle::Postgres(pool) => sql::list_tables_postgres(pool, schema.as_deref()).await,
+        DbHandle::PanWeiDB(client) => panwei::list_tables(client, schema.as_deref()).await,
         DbHandle::SqlServer(client) => sql::list_tables_sqlserver(client, schema.as_deref()).await,
         DbHandle::ClickHouse(client) => clickhouse::list_tables(client, schema.as_deref()).await,
         DbHandle::Presto(client) => {
@@ -622,6 +647,9 @@ pub async fn db_describe_table(
         }
         DbHandle::Postgres(pool) => {
             sql::describe_table_postgres(pool, schema.as_deref(), &table).await
+        }
+        DbHandle::PanWeiDB(client) => {
+            panwei::describe_table(client, schema.as_deref(), &table).await
         }
         DbHandle::SqlServer(client) => {
             sql::describe_table_sqlserver(client, schema.as_deref(), &table).await
@@ -650,6 +678,9 @@ pub async fn db_list_indexes(
         DbHandle::Postgres(pool) => {
             sql::list_indexes_postgres(pool, schema.as_deref(), &table).await
         }
+        DbHandle::PanWeiDB(client) => {
+            panwei::list_indexes(client, schema.as_deref(), &table).await
+        }
         DbHandle::SqlServer(client) => {
             sql::list_indexes_sqlserver(client, schema.as_deref(), &table).await
         }
@@ -672,6 +703,9 @@ pub async fn db_list_objects(
         DbHandle::StarRocks(_) => Ok(Vec::new()),
         DbHandle::Postgres(pool) => {
             sql::list_objects_postgres(pool, schema.as_deref(), &kind).await
+        }
+        DbHandle::PanWeiDB(client) => {
+            panwei::list_objects(client, schema.as_deref(), &kind).await
         }
         DbHandle::SqlServer(client) => {
             sql::list_objects_sqlserver(client, schema.as_deref(), &kind).await
@@ -701,6 +735,9 @@ pub async fn db_object_ddl(
         DbHandle::Postgres(pool) => {
             sql::object_ddl_postgres(pool, schema.as_deref(), &kind, &name).await
         }
+        DbHandle::PanWeiDB(client) => {
+            panwei::object_ddl(client, schema.as_deref(), &kind, &name).await
+        }
         DbHandle::SqlServer(client) => {
             sql::object_ddl_sqlserver(client, schema.as_deref(), &kind, &name).await
         }
@@ -728,6 +765,7 @@ pub async fn db_table_stats(
         DbHandle::Postgres(pool) => {
             sql::table_stats_postgres(pool, schema.as_deref(), &table).await
         }
+        DbHandle::PanWeiDB(client) => panwei::table_stats(client, schema.as_deref(), &table).await,
         DbHandle::SqlServer(client) => {
             sql::table_stats_sqlserver(client, schema.as_deref(), &table).await
         }
@@ -775,6 +813,7 @@ pub async fn db_execute(
         DbHandle::MySql(pool) => sql::execute_mysql(pool, &sql, &token).await,
         DbHandle::StarRocks(pool) => sql::execute_mysql(pool, &sql, &token).await,
         DbHandle::Postgres(pool) => sql::execute_postgres(pool, &sql, &token).await,
+        DbHandle::PanWeiDB(client) => panwei::execute(client, &sql, &token).await,
         DbHandle::SqlServer(client) => sql::execute_sqlserver(client, &sql, &token).await,
         DbHandle::ClickHouse(client) => clickhouse::execute(client, &sql, &token).await,
         DbHandle::Presto(client) => presto::execute(client, &sql, &token).await,
@@ -801,6 +840,9 @@ pub async fn db_execute_stream(
         }
         DbHandle::Postgres(pool) => {
             sql::execute_postgres_stream(pool, &sql, max_rows, &token, &on_event).await
+        }
+        DbHandle::PanWeiDB(client) => {
+            panwei::execute_stream(client, &sql, max_rows, &token, &on_event).await
         }
         DbHandle::SqlServer(client) => {
             sql::execute_sqlserver_stream(client, &sql, max_rows, &token, &on_event).await

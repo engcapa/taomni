@@ -466,6 +466,14 @@ describe("DBeaver session import", () => {
             url: "redis://:redis-pass@redis.example.com:6380/2",
           },
         },
+        panwei: {
+          driver: "panweidb",
+          name: "PanWei Warehouse",
+          configuration: {
+            url: "jdbc:postgresql://pw.example.com:5432/pwdb?sslmode=disable",
+            user: "pwuser",
+          },
+        },
         oracle: {
           driver: "oracle",
           name: "Skipped Oracle",
@@ -487,6 +495,7 @@ describe("DBeaver session import", () => {
       "ClickHouse",
       "Presto",
       "Redis",
+      "PanWeiDB",
     ]);
     expect(result.skipped).toBe(1);
     expect(result.secrets).toHaveLength(2);
@@ -551,6 +560,17 @@ describe("DBeaver session import", () => {
     });
     expect(JSON.parse(result.sessions[6].options_json)).toMatchObject({
       dbRedisIndex: "2",
+    });
+    expect(result.sessions[7]).toMatchObject({
+      name: "PanWei Warehouse",
+      session_type: "PanWeiDB",
+      host: "pw.example.com",
+      port: 5432,
+      username: "pwuser",
+    });
+    expect(JSON.parse(result.sessions[7].options_json)).toMatchObject({
+      dbDatabase: "pwdb",
+      dbSsl: false,
     });
   });
 

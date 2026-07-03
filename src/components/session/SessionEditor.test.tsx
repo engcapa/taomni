@@ -693,6 +693,36 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists PanWeiDB database settings through the session store save path", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "PanWeiDB" });
+
+    await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "192.168.152.250");
+    await user.clear(screen.getByLabelText("Port"));
+    await user.type(screen.getByLabelText("Port"), "17700");
+    await user.type(screen.getByLabelText("Database username"), "panwei_omm");
+    await user.type(screen.getByLabelText("Database name"), "panweidb");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "PanWeiDB",
+      host: "192.168.152.250",
+      port: 17700,
+      username: "panwei_omm",
+    });
+    expect(savedOptions).toMatchObject({
+      dbDatabase: "panweidb",
+      dbSsl: false,
+      dbTimeout: "15",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists StarRocks database settings with the FE query port", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "StarRocks" });

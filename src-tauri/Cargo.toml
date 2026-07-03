@@ -125,13 +125,15 @@ nokhwa = { version = "0.10", optional = true, default-features = false, features
 ash = { version = "0.38", optional = true }
 llama-cpp-2 = { version = "0.1", optional = true }
 plist = "1.9"
-# Database client backends (MySQL / StarRocks / PostgreSQL via sqlx, SQL Server
-# via tiberius, Redis via redis-rs, ClickHouse via the existing reqwest HTTP
-# client). Values are decoded to frontend strings while preserving common
-# database-native numeric, UUID, JSON and time types.
+# Database client backends (MySQL / StarRocks / PostgreSQL via sqlx, PanWeiDB
+# via the native openGauss connector, SQL Server via tiberius, Redis via
+# redis-rs, ClickHouse via the existing reqwest HTTP client). Values are decoded
+# to frontend strings while preserving common database-native numeric, UUID,
+# JSON and time types where the driver exposes them.
 sqlx-core = { version = "0.9", default-features = false, features = ["_rt-tokio", "_tls-rustls-ring-webpki", "chrono", "bigdecimal", "uuid", "json"] }
 sqlx-mysql = { version = "0.9", default-features = false, features = ["chrono", "bigdecimal", "uuid", "json"] }
 sqlx-postgres = { version = "0.9", default-features = false, features = ["chrono", "bigdecimal", "uuid", "json"] }
+tokio-opengauss = "0.1"
 tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls", "chrono", "bigdecimal"] }
 redis = { version = "1.2", default-features = false, features = ["tokio-comp", "tokio-rustls-comp", "streams"] }
 # Native HBase RPC client (hbase/native): protobuf wire types via prost,

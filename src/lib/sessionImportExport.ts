@@ -63,6 +63,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   Mosh: 60001,
   MySQL: 3306,
   PostgreSQL: 5432,
+  PanWeiDB: 5432,
   SQLServer: 1433,
   StarRocks: 9030,
   ClickHouse: 9000,
@@ -84,6 +85,7 @@ const CSV_PASSWORD_SESSION_TYPES = new Set([
   "Mosh",
   "MySQL",
   "PostgreSQL",
+  "PanWeiDB",
   "SQLServer",
   "StarRocks",
   "ClickHouse",
@@ -884,6 +886,7 @@ function navicatSessionType(value: string): string | null {
   const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
   if (/\b(starrocks|starrocksdb|star rocks)\b/.test(key)) return "StarRocks";
   if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
+  if (/\b(panwei|panweidb|open gauss|opengauss)\b/.test(key)) return "PanWeiDB";
   if (/\b(postgresql|postgres|pgsql)\b/.test(key)) return "PostgreSQL";
   if (/\b(sqlserver|sql server|mssql|azure sql)\b/.test(key)) return "SQLServer";
   if (/\b(clickhouse|click house)\b/.test(key)) return "ClickHouse";
@@ -1167,6 +1170,7 @@ function dbeaverSessionType(value: string): string | null {
   const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
   if (/\b(starrocks|starrocksdb|star rocks)\b/.test(key)) return "StarRocks";
   if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
+  if (/\b(panwei|panweidb|open gauss|opengauss)\b/.test(key)) return "PanWeiDB";
   if (/\b(postgresql|postgres|cockroach|yugabyte)\b/.test(key)) return "PostgreSQL";
   if (/\b(sqlserver|sql server|mssql|jtds|azure sql)\b/.test(key)) return "SQLServer";
   if (/\b(clickhouse|click house|chjdbc)\b/.test(key)) return "ClickHouse";

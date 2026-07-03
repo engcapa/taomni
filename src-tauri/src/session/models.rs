@@ -39,6 +39,7 @@ pub enum SessionType {
     Mosh,
     MySQL,
     PostgreSQL,
+    PanWeiDB,
     SQLServer,
     StarRocks,
     ClickHouse,
@@ -78,6 +79,7 @@ impl SessionType {
             Self::Mosh => "Mosh",
             Self::MySQL => "MySQL",
             Self::PostgreSQL => "PostgreSQL",
+            Self::PanWeiDB => "PanWeiDB",
             Self::SQLServer => "SQLServer",
             Self::StarRocks => "StarRocks",
             Self::ClickHouse => "ClickHouse",
@@ -107,6 +109,7 @@ impl SessionType {
             "Mosh" => Self::Mosh,
             "MySQL" => Self::MySQL,
             "PostgreSQL" => Self::PostgreSQL,
+            "PanWeiDB" | "PanWei" | "openGauss" | "OpenGauss" => Self::PanWeiDB,
             "SQLServer" | "SQL Server" | "MSSQL" => Self::SQLServer,
             "StarRocks" | "StarRocksDB" => Self::StarRocks,
             "ClickHouse" => Self::ClickHouse,
@@ -132,6 +135,7 @@ impl SessionType {
             Self::Mosh => 60001,
             Self::MySQL => 3306,
             Self::PostgreSQL => 5432,
+            Self::PanWeiDB => 5432,
             Self::SQLServer => 1433,
             Self::StarRocks => 9030,
             Self::ClickHouse => 9000,
@@ -200,11 +204,35 @@ mod tests {
             ("Mosh", 60001),
             ("Browser", 0),
             ("Mail", 993),
+            ("PanWeiDB", 5432),
         ] {
             let ty = SessionType::from_str(raw);
             assert_eq!(ty.as_str(), raw);
             assert_eq!(ty.default_port(), expected_port);
         }
+    }
+
+    #[test]
+    fn session_config_deserializes_panweidb_type() {
+        let json = r#"{
+            "id": "pw",
+            "name": "PanWei 192.168.152.250",
+            "session_type": "PanWeiDB",
+            "group_path": null,
+            "host": "192.168.152.250",
+            "port": 17700,
+            "username": "panwei_omm",
+            "auth_method": "Password",
+            "options_json": "{\"dbDatabase\":\"panweidb\"}",
+            "created_at": 0,
+            "updated_at": 0,
+            "last_connected_at": null,
+            "sort_order": 0
+        }"#;
+        let config: SessionConfig =
+            serde_json::from_str(json).expect("PanWeiDB session_type must deserialize");
+        assert_eq!(config.session_type, SessionType::PanWeiDB);
+        assert_eq!(config.session_type.as_str(), "PanWeiDB");
     }
 
     #[test]

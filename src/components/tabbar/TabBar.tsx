@@ -575,6 +575,8 @@ function dbEngineColor(engine?: string): string {
       return "#00758f";
     case "PostgreSQL":
       return "#336791";
+    case "PanWeiDB":
+      return "#0b8f6a";
     case "SQLServer":
       return "#cc2927";
     case "StarRocks":

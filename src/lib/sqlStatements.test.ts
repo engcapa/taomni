@@ -71,6 +71,9 @@ describe("splitSqlStatements", () => {
     expect(sqlStatementsForExecution("PostgreSQL", "select 1; select 2;")).toEqual([
       "select 1; select 2;",
     ]);
+    expect(sqlStatementsForExecution("PanWeiDB", "select 1; select 2;")).toEqual([
+      "select 1; select 2;",
+    ]);
   });
 
   it("returns source ranges for executable statements", () => {

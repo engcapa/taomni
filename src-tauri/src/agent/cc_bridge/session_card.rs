@@ -74,7 +74,8 @@ fn is_remote(t: &SessionType) -> bool {
 /// so a DB thread is steered to its SQL/Redis tools, not the terminal tools its
 /// `.mcp.json` doesn't even expose (Phase 6).
 enum DbRouting {
-    /// MySQL / PostgreSQL / SQL Server / StarRocks / ClickHouse / Presto — the `taomni_sql` tools.
+    /// MySQL / PostgreSQL / PanWeiDB / SQL Server / StarRocks / ClickHouse /
+    /// Presto — the `taomni_sql` tools.
     Sql,
     /// Redis — the `taomni_redis` tools.
     Redis,
@@ -86,6 +87,7 @@ fn db_routing(t: &SessionType) -> DbRouting {
     match t {
         SessionType::MySQL
         | SessionType::PostgreSQL
+        | SessionType::PanWeiDB
         | SessionType::SQLServer
         | SessionType::StarRocks
         | SessionType::ClickHouse
@@ -576,6 +578,7 @@ mod tests {
         for engine in [
             SessionType::MySQL,
             SessionType::PostgreSQL,
+            SessionType::PanWeiDB,
             SessionType::SQLServer,
             SessionType::StarRocks,
             SessionType::ClickHouse,

@@ -128,6 +128,7 @@ function dialectFor(engine: string): SQLDialect {
     case "StarRocks":
       return MySQL;
     case "PostgreSQL":
+    case "PanWeiDB":
       return PostgreSQL;
     case "SQLServer":
       return StandardSQL;
