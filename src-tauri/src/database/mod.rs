@@ -14,8 +14,10 @@ pub mod presto;
 pub mod redis_ops;
 pub mod sql;
 pub mod bookmarks;
+pub mod history;
 
 pub use bookmarks::*;
+pub use history::*;
 
 use serde::{Deserialize, Serialize};
 use sqlx_core::pool::Pool;

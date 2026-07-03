@@ -48,6 +48,7 @@ const GROUP_STORAGE_KEY = "taomni.groups.v1";
 const TUNNEL_STORAGE_KEY = "taomni.tunnels.v1";
 const CHAT_THREADS_STORAGE_KEY = "taomni.stub.chatThreads.v1";
 const CHAT_MESSAGES_STORAGE_KEY = "taomni.stub.chatMessages.v1";
+const DB_HISTORY_STORAGE_KEY = "taomni.stub.dbSqlHistory.v1";
 const NOTES_STORAGE_KEY = "taomni.stub.notes.v1";
 const NOTE_TAGS_STORAGE_KEY = "taomni.stub.noteTags.v1";
 const NOTE_PREFS_STORAGE_KEY = "taomni.stub.notePrefs.v1";
@@ -115,6 +116,38 @@ interface StubChatAttachment {
   size: number;
   mime?: string | null;
   preview_url?: string | null;
+}
+
+interface StubDbSqlHistoryEntry {
+  id: string;
+  savedSessionId?: string | null;
+  engine: string;
+  host: string;
+  port: number;
+  catalog?: string | null;
+  databaseName?: string | null;
+  schemaName?: string | null;
+  sqlContent: string;
+  startedAt: number;
+  durationMs?: number | null;
+  rowsAffected?: number | null;
+  rowCount?: number | null;
+  hasResultSet: boolean;
+  error?: string | null;
+  createdAt: number;
+}
+
+function loadDbSqlHistory(): StubDbSqlHistoryEntry[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DB_HISTORY_STORAGE_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDbSqlHistory(entries: StubDbSqlHistoryEntry[]): void {
+  localStorage.setItem(DB_HISTORY_STORAGE_KEY, JSON.stringify(entries));
 }
 
 function loadChatThreads(): StubChatThread[] {
@@ -2094,6 +2127,42 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;
     }
     case "mail_clear_cache": {
+      return undefined as T;
+    }
+    case "db_append_history": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const entry = invokeArgs?.entry as StubDbSqlHistoryEntry | undefined;
+      if (!entry?.id) return undefined as T;
+      const entries = loadDbSqlHistory().filter((candidate) => candidate.id !== entry.id);
+      saveDbSqlHistory([entry, ...entries].slice(0, 1000));
+      return undefined as T;
+    }
+    case "db_list_history": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const savedSessionId = (invokeArgs?.savedSessionId as string | null | undefined) ?? null;
+      const engine = (invokeArgs?.engine as string | null | undefined) ?? null;
+      const limit = Math.max(1, Math.min(1000, Number((invokeArgs?.limit as number | undefined) ?? 200)));
+      const entries = loadDbSqlHistory()
+        .filter((entry) => !savedSessionId || entry.savedSessionId === savedSessionId)
+        .filter((entry) => !engine || entry.engine === engine)
+        .sort((a, b) => (b.startedAt - a.startedAt) || (b.createdAt - a.createdAt))
+        .slice(0, limit);
+      return entries as T;
+    }
+    case "db_delete_history": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const id = (invokeArgs?.id as string | undefined) ?? "";
+      saveDbSqlHistory(loadDbSqlHistory().filter((entry) => entry.id !== id));
+      return undefined as T;
+    }
+    case "db_clear_history": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const savedSessionId = (invokeArgs?.savedSessionId as string | null | undefined) ?? null;
+      saveDbSqlHistory(
+        savedSessionId
+          ? loadDbSqlHistory().filter((entry) => entry.savedSessionId !== savedSessionId)
+          : [],
+      );
       return undefined as T;
     }
     // ---------- Database client commands (desktop-only) ----------
