@@ -41,12 +41,12 @@ describe("TerminalAppearanceSettings", () => {
     cleanup();
   });
 
-  it("lists OS fonts and selects Source Code Pro by default when available", async () => {
+  it("lists OS fonts and selects system monospace by default", async () => {
     renderAppearance();
 
     await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
 
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("Source Code Pro");
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("monospace");
     expect(screen.getByRole("option", { name: "Arial" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Fira Code" })).not.toBeInTheDocument();
   });

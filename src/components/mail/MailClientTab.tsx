@@ -301,7 +301,7 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     "--taomni-accent": accent,
     "--taomni-text": foreground,
     "--taomni-text-muted": mixColor(foreground, background, 62),
-    fontFamily: "var(--taomni-ui-font-family)",
+    fontFamily: terminalProfile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily,
     zoom: clampMailFontSize(fontSize) / MAIL_BASE_FONT_SIZE,
   } as CSSProperties;
 }
@@ -787,7 +787,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
-  const [mailFontSize, setMailFontSize] = useState(MAIL_BASE_FONT_SIZE);
+  const profileFontSize = clampMailFontSize(info.terminalProfile?.fontSize ?? DEFAULT_MAIL_TERMINAL_PROFILE.fontSize);
+  const [mailFontSize, setMailFontSize] = useState(profileFontSize);
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
   const confirmDialog = useConfirmDialog();
@@ -931,12 +932,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, []);
 
   const resetFontSize = useCallback(() => {
-    setMailFontSize(MAIL_BASE_FONT_SIZE);
-  }, []);
+    setMailFontSize(profileFontSize);
+  }, [profileFontSize]);
 
   useEffect(() => {
-    setMailFontSize(MAIL_BASE_FONT_SIZE);
-  }, [info.sessionId]);
+    setMailFontSize(profileFontSize);
+  }, [info.sessionId, profileFontSize]);
 
   useEffect(() => {
     if (!composeOpen || contactIndexAccountRef.current === info.sessionId) return;

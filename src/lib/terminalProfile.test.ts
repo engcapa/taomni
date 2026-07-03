@@ -10,9 +10,10 @@ describe("local terminal default profile", () => {
     window.localStorage.clear();
   });
 
-  it("defaults new local terminals to the system theme", () => {
+  it("defaults new local terminals to MobaXterm Classic with system monospace", () => {
     expect(loadLocalTerminalDefaultProfile()).toMatchObject({
-      theme: "system",
+      theme: "classic",
+      fontFamily: expect.stringContaining("monospace"),
     });
   });
 

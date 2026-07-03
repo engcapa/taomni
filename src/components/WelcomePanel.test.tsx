@@ -10,6 +10,7 @@ const ipcMocks = vi.hoisted(() => ({
   listLocalShells: vi.fn(),
   listSessionGroups: vi.fn(),
   listSessions: vi.fn(),
+  listSystemFonts: vi.fn(),
   listWslDistros: vi.fn(),
   openLocalShellAsAdministrator: vi.fn(),
   saveSession: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("../lib/ipc", () => ({
   listLocalShells: ipcMocks.listLocalShells,
   listSessionGroups: ipcMocks.listSessionGroups,
   listSessions: ipcMocks.listSessions,
+  listSystemFonts: ipcMocks.listSystemFonts,
   listWslDistros: ipcMocks.listWslDistros,
   openLocalShellAsAdministrator: ipcMocks.openLocalShellAsAdministrator,
   saveSession: ipcMocks.saveSession,
@@ -50,6 +52,7 @@ describe("WelcomePanel", () => {
     ]);
     ipcMocks.listSessions.mockResolvedValue([]);
     ipcMocks.listSessionGroups.mockResolvedValue([]);
+    ipcMocks.listSystemFonts.mockResolvedValue(["monospace", "JetBrains Mono"]);
     ipcMocks.listWslDistros.mockResolvedValue([]);
     ipcMocks.openLocalShellAsAdministrator.mockResolvedValue(undefined);
     ipcMocks.saveSession.mockResolvedValue(undefined);
@@ -234,6 +237,7 @@ describe("WelcomePanel", () => {
     fireEvent.contextMenu(rows[0]);
     const item = screen.getByTestId("context-menu-item-set-terminal-theme");
     fireEvent.mouseEnter(item.parentElement!);
+    expect(await screen.findByTestId("session-terminal-font-select")).toBeInTheDocument();
     fireEvent.click(await screen.findByTestId("session-terminal-theme-option-kanagawa-wave"));
 
     await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));

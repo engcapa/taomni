@@ -30,7 +30,6 @@ import {
   toNetworkSettingsPayload,
 } from "../../lib/networkSettings";
 import { resolveThemeId } from "../../lib/themes";
-import { ThemePreviewList } from "../theme/ThemePreviewSelect";
 import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import {
   findFontName,
@@ -41,6 +40,7 @@ import {
   useSystemFonts,
 } from "../../lib/systemFonts";
 import { FontPickerPanel } from "./FontPickerPanel";
+import { TerminalAppearanceMenuPanel } from "./TerminalAppearanceMenuPanel";
 import {
   attachTerminalImeGuard,
   shouldUseLinuxImeGuard,
@@ -1694,26 +1694,32 @@ export function TerminalPanel({
       {
         label: "Theme",
         customPanel: (
-          <ThemePreviewList
-            value={themeMenuValue}
-            options={themeOptions}
-            testId="terminal-context-theme-list"
-            className="w-[360px] max-w-[calc(100vw-24px)] rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
-            onChange={(theme) => {
-              setThemeName(theme);
-              contextMenu.close();
-            }}
+          <TerminalAppearanceMenuPanel
+            themeValue={themeMenuValue}
+            themeOptions={themeOptions}
+            fonts={fontState.fonts}
+            fontFamily={fontFamily}
+            fontSize={fontSize}
+            onChangeTheme={setThemeName}
+            onChangeFontFamily={setFontFamily}
+            onChangeFontSize={setFontSize}
           />
         ),
       },
       ...(isLocal
         ? [{
-            label: "Set current theme as default for new local terminals",
+            label: "Set current appearance as default for new local terminals",
             testId: "terminal-context-set-local-default-theme",
             onClick: () => {
               const currentDefault = loadLocalTerminalDefaultProfile();
-              saveLocalTerminalDefaultProfile({ ...currentDefault, theme: themeName });
-              setStatusMessage("Default theme for new local terminals updated");
+              saveLocalTerminalDefaultProfile({
+                ...currentDefault,
+                theme: themeName,
+                fontFamily,
+                fontSize,
+                fontLigatures,
+              });
+              setStatusMessage("Default appearance for new local terminals updated");
             },
           }]
         : []),
@@ -1792,8 +1798,10 @@ export function TerminalPanel({
     copySelection,
     decreaseFontSize,
     executeMacro,
+    fontSize,
     fontFamily,
     fontLigatures,
+    fontState.fonts,
     fullscreen,
     getActiveTerminalSelectionText,
     gitState.kind,
@@ -1804,7 +1812,6 @@ export function TerminalPanel({
     openSearch,
     pasteFromClipboard,
     quickFontOptions,
-    contextMenu,
     effectiveReadOnly,
     readOnly,
     renameTerminal,

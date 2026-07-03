@@ -232,7 +232,7 @@ describe("MailClientTab", () => {
     expect(await screen.findByRole("button", { name: /Load older messages/ })).toBeInTheDocument();
   });
 
-  it("does not use terminal font settings as the initial mail UI zoom", async () => {
+  it("uses saved mail font settings as the initial mail UI appearance", async () => {
     render(
       <MailClientTab
         tabId="mail-tab"
@@ -249,8 +249,8 @@ describe("MailClientTab", () => {
     );
 
     const root = await screen.findByTestId("mail-client-tab");
-    expect(root.style.fontFamily).toBe("var(--taomni-ui-font-family)");
-    expect(root.style.getPropertyValue("zoom")).toBe("1");
+    expect(root.style.fontFamily).toContain("Cascadia Mono");
+    expect(root.style.getPropertyValue("zoom")).toBe(String(22 / DEFAULT_TERMINAL_PROFILE.fontSize));
   });
 
   it("applies code view theme colors to the mail chrome", async () => {

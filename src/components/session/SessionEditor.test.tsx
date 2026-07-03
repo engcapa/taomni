@@ -190,7 +190,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
 
     await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("Source Code Pro");
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("monospace");
 
     const background = screen.getByLabelText("Terminal background hex");
     await user.clear(background);

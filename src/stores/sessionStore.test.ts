@@ -183,4 +183,50 @@ describe("sessionStore batch operations", () => {
     expect(options.terminalProfile.theme).toBe("kanagawa-wave");
     expect(options.terminalProfile.fontSize).toBe(18);
   });
+
+  it("updateSessionsTerminalAppearance writes font settings and skips mail sessions", async () => {
+    const ssh: SessionConfig = {
+      ...a,
+      options_json: JSON.stringify({
+        description: "keep me",
+        terminalProfile: {
+          ...JSON.parse(a.options_json || "{}").terminalProfile,
+          theme: "classic",
+          fontSize: 18,
+        },
+      }),
+    };
+    const mail: SessionConfig = {
+      ...makeSession("mail", "Mail", null),
+      session_type: "Mail",
+      options_json: JSON.stringify({
+        terminalProfile: { theme: "system" },
+      }),
+    };
+    useSessionStore.setState({
+      sessions: [ssh, mail],
+      groups: [],
+      loading: false,
+      selectedSessionId: null,
+      selectedSessionIds: [],
+      searchQuery: "",
+    });
+    const saved: SessionConfig[] = [];
+    ipcMocks.saveSession.mockImplementation(async (cfg: SessionConfig) => {
+      saved.push(cfg);
+    });
+
+    const count = await useSessionStore.getState().updateSessionsTerminalAppearance(["a", "mail"], {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: 16,
+    });
+
+    expect(count).toBe(1);
+    expect(saved).toHaveLength(1);
+    const options = JSON.parse(saved[0].options_json);
+    expect(options.description).toBe("keep me");
+    expect(options.terminalProfile.theme).toBe("classic");
+    expect(options.terminalProfile.fontFamily).toContain("JetBrains Mono");
+    expect(options.terminalProfile.fontSize).toBe(16);
+  });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Palette } from "lucide-react";
+import { Minus, Palette, Plus } from "lucide-react";
 import {
+  DEFAULT_MAIL_TERMINAL_PROFILE,
   isCustomTerminalTheme,
   makeCustomTerminalTheme,
   resolveTerminalTheme,
@@ -11,6 +12,13 @@ import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { buildMailThemeOptions } from "../theme/themePreviews";
+import {
+  isMonospaceFont,
+  makeTerminalFontFamily,
+  resolveSelectedFontName,
+  useSystemFonts,
+  useTerminalFontOptions,
+} from "../../lib/systemFonts";
 
 interface MailAppearanceSettingsProps {
   profile: TerminalProfile;
@@ -22,6 +30,21 @@ export function MailAppearanceSettings({
   onProfileChange,
 }: MailAppearanceSettingsProps) {
   const t = useT();
+  const fontState = useSystemFonts();
+  const fontOptions = useTerminalFontOptions(fontState.fonts);
+  const partitionedFonts = useMemo(() => {
+    const mono: string[] = [];
+    const prop: string[] = [];
+    for (const font of fontOptions) {
+      if (isMonospaceFont(font)) {
+        mono.push(font);
+      } else {
+        prop.push(font);
+      }
+    }
+    return { mono, prop };
+  }, [fontOptions]);
+  const selectedFont = resolveSelectedFontName(profile.fontFamily, fontOptions);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
   const systemPrefersDark = resolvedAppTheme === "dark";
   const resolvedTheme = resolveMailTheme(profile.theme, systemPrefersDark);
@@ -34,6 +57,7 @@ export function MailAppearanceSettings({
   );
   const [bg, setBg] = useState(colors.background);
   const [fg, setFg] = useState(colors.foreground);
+  const [fontSizeText, setFontSizeText] = useState(String(profile.fontSize));
   const draftProfileRef = useRef(profile);
 
   useEffect(() => {
@@ -44,6 +68,10 @@ export function MailAppearanceSettings({
     setBg(colors.background);
     setFg(colors.foreground);
   }, [colors.background, colors.foreground]);
+
+  useEffect(() => {
+    setFontSizeText(String(profile.fontSize));
+  }, [profile.fontSize]);
 
   const updateProfile = (patch: Partial<TerminalProfile>) => {
     const next = { ...draftProfileRef.current, ...patch };
@@ -73,9 +101,91 @@ export function MailAppearanceSettings({
   const previewTheme = isCustomTerminalTheme(profile.theme)
     ? resolveMailTheme(makeCustomTerminalTheme(bg, fg), systemPrefersDark)
     : resolvedTheme;
+  const previewFontFamily = profile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily;
 
   return (
     <div data-testid="mail-appearance-settings" className="space-y-4 text-[12px]">
+      <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+        <div className="grid grid-cols-12 gap-3 items-end">
+          <label className="col-span-12 md:col-span-8">
+            <span className="block text-[12px] font-semibold mb-1">{t("mailAppearance.fontLabel")}</span>
+            <select
+              aria-label={t("mailAppearance.fontAria")}
+              className="taomni-input w-full"
+              value={selectedFont}
+              disabled={fontOptions.length === 0}
+              onChange={(event) => updateProfile({ fontFamily: makeTerminalFontFamily(event.target.value) })}
+            >
+              {partitionedFonts.mono.length > 0 && (
+                <optgroup label={t("terminalAppearance.fontGroupMonoSystem")}>
+                  {partitionedFonts.mono.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {partitionedFonts.prop.length > 0 && (
+                <optgroup label={t("terminalAppearance.fontGroupProportional")}>
+                  {partitionedFonts.prop.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+
+          <div className="col-span-12 md:col-span-4">
+            <span className="block text-[12px] font-semibold mb-1">{t("mailAppearance.textSizeLabel")}</span>
+            <div className="inline-flex items-center gap-1">
+              <button
+                className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
+                type="button"
+                aria-label={t("mailAppearance.decreaseTextSize")}
+                onClick={() => updateProfile({ fontSize: Math.max(8, profile.fontSize - 1) })}
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <input
+                className="taomni-input h-8 w-14 text-center"
+                aria-label={t("mailAppearance.fontSizeAria")}
+                value={fontSizeText}
+                inputMode="numeric"
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (!/^\d*$/.test(next)) return;
+                  setFontSizeText(next);
+                  const parsed = Number(next);
+                  if (Number.isFinite(parsed) && parsed >= 8 && parsed <= 32) {
+                    updateProfile({ fontSize: Math.round(parsed) });
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number(fontSizeText);
+                  if (Number.isFinite(parsed) && parsed > 0) {
+                    const clamped = Math.max(8, Math.min(32, Math.round(parsed)));
+                    setFontSizeText(String(clamped));
+                    updateProfile({ fontSize: clamped });
+                  } else {
+                    setFontSizeText(String(profile.fontSize));
+                  }
+                }}
+              />
+              <button
+                className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
+                type="button"
+                aria-label={t("mailAppearance.increaseTextSize")}
+                onClick={() => updateProfile({ fontSize: Math.min(32, profile.fontSize + 1) })}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="flex items-center gap-2 mb-2">
           <Palette className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
@@ -127,12 +237,20 @@ export function MailAppearanceSettings({
         </div>
       </section>
 
-      <MailMessagePreview theme={previewTheme} />
+      <MailMessagePreview theme={previewTheme} fontFamily={previewFontFamily} fontSize={profile.fontSize} />
     </div>
   );
 }
 
-function MailMessagePreview({ theme }: { theme: ReturnType<typeof resolveMailTheme> }) {
+function MailMessagePreview({
+  theme,
+  fontFamily,
+  fontSize,
+}: {
+  theme: ReturnType<typeof resolveMailTheme>;
+  fontFamily: string;
+  fontSize: number;
+}) {
   const bg = themeColor(theme.background, "#1d1f21");
   const fg = themeColor(theme.foreground, "#eaeaea");
   const accent = themeColor(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
@@ -145,6 +263,8 @@ function MailMessagePreview({ theme }: { theme: ReturnType<typeof resolveMailThe
     background: bg,
     color: fg,
     borderColor: divider,
+    fontFamily,
+    zoom: Math.max(8, Math.min(32, Math.round(fontSize))) / DEFAULT_MAIL_TERMINAL_PROFILE.fontSize,
   } satisfies CSSProperties;
 
   return (

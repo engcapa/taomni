@@ -99,6 +99,7 @@ import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog"
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useT } from "../../lib/i18n";
 import { prepareImportedSecretsForSave } from "../../lib/sessionImportSecrets";
+import type { SessionTerminalAppearancePatch } from "../../lib/sessionTerminalTheme";
 
 const SESSION_DRAG_MIME = "taomni/session";
 
@@ -134,7 +135,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     duplicateSessions,
     moveSessionToGroup,
     moveSessionsToGroup,
-    updateSessionsTerminalTheme,
+    updateSessionsTerminalAppearance,
     createFolderPath,
     renameFolderPath,
     deleteFolderPath,
@@ -1378,9 +1379,15 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     }
     const targetIds = selectedContextSessions.map((candidate) => candidate.id);
     const hasMultiSelection = selectedContextSessions.length > 1;
-    const setTerminalTheme = async (theme: string, targetSessions: readonly SessionConfig[]) => {
-      const updatedCount = await updateSessionsTerminalTheme(targetSessions.map((candidate) => candidate.id), theme);
-      setStatusMessage(t("sessionTree.terminalThemeUpdated", { count: updatedCount }));
+    const setTerminalAppearance = async (
+      patch: SessionTerminalAppearancePatch,
+      targetSessions: readonly SessionConfig[],
+    ) => {
+      const updatedCount = await updateSessionsTerminalAppearance(
+        targetSessions.map((candidate) => candidate.id),
+        patch,
+      );
+      setStatusMessage(t("sessionTree.terminalAppearanceUpdated", { count: updatedCount }));
     };
     const moveChildren: MenuItem[] = [
       { label: SESSION_ROOT_LABEL, icon: <FolderOpen className="w-3 h-3" />, onClick: () => void moveSessionsToGroup(targetIds, null) },
@@ -1417,8 +1424,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       buildSessionTerminalThemeMenuItem({
         sessions: selectedContextSessions,
         t,
-        onSelectTheme: setTerminalTheme,
-        onClose: ctx.close,
+        onSelectAppearance: setTerminalAppearance,
       }),
       { label: "", separator: true },
       {

@@ -12,6 +12,7 @@ const ipcMocks = vi.hoisted(() => ({
   importWslSessions: vi.fn(async () => []),
   isVaultLockedError: vi.fn(() => false),
   keychainLookupBatch: vi.fn(async () => []),
+  listSystemFonts: vi.fn(async () => ["monospace", "JetBrains Mono"]),
   listSessionGroups: vi.fn<() => Promise<SessionGroup[]>>(async () => []),
   listSessions: vi.fn<() => Promise<SessionConfig[]>>(async () => []),
   markSessionConnected: vi.fn(async () => 0),
@@ -270,6 +271,24 @@ describe("SessionTree multi-select batch operations", () => {
     expect(savedOptions.map((options) => options.terminalProfile.theme)).toEqual([
       "kanagawa-wave",
       "kanagawa-wave",
+    ]);
+  });
+
+  it("sets a terminal font for the selected sessions from the context menu", async () => {
+    render(<SessionTree />);
+    selectBothIpySessions();
+
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    const item = screen.getByTestId("context-menu-item-set-terminal-theme");
+    fireEvent.mouseEnter(item.parentElement!);
+    const fontSelect = await screen.findByTestId("session-terminal-font-select");
+    fireEvent.change(fontSelect, { target: { value: "JetBrains Mono" } });
+
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
+    const savedOptions = ipcMocks.saveSession.mock.calls.map(([cfg]) => JSON.parse(cfg.options_json));
+    expect(savedOptions.map((options) => options.terminalProfile.fontFamily)).toEqual([
+      expect.stringContaining("JetBrains Mono"),
+      expect.stringContaining("JetBrains Mono"),
     ]);
   });
 });
