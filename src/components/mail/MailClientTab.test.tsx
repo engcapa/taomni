@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MailTabInfo } from "../../types";
 import type { MailFolder, MailMessageBody, MailMessageHeader } from "../../lib/mail";
@@ -306,5 +306,61 @@ describe("MailClientTab", () => {
     });
 
     await waitFor(() => expect(screen.queryByTestId("mail-body-warming-progress")).not.toBeInTheDocument());
+  });
+
+  it("defers auto-sync UI refresh and body warming while hidden", async () => {
+    const syncOnOpenInfo: MailTabInfo = {
+      ...info,
+      sync: { ...info.sync, onOpen: true },
+    };
+    let resolveSync!: (value: Awaited<ReturnType<typeof mailMocks.mailSyncHeaders>>) => void;
+    mailMocks.mailSyncHeaders.mockReturnValue(new Promise((resolve) => {
+      resolveSync = resolve;
+    }));
+
+    const view = render(<MailClientTab tabId="mail-tab" info={syncOnOpenInfo} visible />);
+
+    await screen.findByText(/Second line stays visible/);
+    await waitFor(() => expect(mailMocks.mailSyncHeaders).toHaveBeenCalledWith(
+      syncOnOpenInfo,
+      "INBOX",
+      { limit: 50, offset: 0, includeBodies: false },
+    ));
+    mailMocks.mailListCachedFolders.mockClear();
+    mailMocks.mailListCachedMessages.mockClear();
+    mailMocks.mailGetMessageBody.mockClear();
+
+    view.rerender(<MailClientTab tabId="mail-tab" info={syncOnOpenInfo} visible={false} />);
+    await waitFor(() => expect(screen.getByTestId("mail-client-tab")).toHaveAttribute("aria-hidden", "true"));
+
+    await act(async () => {
+      resolveSync({
+        accountId: info.sessionId,
+        folder: "INBOX",
+        folders: [folder],
+        messages: [message],
+        fetchedMessages: 1,
+        cachedBodies: 0,
+        syncedAt: 0,
+        offset: 0,
+        limit: 50,
+        hasMore: false,
+      });
+      await Promise.resolve();
+    });
+
+    expect(mailMocks.mailListCachedFolders).not.toHaveBeenCalled();
+    expect(mailMocks.mailListCachedMessages).not.toHaveBeenCalled();
+    expect(mailMocks.mailGetMessageBody).not.toHaveBeenCalled();
+
+    view.rerender(<MailClientTab tabId="mail-tab" info={syncOnOpenInfo} visible />);
+
+    await waitFor(() => expect(mailMocks.mailListCachedFolders).toHaveBeenCalledWith(info.sessionId));
+    await waitFor(() => expect(mailMocks.mailListCachedMessages).toHaveBeenCalledWith(
+      info.sessionId,
+      "INBOX",
+      51,
+      0,
+    ));
   });
 });

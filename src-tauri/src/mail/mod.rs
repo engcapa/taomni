@@ -2663,16 +2663,17 @@ fn cache_sync_result(
     folder: &str,
     cache: &MailCacheSettings,
 ) -> SqlResult<()> {
+    let tx = conn.unchecked_transaction()?;
     for folder in folders {
-        reset_folder_if_uid_validity_changed(conn, folder)?;
-        upsert_folder(conn, folder)?;
+        reset_folder_if_uid_validity_changed(&tx, folder)?;
+        upsert_folder(&tx, folder)?;
     }
     for message in messages {
-        upsert_message(conn, message)?;
+        upsert_message(&tx, message)?;
     }
-    prune_mail_cache(conn, account_id, folder, cache)?;
-    reindex_cached_contacts(conn, account_id)?;
-    Ok(())
+    prune_mail_cache(&tx, account_id, folder, cache)?;
+    reindex_cached_contacts(&tx, account_id)?;
+    tx.commit()
 }
 
 fn cache_sync_all_result(
@@ -2682,18 +2683,19 @@ fn cache_sync_all_result(
     messages: &[MailMessageCached],
     cache: &MailCacheSettings,
 ) -> SqlResult<()> {
+    let tx = conn.unchecked_transaction()?;
     for folder in folders {
-        reset_folder_if_uid_validity_changed(conn, folder)?;
-        upsert_folder(conn, folder)?;
+        reset_folder_if_uid_validity_changed(&tx, folder)?;
+        upsert_folder(&tx, folder)?;
     }
     for message in messages {
-        upsert_message(conn, message)?;
+        upsert_message(&tx, message)?;
     }
     for folder in folders {
-        prune_mail_cache(conn, account_id, &folder.name, cache)?;
+        prune_mail_cache(&tx, account_id, &folder.name, cache)?;
     }
-    reindex_cached_contacts(conn, account_id)?;
-    Ok(())
+    reindex_cached_contacts(&tx, account_id)?;
+    tx.commit()
 }
 
 fn reset_folder_if_uid_validity_changed(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
