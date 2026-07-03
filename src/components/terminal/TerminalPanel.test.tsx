@@ -1242,6 +1242,62 @@ describe("TerminalPanel focus behavior", () => {
     expect(screen.getByTestId("context-menu-item-send-file-using-z-modem")).toBeInTheDocument();
   });
 
+  it("keeps the terminal context font submenu scoped to font size changes", async () => {
+    const onProfileChange = vi.fn();
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{ ...DEFAULT_TERMINAL_PROFILE, fontSize: 14 }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+
+    expect(await screen.findByTestId("context-menu-item-font-size")).toBeInTheDocument();
+    expect(screen.queryByTestId("context-menu-item-font-settings")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Use font/)).not.toBeInTheDocument();
+    expect(screen.queryByText("More fonts...")).not.toBeInTheDocument();
+    expect(screen.queryByText("Display font ligatures")).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-font-size"));
+    fireEvent.click(await screen.findByText("Increase font size"));
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      fontSize: 15,
+      theme: DEFAULT_TERMINAL_PROFILE.theme,
+    }));
+  });
+
+  it("emits a complete terminal profile when a context menu theme is selected", async () => {
+    const onProfileChange = vi.fn();
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{ ...DEFAULT_TERMINAL_PROFILE, theme: "classic", fontSize: 16 }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.click(await screen.findByText("Termius Dark"));
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      fontSize: 16,
+      theme: "termius-dark",
+      fontFamily: DEFAULT_TERMINAL_PROFILE.fontFamily,
+    }));
+  });
+
   it("does not render the Git rail button inside the terminal pane", async () => {
     const onOpen = vi.fn();
     const onSessionReady = vi.fn();

@@ -638,32 +638,25 @@ status: done
 area: terminal/right-menu
 files:
   - src/components/terminal/TerminalPanel.tsx
-  - src/components/terminal/FontPickerPanel.tsx
 controls:
-  - id: font-settings
-    selector: 'text="Font settings"'
+  - id: font-size
+    selector: 'text="Font size"'
     kind: interactive
     optional: true
     aliases:
-      - '[data-testid="context-menu-item-font-settings"]'
-  - id: font-more-fonts
-    selector: '[data-testid="context-menu-item-more-fonts"]'
+      - '[data-testid="context-menu-item-font-size"]'
+  - id: font-size-increase
+    selector: 'text="Increase font size"'
     kind: interactive
     optional: true
-  - id: font-picker-search
-    selector: 'input[placeholder="Search fonts..."]'
+  - id: font-size-decrease
+    selector: 'text="Decrease font size"'
     kind: interactive
     optional: true
-  - id: font-picker-empty
-    selector: 'text="No matching fonts found"'
-    kind: display
-    optional: true
-  - id: font-ligatures-toggle
-    selector: '[data-testid="context-menu-item-display-font-ligatures"]'
+  - id: font-size-reset
+    selector: 'text="Reset font size to default"'
     kind: interactive
     optional: true
-    aliases:
-      - 'text="Display font ligatures"'
   - id: terminal-display
     selector: 'text="Terminal display"'
     kind: interactive
@@ -682,7 +675,7 @@ controls:
     optional: true
 -->
 
-- 字体设置子菜单：切换字体家族、More fonts 搜索面板、显示字体连字、字号增大/减小/重置
+- 字号子菜单：字号增大/减小/重置；字体家族与连字改由 Terminal Appearance 设置页统一配置
 - Ctrl+滚轮调整字号、Ctrl+0 重置
 - Terminal display 子菜单：Reset terminal output、Clear scrollback、Set terminal title、Toggle scrollbar、Fullscreen (F11)、Read-only
 

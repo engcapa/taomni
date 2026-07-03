@@ -31,7 +31,7 @@ function renderAppearance(profile: TerminalProfile = DEFAULT_TERMINAL_PROFILE) {
 describe("TerminalAppearanceSettings", () => {
   beforeEach(() => {
     ipcMocks.listSystemFonts.mockReset();
-    ipcMocks.listSystemFonts.mockResolvedValue(["Arial", "Source Code Pro", "JetBrains Mono"]);
+    ipcMocks.listSystemFonts.mockResolvedValue(["Arial", "Cascadia Mono", "Source Code Pro", "JetBrains Mono"]);
     runtimeMocks.getAppPlatform.mockReset();
     runtimeMocks.getAppPlatform.mockReturnValue("linux");
     setAppThemeMode("system");
@@ -41,12 +41,12 @@ describe("TerminalAppearanceSettings", () => {
     cleanup();
   });
 
-  it("lists OS fonts and selects Source Code Pro by default when available", async () => {
+  it("lists OS fonts and selects Cascadia Mono by default when available", async () => {
     renderAppearance();
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("option", { name: "Cascadia Mono" })).toBeInTheDocument());
 
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("Source Code Pro");
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("Cascadia Mono");
     expect(screen.getByRole("option", { name: "Arial" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Fira Code" })).not.toBeInTheDocument();
   });

@@ -27,14 +27,10 @@ import {
 } from "../../lib/networkSettings";
 import { TERMINAL_THEME_DEFINITIONS, resolveThemeId } from "../../lib/themes";
 import {
-  findFontName,
+  getDefaultTerminalFontFamily,
   getPrimaryFontName,
   isMonospaceFont,
-  makeTerminalFontFamily,
-  SAFE_TERMINAL_FONT_FALLBACKS,
-  useSystemFonts,
 } from "../../lib/systemFonts";
-import { FontPickerPanel } from "./FontPickerPanel";
 import {
   attachTerminalImeGuard,
   shouldUseLinuxImeGuard,
@@ -186,6 +182,7 @@ interface TerminalPanelProps {
     args?: string[];
   };
   terminalProfile?: TerminalProfile;
+  onTerminalProfileChange?: (profile: TerminalProfile) => void;
   adoptedTerminal?: AdoptedTerminalSession;
   /**
    * One-shot working directory for the initial connect. Local terminals launch
@@ -289,6 +286,7 @@ export function TerminalPanel({
   commandTerminal,
   localShell,
   terminalProfile,
+  onTerminalProfileChange,
   adoptedTerminal,
   initialCwd,
   preserveSessionOnUnmount = false,
@@ -315,6 +313,7 @@ export function TerminalPanel({
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
   const onInputBroadcastRef = useRef<typeof onInputBroadcast>(onInputBroadcast);
+  const onTerminalProfileChangeRef = useRef<typeof onTerminalProfileChange>(onTerminalProfileChange);
   const onDetachedStateChangeRef = useRef<typeof onDetachedStateChange>(onDetachedStateChange);
   const preserveSessionOnUnmountRef = useRef(preserveSessionOnUnmount);
   const adoptedTerminalRef = useRef(adoptedTerminal);
@@ -324,6 +323,7 @@ export function TerminalPanel({
     onSessionReadyRef.current = onSessionReady;
     onOutputRef.current = onOutput;
     onInputBroadcastRef.current = onInputBroadcast;
+    onTerminalProfileChangeRef.current = onTerminalProfileChange;
     onDetachedStateChangeRef.current = onDetachedStateChange;
     preserveSessionOnUnmountRef.current = preserveSessionOnUnmount;
     multiExecActiveRef.current = multiExecActive;
@@ -332,6 +332,7 @@ export function TerminalPanel({
     onSessionReady,
     onOutput,
     onInputBroadcast,
+    onTerminalProfileChange,
     onDetachedStateChange,
     preserveSessionOnUnmount,
     multiExecActive,
@@ -352,7 +353,6 @@ export function TerminalPanel({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fallbackSearchRef = useRef<{ query: string; index: number }>({ query: "", index: -1 });
   const contextMenu = useContextMenu();
-  const fontState = useSystemFonts();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
   const attachToComposer = useChatStore((s) => s.attachToComposer);
@@ -365,6 +365,7 @@ export function TerminalPanel({
   const appliedTerminalProfileSignatureRef = useRef<string | null>(
     terminalProfile ? terminalProfileSignature(terminalProfile) : null,
   );
+  const currentTerminalProfileRef = useRef<TerminalProfile>(initialProfile);
 
   const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
   const [fontSize, setFontSize] = useState(initialProfile.fontSize);
@@ -394,7 +395,95 @@ export function TerminalPanel({
   const [blockSelection, setBlockSelection] = useState<TerminalBlockSelection | null>(null);
   const [commonCommands, setCommonCommands] = useState<UserCommonCommand[]>(initialProfile.commonCommands);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const commitTerminalProfilePatch = useCallback((patch: Partial<TerminalProfile>) => {
+    const next: TerminalProfile = { ...currentTerminalProfileRef.current, ...patch };
+    currentTerminalProfileRef.current = next;
+
+    if (patch.fontFamily !== undefined) setFontFamily(next.fontFamily);
+    if (patch.fontSize !== undefined) setFontSize(next.fontSize);
+    if (patch.fontLigatures !== undefined) setFontLigatures(next.fontLigatures);
+    if (patch.showScrollbar !== undefined) setShowScrollbar(next.showScrollbar);
+    if (patch.webglRenderer !== undefined) setWebglRenderer(next.webglRenderer);
+    if (patch.readOnly !== undefined) setReadOnly(next.readOnly);
+    if (patch.theme !== undefined) setThemeName(next.theme || theme);
+    if (patch.cursorStyle !== undefined) setCursorStyle(next.cursorStyle);
+    if (patch.cursorBlink !== undefined) setCursorBlink(next.cursorBlink);
+    if (patch.scrollback !== undefined) setScrollback(next.scrollback);
+    if (patch.syntaxMode !== undefined) setSyntaxMode(next.syntaxMode);
+    if (patch.rightClickBehavior !== undefined) setRightClickBehavior(next.rightClickBehavior);
+    if (patch.copyOnSelect !== undefined) setCopyOnSelect(next.copyOnSelect);
+    if (patch.allowRemoteOsc52Clipboard !== undefined) {
+      setAllowRemoteOsc52Clipboard(next.allowRemoteOsc52Clipboard);
+    }
+    if (patch.loggingEnabled !== undefined) setLoggingActive(next.loggingEnabled);
+    if (patch.multilinePasteConfirm !== undefined) {
+      setMultilinePasteConfirm(next.multilinePasteConfirm);
+    }
+    if (patch.inlineSuggestions !== undefined) setInlineSuggestionsEnabled(next.inlineSuggestions);
+    if (patch.inlineSuggestionsMax !== undefined) setInlineSuggestionsMax(next.inlineSuggestionsMax);
+    if (patch.inlineSuggestionsSource !== undefined) {
+      setInlineSuggestionsSource(next.inlineSuggestionsSource);
+    }
+    if (patch.aiCommandRewriteEnabled !== undefined) {
+      setAiCommandRewriteEnabled(next.aiCommandRewriteEnabled);
+    }
+    if (patch.commonCommands !== undefined) setCommonCommands(next.commonCommands);
+
+    onTerminalProfileChangeRef.current?.(next);
+  }, [theme]);
+
   const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    currentTerminalProfileRef.current = {
+      ...currentTerminalProfileRef.current,
+      fontFamily,
+      fontSize,
+      fontLigatures,
+      theme: themeName,
+      scrollback,
+      cursorStyle,
+      cursorBlink,
+      showScrollbar,
+      webglRenderer,
+      readOnly,
+      syntaxMode,
+      rightClickBehavior,
+      copyOnSelect,
+      allowRemoteOsc52Clipboard,
+      loggingEnabled: loggingActive,
+      multilinePasteConfirm,
+      inlineSuggestions: inlineSuggestionsEnabled,
+      inlineSuggestionsMax,
+      inlineSuggestionsSource,
+      aiCommandRewriteEnabled,
+      commonCommands,
+    };
+  }, [
+    aiCommandRewriteEnabled,
+    allowRemoteOsc52Clipboard,
+    commonCommands,
+    copyOnSelect,
+    cursorBlink,
+    cursorStyle,
+    fontFamily,
+    fontLigatures,
+    fontSize,
+    inlineSuggestionsEnabled,
+    inlineSuggestionsMax,
+    inlineSuggestionsSource,
+    loggingActive,
+    multilinePasteConfirm,
+    readOnly,
+    rightClickBehavior,
+    scrollback,
+    showScrollbar,
+    syntaxMode,
+    themeName,
+    webglRenderer,
+  ]);
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [eventLogOpen, setEventLogOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -445,13 +534,6 @@ export function TerminalPanel({
   const lastMacMiddlePasteAtRef = useRef(0);
   const lastTerminalSizeSyncRef = useRef<{ sessionId: string; cols: number; rows: number } | null>(null);
   const lastCwdRequestTokenRef = useRef(cwdRequestToken);
-  const quickFontOptions = useMemo(() => {
-    const available = fontState.fonts;
-    const preferred = SAFE_TERMINAL_FONT_FALLBACKS
-      .map((font) => findFontName(available, font))
-      .filter((font): font is string => !!font);
-    return preferred.length > 0 ? preferred : available.slice(0, 8);
-  }, [fontState.fonts]);
 
   const syncTerminalSize = useCallback((force = false) => {
     const sid = sessionIdRef.current;
@@ -1319,21 +1401,23 @@ export function TerminalPanel({
   }, [focusTerminal]);
 
   const increaseFontSize = useCallback(() => {
-    setFontSize((size) => Math.min(size + 1, 32));
-  }, []);
+    const nextSize = Math.min(currentTerminalProfileRef.current.fontSize + 1, 32);
+    commitTerminalProfilePatch({ fontSize: nextSize });
+  }, [commitTerminalProfilePatch]);
 
   const decreaseFontSize = useCallback(() => {
-    setFontSize((size) => Math.max(size - 1, 8));
-  }, []);
+    const nextSize = Math.max(currentTerminalProfileRef.current.fontSize - 1, 8);
+    commitTerminalProfilePatch({ fontSize: nextSize });
+  }, [commitTerminalProfilePatch]);
 
   const resetFontSize = useCallback(() => {
-    setFontSize(DEFAULT_FONT_SIZE);
-  }, []);
+    commitTerminalProfilePatch({ fontSize: DEFAULT_FONT_SIZE });
+  }, [commitTerminalProfilePatch]);
 
   const setSyntaxModeAndFocus = useCallback((mode: TerminalSyntaxMode) => {
-    setSyntaxMode(mode);
+    commitTerminalProfilePatch({ syntaxMode: mode });
     focusTerminal();
-  }, [focusTerminal]);
+  }, [commitTerminalProfilePatch, focusTerminal]);
 
   const selectZmodemSendFiles = useCallback(async (): Promise<ZmodemSendFile[]> => {
     const filePaths = await selectUploadFile();
@@ -1638,27 +1722,8 @@ export function TerminalPanel({
         : []),
       { label: "", separator: true },
       {
-        label: "Font settings",
+        label: "Font size",
         children: [
-          ...quickFontOptions.slice(0, 2).map((font) => ({
-            label: `Use font "${font}"`,
-            checked: getPrimaryFontName(fontFamily).toLowerCase() === font.toLowerCase(),
-            onClick: () => setFontFamily(makeTerminalFontFamily(font)),
-          })),
-          {
-            label: "More fonts...",
-            customPanel: (
-              <FontPickerPanel
-                fonts={fontState.fonts}
-                selectedFont={getPrimaryFontName(fontFamily)}
-                onSelect={(font) => setFontFamily(makeTerminalFontFamily(font))}
-              />
-            ),
-          },
-          ...(quickFontOptions.length === 0 ? [{ label: "Loading fonts...", disabled: true }] : []),
-          { label: "", separator: true },
-          { label: "Display font ligatures", checked: fontLigatures, onClick: () => setFontLigatures((v) => !v) },
-          { label: "", separator: true },
           { label: "Increase font size", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
           { label: "Decrease font size", shortcut: "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
           { label: "Reset font size to default", shortcut: "Ctrl+0", onClick: resetFontSize },
@@ -1669,7 +1734,7 @@ export function TerminalPanel({
         children: TERMINAL_THEME_DEFINITIONS.map((definition) => ({
           label: definition.name,
           checked: resolveThemeId(themeName) === definition.id,
-          onClick: () => setThemeName(definition.id),
+          onClick: () => commitTerminalProfilePatch({ theme: definition.id }),
         })),
       },
       {
@@ -1678,9 +1743,17 @@ export function TerminalPanel({
           { label: "Reset terminal output", onClick: resetOutput },
           { label: "Clear terminal scrollback", onClick: clearScrollback },
           { label: "Set terminal title", onClick: renameTerminal, disabled: !tabId },
-          { label: "Toggle terminal scrollbar", checked: showScrollbar, onClick: () => setShowScrollbar((v) => !v) },
+          {
+            label: "Toggle terminal scrollbar",
+            checked: showScrollbar,
+            onClick: () => commitTerminalProfilePatch({ showScrollbar: !showScrollbar }),
+          },
           { label: "Fullscreen terminal", shortcut: "F11", checked: fullscreen, onClick: () => setFullscreen((v) => !v) },
-          { label: "Read-only terminal", checked: readOnly, onClick: () => setReadOnly((v) => !v) },
+          {
+            label: "Read-only terminal",
+            checked: readOnly,
+            onClick: () => commitTerminalProfilePatch({ readOnly: !readOnly }),
+          },
         ],
       },
       {
@@ -1745,10 +1818,9 @@ export function TerminalPanel({
     copyAll,
     copyFormattedSelection,
     copySelection,
+    commitTerminalProfilePatch,
     decreaseFontSize,
     executeMacro,
-    fontFamily,
-    fontLigatures,
     fullscreen,
     getActiveTerminalSelectionText,
     gitState.kind,
@@ -1757,7 +1829,6 @@ export function TerminalPanel({
     isMac,
     openSearch,
     pasteFromClipboard,
-    quickFontOptions,
     effectiveReadOnly,
     readOnly,
     renameTerminal,
@@ -1950,6 +2021,7 @@ export function TerminalPanel({
     if (appliedTerminalProfileSignatureRef.current === signature) return;
     appliedTerminalProfileSignatureRef.current = signature;
     initialProfileRef.current = terminalProfile;
+    currentTerminalProfileRef.current = terminalProfile;
 
     setFontFamily(terminalProfile.fontFamily);
     setFontSize(terminalProfile.fontSize);
@@ -1997,7 +2069,7 @@ export function TerminalPanel({
     let resizeTimer: ReturnType<typeof setTimeout>;
 
     const primaryFont = getPrimaryFontName(fontFamily);
-    const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : makeTerminalFontFamily("Source Code Pro");
+    const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : getDefaultTerminalFontFamily();
 
     const term = new Terminal({
       theme: resolveTerminalTheme(themeName),
@@ -2726,7 +2798,7 @@ export function TerminalPanel({
     if (!term) return;
 
     const primaryFont = getPrimaryFontName(fontFamily);
-    const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : makeTerminalFontFamily("Source Code Pro");
+    const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : getDefaultTerminalFontFamily();
 
     term.options = {
       fontFamily: safeFontFamily,

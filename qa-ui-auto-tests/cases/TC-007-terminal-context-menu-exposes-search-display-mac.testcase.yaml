@@ -22,7 +22,7 @@ steps:
   - assert_visible: "text=\"Copy All\""
   - assert_visible: "text=\"Paste\""
   - assert_visible: "text=\"Find\""
-  - assert_visible: "text=\"Font settings\""
+  - assert_visible: "text=\"Font size\""
   - assert_visible: "text=\"Terminal display\""
   - assert_visible: "text=\"Syntax highlighting\""
   - assert_visible: "text=\"Record new macro\""

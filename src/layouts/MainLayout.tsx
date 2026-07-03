@@ -532,6 +532,60 @@ export function MainLayout() {
     }
     return profiles;
   }, [sessions]);
+  const terminalProfileSignaturesBySessionId = useMemo(() => {
+    const signatures = new Map<string, string | null>();
+    for (const session of sessions) {
+      const profile = getSessionTerminalProfile(session.options_json);
+      signatures.set(session.id, profile ? JSON.stringify(profile) : null);
+    }
+    return signatures;
+  }, [sessions]);
+  const [terminalProfileOverrides, setTerminalProfileOverrides] = useState<Record<string, TerminalProfile>>({});
+  const previousTerminalProfileSignaturesRef = useRef<Map<string, string | null> | null>(null);
+
+  useEffect(() => {
+    setTerminalProfileOverrides((current) => {
+      const liveTabIds = new Set(tabs.map((tab) => tab.id));
+      let changed = false;
+      const next = { ...current };
+      for (const tabId of Object.keys(next)) {
+        if (!liveTabIds.has(tabId)) {
+          delete next[tabId];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [tabs]);
+
+  useEffect(() => {
+    const previous = previousTerminalProfileSignaturesRef.current;
+    previousTerminalProfileSignaturesRef.current = terminalProfileSignaturesBySessionId;
+    if (!previous) return;
+
+    setTerminalProfileOverrides((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const tab of tabs) {
+        if (tab.type !== "terminal" || !tab.sessionId || !(tab.id in next)) continue;
+        const before = previous.get(tab.sessionId);
+        const after = terminalProfileSignaturesBySessionId.get(tab.sessionId) ?? null;
+        if (before !== undefined && before !== after) {
+          delete next[tab.id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [tabs, terminalProfileSignaturesBySessionId]);
+
+  const handleTerminalProfileChange = useCallback((tabId: string, profile: TerminalProfile) => {
+    setTerminalProfileOverrides((current) => {
+      const currentProfile = current[tabId];
+      if (currentProfile && JSON.stringify(currentProfile) === JSON.stringify(profile)) return current;
+      return { ...current, [tabId]: profile };
+    });
+  }, []);
   const welcomeRecentSessions = useMemo(
     () =>
       sessions
@@ -936,13 +990,17 @@ export function MainLayout() {
       const reattach = liveSessionId
         ? { terminalSessionId: liveSessionId, snapshotText }
         : undefined;
+      const terminalProfile = terminalProfileOverrides[tabId]
+        ?? (tab.sessionId ? terminalProfilesBySessionId.get(tab.sessionId) : undefined)
+        ?? tab.terminalProfile
+        ?? null;
       const payload: DetachedTerminalParams = {
         tabId,
         title,
         ssh: tab.ssh ?? null,
         commandTerminal: tab.commandTerminal ?? null,
         localShell: tab.localShell ?? null,
-        terminalProfile: tab.terminalProfile ?? null,
+        terminalProfile,
         reattach,
       };
       if (liveSessionId) {
@@ -955,7 +1013,7 @@ export function MainLayout() {
         throw err;
       }
     },
-    [openDetachedGenericWindow],
+    [openDetachedGenericWindow, terminalProfileOverrides, terminalProfilesBySessionId],
   );
 
   const openDetachedDatabase = useCallback(
@@ -2914,9 +2972,9 @@ export function MainLayout() {
                       const isActive = activeTabId === tab.id;
                       const inputLocked = terminalSplitVisible && terminalSplitInputLockedTabIds.has(tab.id);
                       const sidebarOpen = !terminalSplitVisible && !!attachedSidebars[tab.id] && !!tab.ssh;
-                      const liveTerminalProfile = tab.sessionId
-                        ? terminalProfilesBySessionId.get(tab.sessionId) ?? tab.terminalProfile
-                        : tab.terminalProfile;
+                      const liveTerminalProfile = terminalProfileOverrides[tab.id]
+                        ?? (tab.sessionId ? terminalProfilesBySessionId.get(tab.sessionId) : undefined)
+                        ?? tab.terminalProfile;
                       const terminalNode = (
                         <div className="h-full w-full relative">
                           <TerminalPanel
@@ -2926,6 +2984,7 @@ export function MainLayout() {
                             commandTerminal={tab.commandTerminal}
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
+                            onTerminalProfileChange={(profile) => handleTerminalProfileChange(tab.id, profile)}
                             adoptedTerminal={tab.adoptedTerminal}
                             initialCwd={tab.terminalInitialCwd}
                             visible={terminalSplitVisible || isActive}
