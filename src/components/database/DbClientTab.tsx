@@ -47,7 +47,7 @@ import {
 } from "../../lib/ipc";
 import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
 import { BookmarksPanel } from "./BookmarksPanel";
-import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
+import { SqlEditorPanel, type SqlEditorHandle, type SqlEditorRunContext } from "./SqlEditorPanel";
 import {
   QueryResultGrid,
   type QueryGridCommitPayload,
@@ -68,7 +68,7 @@ import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../li
 import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
-import { sqlStatementsForExecution } from "../../lib/sqlStatements";
+import { sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
 import { createDbMetadataCache } from "../../lib/dbMetadataCache";
 import { sqlNamespaceFromMetadata } from "../../lib/sqlMetadataCompletions";
 import {
@@ -117,6 +117,7 @@ interface ResultSheet {
   id: string;
   title: string;
   sql: string;
+  sourceRef: SqlStatementSourceRef | null;
   result: DbQueryResult | null;
   error: string | null;
   warnings: string[];
@@ -126,6 +127,18 @@ interface ResultSheet {
   resultTab: ResultSubTab;
   rowLimit: number;
   createdAt: number;
+}
+
+interface SqlStatementSourceRef {
+  id: string;
+  panelId: string;
+  origin: "editor" | "history" | "generated";
+  sql: string;
+  from: number | null;
+  to: number | null;
+  exactHash: string;
+  historyId?: string;
+  parentSheetId?: string;
 }
 
 interface PanelState {
@@ -246,6 +259,34 @@ function formatDurationMs(durationMs: number | null | undefined): string | null 
   if (ms < 1000) return `${ms} ms`;
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
   return `${Math.round(ms / 1000)} s`;
+}
+
+function hashSqlText(sql: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < sql.length; i += 1) {
+    hash ^= sql.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function sourceRefForRange(
+  panelId: string,
+  range: SqlStatementRange,
+  origin: SqlStatementSourceRef["origin"] = "editor",
+  patch: Partial<Pick<SqlStatementSourceRef, "historyId" | "parentSheetId">> = {},
+): SqlStatementSourceRef {
+  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return {
+    id: `${panelId}:${range.from}:${range.to}:${hashSqlText(range.sql)}:${suffix}`,
+    panelId,
+    origin,
+    sql: range.sql,
+    from: range.from,
+    to: range.to,
+    exactHash: hashSqlText(range.sql),
+    ...patch,
+  };
 }
 
 function resultSheetTimingTitle(sheet: ResultSheet): string {
@@ -392,11 +433,17 @@ function newPanel(patch: Partial<PanelState> = {}): PanelState {
   };
 }
 
-function newResultSheet(sql: string, ordinal: number, rowLimit: number): ResultSheet {
+function newResultSheet(
+  sql: string,
+  ordinal: number,
+  rowLimit: number,
+  sourceRef: SqlStatementSourceRef | null = null,
+): ResultSheet {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `sheet-${Date.now()}-${Math.random()}`,
     title: `Result ${ordinal}`,
     sql,
+    sourceRef,
     result: emptyQueryResult(),
     error: null,
     warnings: [],
@@ -804,23 +851,56 @@ export default function DbClientTab({
     [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, patchSheet, updateSheet],
   );
 
+  const statementRangesForRun = useCallback(
+    (sqlText: string, context?: SqlEditorRunContext): SqlStatementRange[] => {
+      const ranges = sqlStatementRangesForExecution(info.engine, sqlText);
+      const selection = context?.selectionRange;
+      if (!selection) return ranges;
+      const selectedText = context.doc.slice(selection.from, selection.to);
+      if (selectedText !== sqlText) return ranges;
+      return ranges.map((range) => ({
+        ...range,
+        from: range.from + selection.from,
+        to: range.to + selection.from,
+      }));
+    },
+    [info.engine],
+  );
+
   const runQuery = useCallback(
-    async (panelId: string, sqlText: string) => {
+    async (
+      panelId: string,
+      sqlText: string,
+      options: {
+        context?: SqlEditorRunContext;
+        origin?: SqlStatementSourceRef["origin"];
+        historyId?: string;
+        parentSheetId?: string;
+      } = {},
+    ) => {
       const trimmed = sqlText.trim();
       if (!trimmed) return;
       const panel = panels.find((p) => p.id === panelId);
       if (panel?.sheets.some((sheet) => sheet.running)) return;
-      const statements = sqlStatementsForExecution(info.engine, trimmed);
-      if (statements.length === 0) return;
-      // Record history (newest first, dedup consecutive).
+      const statementRanges = statementRangesForRun(sqlText, options.context);
+      if (statementRanges.length === 0) return;
+      // Record in-memory history per executable statement (newest first, dedup consecutive).
       const panelHistory = historyRef.current[panelId] ?? [];
-      if (panelHistory[0] !== trimmed) {
-        historyRef.current[panelId] = [trimmed, ...panelHistory].slice(0, MAX_HISTORY);
+      const nextHistory = [...panelHistory];
+      for (const range of [...statementRanges].reverse()) {
+        if (nextHistory[0] !== range.sql) {
+          nextHistory.unshift(range.sql);
+        }
       }
+      historyRef.current[panelId] = nextHistory.slice(0, MAX_HISTORY);
 
       const baseOrdinal = panel?.sheets.length ?? 0;
-      for (const [index, statement] of statements.entries()) {
-        const sheet = newResultSheet(statement, baseOrdinal + index + 1, rowLimit);
+      for (const [index, statement] of statementRanges.entries()) {
+        const sourceRef = sourceRefForRange(panelId, statement, options.origin ?? "editor", {
+          historyId: options.historyId,
+          parentSheetId: options.parentSheetId,
+        });
+        const sheet = newResultSheet(statement.sql, baseOrdinal + index + 1, rowLimit, sourceRef);
         setPanels((prev) =>
           prev.map((p) => {
             if (p.id !== panelId) return p;
@@ -832,11 +912,11 @@ export default function DbClientTab({
             };
           }),
         );
-        const ok = await streamQueryIntoSheet(panelId, sheet.id, statement, rowLimit);
+        const ok = await streamQueryIntoSheet(panelId, sheet.id, statement.sql, rowLimit);
         if (!ok) break;
       }
     },
-    [info.engine, maxResultSheets, panels, rowLimit, streamQueryIntoSheet],
+    [maxResultSheets, panels, rowLimit, statementRangesForRun, streamQueryIntoSheet],
   );
 
   const insertQueryFromOutside = useCallback(
@@ -1298,6 +1378,21 @@ export default function DbClientTab({
 
   const panelSql = (panel: PanelState) => editorHandles.current[panel.id]?.getValue() ?? panel.doc;
 
+  const editorRunPayload = (panel: PanelState, selectionOnly: boolean) => {
+    const handle = editorHandles.current[panel.id];
+    const doc = handle?.getValue() ?? panel.doc;
+    const selectionRange = selectionOnly ? handle?.getSelectionRange() ?? null : null;
+    const cursorPosition = handle?.getCursorPosition() ?? doc.length;
+    return {
+      sql: selectionRange ? doc.slice(selectionRange.from, selectionRange.to) : doc,
+      context: {
+        doc,
+        cursorPosition,
+        selectionRange,
+      } satisfies SqlEditorRunContext,
+    };
+  };
+
   const formatPanel = (panel: PanelState) => {
     const handle = editorHandles.current[panel.id];
     const formatted = formatSql(handle?.getValue() ?? panel.doc);
@@ -1317,13 +1412,19 @@ export default function DbClientTab({
       {
         label: "Run query",
         icon: <Play className="w-3 h-3" />,
-        onClick: () => void runQuery(panel.id, panelSql(panel)),
+        onClick: () => {
+          const payload = editorRunPayload(panel, false);
+          void runQuery(panel.id, payload.sql, { context: payload.context });
+        },
         disabled: running || !sqlText.trim(),
       },
       {
         label: "Run selection",
         icon: <SquareDashedMousePointer className="w-3 h-3" />,
-        onClick: () => void runQuery(panel.id, editorHandles.current[panel.id]?.getSelectionOrAll() ?? panelSql(panel)),
+        onClick: () => {
+          const payload = editorRunPayload(panel, true);
+          void runQuery(panel.id, payload.sql, { context: payload.context });
+        },
         disabled: running || !hasEditor,
       },
       {
@@ -1731,10 +1832,14 @@ export default function DbClientTab({
                 schemas={schemas}
                 activeSchema={activeSchema}
                 running={activePanel.sheets.some((sheet) => sheet.running)}
-                onRun={() => runQuery(activePanel.id, editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc)}
-                onRunSelection={() =>
-                  runQuery(activePanel.id, editorHandles.current[activePanel.id]?.getSelectionOrAll() ?? activePanel.doc)
-                }
+                onRun={() => {
+                  const payload = editorRunPayload(activePanel, false);
+                  void runQuery(activePanel.id, payload.sql, { context: payload.context });
+                }}
+                onRunSelection={() => {
+                  const payload = editorRunPayload(activePanel, true);
+                  void runQuery(activePanel.id, payload.sql, { context: payload.context });
+                }}
                 onCancel={() => cancelQuery(activePanel.id)}
                 onFormat={() => formatPanel(activePanel)}
                 onToggleHistory={() =>
@@ -1791,7 +1896,7 @@ export default function DbClientTab({
                       }}
                       onDocChange={(doc) => patchPanel(activePanel.id, { doc, dirty: true })}
                       onFocus={() => setActivePanelId(activePanel.id)}
-                      onRun={(sql) => runQuery(activePanel.id, sql)}
+                      onRun={(sql, context) => void runQuery(activePanel.id, sql, { context })}
                     />
                   </div>
                 </Panel>

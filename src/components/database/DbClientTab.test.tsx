@@ -102,9 +102,15 @@ vi.mock("./SqlEditorPanel", () => ({
       const handle = {
         getValue: () => doc,
         getSelectionOrAll: () => "select 1",
+        getCursorPosition: () => doc.length,
+        getSelectionRange: () => null,
         insertText: vi.fn(),
         setValue: vi.fn((text: string) => {
           doc = text;
+        }),
+        selectRange: vi.fn(),
+        replaceRange: vi.fn((from: number, to: number, text: string) => {
+          doc = `${doc.slice(0, from)}${text}${doc.slice(to)}`;
         }),
         focus: vi.fn(),
       };
