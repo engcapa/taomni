@@ -2169,18 +2169,13 @@ controls:
   - id: panel-root
     selector: '[data-testid="settings-panel"]'
     kind: display
-  - id: reset-terminal-profile
-    selector: '[data-testid="settings-reset-terminal-profile"]'
-    kind: interactive
   - id: welcome-recent-session-limit
     selector: '[data-testid="settings-welcome-recent-session-limit"]'
     kind: interactive
 -->
 
 - Application Theme 切换（Light / Dark / Follow system）
-- Terminal Appearance 区块（与会话编辑器 Terminal 段一致的完整外观与行为控件）
 - Welcome 最近会话历史数量设置（默认 20）
-- 终端预览
 - 设置项即时持久化
 
 ---

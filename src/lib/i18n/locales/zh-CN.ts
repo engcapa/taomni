@@ -1655,8 +1655,6 @@ export const zhCN: DeepPartial<typeof en> = {
     fontFamilyCurated: "推荐界面字体",
     fontFamilySystem: "全部系统字体",
     fontSizeLabel: "界面基础字号",
-    terminalAppearanceTitle: "终端外观",
-    terminalAppearanceSubtitle: "字体与主题默认设置",
     codeViewAppearanceTitle: "代码视图外观",
     codeViewAppearanceSubtitle: "为代码工作区与 Git diff 视图设置字体与主题",
     reset: "重置",

@@ -3,12 +3,7 @@ import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Type, Undo, X 
 import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
-import {
-  DEFAULT_TERMINAL_PROFILE,
-  loadGlobalTerminalProfile,
-  saveGlobalTerminalProfile,
-  type TerminalProfile,
-} from "../../lib/terminalProfile";
+import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import {
   DEFAULT_CODE_VIEW_PROFILE,
   applyCodeViewProfile,
@@ -16,7 +11,6 @@ import {
   saveCodeViewProfile,
   type CodeViewProfile,
 } from "../../lib/codeViewProfile";
-import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { LanguageSection } from "./LanguageSection";
 import { VaultSettings } from "../vault/VaultSettings";
@@ -102,7 +96,6 @@ function SettingsAnchor({
 }
 
 export function SettingsPanel() {
-  const [profile, setProfile] = useState<TerminalProfile>(() => loadGlobalTerminalProfile());
   const [codeViewProfile, setCodeViewProfile] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
@@ -176,9 +169,8 @@ export function SettingsPanel() {
   }, [uiFontFamily, systemFonts.fonts]);
 
   useEffect(() => {
-    saveGlobalTerminalProfile(profile);
-    applyCodeViewProfile(codeViewProfile, profile, { resolvedAppTheme: resolvedTheme });
-  }, [codeViewProfile, profile, resolvedTheme]);
+    applyCodeViewProfile(codeViewProfile, DEFAULT_TERMINAL_PROFILE, { resolvedAppTheme: resolvedTheme });
+  }, [codeViewProfile, resolvedTheme]);
 
   useEffect(() => {
     saveCodeViewProfile(codeViewProfile);
@@ -407,27 +399,8 @@ export function SettingsPanel() {
               </div>
             </section>
           </SettingsAnchor>
-          <SettingsAnchor id="terminal-appearance">
-            <div className="mb-4 flex items-center gap-3">
-              <div>
-                <div className="text-[18px] font-semibold">{t("settings.terminalAppearanceTitle")}</div>
-                <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.terminalAppearanceSubtitle")}</div>
-              </div>
-              <button
-                data-testid="settings-reset-terminal-profile"
-                className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
-                type="button"
-                onClick={() => setProfile(DEFAULT_TERMINAL_PROFILE)}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t("settings.reset")}
-              </button>
-            </div>
-            <TerminalAppearanceSettings profile={profile} onProfileChange={setProfile} showCustomColors />
-          </SettingsAnchor>
-
           <SettingsAnchor id="code-view-appearance">
-            <div className="mt-6 mb-4 flex items-center gap-3">
+            <div className="mb-4 flex items-center gap-3">
               <div>
                 <div className="text-[18px] font-semibold">{t("settings.codeViewAppearanceTitle")}</div>
                 <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.codeViewAppearanceSubtitle")}</div>
@@ -444,7 +417,7 @@ export function SettingsPanel() {
             </div>
             <CodeViewAppearanceSettings
               profile={codeViewProfile}
-              terminalProfile={profile}
+              terminalProfile={DEFAULT_TERMINAL_PROFILE}
               onProfileChange={setCodeViewProfile}
             />
           </SettingsAnchor>

@@ -1659,8 +1659,6 @@ const dict = {
     fontFamilyCurated: "Curated UI Fonts",
     fontFamilySystem: "All System Fonts",
     fontSizeLabel: "UI Base Font Size",
-    terminalAppearanceTitle: "Terminal Appearance",
-    terminalAppearanceSubtitle: "Font and theme defaults",
     codeViewAppearanceTitle: "Code View Appearance",
     codeViewAppearanceSubtitle: "Font and theme for the code workspace and Git diff view",
     reset: "Reset",

@@ -38,15 +38,6 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["ui font", "font family", "font size", "typography", "interface font", "界面字体", "字体", "字号", "排版"],
   },
   {
-    id: "terminal-appearance",
-    titleKeys: ["settings.terminalAppearanceTitle"],
-    terms: [
-      "terminal", "font", "theme", "cursor", "scrollback", "ligatures", "color", "behavior",
-      "right click", "copy on select", "osc52", "inline suggestions", "common commands",
-      "终端", "字体", "主题", "光标", "滚动", "回滚", "连字", "颜色", "行为", "右键", "选中复制", "内联建议", "常用命令",
-    ],
-  },
-  {
     id: "code-view-appearance",
     titleKeys: ["settings.codeViewAppearanceTitle"],
     terms: [
