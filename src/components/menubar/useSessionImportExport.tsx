@@ -92,9 +92,12 @@ export function useSessionImportExport(): UseSessionImportExport {
   };
 
   const downloadCsvTemplate = () => {
-    const result = serializeCsvSessionTemplate();
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    setStatusMessage(translate("status.csvTemplateDownloaded"));
+    void (async () => {
+      const result = serializeCsvSessionTemplate();
+      const savedPath = await downloadTextFile(result.filename, result.text, result.mimeType);
+      if (!savedPath) return;
+      setStatusMessage(translate("status.csvTemplateDownloaded"));
+    })().catch(reportError);
   };
 
   const importOpenSsh = () => {
@@ -106,28 +109,31 @@ export function useSessionImportExport(): UseSessionImportExport {
   };
 
   const exportResult = (format: string, result: SessionExportResult) => {
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    const count = sessions.length - result.skipped;
-    const skipped = result.skipped ? translate("status.skippedSuffix", { count: result.skipped }) : "";
-    const warningSuffix = result.warnings.length
-      ? translate("status.warningsSuffix", { count: result.warnings.length, plural: result.warnings.length === 1 ? "" : "s" })
-      : "";
-    setStatusMessage(translate("status.exportedSessions", {
-      count,
-      format,
-      plural: count === 1 ? "" : "s",
-      skipped,
-      warnings: warningSuffix,
-    }));
-    if (result.warnings.length) {
-      void alertAppDialog({
-        title: translate("status.warnings", {
-          count: result.warnings.length,
-          plural: result.warnings.length === 1 ? "" : "s",
-        }),
-        message: result.warnings.slice(0, 8).join("\n"),
-      });
-    }
+    void (async () => {
+      const savedPath = await downloadTextFile(result.filename, result.text, result.mimeType);
+      if (!savedPath) return;
+      const count = sessions.length - result.skipped;
+      const skipped = result.skipped ? translate("status.skippedSuffix", { count: result.skipped }) : "";
+      const warningSuffix = result.warnings.length
+        ? translate("status.warningsSuffix", { count: result.warnings.length, plural: result.warnings.length === 1 ? "" : "s" })
+        : "";
+      setStatusMessage(translate("status.exportedSessions", {
+        count,
+        format,
+        plural: count === 1 ? "" : "s",
+        skipped,
+        warnings: warningSuffix,
+      }));
+      if (result.warnings.length) {
+        void alertAppDialog({
+          title: translate("status.warnings", {
+            count: result.warnings.length,
+            plural: result.warnings.length === 1 ? "" : "s",
+          }),
+          message: result.warnings.slice(0, 8).join("\n"),
+        });
+      }
+    })().catch(reportError);
   };
 
   const exportJson = () => exportResult("Taomni", serializeTaomniSessions(sessions, null));

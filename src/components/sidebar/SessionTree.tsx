@@ -308,32 +308,28 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const label = folderOptionLabel(folderPath);
     const result = serializeTaomniSessions(folderSessions, folderPath);
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    reportExportResult("Taomni", result, folderSessions.length, label);
+    void saveExportResult("Taomni", result, folderSessions.length, label).catch(reportFileError);
   };
 
   const exportMobaFolder = (folderPath: string | null) => {
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const label = folderOptionLabel(folderPath);
     const result = serializeMobaXtermSessions(folderSessions, folderPath);
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    reportExportResult("MobaXterm", result, folderSessions.length - result.skipped, label);
+    void saveExportResult("MobaXterm", result, folderSessions.length - result.skipped, label).catch(reportFileError);
   };
 
   const exportCsvFolder = (folderPath: string | null) => {
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const label = folderOptionLabel(folderPath);
     const result = serializeCsvSessions(folderSessions, folderPath);
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    reportExportResult("CSV", result, folderSessions.length - result.skipped, label);
+    void saveExportResult("CSV", result, folderSessions.length - result.skipped, label).catch(reportFileError);
   };
 
   const generateHtml = (folderPath: string | null) => {
     const folderSessions = sessionsInFolder(sessions, folderPath);
     const label = folderOptionLabel(folderPath);
     const result = serializeHtmlSessions(folderSessions, folderPath);
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    reportExportResult("HTML", result, folderSessions.length, label);
+    void saveExportResult("HTML", result, folderSessions.length, label).catch(reportFileError);
   };
 
   const importJson = (folderPath: string | null) => {
@@ -368,9 +364,12 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const downloadCsvTemplate = () => {
-    const result = serializeCsvSessionTemplate();
-    downloadTextFile(result.filename, result.text, result.mimeType);
-    setStatusMessage(t("sessionTree.csvTemplateDownloaded"));
+    void (async () => {
+      const result = serializeCsvSessionTemplate();
+      const savedPath = await downloadTextFile(result.filename, result.text, result.mimeType);
+      if (!savedPath) return;
+      setStatusMessage(t("sessionTree.csvTemplateDownloaded"));
+    })().catch(reportFileError);
   };
 
   const queueImportPreview = (
@@ -772,6 +771,17 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     return prepareImportedSecretsForSave(result, t);
   };
 
+  const saveExportResult = async (
+    format: string,
+    result: SessionExportResult,
+    count: number,
+    label: string,
+  ): Promise<void> => {
+    const savedPath = await downloadTextFile(result.filename, result.text, result.mimeType);
+    if (!savedPath) return;
+    reportExportResult(format, result, count, label);
+  };
+
   const reportImportResult = (
     source: string,
     result: SessionImportResult,
@@ -803,6 +813,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     const shown = warnings.slice(0, 8);
     const more = warnings.length > shown.length ? t("sessionTree.warningsMore", { count: warnings.length - shown.length, plural: warnings.length - shown.length === 1 ? "" : "s" }) : "";
     window.alert(`${shown.join("\n")}${more}`);
+  };
+
+  const reportFileError = (error: unknown) => {
+    window.alert(error instanceof Error ? error.message : String(error));
   };
 
   const executeFolder = (folderPath: string | null) => {
