@@ -89,7 +89,12 @@ import { useVaultStore } from "../stores/vaultStore";
 import { ensureVaultReady } from "../lib/vaultGate";
 import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
-import { DEFAULT_MAIL_TERMINAL_PROFILE, getSessionTerminalProfile, type TerminalProfile } from "../lib/terminalProfile";
+import {
+  DEFAULT_MAIL_TERMINAL_PROFILE,
+  getSessionTerminalProfile,
+  loadLocalTerminalDefaultProfile,
+  type TerminalProfile,
+} from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
 import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout";
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
@@ -1292,6 +1297,7 @@ export function MainLayout() {
     initialCwd?: string,
   ) => {
     const id = `local-${Date.now()}`;
+    const resolvedTerminalProfile = terminalProfile ?? (sessionId ? undefined : loadLocalTerminalDefaultProfile());
     const requestedTitle = title || tr("tabs.localTerminal");
     const resolvedTitle = computeNewTerminalTitle(
       requestedTitle,
@@ -1305,7 +1311,7 @@ export function MainLayout() {
       title: resolvedTitle,
       sessionId,
       localShell,
-      terminalProfile,
+      terminalProfile: resolvedTerminalProfile,
       terminalInitialCwd: initialCwd,
       closable: true,
     });

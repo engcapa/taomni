@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPanel";
-import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
+import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 
 const terminalMocks = vi.hoisted(() => {
@@ -1282,6 +1282,56 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.click(await screen.findByText("Open Git Panel"));
 
     expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the current theme as the default for new local terminals", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "kanagawa-wave",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
+
+    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    expect(stored.theme).toBe("kanagawa-wave");
+  });
+
+  it("keeps follow-system as a savable local terminal default theme", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: SYSTEM_TERMINAL_THEME,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
+
+    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    expect(stored.theme).toBe(SYSTEM_TERMINAL_THEME);
   });
 
   it("opens Git from the terminal shortcut", async () => {

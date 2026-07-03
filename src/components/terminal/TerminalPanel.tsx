@@ -14,10 +14,13 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {
-  loadGlobalTerminalProfile,
+  DEFAULT_TERMINAL_PROFILE,
   isCustomTerminalTheme,
+  loadLocalTerminalDefaultProfile,
   parseSessionOptions,
   resolveTerminalTheme,
+  resolveTerminalThemeWithSystem,
+  saveLocalTerminalDefaultProfile,
   type TerminalProfile,
   type TerminalSyntaxMode,
   type UserCommonCommand,
@@ -57,6 +60,7 @@ import {
   type XtermCaptureTheme,
 } from "../../lib/capture";
 import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { useAppTheme } from "../../lib/appTheme";
 import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
@@ -362,7 +366,7 @@ export function TerminalPanel({
   const explainSelection = useChatStore((s) => s.explainSelection);
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
-    initialProfileRef.current = terminalProfile ?? loadGlobalTerminalProfile();
+    initialProfileRef.current = terminalProfile ?? DEFAULT_TERMINAL_PROFILE;
   }
   const initialProfile = initialProfileRef.current;
   const appliedTerminalProfileSignatureRef = useRef<string | null>(
@@ -376,6 +380,12 @@ export function TerminalPanel({
   const [webglRenderer, setWebglRenderer] = useState(initialProfile.webglRenderer);
   const [readOnly, setReadOnly] = useState(initialProfile.readOnly);
   const [themeName, setThemeName] = useState(initialProfile.theme || theme);
+  const { resolvedTheme: resolvedAppTheme } = useAppTheme();
+  const systemPrefersDark = resolvedAppTheme === "dark";
+  const resolvePanelTheme = useCallback(
+    (name: string) => resolveTerminalThemeWithSystem(name, systemPrefersDark),
+    [systemPrefersDark],
+  );
   const [cursorStyle, setCursorStyle] = useState(initialProfile.cursorStyle);
   const [cursorBlink, setCursorBlink] = useState(initialProfile.cursorBlink);
   const [scrollback, setScrollback] = useState(initialProfile.scrollback);
@@ -1065,7 +1075,7 @@ export function TerminalPanel({
       return;
     }
 
-    const resolvedTheme = resolveTerminalTheme(themeName);
+    const resolvedTheme = resolvePanelTheme(themeName);
     const html = `<pre style="margin:0;font-family:${escapeHtml(fontFamily)};font-size:${fontSize}px;background:${resolvedTheme.background ?? "#1d1f21"};color:${resolvedTheme.foreground ?? "#eaeaea"};white-space:pre-wrap;">${escapeHtml(text)}</pre>`;
 
     try {
@@ -1076,7 +1086,7 @@ export function TerminalPanel({
     } finally {
       focusTerminal();
     }
-  }, [focusTerminal, fontFamily, fontSize, getActiveTerminalSelectionText, setStatusMessage, themeName, writeClipboardText]);
+  }, [focusTerminal, fontFamily, fontSize, getActiveTerminalSelectionText, resolvePanelTheme, setStatusMessage, themeName, writeClipboardText]);
 
   const pasteTextIntoTerminal = useCallback(async (text: string): Promise<boolean> => {
     if (readOnlyRef.current) {
@@ -1607,8 +1617,8 @@ export function TerminalPanel({
     extendTerminalBlockSelectionByKeyboard,
     getActiveTerminalSelectionText,
     increaseFontSize,
-    isMac,
     isLocal,
+    isMac,
     openSearch,
     pasteFromClipboard,
     resetFontSize,
@@ -1624,6 +1634,8 @@ export function TerminalPanel({
     const customTheme = isCustomTerminalTheme(themeName) ? resolveTerminalTheme(themeName) : null;
     const themeMenuValue = customTheme ? themeName : resolveThemeId(themeName);
     const themeOptions = buildTerminalThemeOptions({
+      includeSystem: true,
+      systemLabel: "Follow system theme",
       customValue: customTheme ? themeName : undefined,
       customTheme,
       customLabel: "Custom colors",
@@ -1694,6 +1706,17 @@ export function TerminalPanel({
           />
         ),
       },
+      ...(isLocal
+        ? [{
+            label: "Set current theme as default for new local terminals",
+            testId: "terminal-context-set-local-default-theme",
+            onClick: () => {
+              const currentDefault = loadLocalTerminalDefaultProfile();
+              saveLocalTerminalDefaultProfile({ ...currentDefault, theme: themeName });
+              setStatusMessage("Default theme for new local terminals updated");
+            },
+          }]
+        : []),
       {
         label: "Terminal display",
         children: [
@@ -1776,6 +1799,7 @@ export function TerminalPanel({
     gitState.kind,
     gitToggle,
     increaseFontSize,
+    isLocal,
     isMac,
     openSearch,
     pasteFromClipboard,
@@ -1788,6 +1812,7 @@ export function TerminalPanel({
     resetOutput,
     saveBufferToFile,
     showScrollbar,
+    setStatusMessage,
     syntaxMode,
     setSyntaxModeAndFocus,
     themeName,
@@ -2023,7 +2048,7 @@ export function TerminalPanel({
     const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : makeTerminalFontFamily("Source Code Pro");
 
     const term = new Terminal({
-      theme: resolveTerminalTheme(themeName),
+      theme: resolvePanelTheme(themeName),
       fontFamily: safeFontFamily,
       fontSize,
       cursorBlink,
@@ -2754,14 +2779,14 @@ export function TerminalPanel({
     term.options = {
       fontFamily: safeFontFamily,
       fontSize,
-      theme: resolveTerminalTheme(themeName),
+      theme: resolvePanelTheme(themeName),
       cursorBlink,
       cursorStyle,
       scrollback,
       macOptionIsMeta: false,
     };
     window.setTimeout(() => requestAnimationFrame(() => fitVisibleTerminal()), 0);
-  }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, scrollback, themeName]);
+  }, [cursorBlink, cursorStyle, fitVisibleTerminal, fontFamily, fontSize, resolvePanelTheme, scrollback, themeName]);
 
   // When a hidden tab becomes visible again, re-measure xterm. Focus is
   // reserved for the active pane so split view does not race visible panes.
@@ -2929,7 +2954,7 @@ export function TerminalPanel({
     showScrollbar ? "" : "terminal-hide-scrollbar",
     fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");
-  const resolvedTheme = resolveTerminalTheme(themeName);
+  const resolvedTheme = resolvePanelTheme(themeName);
   // Latest theme/font for capture, read lazily so the registration effect below
   // doesn't churn on every render (resolvedTheme is a fresh object each time).
   const captureThemeRef = useRef({ resolvedTheme, fontFamily, fontSize });

@@ -990,6 +990,10 @@ controls:
     selector: '[data-testid^="terminal-theme-option-"]'
     kind: interactive
     optional: true       # only visible while the preview dropdown is open
+  - id: local-default-theme
+    selector: '[data-testid="terminal-context-set-local-default-theme"]'
+    kind: interactive
+    optional: true       # only visible in the local terminal context menu
   - id: preview
     selector: '[data-testid="terminal-preview"]'
     kind: display
@@ -1040,12 +1044,12 @@ controls:
 - 字体选择器、字号 stepper、主题预览下拉、底部预览
 - 光标样式（block / underline / bar）+ 闪烁
 - Scrollback 行数、日志、关键字高亮、显示项、剪贴板/粘贴策略
-- 同一控件复用于全局设置面板与会话编辑器
+- 同一控件复用于终端类会话编辑器与终端上下文菜单相关设置
 - 实时预览反映光标样式与闪烁状态
 
 ### 5.4 配置持久化 ✅
-- 全局终端配置：`localStorage`（默认值，未保存会话使用）
-- 每会话 override：`session.options_json.terminalProfile`
+- 临时本地终端默认配置：`localStorage` 的 `taomni.localTerminalProfile.v1`（用于 `+` 号新开本地终端）
+- 保存会话 override：`session.options_json.terminalProfile`
 - 活跃终端可在不重启的情况下应用主题/字体/字号/连字变化
 
 ### 5.5 应用整体主题（Light / Dark / Follow system）✅

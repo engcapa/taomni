@@ -69,10 +69,11 @@ import {
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import {
+  DEFAULT_TERMINAL_PROFILE,
   DEFAULT_MAIL_TERMINAL_PROFILE,
   SYSTEM_TERMINAL_THEME,
   getSessionTerminalProfile,
-  loadGlobalTerminalProfile,
+  loadLocalTerminalDefaultProfile,
   parseSessionOptions,
   type TerminalProfile,
 } from "../../lib/terminalProfile";
@@ -537,6 +538,7 @@ function TerminalSettings({
         profile={profile}
         onProfileChange={onProfileChange}
         showCustomColors
+        allowSystemTheme
       />
     </div>
   );
@@ -544,13 +546,14 @@ function TerminalSettings({
 
 function initialTerminalProfileForProto(optionsJson: string | null | undefined, proto: Proto): TerminalProfile {
   const saved = getSessionTerminalProfile(optionsJson);
-  if (saved) {
-    if (proto !== "Mail" && saved.theme === SYSTEM_TERMINAL_THEME) {
-      return { ...saved, theme: loadGlobalTerminalProfile().theme };
-    }
-    return saved;
-  }
-  return proto === "Mail" ? DEFAULT_MAIL_TERMINAL_PROFILE : loadGlobalTerminalProfile();
+  if (saved) return saved;
+  return defaultTerminalProfileForProto(proto);
+}
+
+function defaultTerminalProfileForProto(proto: Proto): TerminalProfile {
+  if (proto === "Mail") return DEFAULT_MAIL_TERMINAL_PROFILE;
+  if (proto === "Shell" || proto === "WSL") return loadLocalTerminalDefaultProfile();
+  return DEFAULT_TERMINAL_PROFILE;
 }
 
 /** Proxy selector + (HTTP/SOCKS5) proxy fields or the SSH jump-host section.
@@ -2364,7 +2367,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setTerminalProfile((current) => ({ ...current, theme: SYSTEM_TERMINAL_THEME }));
     } else {
       setTerminalProfile((current) => current.theme === SYSTEM_TERMINAL_THEME
-        ? { ...current, theme: loadGlobalTerminalProfile().theme }
+        ? { ...current, theme: defaultTerminalProfileForProto(p).theme }
         : current);
     }
     // Object storage opens straight to its settings tab.
