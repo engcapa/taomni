@@ -1298,6 +1298,41 @@ describe("TerminalPanel focus behavior", () => {
     }));
   });
 
+  it("keeps the open terminal appearance menu in sync while changing theme and font size", async () => {
+    const onProfileChange = vi.fn();
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{ ...DEFAULT_TERMINAL_PROFILE, theme: "classic", fontSize: 14 }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+
+    const kanagawa = await screen.findByTestId("terminal-context-theme-option-kanagawa-wave");
+    fireEvent.click(kanagawa);
+
+    expect(kanagawa).toHaveAttribute("aria-selected", "true");
+
+    const sizeInput = screen.getByTestId("terminal-context-font-size");
+    const increase = screen.getByLabelText("Increase terminal font size");
+    fireEvent.click(increase);
+    expect(sizeInput).toHaveValue("15");
+    fireEvent.click(increase);
+    expect(sizeInput).toHaveValue("16");
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      theme: "kanagawa-wave",
+      fontSize: 16,
+    }));
+  });
+
   it("does not render the Git rail button inside the terminal pane", async () => {
     const onOpen = vi.fn();
     const onSessionReady = vi.fn();
@@ -1363,6 +1398,36 @@ describe("TerminalPanel focus behavior", () => {
 
     const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
     expect(stored.theme).toBe("kanagawa-wave");
+  });
+
+  it("saves appearance changes made in the open context menu as the local terminal default", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "classic",
+          fontSize: 14,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.click(await screen.findByTestId("terminal-context-theme-option-kanagawa-wave"));
+    fireEvent.click(screen.getByLabelText("Increase terminal font size"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
+
+    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    expect(stored.theme).toBe("kanagawa-wave");
+    expect(stored.fontSize).toBe(15);
   });
 
   it("auto-saves local terminal appearance changes for future local terminals", async () => {

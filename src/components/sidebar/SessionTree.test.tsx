@@ -291,4 +291,26 @@ describe("SessionTree multi-select batch operations", () => {
       expect.stringContaining("JetBrains Mono"),
     ]);
   });
+
+  it("keeps the session appearance menu draft current for repeated font size changes", async () => {
+    render(<SessionTree />);
+    selectBothIpySessions();
+
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    const item = screen.getByTestId("context-menu-item-set-terminal-theme");
+    fireEvent.mouseEnter(item.parentElement!);
+
+    const fontSizeInput = await screen.findByTestId("session-terminal-font-size");
+    const increase = await screen.findByLabelText("Increase text size");
+    fireEvent.click(increase);
+    expect(fontSizeInput).toHaveValue("15");
+    fireEvent.click(increase);
+    expect(fontSizeInput).toHaveValue("16");
+
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(4));
+    const savedFontSizes = ipcMocks.saveSession.mock.calls.map(([cfg]) => (
+      JSON.parse(cfg.options_json).terminalProfile.fontSize
+    ));
+    expect(savedFontSizes.filter((size) => size === 16)).toHaveLength(2);
+  });
 });

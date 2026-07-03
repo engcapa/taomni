@@ -61,8 +61,11 @@ export function TerminalAppearanceMenuPanel({
   fontSizeTestId?: string;
 }) {
   const fontOptions = useTerminalFontOptions(fonts.length > 0 ? fonts : SAFE_TERMINAL_FONT_FALLBACKS);
-  const selectedFont = fontFamily ? resolveSelectedFontName(fontFamily, fontOptions) : MIXED_FONT_VALUE;
-  const [fontSizeText, setFontSizeText] = useState(fontSize === null ? "" : String(fontSize));
+  const [draftThemeValue, setDraftThemeValue] = useState(themeValue);
+  const [draftFontFamily, setDraftFontFamily] = useState<string | null>(fontFamily);
+  const [draftFontSize, setDraftFontSize] = useState<number | null>(fontSize);
+  const selectedFont = draftFontFamily ? resolveSelectedFontName(draftFontFamily, fontOptions) : MIXED_FONT_VALUE;
+  const [fontSizeText, setFontSizeText] = useState(draftFontSize === null ? "" : String(draftFontSize));
   const partitionedFonts = useMemo(() => {
     const mono: string[] = [];
     const prop: string[] = [];
@@ -77,22 +80,40 @@ export function TerminalAppearanceMenuPanel({
   }, [fontOptions]);
 
   useEffect(() => {
-    setFontSizeText(fontSize === null ? "" : String(fontSize));
+    setDraftThemeValue(themeValue);
+  }, [themeValue]);
+
+  useEffect(() => {
+    setDraftFontFamily(fontFamily);
+  }, [fontFamily]);
+
+  useEffect(() => {
+    setDraftFontSize(fontSize);
   }, [fontSize]);
+
+  useEffect(() => {
+    setFontSizeText(draftFontSize === null ? "" : String(draftFontSize));
+  }, [draftFontSize]);
 
   const updateFontSize = (next: number) => {
     if (!Number.isFinite(next)) return;
-    onChangeFontSize(Math.max(8, Math.min(32, Math.round(next))));
+    const clamped = Math.max(8, Math.min(32, Math.round(next)));
+    setDraftFontSize(clamped);
+    setFontSizeText(String(clamped));
+    onChangeFontSize(clamped);
   };
 
   return (
     <div className="w-[380px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-24px))] overflow-hidden rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg">
       <ThemePreviewList
-        value={themeValue}
+        value={draftThemeValue}
         options={themeOptions}
         testId={themeListTestId}
         className="max-h-[min(270px,calc(100vh-170px))] overflow-y-auto overscroll-contain p-1"
-        onChange={onChangeTheme}
+        onChange={(nextTheme) => {
+          setDraftThemeValue(nextTheme);
+          onChangeTheme(nextTheme);
+        }}
       />
       <div className="border-t border-[var(--taomni-divider)] p-2 space-y-2">
         <label className="block">
@@ -103,9 +124,13 @@ export function TerminalAppearanceMenuPanel({
             data-testid={fontSelectTestId}
             value={selectedFont}
             disabled={fontOptions.length === 0}
-            onChange={(event) => onChangeFontFamily(makeTerminalFontFamily(event.target.value))}
+            onChange={(event) => {
+              const nextFontFamily = makeTerminalFontFamily(event.target.value);
+              setDraftFontFamily(nextFontFamily);
+              onChangeFontFamily(nextFontFamily);
+            }}
           >
-            {!fontFamily && (
+            {!draftFontFamily && (
               <option value={MIXED_FONT_VALUE} disabled>
                 {labels.mixedFont}
               </option>
@@ -137,8 +162,8 @@ export function TerminalAppearanceMenuPanel({
               type="button"
               className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
               aria-label={labels.decreaseTextSize}
-              disabled={fontSize === null}
-              onClick={() => fontSize !== null && updateFontSize(fontSize - 1)}
+              disabled={draftFontSize === null}
+              onClick={() => draftFontSize !== null && updateFontSize(draftFontSize - 1)}
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
@@ -147,7 +172,7 @@ export function TerminalAppearanceMenuPanel({
               aria-label={labels.fontSize}
               data-testid={fontSizeTestId}
               inputMode="numeric"
-              placeholder={fontSize === null ? "-" : undefined}
+              placeholder={draftFontSize === null ? "-" : undefined}
               value={fontSizeText}
               onChange={(event) => {
                 const next = event.target.value;
@@ -160,14 +185,13 @@ export function TerminalAppearanceMenuPanel({
               }}
               onBlur={() => {
                 if (!fontSizeText) {
-                  setFontSizeText(fontSize === null ? "" : String(fontSize));
+                  setFontSizeText(draftFontSize === null ? "" : String(draftFontSize));
                   return;
                 }
                 const parsed = Number(fontSizeText);
                 if (Number.isFinite(parsed) && parsed > 0) {
                   const clamped = Math.max(8, Math.min(32, Math.round(parsed)));
-                  setFontSizeText(String(clamped));
-                  onChangeFontSize(clamped);
+                  updateFontSize(clamped);
                 }
               }}
             />
@@ -175,8 +199,8 @@ export function TerminalAppearanceMenuPanel({
               type="button"
               className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
               aria-label={labels.increaseTextSize}
-              disabled={fontSize === null}
-              onClick={() => fontSize !== null && updateFontSize(fontSize + 1)}
+              disabled={draftFontSize === null}
+              onClick={() => draftFontSize !== null && updateFontSize(draftFontSize + 1)}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
