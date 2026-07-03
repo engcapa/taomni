@@ -439,6 +439,7 @@ function sqlTextExpression(engine: SqlEngine, expression: string): string {
     case "StarRocks":
       return `CAST(${expression} AS CHAR)`;
     case "PostgreSQL":
+    case "PanWeiDB":
       return `${expression}::text`;
     case "SQLServer":
       return `CAST(${expression} AS NVARCHAR(MAX))`;

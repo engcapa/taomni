@@ -8,6 +8,7 @@ type TranslateFn = (key: string, vars?: Record<string, string | number>) => stri
 const DB_PASSWORD_SESSION_TYPES = new Set([
   "MySQL",
   "PostgreSQL",
+  "PanWeiDB",
   "SQLServer",
   "StarRocks",
   "ClickHouse",

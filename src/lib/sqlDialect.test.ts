@@ -33,6 +33,7 @@ describe("sqlDialect identifiers", () => {
     expect(quoteIdent("MySQL", "a`b")).toBe("`a``b`");
     expect(quoteIdent("ClickHouse", "x")).toBe("`x`");
     expect(quoteIdent("PostgreSQL", 'a"b')).toBe('"a""b"');
+    expect(quoteIdent("PanWeiDB", 'a"b')).toBe('"a""b"');
     expect(quoteIdent("Presto", "x")).toBe('"x"');
     expect(quoteIdent("SQLServer", "a]b")).toBe("[a]]b]");
   });
@@ -56,6 +57,7 @@ describe("sqlDialect identifiers", () => {
 
   it("narrows engine strings", () => {
     expect(asSqlEngine("PostgreSQL")).toBe("PostgreSQL");
+    expect(asSqlEngine("PanWeiDB")).toBe("PanWeiDB");
     expect(asSqlEngine("SQLServer")).toBe("SQLServer");
     expect(asSqlEngine("StarRocks")).toBe("StarRocks");
     expect(asSqlEngine("nonsense")).toBe("MySQL");
@@ -63,6 +65,7 @@ describe("sqlDialect identifiers", () => {
 
   it("emits the right set-default statement", () => {
     expect(setDefaultSchemaSql("PostgreSQL", "s")).toBe('SET search_path TO "s"');
+    expect(setDefaultSchemaSql("PanWeiDB", "s")).toBe('SET search_path TO "s"');
     expect(setDefaultSchemaSql("Presto", "s", "c")).toBe('USE "c"."s"');
     expect(setDefaultSchemaSql("MySQL", "s")).toBe("USE `s`");
     expect(setDefaultSchemaSql("StarRocks", "s")).toBe("USE `s`");
@@ -74,6 +77,7 @@ describe("sqlDialect capabilities", () => {
   it("exposes per-engine folder categories", () => {
     expect(categoriesForEngine("MySQL")).toContain("trigger");
     expect(categoriesForEngine("PostgreSQL")).toContain("sequence");
+    expect(categoriesForEngine("PanWeiDB")).toContain("sequence");
     expect(categoriesForEngine("SQLServer")).toContain("procedure");
     expect(categoriesForEngine("StarRocks")).toEqual(["table", "view"]);
     expect(categoriesForEngine("ClickHouse")).toContain("dictionary");
@@ -86,6 +90,7 @@ describe("sqlDialect capabilities", () => {
     expect(supportsInlineEdit("StarRocks")).toBe(false);
     expect(supportsInlineEdit("ClickHouse")).toBe(false);
     expect(supportsIndexes("PostgreSQL")).toBe(true);
+    expect(supportsIndexes("PanWeiDB")).toBe(true);
     expect(supportsIndexes("SQLServer")).toBe(true);
     expect(supportsIndexes("StarRocks")).toBe(false);
     expect(supportsIndexes("Presto")).toBe(false);
@@ -96,6 +101,7 @@ describe("sqlDialect capabilities", () => {
     expect(actionMode("MySQL", "renameDatabase")).toBe("disabled");
     expect(actionMode("PostgreSQL", "renameDatabase")).toBe("execute");
     expect(actionMode("PostgreSQL", "disableTrigger")).toBe("execute");
+    expect(actionMode("PanWeiDB", "disableTrigger")).toBe("execute");
     expect(actionMode("SQLServer", "disableTrigger")).toBe("execute");
     expect(actionMode("SQLServer", "renameDatabase")).toBe("disabled");
     expect(actionMode("MySQL", "disableTrigger")).toBe("disabled");

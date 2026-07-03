@@ -885,7 +885,7 @@ export async function secureCrtDecryptPasswords(
   });
 }
 
-// --- Database client (MySQL / PostgreSQL / SQL Server / StarRocks / ClickHouse / Presto / Redis) ---
+// --- Database client (MySQL / PostgreSQL / PanWeiDB / SQL Server / StarRocks / ClickHouse / Presto / Redis) ---
 
 /** Strip the frontend-only `sessionId` to build the Rust `DbConfig` payload. */
 function toDbConfigPayload(info: DbConnectInfo): Record<string, unknown> {

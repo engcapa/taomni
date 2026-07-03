@@ -109,14 +109,16 @@ impl Flavor {
     }
 
     /// Pick the MCP flavor for a thread from its bound session's type: SQL DB
-    /// engines (MySQL/PG/SQL Server/StarRocks/ClickHouse/Presto) → `Sql`, Redis → `Redis`, anything
-    /// else (SSH/terminal/local/unbound) → `Shell`.
+    /// engines (MySQL/PG/PanWeiDB/SQL Server/StarRocks/ClickHouse/Presto) →
+    /// `Sql`, Redis → `Redis`, anything else (SSH/terminal/local/unbound) →
+    /// `Shell`.
     pub fn for_session_type(t: Option<&crate::session::models::SessionType>) -> Flavor {
         use crate::session::models::SessionType;
         match t {
             Some(
                 SessionType::MySQL
                 | SessionType::PostgreSQL
+                | SessionType::PanWeiDB
                 | SessionType::SQLServer
                 | SessionType::StarRocks
                 | SessionType::ClickHouse
@@ -1850,6 +1852,7 @@ mod tests {
         let sql = [
             SessionType::MySQL,
             SessionType::PostgreSQL,
+            SessionType::PanWeiDB,
             SessionType::SQLServer,
             SessionType::StarRocks,
             SessionType::ClickHouse,
