@@ -79,6 +79,8 @@ interface SchemaTreeProps {
   quickSelectLimit?: number;
   /** Presto catalog, needed to fully-qualify object names. */
   catalog?: string | null;
+  /** Connection database name for engines where schemas live under a database. */
+  databaseName?: string | null;
   /** Insert a full statement into a new query panel (for review/run). */
   onInsertSql?: (sql: string) => void;
   /** Open a fresh, empty query panel. */
@@ -150,6 +152,7 @@ export function SchemaTree({
   onQuickSelect,
   quickSelectLimit = 1000,
   catalog,
+  databaseName,
   onInsertSql,
   onNewQuery,
   onSetDefaultSchema,
@@ -162,11 +165,15 @@ export function SchemaTree({
   const sqlEngine = asSqlEngine(engine);
   const categories = categoriesForEngine(sqlEngine);
   const showIndexes = supportsIndexes(sqlEngine);
+  const databaseRootName = databaseName?.trim() ?? "";
+  const groupSchemasUnderDatabase =
+    databaseRootName.length > 0 && (sqlEngine === "PostgreSQL" || sqlEngine === "PanWeiDB");
   const confirmDialog = useConfirmDialog();
   const inputDialog = useTextInputDialog();
   const [detail, setDetail] = useState<ObjectDetail | null>(null);
 
   const [schemas, setSchemas] = useState<string[]>([]);
+  const [databaseRootExpanded, setDatabaseRootExpanded] = useState(true);
   const [expandedDb, setExpandedDb] = useState<Record<string, boolean>>({});
   const [expandedCat, setExpandedCat] = useState<Record<string, boolean>>({});
   const [tablesByDb, setTablesByDb] = useState<Record<string, DbTable[]>>({});
@@ -349,6 +356,13 @@ export function SchemaTree({
 
   const databaseVisible = (db: string): boolean =>
     !filterActive || matchesFilter(db) || categories.some((kind) => categoryVisible(db, kind));
+
+  const databaseRootMatchesFilter = filterActive && matchesFilter(databaseRootName);
+
+  const visibleSchemas = useMemo(
+    () => schemas.filter((db) => databaseRootMatchesFilter || databaseVisible(db)),
+    [databaseRootMatchesFilter, databaseVisible, schemas],
+  );
 
   const categoryCount = (db: string, kind: ObjectKind): number | null => {
     if (filterActive) return filteredObjectsFor(db, kind).length;
@@ -1014,6 +1028,57 @@ export function SchemaTree({
     </div>
   );
 
+  const renderSchemaRows = () => (
+    visibleSchemas.map((db) => (
+      <div key={db}>
+        <button
+          type="button"
+          className="taomni-tree-row w-full text-left"
+          onClick={() => toggleDb(db)}
+          onContextMenu={(e) => openMenu(e, databaseMenu(db))}
+        >
+          {expandedDb[dbKey(db)] || filterActive ? (
+            <ChevronDown className="w-3 h-3" />
+          ) : (
+            <ChevronRight className="w-3 h-3" />
+          )}
+          <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+          <span className="flex-1 truncate">{db}</span>
+        </button>
+        {(expandedDb[dbKey(db)] || filterActive) &&
+          categories.filter((kind) => categoryVisible(db, kind)).map((kind) => {
+            const meta = CATEGORY_META[kind];
+            const CatIcon = meta.Icon;
+            const ckey = catKey(db, kind);
+            const count = categoryCount(db, kind);
+            return (
+              <div key={kind}>
+                <button
+                  type="button"
+                  className="taomni-tree-row w-full text-left"
+                  style={{ paddingLeft: 18 }}
+                  onClick={() => toggleCategory(db, kind)}
+                  onContextMenu={(e) => openMenu(e, categoryMenu(db, kind))}
+                >
+                  {expandedCat[ckey] || filterActive ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                  <CatIcon className="w-3.5 h-3.5" style={{ color: meta.color }} />
+                  <span className="flex-1 truncate">{meta.label}</span>
+                  {count !== null && (
+                    <span className="text-[10px] text-[var(--taomni-text-muted)]">{count}</span>
+                  )}
+                </button>
+                {(expandedCat[ckey] || filterActive) && renderObjects(db, kind)}
+              </div>
+            );
+          })}
+      </div>
+    ))
+  );
+
   return (
     <div className="h-full flex flex-col" data-testid="schema-tree">
       <div
@@ -1083,57 +1148,33 @@ export function SchemaTree({
         {loadingSchemas && schemas.length === 0 && (
           <div className="px-2 py-1 text-[var(--taomni-text-muted)]">Loading…</div>
         )}
-        {filterActive && !schemas.some(databaseVisible) && (
+        {filterActive && !visibleSchemas.length && !databaseRootMatchesFilter && (
           <div className="px-2 py-1 text-[var(--taomni-text-muted)]">{t("dbObjects.noFilterMatches")}</div>
         )}
-        {schemas.filter(databaseVisible).map((db) => (
-          <div key={db}>
+        {groupSchemasUnderDatabase ? (
+          <>
             <button
               type="button"
               className="taomni-tree-row w-full text-left"
-              onClick={() => toggleDb(db)}
-              onContextMenu={(e) => openMenu(e, databaseMenu(db))}
+              onClick={() => setDatabaseRootExpanded((value) => !value)}
+              title={databaseRootName}
             >
-              {expandedDb[dbKey(db)] || filterActive ? (
+              {databaseRootExpanded || filterActive ? (
                 <ChevronDown className="w-3 h-3" />
               ) : (
                 <ChevronRight className="w-3 h-3" />
               )}
               <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-              <span className="flex-1 truncate">{db}</span>
+              <span className="flex-1 truncate">{databaseRootName}</span>
+              <span className="text-[10px] text-[var(--taomni-text-muted)]">{schemas.length}</span>
             </button>
-            {(expandedDb[dbKey(db)] || filterActive) &&
-              categories.filter((kind) => categoryVisible(db, kind)).map((kind) => {
-                const meta = CATEGORY_META[kind];
-                const CatIcon = meta.Icon;
-                const ckey = catKey(db, kind);
-                const count = categoryCount(db, kind);
-                return (
-                  <div key={kind}>
-                    <button
-                      type="button"
-                      className="taomni-tree-row w-full text-left"
-                      style={{ paddingLeft: 18 }}
-                      onClick={() => toggleCategory(db, kind)}
-                      onContextMenu={(e) => openMenu(e, categoryMenu(db, kind))}
-                    >
-                      {expandedCat[ckey] || filterActive ? (
-                        <ChevronDown className="w-3 h-3" />
-                      ) : (
-                        <ChevronRight className="w-3 h-3" />
-                      )}
-                      <CatIcon className="w-3.5 h-3.5" style={{ color: meta.color }} />
-                      <span className="flex-1 truncate">{meta.label}</span>
-                      {count !== null && (
-                        <span className="text-[10px] text-[var(--taomni-text-muted)]">{count}</span>
-                      )}
-                    </button>
-                    {(expandedCat[ckey] || filterActive) && renderObjects(db, kind)}
-                  </div>
-                );
-              })}
-          </div>
-        ))}
+            {(databaseRootExpanded || filterActive) && (
+              <div style={{ paddingLeft: 14 }}>{renderSchemaRows()}</div>
+            )}
+          </>
+        ) : (
+          renderSchemaRows()
+        )}
       </div>
       {menu}
       {confirmDialog.render}

@@ -11,17 +11,18 @@ use std::{
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::task::JoinHandle;
 use tokio_opengauss::{
-    Client as OgClient, Config as OgConfig, NoTls, Row as OgRow, SimpleQueryMessage,
-    config::SslMode, types::ToSql,
+    config::SslMode, types::ToSql, Client as OgClient, Config as OgConfig, NoTls, Row as OgRow,
+    SimpleQueryMessage,
 };
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject, IndexInfo, QueryResult,
-    QueryStreamChannel, SchemaInfo, TableInfo, emit_query_result_stream,
+    emit_query_result_stream, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
+    IndexInfo, QueryResult, QueryStreamChannel, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
+const FALLBACK_SCHEMA: &str = "public";
 
 #[derive(Clone)]
 pub struct PanWeiClient {
@@ -187,6 +188,104 @@ async fn fetch_optional(
         .map_err(|e| format!("Query failed: {e}"))
 }
 
+fn is_user_schema_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    !trimmed.is_empty() && trimmed != "information_schema" && !trimmed.starts_with("pg_")
+}
+
+fn ordered_schema_infos(names: Vec<String>, preferred: Option<&str>) -> Vec<SchemaInfo> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut ordered = Vec::new();
+    if let Some(preferred) = preferred
+        .map(str::trim)
+        .filter(|name| is_user_schema_name(name))
+    {
+        seen.insert(preferred.to_string());
+        ordered.push(preferred.to_string());
+    }
+    for name in names {
+        let name = name.trim();
+        if is_user_schema_name(name) && seen.insert(name.to_string()) {
+            ordered.push(name.to_string());
+        }
+    }
+    ordered
+        .into_iter()
+        .map(|name| SchemaInfo { name })
+        .collect()
+}
+
+async fn current_schema(client: &PanWeiClient) -> Result<Option<String>, String> {
+    let row = fetch_optional(client, "SELECT current_schema()", &[]).await?;
+    Ok(row
+        .and_then(|row| row.try_get::<usize, String>(0).ok())
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty()))
+}
+
+async fn resolve_schema(client: &PanWeiClient, schema: Option<&str>) -> Result<String, String> {
+    if let Some(schema) = schema.map(str::trim).filter(|schema| !schema.is_empty()) {
+        return Ok(schema.to_string());
+    }
+    Ok(current_schema(client)
+        .await?
+        .filter(|schema| is_user_schema_name(schema))
+        .unwrap_or_else(|| FALLBACK_SCHEMA.to_string()))
+}
+
+fn panwei_table_kind(table_type: &str) -> String {
+    if table_type.eq_ignore_ascii_case("VIEW") {
+        "view".to_string()
+    } else {
+        "table".to_string()
+    }
+}
+
+fn panwei_relkind_to_kind(relkind: &str) -> Option<&'static str> {
+    match relkind {
+        "r" | "p" | "f" => Some("table"),
+        "v" => Some("view"),
+        "m" => Some("materialized_view"),
+        _ => None,
+    }
+}
+
+fn merge_table(tables: &mut std::collections::BTreeMap<String, TableInfo>, table: TableInfo) {
+    tables.insert(table.name.clone(), table);
+}
+
+async fn list_tables_show(client: &PanWeiClient) -> Result<Vec<TableInfo>, String> {
+    let guard = client.inner.client.lock().await;
+    let messages = guard
+        .simple_query("SHOW TABLES")
+        .await
+        .map_err(|e| format!("SHOW TABLES failed: {e}"))?;
+    Ok(messages
+        .into_iter()
+        .filter_map(|message| match message {
+            SimpleQueryMessage::Row(row) => row
+                .try_get(0)
+                .ok()
+                .flatten()
+                .map(|name: &str| name.trim().to_string())
+                .filter(|name| !name.is_empty())
+                .map(|name| TableInfo {
+                    name,
+                    kind: "table".to_string(),
+                    row_count: None,
+                }),
+            _ => None,
+        })
+        .collect())
+}
+
+fn should_use_show_tables_fallback(schema: &str, current: Option<&str>) -> bool {
+    current
+        .map(str::trim)
+        .filter(|current| !current.is_empty())
+        .is_some_and(|current| current == schema)
+}
+
 pub async fn execute(
     client: &PanWeiClient,
     sql: &str,
@@ -227,6 +326,7 @@ pub async fn execute_stream(
 }
 
 pub async fn list_schemas(client: &PanWeiClient) -> Result<Vec<SchemaInfo>, String> {
+    let current = current_schema(client).await.ok().flatten();
     let rows = fetch(
         client,
         "SELECT schema_name FROM information_schema.schemata \
@@ -236,19 +336,29 @@ pub async fn list_schemas(client: &PanWeiClient) -> Result<Vec<SchemaInfo>, Stri
     )
     .await
     .map_err(|e| format!("list schemas failed: {e}"))?;
-    Ok(rows
+    let names = rows
         .iter()
         .filter_map(|row| row.try_get::<usize, String>(0).ok())
-        .map(|name| SchemaInfo { name })
-        .collect())
+        .collect();
+    Ok(ordered_schema_infos(names, current.as_deref()))
 }
 
 pub async fn list_tables(
     client: &PanWeiClient,
     schema: Option<&str>,
 ) -> Result<Vec<TableInfo>, String> {
-    let schema = schema.unwrap_or("public");
-    let rows = fetch(
+    let current = current_schema(client).await.ok().flatten();
+    let schema = schema
+        .map(str::trim)
+        .filter(|schema| !schema.is_empty())
+        .map(str::to_string)
+        .or_else(|| current.clone().filter(|schema| is_user_schema_name(schema)))
+        .unwrap_or_else(|| FALLBACK_SCHEMA.to_string());
+    let schema_ref = schema.as_str();
+    let mut tables = std::collections::BTreeMap::<String, TableInfo>::new();
+    let mut errors = Vec::new();
+
+    match fetch(
         client,
         "SELECT t.table_name, t.table_type, \
                 CASE WHEN c.reltuples >= 0 THEN c.reltuples::bigint ELSE NULL END AS row_count \
@@ -256,50 +366,81 @@ pub async fn list_tables(
          LEFT JOIN pg_namespace n ON n.nspname = t.table_schema \
          LEFT JOIN pg_class c ON c.relname = t.table_name AND c.relnamespace = n.oid \
          WHERE t.table_schema = $1 ORDER BY t.table_name",
-        &[&schema],
-    )
-    .await
-    .map_err(|e| format!("list tables failed: {e}"))?;
-
-    let mut out: Vec<TableInfo> = rows
-        .iter()
-        .filter_map(|row| {
-            let name: String = row.try_get(0).ok()?;
-            let table_type: String = row.try_get(1).unwrap_or_default();
-            let row_count: Option<i64> = row.try_get(2).ok().flatten();
-            Some(TableInfo {
-                name,
-                kind: if table_type.eq_ignore_ascii_case("VIEW") {
-                    "view"
-                } else {
-                    "table"
-                }
-                .to_string(),
-                row_count,
-            })
-        })
-        .collect();
-
-    if let Ok(mvs) = fetch(
-        client,
-        "SELECT matviewname FROM pg_matviews WHERE schemaname = $1",
-        &[&schema],
+        &[&schema_ref],
     )
     .await
     {
-        for row in &mvs {
-            if let Ok(name) = row.try_get::<usize, String>(0) {
-                out.push(TableInfo {
-                    name,
-                    kind: "materialized_view".to_string(),
-                    row_count: None,
-                });
+        Ok(rows) => {
+            for row in &rows {
+                let Some(name) = row.try_get::<usize, String>(0).ok() else {
+                    continue;
+                };
+                let table_type: String = row.try_get(1).unwrap_or_default();
+                let row_count: Option<i64> = row.try_get(2).ok().flatten();
+                merge_table(
+                    &mut tables,
+                    TableInfo {
+                        name,
+                        kind: panwei_table_kind(&table_type),
+                        row_count,
+                    },
+                );
             }
+        }
+        Err(err) => errors.push(format!("information_schema.tables: {err}")),
+    }
+
+    match fetch(
+        client,
+        "SELECT c.relname, c.relkind::text, \
+                CASE WHEN c.reltuples >= 0 THEN c.reltuples::bigint ELSE NULL END AS row_count \
+         FROM pg_catalog.pg_class c \
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+         WHERE n.nspname = $1 AND c.relkind IN ('r','p','f','v','m') \
+         ORDER BY c.relname",
+        &[&schema_ref],
+    )
+    .await
+    {
+        Ok(rows) => {
+            for row in &rows {
+                let Some(name) = row.try_get::<usize, String>(0).ok() else {
+                    continue;
+                };
+                let relkind: String = row.try_get(1).unwrap_or_default();
+                let Some(kind) = panwei_relkind_to_kind(&relkind) else {
+                    continue;
+                };
+                let row_count: Option<i64> = row.try_get(2).ok().flatten();
+                merge_table(
+                    &mut tables,
+                    TableInfo {
+                        name,
+                        kind: kind.to_string(),
+                        row_count,
+                    },
+                );
+            }
+        }
+        Err(err) => errors.push(format!("pg_catalog.pg_class: {err}")),
+    }
+
+    if tables.is_empty() && should_use_show_tables_fallback(&schema, current.as_deref()) {
+        match list_tables_show(client).await {
+            Ok(show_tables) => {
+                for table in show_tables {
+                    merge_table(&mut tables, table);
+                }
+            }
+            Err(err) => errors.push(err),
         }
     }
 
-    out.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(out)
+    if tables.is_empty() && !errors.is_empty() {
+        return Err(format!("list tables failed: {}", errors.join("; ")));
+    }
+
+    Ok(tables.into_values().collect())
 }
 
 pub async fn describe_table(
@@ -307,8 +448,9 @@ pub async fn describe_table(
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<ColumnDescription>, String> {
-    let schema = schema.unwrap_or("public");
-    let rows = fetch(
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
+    let rows = match fetch(
         client,
         "SELECT c.column_name, c.data_type, c.is_nullable, c.column_default, \
             COALESCE(pk.is_pk, false) AS is_pk \
@@ -324,10 +466,15 @@ pub async fn describe_table(
          ) pk ON pk.column_name = c.column_name \
          WHERE c.table_schema = $1 AND c.table_name = $2 \
          ORDER BY c.ordinal_position",
-        &[&schema, &table],
+        &[&schema_ref, &table],
     )
     .await
-    .map_err(|e| format!("describe table failed: {e}"))?;
+    {
+        Ok(rows) if !rows.is_empty() => rows,
+        Ok(_) | Err(_) => {
+            return describe_table_pg_catalog(client, schema_ref, table).await;
+        }
+    };
     Ok(rows
         .iter()
         .filter_map(|row| {
@@ -347,12 +494,58 @@ pub async fn describe_table(
         .collect())
 }
 
+async fn describe_table_pg_catalog(
+    client: &PanWeiClient,
+    schema: &str,
+    table: &str,
+) -> Result<Vec<ColumnDescription>, String> {
+    let rows = fetch(
+        client,
+        "SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), \
+                NOT a.attnotnull AS nullable, pg_catalog.pg_get_expr(d.adbin, d.adrelid), \
+                EXISTS ( \
+                    SELECT 1 \
+                    FROM pg_catalog.pg_index i \
+                    WHERE i.indrelid = c.oid \
+                      AND i.indisprimary \
+                      AND a.attnum = ANY(i.indkey) \
+                ) AS is_pk \
+         FROM pg_catalog.pg_class c \
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+         JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid \
+         LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum \
+         WHERE n.nspname = $1 AND c.relname = $2 AND a.attnum > 0 AND NOT a.attisdropped \
+         ORDER BY a.attnum",
+        &[&schema, &table],
+    )
+    .await
+    .map_err(|e| format!("describe table failed: {e}"))?;
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name: String = row.try_get(0).ok()?;
+            let type_name: String = row.try_get(1).unwrap_or_default();
+            let nullable: bool = row.try_get(2).unwrap_or(true);
+            let default: Option<String> = row.try_get(3).ok().flatten();
+            let primary_key: bool = row.try_get(4).unwrap_or(false);
+            Some(ColumnDescription {
+                name,
+                type_name,
+                nullable,
+                default,
+                primary_key,
+            })
+        })
+        .collect())
+}
+
 pub async fn list_indexes(
     client: &PanWeiClient,
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<IndexInfo>, String> {
-    let schema = schema.unwrap_or("public");
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
     let rows = fetch(
         client,
         "SELECT i.relname AS index_name, a.attname AS column_name, ix.indisunique AS is_unique \
@@ -363,7 +556,7 @@ pub async fn list_indexes(
          JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey) \
          WHERE n.nspname = $1 AND t.relname = $2 \
          ORDER BY i.relname, array_position(ix.indkey, a.attnum)",
-        &[&schema, &table],
+        &[&schema_ref, &table],
     )
     .await
     .map_err(|e| format!("list indexes failed: {e}"))?;
@@ -393,7 +586,8 @@ pub async fn list_objects(
     schema: Option<&str>,
     kind: &str,
 ) -> Result<Vec<DbObject>, String> {
-    let schema = schema.unwrap_or("public");
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
     let sql = match kind {
         "function" => {
             "SELECT DISTINCT p.proname FROM pg_catalog.pg_proc p \
@@ -406,7 +600,7 @@ pub async fn list_objects(
         }
         _ => return Ok(Vec::new()),
     };
-    let rows = fetch(client, sql, &[&schema])
+    let rows = fetch(client, sql, &[&schema_ref])
         .await
         .map_err(|e| format!("list {kind} failed: {e}"))?;
     Ok(rows
@@ -428,7 +622,8 @@ pub async fn object_ddl(
     kind: &str,
     name: &str,
 ) -> Result<String, String> {
-    let schema = schema.unwrap_or("public");
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
     match kind {
         "view" | "materialized_view" => {
             let row = fetch_optional(
@@ -436,7 +631,7 @@ pub async fn object_ddl(
                 "SELECT pg_get_viewdef(c.oid, true) FROM pg_class c \
                  JOIN pg_namespace n ON n.oid = c.relnamespace \
                  WHERE n.nspname = $1 AND c.relname = $2",
-                &[&schema, &name],
+                &[&schema_ref, &name],
             )
             .await
             .map_err(|e| format!("view definition failed: {e}"))?;
@@ -458,7 +653,7 @@ pub async fn object_ddl(
                 "SELECT pg_get_functiondef(p.oid) FROM pg_proc p \
                  JOIN pg_namespace n ON n.oid = p.pronamespace \
                  WHERE n.nspname = $1 AND p.proname = $2 LIMIT 1",
-                &[&schema, &name],
+                &[&schema_ref, &name],
             )
             .await
             .map_err(|e| format!("function definition failed: {e}"))?;
@@ -467,7 +662,7 @@ pub async fn object_ddl(
         }
         "sequence" => Ok(format!("CREATE SEQUENCE \"{schema}\".\"{name}\";")),
         _ => {
-            let cols = describe_table(client, Some(schema), name).await?;
+            let cols = describe_table(client, Some(schema_ref), name).await?;
             if cols.is_empty() {
                 return Err(format!("Table {name} not found"));
             }
@@ -506,7 +701,8 @@ pub async fn table_stats(
     schema: Option<&str>,
     table: &str,
 ) -> Result<QueryResult, String> {
-    let schema = schema.unwrap_or("public");
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
     let row = fetch_optional(
         client,
         "SELECT pg_total_relation_size(c.oid), pg_relation_size(c.oid), \
@@ -514,7 +710,7 @@ pub async fn table_stats(
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace \
          LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid \
          WHERE n.nspname = $1 AND c.relname = $2",
-        &[&schema, &table],
+        &[&schema_ref, &table],
     )
     .await
     .map_err(|e| format!("table stats failed: {e}"))?
@@ -531,4 +727,46 @@ pub async fn table_stats(
         ("Indexes size (bytes)", num(2)),
         ("Live rows (estimate)", num(3)),
     ]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn orders_current_schema_first_without_system_names() {
+        let schemas = ordered_schema_infos(
+            vec![
+                "public".to_string(),
+                "panwei_omm".to_string(),
+                "information_schema".to_string(),
+                "pg_catalog".to_string(),
+            ],
+            Some("panwei_omm"),
+        );
+        let names: Vec<_> = schemas.into_iter().map(|schema| schema.name).collect();
+        assert_eq!(names, vec!["panwei_omm", "public"]);
+    }
+
+    #[test]
+    fn maps_pg_relkind_to_object_kind() {
+        assert_eq!(panwei_relkind_to_kind("r"), Some("table"));
+        assert_eq!(panwei_relkind_to_kind("p"), Some("table"));
+        assert_eq!(panwei_relkind_to_kind("v"), Some("view"));
+        assert_eq!(panwei_relkind_to_kind("m"), Some("materialized_view"));
+        assert_eq!(panwei_relkind_to_kind("i"), None);
+    }
+
+    #[test]
+    fn show_tables_fallback_only_tracks_current_schema() {
+        assert!(should_use_show_tables_fallback(
+            "panwei_omm",
+            Some("panwei_omm")
+        ));
+        assert!(!should_use_show_tables_fallback(
+            "public",
+            Some("panwei_omm")
+        ));
+        assert!(!should_use_show_tables_fallback("public", None));
+    }
 }

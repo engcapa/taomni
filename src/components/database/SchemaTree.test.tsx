@@ -139,6 +139,15 @@ describe("SchemaTree folder model", () => {
     expect(screen.queryByText("Procedures")).not.toBeInTheDocument();
     expect(screen.queryByText("Triggers")).not.toBeInTheDocument();
   });
+
+  it("groups PanWeiDB schemas under the configured connection database", async () => {
+    render(<SchemaTree sessionId="s1" engine="PanWeiDB" databaseName="panweidb" />);
+    expect(await screen.findByText("panweidb")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    await waitFor(() => expect(ipcMock.dbListTables).toHaveBeenCalledWith("s1", "ecommerce", null));
+    expect(await screen.findByText("orders")).toBeInTheDocument();
+  });
 });
 
 describe("SchemaTree context menus", () => {

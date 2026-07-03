@@ -404,6 +404,14 @@ function schemaSwitchSql(engine: string, schema: string, catalog?: string | null
   return setDefaultSchemaSql(asSqlEngine(engine), schema, catalog);
 }
 
+function engineUsesDatabaseAsSchema(engine: string): boolean {
+  return engine === "MySQL" || engine === "StarRocks" || engine === "ClickHouse" || engine === "Presto";
+}
+
+function initialActiveSchema(info: DbConnectInfo): string | null {
+  return engineUsesDatabaseAsSchema(info.engine) ? (info.database ?? null) : null;
+}
+
 function unquoteIdent(value: string): string {
   const trimmed = value.trim();
   if (
@@ -549,7 +557,7 @@ export default function DbClientTab({
     ),
   );
   const [schemas, setSchemas] = useState<string[]>([]);
-  const [activeSchema, setActiveSchema] = useState<string | null>(info.database ?? null);
+  const [activeSchema, setActiveSchema] = useState<string | null>(() => initialActiveSchema(info));
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [metadataVersion, setMetadataVersion] = useState(0);
   const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
@@ -1323,10 +1331,10 @@ export default function DbClientTab({
     setSchemas(names);
     setActiveSchema((current) => {
       if (current && names.includes(current)) return current;
-      if (info.database && names.includes(info.database)) return info.database;
+      if (engineUsesDatabaseAsSchema(info.engine) && info.database && names.includes(info.database)) return info.database;
       return names[0] ?? null;
     });
-  }, [info.database]);
+  }, [info.database, info.engine]);
 
   useEffect(() => {
     if (!metadataCache) return;
@@ -2236,6 +2244,7 @@ export default function DbClientTab({
                     sessionId={connectionSessionId}
                     engine={info.engine}
                     catalog={info.catalog}
+                    databaseName={info.database}
                     onSelectionChange={handleSchemaSelectionChange}
                     onInsertTable={insertIntoActive}
                     onQuickSelect={quickSelect}
