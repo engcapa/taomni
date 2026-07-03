@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { listSystemFonts } from "./ipc";
+import { getAppPlatform } from "./runtime";
 
 export const SOURCE_CODE_PRO = "Source Code Pro";
+export const CASCADIA_MONO = "Cascadia Mono";
+export const MENLO = "Menlo";
 export const SYSTEM_MONOSPACE_FONT = "monospace";
 
 const GENERIC_FONTS = new Set(["monospace", "serif", "sans-serif", "cursive", "fantasy", "system-ui"]);
 
 export const SAFE_TERMINAL_FONT_FALLBACKS = [
+  CASCADIA_MONO,
   SOURCE_CODE_PRO,
   "JetBrains Mono",
   "Cascadia Code",
   "Fira Code",
   "Consolas",
-  "Menlo",
+  MENLO,
   "DejaVu Sans Mono",
   "monospace",
 ];
@@ -93,9 +97,17 @@ export function makeTerminalFontFamily(primaryFont: string): string {
   return stack.map(formatFontFamilyToken).join(", ");
 }
 
+export function getDefaultTerminalFontName(): string {
+  return getAppPlatform() === "macos" ? MENLO : CASCADIA_MONO;
+}
+
+export function getDefaultTerminalFontFamily(): string {
+  return makeTerminalFontFamily(getDefaultTerminalFontName());
+}
+
 export function getPrimaryFontName(fontFamily: string): string {
   const [first] = splitFontFamily(fontFamily);
-  return first || SOURCE_CODE_PRO;
+  return first || getDefaultTerminalFontName();
 }
 
 export function resolveSelectedFontName(fontFamily: string, availableFonts: readonly string[]): string {
@@ -108,6 +120,9 @@ export function resolveSelectedFontName(fontFamily: string, availableFonts: read
 }
 
 export function getPreferredDefaultFontName(availableFonts: readonly string[]): string | null {
+  const platformDefault = findFontName(availableFonts, getDefaultTerminalFontName());
+  if (platformDefault) return platformDefault;
+
   const sourceCodePro = findFontName(availableFonts, SOURCE_CODE_PRO);
   if (sourceCodePro) return sourceCodePro;
 

@@ -4,16 +4,17 @@ import {
   loadLocalTerminalDefaultProfile,
   saveLocalTerminalDefaultProfile,
 } from "./terminalProfile";
+import { getDefaultTerminalFontName } from "./systemFonts";
 
 describe("local terminal default profile", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
-  it("defaults new local terminals to MobaXterm Classic with system monospace", () => {
+  it("defaults new local terminals to MobaXterm Classic with the platform terminal font", () => {
     expect(loadLocalTerminalDefaultProfile()).toMatchObject({
       theme: "classic",
-      fontFamily: expect.stringContaining("monospace"),
+      fontFamily: expect.stringContaining(getDefaultTerminalFontName()),
     });
   });
 

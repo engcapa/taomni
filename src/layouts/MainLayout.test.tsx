@@ -14,6 +14,14 @@ const terminalLifecycle = vi.hoisted(() => ({
   unmounted: vi.fn(),
 }));
 
+const terminalPanelMock = vi.hoisted(() => ({
+  props: [] as Array<{
+    tabId?: string;
+    terminalProfile?: TerminalProfile;
+    onTerminalProfileChange?: (profile: TerminalProfile) => void;
+  }>,
+}));
+
 const sidebarMock = vi.hoisted(() => ({
   props: [] as Array<{
     onConnectSession?: (session: SessionConfig) => void;
@@ -173,6 +181,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     tabId,
     commandTerminal,
     terminalProfile,
+    onTerminalProfileChange,
     sftpToggle,
     chatToggle,
     visible,
@@ -195,7 +204,9 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     activeForShortcuts?: boolean;
     inputLocked?: boolean;
     onSessionReady?: (sessionId: string) => void;
+    onTerminalProfileChange?: (profile: TerminalProfile) => void;
   }) => {
+    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange });
     useEffect(() => {
       terminalLifecycle.mounted();
       onSessionReady?.(`session-${tabId ?? "terminal"}`);
@@ -215,6 +226,17 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
         data-terminal-font-size={terminalProfile?.fontSize ?? ""}
         data-terminal-theme={terminalProfile?.theme ?? ""}
       >
+        <button
+          type="button"
+          data-testid={`mock-terminal-profile-change-${tabId ?? "terminal"}`}
+          onClick={() => onTerminalProfileChange?.({
+            ...terminalProfile!,
+            fontSize: 21,
+            theme: "kanagawa-wave",
+          })}
+        >
+          Profile
+        </button>
         {sftpToggle && (
           <button
             type="button"
@@ -351,6 +373,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     window.localStorage.clear();
     terminalLifecycle.mounted.mockClear();
     terminalLifecycle.unmounted.mockClear();
+    terminalPanelMock.props = [];
     sidebarMock.props = [];
     quickConnectMock.props = [];
     dbClientMock.props = [];
@@ -977,6 +1000,40 @@ describe("MainLayout attached SFTP sidebar", () => {
     await waitFor(() => {
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-font-size", "19");
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-theme", "termius-dark");
+    });
+  });
+
+  it("applies runtime terminal profile changes from an open terminal tab", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        {
+          id: "ssh-tab",
+          type: "terminal",
+          title: "root@example.test",
+          closable: true,
+          terminalProfile: {
+            ...DEFAULT_TERMINAL_PROFILE,
+            fontSize: 14,
+            theme: "classic",
+          },
+        },
+      ],
+      activeTabId: "ssh-tab",
+      sidebarCollapsed: false,
+      statusMessage: "Ready",
+    });
+
+    render(<MainLayout />);
+
+    expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-font-size", "14");
+    expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-theme", "classic");
+
+    fireEvent.click(screen.getByTestId("mock-terminal-profile-change-ssh-tab"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-font-size", "21");
+      expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-theme", "kanagawa-wave");
     });
   });
 

@@ -15,6 +15,7 @@ import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import {
   getPrimaryFontName,
+  getDefaultTerminalFontFamily,
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
@@ -90,7 +91,7 @@ export function TerminalAppearanceSettings({
 
   const primaryFont = useMemo(() => getPrimaryFontName(profile.fontFamily), [profile.fontFamily]);
   const safeFontFamily = useMemo(() => {
-    return isMonospaceFont(primaryFont) ? profile.fontFamily : makeTerminalFontFamily("Source Code Pro");
+    return isMonospaceFont(primaryFont) ? profile.fontFamily : getDefaultTerminalFontFamily();
   }, [primaryFont, profile.fontFamily]);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
   const appPrefersDark = resolvedAppTheme === "dark";

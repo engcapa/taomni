@@ -65,7 +65,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     ipcMocks.deleteSession.mockResolvedValue(undefined);
     ipcMocks.saveSessionGroup.mockResolvedValue(undefined);
     ipcMocks.testSshConnection.mockResolvedValue("Connection successful");
-    ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
+    ipcMocks.listSystemFonts.mockResolvedValue(["Cascadia Mono", "Consolas", "JetBrains Mono", "Source Code Pro"]);
     ipcMocks.listLocalShells.mockResolvedValue([
       {
         id: "bash",
@@ -189,8 +189,8 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
 
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("monospace");
+    await waitFor(() => expect(screen.getByRole("option", { name: "Cascadia Mono" })).toBeInTheDocument());
+    expect(screen.getByLabelText("Terminal font")).toHaveValue("Cascadia Mono");
 
     const background = screen.getByLabelText("Terminal background hex");
     await user.clear(background);

@@ -1,6 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
 import { terminalThemes } from "./themes";
-import { makeTerminalFontFamily, SYSTEM_MONOSPACE_FONT } from "./systemFonts";
+import { getDefaultTerminalFontFamily } from "./systemFonts";
 
 export type TerminalCursorStyle = "block" | "underline" | "bar";
 export type TerminalRightClickBehavior = "menu" | "paste" | "copy-or-paste";
@@ -49,10 +49,10 @@ export const SYSTEM_DARK_TERMINAL_THEME = "termius-dark";
 export const SYSTEM_LIGHT_TERMINAL_THEME = "termius-light";
 
 export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
-  fontFamily: makeTerminalFontFamily(SYSTEM_MONOSPACE_FONT),
+  fontFamily: getDefaultTerminalFontFamily(),
   fontSize: 14,
   fontLigatures: false,
-  theme: SYSTEM_TERMINAL_THEME,
+  theme: "classic",
   scrollback: 10000,
   cursorStyle: "block",
   cursorBlink: true,
