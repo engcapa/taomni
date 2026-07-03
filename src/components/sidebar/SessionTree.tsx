@@ -94,6 +94,7 @@ import {
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
 import { SessionImportPreview } from "../session/SessionImportPreview";
+import { buildSessionTerminalThemeMenuItem } from "../session/SessionTerminalThemeMenu";
 import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useT } from "../../lib/i18n";
@@ -133,6 +134,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     duplicateSessions,
     moveSessionToGroup,
     moveSessionsToGroup,
+    updateSessionsTerminalTheme,
     createFolderPath,
     renameFolderPath,
     deleteFolderPath,
@@ -1376,6 +1378,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     }
     const targetIds = selectedContextSessions.map((candidate) => candidate.id);
     const hasMultiSelection = selectedContextSessions.length > 1;
+    const setTerminalTheme = async (theme: string, targetSessions: readonly SessionConfig[]) => {
+      const updatedCount = await updateSessionsTerminalTheme(targetSessions.map((candidate) => candidate.id), theme);
+      setStatusMessage(t("sessionTree.terminalThemeUpdated", { count: updatedCount }));
+    };
     const moveChildren: MenuItem[] = [
       { label: SESSION_ROOT_LABEL, icon: <FolderOpen className="w-3 h-3" />, onClick: () => void moveSessionsToGroup(targetIds, null) },
       ...folderPaths.map((path) => ({
@@ -1408,6 +1414,12 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         onClick: () => void duplicateSessions(targetIds),
       },
       { label: t("sessionTree.contextMoveToFolder"), icon: <Folder className="w-3 h-3" />, children: moveChildren },
+      buildSessionTerminalThemeMenuItem({
+        sessions: selectedContextSessions,
+        t,
+        onSelectTheme: setTerminalTheme,
+        onClose: ctx.close,
+      }),
       { label: "", separator: true },
       {
         label: hasMultiSelection ? t("sessionTree.contextDeleteCount", { count: targetIds.length }) : t("sessionTree.contextDelete"),

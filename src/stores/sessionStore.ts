@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create, type StoreApi, type UseBoundStore } from "zustand";
 import {
   listSessions,
   saveSession,
@@ -21,6 +21,7 @@ import {
   resolveGroupPaths,
   toStoredGroupPath,
 } from "../lib/sessionPaths";
+import { isTerminalThemeSession, withSessionTerminalTheme } from "../lib/sessionTerminalTheme";
 
 interface SessionState {
   sessions: SessionConfig[];
@@ -46,6 +47,7 @@ interface SessionState {
   deleteFolderPath: (path: string) => Promise<void>;
   moveSessionToGroup: (id: string, groupPath: string | null) => Promise<void>;
   moveSessionsToGroup: (ids: string[], groupPath: string | null) => Promise<void>;
+  updateSessionsTerminalTheme: (ids: string[], theme: string) => Promise<number>;
   importSessions: (configs: SessionConfig[]) => Promise<void>;
   setSelectedSession: (id: string | null) => void;
   setSelectedSessionIds: (ids: string[]) => void;
@@ -93,7 +95,7 @@ async function reloadSessionState(setState: (state: Partial<SessionState>) => vo
   setState({ sessions, groups, ...pruneSelection(sessions, selectedSessionIds, selectedSessionId) });
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<SessionState>((set) => ({
   sessions: [],
   groups: [],
   loading: false,
@@ -319,6 +321,21 @@ export const useSessionStore = create<SessionState>((set) => ({
       });
     }
     await reloadSessionState(set);
+  },
+
+  updateSessionsTerminalTheme: async (ids, theme) => {
+    const targets = new Set(ids);
+    if (targets.size === 0) return 0;
+    const sessions = useSessionStore.getState().sessions
+      .filter((session) => targets.has(session.id) && isTerminalThemeSession(session));
+    if (sessions.length === 0) return 0;
+
+    const updatedAt = nowSeconds();
+    for (const session of sessions) {
+      await saveSession(withSessionTerminalTheme(session, theme, updatedAt));
+    }
+    await reloadSessionState(set);
+    return sessions.length;
   },
 
   importSessions: async (configs) => {

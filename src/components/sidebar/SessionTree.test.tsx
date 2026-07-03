@@ -255,4 +255,21 @@ describe("SessionTree multi-select batch operations", () => {
       "152.92 (copy)",
     ]);
   });
+
+  it("sets a terminal theme for the selected sessions from the context menu", async () => {
+    render(<SessionTree />);
+    selectBothIpySessions();
+
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    const item = screen.getByTestId("context-menu-item-set-terminal-theme");
+    fireEvent.mouseEnter(item.parentElement!);
+    fireEvent.click(await screen.findByTestId("session-terminal-theme-option-kanagawa-wave"));
+
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
+    const savedOptions = ipcMocks.saveSession.mock.calls.map(([cfg]) => JSON.parse(cfg.options_json));
+    expect(savedOptions.map((options) => options.terminalProfile.theme)).toEqual([
+      "kanagawa-wave",
+      "kanagawa-wave",
+    ]);
+  });
 });

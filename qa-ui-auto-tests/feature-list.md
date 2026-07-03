@@ -1140,12 +1140,20 @@ controls:
   - id: session-delete
     selector: '[data-testid="session-delete"]'
     kind: interactive
+  - id: context-set-terminal-theme
+    selector: '[data-testid="context-menu-item-set-terminal-theme"]'
+    kind: interactive
+    optional: true       # visible from a saved session context menu
+  - id: context-terminal-theme-options
+    selector: '[data-testid^="session-terminal-theme-option-"]'
+    kind: interactive
+    optional: true       # visible while the terminal theme flyout is open
 -->
 
 - 分组树（展开 / 折叠 / 拖拽到分组）
 - 搜索框 `session-search`
 - 双击 → 触发连接
-- 右键菜单：Connect / Edit / Duplicate / Move to folder / Delete
+- 右键菜单：Connect / Edit / Duplicate / Move to folder / Set terminal theme / Delete
 - 「最近连接」区域
 
 ### 6.3 会话编辑器 `SessionEditor` ✅
@@ -2921,12 +2929,21 @@ files:
   - src/components/sidebar/SessionTree.tsx
   - src/components/sidebar/Sidebar.tsx
   - src/layouts/MainLayout.tsx
-controls: []   # selection state is exposed via [data-selected] / [aria-selected] on existing session-tree-item rows; no new dedicated testids
+controls:
+  - id: set-terminal-theme
+    selector: '[data-testid="context-menu-item-set-terminal-theme"]'
+    kind: interactive
+    optional: true       # visible after opening a selected saved-session context menu
+  - id: terminal-theme-options
+    selector: '[data-testid^="session-terminal-theme-option-"]'
+    kind: interactive
+    optional: true       # visible while the terminal theme flyout is open
 -->
 
 - 在 SessionTree 中按住 Ctrl / Meta 单击会话条目可累加选中
 - 选中状态通过 `data-selected` / `aria-selected` 属性暴露
 - 右键菜单首项变成 `Connect selected sessions (N)`，一次性把所有选中会话作为新 tab 打开
+- 右键菜单提供 `Set terminal theme...` 预览 flyout，可批量写入所选非 Mail 保存会话的 `terminalProfile.theme`
 - 普通点击仍然回到单选语义
 
 ---

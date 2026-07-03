@@ -139,5 +139,48 @@ describe("sessionStore batch operations", () => {
     expect(saved).toHaveLength(1);
     expect(saved[0].group_path).toBeNull();
   });
-});
 
+  it("updateSessionsTerminalTheme writes terminal profiles and skips mail sessions", async () => {
+    const ssh: SessionConfig = {
+      ...a,
+      options_json: JSON.stringify({
+        description: "keep me",
+        terminalProfile: {
+          ...JSON.parse(a.options_json || "{}").terminalProfile,
+          fontSize: 18,
+          theme: "classic",
+        },
+      }),
+    };
+    const mail: SessionConfig = {
+      ...makeSession("mail", "Mail", null),
+      session_type: "Mail",
+      options_json: JSON.stringify({
+        mailCacheEnabled: true,
+        terminalProfile: { theme: "system" },
+      }),
+    };
+    useSessionStore.setState({
+      sessions: [ssh, mail],
+      groups: [],
+      loading: false,
+      selectedSessionId: null,
+      selectedSessionIds: [],
+      searchQuery: "",
+    });
+    const saved: SessionConfig[] = [];
+    ipcMocks.saveSession.mockImplementation(async (cfg: SessionConfig) => {
+      saved.push(cfg);
+    });
+
+    const count = await useSessionStore.getState().updateSessionsTerminalTheme(["a", "mail"], "kanagawa-wave");
+
+    expect(count).toBe(1);
+    expect(saved).toHaveLength(1);
+    expect(saved[0].id).toBe("a");
+    const options = JSON.parse(saved[0].options_json);
+    expect(options.description).toBe("keep me");
+    expect(options.terminalProfile.theme).toBe("kanagawa-wave");
+    expect(options.terminalProfile.fontSize).toBe(18);
+  });
+});

@@ -8,15 +8,21 @@ import type { SessionConfig } from "../lib/ipc";
 const ipcMocks = vi.hoisted(() => ({
   listCommonLocalDirectories: vi.fn(),
   listLocalShells: vi.fn(),
+  listSessionGroups: vi.fn(),
+  listSessions: vi.fn(),
   listWslDistros: vi.fn(),
   openLocalShellAsAdministrator: vi.fn(),
+  saveSession: vi.fn(),
 }));
 
 vi.mock("../lib/ipc", () => ({
   listCommonLocalDirectories: ipcMocks.listCommonLocalDirectories,
   listLocalShells: ipcMocks.listLocalShells,
+  listSessionGroups: ipcMocks.listSessionGroups,
+  listSessions: ipcMocks.listSessions,
   listWslDistros: ipcMocks.listWslDistros,
   openLocalShellAsAdministrator: ipcMocks.openLocalShellAsAdministrator,
+  saveSession: ipcMocks.saveSession,
 }));
 
 vi.mock("../lib/runtime", () => ({
@@ -42,8 +48,11 @@ describe("WelcomePanel", () => {
       { label: "Home", path: "/home/test", kind: "system" },
       { label: "Projects", path: "/home/test/projects", kind: "personal" },
     ]);
+    ipcMocks.listSessions.mockResolvedValue([]);
+    ipcMocks.listSessionGroups.mockResolvedValue([]);
     ipcMocks.listWslDistros.mockResolvedValue([]);
     ipcMocks.openLocalShellAsAdministrator.mockResolvedValue(undefined);
+    ipcMocks.saveSession.mockResolvedValue(undefined);
     useAppStore.setState({
       tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
       activeTabId: "welcome",
@@ -54,6 +63,7 @@ describe("WelcomePanel", () => {
       groups: [],
       loading: false,
       selectedSessionId: null,
+      selectedSessionIds: [],
       searchQuery: "",
     });
   });
@@ -183,6 +193,58 @@ describe("WelcomePanel", () => {
     fireEvent.contextMenu(firstRow);
     fireEvent.click(screen.getByTestId("context-menu-item-edit"));
     expect(editSession).toHaveBeenCalledWith(recentSessions[1]);
+  });
+
+  it("sets a terminal theme for selected recent sessions from the context menu", async () => {
+    const recentSessions: SessionConfig[] = [
+      session("ssh-prod", "Prod SSH", "SSH", "prod.example.com", 22, 300),
+      session("sftp-prod", "Prod SFTP", "SFTP", "files.example.com", 22, 200),
+      session("mail-work", "Work Mail", "Mail", "imap.example.com", 993, 100),
+    ];
+    useSessionStore.setState({
+      sessions: recentSessions,
+      groups: [],
+      loading: false,
+      selectedSessionId: null,
+      selectedSessionIds: [],
+      searchQuery: "",
+    });
+    ipcMocks.listSessions.mockResolvedValue(recentSessions);
+
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={vi.fn()}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+        recentSessions={recentSessions}
+        onOpenRecentSession={vi.fn()}
+        onOpenRecentSessions={vi.fn()}
+        onEditRecentSession={vi.fn()}
+        onRevealRecentSession={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
+    });
+
+    const rows = screen.getAllByTestId("welcome-recent-session-row");
+    fireEvent.click(within(rows[0]).getByTestId("welcome-recent-select"));
+    fireEvent.click(within(rows[1]).getByTestId("welcome-recent-select"));
+    fireEvent.contextMenu(rows[0]);
+    const item = screen.getByTestId("context-menu-item-set-terminal-theme");
+    fireEvent.mouseEnter(item.parentElement!);
+    fireEvent.click(await screen.findByTestId("session-terminal-theme-option-kanagawa-wave"));
+
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
+    expect(ipcMocks.saveSession.mock.calls.map(([cfg]) => cfg.id).sort()).toEqual([
+      "sftp-prod",
+      "ssh-prod",
+    ]);
+    const themes = ipcMocks.saveSession.mock.calls.map(([cfg]) =>
+      JSON.parse(cfg.options_json).terminalProfile.theme,
+    );
+    expect(themes).toEqual(["kanagawa-wave", "kanagawa-wave"]);
   });
 
   it("hides the mail card when there are no mail sessions", async () => {
