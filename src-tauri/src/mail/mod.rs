@@ -727,6 +727,17 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
     )
 }
 
+fn with_mail_db<T>(
+    state: &State<'_, AppState>,
+    account_id: &str,
+    f: impl FnOnce(&Connection) -> SqlResult<T>,
+) -> Result<T, String> {
+    let db = state.mail_db(account_id)?;
+    let db = db.lock().map_err(|e| e.to_string())?;
+    init_mail_tables(&db).map_err(|e| e.to_string())?;
+    f(&db).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn mail_test_connection(
     config: MailAccountConfig,
@@ -785,17 +796,16 @@ pub async fn mail_sync_headers(
     .map_err(|e| format!("mail sync task failed: {e}"))??;
 
     if cache_enabled {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
-        cache_sync_result(
-            &db,
-            &account_id,
-            &result.0,
-            &result.2,
-            &result.1.name,
-            &cache_settings,
-        )
-        .map_err(|e| e.to_string())?;
+        with_mail_db(&state, &account_id, |db| {
+            cache_sync_result(
+                db,
+                &account_id,
+                &result.0,
+                &result.2,
+                &result.1.name,
+                &cache_settings,
+            )
+        })?;
     }
 
     let synced_at = now_ts();
@@ -831,9 +841,9 @@ pub async fn mail_sync_all_folders(
         .min(2000);
     let include_bodies = include_bodies.unwrap_or(false);
     let sync_states = if cache_enabled {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
-        cached_folder_sync_states(&db, &account_id).map_err(|e| e.to_string())?
+        with_mail_db(&state, &account_id, |db| {
+            cached_folder_sync_states(db, &account_id)
+        })?
     } else {
         HashMap::new()
     };
@@ -867,10 +877,9 @@ pub async fn mail_sync_all_folders(
     .map_err(|e| format!("mail sync all task failed: {e}"))??;
 
     if cache_enabled {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
-        cache_sync_all_result(&db, &account_id, &result.0, &result.1, &cache_settings)
-            .map_err(|e| e.to_string())?;
+        with_mail_db(&state, &account_id, |db| {
+            cache_sync_all_result(db, &account_id, &result.0, &result.1, &cache_settings)
+        })?;
     }
 
     let fetched_messages = result.1.len();
@@ -888,9 +897,7 @@ pub async fn mail_list_cached_folders(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    list_cached_folders(&db, &account_id).map_err(|e| e.to_string())
+    with_mail_db(&state, &account_id, |db| list_cached_folders(db, &account_id))
 }
 
 #[tauri::command]
@@ -901,16 +908,15 @@ pub async fn mail_list_cached_messages(
     offset: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    list_cached_messages(
-        &db,
-        &account_id,
-        &folder,
-        limit.unwrap_or(DEFAULT_MESSAGE_LIMIT as u32).min(1000),
-        offset.unwrap_or(0),
-    )
-    .map_err(|e| e.to_string())
+    with_mail_db(&state, &account_id, |db| {
+        list_cached_messages(
+            db,
+            &account_id,
+            &folder,
+            limit.unwrap_or(DEFAULT_MESSAGE_LIMIT as u32).min(1000),
+            offset.unwrap_or(0),
+        )
+    })
 }
 
 #[tauri::command]
@@ -920,12 +926,11 @@ pub async fn mail_get_message_body(
     uid: u32,
     state: State<'_, AppState>,
 ) -> Result<MailMessageBody, String> {
+    let account_id = config.session_id.clone();
     if config.cache.enabled {
-        let cached = {
-            let db = state.db.lock().map_err(|e| e.to_string())?;
-            init_mail_tables(&db).map_err(|e| e.to_string())?;
-            get_cached_body(&db, &config.session_id, &folder, uid).map_err(|e| e.to_string())?
-        };
+        let cached = with_mail_db(&state, &account_id, |db| {
+            get_cached_body(db, &account_id, &folder, uid)
+        })?;
         if let Some(body) = cached {
             return Ok(body);
         }
@@ -943,9 +948,7 @@ pub async fn mail_get_message_body(
     .map_err(|e| format!("mail body task failed: {e}"))??;
 
     if cache_enabled {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
-        upsert_message(&db, &message).map_err(|e| e.to_string())?;
+        with_mail_db(&state, &account_id, |db| upsert_message(db, &message))?;
     }
 
     Ok(cached_to_body(message, "remote"))
@@ -990,9 +993,9 @@ pub async fn mail_send_message(
         .await
         .map_err(|e| format!("mail send task failed: {e}"))??;
     if result.accepted {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
-        upsert_sent_contacts(&db, &account_id, &sent_request).map_err(|e| e.to_string())?;
+        with_mail_db(&state, &account_id, |db| {
+            upsert_sent_contacts(db, &account_id, &sent_request)
+        })?;
     }
     Ok(result)
 }
@@ -1002,9 +1005,7 @@ pub async fn mail_list_drafts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailDraft>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    list_mail_drafts(&db, &account_id).map_err(|e| e.to_string())
+    with_mail_db(&state, &account_id, |db| list_mail_drafts(db, &account_id))
 }
 
 #[tauri::command]
@@ -1017,9 +1018,7 @@ pub async fn mail_save_draft(
     if account_id.is_empty() {
         return Err("mail account id is required".into());
     }
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    save_mail_draft(&db, account_id, draft).map_err(|e| e.to_string())
+    with_mail_db(&state, account_id, |db| save_mail_draft(db, account_id, draft))
 }
 
 #[tauri::command]
@@ -1036,9 +1035,7 @@ pub async fn mail_delete_draft(
     if draft_id.is_empty() {
         return Err("mail draft id is required".into());
     }
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    delete_mail_draft(&db, account_id, draft_id).map_err(|e| e.to_string())
+    with_mail_db(&state, account_id, |db| delete_mail_draft(db, account_id, draft_id))
 }
 
 #[tauri::command]
@@ -1046,9 +1043,7 @@ pub async fn mail_index_cached_contacts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    reindex_cached_contacts(&db, &account_id).map_err(|e| e.to_string())
+    with_mail_db(&state, &account_id, |db| reindex_cached_contacts(db, &account_id))
 }
 
 #[tauri::command]
@@ -1058,10 +1053,9 @@ pub async fn mail_search_contacts(
     limit: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailContactSuggestion>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    search_contacts(&db, &account_id, &query, limit.unwrap_or(8).clamp(1, 20))
-        .map_err(|e| e.to_string())
+    with_mail_db(&state, &account_id, |db| {
+        search_contacts(db, &account_id, &query, limit.unwrap_or(8).clamp(1, 20))
+    })
 }
 
 #[tauri::command]
@@ -1077,17 +1071,15 @@ pub async fn mail_mark_read(
         return Err("mail folder is required".into());
     }
     let account_id = config.session_id.clone();
-    let target_uids = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
-        if all.unwrap_or(false) {
-            unread_cached_uids(&db, &account_id, &folder).map_err(|e| e.to_string())?
-        } else {
-            uids.unwrap_or_default()
-                .into_iter()
-                .filter(|uid| *uid > 0)
-                .collect::<Vec<_>>()
-        }
+    let target_uids = if all.unwrap_or(false) {
+        with_mail_db(&state, &account_id, |db| {
+            unread_cached_uids(db, &account_id, &folder)
+        })?
+    } else {
+        uids.unwrap_or_default()
+            .into_iter()
+            .filter(|uid| *uid > 0)
+            .collect::<Vec<_>>()
     };
     if target_uids.is_empty() {
         return Ok(MailMarkReadResult { folder, marked: 0 });
@@ -1106,10 +1098,9 @@ pub async fn mail_mark_read(
     .await
     .map_err(|e| format!("mail mark read task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    mark_cached_messages_read(&db, &account_id, &folder, &target_uids)
-        .map_err(|e| e.to_string())?;
+    with_mail_db(&state, &account_id, |db| {
+        mark_cached_messages_read(db, &account_id, &folder, &target_uids)
+    })?;
     Ok(MailMarkReadResult { folder, marked })
 }
 
@@ -1118,19 +1109,17 @@ pub async fn mail_clear_cache(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    db.execute(
-        "DELETE FROM mail_messages WHERE account_id = ?1",
-        params![account_id],
-    )
-    .map_err(|e| e.to_string())?;
-    db.execute(
-        "DELETE FROM mail_folders WHERE account_id = ?1",
-        params![account_id],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
+    with_mail_db(&state, &account_id, |db| {
+        db.execute(
+            "DELETE FROM mail_messages WHERE account_id = ?1",
+            params![account_id],
+        )?;
+        db.execute(
+            "DELETE FROM mail_folders WHERE account_id = ?1",
+            params![account_id],
+        )?;
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -1173,10 +1162,9 @@ pub async fn mail_set_flags(
     .await
     .map_err(|e| format!("mail set flags task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    update_cached_flags(&db, &account_id, &folder, &target_uids, &add, &remove)
-        .map_err(|e| e.to_string())?;
+    with_mail_db(&state, &account_id, |db| {
+        update_cached_flags(db, &account_id, &folder, &target_uids, &add, &remove)
+    })?;
     Ok(MailFlagResult {
         folder,
         updated: target_uids.len(),
@@ -1222,9 +1210,9 @@ pub async fn mail_move_messages(
     .await
     .map_err(|e| format!("mail move task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    remove_cached_messages(&db, &account_id, &folder, &target_uids).map_err(|e| e.to_string())?;
+    with_mail_db(&state, &account_id, |db| {
+        remove_cached_messages(db, &account_id, &folder, &target_uids)
+    })?;
     Ok(MailMoveResult {
         folder,
         target: target_folder,
@@ -1309,18 +1297,17 @@ pub async fn mail_delete_messages(
     .await
     .map_err(|e| format!("mail delete task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    if all {
-        db.execute(
-            "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
-            params![account_id, folder],
-        )
-        .map_err(|e| e.to_string())?;
-    } else {
-        remove_cached_messages(&db, &account_id, &folder, &target_uids)
-            .map_err(|e| e.to_string())?;
-    }
+    with_mail_db(&state, &account_id, |db| {
+        if all {
+            db.execute(
+                "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
+                params![account_id, folder],
+            )?;
+        } else {
+            remove_cached_messages(db, &account_id, &folder, &target_uids)?;
+        }
+        Ok(())
+    })?;
     Ok(MailDeleteResult { folder, deleted })
 }
 
@@ -1394,6 +1381,7 @@ pub async fn mail_create_folder(
     if name.is_empty() {
         return Err("folder name is required".into());
     }
+    let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
     let name_for_task = name.clone();
     let folders = tokio::task::spawn_blocking(move || {
@@ -1406,11 +1394,12 @@ pub async fn mail_create_folder(
     .await
     .map_err(|e| format!("mail create folder task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    for folder in &folders {
-        upsert_folder(&db, folder).map_err(|e| e.to_string())?;
-    }
+    with_mail_db(&state, &account_id, |db| {
+        for folder in &folders {
+            upsert_folder(db, folder)?;
+        }
+        Ok(())
+    })?;
     Ok(folders)
 }
 
@@ -1440,12 +1429,13 @@ pub async fn mail_rename_folder(
     .await
     .map_err(|e| format!("mail rename folder task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    purge_cached_folder(&db, &account_id, &from).map_err(|e| e.to_string())?;
-    for folder in &folders {
-        upsert_folder(&db, folder).map_err(|e| e.to_string())?;
-    }
+    with_mail_db(&state, &account_id, |db| {
+        purge_cached_folder(db, &account_id, &from)?;
+        for folder in &folders {
+            upsert_folder(db, folder)?;
+        }
+        Ok(())
+    })?;
     Ok(folders)
 }
 
@@ -1472,12 +1462,13 @@ pub async fn mail_delete_folder(
     .await
     .map_err(|e| format!("mail delete folder task failed: {e}"))??;
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
-    purge_cached_folder(&db, &account_id, &name).map_err(|e| e.to_string())?;
-    for folder in &folders {
-        upsert_folder(&db, folder).map_err(|e| e.to_string())?;
-    }
+    with_mail_db(&state, &account_id, |db| {
+        purge_cached_folder(db, &account_id, &name)?;
+        for folder in &folders {
+            upsert_folder(db, folder)?;
+        }
+        Ok(())
+    })?;
     Ok(folders)
 }
 

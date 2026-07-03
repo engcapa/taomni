@@ -84,8 +84,9 @@ pub fn run() {
             let db_path = app_data.join("taomni.db");
             let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
-            mail::init_mail_tables(&conn).expect("failed to init mail cache tables");
             servers::db::init_server_tables(&conn).expect("init server tables");
+            let mail_db_dir = app_data.join("mail-cache");
+            std::fs::create_dir_all(&mail_db_dir).expect("failed to create mail cache directory");
 
             // Tao Notes lives in its own SQLite file (notes.db), deliberately
             // separate from taomni.db so its data model / backup / encryption can
@@ -110,7 +111,14 @@ pub fn run() {
             // Decentralized LAN messenger state (separate lanchat.sqlite).
             let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
 
-            app.manage(AppState::new(conn, notes_conn, vault_arc, ai_ctx, lanchat_state));
+            app.manage(AppState::new(
+                conn,
+                notes_conn,
+                mail_db_dir,
+                vault_arc,
+                ai_ctx,
+                lanchat_state,
+            ));
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
