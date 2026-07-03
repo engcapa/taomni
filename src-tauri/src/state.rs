@@ -22,6 +22,8 @@ use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
 
+pub type MailDbHandle = Arc<Mutex<rusqlite::Connection>>;
+
 pub struct WriteStreamHandle {
     pub path: PathBuf,
     pub file: std::fs::File,
@@ -95,6 +97,11 @@ pub struct AppState {
     /// Dedicated connection to the standalone Tao Notes database (`notes.db`),
     /// kept separate from `taomni.db` so note storage can evolve independently.
     pub notes_db: Mutex<rusqlite::Connection>,
+    /// Directory containing one SQLite cache database per saved or transient mail
+    /// session. Mail caches are intentionally isolated from `taomni.db`, and
+    /// from each other, so mailbox refresh writes cannot block session CRUD.
+    mail_db_dir: PathBuf,
+    mail_dbs: Arc<Mutex<HashMap<String, MailDbHandle>>>,
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
@@ -162,6 +169,7 @@ impl AppState {
     pub fn new(
         db: rusqlite::Connection,
         notes_db: rusqlite::Connection,
+        mail_db_dir: PathBuf,
         vault: Arc<Vault>,
         ai_ctx: AppAiCtx,
         lanchat: Arc<LanChatState>,
@@ -184,6 +192,8 @@ impl AppState {
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
             notes_db: Mutex::new(notes_db),
+            mail_db_dir,
+            mail_dbs: Arc::new(Mutex::new(HashMap::new())),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
             codex_processes: tokio::sync::Mutex::new(HashMap::new()),
@@ -204,4 +214,46 @@ impl AppState {
             lanchat,
         }
     }
+
+    pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
+        let stem = mail_db_file_stem(account_id);
+        let mut dbs = self.mail_dbs.lock().map_err(|e| e.to_string())?;
+        if let Some(db) = dbs.get(&stem) {
+            return Ok(Arc::clone(db));
+        }
+
+        std::fs::create_dir_all(&self.mail_db_dir)
+            .map_err(|e| format!("create mail cache directory: {e}"))?;
+        let path = self.mail_db_dir.join(format!("{stem}.db"));
+        let conn = rusqlite::Connection::open(&path)
+            .map_err(|e| format!("open mail cache database {}: {e}", path.display()))?;
+        let handle = Arc::new(Mutex::new(conn));
+        dbs.insert(stem, Arc::clone(&handle));
+        Ok(handle)
+    }
+}
+
+fn mail_db_file_stem(account_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut cleaned = account_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string();
+    if cleaned.is_empty() {
+        cleaned = "mail".into();
+    }
+    cleaned = cleaned.chars().take(80).collect();
+
+    let digest = Sha256::digest(account_id.as_bytes());
+    let digest_hex = hex::encode(digest);
+    format!("{cleaned}-{}", &digest_hex[..16])
 }
