@@ -386,10 +386,10 @@ export function TerminalPanel({
   const [readOnly, setReadOnly] = useState(initialProfile.readOnly);
   const [themeName, setThemeName] = useState(initialProfile.theme || theme);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
-  const systemPrefersDark = resolvedAppTheme === "dark";
+  const appPrefersDark = resolvedAppTheme === "dark";
   const resolvePanelTheme = useCallback(
-    (name: string) => resolveTerminalThemeWithSystem(name, systemPrefersDark),
-    [systemPrefersDark],
+    (name: string) => resolveTerminalThemeWithSystem(name, appPrefersDark),
+    [appPrefersDark],
   );
   const [cursorStyle, setCursorStyle] = useState(initialProfile.cursorStyle);
   const [cursorBlink, setCursorBlink] = useState(initialProfile.cursorBlink);
@@ -1639,7 +1639,7 @@ export function TerminalPanel({
     const themeMenuValue = customTheme ? themeName : resolveThemeId(themeName);
     const themeOptions = buildTerminalThemeOptions({
       includeSystem: true,
-      systemLabel: "Follow system theme",
+      systemLabel: t("terminalAppearance.themeSystemName"),
       customValue: customTheme ? themeName : undefined,
       customTheme,
       customLabel: "Custom colors",

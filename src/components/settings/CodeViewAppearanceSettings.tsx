@@ -68,7 +68,6 @@ export function CodeViewAppearanceSettings({
 
   const terminalThemeName = getTerminalThemeDefinition(terminalProfile.theme)?.name ?? terminalProfile.theme;
   const themeOptions = useMemo(() => buildCodeThemeOptions({
-    systemLabel: t("codeViewAppearance.themeFollowSystem"),
     appLabel: t("codeViewAppearance.themeFollowApp"),
     terminalLabel: t("codeViewAppearance.themeFollowTerminal", { name: terminalThemeName }),
     terminalTheme: resolveTerminalTheme(terminalProfile.theme),

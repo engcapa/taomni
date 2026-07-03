@@ -26,7 +26,7 @@ import {
 } from "../lib/notes";
 
 export type NotesPanelMode = "hub" | "floating";
-export type NotesTheme = "taomni" | "system" | "light" | "dark" | "paper" | "compact";
+export type NotesTheme = "taomni" | "light" | "dark" | "paper" | "compact";
 export type NotesFont = "inherit" | "inter" | "outfit" | "system" | "mono";
 
 export interface NotesPanelPosition {
@@ -53,8 +53,7 @@ export const DEFAULT_NOTES_PANEL_POSITION: NotesPanelPosition = {
 };
 
 function coerceTheme(value: unknown): NotesTheme {
-  return value === "system" ||
-    value === "light" ||
+  return value === "light" ||
     value === "dark" ||
     value === "paper" ||
     value === "compact"

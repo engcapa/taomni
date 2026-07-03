@@ -3866,7 +3866,7 @@ controls:
 -->
 
 - Mail session 的 Appearance 使用邮件专用主题面板，不再复用 Terminal behavior / cursor / scrollback 控件。
-- 主题下拉整合 Follow system、Code View 色板与 Terminal color themes，但预览统一使用邮件正文语义。
+- 主题下拉整合 Match app theme、Code View 色板与 Terminal color themes，但预览统一使用邮件正文语义。
 - 底部预览展示邮件列表 + HTML 正文片段。
 
 ---

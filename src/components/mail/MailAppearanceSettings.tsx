@@ -46,8 +46,8 @@ export function MailAppearanceSettings({
   }, [fontOptions]);
   const selectedFont = resolveSelectedFontName(profile.fontFamily, fontOptions);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
-  const systemPrefersDark = resolvedAppTheme === "dark";
-  const resolvedTheme = resolveMailTheme(profile.theme, systemPrefersDark);
+  const appPrefersDark = resolvedAppTheme === "dark";
+  const resolvedTheme = resolveMailTheme(profile.theme, appPrefersDark);
   const colors = useMemo(
     () => ({
       background: themeColor(resolvedTheme.background, "#1d1f21"),
@@ -99,7 +99,7 @@ export function MailAppearanceSettings({
   }), [customTheme, profile.theme, t]);
 
   const previewTheme = isCustomTerminalTheme(profile.theme)
-    ? resolveMailTheme(makeCustomTerminalTheme(bg, fg), systemPrefersDark)
+    ? resolveMailTheme(makeCustomTerminalTheme(bg, fg), appPrefersDark)
     : resolvedTheme;
   const previewFontFamily = profile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily;
 

@@ -42,7 +42,9 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     titleKeys: ["settings.codeViewAppearanceTitle"],
     terms: [
       "code view", "code editor", "diff viewer", "syntax highlighting", "code font", "code theme",
+      "match app", "app theme", "taomni theme",
       "代码视图", "代码编辑器", "diff", "差异", "语法高亮", "代码字体", "代码主题",
+      "跟随应用", "应用主题", "Taomni 主题",
     ],
   },
   {

@@ -279,9 +279,9 @@ function mixColor(foreground: string, background: string, amount: number): strin
   return `#${hex(mixed[0])}${hex(mixed[1])}${hex(mixed[2])}`;
 }
 
-function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, systemPrefersDark: boolean): CSSProperties {
+function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, appPrefersDark: boolean): CSSProperties {
   const terminalProfile = profile ?? DEFAULT_MAIL_TERMINAL_PROFILE;
-  const theme = resolveMailTheme(terminalProfile.theme, systemPrefersDark);
+  const theme = resolveMailTheme(terminalProfile.theme, appPrefersDark);
   const background = color(theme.background, "#1d1f21");
   const foreground = color(theme.foreground, "#eaeaea");
   const accent = color(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
@@ -797,7 +797,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [sourceView, setSourceView] = useState<{ subject: string; content: string } | null>(null);
   const [busyAction, setBusyAction] = useState(false);
   const { resolvedTheme } = useAppTheme();
-  const systemPrefersDark = resolvedTheme === "dark";
+  const appPrefersDark = resolvedTheme === "dark";
 
   const openTabChat = useChatStore((s) => s.openTabChat);
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
@@ -810,8 +810,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     [info.emailAddress, info.imap.username, info.smtp.username],
   );
   const mailAppearance = useMemo(
-    () => mailAppearanceStyle(info.terminalProfile, mailFontSize, systemPrefersDark),
-    [info.terminalProfile, mailFontSize, systemPrefersDark],
+    () => mailAppearanceStyle(info.terminalProfile, mailFontSize, appPrefersDark),
+    [info.terminalProfile, mailFontSize, appPrefersDark],
   );
   const selectedMessage = useMemo(
     () =>

@@ -93,9 +93,9 @@ export function TerminalAppearanceSettings({
     return isMonospaceFont(primaryFont) ? profile.fontFamily : makeTerminalFontFamily("Source Code Pro");
   }, [primaryFont, profile.fontFamily]);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
-  const systemPrefersDark = resolvedAppTheme === "dark";
+  const appPrefersDark = resolvedAppTheme === "dark";
   const terminalSystemThemeSelected = allowSystemTheme && profile.theme === "system";
-  const resolvedThemeId = terminalSystemThemeSelected ? resolveSystemTerminalThemeId(systemPrefersDark) : profile.theme;
+  const resolvedThemeId = terminalSystemThemeSelected ? resolveSystemTerminalThemeId(appPrefersDark) : profile.theme;
   const resolvedTheme = resolveTerminalTheme(resolvedThemeId);
   const colors = useMemo(
     () => ({

@@ -26,14 +26,14 @@ export function normalizeMailThemeSelectValue(value: string): string {
   return resolveThemeId(value);
 }
 
-export function resolveMailTheme(value: string, prefersDark: boolean): ITheme {
+export function resolveMailTheme(value: string, appPrefersDark: boolean): ITheme {
   const codeId = mailCodeThemeIdFromValue(value)
     ?? (isCodeThemeId(value) && !getTerminalThemeDefinition(value) ? value : null);
   if (codeId) {
     const definition = getCodeThemeDefinition(codeId);
     if (definition) return terminalThemeFromCodeTheme(definition);
   }
-  return resolveTerminalThemeWithSystem(value, prefersDark);
+  return resolveTerminalThemeWithSystem(value, appPrefersDark);
 }
 
 function terminalThemeFromCodeTheme(definition: CodeThemeDefinition): ITheme {

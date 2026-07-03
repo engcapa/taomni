@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NOTES_THEMES, notesThemeDensity, notesThemeStyle, resolveSystemTheme } from "./notesTheme";
+import { NOTES_THEMES, notesThemeDensity, notesThemeStyle } from "./notesTheme";
 
 describe("notesTheme", () => {
   afterEach(() => {
@@ -30,20 +30,13 @@ describe("notesTheme", () => {
     }
   });
 
-  it("resolves the system theme from prefers-color-scheme", () => {
-    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("dark"), media: q }));
-    expect(resolveSystemTheme()).toBe("dark");
-    const style = notesThemeStyle("system") as Record<string, string>;
-    expect(style["--taomni-bg"]).toBe("#0f172a");
-  });
-
   it("marks only the compact theme as compact density", () => {
     expect(notesThemeDensity("compact")).toBe("compact");
     expect(notesThemeDensity("taomni")).toBe("comfortable");
     expect(notesThemeDensity("dark")).toBe("comfortable");
   });
 
-  it("exposes exactly the six planned themes", () => {
-    expect(NOTES_THEMES).toEqual(["taomni", "system", "light", "dark", "paper", "compact"]);
+  it("exposes app-following and explicit note themes", () => {
+    expect(NOTES_THEMES).toEqual(["taomni", "light", "dark", "paper", "compact"]);
   });
 });
