@@ -193,6 +193,7 @@ interface TerminalPanelProps {
     args?: string[];
   };
   terminalProfile?: TerminalProfile;
+  persistLocalProfile?: boolean;
   adoptedTerminal?: AdoptedTerminalSession;
   /**
    * One-shot working directory for the initial connect. Local terminals launch
@@ -296,6 +297,7 @@ export function TerminalPanel({
   commandTerminal,
   localShell,
   terminalProfile,
+  persistLocalProfile,
   adoptedTerminal,
   initialCwd,
   preserveSessionOnUnmount = false,
@@ -364,14 +366,17 @@ export function TerminalPanel({
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
   const attachToComposer = useChatStore((s) => s.attachToComposer);
   const explainSelection = useChatStore((s) => s.explainSelection);
+  const isLocal = !ssh && !commandTerminal;
+  const shouldPersistLocalProfile = persistLocalProfile ?? (isLocal && !terminalProfile && !adoptedTerminal);
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
-    initialProfileRef.current = terminalProfile ?? DEFAULT_TERMINAL_PROFILE;
+    initialProfileRef.current = terminalProfile ?? (isLocal ? loadLocalTerminalDefaultProfile() : DEFAULT_TERMINAL_PROFILE);
   }
   const initialProfile = initialProfileRef.current;
   const appliedTerminalProfileSignatureRef = useRef<string | null>(
     terminalProfile ? terminalProfileSignature(terminalProfile) : null,
   );
+  const lastAutoSavedLocalProfileSignatureRef = useRef<string | null>(null);
 
   const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
   const [fontSize, setFontSize] = useState(initialProfile.fontSize);
@@ -585,7 +590,6 @@ export function TerminalPanel({
       : makeHostKey(ssh),
     [commandTerminal, ssh],
   );
-  const isLocal = !ssh && !commandTerminal;
   // Tracks which local shell the backend actually launched. Lets us suppress
   // inline history suggestions on shells that already provide their own
   // (PSReadLine on PowerShell). Resolved on connect — the prop only carries
@@ -1700,6 +1704,8 @@ export function TerminalPanel({
             fonts={fontState.fonts}
             fontFamily={fontFamily}
             fontSize={fontSize}
+            fontSelectTestId="terminal-context-font-select"
+            fontSizeTestId="terminal-context-font-size"
             onChangeTheme={setThemeName}
             onChangeFontFamily={setFontFamily}
             onChangeFontSize={setFontSize}
@@ -2028,6 +2034,21 @@ export function TerminalPanel({
     setAiCommandRewriteEnabled(terminalProfile.aiCommandRewriteEnabled);
     setCommonCommands(terminalProfile.commonCommands);
   }, [terminalProfile, theme]);
+
+  useEffect(() => {
+    if (!shouldPersistLocalProfile) return;
+    const nextProfile = {
+      ...loadLocalTerminalDefaultProfile(),
+      theme: themeName,
+      fontFamily,
+      fontSize,
+      fontLigatures,
+    };
+    const signature = terminalProfileSignature(nextProfile);
+    if (lastAutoSavedLocalProfileSignatureRef.current === signature) return;
+    lastAutoSavedLocalProfileSignatureRef.current = signature;
+    saveLocalTerminalDefaultProfile(nextProfile);
+  }, [fontFamily, fontLigatures, fontSize, shouldPersistLocalProfile, themeName]);
 
   useEffect(() => {
     macroRecordingRef.current = macroRecording;

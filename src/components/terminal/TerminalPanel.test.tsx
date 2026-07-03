@@ -1309,6 +1309,45 @@ describe("TerminalPanel focus behavior", () => {
     expect(stored.theme).toBe("kanagawa-wave");
   });
 
+  it("auto-saves local terminal appearance changes for future local terminals", async () => {
+    window.localStorage.clear();
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        persistLocalProfile
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "classic",
+          fontSize: 14,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.click(await screen.findByTestId("terminal-context-theme-option-kanagawa-wave"));
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+      expect(stored.theme).toBe("kanagawa-wave");
+    });
+
+    fireEvent.change(screen.getByTestId("terminal-context-font-size"), { target: { value: "18" } });
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+      expect(stored.theme).toBe("kanagawa-wave");
+      expect(stored.fontSize).toBe(18);
+    });
+  });
+
   it("keeps follow-system as a savable local terminal default theme", async () => {
     const onSessionReady = vi.fn();
 

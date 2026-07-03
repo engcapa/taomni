@@ -948,6 +948,7 @@ export function MainLayout() {
         commandTerminal: tab.commandTerminal ?? null,
         localShell: tab.localShell ?? null,
         terminalProfile: tab.terminalProfile ?? null,
+        persistLocalProfile: !tab.sessionId && !tab.ssh && !tab.commandTerminal,
         reattach,
       };
       if (liveSessionId) {
@@ -2932,6 +2933,7 @@ export function MainLayout() {
                             commandTerminal={tab.commandTerminal}
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
+                            persistLocalProfile={!tab.sessionId && !tab.ssh && !tab.commandTerminal}
                             adoptedTerminal={tab.adoptedTerminal}
                             initialCwd={tab.terminalInitialCwd}
                             visible={terminalSplitVisible || isActive}
