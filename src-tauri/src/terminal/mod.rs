@@ -54,7 +54,13 @@ pub fn list_local_shells() -> Vec<pty::LocalShellOption> {
 pub fn list_common_local_directories(
     state: State<'_, AppState>,
 ) -> Result<Vec<pty::LocalDirectoryShortcut>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = match state.db.try_lock() {
+        Ok(db) => db,
+        Err(std::sync::TryLockError::WouldBlock) => {
+            return Ok(pty::list_common_local_directories(&[]));
+        }
+        Err(e) => return Err(e.to_string()),
+    };
     let mut stmt = db
         .prepare(
             "SELECT command FROM command_history
