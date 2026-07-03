@@ -6,9 +6,12 @@ import {
   codeThemeVariablesFromPalette,
   getCodeThemeDefinition,
   isCodeThemeId,
-  resolveSystemCodeThemeId,
 } from "./codeThemes";
-import { resolveCodeThemeVars, type CodeViewProfile } from "./codeViewProfile";
+import {
+  CODE_VIEW_TERMINAL_THEME_PREFIX,
+  resolveCodeThemeVars,
+  type CodeViewProfile,
+} from "./codeViewProfile";
 
 const baseProfile: CodeViewProfile = {
   fontFamily: "monospace",
@@ -23,11 +26,6 @@ describe("codeThemes registry", () => {
     expect(SYSTEM_LIGHT_CODE_THEME).toBe("github-light");
     expect(getCodeThemeDefinition("dracula")?.variant).toBe("dark");
     expect(getCodeThemeDefinition("github-light")?.variant).toBe("light");
-  });
-
-  it("resolves the system theme id from the resolved app theme", () => {
-    expect(resolveSystemCodeThemeId("dark")).toBe("dracula");
-    expect(resolveSystemCodeThemeId("light")).toBe("github-light");
   });
 
   it("expands a palette into the full variable set with the declared background", () => {
@@ -47,9 +45,9 @@ describe("codeThemes registry", () => {
 });
 
 describe("resolveCodeThemeVars", () => {
-  it("maps the system theme to dracula in dark and github-light in light", () => {
-    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "dark" })?.["--taomni-code-bg"]).toBe("#282a36");
-    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "light" })?.["--taomni-code-bg"]).toBe("#ffffff");
+  it("treats the legacy system theme as app-following", () => {
+    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "dark" })).toBeNull();
+    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "light" })).toBeNull();
   });
 
   it("resolves an explicit editor theme id", () => {
@@ -64,5 +62,13 @@ describe("resolveCodeThemeVars", () => {
   it("keeps back-compat with saved terminal-theme ids", () => {
     const vars = resolveCodeThemeVars({ ...baseProfile, theme: "kanagawa-wave" }, { resolvedAppTheme: "dark" });
     expect(vars?.["--taomni-code-bg"]).toBe("#1f1f28");
+  });
+
+  it("resolves explicit prefixed terminal-theme ids", () => {
+    const vars = resolveCodeThemeVars(
+      { ...baseProfile, theme: `${CODE_VIEW_TERMINAL_THEME_PREFIX}night-owl` },
+      { resolvedAppTheme: "dark" },
+    );
+    expect(vars?.["--taomni-code-bg"]).toBe("#011627");
   });
 });

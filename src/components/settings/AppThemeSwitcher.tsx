@@ -2,6 +2,8 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
+import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
+import { AppThemeLinePreview } from "../theme/themePreviews";
 
 const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
   { mode: "light", icon: <Sun className="w-4 h-4" /> },
@@ -13,40 +15,39 @@ export function AppThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { mode, resolvedTheme, setMode } = useAppTheme();
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
+  const options = THEME_MODES.map((item) => ({
+    value: item.mode,
+    label: themeLabel(item.mode),
+    preview: <AppThemeLinePreview mode={item.mode} />,
+    testId: `app-theme-${item.mode}`,
+  }));
 
   if (compact) {
     return (
-      <label className="inline-flex items-center gap-1.5 text-[11px]">
+      <div className="inline-flex items-center gap-1.5 text-[11px]">
         <span className="text-[var(--taomni-text-muted)]">{t("settings.themeLabel")}</span>
-        <select
-          className="taomni-input h-6 w-[122px]"
-          aria-label={t("titlebar.appThemeAria")}
+        <ThemePreviewSelect
           value={mode}
+          options={options}
+          ariaLabel={t("titlebar.appThemeAria")}
+          testId="app-theme-select"
+          className="w-[260px]"
           title={t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
-          onChange={(event) => setMode(event.target.value as AppThemeMode)}
-        >
-          {THEME_MODES.map((item) => (
-            <option key={item.mode} value={item.mode}>
-              {themeLabel(item.mode)}
-            </option>
-          ))}
-        </select>
-      </label>
+          onChange={(next) => setMode(next as AppThemeMode)}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="inline-flex rounded-md border border-[var(--taomni-input-border)] overflow-hidden">
-      {THEME_MODES.map((item) => (
-        <ThemeModeButton
-          key={item.mode}
-          mode={item.mode}
-          currentMode={mode}
-          onSelect={setMode}
-          icon={item.icon}
-        />
-      ))}
-    </div>
+    <ThemePreviewSelect
+      value={mode}
+      options={options}
+      ariaLabel={t("titlebar.appThemeAria")}
+      testId="app-theme-select"
+      className="w-full max-w-[360px]"
+      onChange={(next) => setMode(next as AppThemeMode)}
+    />
   );
 }
 
@@ -73,39 +74,6 @@ export function AppThemeIconButton() {
     >
       {current.icon}
       <span>{themeLabel(mode)}</span>
-    </button>
-  );
-}
-
-function ThemeModeButton({
-  mode,
-  currentMode,
-  onSelect,
-  icon,
-}: {
-  mode: AppThemeMode;
-  currentMode: AppThemeMode;
-  onSelect: (mode: AppThemeMode) => void;
-  icon: React.ReactNode;
-}) {
-  const themeLabel = useAppThemeI18nLabel();
-  const selected = mode === currentMode;
-
-  return (
-    <button
-      data-testid={`app-theme-${mode}`}
-      type="button"
-      aria-pressed={selected}
-      className="h-9 px-3 inline-flex items-center gap-2 text-[12px] border-r last:border-r-0 border-[var(--taomni-input-border)]"
-      style={{
-        background: selected ? "var(--taomni-selected)" : "var(--taomni-input-bg)",
-        color: selected ? "var(--taomni-accent)" : "var(--taomni-text)",
-        fontWeight: selected ? 600 : 400,
-      }}
-      onClick={() => onSelect(mode)}
-    >
-      {icon}
-      {themeLabel(mode)}
     </button>
   );
 }

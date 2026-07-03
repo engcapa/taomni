@@ -112,7 +112,7 @@ import {
   subscribeCodeViewProfile,
   type CodeViewProfile,
 } from "../../lib/codeViewProfile";
-import { loadGlobalTerminalProfile } from "../../lib/terminalProfile";
+import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
@@ -740,7 +740,7 @@ export function CodeWorkspaceTab({
       codeViewProfileRef.current = next;
       setCodeViewProfileState(next);
       saveCodeViewProfile(next);
-      applyCodeViewProfile(next, loadGlobalTerminalProfile());
+      applyCodeViewProfile(next, DEFAULT_TERMINAL_PROFILE);
       if (statusMessage) setStatusMessage(statusMessage(next));
     },
     [setStatusMessage],
@@ -754,7 +754,7 @@ export function CodeWorkspaceTab({
       if (sameCodeViewProfile(incoming, codeViewProfileRef.current)) return;
       codeViewProfileRef.current = incoming;
       setCodeViewProfileState(incoming);
-      applyCodeViewProfile(incoming, loadGlobalTerminalProfile());
+      applyCodeViewProfile(incoming, DEFAULT_TERMINAL_PROFILE);
     });
   }, []);
 

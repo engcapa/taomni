@@ -21,6 +21,7 @@ steps:
   - wait_for: '[data-testid="notes-panel"]'
   - click: '[data-testid="notes-settings-toggle"]'
   - wait_for: '[data-testid="note-theme-settings"]'
+  - click: '[data-testid="note-theme-select"]'
   - click: '[data-testid="note-theme-paper"]'
   - wait: 0.3
   - assert_attribute: { selector: '[data-testid="notes-panel"]', name: 'data-notes-theme', equals: 'paper' }

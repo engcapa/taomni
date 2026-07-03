@@ -199,6 +199,7 @@ describe("MailClientTab", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("keeps the loaded body when double-click opens the message in a tab", async () => {
@@ -232,7 +233,7 @@ describe("MailClientTab", () => {
     expect(await screen.findByRole("button", { name: /Load older messages/ })).toBeInTheDocument();
   });
 
-  it("does not use terminal font settings as the initial mail UI zoom", async () => {
+  it("uses saved mail font settings as the initial mail UI appearance", async () => {
     render(
       <MailClientTab
         tabId="mail-tab"
@@ -249,8 +250,29 @@ describe("MailClientTab", () => {
     );
 
     const root = await screen.findByTestId("mail-client-tab");
-    expect(root.style.fontFamily).toBe("var(--taomni-ui-font-family)");
-    expect(root.style.getPropertyValue("zoom")).toBe("1");
+    expect(root.style.fontFamily).toContain("Cascadia Mono");
+    expect(root.style.getPropertyValue("zoom")).toBe(String(22 / DEFAULT_TERMINAL_PROFILE.fontSize));
+  });
+
+  it("applies code view theme colors to the mail chrome", async () => {
+    render(
+      <MailClientTab
+        tabId="mail-tab"
+        info={{
+          ...info,
+          terminalProfile: {
+            ...DEFAULT_TERMINAL_PROFILE,
+            theme: "code:dracula",
+          },
+        }}
+        visible
+      />,
+    );
+
+    const root = await screen.findByTestId("mail-client-tab");
+    expect(root.style.getPropertyValue("--taomni-bg")).toBe("#282a36");
+    expect(root.style.getPropertyValue("--taomni-text")).toBe("#f8f8f2");
+    expect(root.style.getPropertyValue("--taomni-accent")).toBe("#8be9fd");
   });
 
   it("does not force borders onto HTML email layout tables", async () => {
@@ -362,5 +384,62 @@ describe("MailClientTab", () => {
       51,
       0,
     ));
+  });
+
+  it("keeps periodic sync running while hidden and refreshes from cache when visible", async () => {
+    vi.useFakeTimers();
+    const intervalInfo: MailTabInfo = {
+      ...info,
+      sync: { ...info.sync, onOpen: false, intervalMinutes: 1 },
+    };
+    const freshFolder: MailFolder = {
+      ...folder,
+      total: 2,
+      unread: 1,
+      updatedAt: 2,
+    };
+    const freshMessage: MailMessageHeader = {
+      ...uncachedMessage,
+      flags: [],
+    };
+    mailMocks.mailSyncAllFolders.mockResolvedValue({
+      accountId: info.sessionId,
+      folders: [freshFolder],
+      fetchedMessages: 1,
+      cachedBodies: 0,
+      syncedAt: 2,
+    });
+    mailMocks.mailListCachedFolders.mockResolvedValue([freshFolder]);
+    mailMocks.mailListCachedMessages.mockResolvedValue([freshMessage]);
+
+    const view = render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible={false} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledWith(
+      intervalInfo,
+      { limit: 50, includeBodies: false },
+    );
+    expect(mailMocks.mailListCachedFolders).not.toHaveBeenCalled();
+    expect(mailMocks.mailListCachedMessages).not.toHaveBeenCalled();
+
+    view.rerender(<MailClientTab tabId="mail-tab" info={intervalInfo} visible />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mailMocks.mailListCachedFolders).toHaveBeenCalledWith(info.sessionId);
+    expect(mailMocks.mailListCachedMessages).toHaveBeenCalledWith(
+      info.sessionId,
+      "INBOX",
+      51,
+      0,
+    );
+    expect(screen.getAllByText(/Header arrived before the body cache is warm/).length).toBeGreaterThan(0);
   });
 });

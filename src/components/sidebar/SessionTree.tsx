@@ -94,10 +94,12 @@ import {
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
 import { SessionImportPreview } from "../session/SessionImportPreview";
+import { buildSessionTerminalThemeMenuItem } from "../session/SessionTerminalThemeMenu";
 import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useT } from "../../lib/i18n";
 import { prepareImportedSecretsForSave } from "../../lib/sessionImportSecrets";
+import type { SessionTerminalAppearancePatch } from "../../lib/sessionTerminalTheme";
 
 const SESSION_DRAG_MIME = "taomni/session";
 
@@ -133,6 +135,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     duplicateSessions,
     moveSessionToGroup,
     moveSessionsToGroup,
+    updateSessionsTerminalAppearance,
     createFolderPath,
     renameFolderPath,
     deleteFolderPath,
@@ -1376,6 +1379,16 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     }
     const targetIds = selectedContextSessions.map((candidate) => candidate.id);
     const hasMultiSelection = selectedContextSessions.length > 1;
+    const setTerminalAppearance = async (
+      patch: SessionTerminalAppearancePatch,
+      targetSessions: readonly SessionConfig[],
+    ) => {
+      const updatedCount = await updateSessionsTerminalAppearance(
+        targetSessions.map((candidate) => candidate.id),
+        patch,
+      );
+      setStatusMessage(t("sessionTree.terminalAppearanceUpdated", { count: updatedCount }));
+    };
     const moveChildren: MenuItem[] = [
       { label: SESSION_ROOT_LABEL, icon: <FolderOpen className="w-3 h-3" />, onClick: () => void moveSessionsToGroup(targetIds, null) },
       ...folderPaths.map((path) => ({
@@ -1408,6 +1421,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         onClick: () => void duplicateSessions(targetIds),
       },
       { label: t("sessionTree.contextMoveToFolder"), icon: <Folder className="w-3 h-3" />, children: moveChildren },
+      buildSessionTerminalThemeMenuItem({
+        sessions: selectedContextSessions,
+        t,
+        onSelectAppearance: setTerminalAppearance,
+      }),
       { label: "", separator: true },
       {
         label: hasMultiSelection ? t("sessionTree.contextDeleteCount", { count: targetIds.length }) : t("sessionTree.contextDelete"),

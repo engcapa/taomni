@@ -5,7 +5,7 @@ import type { NotesFont, NotesTheme } from "../../stores/notesStore";
  * Notes theme system (see tao-notes-feature-plan.md §9). A theme re-maps a
  * handful of `--taomni-*` CSS variables **locally** on the notes panel root, so
  * it restyles only the notes surface and cards without disturbing the global
- * app theme. "taomni" inherits the app theme unchanged; "system" follows the OS.
+ * app theme. "taomni" inherits the app theme unchanged.
  * All palettes keep text readable against their background in both modes.
  */
 
@@ -104,11 +104,6 @@ const PAPER: NotesPalette = {
   "--taomni-shadow-lg": "0 16px 24px -4px rgba(74, 63, 47, 0.16), 0 4px 8px -2px rgba(74, 63, 47, 0.08)",
 };
 
-export function resolveSystemTheme(): "light" | "dark" {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
 /**
  * CSS-variable overrides for a notes theme, applied as inline style on the notes
  * root. Returns an empty object for "taomni" and "compact" (they inherit the
@@ -122,8 +117,6 @@ export function notesThemeStyle(theme: NotesTheme): CSSProperties {
       return DARK as CSSProperties;
     case "paper":
       return PAPER as CSSProperties;
-    case "system":
-      return (resolveSystemTheme() === "dark" ? DARK : LIGHT) as CSSProperties;
     case "compact":
     case "taomni":
     default:
@@ -136,7 +129,7 @@ export function notesThemeDensity(theme: NotesTheme): "comfortable" | "compact" 
   return theme === "compact" ? "compact" : "comfortable";
 }
 
-export const NOTES_THEMES: NotesTheme[] = ["taomni", "system", "light", "dark", "paper", "compact"];
+export const NOTES_THEMES: NotesTheme[] = ["taomni", "light", "dark", "paper", "compact"];
 
 export function notesFontStyle(font: NotesFont): CSSProperties {
   switch (font) {

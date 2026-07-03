@@ -5,6 +5,7 @@ import { getAppPlatform } from "./runtime";
 export const SOURCE_CODE_PRO = "Source Code Pro";
 export const CASCADIA_MONO = "Cascadia Mono";
 export const MENLO = "Menlo";
+export const SYSTEM_MONOSPACE_FONT = "monospace";
 
 const GENERIC_FONTS = new Set(["monospace", "serif", "sans-serif", "cursive", "fantasy", "system-ui"]);
 
@@ -78,7 +79,7 @@ export function useSystemFonts(): SystemFontState {
 }
 
 export function useTerminalFontOptions(fonts: string[]): string[] {
-  return useMemo(() => normalizeFontFamilies(fonts), [fonts]);
+  return useMemo(() => normalizeFontFamilies([...fonts, SYSTEM_MONOSPACE_FONT]), [fonts]);
 }
 
 export function normalizeFontFamilies(fonts: readonly string[]): string[] {

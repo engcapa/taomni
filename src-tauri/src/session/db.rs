@@ -73,6 +73,7 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
 
     // Chat tables (v2.4).
     crate::chat::store::init_chat_tables(conn)?;
+    crate::database::history::init_history_tables(conn)?;
 
     Ok(())
 }

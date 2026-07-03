@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import {
-  CODE_VIEW_THEME_APP,
-  CODE_VIEW_THEME_SYSTEM,
-  CODE_VIEW_THEME_TERMINAL,
+  CODE_VIEW_TERMINAL_THEME_PREFIX,
   resolveCodeThemeVars,
   type CodeViewProfile,
 } from "../../lib/codeViewProfile";
-import type { TerminalProfile } from "../../lib/terminalProfile";
-import { TERMINAL_THEME_DEFINITIONS, getTerminalThemeDefinition } from "../../lib/themes";
-import { CODE_THEME_DEFINITIONS } from "../../lib/codeThemes";
+import { resolveTerminalTheme, type TerminalProfile } from "../../lib/terminalProfile";
+import { getTerminalThemeDefinition, resolveThemeId } from "../../lib/themes";
 import { useAppTheme } from "../../lib/appTheme";
+import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
+import { buildCodeThemeOptions } from "../theme/themePreviews";
 import {
   getPrimaryFontName,
   isMonospaceFont,
@@ -68,6 +67,20 @@ export function CodeViewAppearanceSettings({
   };
 
   const terminalThemeName = getTerminalThemeDefinition(terminalProfile.theme)?.name ?? terminalProfile.theme;
+  const themeOptions = useMemo(() => buildCodeThemeOptions({
+    appLabel: t("codeViewAppearance.themeFollowApp"),
+    terminalLabel: t("codeViewAppearance.themeFollowTerminal", { name: terminalThemeName }),
+    terminalTheme: resolveTerminalTheme(terminalProfile.theme),
+    darkGroup: t("codeViewAppearance.themeEditorDarkGroup"),
+    lightGroup: t("codeViewAppearance.themeEditorLightGroup"),
+    terminalGroup: t("codeViewAppearance.themeTerminalGroup"),
+  }), [t, terminalProfile.theme, terminalThemeName]);
+  const themeSelectValue = useMemo(() => {
+    if (themeOptions.some((option) => option.value === profile.theme)) return profile.theme;
+    const terminalThemeId = resolveThemeId(profile.theme);
+    const terminalValue = `${CODE_VIEW_TERMINAL_THEME_PREFIX}${terminalThemeId}`;
+    return themeOptions.some((option) => option.value === terminalValue) ? terminalValue : profile.theme;
+  }, [profile.theme, themeOptions]);
 
   return (
     <div data-testid="code-view-appearance-settings" className="space-y-4">
@@ -169,42 +182,16 @@ export function CodeViewAppearanceSettings({
       </section>
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-        <label className="block">
+        <div className="block">
           <span className="block text-[12px] font-semibold mb-1">{t("codeViewAppearance.themeLabel")}</span>
-          <select
-            aria-label={t("codeViewAppearance.themeAria")}
-            className="taomni-input h-8 w-full"
-            value={profile.theme}
-            onChange={(event) => updateProfile({ theme: event.target.value })}
-          >
-            <option value={CODE_VIEW_THEME_SYSTEM}>{t("codeViewAppearance.themeFollowSystem")}</option>
-            <option value={CODE_VIEW_THEME_APP}>{t("codeViewAppearance.themeFollowApp")}</option>
-            <option value={CODE_VIEW_THEME_TERMINAL}>
-              {t("codeViewAppearance.themeFollowTerminal", { name: terminalThemeName })}
-            </option>
-            <optgroup label={t("codeViewAppearance.themeEditorDarkGroup")}>
-              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "dark").map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label={t("codeViewAppearance.themeEditorLightGroup")}>
-              {CODE_THEME_DEFINITIONS.filter((definition) => definition.variant === "light").map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label={t("codeViewAppearance.themeTerminalGroup")}>
-              {TERMINAL_THEME_DEFINITIONS.map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
+          <ThemePreviewSelect
+            ariaLabel={t("codeViewAppearance.themeAria")}
+            value={themeSelectValue}
+            options={themeOptions}
+            testId="code-theme-select"
+            onChange={(theme) => updateProfile({ theme })}
+          />
+        </div>
       </section>
 
       <CodeViewPreview

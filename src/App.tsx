@@ -16,7 +16,7 @@ import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { useAppStore } from "./stores/appStore";
 import { AppDialogProvider } from "./lib/appDialogs";
 import { VaultGateProvider } from "./lib/vaultGate";
-import { loadGlobalTerminalProfile } from "./lib/terminalProfile";
+import { DEFAULT_TERMINAL_PROFILE } from "./lib/terminalProfile";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -38,7 +38,7 @@ function App() {
   }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => {
-    applyCodeViewProfile(loadCodeViewProfile(), loadGlobalTerminalProfile(), {
+    applyCodeViewProfile(loadCodeViewProfile(), DEFAULT_TERMINAL_PROFILE, {
       resolvedAppTheme: resolvedTheme,
     });
   }, [resolvedTheme]);

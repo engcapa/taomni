@@ -76,12 +76,17 @@ export const DEFAULT_TERMINAL_PROFILE: TerminalProfile = {
   commonCommandsShortcut: "Ctrl+Shift+P",
 };
 
+export const DEFAULT_LOCAL_TERMINAL_PROFILE: TerminalProfile = {
+  ...DEFAULT_TERMINAL_PROFILE,
+  theme: "classic",
+};
+
 export const DEFAULT_MAIL_TERMINAL_PROFILE: TerminalProfile = {
   ...DEFAULT_TERMINAL_PROFILE,
   theme: SYSTEM_TERMINAL_THEME,
 };
 
-const TERMINAL_PROFILE_STORAGE_KEY = "taomni.terminalProfile.v1";
+const LOCAL_TERMINAL_PROFILE_STORAGE_KEY = "taomni.localTerminalProfile.v1";
 
 export function parseSessionOptions(optionsJson: string | null | undefined): Record<string, unknown> {
   if (!optionsJson?.trim()) return {};
@@ -114,21 +119,25 @@ export function getSessionTerminalProfile(optionsJson: string | null | undefined
   return normalizeTerminalProfile(options.terminalProfile);
 }
 
-export function loadGlobalTerminalProfile(): TerminalProfile {
-  if (typeof window === "undefined") return DEFAULT_TERMINAL_PROFILE;
+export function loadLocalTerminalDefaultProfile(): TerminalProfile {
+  if (typeof window === "undefined") return DEFAULT_LOCAL_TERMINAL_PROFILE;
   try {
-    const raw = window.localStorage.getItem(TERMINAL_PROFILE_STORAGE_KEY);
-    return normalizeTerminalProfile(raw ? JSON.parse(raw) : undefined);
+    const raw = window.localStorage.getItem(LOCAL_TERMINAL_PROFILE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : DEFAULT_LOCAL_TERMINAL_PROFILE;
+    return normalizeTerminalProfile({
+      ...DEFAULT_LOCAL_TERMINAL_PROFILE,
+      ...(isRecord(parsed) ? parsed : {}),
+    });
   } catch {
-    return DEFAULT_TERMINAL_PROFILE;
+    return DEFAULT_LOCAL_TERMINAL_PROFILE;
   }
 }
 
-export function saveGlobalTerminalProfile(profile: TerminalProfile): void {
+export function saveLocalTerminalDefaultProfile(profile: TerminalProfile): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      TERMINAL_PROFILE_STORAGE_KEY,
+      LOCAL_TERMINAL_PROFILE_STORAGE_KEY,
       JSON.stringify(normalizeTerminalProfile(profile)),
     );
   } catch {
@@ -217,12 +226,12 @@ export function terminalProfileThemeColors(profile: TerminalProfile): { backgrou
   };
 }
 
-export function resolveSystemTerminalThemeId(prefersDark: boolean): string {
-  return prefersDark ? SYSTEM_DARK_TERMINAL_THEME : SYSTEM_LIGHT_TERMINAL_THEME;
+export function resolveSystemTerminalThemeId(appPrefersDark: boolean): string {
+  return appPrefersDark ? SYSTEM_DARK_TERMINAL_THEME : SYSTEM_LIGHT_TERMINAL_THEME;
 }
 
-export function resolveTerminalThemeWithSystem(theme: string, prefersDark: boolean): ITheme {
-  return resolveTerminalTheme(theme === SYSTEM_TERMINAL_THEME ? resolveSystemTerminalThemeId(prefersDark) : theme);
+export function resolveTerminalThemeWithSystem(theme: string, appPrefersDark: boolean): ITheme {
+  return resolveTerminalTheme(theme === SYSTEM_TERMINAL_THEME ? resolveSystemTerminalThemeId(appPrefersDark) : theme);
 }
 
 export function resolveTerminalTheme(theme: string): ITheme {

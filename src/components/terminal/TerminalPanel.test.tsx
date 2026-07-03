@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPanel";
-import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
+import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 
 const terminalMocks = vi.hoisted(() => {
@@ -1338,6 +1338,95 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.click(await screen.findByText("Open Git Panel"));
 
     expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the current theme as the default for new local terminals", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "kanagawa-wave",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
+
+    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    expect(stored.theme).toBe("kanagawa-wave");
+  });
+
+  it("auto-saves local terminal appearance changes for future local terminals", async () => {
+    window.localStorage.clear();
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        persistLocalProfile
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "classic",
+          fontSize: 14,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.click(await screen.findByTestId("terminal-context-theme-option-kanagawa-wave"));
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+      expect(stored.theme).toBe("kanagawa-wave");
+    });
+
+    fireEvent.change(screen.getByTestId("terminal-context-font-size"), { target: { value: "18" } });
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+      expect(stored.theme).toBe("kanagawa-wave");
+      expect(stored.fontSize).toBe(18);
+    });
+  });
+
+  it("keeps follow-system as a savable local terminal default theme", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: SYSTEM_TERMINAL_THEME,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
+
+    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    expect(stored.theme).toBe(SYSTEM_TERMINAL_THEME);
   });
 
   it("opens Git from the terminal shortcut", async () => {

@@ -530,6 +530,10 @@ describe("MainLayout attached SFTP sidebar", () => {
   });
 
   it("opens a local terminal from Ctrl+Shift+T outside the welcome tab", async () => {
+    window.localStorage.setItem("taomni.localTerminalProfile.v1", JSON.stringify({
+      ...DEFAULT_TERMINAL_PROFILE,
+      theme: "kanagawa-wave",
+    }));
     render(<MainLayout />);
 
     expect(useAppStore.getState().activeTabId).toBe("ssh-tab");
@@ -541,6 +545,8 @@ describe("MainLayout attached SFTP sidebar", () => {
         useAppStore.getState().tabs.some((tab) => tab.type === "terminal" && tab.id.startsWith("local-")),
       ).toBe(true);
     });
+    const localTab = useAppStore.getState().tabs.find((tab) => tab.type === "terminal" && tab.id.startsWith("local-"));
+    expect(localTab?.terminalProfile?.theme).toBe("kanagawa-wave");
   });
 
   it("numbers new local terminal titles from existing terminal tab names", async () => {

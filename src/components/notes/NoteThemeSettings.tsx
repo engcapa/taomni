@@ -2,6 +2,8 @@ import { Monitor, PanelRightClose, Pin, Type } from "lucide-react";
 import { useNotesStore, type NotesFont, type NotesTheme } from "../../stores/notesStore";
 import { NOTES_FONTS, NOTES_THEMES } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
+import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
+import { NotesThemeLinePreview } from "../theme/themePreviews";
 
 /**
  * NoteThemeSettings — theme picker + panel-mode toggle + in-app always-on-top,
@@ -18,6 +20,12 @@ export function NoteThemeSettings() {
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
   const setAlwaysOnTop = useNotesStore((s) => s.setAlwaysOnTop);
+  const themeOptions = NOTES_THEMES.map((th: NotesTheme) => ({
+    value: th,
+    label: t(`notes.theme_${th}`),
+    preview: <NotesThemeLinePreview theme={th} />,
+    testId: `note-theme-${th}`,
+  }));
 
   return (
     <div
@@ -27,24 +35,13 @@ export function NoteThemeSettings() {
       {/* Theme */}
       <div className="flex flex-col gap-1">
         <span className="text-[var(--taomni-text-muted)]">{t("notes.theme")}</span>
-        <div className="flex flex-wrap gap-1">
-          {NOTES_THEMES.map((th: NotesTheme) => (
-            <button
-              key={th}
-              type="button"
-              className={`h-6 px-2 rounded border text-[10px] transition-colors ${
-                theme === th
-                  ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
-                  : "border-[var(--taomni-divider)] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
-              }`}
-              aria-pressed={theme === th}
-              data-testid={`note-theme-${th}`}
-              onClick={() => setTheme(th)}
-            >
-              {t(`notes.theme_${th}`)}
-            </button>
-          ))}
-        </div>
+        <ThemePreviewSelect
+          value={theme}
+          options={themeOptions}
+          ariaLabel={t("notes.theme")}
+          testId="note-theme-select"
+          onChange={(next) => setTheme(next as NotesTheme)}
+        />
       </div>
 
       {/* Font */}

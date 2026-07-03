@@ -112,9 +112,10 @@ import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
-import { DEFAULT_MAIL_TERMINAL_PROFILE, resolveTerminalThemeWithSystem, type TerminalProfile } from "../../lib/terminalProfile";
+import { DEFAULT_MAIL_TERMINAL_PROFILE, type TerminalProfile } from "../../lib/terminalProfile";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useAppTheme } from "../../lib/appTheme";
+import { resolveMailTheme } from "../../lib/mailTheme";
 
 interface MailClientTabProps {
   tabId: string;
@@ -278,9 +279,9 @@ function mixColor(foreground: string, background: string, amount: number): strin
   return `#${hex(mixed[0])}${hex(mixed[1])}${hex(mixed[2])}`;
 }
 
-function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, systemPrefersDark: boolean): CSSProperties {
+function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, appPrefersDark: boolean): CSSProperties {
   const terminalProfile = profile ?? DEFAULT_MAIL_TERMINAL_PROFILE;
-  const theme = resolveTerminalThemeWithSystem(terminalProfile.theme, systemPrefersDark);
+  const theme = resolveMailTheme(terminalProfile.theme, appPrefersDark);
   const background = color(theme.background, "#1d1f21");
   const foreground = color(theme.foreground, "#eaeaea");
   const accent = color(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
@@ -300,7 +301,7 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     "--taomni-accent": accent,
     "--taomni-text": foreground,
     "--taomni-text-muted": mixColor(foreground, background, 62),
-    fontFamily: "var(--taomni-ui-font-family)",
+    fontFamily: terminalProfile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily,
     zoom: clampMailFontSize(fontSize) / MAIL_BASE_FONT_SIZE,
   } as CSSProperties;
 }
@@ -786,7 +787,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
-  const [mailFontSize, setMailFontSize] = useState(MAIL_BASE_FONT_SIZE);
+  const profileFontSize = clampMailFontSize(info.terminalProfile?.fontSize ?? DEFAULT_MAIL_TERMINAL_PROFILE.fontSize);
+  const [mailFontSize, setMailFontSize] = useState(profileFontSize);
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
   const confirmDialog = useConfirmDialog();
@@ -795,7 +797,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const [sourceView, setSourceView] = useState<{ subject: string; content: string } | null>(null);
   const [busyAction, setBusyAction] = useState(false);
   const { resolvedTheme } = useAppTheme();
-  const systemPrefersDark = resolvedTheme === "dark";
+  const appPrefersDark = resolvedTheme === "dark";
 
   const openTabChat = useChatStore((s) => s.openTabChat);
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
@@ -808,8 +810,8 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     [info.emailAddress, info.imap.username, info.smtp.username],
   );
   const mailAppearance = useMemo(
-    () => mailAppearanceStyle(info.terminalProfile, mailFontSize, systemPrefersDark),
-    [info.terminalProfile, mailFontSize, systemPrefersDark],
+    () => mailAppearanceStyle(info.terminalProfile, mailFontSize, appPrefersDark),
+    [info.terminalProfile, mailFontSize, appPrefersDark],
   );
   const selectedMessage = useMemo(
     () =>
@@ -930,12 +932,12 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, []);
 
   const resetFontSize = useCallback(() => {
-    setMailFontSize(MAIL_BASE_FONT_SIZE);
-  }, []);
+    setMailFontSize(profileFontSize);
+  }, [profileFontSize]);
 
   useEffect(() => {
-    setMailFontSize(MAIL_BASE_FONT_SIZE);
-  }, [info.sessionId]);
+    setMailFontSize(profileFontSize);
+  }, [info.sessionId, profileFontSize]);
 
   useEffect(() => {
     if (!composeOpen || contactIndexAccountRef.current === info.sessionId) return;
@@ -1582,17 +1584,17 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
 
   useEffect(() => {
-    if (!visible || info.sync.intervalMinutes <= 0) return;
+    if (info.sync.intervalMinutes <= 0) return;
     const intervalMs = Math.max(1, info.sync.intervalMinutes) * 60 * 1000;
     const id = window.setInterval(() => {
-      void syncFolder(selectedFolder, true, {
+      void syncAllFolders(true, {
         limit: batchSize,
         includeBodies: false,
         indicator: "none",
       });
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [batchSize, info.sync.intervalMinutes, selectedFolder, syncFolder, visible]);
+  }, [batchSize, info.sync.intervalMinutes, syncAllFolders]);
 
   useEffect(() => {
     if (messages.length === 0) {
