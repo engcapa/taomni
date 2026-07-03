@@ -10,6 +10,7 @@ import {
   parseMobaXtermSessions,
   parseTaomniSessions,
   serializeCsvSessions,
+  serializeCsvSessionTemplate,
   serializeMobaXtermSessions,
   serializeTaomniSessions,
   type SessionExportResult,
@@ -19,6 +20,7 @@ import { SessionImportPreview } from "../session/SessionImportPreview";
 import { t as translate } from "../../lib/i18n";
 import { alertAppDialog } from "../../lib/appDialogs";
 import { getHomeDir } from "../../lib/ipc";
+import { prepareImportedSecretsForSave } from "../../lib/sessionImportSecrets";
 
 /**
  * Session import/export handlers shared by the in-app {@link MenuBar} (used on
@@ -31,6 +33,7 @@ export interface UseSessionImportExport {
   importJson: () => void;
   importMoba: () => void;
   importCsv: () => void;
+  downloadCsvTemplate: () => void;
   importOpenSsh: () => void;
   exportJson: () => void;
   exportMoba: () => void;
@@ -53,13 +56,16 @@ export function useSessionImportExport(): UseSessionImportExport {
     setPendingImport({ result, source });
   };
 
-  const confirmPendingImport = async () => {
+  const confirmPendingImport = async (selectedIds: ReadonlySet<string>) => {
     const pending = pendingImport;
     if (!pending) return;
-    if (pending.result.sessions.length > 0) {
-      await importSessions(pending.result.sessions);
+    const filtered = filterImportResultBySelection(pending.result, selectedIds);
+    const prepared = await prepareImportedSecretsForSave(filtered, translate);
+    if (prepared.sessions.length > 0) {
+      await importSessions(prepared.sessions);
     }
-    setStatusMessage(importStatusMessage(pending.source, pending.result));
+    setStatusMessage(importStatusMessage(pending.source, prepared));
+    if (prepared.warnings.length) reportWarnings(prepared.warnings);
     setPendingImport(null);
   };
 
@@ -83,6 +89,12 @@ export function useSessionImportExport(): UseSessionImportExport {
       if (!text) return;
       queueImportPreview(parseCsvSessions(text, { existingSessions: sessions }), "CSV");
     }).catch(reportError);
+  };
+
+  const downloadCsvTemplate = () => {
+    const result = serializeCsvSessionTemplate();
+    downloadTextFile(result.filename, result.text, result.mimeType);
+    setStatusMessage(translate("status.csvTemplateDownloaded"));
   };
 
   const importOpenSsh = () => {
@@ -129,7 +141,7 @@ export function useSessionImportExport(): UseSessionImportExport {
       result={pendingImport.result}
       targetFolder={null}
       onCancel={() => setPendingImport(null)}
-      onConfirm={() => void confirmPendingImport()}
+      onConfirm={(selectedIds) => void confirmPendingImport(selectedIds)}
     />
   ) : null;
 
@@ -138,6 +150,7 @@ export function useSessionImportExport(): UseSessionImportExport {
     importJson,
     importMoba,
     importCsv,
+    downloadCsvTemplate,
     importOpenSsh,
     exportJson,
     exportMoba,
@@ -159,6 +172,40 @@ export function importStatusMessage(source: string, result: SessionImportResult)
     plural: count === 1 ? "" : "s",
     skipped,
     warnings: warningSuffix,
+  });
+}
+
+function filterImportResultBySelection(
+  result: SessionImportResult,
+  selectedIds: ReadonlySet<string>,
+): SessionImportResult {
+  const selectedSessions = result.sessions.filter((session) => selectedIds.has(session.id));
+  if (selectedSessions.length === result.sessions.length) return result;
+  const selectedSecrets = result.secrets.filter((secret) => {
+    const isStandalone = secret.attachment === "standalone" || !secret.sessionId;
+    if (isStandalone) return true;
+    return selectedIds.has(secret.sessionId);
+  });
+  const selectedSecureCrtPasswords = result.secureCrtPasswords?.filter((password) =>
+    selectedIds.has(password.sessionId),
+  );
+  return {
+    ...result,
+    sessions: selectedSessions,
+    secrets: selectedSecrets,
+    secureCrtPasswords: selectedSecureCrtPasswords,
+    skipped: result.skipped + result.sessions.length - selectedSessions.length,
+  };
+}
+
+function reportWarnings(warnings: string[]) {
+  if (warnings.length === 0) return;
+  void alertAppDialog({
+    title: translate("status.warnings", {
+      count: warnings.length,
+      plural: warnings.length === 1 ? "" : "s",
+    }),
+    message: warnings.slice(0, 8).join("\n"),
   });
 }
 

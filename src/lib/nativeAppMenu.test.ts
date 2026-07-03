@@ -132,6 +132,7 @@ describe("buildAppMenuSpec", () => {
       "import-json",
       "import-moba",
       "import-csv",
+      "download-csv-template",
       "import-openssh",
       "export-json",
       "export-moba",

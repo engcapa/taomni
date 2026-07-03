@@ -2525,6 +2525,7 @@ export function MainLayout() {
       case "import-json": importExport.importJson(); break;
       case "import-moba": importExport.importMoba(); break;
       case "import-csv": importExport.importCsv(); break;
+      case "download-csv-template": importExport.downloadCsvTemplate(); break;
       case "import-openssh": importExport.importOpenSsh(); break;
       case "export-json": importExport.exportJson(); break;
       case "export-moba": importExport.exportMoba(); break;

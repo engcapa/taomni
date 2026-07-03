@@ -14,6 +14,7 @@ export type MenuActionId =
   | "import-json"
   | "import-moba"
   | "import-csv"
+  | "download-csv-template"
   | "import-openssh"
   | "export-json"
   | "export-moba"
@@ -136,6 +137,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
         { type: "item", id: "import-json", label: t("menu.importTaomni"), action: "import-json" },
         { type: "item", id: "import-moba", label: t("menu.importMobaXterm"), action: "import-moba" },
         { type: "item", id: "import-csv", label: t("menu.importCsv"), action: "import-csv" },
+        { type: "item", id: "download-csv-template", label: t("menu.downloadCsvTemplate"), action: "download-csv-template" },
         { type: "item", id: "import-openssh", label: t("menu.importOpenSsh"), action: "import-openssh" },
       ],
     },

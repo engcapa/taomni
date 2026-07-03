@@ -1,4 +1,5 @@
 import type { AuthMethod, DbeaverCredentialEntry, SessionConfig } from "./ipc";
+import { normalizeNetworkSettings } from "./networkSettings";
 import {
   groupPathContains,
   leafGroupName,
@@ -25,6 +26,28 @@ const MAX_HOST_LENGTH = 512;
 const MAX_PATH_LENGTH = 1_024;
 const MAX_OPTION_LENGTH = 4_000;
 
+const CSV_SESSION_HEADERS = [
+  "name",
+  "session_type",
+  "host",
+  "port",
+  "username",
+  "auth_method",
+  "private_key_path",
+  "password",
+  "group_path",
+  "description",
+  "tags",
+  "startup_cmd",
+  "jump_host",
+  "jump_port",
+  "jump_user",
+  "jump_key_path",
+  "compression",
+  "x11",
+  "agent_forward",
+];
+
 const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22,
   Telnet: 23,
@@ -49,6 +72,27 @@ const DEFAULT_PORTS: Record<string, number> = {
   Proxy: 3128,
   Mail: 993,
 };
+
+const CSV_PASSWORD_SESSION_TYPES = new Set([
+  "SSH",
+  "SFTP",
+  "RDP",
+  "VNC",
+  "FTP",
+  "Telnet",
+  "Rlogin",
+  "Mosh",
+  "MySQL",
+  "PostgreSQL",
+  "SQLServer",
+  "StarRocks",
+  "ClickHouse",
+  "Presto",
+  "Redis",
+  "HBaseShell",
+  "Proxy",
+  "Mail",
+]);
 
 const MOBAXTERM_TYPE_TO_SESSION: Record<string, string> = {
   "0": "SSH",
@@ -213,18 +257,24 @@ export function parseCsvSessions(text: string, options: SessionImportOptions = {
     throw new Error("The selected CSV file is empty.");
   }
 
-  const headers = rows[0].map((header) => header.trim().toLowerCase());
-  const hasHeader = ["name", "session_type", "type", "host"].some((key) => headers.includes(key));
+  const headers = rows[0].map(normalizeCsvHeader);
+  const hasHeader = ["name", "session_type", "type", "host", "hostname", "ip", "address"].some((key) => headers.includes(key));
   const dataRows = hasHeader ? rows.slice(1) : rows;
   const now = resolveNow(options.now);
-  const sessions = dataRows
+  const parsedRows = dataRows
     .filter((row) => row.some((cell) => cell.trim()))
     .slice(0, MAX_SESSIONS)
     .map((row) => csvRowToSession(row, hasHeader ? headers : null, options.targetFolder ?? null, now, warnings))
-    .filter((session): session is SessionConfig => session !== null);
+    .filter((parsed): parsed is CsvSessionImport => parsed !== null);
 
-  const skipped = dataRows.length - sessions.length;
-  return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
+  const skipped = dataRows.length - parsedRows.length;
+  return finalizeImportResult(
+    parsedRows.map((parsed) => parsed.session),
+    skipped,
+    warnings,
+    options.existingSessions,
+    parsedRows.flatMap((parsed) => parsed.secrets),
+  );
 }
 
 export function serializeCsvSessions(
@@ -232,20 +282,37 @@ export function serializeCsvSessions(
   scopeFolder: string | null,
 ): SessionExportResult {
   const warnings: string[] = [];
-  const rows = [
-    ["name", "session_type", "host", "port", "username", "group_path"],
-  ];
+  const rows = [CSV_SESSION_HEADERS];
 
   for (const session of sessions) {
     const sessionType = sanitizeSessionType(session.session_type, warnings);
     if (!sessionType) continue;
+    const options = parseSessionOptions(session.options_json);
+    const networkSettings = normalizeNetworkSettings(options.networkSettings);
+    const jumpHost = optionString(options.jumpHost) || networkSettings.jumpHost;
+    const jumpPort = optionString(options.jumpPort) || networkSettings.jumpPort;
+    const jumpUser = optionString(options.jumpUser) || networkSettings.jumpUser;
+    const jumpKeyPath = networkSettings.jumpKeyPath;
     rows.push([
       cleanText(session.name, MAX_NAME_LENGTH),
       sessionType,
       cleanText(session.host, MAX_HOST_LENGTH),
       String(sanitizePort(session.port, DEFAULT_PORTS[sessionType] ?? 0)),
       optionalCleanText(session.username, MAX_NAME_LENGTH) ?? "",
+      authMethodToCsv(session.auth_method),
+      privateKeyPath(session.auth_method),
+      "",
       relativeFolderPath(session.group_path, scopeFolder) ?? "",
+      optionString(options.description),
+      optionString(options.tags),
+      optionString(options.startupCmd),
+      jumpHost,
+      jumpPort && jumpHost ? jumpPort : "",
+      jumpHost ? jumpUser : "",
+      jumpHost ? jumpKeyPath : "",
+      csvBooleanValue(options.compression),
+      csvBooleanValue(options.x11),
+      csvBooleanValue(options.agentForward),
     ]);
   }
 
@@ -256,6 +323,16 @@ export function serializeCsvSessions(
     mimeType: "text/csv",
     warnings: uniqueWarnings(warnings),
     skipped,
+  };
+}
+
+export function serializeCsvSessionTemplate(): SessionExportResult {
+  return {
+    filename: "taomni-ssh-session-import-template.csv",
+    text: `${CSV_SESSION_HEADERS.map(csvEscape).join(",")}\r\n`,
+    mimeType: "text/csv",
+    warnings: [],
+    skipped: 0,
   };
 }
 
@@ -1682,6 +1759,11 @@ interface WindTermRow {
   folder: string[];
 }
 
+interface CsvSessionImport {
+  session: SessionConfig;
+  secrets: SessionImportSecret[];
+}
+
 function importedSession(input: ImportedSessionInput): SessionConfig | null {
   const sessionType = sanitizeSessionType(input.sessionType, input.warnings);
   if (!sessionType) return null;
@@ -2774,43 +2856,177 @@ function csvRowToSession(
   targetFolder: string | null,
   now: number,
   warnings: string[],
-): SessionConfig | null {
-  const get = (name: string, index: number) => {
-    if (!headers) return row[index] ?? "";
-    const headerIndex = headers.indexOf(name);
-    return headerIndex >= 0 ? row[headerIndex] ?? "" : "";
+): CsvSessionImport | null {
+  const get = (names: string | string[], index: number) => {
+    if (!headers) return index >= 0 ? row[index] ?? "" : "";
+    const aliases = Array.isArray(names) ? names : [names];
+    for (const name of aliases) {
+      const headerIndex = headers.indexOf(name);
+      if (headerIndex >= 0) return row[headerIndex] ?? "";
+    }
+    return "";
   };
 
-  const typeValue = get("session_type", 1) || get("type", 1) || "SSH";
+  const typeValue = get(["session_type", "type", "protocol"], 1) || "SSH";
   const sessionType = sanitizeSessionType(typeValue, warnings);
   if (!sessionType) return null;
 
-  const host = cleanText(get("host", 2), MAX_HOST_LENGTH);
+  const host = cleanText(get(["host", "hostname", "ip", "address"], 2), MAX_HOST_LENGTH);
   if (sessionType !== "LocalShell" && sessionType !== "Serial" && !host) {
     warnings.push("Skipped a CSV row because host is empty.");
     return null;
   }
 
   const name = cleanText(get("name", 0), MAX_NAME_LENGTH) || host || sessionType;
-  const username = optionalCleanText(get("username", 4) || get("user", 4), MAX_NAME_LENGTH);
-  const importedFolder = normalizeGroupPath(get("group_path", 5) || get("folder_path", 5) || get("folder", 5));
+  const username = optionalCleanText(get(["username", "user", "login"], 4), MAX_NAME_LENGTH);
+  const importedFolder = normalizeGroupPath(get(["group_path", "folder_path", "folder", "group"], 5));
   const groupPath = combineImportFolder(targetFolder, importedFolder);
+  const privateKey = cleanText(
+    get(["private_key_path", "key_path", "identity_file", "identityfile", "private_key", "privatekey"], -1),
+    MAX_PATH_LENGTH,
+  );
+  const password = cleanText(get(["password", "login_password", "ssh_password"], -1), MAX_OPTION_LENGTH);
+  const authMethod = csvAuthMethod(get(["auth_method", "auth", "authentication"], -1), privateKey, sessionType, warnings);
+  const options = csvOptions(get);
+
+  const session = importedSession({
+    sessionType,
+    name,
+    groupPath,
+    host,
+    port: get("port", 3),
+    username,
+    authMethod,
+    options,
+    now,
+    warnings,
+  });
+  if (!session) return null;
 
   return {
-    id: createSessionId(),
-    name,
-    session_type: sessionType,
-    group_path: toStoredGroupPath(groupPath),
-    host,
-    port: sanitizePort(get("port", 3), DEFAULT_PORTS[sessionType] ?? 0),
-    username,
-    auth_method: sessionType === "SSH" || sessionType === "SFTP" ? "Password" : "None",
-    options_json: "{}",
-    created_at: now,
-    updated_at: now,
-    last_connected_at: null,
-    sort_order: 0,
+    session,
+    secrets: csvPasswordSecrets(session, password, privateKey, warnings),
   };
+}
+
+function csvPasswordSecrets(
+  session: SessionConfig,
+  password: string,
+  privateKey: string,
+  warnings: string[],
+): SessionImportSecret[] {
+  if (!password) return [];
+
+  if (!CSV_PASSWORD_SESSION_TYPES.has(session.session_type)) {
+    warnings.push(`Skipped password for "${session.name}" because ${session.session_type} sessions do not support saved passwords.`);
+    return [];
+  }
+
+  if ((session.session_type === "SSH" || session.session_type === "SFTP") && privateKey) {
+    warnings.push(`Skipped password for "${session.name}" because the CSV row uses private-key authentication.`);
+    return [];
+  }
+
+  if ((session.session_type === "SSH" || session.session_type === "SFTP") && session.auth_method !== "Password") {
+    warnings.push(`Skipped password for "${session.name}" because auth_method is not password.`);
+    return [];
+  }
+
+  return [{
+    sessionId: session.id,
+    kind: "password",
+    label: `${session.username ?? "user"}@${session.host}:${session.port}`,
+    value: password,
+  }];
+}
+
+function csvOptions(get: (names: string | string[], index: number) => string): Record<string, unknown> {
+  const options: Record<string, unknown> = {};
+  const description = cleanText(get("description", -1), MAX_OPTION_LENGTH);
+  const tags = cleanText(get("tags", -1), MAX_OPTION_LENGTH);
+  const startupCmd = cleanText(get(["startup_cmd", "startup_command", "command"], -1), MAX_OPTION_LENGTH);
+  const jumpHost = cleanText(get(["jump_host", "bastion_host", "gateway_host"], -1), MAX_HOST_LENGTH);
+  const jumpPort = cleanText(get(["jump_port", "bastion_port", "gateway_port"], -1), 16) || "22";
+  const jumpUser = cleanText(get(["jump_user", "bastion_user", "gateway_user"], -1), MAX_NAME_LENGTH);
+  const jumpKeyPath = cleanText(get(["jump_key_path", "jump_private_key_path", "bastion_key_path"], -1), MAX_PATH_LENGTH);
+  const compression = csvBoolean(get("compression", -1));
+  const x11 = csvBoolean(get("x11", -1));
+  const agentForward = csvBoolean(get(["agent_forward", "agentforward"], -1));
+
+  if (description) options.description = description;
+  if (tags) options.tags = tags;
+  if (startupCmd) options.startupCmd = startupCmd;
+  if (typeof compression === "boolean") options.compression = compression;
+  if (typeof x11 === "boolean") options.x11 = x11;
+  if (typeof agentForward === "boolean") options.agentForward = agentForward;
+
+  if (jumpHost) {
+    options.useJump = true;
+    options.jumpHost = jumpHost;
+    options.jumpPort = jumpPort;
+    options.jumpUser = jumpUser;
+    options.networkSettings = {
+      proxyKind: "ssh-tunnel",
+      jumpSessionId: "",
+      jumpHost,
+      jumpPort,
+      jumpUser,
+      jumpAuthKind: jumpKeyPath ? "PrivateKey" : "Password",
+      jumpKeyPath,
+    };
+  }
+
+  return options;
+}
+
+function csvAuthMethod(
+  authValue: string,
+  privateKey: string,
+  sessionType: string,
+  warnings: string[],
+): AuthMethod | undefined {
+  const supportsSshAuth = sessionType === "SSH" || sessionType === "SFTP";
+  if (!supportsSshAuth) return undefined;
+  if (privateKey) return privateKeyAuth(privateKey);
+
+  const normalized = cleanText(authValue, 32).toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!normalized) return undefined;
+  if (normalized === "password" || normalized === "pass") return "Password";
+  if (normalized === "agent" || normalized === "sshagent") return "Agent";
+  if (normalized === "none" || normalized === "noauth") return "None";
+  if (normalized === "privatekey" || normalized === "publickey" || normalized === "key") {
+    warnings.push("A CSV row uses private-key authentication but private_key_path is empty; password authentication will be used.");
+    return undefined;
+  }
+  warnings.push(`CSV auth_method "${authValue}" is not supported; password authentication will be used.`);
+  return undefined;
+}
+
+function normalizeCsvHeader(value: string): string {
+  return value
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function csvBoolean(value: string): boolean | undefined {
+  const normalized = cleanText(value, 16).toLowerCase();
+  if (!normalized) return undefined;
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "n", "off"].includes(normalized)) return false;
+  return undefined;
+}
+
+function csvBooleanValue(value: unknown): string {
+  return typeof value === "boolean" ? String(value) : "";
+}
+
+function authMethodToCsv(authMethod: AuthMethod): string {
+  if (authMethod === "Password") return "password";
+  if (authMethod === "Agent") return "agent";
+  if (authMethod === "None") return "none";
+  return "private-key";
 }
 
 interface MobaSection {
@@ -3258,6 +3474,10 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyString(source, output, "testUrl", MAX_HOST_LENGTH);
   copyBoolean(source, output, "dbSsl");
 
+  if ("networkSettings" in source) {
+    output.networkSettings = sanitizeNetworkSettings(source.networkSettings);
+  }
+
   if ("terminalProfile" in source) {
     const profile = normalizeTerminalProfile(source.terminalProfile);
     delete profile.logPath;
@@ -3265,6 +3485,56 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   }
 
   return output;
+}
+
+function sanitizeNetworkSettings(input: unknown): Record<string, unknown> {
+  const settings = normalizeNetworkSettings(input);
+  const proxyPass = safeVaultRef(settings.proxyPass);
+  const jumpPassword = safeVaultRef(settings.jumpPassword);
+  return {
+    proxyKind: safeProxyKind(settings.proxyKind),
+    proxyHost: cleanText(settings.proxyHost, MAX_HOST_LENGTH),
+    proxyPort: cleanText(settings.proxyPort, 16),
+    proxyUser: cleanText(settings.proxyUser, MAX_NAME_LENGTH),
+    proxyPass,
+    proxySaveAuth: Boolean(proxyPass),
+    proxySessionId: cleanText(settings.proxySessionId, MAX_OPTION_LENGTH),
+    keepAlive: settings.keepAlive,
+    keepAliveIntervalSecs: cleanText(settings.keepAliveIntervalSecs, 16),
+    tcpNodelay: settings.tcpNodelay,
+    disableNagle: settings.disableNagle,
+    ipVersion: safeIpVersion(settings.ipVersion),
+    localForwards: settings.localForwards
+      .map((forward) => ({
+        id: cleanText(forward.id, MAX_OPTION_LENGTH),
+        local: cleanText(forward.local, MAX_OPTION_LENGTH),
+        remote: cleanText(forward.remote, MAX_OPTION_LENGTH),
+        desc: cleanText(forward.desc, MAX_OPTION_LENGTH),
+      }))
+      .filter((forward) => forward.local && forward.remote)
+      .slice(0, 128),
+    jumpSessionId: cleanText(settings.jumpSessionId, MAX_OPTION_LENGTH),
+    jumpHost: cleanText(settings.jumpHost, MAX_HOST_LENGTH),
+    jumpPort: cleanText(settings.jumpPort, 16) || "22",
+    jumpUser: cleanText(settings.jumpUser, MAX_NAME_LENGTH),
+    jumpAuthKind: settings.jumpAuthKind,
+    jumpPassword,
+    jumpKeyPath: cleanText(settings.jumpKeyPath, MAX_PATH_LENGTH),
+    jumpSaveAuth: Boolean(jumpPassword),
+  };
+}
+
+function safeVaultRef(value: unknown): string {
+  const cleaned = cleanText(value, MAX_OPTION_LENGTH);
+  return cleaned.startsWith("vault:") ? cleaned : "";
+}
+
+function safeProxyKind(value: string): string {
+  return ["none", "http", "socks5", "ssh-tunnel", "system"].includes(value) ? value : "none";
+}
+
+function safeIpVersion(value: string): string {
+  return ["auto", "ipv4", "ipv6"].includes(value) ? value : "auto";
 }
 
 function parseOptionsString(value: string): unknown {
