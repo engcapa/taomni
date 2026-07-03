@@ -79,7 +79,7 @@ import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../li
 import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
-import { sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
+import { splitSqlStatementRanges, sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
 import { writeText } from "../../lib/clipboard";
 import { createDbMetadataCache } from "../../lib/dbMetadataCache";
 import { sqlNamespaceFromMetadata } from "../../lib/sqlMetadataCompletions";
@@ -161,6 +161,12 @@ interface QueryExecutionSummary {
   rowCount: number | null;
   hasResultSet: boolean;
   error: string | null;
+}
+
+interface EditorStatementAction {
+  panelId: string;
+  doc: string;
+  range: SqlStatementRange;
 }
 
 interface PanelState {
@@ -547,6 +553,7 @@ export default function DbClientTab({
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [metadataVersion, setMetadataVersion] = useState(0);
   const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
+  const [statementAction, setStatementAction] = useState<EditorStatementAction | null>(null);
   const [historyEntries, setHistoryEntries] = useState<DbSqlHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [leftPanelTab, setLeftPanelTab] = useState<"schema" | "bookmarks">("schema");
@@ -1852,6 +1859,7 @@ export default function DbClientTab({
   const toggleHistoryPanel = () => {
     const opening = historyPanelId !== activePanel.id;
     setHistoryPanelId(opening ? activePanel.id : null);
+    if (opening) setStatementAction(null);
     if (opening) void refreshHistory();
   };
 
@@ -1883,6 +1891,57 @@ export default function DbClientTab({
     }
   };
 
+  const currentEditorStatement = (): EditorStatementAction | null => {
+    const handle = editorHandles.current[activePanel.id];
+    const doc = handle?.getValue() ?? activePanel.doc;
+    const selection = handle?.getSelectionRange() ?? null;
+    const position = selection && selection.from !== selection.to
+      ? selection.from
+      : handle?.getCursorPosition() ?? doc.length;
+    const ranges = splitSqlStatementRanges(doc, { splitGo: info.engine === "SQLServer" });
+    const range =
+      ranges.find((candidate) => candidate.from <= position && position <= candidate.to) ??
+      (ranges.length === 1 ? ranges[0] : null);
+    if (!range) {
+      setStatusMessage("No SQL statement at the current cursor.");
+      return null;
+    }
+    return { panelId: activePanel.id, doc, range };
+  };
+
+  const toggleStatementPanel = () => {
+    if (statementAction?.panelId === activePanel.id) {
+      setStatementAction(null);
+      return;
+    }
+    const action = currentEditorStatement();
+    if (!action) return;
+    setHistoryPanelId(null);
+    setStatementAction(action);
+  };
+
+  const runEditorStatement = (action: EditorStatementAction) => {
+    void runQuery(action.panelId, action.range.sql, {
+      context: {
+        doc: action.doc,
+        cursorPosition: action.range.from,
+        selectionRange: { from: action.range.from, to: action.range.to },
+      },
+    });
+    setStatementAction(null);
+  };
+
+  const selectEditorStatement = (action: EditorStatementAction) => {
+    setActivePanelId(action.panelId);
+    editorHandles.current[action.panelId]?.selectRange(action.range.from, action.range.to);
+    setStatementAction(null);
+  };
+
+  const openEditorStatementInNewPanel = (action: EditorStatementAction) => {
+    openSqlInNewPanel(action.range.sql, true, "editor");
+    setStatementAction(null);
+  };
+
   const latestResultForSql = (sql: string): DbQueryResult | null => {
     const target = sql.trim();
     for (const panel of [...panelsRef.current].reverse()) {
@@ -1904,6 +1963,20 @@ export default function DbClientTab({
     try {
       await writeText(resultToJsonText(result));
       setStatusMessage("Copied query result JSON.");
+    } catch (err) {
+      setStatusMessage(`Copy JSON failed: ${String(err)}`);
+    }
+  };
+
+  const copyStatementJson = async (action: EditorStatementAction) => {
+    const result = latestResultForSql(action.range.sql);
+    if (!result) {
+      setStatusMessage("No in-memory result is available for this statement. Run it again to export JSON.");
+      return;
+    }
+    try {
+      await writeText(resultToJsonText(result));
+      setStatusMessage("Copied statement result JSON.");
     } catch (err) {
       setStatusMessage(`Copy JSON failed: ${String(err)}`);
     }
@@ -1932,6 +2005,28 @@ export default function DbClientTab({
     await useChatStore.getState().openTabChat(tabId);
     await useChatStore.getState().attachToComposer(prompt);
     setHistoryPanelId(null);
+  };
+
+  const askAiAboutStatement = async (action: EditorStatementAction) => {
+    const result = latestResultForSql(action.range.sql);
+    const resultSummary = result
+      ? `\n\nResult summary: ${result.rows.length} row(s), ${result.columns.length} column(s).`
+      : "";
+    const prompt = [
+      "请分析当前编辑器中的这条数据库 SQL，并说明含义、潜在问题和可优化点：",
+      "",
+      "```sql",
+      action.range.sql,
+      "```",
+      "",
+      `Engine: ${info.engine}`,
+      `Database: ${info.database ?? "-"}`,
+      `Schema: ${activeSchema ?? "-"}`,
+      resultSummary,
+    ].join("\n");
+    await useChatStore.getState().openTabChat(tabId);
+    await useChatStore.getState().attachToComposer(prompt);
+    setStatementAction(null);
   };
 
   const deleteHistoryEntry = async (entry: DbSqlHistoryEntry) => {
@@ -2244,6 +2339,7 @@ export default function DbClientTab({
                 }}
                 onCancel={() => cancelQuery(activePanel.id)}
                 onFormat={() => formatPanel(activePanel)}
+                onToggleStatement={toggleStatementPanel}
                 onToggleHistory={toggleHistoryPanel}
                 onSave={() => void saveQueryFile(activePanel)}
                 onBookmark={() => addBookmarkTriggerRef.current?.()}
@@ -2270,6 +2366,18 @@ export default function DbClientTab({
                   onDelete={(entry) => void deleteHistoryEntry(entry)}
                   onClear={() => void clearCurrentHistory()}
                   onClose={() => setHistoryPanelId(null)}
+                />
+              )}
+              {statementAction?.panelId === activePanel.id && (
+                <StatementDropdown
+                  action={statementAction}
+                  hasJson={latestResultForSql(statementAction.range.sql) !== null}
+                  onRun={runEditorStatement}
+                  onSelect={selectEditorStatement}
+                  onOpenTab={openEditorStatementInNewPanel}
+                  onJson={(action) => void copyStatementJson(action)}
+                  onAskAi={(action) => void askAiAboutStatement(action)}
+                  onClose={() => setStatementAction(null)}
                 />
               )}
               <PanelGroup orientation="vertical" className="flex-1 min-h-0">
@@ -2334,6 +2442,7 @@ function EditorToolbar({
   onRunSelection,
   onCancel,
   onFormat,
+  onToggleStatement,
   onToggleHistory,
   onSave,
   onBookmark,
@@ -2351,6 +2460,7 @@ function EditorToolbar({
   onRunSelection: () => void;
   onCancel: () => void;
   onFormat: () => void;
+  onToggleStatement: () => void;
   onToggleHistory: () => void;
   onSave: () => void;
   onBookmark: () => void;
@@ -2379,6 +2489,9 @@ function EditorToolbar({
       <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
       <button type="button" className={btn} onClick={onFormat} title="Format SQL">
         <Sparkles className="w-3.5 h-3.5" /> Format
+      </button>
+      <button type="button" className={btn} onClick={onToggleStatement} title="Current statement actions">
+        <SquareDashedMousePointer className="w-3.5 h-3.5" /> Statement
       </button>
       <button type="button" className={btn} onClick={onToggleHistory} title="Query history">
         <Clock className="w-3.5 h-3.5" /> History
@@ -2432,6 +2545,75 @@ function EditorToolbar({
       )}
       <span className="text-[10px] text-[var(--taomni-text-muted)]">{engine}</span>
     </div>
+  );
+}
+
+function StatementDropdown({
+  action,
+  hasJson,
+  onRun,
+  onSelect,
+  onOpenTab,
+  onJson,
+  onAskAi,
+  onClose,
+}: {
+  action: EditorStatementAction;
+  hasJson: boolean;
+  onRun: (action: EditorStatementAction) => void;
+  onSelect: (action: EditorStatementAction) => void;
+  onOpenTab: (action: EditorStatementAction) => void;
+  onJson: (action: EditorStatementAction) => void;
+  onAskAi: (action: EditorStatementAction) => void;
+  onClose: () => void;
+}) {
+  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-[10px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const compactSql = action.range.sql.replace(/\s+/g, " ").trim();
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        data-testid="db-current-statement-panel"
+        className="absolute right-2 top-9 z-50 w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded shadow-lg flex flex-col"
+        style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
+      >
+        <div
+          className="h-8 shrink-0 flex items-center gap-2 px-2"
+          style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+        >
+          <SquareDashedMousePointer className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+          <span className="text-[12px] font-semibold">Current statement</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">
+            {action.range.from}-{action.range.to}
+          </span>
+        </div>
+        <div className="px-2 py-2">
+          <div
+            className="truncate font-mono text-[11px] text-[var(--taomni-text)]"
+            title={action.range.sql}
+          >
+            {compactSql}
+          </div>
+          <div className="mt-2 flex items-center gap-1">
+            <button type="button" data-testid="db-current-statement-run" className={iconButton} onClick={() => onRun(action)} title="Run this SQL statement">
+              <Play className="w-3 h-3" /> Run
+            </button>
+            <button type="button" data-testid="db-current-statement-select" className={iconButton} onClick={() => onSelect(action)} title="Select this SQL statement in the editor">
+              <SquareDashedMousePointer className="w-3 h-3" /> Select
+            </button>
+            <button type="button" data-testid="db-current-statement-open-tab" className={iconButton} onClick={() => onOpenTab(action)} title="Open and run in a new query panel">
+              <Plus className="w-3 h-3" /> +Tab
+            </button>
+            <button type="button" data-testid="db-current-statement-json" className={iconButton} onClick={() => onJson(action)} disabled={!hasJson} title={hasJson ? "Copy in-memory result as JSON" : "Run this statement to make JSON available"}>
+              <FileJson className="w-3 h-3" /> JSON
+            </button>
+            <button type="button" data-testid="db-current-statement-ask-ai" className={iconButton} onClick={() => onAskAi(action)} title="Ask AI about this SQL statement">
+              <MessageSquare className="w-3 h-3" /> Ask AI
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
