@@ -70,7 +70,7 @@ describe("TerminalAppearanceSettings", () => {
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "kanagawa-wave" }));
   });
 
-  it("resolves the system terminal theme from the application theme", () => {
+  it("resolves the app-following terminal theme from the application theme", () => {
     setAppThemeMode("dark");
     render(
       <TerminalAppearanceSettings
@@ -81,7 +81,7 @@ describe("TerminalAppearanceSettings", () => {
       />,
     );
 
-    expect(screen.getByTestId("terminal-theme-select")).toHaveTextContent("Follow system theme");
+    expect(screen.getByTestId("terminal-theme-select")).toHaveTextContent("Match app theme");
   });
 
   it("merges successive edits before the parent rerenders", async () => {

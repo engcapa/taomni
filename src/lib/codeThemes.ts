@@ -404,11 +404,10 @@ export function isCodeThemeId(id: string): boolean {
   return id in CODE_THEME_BY_ID;
 }
 
-/** The editor theme id the "Follow system" option resolves to. */
+/** Legacy system-theme mapping kept for older saved code-view profiles. */
 export function resolveSystemCodeThemeId(resolvedAppTheme: "light" | "dark"): string {
   return resolvedAppTheme === "dark" ? SYSTEM_DARK_CODE_THEME : SYSTEM_LIGHT_CODE_THEME;
 }
-
 
 
 

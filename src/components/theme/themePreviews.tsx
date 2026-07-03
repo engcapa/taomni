@@ -171,7 +171,7 @@ export function terminalThemeOptionValue(id: string): string {
 
 export function buildTerminalThemeOptions({
   includeSystem = false,
-  systemLabel = "Follow system theme",
+  systemLabel = "Match app theme",
   customValue,
   customTheme,
   customLabel = "Custom colors",
@@ -227,7 +227,6 @@ export function buildTerminalThemeOptions({
 }
 
 export function buildCodeThemeOptions({
-  systemLabel,
   appLabel,
   terminalLabel,
   terminalTheme,
@@ -235,7 +234,6 @@ export function buildCodeThemeOptions({
   lightGroup,
   terminalGroup,
 }: {
-  systemLabel: string;
   appLabel: string;
   terminalLabel: string;
   terminalTheme: ITheme;
@@ -244,17 +242,6 @@ export function buildCodeThemeOptions({
   terminalGroup: string;
 }): ThemePreviewOption[] {
   return [
-    {
-      value: "system",
-      label: systemLabel,
-      preview: (
-        <SplitThemeLinePreview
-          left={{ background: "#ffffff", color: "#393a34" }}
-          right={{ background: "#282a36", color: "#f8f8f2" }}
-        />
-      ),
-      testId: "code-theme-option-system",
-    },
     {
       value: "app",
       label: appLabel,

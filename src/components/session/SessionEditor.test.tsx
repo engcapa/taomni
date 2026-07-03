@@ -932,7 +932,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("defaults new mail sessions to follow the system theme", async () => {
+  it("defaults new mail sessions to follow the application theme", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "Mail" });
 
@@ -944,7 +944,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.click(screen.getByRole("button", { name: /appearance/i }));
     expect(await screen.findByTestId("mail-appearance-settings")).toBeInTheDocument();
     const systemTheme = await screen.findByTestId("mail-theme-select");
-    expect(systemTheme).toHaveTextContent("Follow system theme");
+    expect(systemTheme).toHaveTextContent("Match app theme");
 
     await user.click(screen.getByRole("button", { name: "OK" }));
 

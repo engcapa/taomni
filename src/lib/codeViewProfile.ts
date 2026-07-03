@@ -2,14 +2,13 @@ import type { ITheme } from "@xterm/xterm";
 import { DEFAULT_TERMINAL_PROFILE, resolveTerminalTheme, type TerminalProfile } from "./terminalProfile";
 import { makeTerminalFontFamily } from "./systemFonts";
 import { resolveThemeId, terminalThemes } from "./themes";
-import { getAppThemeMode, resolveAppThemeMode, type ResolvedAppTheme } from "./appTheme";
+import type { ResolvedAppTheme } from "./appTheme";
 import {
   CODE_THEME_COLOR_VARS,
   CODE_VIEW_THEME_SYSTEM,
   codeThemeVariablesFromPalette,
   getCodeThemeDefinition,
   isCodeThemeId,
-  resolveSystemCodeThemeId,
   type CodeThemeVars,
 } from "./codeThemes";
 
@@ -29,7 +28,7 @@ export const DEFAULT_CODE_VIEW_PROFILE: CodeViewProfile = {
   fontFamily: makeTerminalFontFamily("JetBrains Mono"),
   fontSize: 13,
   fontLigatures: true,
-  theme: CODE_VIEW_THEME_SYSTEM,
+  theme: CODE_VIEW_THEME_APP,
 };
 
 const CODE_VIEW_PROFILE_STORAGE_KEY = "taomni.codeViewProfile.v1";
@@ -104,13 +103,9 @@ export function normalizeCodeViewProfile(input: unknown): CodeViewProfile {
   };
 }
 
-function currentResolvedAppTheme(): ResolvedAppTheme {
-  return resolveAppThemeMode(getAppThemeMode());
-}
-
 /**
  * Legacy helper: resolves the profile to an xterm `ITheme` only for the
- * terminal-mirroring paths. App/system/editor themes return `null` — callers
+ * terminal-mirroring paths. App/legacy-system/editor themes return `null` — callers
  * that need full colours for those should use {@link resolveCodeThemeVars}.
  */
 export function resolveCodeViewTerminalTheme(
@@ -140,14 +135,9 @@ export function resolveCodeThemeVars(
   options: { resolvedAppTheme?: ResolvedAppTheme; terminalProfile?: TerminalProfile } = {},
 ): CodeThemeVars | null {
   const terminalProfile = options.terminalProfile ?? DEFAULT_TERMINAL_PROFILE;
-  const resolvedAppTheme = options.resolvedAppTheme ?? currentResolvedAppTheme();
   const theme = profile.theme;
 
-  if (theme === CODE_VIEW_THEME_APP) return null;
-  if (theme === CODE_VIEW_THEME_SYSTEM) {
-    const def = getCodeThemeDefinition(resolveSystemCodeThemeId(resolvedAppTheme));
-    return def ? codeThemeVariablesFromPalette(def.palette) : null;
-  }
+  if (theme === CODE_VIEW_THEME_APP || theme === CODE_VIEW_THEME_SYSTEM) return null;
   if (theme === CODE_VIEW_THEME_TERMINAL) {
     return codeThemeVariables(resolveTerminalTheme(terminalProfile.theme));
   }
@@ -275,7 +265,7 @@ function readTheme(value: unknown, fallback: string): string {
     theme === CODE_VIEW_THEME_SYSTEM ||
     theme === CODE_VIEW_THEME_TERMINAL
   ) {
-    return theme;
+    return theme === CODE_VIEW_THEME_SYSTEM ? CODE_VIEW_THEME_APP : theme;
   }
   if (isCodeThemeId(theme)) return theme;
   const terminalThemeId = codeViewTerminalThemeId(theme);

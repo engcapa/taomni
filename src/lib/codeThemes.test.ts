@@ -6,7 +6,6 @@ import {
   codeThemeVariablesFromPalette,
   getCodeThemeDefinition,
   isCodeThemeId,
-  resolveSystemCodeThemeId,
 } from "./codeThemes";
 import {
   CODE_VIEW_TERMINAL_THEME_PREFIX,
@@ -29,11 +28,6 @@ describe("codeThemes registry", () => {
     expect(getCodeThemeDefinition("github-light")?.variant).toBe("light");
   });
 
-  it("resolves the system theme id from the resolved app theme", () => {
-    expect(resolveSystemCodeThemeId("dark")).toBe("dracula");
-    expect(resolveSystemCodeThemeId("light")).toBe("github-light");
-  });
-
   it("expands a palette into the full variable set with the declared background", () => {
     const dracula = getCodeThemeDefinition("dracula")!;
     const vars = codeThemeVariablesFromPalette(dracula.palette);
@@ -51,9 +45,9 @@ describe("codeThemes registry", () => {
 });
 
 describe("resolveCodeThemeVars", () => {
-  it("maps the system theme to dracula in dark and github-light in light", () => {
-    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "dark" })?.["--taomni-code-bg"]).toBe("#282a36");
-    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "light" })?.["--taomni-code-bg"]).toBe("#ffffff");
+  it("treats the legacy system theme as app-following", () => {
+    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "dark" })).toBeNull();
+    expect(resolveCodeThemeVars(baseProfile, { resolvedAppTheme: "light" })).toBeNull();
   });
 
   it("resolves an explicit editor theme id", () => {

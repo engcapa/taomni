@@ -226,12 +226,12 @@ export function terminalProfileThemeColors(profile: TerminalProfile): { backgrou
   };
 }
 
-export function resolveSystemTerminalThemeId(prefersDark: boolean): string {
-  return prefersDark ? SYSTEM_DARK_TERMINAL_THEME : SYSTEM_LIGHT_TERMINAL_THEME;
+export function resolveSystemTerminalThemeId(appPrefersDark: boolean): string {
+  return appPrefersDark ? SYSTEM_DARK_TERMINAL_THEME : SYSTEM_LIGHT_TERMINAL_THEME;
 }
 
-export function resolveTerminalThemeWithSystem(theme: string, prefersDark: boolean): ITheme {
-  return resolveTerminalTheme(theme === SYSTEM_TERMINAL_THEME ? resolveSystemTerminalThemeId(prefersDark) : theme);
+export function resolveTerminalThemeWithSystem(theme: string, appPrefersDark: boolean): ITheme {
+  return resolveTerminalTheme(theme === SYSTEM_TERMINAL_THEME ? resolveSystemTerminalThemeId(appPrefersDark) : theme);
 }
 
 export function resolveTerminalTheme(theme: string): ITheme {
