@@ -15,6 +15,7 @@ import {
 
 export const CODE_VIEW_THEME_APP = "app";
 export const CODE_VIEW_THEME_TERMINAL = "terminal";
+export const CODE_VIEW_TERMINAL_THEME_PREFIX = "terminal:";
 export { CODE_VIEW_THEME_SYSTEM } from "./codeThemes";
 
 export interface CodeViewProfile {
@@ -117,6 +118,8 @@ export function resolveCodeViewTerminalTheme(
   terminalProfile: TerminalProfile = DEFAULT_TERMINAL_PROFILE,
 ): ITheme | null {
   if (profile.theme === CODE_VIEW_THEME_TERMINAL) return resolveTerminalTheme(terminalProfile.theme);
+  const terminalThemeId = codeViewTerminalThemeId(profile.theme);
+  if (terminalThemeId) return resolveTerminalTheme(terminalThemeId);
   if (
     profile.theme === CODE_VIEW_THEME_APP ||
     profile.theme === CODE_VIEW_THEME_SYSTEM ||
@@ -151,6 +154,10 @@ export function resolveCodeThemeVars(
   if (isCodeThemeId(theme)) {
     const def = getCodeThemeDefinition(theme);
     return def ? codeThemeVariablesFromPalette(def.palette) : null;
+  }
+  const terminalThemeId = codeViewTerminalThemeId(theme);
+  if (terminalThemeId) {
+    return codeThemeVariables(resolveTerminalTheme(terminalThemeId));
   }
   // Back-compat: profiles that stored a terminal-theme id (e.g. "kanagawa-wave").
   return codeThemeVariables(resolveTerminalTheme(theme));
@@ -271,7 +278,17 @@ function readTheme(value: unknown, fallback: string): string {
     return theme;
   }
   if (isCodeThemeId(theme)) return theme;
+  const terminalThemeId = codeViewTerminalThemeId(theme);
+  if (terminalThemeId && terminalThemes[resolveThemeId(terminalThemeId)]) {
+    return `${CODE_VIEW_TERMINAL_THEME_PREFIX}${resolveThemeId(terminalThemeId)}`;
+  }
   return terminalThemes[resolveThemeId(theme)] ? theme : fallback;
+}
+
+function codeViewTerminalThemeId(theme: string): string | null {
+  if (!theme.startsWith(CODE_VIEW_TERMINAL_THEME_PREFIX)) return null;
+  const id = theme.slice(CODE_VIEW_TERMINAL_THEME_PREFIX.length).trim();
+  return id || null;
 }
 
 function color(value: string | undefined, fallback: string): string {

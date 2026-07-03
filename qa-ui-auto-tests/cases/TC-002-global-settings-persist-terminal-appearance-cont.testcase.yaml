@@ -11,7 +11,7 @@ steps:
   - assert_visible: "text=\"Application Theme\""
   - assert_visible: "text=\"Terminal Appearance\""
   - assert_visible: "[data-testid=\"terminal-appearance-settings\"]"
-  - assert_visible: "[data-testid=\"terminal-theme-gallery\"]"
+  - assert_visible: "[data-testid=\"terminal-theme-select\"]"
   - assert_visible: "[data-testid=\"terminal-preview\"]"
   - assert_visible: "[data-testid=\"terminal-preview-cursor\"]"
   - click: "button[aria-label=\"Cycle application theme\"]"

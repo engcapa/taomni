@@ -59,7 +59,8 @@ describe("SettingsPanel", () => {
     await user.clear(fontSize);
     await user.type(fontSize, "18");
     await user.click(screen.getByLabelText("Enable font ligatures"));
-    await user.click(screen.getByRole("button", { name: "Use theme Kanagawa Wave" }));
+    await user.click(screen.getByTestId("terminal-theme-select"));
+    await user.click(screen.getByTestId("terminal-theme-option-kanagawa-wave"));
     await user.selectOptions(screen.getByLabelText("Terminal cursor"), "Underline (steady)");
     await user.click(screen.getByLabelText("Enable keyword highlighting"));
 
@@ -79,10 +80,12 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
-    await user.click(screen.getByRole("button", { name: "Dark" }));
+    await user.click(screen.getByTestId("app-theme-select"));
+    await user.click(screen.getByTestId("app-theme-dark"));
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("dark");
 
-    await user.click(screen.getByRole("button", { name: "Follow system" }));
+    await user.click(screen.getByTestId("app-theme-select"));
+    await user.click(screen.getByTestId("app-theme-system"));
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("system");
   });
 
@@ -120,14 +123,15 @@ describe("SettingsPanel", () => {
     await user.clear(fontSize);
     await user.type(fontSize, "15");
     await user.click(screen.getByLabelText("Enable code font ligatures"));
-    await user.selectOptions(screen.getByLabelText("Code theme"), "kanagawa-wave");
+    await user.click(screen.getByTestId("code-theme-select"));
+    await user.click(screen.getByTestId("code-theme-option-terminal-kanagawa-wave"));
 
     await waitFor(() => {
       const saved = JSON.parse(window.localStorage.getItem(CODE_VIEW_STORAGE_KEY) ?? "{}");
       expect(saved.fontFamily).toContain("JetBrains Mono");
       expect(saved.fontSize).toBe(15);
       expect(saved.fontLigatures).toBe(false);
-      expect(saved.theme).toBe("kanagawa-wave");
+      expect(saved.theme).toBe("terminal:kanagawa-wave");
     });
   }, 10_000);
 

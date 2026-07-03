@@ -253,6 +253,27 @@ describe("MailClientTab", () => {
     expect(root.style.getPropertyValue("zoom")).toBe("1");
   });
 
+  it("applies code view theme colors to the mail chrome", async () => {
+    render(
+      <MailClientTab
+        tabId="mail-tab"
+        info={{
+          ...info,
+          terminalProfile: {
+            ...DEFAULT_TERMINAL_PROFILE,
+            theme: "code:dracula",
+          },
+        }}
+        visible
+      />,
+    );
+
+    const root = await screen.findByTestId("mail-client-tab");
+    expect(root.style.getPropertyValue("--taomni-bg")).toBe("#282a36");
+    expect(root.style.getPropertyValue("--taomni-text")).toBe("#f8f8f2");
+    expect(root.style.getPropertyValue("--taomni-accent")).toBe("#8be9fd");
+  });
+
   it("does not force borders onto HTML email layout tables", async () => {
     mailMocks.mailGetMessageBody.mockResolvedValue({
       ...messageBody,

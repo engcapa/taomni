@@ -526,10 +526,12 @@ function TerminalSettings({
   profile,
   onProfileChange,
   allowSystemTheme = false,
+  themeSelector = "terminal-gallery",
 }: {
   profile: TerminalProfile;
   onProfileChange: (profile: TerminalProfile) => void;
   allowSystemTheme?: boolean;
+  themeSelector?: "terminal-gallery" | "mail-combined-select";
 }) {
   return (
     <div data-testid="terminal-settings" className="text-[12px]">
@@ -538,6 +540,7 @@ function TerminalSettings({
         onProfileChange={onProfileChange}
         showCustomColors
         allowSystemTheme={allowSystemTheme}
+        themeSelector={themeSelector}
       />
     </div>
   );
@@ -3841,6 +3844,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               profile={terminalProfile}
               onProfileChange={setTerminalProfile}
               allowSystemTheme={isMail}
+              themeSelector={isMail ? "mail-combined-select" : "terminal-gallery"}
             />
           )}
           {activeSection === "rdp" && (

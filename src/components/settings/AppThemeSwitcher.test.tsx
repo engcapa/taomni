@@ -20,7 +20,8 @@ describe("AppThemeSwitcher", () => {
     const user = userEvent.setup();
     render(<AppThemeSwitcher compact />);
 
-    await user.selectOptions(screen.getByLabelText("Application theme"), "dark");
+    await user.click(screen.getByTestId("app-theme-select"));
+    await user.click(screen.getByTestId("app-theme-dark"));
 
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("dark");
   });

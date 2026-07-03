@@ -112,9 +112,10 @@ import { useChatStore } from "../../stores/chatStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
-import { DEFAULT_MAIL_TERMINAL_PROFILE, resolveTerminalThemeWithSystem, type TerminalProfile } from "../../lib/terminalProfile";
+import { DEFAULT_MAIL_TERMINAL_PROFILE, type TerminalProfile } from "../../lib/terminalProfile";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useAppTheme } from "../../lib/appTheme";
+import { resolveMailTheme } from "../../lib/mailTheme";
 
 interface MailClientTabProps {
   tabId: string;
@@ -280,7 +281,7 @@ function mixColor(foreground: string, background: string, amount: number): strin
 
 function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, systemPrefersDark: boolean): CSSProperties {
   const terminalProfile = profile ?? DEFAULT_MAIL_TERMINAL_PROFILE;
-  const theme = resolveTerminalThemeWithSystem(terminalProfile.theme, systemPrefersDark);
+  const theme = resolveMailTheme(terminalProfile.theme, systemPrefersDark);
   const background = color(theme.background, "#1d1f21");
   const foreground = color(theme.foreground, "#eaeaea");
   const accent = color(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");

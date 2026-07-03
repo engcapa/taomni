@@ -970,7 +970,7 @@ controls: []   # font enumeration is consumed by F4.2/F5.2 UI controls
 - 前端 IPC 拉取系统字体列表，加载失败时使用安全 fallback
 - Source Code Pro 在可用时作为默认字体
 
-### 5.2 终端主题画廊（Termius 风格）✅
+### 5.2 终端主题预览下拉（Termius 风格）✅
 
 <!-- feature
 id: F5.2
@@ -983,9 +983,13 @@ controls:
   - id: appearance-root
     selector: '[data-testid="terminal-appearance-settings"]'
     kind: display
-  - id: theme-gallery
-    selector: '[data-testid="terminal-theme-gallery"]'
-    kind: display
+  - id: theme-select
+    selector: '[data-testid="terminal-theme-select"]'
+    kind: interactive
+  - id: theme-options
+    selector: '[data-testid^="terminal-theme-option-"]'
+    kind: interactive
+    optional: true       # only visible while the preview dropdown is open
   - id: preview
     selector: '[data-testid="terminal-preview"]'
     kind: display
@@ -1033,7 +1037,7 @@ controls:
 - 终端右键菜单可快速切换主题（无需重连重挂载）
 
 ### 5.3 共享外观控件 `TerminalAppearanceSettings` ✅
-- 字体选择器、字号 stepper、主题画廊、底部预览
+- 字体选择器、字号 stepper、主题预览下拉、底部预览
 - 光标样式（block / underline / bar）+ 闪烁
 - Scrollback 行数、日志、关键字高亮、显示项、剪贴板/粘贴策略
 - 同一控件复用于全局设置面板与会话编辑器
@@ -1055,20 +1059,14 @@ files:
   - src/components/settings/AppThemeSwitcher.tsx
 controls:
   # Title-bar quick-cycle theme button is owned by F1.3 (theme-cycle).
-  # F5.5 owns the in-Settings switcher: 3-button group + compact <select> + standalone icon button.
-  - id: theme-light
-    selector: '[data-testid="app-theme-light"]'
+  # F5.5 owns the in-Settings preview dropdown + standalone icon button.
+  - id: theme-select
+    selector: '[data-testid="app-theme-select"]'
     kind: interactive
-  - id: theme-dark
-    selector: '[data-testid="app-theme-dark"]'
+  - id: theme-options
+    selector: '[data-testid^="app-theme-"]'
     kind: interactive
-  - id: theme-system
-    selector: '[data-testid="app-theme-system"]'
-    kind: interactive
-  - id: theme-compact-select
-    selector: 'select[aria-label="Application theme"]'
-    kind: interactive
-    optional: true       # only renders in compact mode of AppThemeSwitcher
+    optional: true       # light/dark/system rows only render while the dropdown is open
   - id: theme-icon-button
     selector: 'button[aria-label="Cycle application theme"]'
     kind: interactive
@@ -3558,10 +3556,14 @@ controls:
     selector: '[data-testid="note-theme-settings"]'
     kind: display
     optional: true
+  - id: note-theme-select
+    selector: '[data-testid="note-theme-select"]'
+    kind: interactive
+    optional: true
   - id: note-theme-paper
     selector: '[data-testid="note-theme-paper"]'
     kind: interactive
-    optional: true
+    optional: true       # only visible while the preview dropdown is open
   - id: note-panel-mode-floating
     selector: '[data-testid="note-panel-mode-floating"]'
     kind: interactive

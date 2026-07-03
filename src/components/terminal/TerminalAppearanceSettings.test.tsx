@@ -64,7 +64,8 @@ describe("TerminalAppearanceSettings", () => {
     const user = userEvent.setup();
     const { onProfileChange } = renderAppearance();
 
-    await user.click(screen.getByRole("button", { name: "Use theme Kanagawa Wave" }));
+    await user.click(screen.getByTestId("terminal-theme-select"));
+    await user.click(screen.getByTestId("terminal-theme-option-kanagawa-wave"));
 
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "kanagawa-wave" }));
   });
@@ -80,8 +81,7 @@ describe("TerminalAppearanceSettings", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Use system theme" })).toHaveAttribute("data-selected", "true");
-    expect(screen.getByText("Currently using Termius Dark")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-theme-select")).toHaveTextContent("Follow system theme");
   });
 
   it("merges successive edits before the parent rerenders", async () => {
@@ -93,7 +93,8 @@ describe("TerminalAppearanceSettings", () => {
     const fontSize = screen.getByLabelText("Terminal font size");
     await user.clear(fontSize);
     await user.type(fontSize, "18");
-    await user.click(screen.getByRole("button", { name: "Use theme Kanagawa Wave" }));
+    await user.click(screen.getByTestId("terminal-theme-select"));
+    await user.click(screen.getByTestId("terminal-theme-option-kanagawa-wave"));
 
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
       fontFamily: expect.stringContaining("JetBrains Mono"),

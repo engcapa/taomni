@@ -15,6 +15,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {
   loadGlobalTerminalProfile,
+  isCustomTerminalTheme,
   parseSessionOptions,
   resolveTerminalTheme,
   type TerminalProfile,
@@ -25,7 +26,9 @@ import {
   getSessionNetworkSettings,
   toNetworkSettingsPayload,
 } from "../../lib/networkSettings";
-import { TERMINAL_THEME_DEFINITIONS, resolveThemeId } from "../../lib/themes";
+import { resolveThemeId } from "../../lib/themes";
+import { ThemePreviewList } from "../theme/ThemePreviewSelect";
+import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import {
   findFontName,
   getPrimaryFontName,
@@ -1618,6 +1621,18 @@ export function TerminalPanel({
     const hasSelection = !!getActiveTerminalSelectionText();
     const copyShortcut = isMac ? "Cmd+C" : "Ctrl+Shift+C";
     const pasteShortcut = isMac ? "Cmd+V" : "Ctrl+Shift+V / Shift+Insert";
+    const customTheme = isCustomTerminalTheme(themeName) ? resolveTerminalTheme(themeName) : null;
+    const themeMenuValue = customTheme ? themeName : resolveThemeId(themeName);
+    const themeOptions = buildTerminalThemeOptions({
+      customValue: customTheme ? themeName : undefined,
+      customTheme,
+      customLabel: "Custom colors",
+      darkGroup: "Dark",
+      lightGroup: "Light",
+    }).map((option) => ({
+      ...option,
+      testId: `terminal-context-theme-option-${option.value.replace(/[^a-zA-Z0-9_-]+/g, "-")}`,
+    }));
 
     return [
       { label: "Copy", shortcut: copyShortcut, onClick: () => void copySelection(), disabled: !hasSelection },
@@ -1666,11 +1681,18 @@ export function TerminalPanel({
       },
       {
         label: "Theme",
-        children: TERMINAL_THEME_DEFINITIONS.map((definition) => ({
-          label: definition.name,
-          checked: resolveThemeId(themeName) === definition.id,
-          onClick: () => setThemeName(definition.id),
-        })),
+        customPanel: (
+          <ThemePreviewList
+            value={themeMenuValue}
+            options={themeOptions}
+            testId="terminal-context-theme-list"
+            className="w-[360px] max-w-[calc(100vw-24px)] rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
+            onChange={(theme) => {
+              setThemeName(theme);
+              contextMenu.close();
+            }}
+          />
+        ),
       },
       {
         label: "Terminal display",
@@ -1758,6 +1780,7 @@ export function TerminalPanel({
     openSearch,
     pasteFromClipboard,
     quickFontOptions,
+    contextMenu,
     effectiveReadOnly,
     readOnly,
     renameTerminal,
