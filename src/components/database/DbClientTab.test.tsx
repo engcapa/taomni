@@ -198,6 +198,18 @@ const postgresInfo: DbConnectInfo = {
   ssl: false,
 };
 
+const panweiInfo: DbConnectInfo = {
+  sessionId: "saved-panwei",
+  workspaceSessionId: "saved-panwei",
+  engine: "PanWeiDB",
+  host: "192.168.152.250",
+  port: 17700,
+  username: "panwei_omm",
+  password: "secret",
+  database: "panweidb",
+  ssl: false,
+};
+
 describe("DbClientTab connection lifecycle", () => {
   afterEach(() => {
     cleanup();
@@ -275,6 +287,25 @@ describe("DbClientTab connection lifecycle", () => {
       expect(dbChildProps.schemaTree?.metadataCache).toBeTruthy();
       expect(dbChildProps.sqlEditor?.metadataCache).toBe(dbChildProps.schemaTree?.metadataCache);
     });
+  });
+
+  it("uses PanWeiDB schema metadata instead of treating the connection database as the schema", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    ipcMock.dbListSchemas.mockResolvedValueOnce([{ name: "panwei_omm" }, { name: "public" }]);
+
+    render(<DbClientTab tabId="tab-panwei" info={panweiInfo} visible />);
+
+    const schemaSelect = await screen.findByLabelText("Schema");
+    await waitFor(() => expect(schemaSelect).toHaveValue("panwei_omm"));
+    await waitFor(() =>
+      expect(ipcMock.dbListTables).toHaveBeenCalledWith(
+        expect.stringMatching(/^saved-panwei::/),
+        "panwei_omm",
+        null,
+      ),
+    );
+    const tableCalls = ipcMock.dbListTables.mock.calls as unknown as Array<[string, string | null, string | null]>;
+    expect(tableCalls.some(([, schema]) => schema === "panweidb")).toBe(false);
   });
 
   it("appends echoed agent SQL with comments and semicolons into one query panel", async () => {
