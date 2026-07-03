@@ -199,6 +199,7 @@ describe("MailClientTab", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("keeps the loaded body when double-click opens the message in a tab", async () => {
@@ -362,5 +363,62 @@ describe("MailClientTab", () => {
       51,
       0,
     ));
+  });
+
+  it("keeps periodic sync running while hidden and refreshes from cache when visible", async () => {
+    vi.useFakeTimers();
+    const intervalInfo: MailTabInfo = {
+      ...info,
+      sync: { ...info.sync, onOpen: false, intervalMinutes: 1 },
+    };
+    const freshFolder: MailFolder = {
+      ...folder,
+      total: 2,
+      unread: 1,
+      updatedAt: 2,
+    };
+    const freshMessage: MailMessageHeader = {
+      ...uncachedMessage,
+      flags: [],
+    };
+    mailMocks.mailSyncAllFolders.mockResolvedValue({
+      accountId: info.sessionId,
+      folders: [freshFolder],
+      fetchedMessages: 1,
+      cachedBodies: 0,
+      syncedAt: 2,
+    });
+    mailMocks.mailListCachedFolders.mockResolvedValue([freshFolder]);
+    mailMocks.mailListCachedMessages.mockResolvedValue([freshMessage]);
+
+    const view = render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible={false} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledWith(
+      intervalInfo,
+      { limit: 50, includeBodies: false },
+    );
+    expect(mailMocks.mailListCachedFolders).not.toHaveBeenCalled();
+    expect(mailMocks.mailListCachedMessages).not.toHaveBeenCalled();
+
+    view.rerender(<MailClientTab tabId="mail-tab" info={intervalInfo} visible />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mailMocks.mailListCachedFolders).toHaveBeenCalledWith(info.sessionId);
+    expect(mailMocks.mailListCachedMessages).toHaveBeenCalledWith(
+      info.sessionId,
+      "INBOX",
+      51,
+      0,
+    );
+    expect(screen.getAllByText(/Header arrived before the body cache is warm/).length).toBeGreaterThan(0);
   });
 });

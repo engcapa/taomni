@@ -1582,17 +1582,17 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
 
   useEffect(() => {
-    if (!visible || info.sync.intervalMinutes <= 0) return;
+    if (info.sync.intervalMinutes <= 0) return;
     const intervalMs = Math.max(1, info.sync.intervalMinutes) * 60 * 1000;
     const id = window.setInterval(() => {
-      void syncFolder(selectedFolder, true, {
+      void syncAllFolders(true, {
         limit: batchSize,
         includeBodies: false,
         indicator: "none",
       });
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [batchSize, info.sync.intervalMinutes, selectedFolder, syncFolder, visible]);
+  }, [batchSize, info.sync.intervalMinutes, syncAllFolders]);
 
   useEffect(() => {
     if (messages.length === 0) {
