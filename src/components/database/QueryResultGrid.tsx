@@ -67,6 +67,7 @@ const ROW_HEIGHT = 26;
 const OVERSCAN = 12;
 
 export type QueryRefreshMode = "normal" | "currentLimit" | "clearView";
+export type QueryGeneratedSqlSyncMode = "sync" | "replaceSource";
 
 export interface QueryGridRowChange {
   status: "inserted" | "updated" | "deleted";
@@ -94,6 +95,8 @@ interface QueryResultGridProps {
   onRefresh?: (mode: QueryRefreshMode) => void;
   onCancel?: () => void;
   onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
+  onGeneratedSqlChange?: (sql: string | null) => void;
+  onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onStatus?: (message: string) => void;
 }
 
@@ -950,6 +953,8 @@ export function QueryResultGrid({
   onRefresh,
   onCancel,
   onCommitChanges,
+  onGeneratedSqlChange,
+  onGeneratedSqlSync,
   onStatus,
 }: QueryResultGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -985,7 +990,12 @@ export function QueryResultGrid({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [cellValueViewer, setCellValueViewer] = useState<CellValueViewer | null>(null);
   const [localNotice, setLocalNotice] = useState("");
+  const generatedSqlChangeRef = useRef(onGeneratedSqlChange);
   const { show: openCellMenu, showAt: openMenuAt, render: menu } = useContextMenu();
+
+  useEffect(() => {
+    generatedSqlChangeRef.current = onGeneratedSqlChange;
+  }, [onGeneratedSqlChange]);
 
   useEffect(() => {
     setRows(makeRows(result));
@@ -1077,6 +1087,13 @@ export function QueryResultGrid({
       }),
     [activeColumnFilters, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      generatedSqlChangeRef.current?.(generatedSql);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [generatedSql]);
 
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
@@ -1655,8 +1672,12 @@ export function QueryResultGrid({
     }
   };
 
-  const insertGeneratedSql = () => {
+  const syncGeneratedSql = (mode: QueryGeneratedSqlSyncMode) => {
     if (!generatedSql) return;
+    if (onGeneratedSqlSync) {
+      onGeneratedSqlSync(generatedSql, mode);
+      return;
+    }
     const targetTab = getActiveQueryTab() ?? listQueryTabs().find((entry) => entry.engine === sqlEngine);
     if (!targetTab) {
       setStatus("No SQL Commander editor is available.");
@@ -2053,6 +2074,7 @@ export function QueryResultGrid({
 
       {generatedSql && (
         <div
+          data-testid="query-result-generated-sql-bar"
           className="min-h-7 shrink-0 flex items-center gap-1.5 px-2 py-1 text-[11px]"
           style={{ background: "var(--taomni-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
         >
@@ -2068,6 +2090,7 @@ export function QueryResultGrid({
           </code>
           <button
             type="button"
+            data-testid="query-result-generated-sql-copy"
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Copy generated SQL"
             aria-label="Copy generated SQL"
@@ -2078,13 +2101,25 @@ export function QueryResultGrid({
           </button>
           <button
             type="button"
+            data-testid="query-result-generated-sql-sync"
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
-            title="Insert generated SQL"
-            aria-label="Insert generated SQL"
-            onClick={insertGeneratedSql}
+            title="Sync generated SQL to a query editor"
+            aria-label="Sync generated SQL"
+            onClick={() => syncGeneratedSql("sync")}
           >
-            <FileText className="w-3.5 h-3.5" />
-            Insert
+            <RefreshCw className="w-3.5 h-3.5" />
+            Sync
+          </button>
+          <button
+            type="button"
+            data-testid="query-result-generated-sql-replace"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            title="Replace the source SQL when it still matches this result"
+            aria-label="Replace source SQL"
+            onClick={() => syncGeneratedSql("replaceSource")}
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            Replace
           </button>
         </div>
       )}
