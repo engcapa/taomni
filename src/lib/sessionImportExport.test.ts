@@ -17,6 +17,7 @@ import {
   parseXshellFile,
   parseZeroOmegaProxies,
   serializeCsvSessions,
+  serializeCsvSessionTemplate,
   serializeMobaXtermSessions,
   serializeTaomniSessions,
 } from "./sessionImportExport";
@@ -288,7 +289,7 @@ describe("CSV session import/export", () => {
     ], "Production");
 
     expect(result.filename).toBe("production.csv");
-    expect(result.text).toContain('"Prod, primary",SSH,prod.example.com,22,"deploy""ops",Web');
+    expect(result.text).toContain('"Prod, primary",SSH,prod.example.com,22,"deploy""ops",private-key,C:\\keys\\deploy.ppk,,Web');
 
     const imported = parseCsvSessions(result.text, {
       targetFolder: "Imported",
@@ -304,6 +305,96 @@ describe("CSV session import/export", () => {
       created_at: 5555,
       updated_at: 5555,
     });
+    expect(imported.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "C:\\keys\\deploy.ppk" } });
+  });
+
+  it("imports SSH sessions from the fixed CSV template fields", () => {
+    const result = parseCsvSessions([
+      "name,ip,username,auth_method,private_key_path,group_path,description,startup_cmd,jump_host,jump_user,jump_key_path,compression,x11,agent_forward",
+      "Legacy SecureCRT,10.0.0.12,ops,private-key,C:\\keys\\ops.pem,Imported / SecureCRT,old appliance,tmux a,bastion.example.com,jump,C:\\keys\\jump.pem,yes,no,true",
+    ].join("\n"), {
+      targetFolder: "CSV",
+      now: 5566,
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Legacy SecureCRT",
+      session_type: "SSH",
+      group_path: "User sessions / CSV / Imported / SecureCRT",
+      host: "10.0.0.12",
+      port: 22,
+      username: "ops",
+      auth_method: { PrivateKey: { key_path: "C:\\keys\\ops.pem" } },
+    });
+    expect(JSON.parse(result.sessions[0].options_json)).toMatchObject({
+      description: "old appliance",
+      startupCmd: "tmux a",
+      compression: true,
+      x11: false,
+      agentForward: true,
+      jumpHost: "bastion.example.com",
+      jumpUser: "jump",
+      jumpPort: "22",
+      networkSettings: {
+        proxyKind: "ssh-tunnel",
+        jumpHost: "bastion.example.com",
+        jumpUser: "jump",
+        jumpAuthKind: "PrivateKey",
+        jumpKeyPath: "C:\\keys\\jump.pem",
+      },
+    });
+  });
+
+  it("imports CSV passwords as vault secrets for password-auth sessions", () => {
+    const result = parseCsvSessions([
+      "name,host,port,username,auth_method,password,group_path",
+      "Password Host,192.168.1.20,2202,root,password,secret123,Ops",
+    ].join("\n"), {
+      targetFolder: "CSV",
+      now: 5577,
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]).toMatchObject({
+      name: "Password Host",
+      session_type: "SSH",
+      group_path: "User sessions / CSV / Ops",
+      host: "192.168.1.20",
+      port: 2202,
+      username: "root",
+      auth_method: "Password",
+    });
+    expect(result.secrets).toEqual([{
+      sessionId: result.sessions[0].id,
+      kind: "password",
+      label: "root@192.168.1.20:2202",
+      value: "secret123",
+    }]);
+  });
+
+  it("does not treat CSV passwords as private-key passphrases", () => {
+    const result = parseCsvSessions([
+      "name,host,username,private_key_path,password",
+      "Key Host,192.168.1.21,deploy,C:\\keys\\deploy.pem,not-a-key-passphrase",
+    ].join("\n"), { now: 5578 });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].auth_method).toEqual({ PrivateKey: { key_path: "C:\\keys\\deploy.pem" } });
+    expect(result.secrets).toEqual([]);
+    expect(result.warnings.join("\n")).toContain("uses private-key authentication");
+  });
+
+  it("exports a header-only CSV import template", () => {
+    const result = serializeCsvSessionTemplate();
+
+    expect(result.filename).toBe("taomni-ssh-session-import-template.csv");
+    expect(result.mimeType).toBe("text/csv");
+    expect(result.text).toBe(
+      "name,session_type,host,port,username,auth_method,private_key_path,password,group_path,description,tags,startup_cmd,jump_host,jump_port,jump_user,jump_key_path,compression,x11,agent_forward\r\n",
+    );
+    expect(parseCsvSessions(result.text).sessions).toHaveLength(0);
   });
 });
 

@@ -2790,6 +2790,10 @@ controls:
     selector: '[data-testid="import-csv"]'
     kind: interactive
     optional: true
+  - id: download-csv-template
+    selector: '[data-testid="download-csv-template"]'
+    kind: interactive
+    optional: true
   - id: import-openssh
     selector: '[data-testid="import-openssh"]'
     kind: interactive

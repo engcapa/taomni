@@ -1,10 +1,18 @@
-import { getAppPlatform } from "./runtime";
+import {
+  selectSaveFilePath,
+  writeStreamAbort,
+  writeStreamAppend,
+  writeStreamClose,
+  writeStreamOpen,
+} from "./ipc";
+import { getAppPlatform, isTauriRuntime } from "./runtime";
 
 /**
  * File open/save helpers for session import/export and similar flows.
  *
- * These use the webview's built-in HTML `<input type="file">` chooser and a Blob
- * download. The webview owns and parents those dialogs to the app window, so
+ * Open helpers use the webview's built-in HTML `<input type="file">` chooser.
+ * Download helpers use Tauri's native save dialog in the desktop app and a Blob
+ * download in the browser dev server. The webview owns and parents those dialogs to the app window, so
  * they stay attached and never sink behind it on focus loss (unlike a spawned
  * `zenity`/`kdialog` process, whose file-selection window cannot be reliably
  * parented).
@@ -79,12 +87,40 @@ export function openBinaryFile(accept: string): Promise<ArrayBuffer | null> {
   });
 }
 
-export function downloadTextFile(filename: string, text: string, type: string): void {
+export async function downloadTextFile(filename: string, text: string, type: string): Promise<string | null> {
+  if (isTauriRuntime()) {
+    const path = await selectSaveFilePath(filename);
+    if (!path) return null;
+    await writeTextToPath(path, text);
+    return path;
+  }
+
   const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  return filename;
+}
+
+async function writeTextToPath(path: string, text: string): Promise<void> {
+  const bytes = new TextEncoder().encode(text);
+  let handleId: string | null = null;
+  try {
+    handleId = await writeStreamOpen(path);
+    const chunkSize = 256 * 1024;
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+      const end = Math.min(offset + chunkSize, bytes.byteLength);
+      await writeStreamAppend(handleId, bytes.subarray(offset, end));
+    }
+    await writeStreamClose(handleId);
+  } catch (err) {
+    if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
+    throw err;
+  }
 }

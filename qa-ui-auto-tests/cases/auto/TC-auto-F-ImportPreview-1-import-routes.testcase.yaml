@@ -35,8 +35,8 @@ steps:
   - assert_visible: 'text="Import Termius sessions"'
   - assert_visible: 'text="Import WindTerm sessions"'
   - press: Escape
-  # MenuBar route — Sessions → Import sessions submenu lists the four
-  # MenuBar-level formats (Taomni / MobaXterm / CSV / OpenSSH).
+  # MenuBar route — Sessions → Import sessions submenu lists the MenuBar-level
+  # import formats plus the CSV template download.
   - click: '[data-testid="menu-sessions"]'
   - wait_for: '[data-testid="context-menu"]'
   - hover: '[data-testid="context-menu"] >> text="Import sessions"'
@@ -44,6 +44,7 @@ steps:
   - assert_visible: '[data-testid="import-json"]'
   - assert_visible: '[data-testid="import-mobaxterm"]'
   - assert_visible: '[data-testid="import-csv"]'
+  - assert_visible: '[data-testid="download-csv-template"]'
   - assert_visible: '[data-testid="import-openssh"]'
   - press: Escape
   - screenshot: import-preview-route.png
