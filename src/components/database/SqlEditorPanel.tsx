@@ -60,7 +60,7 @@ interface SqlEditorPanelProps {
   completionSources?: readonly CompletionSource[];
   onDocChange?: (doc: string) => void;
   /** Run callback receives selection if any text is selected, else full doc. */
-  onRun?: (sql: string) => void;
+  onRun?: (sql: string, context: SqlEditorRunContext) => void;
   onFocus?: () => void;
 }
 
@@ -155,9 +155,19 @@ function defaultCompletionSources(
 export interface SqlEditorHandle {
   getValue: () => string;
   getSelectionOrAll: () => string;
+  getCursorPosition: () => number;
+  getSelectionRange: () => { from: number; to: number } | null;
   setValue: (text: string) => void;
+  selectRange: (from: number, to: number) => void;
+  replaceRange: (from: number, to: number, text: string) => void;
   insertText: (text: string) => void;
   focus: () => void;
+}
+
+export interface SqlEditorRunContext {
+  doc: string;
+  cursorPosition: number;
+  selectionRange: { from: number; to: number } | null;
 }
 
 /**
@@ -222,7 +232,11 @@ export function SqlEditorPanel({
       const text = sel.empty
         ? view.state.doc.toString()
         : view.state.sliceDoc(sel.from, sel.to);
-      onRunRef.current?.(text);
+      onRunRef.current?.(text, {
+        doc: view.state.doc.toString(),
+        cursorPosition: sel.head,
+        selectionRange: sel.empty ? null : { from: sel.from, to: sel.to },
+      });
     };
 
     const state = EditorState.create({
@@ -342,8 +356,30 @@ export function SqlEditorPanel({
         const sel = view.state.selection.main;
         return sel.empty ? view.state.doc.toString() : view.state.sliceDoc(sel.from, sel.to);
       },
+      getCursorPosition: () => view.state.selection.main.head,
+      getSelectionRange: () => {
+        const sel = view.state.selection.main;
+        return sel.empty ? null : { from: sel.from, to: sel.to };
+      },
       setValue: (text: string) => {
         view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+      },
+      selectRange: (from: number, to: number) => {
+        const start = Math.max(0, Math.min(from, view.state.doc.length));
+        const end = Math.max(0, Math.min(to, view.state.doc.length));
+        view.dispatch({ selection: { anchor: start, head: end }, scrollIntoView: true });
+        view.focus();
+      },
+      replaceRange: (from: number, to: number, text: string) => {
+        const start = Math.max(0, Math.min(from, view.state.doc.length));
+        const end = Math.max(0, Math.min(to, view.state.doc.length));
+        const rangeFrom = Math.min(start, end);
+        view.dispatch({
+          changes: { from: rangeFrom, to: Math.max(start, end), insert: text },
+          selection: { anchor: rangeFrom + text.length },
+          scrollIntoView: true,
+        });
+        view.focus();
       },
       insertText: (text: string) => {
         const pos = view.state.selection.main.to;

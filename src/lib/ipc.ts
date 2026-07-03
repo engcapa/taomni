@@ -1104,6 +1104,51 @@ export async function dbCancel(sessionId: string): Promise<void> {
   return invoke("db_cancel", { sessionId });
 }
 
+// --- Database SQL History ---
+
+export interface DbSqlHistoryEntry {
+  id: string;
+  savedSessionId?: string | null;
+  engine: string;
+  host: string;
+  port: number;
+  catalog?: string | null;
+  databaseName?: string | null;
+  schemaName?: string | null;
+  sqlContent: string;
+  startedAt: number;
+  durationMs?: number | null;
+  rowsAffected?: number | null;
+  rowCount?: number | null;
+  hasResultSet: boolean;
+  error?: string | null;
+  createdAt: number;
+}
+
+export async function dbAppendHistory(entry: DbSqlHistoryEntry): Promise<void> {
+  return invoke<void>("db_append_history", { entry });
+}
+
+export async function dbListHistory(options: {
+  savedSessionId?: string | null;
+  engine?: string | null;
+  limit?: number | null;
+} = {}): Promise<DbSqlHistoryEntry[]> {
+  return invoke<DbSqlHistoryEntry[]>("db_list_history", {
+    savedSessionId: options.savedSessionId ?? null,
+    engine: options.engine ?? null,
+    limit: options.limit ?? null,
+  });
+}
+
+export async function dbDeleteHistory(id: string): Promise<void> {
+  return invoke<void>("db_delete_history", { id });
+}
+
+export async function dbClearHistory(savedSessionId?: string | null): Promise<void> {
+  return invoke<void>("db_clear_history", { savedSessionId: savedSessionId ?? null });
+}
+
 // --- Database SQL Bookmarks ---
 
 export interface DbBookmark {

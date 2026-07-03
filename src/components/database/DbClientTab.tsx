@@ -25,6 +25,10 @@ import {
   Star,
   BookMarked,
   Database,
+  FileJson,
+  MessageSquare,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -34,7 +38,11 @@ import {
   dbExecute,
   dbExecuteStream,
   dbCancel,
+  dbAppendHistory,
+  dbClearHistory,
+  dbDeleteHistory,
   dbDescribeTable,
+  dbListHistory,
   readFileBytes,
   selectSaveFilePath,
   temporaryFilePath,
@@ -44,19 +52,22 @@ import {
   writeStreamOpen,
   type DbColumnDescription,
   type DbQueryResult,
+  type DbSqlHistoryEntry,
 } from "../../lib/ipc";
 import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
 import { BookmarksPanel } from "./BookmarksPanel";
-import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
+import { SqlEditorPanel, type SqlEditorHandle, type SqlEditorRunContext } from "./SqlEditorPanel";
 import {
   QueryResultGrid,
   type QueryGridCommitPayload,
+  type QueryGeneratedSqlSyncMode,
   type QueryRefreshMode,
 } from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
 import { useAppStore } from "../../stores/appStore";
 import { TabActions } from "../tabbar/TabActionSlot";
 import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
+import { useChatStore } from "../../stores/chatStore";
 import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
@@ -68,7 +79,8 @@ import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../li
 import { useT } from "../../lib/i18n";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
-import { sqlStatementsForExecution } from "../../lib/sqlStatements";
+import { splitSqlStatementRanges, sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
+import { writeText } from "../../lib/clipboard";
 import { createDbMetadataCache } from "../../lib/dbMetadataCache";
 import { sqlNamespaceFromMetadata } from "../../lib/sqlMetadataCompletions";
 import {
@@ -117,6 +129,8 @@ interface ResultSheet {
   id: string;
   title: string;
   sql: string;
+  sourceRef: SqlStatementSourceRef | null;
+  generatedTargetPanelId: string | null;
   result: DbQueryResult | null;
   error: string | null;
   warnings: string[];
@@ -126,6 +140,33 @@ interface ResultSheet {
   resultTab: ResultSubTab;
   rowLimit: number;
   createdAt: number;
+}
+
+interface SqlStatementSourceRef {
+  id: string;
+  panelId: string;
+  origin: "editor" | "history" | "generated";
+  sql: string;
+  from: number | null;
+  to: number | null;
+  exactHash: string;
+  historyId?: string;
+  parentSheetId?: string;
+}
+
+interface QueryExecutionSummary {
+  ok: boolean;
+  durationMs: number | null;
+  rowsAffected: number | null;
+  rowCount: number | null;
+  hasResultSet: boolean;
+  error: string | null;
+}
+
+interface EditorStatementAction {
+  panelId: string;
+  doc: string;
+  range: SqlStatementRange;
 }
 
 interface PanelState {
@@ -246,6 +287,34 @@ function formatDurationMs(durationMs: number | null | undefined): string | null 
   if (ms < 1000) return `${ms} ms`;
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
   return `${Math.round(ms / 1000)} s`;
+}
+
+function hashSqlText(sql: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < sql.length; i += 1) {
+    hash ^= sql.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function sourceRefForRange(
+  panelId: string,
+  range: SqlStatementRange,
+  origin: SqlStatementSourceRef["origin"] = "editor",
+  patch: Partial<Pick<SqlStatementSourceRef, "historyId" | "parentSheetId">> = {},
+): SqlStatementSourceRef {
+  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return {
+    id: `${panelId}:${range.from}:${range.to}:${hashSqlText(range.sql)}:${suffix}`,
+    panelId,
+    origin,
+    sql: range.sql,
+    from: range.from,
+    to: range.to,
+    exactHash: hashSqlText(range.sql),
+    ...patch,
+  };
 }
 
 function resultSheetTimingTitle(sheet: ResultSheet): string {
@@ -392,11 +461,18 @@ function newPanel(patch: Partial<PanelState> = {}): PanelState {
   };
 }
 
-function newResultSheet(sql: string, ordinal: number, rowLimit: number): ResultSheet {
+function newResultSheet(
+  sql: string,
+  ordinal: number,
+  rowLimit: number,
+  sourceRef: SqlStatementSourceRef | null = null,
+): ResultSheet {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `sheet-${Date.now()}-${Math.random()}`,
     title: `Result ${ordinal}`,
     sql,
+    sourceRef,
+    generatedTargetPanelId: null,
     result: emptyQueryResult(),
     error: null,
     warnings: [],
@@ -421,6 +497,28 @@ function emptyQueryResult(): DbQueryResult {
     durationMs: 0,
     warnings: [],
   };
+}
+
+function createSqlHistoryId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `sql-history-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function uniqueResultColumnNames(result: DbQueryResult): string[] {
+  const seen = new Map<string, number>();
+  return result.columns.map((column, index) => {
+    const base = column.name || `column_${index + 1}`;
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    return count === 0 ? base : `${base}_${count + 1}`;
+  });
+}
+
+function resultToJsonText(result: DbQueryResult): string {
+  const names = uniqueResultColumnNames(result);
+  const rows = result.rows.map((row) =>
+    Object.fromEntries(names.map((name, index) => [name, row[index] ?? null])),
+  );
+  return JSON.stringify(rows, null, 2);
 }
 
 export default function DbClientTab({
@@ -455,6 +553,9 @@ export default function DbClientTab({
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [metadataVersion, setMetadataVersion] = useState(0);
   const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
+  const [statementAction, setStatementAction] = useState<EditorStatementAction | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<DbSqlHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [leftPanelTab, setLeftPanelTab] = useState<"schema" | "bookmarks">("schema");
   const addBookmarkTriggerRef = useRef<(() => void) | null>(null);
   const historyRef = useRef<Record<string, string[]>>({});
@@ -722,17 +823,21 @@ export default function DbClientTab({
       sql: string,
       maxRows: number,
       resetRowsOnColumns = false,
-    ): Promise<boolean> => {
+    ): Promise<QueryExecutionSummary> => {
       const started = Date.now();
       const timer = setInterval(() => {
         patchSheet(panelId, sheetId, { elapsedMs: Date.now() - started });
       }, 100);
       timersRef.current[sheetId] = timer;
       let sawDone = false;
+      let columnCount = 0;
+      let rowCount = 0;
+      let summary: QueryExecutionSummary | null = null;
       try {
         if (!connectionSessionId) throw new Error("Database connection is still starting.");
         await dbExecuteStream(connectionSessionId, sql, maxRows, (event) => {
           if (event.kind === "columns") {
+            columnCount = event.columns.length;
             updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
               return {
@@ -745,6 +850,7 @@ export default function DbClientTab({
               };
             });
           } else if (event.kind === "rows") {
+            rowCount += event.rows.length;
             updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
               const remaining = Math.max(0, current.rowLimit - result.rows.length);
@@ -755,6 +861,14 @@ export default function DbClientTab({
             sawDone = true;
             const warnings = event.warnings ?? [];
             const elapsedMs = Date.now() - started;
+            summary = {
+              ok: true,
+              durationMs: event.durationMs,
+              rowsAffected: event.rowsAffected,
+              rowCount,
+              hasResultSet: columnCount > 0,
+              error: null,
+            };
             updateSheet(panelId, sheetId, (current) => {
               const result = current.result ?? emptyQueryResult();
               return {
@@ -777,23 +891,46 @@ export default function DbClientTab({
         });
         if (!sawDone) {
           patchSheet(panelId, sheetId, { running: false, cancelling: false, elapsedMs: Date.now() - started });
+          summary = {
+            ok: true,
+            durationMs: Date.now() - started,
+            rowsAffected: null,
+            rowCount,
+            hasResultSet: columnCount > 0,
+            error: null,
+          };
         }
         metadataCache?.invalidateSql(sql, {
           engine: info.engine,
           activeSchema,
           defaultCatalog: info.catalog,
         });
-        return true;
+        return summary ?? {
+          ok: true,
+          durationMs: Date.now() - started,
+          rowsAffected: null,
+          rowCount,
+          hasResultSet: columnCount > 0,
+          error: null,
+        };
       } catch (err) {
+        const error = String(err);
         patchSheet(panelId, sheetId, {
           running: false,
           cancelling: false,
           elapsedMs: Date.now() - started,
-          error: String(err),
+          error,
           warnings: [],
           resultTab: "messages",
         });
-        return false;
+        return {
+          ok: false,
+          durationMs: Date.now() - started,
+          rowsAffected: null,
+          rowCount,
+          hasResultSet: columnCount > 0,
+          error,
+        };
       } finally {
         if (timersRef.current[sheetId] === timer) {
           clearInterval(timer);
@@ -804,23 +941,108 @@ export default function DbClientTab({
     [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, patchSheet, updateSheet],
   );
 
+  const statementRangesForRun = useCallback(
+    (sqlText: string, context?: SqlEditorRunContext): SqlStatementRange[] => {
+      const ranges = sqlStatementRangesForExecution(info.engine, sqlText);
+      const selection = context?.selectionRange;
+      if (!selection) return ranges;
+      const selectedText = context.doc.slice(selection.from, selection.to);
+      if (selectedText !== sqlText) return ranges;
+      return ranges.map((range) => ({
+        ...range,
+        from: range.from + selection.from,
+        to: range.to + selection.from,
+      }));
+    },
+    [info.engine],
+  );
+
+  const refreshHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const entries = await dbListHistory({
+        savedSessionId: workspaceSessionId,
+        engine: info.engine,
+        limit: MAX_HISTORY,
+      });
+      setHistoryEntries(entries);
+    } catch (err) {
+      setStatusMessage(`Query history load failed: ${String(err)}`);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [info.engine, setStatusMessage, workspaceSessionId]);
+
+  const appendSqlHistory = useCallback(
+    async (
+      sql: string,
+      startedAt: number,
+      summary: QueryExecutionSummary,
+    ) => {
+      const entry: DbSqlHistoryEntry = {
+        id: createSqlHistoryId(),
+        savedSessionId: workspaceSessionId,
+        engine: info.engine,
+        host: info.host,
+        port: info.port,
+        catalog: info.catalog ?? null,
+        databaseName: info.database ?? null,
+        schemaName: activeSchema ?? null,
+        sqlContent: sql,
+        startedAt,
+        durationMs: summary.durationMs,
+        rowsAffected: summary.rowsAffected,
+        rowCount: summary.rowCount,
+        hasResultSet: summary.hasResultSet,
+        error: summary.error,
+        createdAt: Date.now(),
+      };
+      try {
+        await dbAppendHistory(entry);
+        if (historyPanelId) {
+          await refreshHistory();
+        }
+      } catch (err) {
+        setStatusMessage(`Query history save failed: ${String(err)}`);
+      }
+    },
+    [activeSchema, historyPanelId, info.catalog, info.database, info.engine, info.host, info.port, refreshHistory, setStatusMessage, workspaceSessionId],
+  );
+
   const runQuery = useCallback(
-    async (panelId: string, sqlText: string) => {
+    async (
+      panelId: string,
+      sqlText: string,
+      options: {
+        context?: SqlEditorRunContext;
+        origin?: SqlStatementSourceRef["origin"];
+        historyId?: string;
+        parentSheetId?: string;
+      } = {},
+    ) => {
       const trimmed = sqlText.trim();
       if (!trimmed) return;
-      const panel = panels.find((p) => p.id === panelId);
+      const panel = panelsRef.current.find((p) => p.id === panelId);
       if (panel?.sheets.some((sheet) => sheet.running)) return;
-      const statements = sqlStatementsForExecution(info.engine, trimmed);
-      if (statements.length === 0) return;
-      // Record history (newest first, dedup consecutive).
+      const statementRanges = statementRangesForRun(sqlText, options.context);
+      if (statementRanges.length === 0) return;
+      // Record in-memory history per executable statement (newest first, dedup consecutive).
       const panelHistory = historyRef.current[panelId] ?? [];
-      if (panelHistory[0] !== trimmed) {
-        historyRef.current[panelId] = [trimmed, ...panelHistory].slice(0, MAX_HISTORY);
+      const nextHistory = [...panelHistory];
+      for (const range of [...statementRanges].reverse()) {
+        if (nextHistory[0] !== range.sql) {
+          nextHistory.unshift(range.sql);
+        }
       }
+      historyRef.current[panelId] = nextHistory.slice(0, MAX_HISTORY);
 
       const baseOrdinal = panel?.sheets.length ?? 0;
-      for (const [index, statement] of statements.entries()) {
-        const sheet = newResultSheet(statement, baseOrdinal + index + 1, rowLimit);
+      for (const [index, statement] of statementRanges.entries()) {
+        const sourceRef = sourceRefForRange(panelId, statement, options.origin ?? "editor", {
+          historyId: options.historyId,
+          parentSheetId: options.parentSheetId,
+        });
+        const sheet = newResultSheet(statement.sql, baseOrdinal + index + 1, rowLimit, sourceRef);
         setPanels((prev) =>
           prev.map((p) => {
             if (p.id !== panelId) return p;
@@ -832,11 +1054,12 @@ export default function DbClientTab({
             };
           }),
         );
-        const ok = await streamQueryIntoSheet(panelId, sheet.id, statement, rowLimit);
-        if (!ok) break;
+        const summary = await streamQueryIntoSheet(panelId, sheet.id, statement.sql, rowLimit);
+        await appendSqlHistory(statement.sql, sheet.createdAt, summary);
+        if (!summary.ok) break;
       }
     },
-    [info.engine, maxResultSheets, panels, rowLimit, streamQueryIntoSheet],
+    [appendSqlHistory, maxResultSheets, rowLimit, statementRangesForRun, streamQueryIntoSheet],
   );
 
   const insertQueryFromOutside = useCallback(
@@ -1298,6 +1521,21 @@ export default function DbClientTab({
 
   const panelSql = (panel: PanelState) => editorHandles.current[panel.id]?.getValue() ?? panel.doc;
 
+  const editorRunPayload = (panel: PanelState, selectionOnly: boolean) => {
+    const handle = editorHandles.current[panel.id];
+    const doc = handle?.getValue() ?? panel.doc;
+    const selectionRange = selectionOnly ? handle?.getSelectionRange() ?? null : null;
+    const cursorPosition = handle?.getCursorPosition() ?? doc.length;
+    return {
+      sql: selectionRange ? doc.slice(selectionRange.from, selectionRange.to) : doc,
+      context: {
+        doc,
+        cursorPosition,
+        selectionRange,
+      } satisfies SqlEditorRunContext,
+    };
+  };
+
   const formatPanel = (panel: PanelState) => {
     const handle = editorHandles.current[panel.id];
     const formatted = formatSql(handle?.getValue() ?? panel.doc);
@@ -1317,13 +1555,19 @@ export default function DbClientTab({
       {
         label: "Run query",
         icon: <Play className="w-3 h-3" />,
-        onClick: () => void runQuery(panel.id, panelSql(panel)),
+        onClick: () => {
+          const payload = editorRunPayload(panel, false);
+          void runQuery(panel.id, payload.sql, { context: payload.context });
+        },
         disabled: running || !sqlText.trim(),
       },
       {
         label: "Run selection",
         icon: <SquareDashedMousePointer className="w-3 h-3" />,
-        onClick: () => void runQuery(panel.id, editorHandles.current[panel.id]?.getSelectionOrAll() ?? panelSql(panel)),
+        onClick: () => {
+          const payload = editorRunPayload(panel, true);
+          void runQuery(panel.id, payload.sql, { context: payload.context });
+        },
         disabled: running || !hasEditor,
       },
       {
@@ -1448,6 +1692,360 @@ export default function DbClientTab({
   }, [info.engine]);
 
   const activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0];
+
+  const setPanelDocState = (panelId: string, doc: string) => {
+    setPanels((prev) => {
+      const next = prev.map((panel) => (panel.id === panelId ? { ...panel, doc, dirty: true } : panel));
+      panelsRef.current = next;
+      return next;
+    });
+  };
+
+  const writePanelDocument = (panelId: string, doc: string) => {
+    const editor = activePanelIdRef.current === panelId ? editorHandles.current[panelId] : null;
+    editor?.setValue(doc);
+    setPanelDocState(panelId, doc);
+  };
+
+  const updateResultSheetState = (
+    panelId: string,
+    sheetId: string,
+    updater: (sheet: ResultSheet) => ResultSheet,
+  ) => {
+    setPanels((prev) => {
+      const next = prev.map((panel) =>
+        panel.id === panelId
+          ? {
+              ...panel,
+              sheets: panel.sheets.map((sheet) => (sheet.id === sheetId ? updater(sheet) : sheet)),
+            }
+          : panel,
+      );
+      panelsRef.current = next;
+      return next;
+    });
+  };
+
+  const syncGeneratedSqlPanel = (
+    resultPanelId: string,
+    sheetId: string,
+    generatedSql: string,
+    status: string | null = "Synced generated SQL to query editor.",
+    options: { activate?: boolean } = {},
+  ): string | null => {
+    const activate = options.activate ?? true;
+    const livePanels = panelsRef.current;
+    const resultPanel = livePanels.find((panel) => panel.id === resultPanelId);
+    const sheet = resultPanel?.sheets.find((candidate) => candidate.id === sheetId);
+    if (!resultPanel || !sheet) {
+      setStatusMessage("Result sheet is no longer available.");
+      return null;
+    }
+
+    const existingTargetId =
+      sheet.generatedTargetPanelId && livePanels.some((panel) => panel.id === sheet.generatedTargetPanelId)
+        ? sheet.generatedTargetPanelId
+        : null;
+    if (existingTargetId) {
+      writePanelDocument(existingTargetId, generatedSql);
+      if (activate) setActivePanelId(existingTargetId);
+      if (status) setStatusMessage(status);
+      return existingTargetId;
+    }
+
+    if (livePanels.length >= MAX_PANELS) {
+      setStatusMessage(`Maximum query panels reached (${MAX_PANELS}).`);
+      return null;
+    }
+
+    const targetPanel = newPanel({ doc: generatedSql, dirty: true, fileName: "Generated SQL" });
+    setPanels((prev) => {
+      const next = [
+        ...prev.map((panel) =>
+          panel.id === resultPanelId
+            ? {
+                ...panel,
+                sheets: panel.sheets.map((candidate) =>
+                  candidate.id === sheetId
+                    ? { ...candidate, generatedTargetPanelId: targetPanel.id }
+                    : candidate,
+                ),
+              }
+            : panel,
+        ),
+        targetPanel,
+      ];
+      panelsRef.current = next;
+      return next;
+    });
+    if (activate) setActivePanelId(targetPanel.id);
+    if (status) setStatusMessage(status);
+    return targetPanel.id;
+  };
+
+  const updateGeneratedSqlFromSheet = (resultPanelId: string, sheetId: string, generatedSql: string | null) => {
+    if (!generatedSql) return;
+    syncGeneratedSqlPanel(resultPanelId, sheetId, generatedSql, null, { activate: false });
+  };
+
+  const replaceGeneratedSqlSource = (resultPanelId: string, sheetId: string, generatedSql: string) => {
+    const fallback = () =>
+      syncGeneratedSqlPanel(
+        resultPanelId,
+        sheetId,
+        generatedSql,
+        "Source SQL changed; synced generated SQL to a query editor instead.",
+      );
+    const livePanels = panelsRef.current;
+    const resultPanel = livePanels.find((panel) => panel.id === resultPanelId);
+    const sheet = resultPanel?.sheets.find((candidate) => candidate.id === sheetId);
+    const sourceRef = sheet?.sourceRef;
+    if (!sheet || !sourceRef || sourceRef.origin !== "editor" || sourceRef.from === null || sourceRef.to === null) {
+      fallback();
+      return;
+    }
+
+    const sourcePanel = livePanels.find((panel) => panel.id === sourceRef.panelId);
+    if (!sourcePanel) {
+      fallback();
+      return;
+    }
+
+    const from = sourceRef.from;
+    const to = sourceRef.to;
+    const editor = activePanelIdRef.current === sourcePanel.id ? editorHandles.current[sourcePanel.id] : null;
+    const sourceDoc = editor?.getValue() ?? sourcePanel.doc;
+    if (from < 0 || to < from || to > sourceDoc.length) {
+      fallback();
+      return;
+    }
+
+    const currentSql = sourceDoc.slice(from, to);
+    if (currentSql !== sourceRef.sql || hashSqlText(currentSql) !== sourceRef.exactHash) {
+      fallback();
+      return;
+    }
+
+    const nextDoc = `${sourceDoc.slice(0, from)}${generatedSql}${sourceDoc.slice(to)}`;
+    editor?.replaceRange(from, to, generatedSql);
+    setPanelDocState(sourcePanel.id, nextDoc);
+    updateResultSheetState(resultPanelId, sheetId, (current) => ({
+      ...current,
+      sourceRef: {
+        ...sourceRef,
+        sql: generatedSql,
+        to: from + generatedSql.length,
+        exactHash: hashSqlText(generatedSql),
+        parentSheetId: sheetId,
+      },
+    }));
+    setActivePanelId(sourcePanel.id);
+    setStatusMessage("Replaced source SQL with generated SQL.");
+  };
+
+  const syncGeneratedSqlFromSheet = (
+    resultPanelId: string,
+    sheetId: string,
+    generatedSql: string,
+    mode: QueryGeneratedSqlSyncMode,
+  ) => {
+    if (mode === "replaceSource") {
+      replaceGeneratedSqlSource(resultPanelId, sheetId, generatedSql);
+      return;
+    }
+    syncGeneratedSqlPanel(resultPanelId, sheetId, generatedSql);
+  };
+
+  const toggleHistoryPanel = () => {
+    const opening = historyPanelId !== activePanel.id;
+    setHistoryPanelId(opening ? activePanel.id : null);
+    if (opening) setStatementAction(null);
+    if (opening) void refreshHistory();
+  };
+
+  const selectSqlInActivePanel = (sql: string) => {
+    const handle = editorHandles.current[activePanel.id];
+    handle?.setValue(sql);
+    handle?.selectRange(0, sql.length);
+    patchPanel(activePanel.id, { doc: sql, dirty: true });
+    setHistoryPanelId(null);
+  };
+
+  const openSqlInNewPanel = (sql: string, run = false, origin: SqlStatementSourceRef["origin"] = "history") => {
+    if (panelsRef.current.length >= MAX_PANELS) {
+      setStatusMessage(`Maximum query panels reached (${MAX_PANELS}).`);
+      return;
+    }
+    const panel = newPanel({ doc: sql, dirty: true });
+    setPanels((prev) => {
+      const next = [...prev, panel];
+      panelsRef.current = next;
+      return next;
+    });
+    setActivePanelId(panel.id);
+    setHistoryPanelId(null);
+    if (run) {
+      setTimeout(() => {
+        void runQuery(panel.id, sql, { origin });
+      }, 0);
+    }
+  };
+
+  const currentEditorStatement = (): EditorStatementAction | null => {
+    const handle = editorHandles.current[activePanel.id];
+    const doc = handle?.getValue() ?? activePanel.doc;
+    const selection = handle?.getSelectionRange() ?? null;
+    const position = selection && selection.from !== selection.to
+      ? selection.from
+      : handle?.getCursorPosition() ?? doc.length;
+    const ranges = splitSqlStatementRanges(doc, { splitGo: info.engine === "SQLServer" });
+    const range =
+      ranges.find((candidate) => candidate.from <= position && position <= candidate.to) ??
+      (ranges.length === 1 ? ranges[0] : null);
+    if (!range) {
+      setStatusMessage("No SQL statement at the current cursor.");
+      return null;
+    }
+    return { panelId: activePanel.id, doc, range };
+  };
+
+  const toggleStatementPanel = () => {
+    if (statementAction?.panelId === activePanel.id) {
+      setStatementAction(null);
+      return;
+    }
+    const action = currentEditorStatement();
+    if (!action) return;
+    setHistoryPanelId(null);
+    setStatementAction(action);
+  };
+
+  const runEditorStatement = (action: EditorStatementAction) => {
+    void runQuery(action.panelId, action.range.sql, {
+      context: {
+        doc: action.doc,
+        cursorPosition: action.range.from,
+        selectionRange: { from: action.range.from, to: action.range.to },
+      },
+    });
+    setStatementAction(null);
+  };
+
+  const selectEditorStatement = (action: EditorStatementAction) => {
+    setActivePanelId(action.panelId);
+    editorHandles.current[action.panelId]?.selectRange(action.range.from, action.range.to);
+    setStatementAction(null);
+  };
+
+  const openEditorStatementInNewPanel = (action: EditorStatementAction) => {
+    openSqlInNewPanel(action.range.sql, true, "editor");
+    setStatementAction(null);
+  };
+
+  const latestResultForSql = (sql: string): DbQueryResult | null => {
+    const target = sql.trim();
+    for (const panel of [...panelsRef.current].reverse()) {
+      for (const sheet of [...panel.sheets].reverse()) {
+        if (sheet.sql.trim() === target && sheet.result && sheet.result.columns.length > 0) {
+          return sheet.result;
+        }
+      }
+    }
+    return null;
+  };
+
+  const copyHistoryJson = async (entry: DbSqlHistoryEntry) => {
+    const result = latestResultForSql(entry.sqlContent);
+    if (!result) {
+      setStatusMessage("No in-memory result is available for this SQL. Run it again to export JSON.");
+      return;
+    }
+    try {
+      await writeText(resultToJsonText(result));
+      setStatusMessage("Copied query result JSON.");
+    } catch (err) {
+      setStatusMessage(`Copy JSON failed: ${String(err)}`);
+    }
+  };
+
+  const copyStatementJson = async (action: EditorStatementAction) => {
+    const result = latestResultForSql(action.range.sql);
+    if (!result) {
+      setStatusMessage("No in-memory result is available for this statement. Run it again to export JSON.");
+      return;
+    }
+    try {
+      await writeText(resultToJsonText(result));
+      setStatusMessage("Copied statement result JSON.");
+    } catch (err) {
+      setStatusMessage(`Copy JSON failed: ${String(err)}`);
+    }
+  };
+
+  const askAiAboutHistory = async (entry: DbSqlHistoryEntry) => {
+    const result = latestResultForSql(entry.sqlContent);
+    const resultSummary = result
+      ? `\n\nResult summary: ${result.rows.length} row(s), ${result.columns.length} column(s).`
+      : "";
+    const prompt = [
+      "请分析这条数据库 SQL，并结合执行信息说明含义、潜在问题和可优化点：",
+      "",
+      "```sql",
+      entry.sqlContent,
+      "```",
+      "",
+      `Engine: ${entry.engine}`,
+      `Database: ${entry.databaseName ?? "-"}`,
+      `Schema: ${entry.schemaName ?? "-"}`,
+      `Duration: ${formatDurationMs(entry.durationMs) ?? "-"}`,
+      `Rows: ${entry.rowCount ?? "-"}`,
+      entry.error ? `Error: ${entry.error}` : null,
+      resultSummary,
+    ].filter((line): line is string => line !== null).join("\n");
+    await useChatStore.getState().openTabChat(tabId);
+    await useChatStore.getState().attachToComposer(prompt);
+    setHistoryPanelId(null);
+  };
+
+  const askAiAboutStatement = async (action: EditorStatementAction) => {
+    const result = latestResultForSql(action.range.sql);
+    const resultSummary = result
+      ? `\n\nResult summary: ${result.rows.length} row(s), ${result.columns.length} column(s).`
+      : "";
+    const prompt = [
+      "请分析当前编辑器中的这条数据库 SQL，并说明含义、潜在问题和可优化点：",
+      "",
+      "```sql",
+      action.range.sql,
+      "```",
+      "",
+      `Engine: ${info.engine}`,
+      `Database: ${info.database ?? "-"}`,
+      `Schema: ${activeSchema ?? "-"}`,
+      resultSummary,
+    ].join("\n");
+    await useChatStore.getState().openTabChat(tabId);
+    await useChatStore.getState().attachToComposer(prompt);
+    setStatementAction(null);
+  };
+
+  const deleteHistoryEntry = async (entry: DbSqlHistoryEntry) => {
+    try {
+      await dbDeleteHistory(entry.id);
+      await refreshHistory();
+    } catch (err) {
+      setStatusMessage(`Delete query history failed: ${String(err)}`);
+    }
+  };
+
+  const clearCurrentHistory = async () => {
+    try {
+      await dbClearHistory(workspaceSessionId);
+      await refreshHistory();
+    } catch (err) {
+      setStatusMessage(`Clear query history failed: ${String(err)}`);
+    }
+  };
 
   useEffect(() => {
     setSchemaCollapsed(initialWidth === 0);
@@ -1731,15 +2329,18 @@ export default function DbClientTab({
                 schemas={schemas}
                 activeSchema={activeSchema}
                 running={activePanel.sheets.some((sheet) => sheet.running)}
-                onRun={() => runQuery(activePanel.id, editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc)}
-                onRunSelection={() =>
-                  runQuery(activePanel.id, editorHandles.current[activePanel.id]?.getSelectionOrAll() ?? activePanel.doc)
-                }
+                onRun={() => {
+                  const payload = editorRunPayload(activePanel, false);
+                  void runQuery(activePanel.id, payload.sql, { context: payload.context });
+                }}
+                onRunSelection={() => {
+                  const payload = editorRunPayload(activePanel, true);
+                  void runQuery(activePanel.id, payload.sql, { context: payload.context });
+                }}
                 onCancel={() => cancelQuery(activePanel.id)}
                 onFormat={() => formatPanel(activePanel)}
-                onToggleHistory={() =>
-                  setHistoryPanelId((current) => (current === activePanel.id ? null : activePanel.id))
-                }
+                onToggleStatement={toggleStatementPanel}
+                onToggleHistory={toggleHistoryPanel}
                 onSave={() => void saveQueryFile(activePanel)}
                 onBookmark={() => addBookmarkTriggerRef.current?.()}
                 onSchemaChange={(schema) => void switchSchema(schema)}
@@ -1754,22 +2355,29 @@ export default function DbClientTab({
               />
               {historyPanelId === activePanel.id && (
                 <HistoryDropdown
-                  history={historyRef.current[activePanel.id] ?? []}
-                  onPick={(sql) => {
-                    editorHandles.current[activePanel.id]?.setValue(sql);
-                    patchPanel(activePanel.id, { doc: sql, dirty: true });
-                    setHistoryPanelId(null);
-                  }}
-                  onBookmark={(sql) => {
-                    setLeftPanelTab("bookmarks");
-                    editorHandles.current[activePanel.id]?.setValue(sql);
-                    patchPanel(activePanel.id, { doc: sql, dirty: true });
-                    setHistoryPanelId(null);
-                    setTimeout(() => {
-                      addBookmarkTriggerRef.current?.();
-                    }, 50);
-                  }}
+                  entries={historyEntries}
+                  loading={historyLoading}
+                  onRefresh={() => void refreshHistory()}
+                  onRun={(entry) => void runQuery(activePanel.id, entry.sqlContent, { origin: "history", historyId: entry.id })}
+                  onSelect={(entry) => selectSqlInActivePanel(entry.sqlContent)}
+                  onOpenTab={(entry) => openSqlInNewPanel(entry.sqlContent, true, "history")}
+                  onJson={(entry) => void copyHistoryJson(entry)}
+                  onAskAi={(entry) => void askAiAboutHistory(entry)}
+                  onDelete={(entry) => void deleteHistoryEntry(entry)}
+                  onClear={() => void clearCurrentHistory()}
                   onClose={() => setHistoryPanelId(null)}
+                />
+              )}
+              {statementAction?.panelId === activePanel.id && (
+                <StatementDropdown
+                  action={statementAction}
+                  hasJson={latestResultForSql(statementAction.range.sql) !== null}
+                  onRun={runEditorStatement}
+                  onSelect={selectEditorStatement}
+                  onOpenTab={openEditorStatementInNewPanel}
+                  onJson={(action) => void copyStatementJson(action)}
+                  onAskAi={(action) => void askAiAboutStatement(action)}
+                  onClose={() => setStatementAction(null)}
                 />
               )}
               <PanelGroup orientation="vertical" className="flex-1 min-h-0">
@@ -1791,7 +2399,7 @@ export default function DbClientTab({
                       }}
                       onDocChange={(doc) => patchPanel(activePanel.id, { doc, dirty: true })}
                       onFocus={() => setActivePanelId(activePanel.id)}
-                      onRun={(sql) => runQuery(activePanel.id, sql)}
+                      onRun={(sql, context) => void runQuery(activePanel.id, sql, { context })}
                     />
                   </div>
                 </Panel>
@@ -1805,6 +2413,12 @@ export default function DbClientTab({
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
                     onRefreshSheet={(sheetId, mode) => void refreshSheet(activePanel.id, sheetId, mode)}
                     onCommitGridChanges={(sheetId, payload) => commitGridChanges(activePanel.id, sheetId, payload)}
+                    onGeneratedSqlChange={(sheetId, sql) =>
+                      updateGeneratedSqlFromSheet(activePanel.id, sheetId, sql)
+                    }
+                    onGeneratedSqlSync={(sheetId, sql, mode) =>
+                      syncGeneratedSqlFromSheet(activePanel.id, sheetId, sql, mode)
+                    }
                     onCancel={() => cancelQuery(activePanel.id)}
                     onStatus={setStatusMessage}
                   />
@@ -1828,6 +2442,7 @@ function EditorToolbar({
   onRunSelection,
   onCancel,
   onFormat,
+  onToggleStatement,
   onToggleHistory,
   onSave,
   onBookmark,
@@ -1845,6 +2460,7 @@ function EditorToolbar({
   onRunSelection: () => void;
   onCancel: () => void;
   onFormat: () => void;
+  onToggleStatement: () => void;
   onToggleHistory: () => void;
   onSave: () => void;
   onBookmark: () => void;
@@ -1873,6 +2489,9 @@ function EditorToolbar({
       <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
       <button type="button" className={btn} onClick={onFormat} title="Format SQL">
         <Sparkles className="w-3.5 h-3.5" /> Format
+      </button>
+      <button type="button" className={btn} onClick={onToggleStatement} title="Current statement actions">
+        <SquareDashedMousePointer className="w-3.5 h-3.5" /> Statement
       </button>
       <button type="button" className={btn} onClick={onToggleHistory} title="Query history">
         <Clock className="w-3.5 h-3.5" /> History
@@ -1929,53 +2548,187 @@ function EditorToolbar({
   );
 }
 
-function HistoryDropdown({
-  history,
-  onPick,
-  onBookmark,
+function StatementDropdown({
+  action,
+  hasJson,
+  onRun,
+  onSelect,
+  onOpenTab,
+  onJson,
+  onAskAi,
   onClose,
 }: {
-  history: string[];
-  onPick: (sql: string) => void;
-  onBookmark: (sql: string) => void;
+  action: EditorStatementAction;
+  hasJson: boolean;
+  onRun: (action: EditorStatementAction) => void;
+  onSelect: (action: EditorStatementAction) => void;
+  onOpenTab: (action: EditorStatementAction) => void;
+  onJson: (action: EditorStatementAction) => void;
+  onAskAi: (action: EditorStatementAction) => void;
   onClose: () => void;
 }) {
+  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-[10px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const compactSql = action.range.sql.replace(/\s+/g, " ").trim();
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className="absolute right-2 top-9 z-50 w-[420px] max-h-[300px] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col"
+        data-testid="db-current-statement-panel"
+        className="absolute right-2 top-9 z-50 w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded shadow-lg flex flex-col"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
       >
-        {history.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]">No query history yet.</div>
+        <div
+          className="h-8 shrink-0 flex items-center gap-2 px-2"
+          style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+        >
+          <SquareDashedMousePointer className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+          <span className="text-[12px] font-semibold">Current statement</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">
+            {action.range.from}-{action.range.to}
+          </span>
+        </div>
+        <div className="px-2 py-2">
+          <div
+            className="truncate font-mono text-[11px] text-[var(--taomni-text)]"
+            title={action.range.sql}
+          >
+            {compactSql}
+          </div>
+          <div className="mt-2 flex items-center gap-1">
+            <button type="button" data-testid="db-current-statement-run" className={iconButton} onClick={() => onRun(action)} title="Run this SQL statement">
+              <Play className="w-3 h-3" /> Run
+            </button>
+            <button type="button" data-testid="db-current-statement-select" className={iconButton} onClick={() => onSelect(action)} title="Select this SQL statement in the editor">
+              <SquareDashedMousePointer className="w-3 h-3" /> Select
+            </button>
+            <button type="button" data-testid="db-current-statement-open-tab" className={iconButton} onClick={() => onOpenTab(action)} title="Open and run in a new query panel">
+              <Plus className="w-3 h-3" /> +Tab
+            </button>
+            <button type="button" data-testid="db-current-statement-json" className={iconButton} onClick={() => onJson(action)} disabled={!hasJson} title={hasJson ? "Copy in-memory result as JSON" : "Run this statement to make JSON available"}>
+              <FileJson className="w-3 h-3" /> JSON
+            </button>
+            <button type="button" data-testid="db-current-statement-ask-ai" className={iconButton} onClick={() => onAskAi(action)} title="Ask AI about this SQL statement">
+              <MessageSquare className="w-3 h-3" /> Ask AI
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function HistoryDropdown({
+  entries,
+  loading,
+  onRefresh,
+  onRun,
+  onSelect,
+  onOpenTab,
+  onJson,
+  onAskAi,
+  onDelete,
+  onClear,
+  onClose,
+}: {
+  entries: DbSqlHistoryEntry[];
+  loading: boolean;
+  onRefresh: () => void;
+  onRun: (entry: DbSqlHistoryEntry) => void;
+  onSelect: (entry: DbSqlHistoryEntry) => void;
+  onOpenTab: (entry: DbSqlHistoryEntry) => void;
+  onJson: (entry: DbSqlHistoryEntry) => void;
+  onAskAi: (entry: DbSqlHistoryEntry) => void;
+  onDelete: (entry: DbSqlHistoryEntry) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-[10px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        data-testid="db-query-history-panel"
+        className="absolute right-2 top-9 z-50 w-[620px] max-w-[calc(100vw-24px)] max-h-[440px] overflow-hidden rounded shadow-lg flex flex-col"
+        style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
+      >
+        <div
+          className="h-8 shrink-0 flex items-center gap-2 px-2"
+          style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+        >
+          <Clock className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+          <span className="text-[12px] font-semibold">Query history</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">{entries.length}</span>
+          <div className="flex-1" />
+          <button type="button" data-testid="db-query-history-refresh" className={iconButton} onClick={onRefresh} title="Refresh query history">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+          <button type="button" data-testid="db-query-history-clear" className={iconButton} onClick={onClear} disabled={entries.length === 0} title="Clear this session history">
+            <Trash2 className="w-3.5 h-3.5" /> Clear
+          </button>
+        </div>
+        {loading ? (
+          <div className="px-3 py-4 text-[11px] text-[var(--taomni-text-muted)] inline-flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading query history...
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="px-3 py-4 text-[11px] text-[var(--taomni-text-muted)]">No query history yet.</div>
         ) : (
-          history.map((sql, i) => (
-            <div
-              key={i}
-              className="flex items-center hover:bg-[var(--taomni-hover)] group border-b border-[var(--taomni-divider)] last:border-0"
-            >
-              <button
-                type="button"
-                className="flex-1 text-left px-3 py-2 text-[11px] truncate font-mono text-[var(--taomni-text)]"
-                onClick={() => onPick(sql)}
-                title={sql}
-              >
-                {sql.replace(/\s+/g, " ")}
-              </button>
-              <button
-                type="button"
-                className="p-1.5 mr-1 hover:bg-[var(--taomni-divider)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Bookmark this query"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onBookmark(sql);
-                }}
-              >
-                <Star className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-              </button>
-            </div>
-          ))
+          <div className="overflow-auto taomni-scroll-y">
+            {entries.map((entry) => {
+              const duration = formatDurationMs(entry.durationMs);
+              const sql = entry.sqlContent.replace(/\s+/g, " ").trim();
+              const hasJson = entry.hasResultSet && !entry.error;
+              return (
+                <div
+                  key={entry.id}
+                  data-testid="db-query-history-entry"
+                  className="px-2 py-2 border-b border-[var(--taomni-divider)] last:border-0 hover:bg-[var(--taomni-hover)]"
+                >
+                  <div className="flex items-center gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+                    <span className="font-mono">{formatFullDateTime(entry.startedAt)}</span>
+                    {duration && <span>{duration}</span>}
+                    {entry.hasResultSet ? <span>{entry.rowCount ?? 0} rows</span> : <span>{entry.rowsAffected ?? 0} affected</span>}
+                    {entry.error && <span className="text-[#d9534f] truncate">Error</span>}
+                    <span className="ml-auto truncate">{entry.schemaName ?? entry.databaseName ?? entry.engine}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-1 w-full text-left truncate font-mono text-[11px] text-[var(--taomni-text)]"
+                    title={entry.sqlContent}
+                    onClick={() => onSelect(entry)}
+                  >
+                    {sql}
+                  </button>
+                  {entry.error && (
+                    <div className="mt-1 truncate text-[10px] text-[#d9534f]" title={entry.error}>
+                      {entry.error}
+                    </div>
+                  )}
+                  <div className="mt-1.5 flex items-center gap-1">
+                    <button type="button" data-testid="db-query-history-run" className={iconButton} onClick={() => onRun(entry)} title="Run this historical SQL">
+                      <Play className="w-3 h-3" /> Run
+                    </button>
+                    <button type="button" data-testid="db-query-history-select" className={iconButton} onClick={() => onSelect(entry)} title="Select this SQL in the current editor">
+                      <SquareDashedMousePointer className="w-3 h-3" /> Select
+                    </button>
+                    <button type="button" data-testid="db-query-history-open-tab" className={iconButton} onClick={() => onOpenTab(entry)} title="Open and run in a new query panel">
+                      <Plus className="w-3 h-3" /> +Tab
+                    </button>
+                    <button type="button" data-testid="db-query-history-json" className={iconButton} onClick={() => onJson(entry)} disabled={!hasJson} title={hasJson ? "Copy in-memory result as JSON" : "Run this SQL again to make JSON available"}>
+                      <FileJson className="w-3 h-3" /> JSON
+                    </button>
+                    <button type="button" data-testid="db-query-history-ask-ai" className={iconButton} onClick={() => onAskAi(entry)} title="Ask AI about this SQL">
+                      <MessageSquare className="w-3 h-3" /> Ask AI
+                    </button>
+                    <div className="flex-1" />
+                    <button type="button" data-testid="db-query-history-delete" className={iconButton} onClick={() => onDelete(entry)} title="Delete this history entry">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </>
@@ -1990,6 +2743,8 @@ function ResultArea({
   onTabChange,
   onRefreshSheet,
   onCommitGridChanges,
+  onGeneratedSqlChange,
+  onGeneratedSqlSync,
   onCancel,
   onStatus,
 }: {
@@ -2000,6 +2755,8 @@ function ResultArea({
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
   onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
   onCommitGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<void>;
+  onGeneratedSqlChange: (sheetId: string, sql: string | null) => void;
+  onGeneratedSqlSync: (sheetId: string, sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onCancel: () => void;
   onStatus: (message: string) => void;
 }) {
@@ -2116,6 +2873,8 @@ function ResultArea({
                 onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
                 onCancel={onCancel}
                 onCommitChanges={(payload) => onCommitGridChanges(sheet.id, payload)}
+                onGeneratedSqlChange={(sql) => onGeneratedSqlChange(sheet.id, sql)}
+                onGeneratedSqlSync={(sql, mode) => onGeneratedSqlSync(sheet.id, sql, mode)}
                 onStatus={onStatus}
               />
             </div>
