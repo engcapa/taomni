@@ -342,6 +342,20 @@ fn clipboard_paths_from_uri_text(text: &str) -> Vec<String> {
             out.push(value);
         }
     }
+    for line in text.lines() {
+        let value = line.trim();
+        if value.is_empty()
+            || value.starts_with('#')
+            || value.eq_ignore_ascii_case("copy")
+            || value.eq_ignore_ascii_case("cut")
+            || value.starts_with("file://")
+        {
+            continue;
+        }
+        if PathBuf::from(value).is_absolute() && !out.iter().any(|path| path == value) {
+            out.push(value.to_string());
+        }
+    }
     out
 }
 
@@ -772,6 +786,21 @@ mod tests {
         assert_eq!(
             parsed,
             vec!["/tmp/same".to_string(), "/tmp/other".to_string()]
+        );
+    }
+
+    #[test]
+    fn clipboard_uri_text_parses_plain_absolute_paths() {
+        let parsed = clipboard_paths_from_uri_text(
+            "copy\n/home/me/plain file.txt\n/home/me/plain file.txt\n/home/me/dir\n",
+        );
+
+        assert_eq!(
+            parsed,
+            vec![
+                "/home/me/plain file.txt".to_string(),
+                "/home/me/dir".to_string()
+            ]
         );
     }
 }

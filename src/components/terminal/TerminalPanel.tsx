@@ -4177,7 +4177,7 @@ function normalizePasteText(text: string): string {
 function terminalCanPromptForLocalPathUpload(term: Terminal | null): boolean {
   if (!term) return false;
   if (term.buffer.active.type === "alternate") return false;
-  return captureBufferCommand(term).length === 0;
+  return true;
 }
 
 function uniqueNonEmpty(values: string[]): string[] {

@@ -762,6 +762,60 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("prompts to upload dragged file paths even when the shell prompt is custom", async () => {
+    const onSessionReady = vi.fn();
+    const onUploadLocalPaths = vi.fn(async () => undefined);
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        onSessionReady={onSessionReady}
+        onUploadLocalPaths={onUploadLocalPaths}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+    terminalMocks.oscHandlers.get(7)?.("file://example.test/home/user/project");
+
+    const term = terminalMocks.terminalCtor.mock.results[terminalMocks.terminalCtor.mock.results.length - 1].value;
+    const prompt = "[user@example.test project] λ ";
+    term.buffer.active = {
+      type: "normal",
+      length: 1,
+      baseY: 0,
+      cursorY: 0,
+      cursorX: prompt.length,
+      getLine: vi.fn(() => ({
+        isWrapped: false,
+        translateToString: () => prompt,
+      })),
+    };
+
+    const dataTransfer = {
+      types: ["Files", "text/uri-list"],
+      files: [new File(["x"], "a b.png", { type: "image/png" })],
+      dropEffect: "none",
+      getData: (format: string) => (format === "text/uri-list" ? "file:///home/me/a%20b.png" : ""),
+    };
+
+    fireEvent.drop(screen.getByTestId("terminal-pane"), { dataTransfer });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => {
+      expect(onUploadLocalPaths).toHaveBeenCalledWith({
+        paths: ["/home/me/a b.png"],
+        cwd: "/home/user/project",
+      });
+    });
+  });
+
   it("pastes dragged file paths in an SSH alternate-screen app", async () => {
     const onSessionReady = vi.fn();
     const onUploadLocalPaths = vi.fn(async () => undefined);
