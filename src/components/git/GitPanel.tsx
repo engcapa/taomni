@@ -88,6 +88,7 @@ import { useAppStore } from "../../stores/appStore";
 interface GitPanelProps {
   repoRoot: string;
   visible?: boolean;
+  embedded?: boolean;
   onOpenWorkspace?: (repoRoot: string) => void;
 }
 
@@ -105,7 +106,7 @@ const EMPTY_SETTINGS: GitRepoSettings = {
   commitGpgsign: null,
 };
 
-export function GitPanel({ repoRoot, visible = true, onOpenWorkspace }: GitPanelProps) {
+export function GitPanel({ repoRoot, visible = true, embedded = false, onOpenWorkspace }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
@@ -475,13 +476,21 @@ export function GitPanel({ repoRoot, visible = true, onOpenWorkspace }: GitPanel
       data-testid="git-panel"
       className="h-full w-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
     >
-      <header className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
-        <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
-        <div className="min-w-0">
-          <div className="font-semibold leading-4 truncate">Git · {repoName}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{repoRoot}</div>
-        </div>
-        <span className="taomni-divider-v h-5 mx-1" />
+      <header className={`${embedded ? "h-9 px-2" : "h-10 px-3"} shrink-0 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]`}>
+        {embedded ? (
+          <span className="max-w-40 truncate text-[11px] text-[var(--taomni-text-muted)]" title={repoRoot}>
+            {repoName}
+          </span>
+        ) : (
+          <>
+            <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
+            <div className="min-w-0">
+              <div className="font-semibold leading-4 truncate">Git · {repoName}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{repoRoot}</div>
+            </div>
+            <span className="taomni-divider-v h-5 mx-1" />
+          </>
+        )}
         <BranchBadge snapshot={snapshot} />
         {snapshot && (
           <span className="text-[11px] text-[var(--taomni-text-muted)]">
@@ -490,7 +499,7 @@ export function GitPanel({ repoRoot, visible = true, onOpenWorkspace }: GitPanel
           </span>
         )}
         <div className="flex-1" />
-        {onOpenWorkspace && (
+        {onOpenWorkspace && !embedded && (
           <IconButton
             label="Open code workspace"
             icon={<Braces className="w-3.5 h-3.5" />}

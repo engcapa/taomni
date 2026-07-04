@@ -55,6 +55,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  GitBranch,
   Info,
   List,
   ListTree,
@@ -77,6 +78,7 @@ import {
   workspaceCreateFile,
   workspaceCompactChain,
   workspaceDeletePath,
+  workspaceDetectGitRoots,
   workspaceListFilesRecursive,
   workspaceListDir,
   workspaceReadFile,
@@ -85,7 +87,13 @@ import {
   workspaceWriteFile,
   workspaceWriteLooseFile,
   type WorkspaceEntry,
+  type WorkspaceGitRoot,
 } from "../../lib/editor/workspace";
+import {
+  gitChangeLabel,
+  gitSnapshot,
+  type GitChange,
+} from "../../lib/git";
 import {
   lspChangeDocument,
   lspCloseDocument,
@@ -121,6 +129,7 @@ import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { languageForPath } from "../git/diffLanguage";
+import { WorkspaceGitContainer } from "./WorkspaceGitContainer";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceLooseFileInfo,
@@ -194,6 +203,8 @@ const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
 const CUSTOM_LSP_COMMAND_ID = "__custom__";
 const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
 const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
+const BOTTOM_PANEL_OPEN_KEY = "taomni.codeWorkspace.bottomPanelOpen.v1";
+const BOTTOM_PANEL_SIZE_KEY = "taomni.codeWorkspace.bottomPanelSize.v1";
 const FLAT_VIEW_MAX_FILES = 2_000;
 const FLAT_VIEW_MAX_DEPTH = 25;
 const CODE_WORKSPACE_MIN_FONT_SIZE = 8;
@@ -230,6 +241,12 @@ const DEFAULT_FLAT_FILES_STATE: FlatFilesState = {
   error: null,
   truncated: false,
 };
+
+interface WorkspaceGitSnapshotState {
+  changes: GitChange[];
+  loading: boolean;
+  error: string | null;
+}
 
 const WORKSPACE_EDITOR_STYLE = EditorView.theme({
   "&": {
@@ -377,6 +394,19 @@ function relativePathWithinRoot(rootPath: string, filePath: string): string | nu
   const file = normalizeFsPath(filePath);
   if (file === root) return "";
   return file.startsWith(`${root}/`) ? file.slice(root.length + 1) : null;
+}
+
+function gitPathForWorkspacePath(
+  root: CodeWorkspaceRootInfo,
+  repo: WorkspaceGitRoot,
+  workspacePath: string,
+): string | null {
+  const repoRoot = normalizeFsPath(repo.repoRoot);
+  const rootPath = normalizeFsPath(root.path);
+  if (rootPath === repoRoot) return workspacePath;
+  if (!rootPath.startsWith(`${repoRoot}/`)) return null;
+  const prefix = rootPath.slice(repoRoot.length + 1);
+  return workspacePath ? `${prefix}/${workspacePath}` : prefix;
 }
 
 function rootDirKey(rootId: string, path = ""): string {
@@ -588,6 +618,39 @@ function writeCodeWorkspaceTreeViewMode(mode: TreeViewMode): void {
   }
 }
 
+function readCodeWorkspaceBottomPanelOpen(): boolean {
+  try {
+    return window.localStorage.getItem(BOTTOM_PANEL_OPEN_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeCodeWorkspaceBottomPanelOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(BOTTOM_PANEL_OPEN_KEY, open ? "true" : "false");
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function readCodeWorkspaceBottomPanelSize(): number {
+  try {
+    const raw = Number(window.localStorage.getItem(BOTTOM_PANEL_SIZE_KEY));
+    return Number.isFinite(raw) ? Math.min(55, Math.max(18, raw)) : 32;
+  } catch {
+    return 32;
+  }
+}
+
+function writeCodeWorkspaceBottomPanelSize(size: number): void {
+  try {
+    window.localStorage.setItem(BOTTOM_PANEL_SIZE_KEY, String(Math.round(size)));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 function emptyLspFileState(): LspFileState {
   return {
     status: null,
@@ -690,11 +753,17 @@ export function CodeWorkspaceTab({
   const [codeViewProfile, setCodeViewProfileState] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
   const [treeViewMode, setTreeViewModeState] = useState<TreeViewMode>(() => readCodeWorkspaceTreeViewMode());
+  const [bottomPanelOpen, setBottomPanelOpenState] = useState(() => readCodeWorkspaceBottomPanelOpen());
+  const [bottomPanelSize, setBottomPanelSize] = useState(() => readCodeWorkspaceBottomPanelSize());
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
   const [compactChains, setCompactChains] = useState<Record<string, { path: string; entries: WorkspaceEntry[]; loading: boolean; error: string | null }>>({});
   const [flatFiles, setFlatFiles] = useState<Record<string, FlatFilesState>>({});
+  const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
+  const [gitRootsLoading, setGitRootsLoading] = useState(false);
+  const [gitRootsError, setGitRootsError] = useState<string | null>(null);
+  const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => root.id)));
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => rootDirKey(root.id, ""))));
   const [treeFilter, setTreeFilter] = useState("");
@@ -725,6 +794,7 @@ export function CodeWorkspaceTab({
   const treeFontSizeRef = useRef(treeFontSize);
   const compactChainsRef = useRef(compactChains);
   const flatFilesRef = useRef(flatFiles);
+  const gitRootsRef = useRef(gitRoots);
   const lspVersionRef = useRef<Record<string, number>>({});
   const revealNonceRef = useRef(0);
   const initialOpenedKeyRef = useRef<string | null>(null);
@@ -757,6 +827,10 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     flatFilesRef.current = flatFiles;
   }, [flatFiles]);
+
+  useEffect(() => {
+    gitRootsRef.current = gitRoots;
+  }, [gitRoots]);
 
   useEffect(() => {
     openFilesRef.current = openFiles;
@@ -851,6 +925,11 @@ export function CodeWorkspaceTab({
     writeCodeWorkspaceTreeViewMode(mode);
     setStatusMessage(`File tree view: ${mode}`);
   }, [setStatusMessage]);
+
+  const setBottomPanelOpen = useCallback((open: boolean) => {
+    setBottomPanelOpenState(open);
+    writeCodeWorkspaceBottomPanelOpen(open);
+  }, []);
 
   const zoomTargetForNode = useCallback((target: EventTarget | null): "tree" | "editor" => {
     const node = target instanceof Node ? target : null;
@@ -1270,11 +1349,92 @@ export function CodeWorkspaceTab({
     [findRoot, setStatusMessage],
   );
 
+  const refreshWorkspaceGitSnapshots = useCallback(async (targets = gitRootsRef.current) => {
+    await Promise.all(targets.map(async (root) => {
+      setGitSnapshots((current) => ({
+        ...current,
+        [root.repoRoot]: {
+          changes: current[root.repoRoot]?.changes ?? [],
+          loading: true,
+          error: null,
+        },
+      }));
+      try {
+        const snapshot = await gitSnapshot(root.repoRoot);
+        setGitSnapshots((current) => ({
+          ...current,
+          [root.repoRoot]: {
+            changes: snapshot.changes,
+            loading: false,
+            error: null,
+          },
+        }));
+      } catch (err) {
+        setGitSnapshots((current) => ({
+          ...current,
+          [root.repoRoot]: {
+            changes: current[root.repoRoot]?.changes ?? [],
+            loading: false,
+            error: errorMessage(err),
+          },
+        }));
+      }
+    }));
+  }, []);
+
   useEffect(() => {
     roots.forEach((root) => {
       if (expandedRoots.has(root.id)) void loadDir(root.id, "");
     });
   }, [expandedRoots, loadDir, roots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (roots.length === 0) {
+      setGitRoots([]);
+      setGitRootsError(null);
+      setGitRootsLoading(false);
+      setGitSnapshots({});
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setGitRootsLoading(true);
+    setGitRootsError(null);
+    void workspaceDetectGitRoots(roots.map((root) => ({
+      id: root.id,
+      name: root.name,
+      path: root.path,
+    }))).then((detected) => {
+      if (cancelled) return;
+      setGitRoots(detected);
+      setGitSnapshots((current) => Object.fromEntries(
+        Object.entries(current).filter(([repoRoot]) => detected.some((root) => root.repoRoot === repoRoot)),
+      ));
+    }).catch((err) => {
+      if (cancelled) return;
+      const message = errorMessage(err);
+      setGitRoots([]);
+      setGitRootsError(message);
+      setStatusMessage(message);
+    }).finally(() => {
+      if (!cancelled) setGitRootsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roots, setStatusMessage]);
+
+  useEffect(() => {
+    if (gitRoots.length === 0) return;
+    void refreshWorkspaceGitSnapshots(gitRoots);
+    const timer = window.setInterval(() => {
+      void refreshWorkspaceGitSnapshots(gitRootsRef.current);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [gitRoots, refreshWorkspaceGitSnapshots]);
 
   useEffect(() => {
     if (treeViewMode !== "compact") return;
@@ -1841,6 +2001,36 @@ export function CodeWorkspaceTab({
   const activeMarkdownMode = activeFile && isMarkdownPath(activeFile.languagePath)
     ? markdownModes[activeFile.key] ?? "edit"
     : "edit";
+  const activeRootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : null;
+  const gitRootByRootId = useMemo(() => {
+    const map = new Map<string, WorkspaceGitRoot>();
+    for (const root of gitRoots) {
+      root.rootIds.forEach((rootId) => map.set(rootId, root));
+    }
+    return map;
+  }, [gitRoots]);
+  const gitChangeByRootPath = useMemo(() => {
+    const map = new Map<string, GitChange>();
+    for (const root of roots) {
+      const repo = gitRootByRootId.get(root.id);
+      if (!repo) continue;
+      const snapshot = gitSnapshots[repo.repoRoot];
+      if (!snapshot?.changes.length) continue;
+      for (const change of snapshot.changes) {
+        const rootPrefix = gitPathForWorkspacePath(root, repo, "");
+        if (rootPrefix === null) continue;
+        const normalizedPrefix = rootPrefix.replace(/\/+$/, "");
+        const workspacePath = normalizedPrefix
+          ? change.path.startsWith(`${normalizedPrefix}/`)
+            ? change.path.slice(normalizedPrefix.length + 1)
+            : null
+          : change.path;
+        if (!workspacePath) continue;
+        map.set(`${root.id}:${workspacePath}`, change);
+      }
+    }
+    return map;
+  }, [gitRootByRootId, gitSnapshots, roots]);
 
   useEffect(() => {
     if (!visible || !activeFile || activeFile.loading) return;
@@ -2095,6 +2285,46 @@ export function CodeWorkspaceTab({
     return name.slice(dot).toLowerCase();
   }
 
+  function gitChangeForPath(rootId: string, path: string): GitChange | undefined {
+    return gitChangeByRootPath.get(`${rootId}:${path}`);
+  }
+
+  function gitDirectoryChangeCount(rootId: string, path: string): number {
+    const prefix = path ? `${rootId}:${path}/` : `${rootId}:`;
+    let count = 0;
+    for (const key of gitChangeByRootPath.keys()) {
+      if (key.startsWith(prefix)) count += 1;
+    }
+    return count;
+  }
+
+  function gitStatusBadge(change: GitChange | undefined): ReactNode {
+    if (!change) return null;
+    const label = change.conflict
+      ? "C"
+      : change.status === "untracked"
+        ? "U"
+        : change.status === "renamed"
+          ? "R"
+          : change.status[0]?.toUpperCase() ?? "?";
+    const color = change.conflict
+      ? "border-red-500/30 bg-red-500/10 text-red-500"
+      : change.status === "untracked"
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+        : change.staged
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+          : "border-blue-500/30 bg-blue-500/10 text-blue-500";
+    return (
+      <span
+        data-testid="code-workspace-git-status"
+        className={`inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-[10px] font-semibold ${color}`}
+        title={gitChangeLabel(change)}
+      >
+        {label}
+      </span>
+    );
+  }
+
   function renderFlatEntries(root: CodeWorkspaceRootInfo): ReactNode {
     const state = flatFiles[root.id] ?? DEFAULT_FLAT_FILES_STATE;
     const filter = treeFilter.trim().toLowerCase();
@@ -2153,6 +2383,7 @@ export function CodeWorkspaceTab({
               const active = activeKey === key;
               const isSelected = selected?.kind === "file" && isRootRef(selected.ref, root.id, entry.path);
               const open = openFiles[key];
+              const change = gitChangeForPath(root.id, entry.path);
               return (
                 <button
                   key={`${root.id}:flat:${entry.path}`}
@@ -2171,7 +2402,12 @@ export function CodeWorkspaceTab({
                 >
                   <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                   <span className="truncate">{entry.path}</span>
-                  {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
+                  {(change || open?.dirty) && (
+                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                      {gitStatusBadge(change)}
+                      {open?.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -2222,6 +2458,7 @@ export function CodeWorkspaceTab({
       if (isDir) {
         const childState = directories[dirKey];
         const isSelected = selected?.kind === "dir" && selected.rootId === root.id && selected.path === displayPath;
+        const changeCount = gitDirectoryChangeCount(root.id, displayPath);
         return (
           <Fragment key={`${root.id}:${entry.path}`}>
             <button
@@ -2245,7 +2482,16 @@ export function CodeWorkspaceTab({
               )}
               <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
               <span className="truncate">{displayName}</span>
-              {(childState?.loading || chain?.loading) && <Loader2 className="ml-auto w-3 h-3 animate-spin" />}
+              {(changeCount > 0 || childState?.loading || chain?.loading) && (
+                <span className="ml-auto flex shrink-0 items-center gap-1">
+                  {changeCount > 0 && (
+                    <span className="rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">
+                      {changeCount}
+                    </span>
+                  )}
+                  {(childState?.loading || chain?.loading) && <Loader2 className="w-3 h-3 animate-spin" />}
+                </span>
+              )}
             </button>
             {isExpanded && renderEntries(root, displayPath, depth + 1)}
           </Fragment>
@@ -2256,6 +2502,7 @@ export function CodeWorkspaceTab({
       const active = activeKey === key;
       const isSelected = selected?.kind === "file" && isRootRef(selected.ref, root.id, entry.path);
       const open = openFiles[key];
+      const change = gitChangeForPath(root.id, entry.path);
       return (
         <button
           key={`${root.id}:${entry.path}`}
@@ -2276,7 +2523,12 @@ export function CodeWorkspaceTab({
           <span className="w-3.5 shrink-0" />
           <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
           <span className="truncate">{entry.name}</span>
-          {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
+          {(change || open?.dirty) && (
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              {gitStatusBadge(change)}
+              {open?.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
+            </span>
+          )}
         </button>
       );
     });
@@ -2345,6 +2597,14 @@ export function CodeWorkspaceTab({
           label="Refresh tree"
           icon={<RefreshCw className="w-3.5 h-3.5" />}
           onClick={refreshTree}
+        />
+        <IconButton
+          label={bottomPanelOpen ? "Hide Git panel" : "Show Git panel"}
+          testId="code-workspace-git-panel-toggle"
+          icon={gitRootsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
+          active={bottomPanelOpen}
+          disabled={!gitRootsLoading && !gitRootsError && gitRoots.length === 0}
+          onClick={() => setBottomPanelOpen(!bottomPanelOpen)}
         />
       </header>
 
@@ -2438,6 +2698,7 @@ export function CodeWorkspaceTab({
               {roots.map((root) => {
                 const expanded = expandedRoots.has(root.id);
                 const selectedRoot = selected?.kind === "root" && selected.rootId === root.id;
+                const rootChangeCount = gitDirectoryChangeCount(root.id, "");
                 return (
                   <Fragment key={root.id}>
                     <button
@@ -2456,7 +2717,14 @@ export function CodeWorkspaceTab({
                       )}
                       <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
                       <span className="truncate">{root.name}</span>
-                      <span className="ml-auto shrink-0 text-[10px] font-normal text-[var(--taomni-code-muted)]">{root.kind}</span>
+                      <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-normal text-[var(--taomni-code-muted)]">
+                        {rootChangeCount > 0 && (
+                          <span className="rounded border border-[var(--taomni-code-border)] px-1">
+                            {rootChangeCount}
+                          </span>
+                        )}
+                        <span>{root.kind}</span>
+                      </span>
                     </button>
                     {expanded && (
                       treeViewMode === "flat"
@@ -2568,9 +2836,20 @@ export function CodeWorkspaceTab({
                 })}
               </div>
             )}
-            <div className="flex-1 min-h-0 relative">
-              {activeFile ? (
-                <div className="absolute inset-0 flex flex-col">
+            <PanelGroup
+              orientation="vertical"
+              id={`code-workspace-editor-stack-${workspace.workspaceId ?? workspace.repoRoot ?? tabId}`}
+              className="flex-1 min-h-0"
+            >
+              <Panel
+                id="editor-body"
+                defaultSize={bottomPanelOpen ? 68 : 100}
+                minSize={bottomPanelOpen ? 30 : 100}
+                className="min-h-0"
+              >
+                <div className="h-full min-h-0 relative">
+                  {activeFile ? (
+                    <div className="absolute inset-0 flex flex-col">
                   <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
                     <span className="truncate">{activeFile.subtitle}</span>
                     <span className="shrink-0">{formatBytes(activeFile.size)}</span>
@@ -2651,13 +2930,45 @@ export function CodeWorkspaceTab({
                       />
                     )}
                   </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+                      No file open
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
-                  No file open
-                </div>
+              </Panel>
+              {bottomPanelOpen && (
+                <>
+                  <PanelResizeHandle className="h-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
+                  <Panel
+                    id="workspace-git"
+                    defaultSize={bottomPanelSize}
+                    minSize={18}
+                    maxSize={55}
+                    className="min-h-0"
+                    onResize={(size) => {
+                      const nextSize = typeof size === "number" ? size : Number.parseFloat(String(size));
+                      if (!Number.isFinite(nextSize)) return;
+                      setBottomPanelSize(nextSize);
+                      writeCodeWorkspaceBottomPanelSize(nextSize);
+                    }}
+                  >
+                    {gitRootsError ? (
+                      <div className="h-full flex items-center justify-center text-[12px] text-red-500">
+                        {gitRootsError}
+                      </div>
+                    ) : (
+                      <WorkspaceGitContainer
+                        gitRoots={gitRoots}
+                        activeRootId={activeRootId}
+                        visible={visible && bottomPanelOpen}
+                      />
+                    )}
+                  </Panel>
+                </>
               )}
-            </div>
+            </PanelGroup>
           </main>
         </Panel>
       </PanelGroup>

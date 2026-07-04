@@ -24,6 +24,20 @@ export interface WorkspaceCompactChain {
   entries: WorkspaceEntry[];
 }
 
+export interface WorkspaceGitRootCandidate {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export interface WorkspaceGitRoot {
+  id: string;
+  name: string;
+  path: string;
+  repoRoot: string;
+  rootIds: string[];
+}
+
 export function workspaceListDir(
   repoRoot: string,
   path = "",
@@ -55,6 +69,12 @@ export function workspaceListFilesRecursive(
     maxDepth: maxDepth ?? null,
     maxFiles: maxFiles ?? null,
   });
+}
+
+export function workspaceDetectGitRoots(
+  roots: WorkspaceGitRootCandidate[],
+): Promise<WorkspaceGitRoot[]> {
+  return invoke<WorkspaceGitRoot[]>("workspace_detect_git_roots", { roots });
 }
 
 export function workspaceReadFile(

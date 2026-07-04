@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -36,6 +36,24 @@ pub struct WorkspaceFile {
 pub struct WorkspaceCompactChain {
     pub path: String,
     pub entries: Vec<WorkspaceEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceGitRootCandidate {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceGitRoot {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub repo_root: String,
+    pub root_ids: Vec<String>,
 }
 
 #[tauri::command]
@@ -104,6 +122,43 @@ pub fn workspace_list_files_recursive(
     collect_workspace_files(&root, &start, 0, max_depth, max_files, &mut files)?;
     files.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
     Ok(files)
+}
+
+#[tauri::command]
+pub fn workspace_detect_git_roots(
+    roots: Vec<WorkspaceGitRootCandidate>,
+) -> Result<Vec<WorkspaceGitRoot>, String> {
+    let mut repos: Vec<WorkspaceGitRoot> = Vec::new();
+    for root in roots {
+        let Ok(path) = fs::canonicalize(&root.path) else {
+            continue;
+        };
+        let Ok(meta) = fs::metadata(&path) else {
+            continue;
+        };
+        if !meta.is_dir() {
+            continue;
+        }
+        let Some(repo_root) = find_git_repo_root(&path) else {
+            continue;
+        };
+        let repo_root = path_to_string(&repo_root);
+        if let Some(existing) = repos.iter_mut().find(|item| item.repo_root == repo_root) {
+            if !existing.root_ids.contains(&root.id) {
+                existing.root_ids.push(root.id);
+            }
+            continue;
+        }
+        repos.push(WorkspaceGitRoot {
+            id: root.id.clone(),
+            name: root.name,
+            path: path_to_string(&path),
+            repo_root,
+            root_ids: vec![root.id],
+        });
+    }
+    repos.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(repos)
 }
 
 #[tauri::command]
@@ -525,6 +580,21 @@ fn list_workspace_entries(root: &Path, target: &Path) -> Result<Vec<WorkspaceEnt
     Ok(entries)
 }
 
+fn find_git_repo_root(path: &Path) -> Option<PathBuf> {
+    let mut current = Some(path);
+    while let Some(dir) = current {
+        if dir.join(".git").exists() {
+            return Some(dir.to_path_buf());
+        }
+        current = dir.parent();
+    }
+    None
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
 fn collect_workspace_files(
     root: &Path,
     dir: &Path,
@@ -807,6 +877,43 @@ mod tests {
 
         let limited = workspace_list_files_recursive(root, None, Some(10), Some(1)).unwrap();
         assert_eq!(limited.len(), 1);
+    }
+
+    #[test]
+    fn detects_git_roots_and_deduplicates_nested_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        let nested = repo.join("packages/app");
+        let plain = dir.path().join("plain");
+        fs::create_dir_all(repo.join(".git")).unwrap();
+        fs::create_dir_all(&nested).unwrap();
+        fs::create_dir_all(&plain).unwrap();
+
+        let repos = workspace_detect_git_roots(vec![
+            WorkspaceGitRootCandidate {
+                id: "repo".into(),
+                name: "repo".into(),
+                path: repo.to_string_lossy().to_string(),
+            },
+            WorkspaceGitRootCandidate {
+                id: "app".into(),
+                name: "app".into(),
+                path: nested.to_string_lossy().to_string(),
+            },
+            WorkspaceGitRootCandidate {
+                id: "plain".into(),
+                name: "plain".into(),
+                path: plain.to_string_lossy().to_string(),
+            },
+        ])
+        .unwrap();
+
+        let repo_root = repo.to_string_lossy().to_string();
+        let detected = repos
+            .iter()
+            .find(|item| item.repo_root == repo_root)
+            .expect("target repo should be detected");
+        assert_eq!(detected.root_ids, vec!["repo", "app"]);
     }
 
     #[test]

@@ -405,6 +405,7 @@ pub fn run() {
             workspace::workspace_list_dir,
             workspace::workspace_compact_chain,
             workspace::workspace_list_files_recursive,
+            workspace::workspace_detect_git_roots,
             workspace::workspace_read_file,
             workspace::workspace_read_loose_file,
             workspace::workspace_write_file,
