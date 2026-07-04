@@ -1,8 +1,8 @@
 id: TC-109
-title: Terminal context menu exposes font size controls only
+title: Terminal context menu exposes zoom and appearance controls
 description: |
-  Covers the terminal right-click Font size submenu after font family and
-  ligature controls moved to the shared Terminal Appearance settings.
+  Covers the terminal right-click top-level zoom actions and the unified
+  Appearance panel after the duplicate Font size submenu was removed.
 covers: [F4.2]
 tags: [smoke, p1, terminal, right-menu, font-size]
 modes: [browser]
@@ -14,12 +14,15 @@ steps:
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - right_click: {selector: "[data-testid=\"terminal-pane\"]", position: {x: 24, y: 24}}
   - wait_for: "[data-testid=\"context-menu\"]"
-  - assert_visible: '[data-testid="context-menu-item-font-size"]'
+  - assert_visible: 'text="Zoom in"'
+  - assert_visible: 'text="Zoom out"'
+  - assert_visible: 'text="Reset zoom"'
+  - assert_not_visible: '[data-testid="context-menu-item-font-size"]'
+  - assert_visible: '[data-testid="context-menu-item-appearance"]'
   - assert_not_visible: '[data-testid="context-menu-item-font-settings"]'
   - assert_not_visible: 'text="More fonts..."'
   - assert_not_visible: 'text="Display font ligatures"'
-  - hover: '[data-testid="context-menu-item-font-size"]'
-  - wait_for: 'text="Increase font size"'
-  - assert_visible: 'text="Decrease font size"'
-  - assert_visible: 'text="Reset font size to default"'
-  - screenshot: 109-terminal-font-size-menu.png
+  - hover: '[data-testid="context-menu-item-appearance"]'
+  - wait_for: '[data-testid="terminal-context-font-size"]'
+  - assert_visible: '[data-testid="terminal-context-font-select"]'
+  - screenshot: 109-terminal-appearance-menu.png

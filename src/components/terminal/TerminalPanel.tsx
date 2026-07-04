@@ -191,7 +191,6 @@ interface TerminalPanelProps {
   };
   terminalProfile?: TerminalProfile;
   onTerminalProfileChange?: (profile: TerminalProfile) => void;
-  persistLocalProfile?: boolean;
   adoptedTerminal?: AdoptedTerminalSession;
   /**
    * One-shot working directory for the initial connect. Local terminals launch
@@ -296,7 +295,6 @@ export function TerminalPanel({
   localShell,
   terminalProfile,
   onTerminalProfileChange,
-  persistLocalProfile,
   adoptedTerminal,
   initialCwd,
   preserveSessionOnUnmount = false,
@@ -369,7 +367,6 @@ export function TerminalPanel({
   const attachToComposer = useChatStore((s) => s.attachToComposer);
   const explainSelection = useChatStore((s) => s.explainSelection);
   const isLocal = !ssh && !commandTerminal;
-  const shouldPersistLocalProfile = persistLocalProfile ?? (isLocal && !terminalProfile && !adoptedTerminal);
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
     initialProfileRef.current = terminalProfile ?? (isLocal ? loadLocalTerminalDefaultProfile() : DEFAULT_TERMINAL_PROFILE);
@@ -379,7 +376,6 @@ export function TerminalPanel({
     terminalProfile ? terminalProfileSignature(terminalProfile) : null,
   );
   const currentTerminalProfileRef = useRef<TerminalProfile>(initialProfile);
-  const lastAutoSavedLocalProfileSignatureRef = useRef<string | null>(null);
 
   const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
   const [fontSize, setFontSize] = useState(initialProfile.fontSize);
@@ -1754,16 +1750,12 @@ export function TerminalPanel({
           ]
         : []),
       { label: "", separator: true },
+      { label: "Zoom in", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
+      { label: "Zoom out", shortcut: "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
+      { label: "Reset zoom", shortcut: "Ctrl+0", onClick: resetFontSize },
       {
-        label: "Font size",
-        children: [
-          { label: "Increase font size", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
-          { label: "Decrease font size", shortcut: "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
-          { label: "Reset font size to default", shortcut: "Ctrl+0", onClick: resetFontSize },
-        ],
-      },
-      {
-        label: "Theme",
+        label: "Appearance",
+        testId: "context-menu-item-appearance",
         customPanel: (
           <TerminalAppearanceMenuPanel
             themeValue={themeMenuValue}
@@ -1914,6 +1906,11 @@ export function TerminalPanel({
     startZmodemSend,
     zmodemState,
   ]);
+
+  useEffect(() => {
+    if (!contextMenu.isOpen) return;
+    contextMenu.refreshItems(buildContextMenu());
+  }, [buildContextMenu, contextMenu.isOpen, contextMenu.refreshItems]);
 
   const handleTerminalContextMenu = useCallback((event: ReactMouseEvent) => {
     if (rightClickBehavior === "paste") {
@@ -2111,21 +2108,6 @@ export function TerminalPanel({
     setAiCommandRewriteEnabled(terminalProfile.aiCommandRewriteEnabled);
     setCommonCommands(terminalProfile.commonCommands);
   }, [terminalProfile, theme]);
-
-  useEffect(() => {
-    if (!shouldPersistLocalProfile) return;
-    const nextProfile = {
-      ...loadLocalTerminalDefaultProfile(),
-      theme: themeName,
-      fontFamily,
-      fontSize,
-      fontLigatures,
-    };
-    const signature = terminalProfileSignature(nextProfile);
-    if (lastAutoSavedLocalProfileSignatureRef.current === signature) return;
-    lastAutoSavedLocalProfileSignatureRef.current = signature;
-    saveLocalTerminalDefaultProfile(nextProfile);
-  }, [fontFamily, fontLigatures, fontSize, shouldPersistLocalProfile, themeName]);
 
   useEffect(() => {
     macroRecordingRef.current = macroRecording;

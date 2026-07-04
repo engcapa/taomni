@@ -1,10 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Palette } from "lucide-react";
 import type { SessionConfig } from "../../lib/ipc";
 import type { TranslateFn } from "../../lib/i18n";
 import {
   getSessionTerminalProfileForThemeUpdate,
-  getSessionTerminalTheme,
   isTerminalThemeSession,
   type SessionTerminalAppearancePatch,
 } from "../../lib/sessionTerminalTheme";
@@ -58,12 +57,20 @@ function SessionTerminalThemeMenuPanel({
   onChangeAppearance: (patch: SessionTerminalAppearancePatch) => void;
 }) {
   const fontState = useSystemFonts();
-  const value = useMemo(() => currentThemeValue(sessions), [sessions]);
+  const [draftPatch, setDraftPatch] = useState<SessionTerminalAppearancePatch>({});
+  const draftPatchRef = useRef<SessionTerminalAppearancePatch>({});
+  const profiles = useMemo(
+    () => sessions.map((session) => ({
+      ...getSessionTerminalProfileForThemeUpdate(session),
+      ...draftPatch,
+    })),
+    [draftPatch, sessions],
+  );
+  const value = useMemo(() => commonValue(profiles.map((profile) => profile.theme)) ?? MIXED_THEME_VALUE, [profiles]);
   const customTheme = value !== MIXED_THEME_VALUE && isCustomTerminalTheme(value)
     ? resolveTerminalTheme(value)
     : null;
   const listValue = customTheme ? value : value === MIXED_THEME_VALUE ? value : resolveThemeId(value);
-  const profiles = useMemo(() => sessions.map(getSessionTerminalProfileForThemeUpdate), [sessions]);
   const fontFamilyValue = useMemo(() => commonValue(profiles.map((profile) => profile.fontFamily)), [profiles]);
   const fontSizeValue = useMemo(() => commonValue(profiles.map((profile) => profile.fontSize)), [profiles]);
   const options = useMemo(() => buildTerminalThemeOptions({
@@ -89,6 +96,12 @@ function SessionTerminalThemeMenuPanel({
     increaseTextSize: t("terminalAppearance.increaseTextSize"),
     fontSize: t("terminalAppearance.fontSizeAria"),
   }), [t]);
+  const changeAppearance = (patch: SessionTerminalAppearancePatch) => {
+    const next = { ...draftPatchRef.current, ...patch };
+    draftPatchRef.current = next;
+    setDraftPatch(next);
+    onChangeAppearance(next);
+  };
 
   return (
     <TerminalAppearanceMenuPanel
@@ -101,17 +114,11 @@ function SessionTerminalThemeMenuPanel({
       themeListTestId="session-terminal-theme-list"
       fontSelectTestId="session-terminal-font-select"
       fontSizeTestId="session-terminal-font-size"
-      onChangeTheme={(theme) => onChangeAppearance({ theme })}
-      onChangeFontFamily={(fontFamily) => onChangeAppearance({ fontFamily })}
-      onChangeFontSize={(fontSize) => onChangeAppearance({ fontSize })}
+      onChangeTheme={(theme) => changeAppearance({ theme })}
+      onChangeFontFamily={(fontFamily) => changeAppearance({ fontFamily })}
+      onChangeFontSize={(fontSize) => changeAppearance({ fontSize })}
     />
   );
-}
-
-function currentThemeValue(sessions: readonly SessionConfig[]): string {
-  const themes = new Set(sessions.map(getSessionTerminalTheme));
-  if (themes.size !== 1) return MIXED_THEME_VALUE;
-  return themes.values().next().value ?? MIXED_THEME_VALUE;
 }
 
 function commonValue<T>(values: readonly T[]): T | null {

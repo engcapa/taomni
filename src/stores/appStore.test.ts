@@ -141,6 +141,52 @@ describe("appStore.duplicateTab", () => {
     expect(useAppStore.getState().tabs.find((t) => t.id !== "rdp" && t.title === "Desktop-1")?.terminalInitialCwd).toBeUndefined();
   });
 
+  it("can carry a live terminal profile onto terminal copies", () => {
+    const terminalProfile = {
+      fontFamily: "\"JetBrains Mono\", monospace",
+      fontSize: 18,
+      fontLigatures: false,
+      theme: "kanagawa-wave",
+      scrollback: 10000,
+      cursorStyle: "block" as const,
+      cursorBlink: true,
+      showScrollbar: true,
+      webglRenderer: true,
+      copyOnSelect: false,
+      allowRemoteOsc52Clipboard: false,
+      rightClickBehavior: "menu" as const,
+      readOnly: false,
+      bracketedPaste: true,
+      multilinePasteConfirm: true,
+      syntaxMode: "default" as const,
+      loggingEnabled: false,
+      inlineSuggestions: true,
+      inlineSuggestionsMax: 2000,
+      inlineSuggestionsSource: "history" as const,
+      aiCommandRewriteEnabled: false,
+      aiCommandRewriteShortcut: "Ctrl+K",
+      aiInlineQqRender: false,
+      commonCommands: [],
+      commonCommandsShortcut: "Ctrl+Shift+P",
+    };
+    useAppStore.setState({
+      tabs: [
+        tab("term", { title: "Local" }),
+        tab("rdp", { type: "rdp", title: "Desktop" }),
+      ],
+      activeTabId: "term",
+    });
+
+    useAppStore.getState().duplicateTab("term", { terminalProfile });
+    expect(useAppStore.getState().tabs[1].terminalProfile).toMatchObject({
+      fontSize: 18,
+      theme: "kanagawa-wave",
+    });
+
+    useAppStore.getState().duplicateTab("rdp", { terminalProfile });
+    expect(useAppStore.getState().tabs.find((t) => t.id !== "rdp" && t.title === "Desktop-1")?.terminalProfile).toBeUndefined();
+  });
+
   it("mints a unique id distinct from the source", () => {
     useAppStore.getState().duplicateTab("a");
     const ids = useAppStore.getState().tabs.map((t) => t.id);

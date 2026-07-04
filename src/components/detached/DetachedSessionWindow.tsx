@@ -90,7 +90,6 @@ export interface DetachedTerminalParams {
   commandTerminal?: CommandTerminalConnectInfo | null;
   localShell?: LocalShellSelection | null;
   terminalProfile?: TerminalProfile | null;
-  persistLocalProfile?: boolean;
   reattach?: TerminalReattachState;
 }
 
@@ -552,7 +551,6 @@ function renderInner(
           commandTerminal={p.commandTerminal ?? undefined}
           localShell={p.localShell ?? undefined}
           terminalProfile={p.terminalProfile ?? undefined}
-          persistLocalProfile={p.persistLocalProfile}
           adoptedTerminal={adopted}
           preserveSessionOnUnmount
           detachedWindowControls={detachedWindowControls}

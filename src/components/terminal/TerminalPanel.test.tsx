@@ -1242,7 +1242,7 @@ describe("TerminalPanel focus behavior", () => {
     expect(screen.getByTestId("context-menu-item-send-file-using-z-modem")).toBeInTheDocument();
   });
 
-  it("keeps the terminal context font submenu scoped to font size changes", async () => {
+  it("puts terminal zoom actions at the top level and keeps font settings in appearance", async () => {
     const onProfileChange = vi.fn();
     render(
       <TerminalPanel
@@ -1258,14 +1258,16 @@ describe("TerminalPanel focus behavior", () => {
 
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
 
-    expect(await screen.findByTestId("context-menu-item-font-size")).toBeInTheDocument();
+    expect(await screen.findByText("Zoom in")).toBeInTheDocument();
+    expect(screen.getByText("Zoom out")).toBeInTheDocument();
+    expect(screen.getByText("Reset zoom")).toBeInTheDocument();
+    expect(screen.queryByTestId("context-menu-item-font-size")).not.toBeInTheDocument();
     expect(screen.queryByTestId("context-menu-item-font-settings")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Use font/)).not.toBeInTheDocument();
     expect(screen.queryByText("More fonts...")).not.toBeInTheDocument();
     expect(screen.queryByText("Display font ligatures")).not.toBeInTheDocument();
 
-    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-font-size"));
-    fireEvent.click(await screen.findByText("Increase font size"));
+    fireEvent.click(screen.getByText("Zoom in"));
 
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
       fontSize: 15,
@@ -1288,7 +1290,7 @@ describe("TerminalPanel focus behavior", () => {
     });
 
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
-    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-appearance"));
     fireEvent.click(await screen.findByText("Termius Dark"));
 
     expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -1313,7 +1315,7 @@ describe("TerminalPanel focus behavior", () => {
     });
 
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
-    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-appearance"));
 
     const kanagawa = await screen.findByTestId("terminal-context-theme-option-kanagawa-wave");
     fireEvent.click(kanagawa);
@@ -1420,7 +1422,7 @@ describe("TerminalPanel focus behavior", () => {
     });
 
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
-    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-appearance"));
     fireEvent.click(await screen.findByTestId("terminal-context-theme-option-kanagawa-wave"));
     fireEvent.click(screen.getByLabelText("Increase terminal font size"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
@@ -1430,14 +1432,13 @@ describe("TerminalPanel focus behavior", () => {
     expect(stored.fontSize).toBe(15);
   });
 
-  it("auto-saves local terminal appearance changes for future local terminals", async () => {
+  it("does not auto-save local terminal appearance changes for future local terminals", async () => {
     window.localStorage.clear();
     const onSessionReady = vi.fn();
 
     render(
       <TerminalPanel
         visible
-        persistLocalProfile
         onSessionReady={onSessionReady}
         terminalProfile={{
           ...DEFAULT_TERMINAL_PROFILE,
@@ -1452,21 +1453,12 @@ describe("TerminalPanel focus behavior", () => {
     });
 
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
-    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-theme"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-appearance"));
     fireEvent.click(await screen.findByTestId("terminal-context-theme-option-kanagawa-wave"));
-
-    await waitFor(() => {
-      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
-      expect(stored.theme).toBe("kanagawa-wave");
-    });
 
     fireEvent.change(screen.getByTestId("terminal-context-font-size"), { target: { value: "18" } });
 
-    await waitFor(() => {
-      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
-      expect(stored.theme).toBe("kanagawa-wave");
-      expect(stored.fontSize).toBe(18);
-    });
+    expect(window.localStorage.getItem("taomni.localTerminalProfile.v1")).toBeNull();
   });
 
   it("keeps follow-system as a savable local terminal default theme", async () => {

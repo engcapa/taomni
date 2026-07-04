@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import {
   isMonospaceFont,
@@ -64,6 +64,7 @@ export function TerminalAppearanceMenuPanel({
   const [draftThemeValue, setDraftThemeValue] = useState(themeValue);
   const [draftFontFamily, setDraftFontFamily] = useState<string | null>(fontFamily);
   const [draftFontSize, setDraftFontSize] = useState<number | null>(fontSize);
+  const draftFontSizeRef = useRef<number | null>(fontSize);
   const selectedFont = draftFontFamily ? resolveSelectedFontName(draftFontFamily, fontOptions) : MIXED_FONT_VALUE;
   const [fontSizeText, setFontSizeText] = useState(draftFontSize === null ? "" : String(draftFontSize));
   const partitionedFonts = useMemo(() => {
@@ -89,19 +90,27 @@ export function TerminalAppearanceMenuPanel({
 
   useEffect(() => {
     setDraftFontSize(fontSize);
+    draftFontSizeRef.current = fontSize;
   }, [fontSize]);
 
   useEffect(() => {
     setFontSizeText(draftFontSize === null ? "" : String(draftFontSize));
   }, [draftFontSize]);
 
-  const updateFontSize = (next: number) => {
+  const updateFontSize = useCallback((next: number) => {
     if (!Number.isFinite(next)) return;
     const clamped = Math.max(8, Math.min(32, Math.round(next)));
+    draftFontSizeRef.current = clamped;
     setDraftFontSize(clamped);
     setFontSizeText(String(clamped));
     onChangeFontSize(clamped);
-  };
+  }, [onChangeFontSize]);
+
+  const stepFontSize = useCallback((delta: number) => {
+    const current = draftFontSizeRef.current;
+    if (current === null) return;
+    updateFontSize(current + delta);
+  }, [updateFontSize]);
 
   return (
     <div className="w-[380px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-24px))] overflow-hidden rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg">
@@ -163,7 +172,7 @@ export function TerminalAppearanceMenuPanel({
               className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
               aria-label={labels.decreaseTextSize}
               disabled={draftFontSize === null}
-              onClick={() => draftFontSize !== null && updateFontSize(draftFontSize - 1)}
+              onClick={() => stepFontSize(-1)}
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
@@ -200,7 +209,7 @@ export function TerminalAppearanceMenuPanel({
               className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
               aria-label={labels.increaseTextSize}
               disabled={draftFontSize === null}
-              onClick={() => draftFontSize !== null && updateFontSize(draftFontSize + 1)}
+              onClick={() => stepFontSize(1)}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>

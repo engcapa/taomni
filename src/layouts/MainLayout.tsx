@@ -791,6 +791,17 @@ export function MainLayout() {
     });
   }, []);
 
+  const duplicateTerminalProfileFor = useCallback((source: Tab): TerminalProfile | undefined => {
+    if (source.type !== "terminal") return undefined;
+    const liveProfile = terminalProfileOverrides[source.id]
+      ?? (source.sessionId ? terminalProfilesBySessionId.get(source.sessionId) : undefined)
+      ?? source.terminalProfile;
+    if (!source.sessionId && !source.ssh && !source.commandTerminal) {
+      return liveProfile ?? loadLocalTerminalDefaultProfile();
+    }
+    return liveProfile;
+  }, [terminalProfileOverrides, terminalProfilesBySessionId]);
+
   // Duplicate a tab. Terminal tabs try to open the copy in the source's current
   // directory. Shell integration makes shells report their cwd via OSC 7 on
   // every prompt, so we read the last-known cwd (terminalCwdsRef) with no
@@ -814,9 +825,13 @@ export function MainLayout() {
           initialCwd = cwd ?? undefined;
         }
       }
-      duplicateTab(tabId, initialCwd ? { terminalInitialCwd: initialCwd } : undefined);
+      const terminalProfile = duplicateTerminalProfileFor(source);
+      duplicateTab(tabId, {
+        ...(initialCwd ? { terminalInitialCwd: initialCwd } : {}),
+        ...(terminalProfile ? { terminalProfile } : {}),
+      });
     },
-    [duplicateTab, queryTerminalCwd],
+    [duplicateTab, duplicateTerminalProfileFor, queryTerminalCwd],
   );
 
   const requestTerminalCwd = useCallback((tabId: string): boolean => {
@@ -1006,7 +1021,6 @@ export function MainLayout() {
         commandTerminal: tab.commandTerminal ?? null,
         localShell: tab.localShell ?? null,
         terminalProfile,
-        persistLocalProfile: !tab.sessionId && !tab.ssh && !tab.commandTerminal,
         reattach,
       };
       if (liveSessionId) {
@@ -2994,7 +3008,6 @@ export function MainLayout() {
                             localShell={tab.localShell}
                             terminalProfile={liveTerminalProfile}
                             onTerminalProfileChange={(profile) => handleTerminalProfileChange(tab.id, profile)}
-                            persistLocalProfile={!tab.sessionId && !tab.ssh && !tab.commandTerminal}
                             adoptedTerminal={tab.adoptedTerminal}
                             initialCwd={tab.terminalInitialCwd}
                             visible={terminalSplitVisible || isActive}

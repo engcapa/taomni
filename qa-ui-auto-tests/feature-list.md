@@ -639,22 +639,20 @@ area: terminal/right-menu
 files:
   - src/components/terminal/TerminalPanel.tsx
 controls:
-  - id: font-size
-    selector: 'text="Font size"'
+  - id: zoom-in
+    selector: 'text="Zoom in"'
     kind: interactive
     optional: true
-    aliases:
-      - '[data-testid="context-menu-item-font-size"]'
-  - id: font-size-increase
-    selector: 'text="Increase font size"'
+  - id: zoom-out
+    selector: 'text="Zoom out"'
     kind: interactive
     optional: true
-  - id: font-size-decrease
-    selector: 'text="Decrease font size"'
+  - id: zoom-reset
+    selector: 'text="Reset zoom"'
     kind: interactive
     optional: true
-  - id: font-size-reset
-    selector: 'text="Reset font size to default"'
+  - id: appearance
+    selector: '[data-testid="context-menu-item-appearance"]'
     kind: interactive
     optional: true
   - id: terminal-display
@@ -675,7 +673,8 @@ controls:
     optional: true
 -->
 
-- 字号子菜单：字号增大/减小/重置；字体家族与连字改由 Terminal Appearance 设置页统一配置
+- 一级菜单：Zoom in / Zoom out / Reset zoom，快捷键保持 Ctrl++ / Ctrl+- / Ctrl+0
+- Appearance 子菜单：统一配置主题、字体家族、字号；不再保留重复的 Font size 子菜单
 - Ctrl+滚轮调整字号、Ctrl+0 重置
 - Terminal display 子菜单：Reset terminal output、Clear scrollback、Set terminal title、Toggle scrollbar、Fullscreen (F11)、Read-only
 
