@@ -526,6 +526,38 @@ describe("FileBrowser → FilePanel toolbar wiring", () => {
     });
   });
 
+  it("consumes a pending terminal upload request through the SFTP browser", async () => {
+    seedSession();
+    const onHandled = vi.fn();
+    render(
+      <FileBrowser
+        sessionId={SESSION_ID}
+        host="example.com"
+        port={22}
+        username="user"
+        authMethod="password"
+        authData={null}
+        pendingUploadRequest={{
+          id: 7,
+          paths: ["/home/me/drop.png"],
+          remoteDir: "/srv/app",
+        }}
+        onPendingUploadRequestHandled={onHandled}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(sftpMocks.sftpStat).toHaveBeenCalledWith(SESSION_ID, "/home/me/drop.png", "local");
+      expect(controllerMocks.upload).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/home/me/drop.png", name: "drop.png" }),
+        "/srv/app",
+      );
+      expect(onHandled).toHaveBeenCalledWith(7);
+    });
+    expect(useSftpStore.getState().sessions[SESSION_ID].remote.path).toBe("/srv/app");
+    expect(useSftpStore.getState().sessions[SESSION_ID].local.path).toBe("/home/me");
+  });
+
   it("wires the local-pane Upload toolbar button to controller.upload", async () => {
     const user = userEvent.setup();
     seedSession();
