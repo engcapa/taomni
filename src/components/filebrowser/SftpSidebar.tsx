@@ -1,4 +1,4 @@
-import { FileBrowser } from "./FileBrowser";
+import { FileBrowser, type SftpPendingUploadRequest } from "./FileBrowser";
 import { useT } from "../../lib/i18n";
 
 interface SftpSidebarProps {
@@ -16,6 +16,8 @@ interface SftpSidebarProps {
   onDetach?: () => void;
   onOpenTerminalHere?: (path: string) => void;
   title?: string;
+  pendingUploadRequest?: SftpPendingUploadRequest | null;
+  onPendingUploadRequestHandled?: (requestId: number) => void;
 }
 
 /**
@@ -44,6 +46,8 @@ export function SftpSidebar(props: SftpSidebarProps) {
       onDetach={props.onDetach}
       onClose={props.onClose}
       onOpenTerminalHere={props.onOpenTerminalHere}
+      pendingUploadRequest={props.pendingUploadRequest}
+      onPendingUploadRequestHandled={props.onPendingUploadRequestHandled}
       showHeader
       title={props.title ?? t("fileBrowser.sftpHeaderDefaultTitle")}
       defaultOrientation="vertical"

@@ -45,6 +45,7 @@ import {
 } from "../../lib/terminalImeGuard";
 import { shouldSuppressMacImeKeydown, clearStaleKeyDownSeen, clearStaleKeyDownSeenIfActive } from "../../lib/terminal/macImeKeydown";
 import {
+  readFiles as clipboardReadFiles,
   readText as clipboardReadText,
   writeText as clipboardWriteText,
   writeMultiFormat as clipboardWriteMultiFormat,
@@ -178,6 +179,11 @@ export interface DetachedTerminalWindowControls {
   osFullscreen: boolean;
 }
 
+export interface TerminalLocalPathUploadRequest {
+  paths: string[];
+  cwd: string | null;
+}
+
 interface TerminalPanelProps {
   tabId?: string;
   tabTitle?: string;
@@ -211,6 +217,8 @@ interface TerminalPanelProps {
   onSessionReady?: (sessionId: string) => void;
   /** Called whenever the terminal receives output (for new-output badge). */
   onOutput?: () => void;
+  /** SSH-only: upload local OS file paths into the terminal's current remote cwd. */
+  onUploadLocalPaths?: (request: TerminalLocalPathUploadRequest) => Promise<void> | void;
   /** Whether MultiExec broadcast mode is active globally. */
   multiExecActive?: boolean;
   /** Whether this terminal is a selected broadcast target (shows visual indicator). */
@@ -307,6 +315,7 @@ export function TerminalPanel({
   cwdRequestToken = 0,
   onSessionReady,
   onOutput,
+  onUploadLocalPaths,
   multiExecActive,
   isMultiExecTarget,
   onInputBroadcast,
@@ -320,6 +329,7 @@ export function TerminalPanel({
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
+  const onUploadLocalPathsRef = useRef<typeof onUploadLocalPaths>(onUploadLocalPaths);
   const onInputBroadcastRef = useRef<typeof onInputBroadcast>(onInputBroadcast);
   const onTerminalProfileChangeRef = useRef<typeof onTerminalProfileChange>(onTerminalProfileChange);
   const onDetachedStateChangeRef = useRef<typeof onDetachedStateChange>(onDetachedStateChange);
@@ -330,6 +340,7 @@ export function TerminalPanel({
     cwdCallbackRef.current = onCwdChange;
     onSessionReadyRef.current = onSessionReady;
     onOutputRef.current = onOutput;
+    onUploadLocalPathsRef.current = onUploadLocalPaths;
     onInputBroadcastRef.current = onInputBroadcast;
     onTerminalProfileChangeRef.current = onTerminalProfileChange;
     onDetachedStateChangeRef.current = onDetachedStateChange;
@@ -339,6 +350,7 @@ export function TerminalPanel({
     onCwdChange,
     onSessionReady,
     onOutput,
+    onUploadLocalPaths,
     onInputBroadcast,
     onTerminalProfileChange,
     onDetachedStateChange,
@@ -355,6 +367,7 @@ export function TerminalPanel({
   // re-runs whenever the backend session id changes.
   const [registeredSessionId, setRegisteredSessionId] = useState<string | null>(null);
   const termRef = useRef<Terminal | null>(null);
+  const latestCwdRef = useRef<string | null>(initialCwd ?? null);
   const panelRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
   const readOnlyRef = useRef(false);
@@ -1193,27 +1206,6 @@ export function TerminalPanel({
     return true;
   }, [confirmPaste, focusTerminal, multilinePasteConfirm, setStatusMessage, t, writeBroadcastInput]);
 
-  const pasteFromClipboard = useCallback(async () => {
-    if (readOnlyRef.current) {
-      setStatusMessage("Terminal is read-only");
-      return;
-    }
-
-    try {
-      const text =
-        (await clipboardReadText()) ||
-        (await promptAppDialog({
-          title: "Paste text",
-          initialValue: "",
-          allowEmpty: true,
-        })) ||
-        "";
-      await pasteTextIntoTerminal(text);
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
-    }
-  }, [pasteTextIntoTerminal, setStatusMessage]);
-
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
@@ -1224,7 +1216,7 @@ export function TerminalPanel({
     event.dataTransfer.dropEffect = "copy";
   }, []);
 
-  const insertDroppedPaths = useCallback((paths: string[]) => {
+  const insertFilePaths = useCallback((paths: string[]) => {
     if (readOnlyRef.current) {
       setStatusMessage("Terminal is read-only");
       focusTerminal();
@@ -1244,6 +1236,80 @@ export function TerminalPanel({
     focusTerminal();
   }, [appendEvent, focusTerminal, isLocal, localShell?.id, resolvedLocalShellId, setStatusMessage, writeBroadcastInput]);
 
+  const handleLocalFilePaths = useCallback(async (paths: string[]) => {
+    const cleanPaths = uniqueNonEmpty(paths);
+    if (cleanPaths.length === 0) return;
+    if (readOnlyRef.current) {
+      setStatusMessage("Terminal is read-only");
+      focusTerminal();
+      return;
+    }
+
+    const term = termRef.current;
+    const upload = onUploadLocalPathsRef.current;
+    const canOfferUpload =
+      !isLocal &&
+      !!upload &&
+      terminalCanPromptForLocalPathUpload(term);
+    if (!canOfferUpload) {
+      insertFilePaths(cleanPaths);
+      return;
+    }
+
+    const cwd = latestCwdRef.current;
+    const confirmed = await confirmPaste({
+      title: t("terminal.filePasteTitle"),
+      message: t("terminal.filePasteMessage", {
+        count: cleanPaths.length,
+        cwd: cwd ?? t("terminal.filePasteUnknownCwd"),
+      }),
+      confirmLabel: t("terminal.filePasteUpload"),
+      cancelLabel: t("terminal.filePastePaths"),
+    });
+
+    if (!confirmed) {
+      insertFilePaths(cleanPaths);
+      return;
+    }
+
+    try {
+      await upload({ paths: cleanPaths, cwd });
+      setStatusMessage(t("terminal.filePasteUploadQueued", { count: cleanPaths.length }));
+      focusTerminal();
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : "Upload failed");
+      focusTerminal();
+    }
+  }, [confirmPaste, focusTerminal, insertFilePaths, isLocal, setStatusMessage, t]);
+
+  const pasteFromClipboard = useCallback(async () => {
+    if (readOnlyRef.current) {
+      setStatusMessage("Terminal is read-only");
+      return;
+    }
+
+    try {
+      if (!isLocal && onUploadLocalPathsRef.current) {
+        const paths = await clipboardReadFiles();
+        if (paths.length > 0) {
+          await handleLocalFilePaths(paths);
+          return;
+        }
+      }
+      const text =
+        (await clipboardReadText()) ||
+        (await promptAppDialog({
+          title: "Paste text",
+          initialValue: "",
+          allowEmpty: true,
+        })) ||
+        "";
+      await pasteTextIntoTerminal(text);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
+    }
+  }, [handleLocalFilePaths, isLocal, pasteTextIntoTerminal, setStatusMessage]);
+
   const handleTerminalDrop = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
@@ -1256,8 +1322,8 @@ export function TerminalPanel({
       return;
     }
 
-    insertDroppedPaths(paths);
-  }, [focusTerminal, insertDroppedPaths, setStatusMessage]);
+    void handleLocalFilePaths(paths);
+  }, [focusTerminal, handleLocalFilePaths, setStatusMessage]);
 
   useEffect(() => {
     const handleNativeFileDrop = (event: Event) => {
@@ -1268,12 +1334,12 @@ export function TerminalPanel({
       const target = document.elementFromPoint(detail.clientX, detail.clientY);
       if (!panel || !target || !panel.contains(target)) return;
 
-      insertDroppedPaths(detail.paths);
+      void handleLocalFilePaths(detail.paths);
     };
 
     window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
     return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-  }, [insertDroppedPaths]);
+  }, [handleLocalFilePaths]);
 
   const saveBufferToFile = useCallback(() => {
     const term = termRef.current;
@@ -2057,6 +2123,10 @@ export function TerminalPanel({
   }, [effectiveReadOnly]);
 
   useEffect(() => {
+    if (initialCwd) latestCwdRef.current = initialCwd;
+  }, [initialCwd]);
+
+  useEffect(() => {
     if (cwdRequestToken === 0 || cwdRequestToken === lastCwdRequestTokenRef.current) return;
     lastCwdRequestTokenRef.current = cwdRequestToken;
     requestTerminalCwd();
@@ -2272,6 +2342,7 @@ export function TerminalPanel({
       term.parser.registerOscHandler(7, (data) => {
         const cwd = parseOsc7(data);
         if (cwd) {
+          latestCwdRef.current = cwd;
           cwdCallbackRef.current?.(cwd);
         }
         return true;
@@ -2951,12 +3022,27 @@ export function TerminalPanel({
       if (Date.now() < suppressNativePasteUntilRef.current) {
         return;
       }
+      if (!isLocal && onUploadLocalPathsRef.current) {
+        void clipboardReadFiles()
+          .then((paths) => {
+            if (paths.length > 0) {
+              return handleLocalFilePaths(paths);
+            }
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            void pasteTextIntoTerminal(text);
+            return undefined;
+          })
+          .catch((err) => {
+            setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
+          });
+        return;
+      }
       const text = event.clipboardData?.getData("text/plain") ?? "";
       void pasteTextIntoTerminal(text);
     };
     el.addEventListener("paste", onPaste, { capture: true });
     return () => el.removeEventListener("paste", onPaste, { capture: true });
-  }, [isMac, pasteTextIntoTerminal]);
+  }, [handleLocalFilePaths, isLocal, isMac, pasteTextIntoTerminal, setStatusMessage]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -4068,6 +4154,23 @@ function firstVisibleMatchIndex(
 
 function normalizePasteText(text: string): string {
   return text.replace(/\r?\n/g, "\r");
+}
+
+function terminalCanPromptForLocalPathUpload(term: Terminal | null): boolean {
+  if (!term) return false;
+  if (term.buffer.active.type === "alternate") return false;
+  return true;
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
 }
 
 // When the running app has enabled DEC bracketed paste (CSI ?2004h), wrap the

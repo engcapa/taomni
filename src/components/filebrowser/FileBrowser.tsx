@@ -21,7 +21,7 @@ import { ChmodDialog } from "./ChmodDialog";
 import { PathMappingsEditor, resolveRemoteByMapping, resolveLocalByMapping } from "./PathMappingsEditor";
 import { useSftpStore, type PaneSide } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
-import { joinPath, basename, sftpStat, effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
+import { joinPath, basename, parentPath, sftpStat, effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
 import type { SftpPathMapping } from "../../types";
 import {
   listenSshAuthPrompt,
@@ -84,6 +84,15 @@ interface FileBrowserProps {
   onOpenTerminalHere?: (path: string) => void;
   /** Deployment path mappings for this session. */
   pathMappings?: import("../../types").SftpPathMapping[];
+  /** One-shot upload request created by an attached SSH terminal paste/drop. */
+  pendingUploadRequest?: SftpPendingUploadRequest | null;
+  onPendingUploadRequestHandled?: (requestId: number) => void;
+}
+
+export interface SftpPendingUploadRequest {
+  id: number;
+  paths: string[];
+  remoteDir: string;
 }
 
 export function FileBrowser(props: FileBrowserProps) {
@@ -126,6 +135,7 @@ export function FileBrowser(props: FileBrowserProps) {
   const authPromptReadyRef = useRef<Promise<unknown>>(Promise.resolve());
   const requestedCwdVersionRef = useRef(props.cwdHintVersion ?? 0);
   const terminalSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledUploadRequestRef = useRef<number | null>(null);
 
   const clearTerminalSyncTimeout = useCallback(() => {
     if (!terminalSyncTimeoutRef.current) return;
@@ -547,6 +557,62 @@ export function FileBrowser(props: FileBrowserProps) {
     },
     [controller, mappings, props.sessionId, session?.remote.path, setStatus, t],
   );
+
+  useEffect(() => {
+    const request = props.pendingUploadRequest;
+    if (!request) return;
+    if (handledUploadRequestRef.current === request.id) return;
+    if (!session?.attached) return;
+
+    handledUploadRequestRef.current = request.id;
+    let cancelled = false;
+
+    void (async () => {
+      const currentRemotePath = useSftpStore.getState().sessions[props.sessionId]?.remote.path ?? "/";
+      const remoteDir = request.remoteDir || currentRemotePath;
+      try {
+        if (currentRemotePath !== remoteDir) {
+          await navigate(props.sessionId, "remote", remoteDir);
+        }
+      } catch (err) {
+        setStatus(t("fileBrowser.statusNavigateFailed", { error: String(err) }));
+      }
+
+      let localDir: string | null = null;
+      for (const path of request.paths) {
+        if (cancelled) return;
+        try {
+          const entry = await sftpStat(props.sessionId, path, "local");
+          if (!localDir) {
+            localDir = parentPath(entry.path);
+            if (localDir) {
+              await navigate(props.sessionId, "local", localDir);
+            }
+          }
+          await controller.upload(entry, remoteDir);
+        } catch (err) {
+          setStatus(t("fileBrowser.statusUploadFailed", { error: err instanceof Error ? err.message : String(err) }));
+        }
+      }
+
+      if (!cancelled) {
+        props.onPendingUploadRequestHandled?.(request.id);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    controller.upload,
+    navigate,
+    props.onPendingUploadRequestHandled,
+    props.pendingUploadRequest,
+    props.sessionId,
+    session?.attached,
+    setStatus,
+    t,
+  ]);
 
   const handleCrossPaneToLocal = useCallback(
     async (entries: FileEntry[]) => {

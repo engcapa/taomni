@@ -135,6 +135,10 @@ const ipcMocks = vi.hoisted(() => {
   };
 });
 
+const clipboardMocks = vi.hoisted(() => ({
+  readFiles: vi.fn(async () => [] as string[]),
+}));
+
 const gitMocks = vi.hoisted(() => ({
   gitProbePath: vi.fn(async (path: string) => ({
     path,
@@ -200,6 +204,14 @@ vi.mock("@xterm/addon-webgl", () => ({
 }));
 
 vi.mock("../../lib/ipc", () => ipcMocks);
+
+vi.mock("../../lib/clipboard", async () => {
+  const actual = await vi.importActual<typeof import("../../lib/clipboard")>("../../lib/clipboard");
+  return {
+    ...actual,
+    readFiles: clipboardMocks.readFiles,
+  };
+});
 
 vi.mock("../../lib/git", () => gitMocks);
 
@@ -271,6 +283,8 @@ describe("TerminalPanel focus behavior", () => {
       ipcMocks.terminalExitHandlers.set(sessionId, callback);
       return vi.fn(() => ipcMocks.terminalExitHandlers.delete(sessionId));
     });
+    clipboardMocks.readFiles.mockReset();
+    clipboardMocks.readFiles.mockResolvedValue([]);
     webglMocks.instances.length = 0;
     webglMocks.ctor.mockClear();
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
@@ -636,6 +650,208 @@ describe("TerminalPanel focus behavior", () => {
         value: originalElementFromPoint,
       });
     }
+  });
+
+  it("prompts to upload copied file paths in an SSH shell and defaults to upload", async () => {
+    clipboardMocks.readFiles.mockResolvedValue(["/home/me/a b.png"]);
+    const onSessionReady = vi.fn();
+    const onUploadLocalPaths = vi.fn(async () => undefined);
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        onSessionReady={onSessionReady}
+        onUploadLocalPaths={onUploadLocalPaths}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+    terminalMocks.oscHandlers.get(7)?.("file://example.test/home/user/project");
+
+    fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("confirm-dialog-confirm")).toHaveFocus();
+    expect(screen.getByTestId("confirm-dialog-message")).toHaveTextContent("/home/user/project");
+
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => {
+      expect(onUploadLocalPaths).toHaveBeenCalledWith({
+        paths: ["/home/me/a b.png"],
+        cwd: "/home/user/project",
+      });
+    });
+  });
+
+  it("pastes copied file paths when the SSH upload prompt is declined", async () => {
+    clipboardMocks.readFiles.mockResolvedValue(["/home/me/a b.png"]);
+    const onSessionReady = vi.fn();
+    const onUploadLocalPaths = vi.fn(async () => undefined);
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        onSessionReady={onSessionReady}
+        onUploadLocalPaths={onUploadLocalPaths}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.keyDown(window, { key: "Insert", shiftKey: true });
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("'/home/me/a b.png' "),
+      );
+    });
+    expect(onUploadLocalPaths).not.toHaveBeenCalled();
+  });
+
+  it("prompts to upload dragged file paths in an SSH shell", async () => {
+    const onSessionReady = vi.fn();
+    const onUploadLocalPaths = vi.fn(async () => undefined);
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        onSessionReady={onSessionReady}
+        onUploadLocalPaths={onUploadLocalPaths}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+    terminalMocks.oscHandlers.get(7)?.("file://example.test/home/user/project");
+
+    const dataTransfer = {
+      types: ["Files", "text/uri-list"],
+      files: [new File(["x"], "a b.png", { type: "image/png" })],
+      dropEffect: "none",
+      getData: (format: string) => (format === "text/uri-list" ? "file:///home/me/a%20b.png" : ""),
+    };
+
+    fireEvent.drop(screen.getByTestId("terminal-pane"), { dataTransfer });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => {
+      expect(onUploadLocalPaths).toHaveBeenCalledWith({
+        paths: ["/home/me/a b.png"],
+        cwd: "/home/user/project",
+      });
+    });
+  });
+
+  it("prompts to upload dragged file paths even when the shell prompt is custom", async () => {
+    const onSessionReady = vi.fn();
+    const onUploadLocalPaths = vi.fn(async () => undefined);
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        onSessionReady={onSessionReady}
+        onUploadLocalPaths={onUploadLocalPaths}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+    terminalMocks.oscHandlers.get(7)?.("file://example.test/home/user/project");
+
+    const term = terminalMocks.terminalCtor.mock.results[terminalMocks.terminalCtor.mock.results.length - 1].value;
+    const prompt = "[user@example.test project] λ ";
+    term.buffer.active = {
+      type: "normal",
+      length: 1,
+      baseY: 0,
+      cursorY: 0,
+      cursorX: prompt.length,
+      getLine: vi.fn(() => ({
+        isWrapped: false,
+        translateToString: () => prompt,
+      })),
+    };
+
+    const dataTransfer = {
+      types: ["Files", "text/uri-list"],
+      files: [new File(["x"], "a b.png", { type: "image/png" })],
+      dropEffect: "none",
+      getData: (format: string) => (format === "text/uri-list" ? "file:///home/me/a%20b.png" : ""),
+    };
+
+    fireEvent.drop(screen.getByTestId("terminal-pane"), { dataTransfer });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => {
+      expect(onUploadLocalPaths).toHaveBeenCalledWith({
+        paths: ["/home/me/a b.png"],
+        cwd: "/home/user/project",
+      });
+    });
+  });
+
+  it("pastes dragged file paths in an SSH alternate-screen app", async () => {
+    const onSessionReady = vi.fn();
+    const onUploadLocalPaths = vi.fn(async () => undefined);
+
+    render(
+      <TerminalPanel
+        visible
+        ssh={sshInfo}
+        onSessionReady={onSessionReady}
+        onUploadLocalPaths={onUploadLocalPaths}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+    const term = terminalMocks.terminalCtor.mock.results[terminalMocks.terminalCtor.mock.results.length - 1].value;
+    term.buffer.active.type = "alternate";
+
+    const dataTransfer = {
+      types: ["Files", "text/uri-list"],
+      files: [new File(["x"], "a b.png", { type: "image/png" })],
+      dropEffect: "none",
+      getData: (format: string) => (format === "text/uri-list" ? "file:///home/me/a%20b.png" : ""),
+    };
+
+    fireEvent.drop(screen.getByTestId("terminal-pane"), { dataTransfer });
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("'/home/me/a b.png' "),
+      );
+    });
+    expect(screen.queryByTestId("confirm-dialog")).not.toBeInTheDocument();
+    expect(onUploadLocalPaths).not.toHaveBeenCalled();
   });
 
   it("blocks typed input when split input is locked", async () => {

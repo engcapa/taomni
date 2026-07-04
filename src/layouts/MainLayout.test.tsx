@@ -19,6 +19,7 @@ const terminalPanelMock = vi.hoisted(() => ({
     tabId?: string;
     terminalProfile?: TerminalProfile;
     onTerminalProfileChange?: (profile: TerminalProfile) => void;
+    onUploadLocalPaths?: (request: { paths: string[]; cwd: string | null }) => Promise<void>;
   }>,
 }));
 
@@ -199,6 +200,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     activeForShortcuts,
     inputLocked,
     onSessionReady,
+    onUploadLocalPaths,
   }: {
     tabId?: string;
     commandTerminal?: {
@@ -216,8 +218,9 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     inputLocked?: boolean;
     onSessionReady?: (sessionId: string) => void;
     onTerminalProfileChange?: (profile: TerminalProfile) => void;
+    onUploadLocalPaths?: (request: { paths: string[]; cwd: string | null }) => Promise<void>;
   }) => {
-    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange });
+    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange, onUploadLocalPaths });
     useEffect(() => {
       terminalLifecycle.mounted();
       onSessionReady?.(`session-${tabId ?? "terminal"}`);
@@ -452,6 +455,38 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+  });
+
+  it("opens attached SFTP with a pending upload request from the terminal", async () => {
+    render(<MainLayout />);
+
+    const terminalProps = terminalPanelMock.props.find((props) => props.tabId === "ssh-tab");
+    expect(terminalProps?.onUploadLocalPaths).toEqual(expect.any(Function));
+
+    await act(async () => {
+      await terminalProps!.onUploadLocalPaths!({
+        paths: ["/tmp/drop.png"],
+        cwd: "/home/root",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
+    });
+    const sidebarProps = sftpSidebarMock.props.at(-1);
+    expect(sidebarProps.pendingUploadRequest).toMatchObject({
+      paths: ["/tmp/drop.png"],
+      remoteDir: "/home/root",
+    });
+    expect(sidebarProps.pendingUploadRequest.id).toEqual(expect.any(Number));
+
+    act(() => {
+      sidebarProps.onPendingUploadRequestHandled(sidebarProps.pendingUploadRequest.id);
+    });
+
+    await waitFor(() => {
+      expect(sftpSidebarMock.props.at(-1).pendingUploadRequest).toBeNull();
+    });
   });
 
   it("toggles the attached SFTP sidebar and handles detaching and reopening behavior", () => {

@@ -30,7 +30,7 @@ import { ControlBar } from "../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
 import { StatusBar } from "../components/statusbar/StatusBar";
 import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
-import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import { TerminalPanel, type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
 import { GitPanel } from "../components/git/GitPanel";
 import { CodeWorkspaceTab } from "../components/editor/CodeWorkspaceTab";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
@@ -41,7 +41,7 @@ import { LanChatGate } from "../components/lanchat/LanChatGate";
 import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
 import { CallOverlay } from "../components/lanchat/CallOverlay";
 import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";import { TunnelManager } from "../components/tunnel/TunnelManager";
-import { FileBrowser } from "../components/filebrowser/FileBrowser";
+import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
 import { MailClientTab } from "../components/mail/MailClientTab";
@@ -522,6 +522,7 @@ export function MainLayout() {
     toggleMultiExec,
     selectAllTerminalTabs,
     clearMultiExecSelection,
+    setTerminalSplitActive,
     toggleTerminalSplit,
     setTerminalSplitLayout,
     toggleTerminalSplitInputLock,
@@ -621,6 +622,7 @@ export function MainLayout() {
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
   const [sftpDetachedTabs, setSftpDetachedTabs] = useState<Record<string, boolean>>({});
+  const [pendingSftpUploadRequests, setPendingSftpUploadRequests] = useState<Record<string, SftpPendingUploadRequest>>({});
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
   // The active tab's contextual action toolbar (Capture / Detach / Maximize …)
   // portals into this slot, which lives inside the ControlBar.
@@ -709,6 +711,7 @@ export function MainLayout() {
   // by queryTerminalCwd to turn the fire-and-forget OSC 7 round trip into an
   // awaitable promise (e.g. when duplicating a terminal tab).
   const cwdQueryResolversRef = useRef<Record<string, Array<(cwd: string | null) => void>>>({});
+  const sftpUploadRequestSeqRef = useRef(0);
 
   const toggleAttachedSidebar = useCallback((tabId: string) => {
     setAttachedSidebars((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
@@ -733,6 +736,14 @@ export function MainLayout() {
         const next = { ...prev };
         for (const closedId of closedIds) {
           delete next[closedId];
+        }
+        return next;
+      });
+      setPendingSftpUploadRequests((prev) => {
+        const next = { ...prev };
+        for (const closedId of closedIds) {
+          delete next[`attached-${closedId}`];
+          delete next[`attached-${closedId}__detached`];
         }
         return next;
       });
@@ -842,6 +853,31 @@ export function MainLayout() {
     setTerminalCwdRequestTokens((prev) => ({ ...prev, [tabId]: (prev[tabId] ?? 0) + 1 }));
     return true;
   }, [setStatusMessage]);
+
+  const handleTerminalLocalPathUpload = useCallback(
+    async (tabId: string, request: TerminalLocalPathUploadRequest): Promise<void> => {
+      if (request.paths.length === 0) return;
+      const remoteDir = request.cwd ?? terminalCwdsRef.current[tabId] ?? null;
+      if (!remoteDir) {
+        throw new Error(tr("status.terminalCwdUnknown"));
+      }
+
+      const sftpSessionId = `attached-${tabId}`;
+      const id = ++sftpUploadRequestSeqRef.current;
+      setTerminalSplitActive(false);
+      setSftpDetachedTabs((prev) => ({ ...prev, [tabId]: false }));
+      setAttachedSidebars((prev) => ({ ...prev, [tabId]: true }));
+      setPendingSftpUploadRequests((prev) => ({
+        ...prev,
+        [sftpSessionId]: {
+          id,
+          paths: request.paths,
+          remoteDir,
+        },
+      }));
+    },
+    [setTerminalSplitActive, tr],
+  );
 
   const broadcastToSelectedTerminals = useCallback((data: string, sourceTabId?: string) => {
     const {
@@ -3017,6 +3053,11 @@ export function MainLayout() {
                             cwdRequestToken={terminalCwdRequestTokens[tab.id] ?? 0}
                             onSessionReady={(sid) => { terminalSessionIds.current[tab.id] = sid; }}
                             onOutput={() => handleTerminalOutput(tab.id)}
+                            onUploadLocalPaths={
+                              tab.ssh
+                                ? (request) => handleTerminalLocalPathUpload(tab.id, request)
+                                : undefined
+                            }
                             multiExecActive={multiExecActive}
                             isMultiExecTarget={
                               multiExecActive &&
@@ -3089,6 +3130,16 @@ export function MainLayout() {
                           title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
                           onClose={() => toggleAttachedSidebar(tab.id)}
                           onRequestTerminalCwd={() => requestTerminalCwd(tab.id)}
+                          pendingUploadRequest={pendingSftpUploadRequests[`attached-${tab.id}`] ?? null}
+                          onPendingUploadRequestHandled={(requestId) => {
+                            const sftpSessionId = `attached-${tab.id}`;
+                            setPendingSftpUploadRequests((prev) => {
+                              if (prev[sftpSessionId]?.id !== requestId) return prev;
+                              const next = { ...prev };
+                              delete next[sftpSessionId];
+                              return next;
+                            });
+                          }}
                           onOpenTerminalHere={(p) => {
                             const sid = terminalSessionIds.current[tab.id];
                             if (!sid) return;

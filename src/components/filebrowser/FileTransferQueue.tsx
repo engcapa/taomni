@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Trash2, X, Eraser, Pause, Play, RotateCw } from "lucide-react";
 import { useTransferStore } from "../../stores/transferStore";
 import { formatBytes, formatRate, formatEta, type TransferState } from "../../lib/sftp";
@@ -13,6 +13,44 @@ interface FileTransferQueueProps {
   compact?: boolean;
 }
 
+const STORAGE_KEY_PREFIX = "taomni.sftp.transferQueueHeight.";
+const DEFAULT_HEIGHT = 220;
+const DEFAULT_COMPACT_HEIGHT = 140;
+const MIN_HEIGHT = 104;
+const MIN_COMPACT_HEIGHT = 72;
+const MAX_HEIGHT = 440;
+const MAX_COMPACT_HEIGHT = 260;
+
+function clampHeight(value: number, compact?: boolean): number {
+  const min = compact ? MIN_COMPACT_HEIGHT : MIN_HEIGHT;
+  const max = compact ? MAX_COMPACT_HEIGHT : MAX_HEIGHT;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function heightStorageKey(sessionId?: string): string {
+  return `${STORAGE_KEY_PREFIX}${sessionId ?? "all"}`;
+}
+
+function loadHeight(sessionId: string | undefined, compact: boolean | undefined): number {
+  const fallback = compact ? DEFAULT_COMPACT_HEIGHT : DEFAULT_HEIGHT;
+  try {
+    const raw = window.localStorage.getItem(heightStorageKey(sessionId));
+    if (!raw) return fallback;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? clampHeight(parsed, compact) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveHeight(sessionId: string | undefined, value: number): void {
+  try {
+    window.localStorage.setItem(heightStorageKey(sessionId), String(value));
+  } catch {
+    /* noop */
+  }
+}
+
 export function FileTransferQueue({
   sessionId,
   onCancel,
@@ -25,6 +63,49 @@ export function FileTransferQueue({
   const items = useTransferStore((s) => s.items);
   const remove = useTransferStore((s) => s.remove);
   const clearCompleted = useTransferStore((s) => s.clearCompleted);
+  const [height, setHeight] = useState(() => loadHeight(sessionId, compact));
+
+  useEffect(() => {
+    setHeight(loadHeight(sessionId, compact));
+  }, [compact, sessionId]);
+
+  const updateHeight = useCallback(
+    (nextHeight: number) => {
+      const clamped = clampHeight(nextHeight, compact);
+      setHeight(clamped);
+      saveHeight(sessionId, clamped);
+    },
+    [compact, sessionId],
+  );
+
+  const startResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = height;
+      const prevCursor = document.body.style.cursor;
+      const prevUserSelect = document.body.style.userSelect;
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+
+      const onMove = (moveEvent: PointerEvent) => {
+        updateHeight(startHeight + startY - moveEvent.clientY);
+      };
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        document.body.style.cursor = prevCursor;
+        document.body.style.userSelect = prevUserSelect;
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp, { once: true });
+      document.addEventListener("pointercancel", onUp, { once: true });
+    },
+    [height, updateHeight],
+  );
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -46,7 +127,16 @@ export function FileTransferQueue({
   const filtered = sessionId ? items.filter((it) => it.sessionId === sessionId) : items;
 
   return (
-    <div data-testid="sftp-transfer-queue" className="border-t flex flex-col shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
+    <div
+      data-testid="sftp-transfer-queue"
+      className="border-t flex flex-col shrink-0"
+      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)", height }}
+    >
+      <div
+        data-testid="sftp-transfer-queue-resize-handle"
+        className="h-1 cursor-row-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors"
+        onPointerDown={startResize}
+      />
       <div className="h-5 px-2 flex items-center text-[11px] font-semibold gap-2"
         style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
         <span>{t("fileBrowser.transferTitle")}</span>
@@ -62,8 +152,7 @@ export function FileTransferQueue({
         </button>
       </div>
       <div
-        className="overflow-auto text-[11px]"
-        style={{ maxHeight: compact ? 90 : 140, minHeight: compact ? 40 : 60 }}
+        className="overflow-auto text-[11px] flex-1 min-h-0"
       >
         {filtered.length === 0 && (
           <div className="px-2 py-2 text-[var(--taomni-text-muted)]">

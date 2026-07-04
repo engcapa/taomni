@@ -4,8 +4,10 @@ import { renderHook } from "@testing-library/react";
 
 import { FilePanel } from "./FilePanel";
 import { FileBrowser } from "./FileBrowser";
+import { FileTransferQueue } from "./FileTransferQueue";
 import { PathBreadcrumb } from "./PathBreadcrumb";
 import { useSftpStore, type PaneState } from "../../stores/sftpStore";
+import { useTransferStore } from "../../stores/transferStore";
 import { useSftpController } from "../../lib/sftpController";
 import type { FileEntry } from "../../lib/sftp";
 
@@ -98,6 +100,7 @@ function seed() {
 beforeEach(() => {
   localStorage.clear();
   useSftpStore.setState({ sessions: {} });
+  useTransferStore.setState({ items: [] });
   setStatusMock.mockReset();
   sftpHomeMock.mockReset();
   sftpDownloadMock.mockReset();
@@ -287,6 +290,33 @@ describe("SFTP file-list column width persistence", () => {
     expect(stored.name).toBe(400);
     expect(stored.mtime).toBe(240);
     expect(stored.type).toBe(240);
+  });
+});
+
+describe("SFTP transfer queue sizing", () => {
+  it("defaults taller and persists pointer resize per session", () => {
+    const { getByTestId, unmount } = render(
+      <FileTransferQueue sessionId={SESSION_ID} onCancel={vi.fn()} />,
+    );
+
+    const queue = getByTestId("sftp-transfer-queue");
+    expect(queue).toHaveStyle({ height: "220px" });
+
+    fireEvent.pointerDown(getByTestId("sftp-transfer-queue-resize-handle"), {
+      button: 0,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(document, { clientY: 240 });
+    fireEvent.pointerUp(document);
+
+    expect(queue).toHaveStyle({ height: "280px" });
+    expect(localStorage.getItem(`taomni.sftp.transferQueueHeight.${SESSION_ID}`)).toBe("280");
+
+    unmount();
+    const rerendered = render(
+      <FileTransferQueue sessionId={SESSION_ID} onCancel={vi.fn()} />,
+    );
+    expect(rerendered.getByTestId("sftp-transfer-queue")).toHaveStyle({ height: "280px" });
   });
 });
 
