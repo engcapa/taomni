@@ -11,6 +11,7 @@ function entry(oid: string, parents: string[]): GitLogEntry {
     authorEmail: "t@e",
     date: "",
     subject: oid,
+    body: "",
     refs: [],
   };
 }

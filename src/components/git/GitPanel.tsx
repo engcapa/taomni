@@ -1372,6 +1372,7 @@ function commitMenuItems(
   const copy = (text: string) => {
     void navigator.clipboard?.writeText(text).catch(() => {});
   };
+  const message = [entry.subject, entry.body.trim()].filter(Boolean).join("\n\n");
   return [
     { label: "Cherry-pick", onClick: () => handlers.onCherryPick(entry) },
     { label: "Revert", onClick: () => handlers.onRevert(entry) },
@@ -1387,6 +1388,7 @@ function commitMenuItems(
     { label: "", separator: true },
     { label: "Copy revision hash", onClick: () => copy(entry.oid) },
     { label: "Copy subject", onClick: () => copy(entry.subject) },
+    { label: "Copy message", onClick: () => copy(message) },
   ];
 }
 

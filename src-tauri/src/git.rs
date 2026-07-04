@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use crate::vault::Vault;
-use base64::{engine::general_purpose::STANDARD as B64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -96,6 +96,7 @@ pub struct GitLogEntry {
     pub author_email: String,
     pub date: String,
     pub subject: String,
+    pub body: String,
     pub refs: Vec<String>,
 }
 
@@ -1332,7 +1333,7 @@ fn list_log(root: &Path, filter: &GitLogFilter) -> Result<Vec<GitLogEntry>, Stri
     let mut args: Vec<String> = vec![
         "log".into(),
         "--date=iso-strict".into(),
-        "--pretty=format:%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%s%x1f%D".into(),
+        "--pretty=format:%x1e%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%s%x1f%D%x1f%b".into(),
         "-n".into(),
         limit,
     ];
@@ -1367,9 +1368,17 @@ fn list_log(root: &Path, filter: &GitLogFilter) -> Result<Vec<GitLogEntry>, Stri
         args.push(path);
     }
     let raw = run_git_strings(Some(root), args)?;
+    Ok(parse_log_entries(&raw))
+}
+
+fn parse_log_entries(raw: &str) -> Vec<GitLogEntry> {
     let mut entries = Vec::new();
-    for line in raw.lines() {
-        let parts: Vec<_> = line.split('\x1f').collect();
+    for record in raw.split('\x1e') {
+        let record = record.trim_start_matches('\n').trim_end_matches('\n');
+        if record.is_empty() {
+            continue;
+        }
+        let parts: Vec<_> = record.splitn(9, '\x1f').collect();
         if parts.len() < 7 {
             continue;
         }
@@ -1385,9 +1394,14 @@ fn list_log(root: &Path, filter: &GitLogFilter) -> Result<Vec<GitLogEntry>, Stri
             date: parts[5].to_string(),
             subject: parts[6].to_string(),
             refs: parts.get(7).map(|d| parse_refs(d)).unwrap_or_default(),
+            body: parts.get(8).map(|d| trim_log_body(d)).unwrap_or_default(),
         });
     }
-    Ok(entries)
+    entries
+}
+
+fn trim_log_body(body: &str) -> String {
+    body.trim_matches(|c| c == '\n' || c == '\r').to_string()
 }
 
 /// Parse a `%D` decoration string ("HEAD -> main, origin/main, tag: v1") into
@@ -1891,11 +1905,7 @@ fn git_path(root: &Path, name: &str) -> Option<PathBuf> {
         .and_then(|s| non_empty_string(&s))
         .map(|p| {
             let pb = PathBuf::from(&p);
-            if pb.is_absolute() {
-                pb
-            } else {
-                root.join(pb)
-            }
+            if pb.is_absolute() { pb } else { root.join(pb) }
         })
 }
 
@@ -2357,6 +2367,33 @@ mod tests {
             ]
         );
         assert!(parse_refs("").is_empty());
+    }
+
+    #[test]
+    fn parses_log_entries_with_multiline_body() {
+        let raw = concat!(
+            "\x1eabcdef0123456789\x1fabcdef0\x1f1234567 7654321\x1fAda\x1fada@example.test\x1f",
+            "2026-07-04T10:00:00Z\x1ffeat: show commit message\x1fHEAD -> main, tag: v1.0\x1f",
+            "Body line one\n\nBody line two\n",
+            "\x1e1234567890abcdef\x1f1234567\x1f\x1fBen\x1fben@example.test\x1f",
+            "2026-07-04T11:00:00Z\x1ffix: compact row\x1f\x1f",
+        );
+
+        let entries = parse_log_entries(raw);
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].subject, "feat: show commit message");
+        assert_eq!(entries[0].body, "Body line one\n\nBody line two");
+        assert_eq!(
+            entries[0].refs,
+            vec!["main".to_string(), "v1.0".to_string()]
+        );
+        assert_eq!(
+            entries[0].parents,
+            vec!["1234567".to_string(), "7654321".to_string()]
+        );
+        assert_eq!(entries[1].subject, "fix: compact row");
+        assert!(entries[1].body.is_empty());
     }
 
     #[test]

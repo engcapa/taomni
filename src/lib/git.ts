@@ -88,6 +88,7 @@ export interface GitLogEntry {
   authorEmail: string;
   date: string;
   subject: string;
+  body: string;
   refs: string[];
 }
 
