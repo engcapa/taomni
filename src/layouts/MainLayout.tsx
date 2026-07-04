@@ -2724,6 +2724,7 @@ export function MainLayout() {
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
+  const settingsTabs = tabs.filter((t) => t.type === "settings");
   const gitTabs = tabs.filter((t) => t.type === "git" && t.git);
   const codeWorkspaceTabs = tabs.filter((t) => t.type === "code-workspace" && t.codeWorkspace);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
@@ -3343,7 +3344,19 @@ export function MainLayout() {
                   );
                 })}
 
-                {activeTab?.type === "settings" && <SettingsPanel />}
+                {settingsTabs.map((tab) => {
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      data-testid="settings-tab-panel"
+                      className="absolute inset-0"
+                      style={{ display: isActive ? "block" : "none" }}
+                    >
+                      <SettingsPanel />
+                    </div>
+                  );
+                })}
 
                 {/* Git tabs stay mounted so repository views, loaded logs, and
                     scroll position survive switching to another app tab. */}

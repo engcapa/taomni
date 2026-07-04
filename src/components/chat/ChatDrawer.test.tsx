@@ -146,6 +146,7 @@ describe("ChatDrawer provider and echo controls", () => {
       drawerPosition: "right",
       drawerPinned: true,
       pendingComposerText: "",
+      composerDrafts: {},
     });
   });
 
@@ -305,6 +306,7 @@ describe("ChatDrawer layout resizing", () => {
       drawerHeight: 420,
       drawerPinned: false,
       pendingComposerText: "",
+      composerDrafts: {},
     });
   });
 

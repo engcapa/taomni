@@ -59,6 +59,11 @@ export interface ChatMessage {
   attachments?: ChatAttachment[];
 }
 
+export interface ChatComposerDraft {
+  text: string;
+  selectedAttachments: ChatAttachment[];
+}
+
 interface ChatGenerateMediaResponse {
   user_message: ChatMessage;
   assistant_message: ChatMessage;
@@ -272,6 +277,9 @@ interface ChatStore {
   /// Text the Composer should pick up next render (e.g. `@selection ...`).
   /// Cleared by the Composer once consumed.
   pendingComposerText: string;
+  /// Unsent composer drafts keyed by thread/tab scope. Kept in memory so
+  /// switching app tabs does not discard a half-written prompt.
+  composerDrafts: Record<string, ChatComposerDraft>;
 
   loadThreads: () => Promise<void>;
   newThread: (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode) => Promise<ChatThread>;
@@ -289,6 +297,8 @@ interface ChatStore {
   /// composer. Used by the Selection toolbar's "Send to AI" action.
   attachToComposer: (text: string) => Promise<void>;
   consumePendingComposerText: () => string;
+  setComposerDraft: (key: string, draft: ChatComposerDraft) => void;
+  clearComposerDraft: (key: string) => void;
   /// Open the drawer, create a fresh thread, and auto-send "请解释这段输出".
   /// Used by the Selection toolbar's "Explain" action.
   explainSelection: (text: string) => Promise<void>;
@@ -405,6 +415,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerPinned: initialDrawerLayoutPrefs.pinned,
   ribbonOffsetRatio: initialDrawerLayoutPrefs.ribbonOffsetRatio,
   pendingComposerText: "",
+  composerDrafts: {},
 
   loadThreads: async () => {
     try {
@@ -448,6 +459,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       messages: Object.fromEntries(Object.entries(s.messages).filter(([k]) => k !== threadId)),
       activeThreadIdByTabId: Object.fromEntries(
         Object.entries(s.activeThreadIdByTabId).filter(([, id]) => id !== threadId),
+      ),
+      composerDrafts: Object.fromEntries(
+        Object.entries(s.composerDrafts).filter(([key]) => key !== `thread:${threadId}`),
       ),
       ...(active ? { drawerScope: null, drawerTabId: null } : {}),
     }));
@@ -968,6 +982,24 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const text = get().pendingComposerText;
     if (text) set({ pendingComposerText: "" });
     return text;
+  },
+
+  setComposerDraft: (key: string, draft: ChatComposerDraft) => {
+    set((s) => ({
+      composerDrafts: {
+        ...s.composerDrafts,
+        [key]: draft,
+      },
+    }));
+  },
+
+  clearComposerDraft: (key: string) => {
+    set((s) => {
+      if (!(key in s.composerDrafts)) return s;
+      const next = { ...s.composerDrafts };
+      delete next[key];
+      return { composerDrafts: next };
+    });
   },
 
   explainSelection: async (text: string) => {

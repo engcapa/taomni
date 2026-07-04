@@ -35,6 +35,7 @@ interface ComposerProps {
   disabled?: boolean;
   attachmentsEnabled?: boolean;
   placeholder?: string;
+  draftKey?: string | null;
   /**
    * Optional resolver: turns AttachmentRefs into LLM-ready text before send.
    * Currently only `terminal` refs surface to the existing terminal_context
@@ -54,11 +55,15 @@ export function Composer({
   disabled,
   attachmentsEnabled = true,
   placeholder,
+  draftKey,
   resolveTerminalContext,
 }: ComposerProps) {
   const t = useT();
-  const [text, setText] = useState("");
-  const [selectedAttachments, setSelectedAttachments] = useState<ChatAttachment[]>([]);
+  const initialDraft = draftKey ? useChatStore.getState().composerDrafts[draftKey] : undefined;
+  const [text, setText] = useState(() => initialDraft?.text ?? "");
+  const [selectedAttachments, setSelectedAttachments] = useState<ChatAttachment[]>(
+    () => initialDraft?.selectedAttachments ?? [],
+  );
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [composerHeight, setComposerHeight] = useState(readComposerHeight);
@@ -66,7 +71,18 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pending = useChatStore((s) => s.pendingComposerText);
   const consumePending = useChatStore((s) => s.consumePendingComposerText);
+  const setComposerDraft = useChatStore((s) => s.setComposerDraft);
+  const clearComposerDraft = useChatStore((s) => s.clearComposerDraft);
   const draftDisabled = disabled === true;
+
+  useEffect(() => {
+    if (!draftKey) return;
+    if (text.length > 0 || selectedAttachments.length > 0) {
+      setComposerDraft(draftKey, { text, selectedAttachments });
+    } else {
+      clearComposerDraft(draftKey);
+    }
+  }, [clearComposerDraft, draftKey, selectedAttachments, setComposerDraft, text]);
 
   // Pick up text staged by the SelectionToolbar's "Send to AI".
   useEffect(() => {

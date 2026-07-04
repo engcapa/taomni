@@ -576,6 +576,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     : currentMode === "video"
       ? t("chat.videoPromptPlaceholder")
       : undefined;
+  const composerDraftKey = activeThreadId
+    ? `thread:${activeThreadId}`
+    : (drawerTabId ?? activeChatTabId)
+      ? `tab:${drawerTabId ?? activeChatTabId}`
+      : null;
   const sendingLabel = currentMode === "image"
     ? t("chat.imageGenerating")
     : currentMode === "video"
@@ -1027,6 +1032,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
         {/* Composer */}
         <Composer
+          key={composerDraftKey ?? "global"}
+          draftKey={composerDraftKey}
           onSend={handleSend}
           sending={sending}
           disabled={false}
