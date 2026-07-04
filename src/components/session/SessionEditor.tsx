@@ -51,12 +51,10 @@ import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
 import { getAppPlatform } from "../../lib/runtime";
 import {
   getSessionNetworkSettings,
-  ipKindToLabel,
-  ipLabelToKind,
-  proxyKindToLabel,
-  proxyLabelToKind,
   toNetworkSettingsPayload,
+  type IpVersion,
   type NetworkSettings as NetworkSettingsValue,
+  type ProxyKind,
 } from "../../lib/networkSettings";
 import { parseUserHostPort } from "../../lib/quickConnect";
 import {
@@ -298,6 +296,16 @@ function Radio({
   );
 }
 
+type SelectOption = string | { value: string; label: string };
+
+function selectOptionValue(option: SelectOption): string {
+  return typeof option === "string" ? option : option.value;
+}
+
+function selectOptionLabel(option: SelectOption): string {
+  return typeof option === "string" ? option : option.label;
+}
+
 function Select({
   value,
   options,
@@ -305,7 +313,7 @@ function Select({
   className = "",
 }: {
   value: string;
-  options: string[];
+  options: SelectOption[];
   onChange?: (v: string) => void;
   className?: string;
 }) {
@@ -317,7 +325,9 @@ function Select({
         onChange={(e) => onChange?.(e.target.value)}
       >
         {options.map((o) => (
-          <option key={o}>{o}</option>
+          <option key={selectOptionValue(o)} value={selectOptionValue(o)}>
+            {selectOptionLabel(o)}
+          </option>
         ))}
       </select>
       <ChevronDown className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--taomni-text-muted)]" />
@@ -582,7 +592,6 @@ function ProxyJumpFields({
   onSaveAsProxySession?: () => void;
 }) {
   const patch = (delta: Partial<NetworkSettingsValue>) => onChange({ ...value, ...delta });
-  const proxy = proxyKindToLabel(value.proxyKind);
   const isJump = value.proxyKind === "ssh-tunnel";
   const isHttpOrSocks = value.proxyKind === "http" || value.proxyKind === "socks5";
   const proxyManual = value.proxySessionId?.trim() === "";
@@ -591,15 +600,15 @@ function ProxyJumpFields({
     <>
       <Field label={t("sessionEditor2.fieldProxy")}>
         <Select
-          value={proxy}
+          value={value.proxyKind}
           options={[
-            t("sessionEditor2.proxyNone"),
-            t("sessionEditor2.proxyHttp"),
-            t("sessionEditor2.proxySocks5"),
-            t("sessionEditor2.proxyLocalSshTunnel"),
-            t("sessionEditor2.proxySystem"),
+            { value: "none", label: t("sessionEditor2.proxyNone") },
+            { value: "http", label: t("sessionEditor2.proxyHttp") },
+            { value: "socks5", label: t("sessionEditor2.proxySocks5") },
+            { value: "ssh-tunnel", label: t("sessionEditor2.proxyLocalSshTunnel") },
+            { value: "system", label: t("sessionEditor2.proxySystem") },
           ]}
-          onChange={(label) => patch({ proxyKind: proxyLabelToKind(label) })}
+          onChange={(kind) => patch({ proxyKind: kind as ProxyKind })}
         />
       </Field>
 
@@ -845,12 +854,11 @@ function NetworkSettings({
   const keepAliveInterval = value.keepAliveIntervalSecs;
   const tcpNodelay = value.tcpNodelay;
   const disableNagle = value.disableNagle;
-  const ipVersion = ipKindToLabel(value.ipVersion);
   const forwards = value.localForwards;
 
   const setKeepAlive = (v: boolean) => patch({ keepAlive: v });
   const setKeepAliveInterval = (v: string) => patch({ keepAliveIntervalSecs: v });
-  const setIpVersion = (label: string) => patch({ ipVersion: ipLabelToKind(label) });
+  const setIpVersion = (kind: string) => patch({ ipVersion: kind as IpVersion });
   const setForwards = (
     updater: (items: NetworkSettingsValue["localForwards"]) => NetworkSettingsValue["localForwards"],
   ) => patch({ localForwards: updater(value.localForwards) });
@@ -906,8 +914,12 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldIpVersion")}>
         <Select
-          value={ipVersion}
-          options={[t("sessionEditor2.ipAuto"), t("sessionEditor2.ipForceIpv4"), t("sessionEditor2.ipForceIpv6")]}
+          value={value.ipVersion}
+          options={[
+            { value: "auto", label: t("sessionEditor2.ipAuto") },
+            { value: "ipv4", label: t("sessionEditor2.ipForceIpv4") },
+            { value: "ipv6", label: t("sessionEditor2.ipForceIpv6") },
+          ]}
           onChange={setIpVersion}
         />
       </Field>

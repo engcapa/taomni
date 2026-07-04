@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionEditor } from "./SessionEditor";
+import { setLocale } from "../../lib/i18n";
 
 const ipcMocks = vi.hoisted(() => ({
   testSshConnection: vi.fn(),
@@ -53,6 +54,7 @@ function checkboxInLabel(text: string): HTMLInputElement {
 
 describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
   beforeEach(() => {
+    setLocale("en");
     Object.values(ipcMocks).forEach((mock) => {
       if (typeof mock === "function" && "mockReset" in mock) {
         (mock as any).mockReset();
@@ -85,6 +87,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
   });
 
   afterEach(() => {
+    setLocale("en");
     cleanup();
   });
 
@@ -298,6 +301,31 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(screen.getByDisplayValue("127.0.0.1:5432")).toBeInTheDocument();
     expect(screen.getByDisplayValue("db.lan:5432")).toBeInTheDocument();
   }, 10_000);
+
+  it("persists localized Local SSH tunnel selection as a stable proxy kind", async () => {
+    setLocale("zh-CN");
+    const user = userEvent.setup();
+    const { onClose } = renderEditor();
+
+    await user.type(screen.getByLabelText("远程主机"), "app.internal");
+    await user.click(screen.getByRole("button", { name: "网络设置" }));
+
+    const proxySelect = screen.getByDisplayValue("无 — 直连");
+    await user.selectOptions(proxySelect, screen.getByRole("option", { name: "本地 SSH 隧道" }));
+    await user.type(screen.getByLabelText("跳板机主机"), "bastion.internal");
+    await user.type(screen.getByLabelText("跳板机用户"), "ops");
+
+    await user.click(screen.getByTestId("session-save"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const saved = ipcMocks.saveSession.mock.calls[0][0];
+    const opts = JSON.parse(saved.options_json);
+    expect(opts.networkSettings).toMatchObject({
+      proxyKind: "ssh-tunnel",
+      jumpHost: "bastion.internal",
+      jumpUser: "ops",
+    });
+  });
 
   it("forwards proxy/jump network settings when testing a DB connection", async () => {
     const user = userEvent.setup();
