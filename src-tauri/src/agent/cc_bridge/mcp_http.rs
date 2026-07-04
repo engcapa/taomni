@@ -63,7 +63,7 @@ const CAPTURE_TIMEOUT_SECS: u64 = 900;
 
 /// Which tool surface a CC thread's MCP endpoint exposes. Selected at spawn
 /// from the bound session's type (E): a terminal/SSH/local thread gets `Shell`;
-/// a SQL DB session (MySQL/PG/SQL Server/ClickHouse/Presto) gets `Sql`; a Redis session
+/// a SQL DB session (MySQL/PG/PanWeiDB/Oracle/SQL Server/ClickHouse/Presto) gets `Sql`; a Redis session
 /// gets `Redis`. One listener serves all three at distinct nest paths, and a
 /// thread's `.mcp.json` lists *only* its flavor's server — so a DB thread never
 /// sees shell tools, and vice-versa (reduces cross-surface confusion).
@@ -109,7 +109,7 @@ impl Flavor {
     }
 
     /// Pick the MCP flavor for a thread from its bound session's type: SQL DB
-    /// engines (MySQL/PG/PanWeiDB/SQL Server/StarRocks/ClickHouse/Presto) →
+    /// engines (MySQL/PG/PanWeiDB/Oracle/SQL Server/StarRocks/ClickHouse/Presto) →
     /// `Sql`, Redis → `Redis`, anything else (SSH/terminal/local/unbound) →
     /// `Shell`.
     pub fn for_session_type(t: Option<&crate::session::models::SessionType>) -> Flavor {
@@ -119,6 +119,7 @@ impl Flavor {
                 SessionType::MySQL
                 | SessionType::PostgreSQL
                 | SessionType::PanWeiDB
+                | SessionType::Oracle
                 | SessionType::SQLServer
                 | SessionType::StarRocks
                 | SessionType::ClickHouse
@@ -235,7 +236,7 @@ pub async fn ensure_started(app: &AppHandle) -> Result<SocketAddr, String> {
             Default::default(),
         )
     };
-    // SQL flavor (`/mcp/sql`) — MySQL/PG/SQL Server/StarRocks/ClickHouse/Presto.
+    // SQL flavor (`/mcp/sql`) — MySQL/PG/PanWeiDB/Oracle/SQL Server/StarRocks/ClickHouse/Presto.
     let sql_service = {
         let app = app.clone();
         let toks = tokens.clone();
@@ -1853,6 +1854,7 @@ mod tests {
             SessionType::MySQL,
             SessionType::PostgreSQL,
             SessionType::PanWeiDB,
+            SessionType::Oracle,
             SessionType::SQLServer,
             SessionType::StarRocks,
             SessionType::ClickHouse,

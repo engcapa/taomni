@@ -64,6 +64,7 @@ const DEFAULT_PORTS: Record<string, number> = {
   MySQL: 3306,
   PostgreSQL: 5432,
   PanWeiDB: 5432,
+  Oracle: 1521,
   SQLServer: 1433,
   StarRocks: 9030,
   ClickHouse: 9000,
@@ -86,6 +87,7 @@ const CSV_PASSWORD_SESSION_TYPES = new Set([
   "MySQL",
   "PostgreSQL",
   "PanWeiDB",
+  "Oracle",
   "SQLServer",
   "StarRocks",
   "ClickHouse",
@@ -887,6 +889,7 @@ function navicatSessionType(value: string): string | null {
   if (/\b(starrocks|starrocksdb|star rocks)\b/.test(key)) return "StarRocks";
   if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
   if (/\b(panwei|panweidb|open gauss|opengauss)\b/.test(key)) return "PanWeiDB";
+  if (/\b(oracle|oracledb|oci)\b/.test(key)) return "Oracle";
   if (/\b(postgresql|postgres|pgsql)\b/.test(key)) return "PostgreSQL";
   if (/\b(sqlserver|sql server|mssql|azure sql)\b/.test(key)) return "SQLServer";
   if (/\b(clickhouse|click house)\b/.test(key)) return "ClickHouse";
@@ -1171,6 +1174,7 @@ function dbeaverSessionType(value: string): string | null {
   if (/\b(starrocks|starrocksdb|star rocks)\b/.test(key)) return "StarRocks";
   if (/\b(mysql|mariadb|tidb|oceanbase|polardb)\b/.test(key)) return "MySQL";
   if (/\b(panwei|panweidb|open gauss|opengauss)\b/.test(key)) return "PanWeiDB";
+  if (/\b(oracle|oracledb|oci|ojdbc)\b/.test(key)) return "Oracle";
   if (/\b(postgresql|postgres|cockroach|yugabyte)\b/.test(key)) return "PostgreSQL";
   if (/\b(sqlserver|sql server|mssql|jtds|azure sql)\b/.test(key)) return "SQLServer";
   if (/\b(clickhouse|click house|chjdbc)\b/.test(key)) return "ClickHouse";
@@ -1185,6 +1189,9 @@ function parseDbeaverJdbcUrl(rawUrl: string): DbeaverUrlInfo {
   let url = raw.replace(/^jdbc:/i, "");
   if (url.toLowerCase().startsWith("jtds:")) {
     url = url.slice(5);
+  }
+  if (/^oracle:/i.test(url)) {
+    return parseOracleJdbcUrl(url);
   }
   if (/^sqlserver:/i.test(url)) {
     return parseSqlServerJdbcUrl(url);
@@ -1216,6 +1223,41 @@ function parseDbeaverJdbcUrl(rawUrl: string): DbeaverUrlInfo {
   } catch {
     return { driverKey };
   }
+}
+
+function parseOracleJdbcUrl(url: string): DbeaverUrlInfo {
+  const info: DbeaverUrlInfo = { driverKey: "oracle" };
+  const atIndex = url.indexOf("@");
+  if (atIndex < 0) return info;
+  const connect = url.slice(atIndex + 1).trim();
+  if (connect.startsWith("//")) {
+    try {
+      const parsed = new URL(`oracle:${connect}`);
+      const service = parsed.pathname.replace(/^\/+/, "");
+      return {
+        ...info,
+        host: parsed.hostname,
+        port: parsed.port ? sanitizePort(parsed.port, DEFAULT_PORTS.Oracle) : undefined,
+        database: service ? decodeURIComponent(service) : undefined,
+      };
+    } catch {
+      return info;
+    }
+  }
+  if (connect.startsWith("(")) {
+    return { ...info, database: connect };
+  }
+  const parts = connect.split(":");
+  if (parts.length >= 3) {
+    return {
+      ...info,
+      host: parts[0],
+      port: sanitizePort(parts[1], DEFAULT_PORTS.Oracle),
+      database: parts.slice(2).join(":") || undefined,
+    };
+  }
+  const hostPort = parseHostPort(connect);
+  return { ...info, host: hostPort.host, port: hostPort.port };
 }
 
 function parseSqlServerJdbcUrl(url: string): DbeaverUrlInfo {

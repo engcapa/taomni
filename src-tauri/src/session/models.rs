@@ -40,6 +40,7 @@ pub enum SessionType {
     MySQL,
     PostgreSQL,
     PanWeiDB,
+    Oracle,
     SQLServer,
     StarRocks,
     ClickHouse,
@@ -80,6 +81,7 @@ impl SessionType {
             Self::MySQL => "MySQL",
             Self::PostgreSQL => "PostgreSQL",
             Self::PanWeiDB => "PanWeiDB",
+            Self::Oracle => "Oracle",
             Self::SQLServer => "SQLServer",
             Self::StarRocks => "StarRocks",
             Self::ClickHouse => "ClickHouse",
@@ -110,6 +112,7 @@ impl SessionType {
             "MySQL" => Self::MySQL,
             "PostgreSQL" => Self::PostgreSQL,
             "PanWeiDB" | "PanWei" | "openGauss" | "OpenGauss" => Self::PanWeiDB,
+            "Oracle" | "OracleDB" | "Oracle Database" => Self::Oracle,
             "SQLServer" | "SQL Server" | "MSSQL" => Self::SQLServer,
             "StarRocks" | "StarRocksDB" => Self::StarRocks,
             "ClickHouse" => Self::ClickHouse,
@@ -136,6 +139,7 @@ impl SessionType {
             Self::MySQL => 3306,
             Self::PostgreSQL => 5432,
             Self::PanWeiDB => 5432,
+            Self::Oracle => 1521,
             Self::SQLServer => 1433,
             Self::StarRocks => 9030,
             Self::ClickHouse => 9000,
@@ -205,6 +209,7 @@ mod tests {
             ("Browser", 0),
             ("Mail", 993),
             ("PanWeiDB", 5432),
+            ("Oracle", 1521),
         ] {
             let ty = SessionType::from_str(raw);
             assert_eq!(ty.as_str(), raw);

@@ -89,6 +89,7 @@ import {
   qualifiedName as dialectQualifiedName,
   sqlLiteral as dialectSqlLiteral,
   setDefaultSchemaSql,
+  selectStatement as dialectSelectStatement,
 } from "../../lib/sqlDialect";
 
 interface DbClientTabProps {
@@ -1452,8 +1453,12 @@ export default function DbClientTab({
 
   const quickSelect = useCallback(
     (schema: string | null, table: string) => {
-      const qualified = qualifiedName(info.engine, schema ?? activeSchema, table, info.catalog);
-      const sql = `SELECT * FROM ${qualified} LIMIT ${rowLimit}`;
+      const sql = dialectSelectStatement(
+        asSqlEngine(info.engine),
+        { catalog: info.catalog, schema: schema ?? activeSchema, name: table },
+        [],
+        rowLimit,
+      );
       editorHandles.current[activePanelId]?.setValue(sql);
       void runQuery(activePanelId, sql);
     },

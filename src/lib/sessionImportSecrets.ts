@@ -9,6 +9,7 @@ const DB_PASSWORD_SESSION_TYPES = new Set([
   "MySQL",
   "PostgreSQL",
   "PanWeiDB",
+  "Oracle",
   "SQLServer",
   "StarRocks",
   "ClickHouse",

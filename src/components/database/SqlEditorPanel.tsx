@@ -130,6 +130,7 @@ function dialectFor(engine: string): SQLDialect {
     case "PostgreSQL":
     case "PanWeiDB":
       return PostgreSQL;
+    case "Oracle":
     case "SQLServer":
       return StandardSQL;
     default:

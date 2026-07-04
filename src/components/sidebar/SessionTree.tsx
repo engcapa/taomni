@@ -1794,6 +1794,8 @@ function sessionIcon(type: string) {
       return <Database className="w-3.5 h-3.5" style={{ color: "#336791" }} />;
     case "PanWeiDB":
       return <Database className="w-3.5 h-3.5" style={{ color: "#0b8f6a" }} />;
+    case "Oracle":
+      return <Database className="w-3.5 h-3.5" style={{ color: "#c74634" }} />;
     case "SQLServer":
       return <Database className="w-3.5 h-3.5" style={{ color: "#cc2927" }} />;
     case "StarRocks":

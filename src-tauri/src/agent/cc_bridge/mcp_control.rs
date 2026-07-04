@@ -350,6 +350,7 @@ fn parse_session_type(s: &str) -> Result<SessionType, String> {
         "MySQL",
         "PostgreSQL",
         "PanWeiDB",
+        "Oracle",
         "SQLServer",
         "StarRocks",
         "ClickHouse",

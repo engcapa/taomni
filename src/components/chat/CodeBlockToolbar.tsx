@@ -325,7 +325,7 @@ const SLASH_COMMENT_LANGS = new Set([
   "less",
 ]);
 
-const SQL_COMMENT_LANGS = new Set(["sql", "mysql", "postgres", "postgresql", "sqlite", "lua", "haskell", "hs"]);
+const SQL_COMMENT_LANGS = new Set(["sql", "mysql", "oracle", "postgres", "postgresql", "sqlite", "lua", "haskell", "hs"]);
 const HTML_COMMENT_LANGS = new Set(["", "html", "xml", "md", "markdown"]);
 const BATCH_COMMENT_LANGS = new Set(["bat", "batch", "cmd"]);
 

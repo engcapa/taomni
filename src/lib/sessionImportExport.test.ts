@@ -476,10 +476,10 @@ describe("DBeaver session import", () => {
         },
         oracle: {
           driver: "oracle",
-          name: "Skipped Oracle",
+          name: "Billing Oracle",
           configuration: {
-            host: "oracle.example.com",
-            port: "1521",
+            url: "jdbc:oracle:thin:@//oracle.example.com:1522/ORCLPDB1",
+            user: "billing",
           },
         },
       },
@@ -496,8 +496,9 @@ describe("DBeaver session import", () => {
       "Presto",
       "Redis",
       "PanWeiDB",
+      "Oracle",
     ]);
-    expect(result.skipped).toBe(1);
+    expect(result.skipped).toBe(0);
     expect(result.secrets).toHaveLength(2);
     expect(result.sessions[0]).toMatchObject({
       name: "Maria Prod",
@@ -570,6 +571,17 @@ describe("DBeaver session import", () => {
     });
     expect(JSON.parse(result.sessions[7].options_json)).toMatchObject({
       dbDatabase: "pwdb",
+      dbSsl: false,
+    });
+    expect(result.sessions[8]).toMatchObject({
+      name: "Billing Oracle",
+      session_type: "Oracle",
+      host: "oracle.example.com",
+      port: 1522,
+      username: "billing",
+    });
+    expect(JSON.parse(result.sessions[8].options_json)).toMatchObject({
+      dbDatabase: "ORCLPDB1",
       dbSsl: false,
     });
   });
@@ -721,14 +733,14 @@ describe("Navicat session import", () => {
       '    <Connection ConnectionName="StarRocks FE" ConnType="STARROCKS" Host="sr.example.com" UserName="reader" Database="warehouse" />',
       "  </Group>",
       '  <Connection ConnectionName="Cache" ConnType="REDIS" Host="redis.example.com" Port="6380" UserName="default" Database="2" />',
-      '  <Connection ConnectionName="Skipped Oracle" ConnType="ORACLE" Host="oracle.example.com" Port="1521" />',
+      '  <Connection ConnectionName="Billing Oracle" ConnType="ORACLE" Host="oracle.example.com" Port="1521" UserName="billing" Database="ORCLPDB1" />',
       "</Connections>",
     ].join("\n");
 
     const result = await parseNavicatSessions(text, { targetFolder: "Imported", now: 6060 });
 
-    expect(result.sessions.map((s) => s.session_type)).toEqual(["MySQL", "StarRocks", "Redis"]);
-    expect(result.skipped).toBe(1);
+    expect(result.sessions.map((s) => s.session_type)).toEqual(["MySQL", "StarRocks", "Redis", "Oracle"]);
+    expect(result.skipped).toBe(0);
     expect(result.sessions[0]).toMatchObject({
       name: "Prod MySQL",
       group_path: "User sessions / Imported / Navicat / Production",
@@ -760,6 +772,18 @@ describe("Navicat session import", () => {
     expect(JSON.parse(result.sessions[2].options_json)).toMatchObject({
       dbRedisIndex: "2",
     });
+    expect(result.sessions[3]).toMatchObject({
+      name: "Billing Oracle",
+      session_type: "Oracle",
+      host: "oracle.example.com",
+      port: 1521,
+      username: "billing",
+    });
+    expect(JSON.parse(result.sessions[3].options_json)).toMatchObject({
+      dbDatabase: "ORCLPDB1",
+      dbSsl: false,
+      dbTimeout: "15",
+    });
     expect(result.secrets).toEqual([
       {
         sessionId: result.sessions[0].id,
@@ -769,7 +793,7 @@ describe("Navicat session import", () => {
         attachment: "session",
       },
     ]);
-    expect(result.warnings).toContain('Skipped Navicat connection "Skipped Oracle" because its database type is not supported by Taomni.');
+    expect(result.warnings).not.toContain('Skipped Navicat connection "Billing Oracle" because its database type is not supported by Taomni.');
   });
 
   it("keeps Navicat Pwd_2 local credential recovery as a phase 2 warning", async () => {

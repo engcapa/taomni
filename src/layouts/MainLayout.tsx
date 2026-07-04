@@ -1868,6 +1868,7 @@ export function MainLayout() {
       session.session_type === "MySQL" ||
       session.session_type === "PostgreSQL" ||
       session.session_type === "PanWeiDB" ||
+      session.session_type === "Oracle" ||
       session.session_type === "SQLServer" ||
       session.session_type === "StarRocks" ||
       session.session_type === "ClickHouse" ||
