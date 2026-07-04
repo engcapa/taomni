@@ -3,8 +3,8 @@ use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
-use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::State;
+use tauri::ipc::{InvokeBody, Request, Response};
 
 const MAX_READ_STREAM_CHUNK: usize = 1_048_576;
 
@@ -280,16 +280,15 @@ pub fn clipboard_write_text(text: String, state: State<'_, AppState>) -> Result<
 
 #[tauri::command]
 pub fn clipboard_read_files(state: State<'_, AppState>) -> Result<Vec<String>, String> {
-    let native = platform::clipboard_read_files()?;
+    let native = platform::clipboard_read_files().unwrap_or_default();
     if !native.is_empty() {
         return Ok(native);
     }
 
     let text = clipboard_read_text(state).unwrap_or_default();
-    let files = crate::rdp::cliprdr::uri_list_to_paths(&text)
+    let files = clipboard_paths_from_uri_text(&text)
         .into_iter()
-        .filter(|path| path.exists())
-        .map(|path| path.to_string_lossy().into_owned())
+        .filter(|path| PathBuf::from(path.as_str()).exists())
         .collect();
     Ok(files)
 }
@@ -335,6 +334,17 @@ fn existing_file_from(current_path: Option<&str>) -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
+fn clipboard_paths_from_uri_text(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for path in crate::rdp::cliprdr::uri_list_to_paths(text) {
+        let value = path.to_string_lossy().into_owned();
+        if !value.is_empty() && !out.contains(&value) {
+            out.push(value);
+        }
+    }
+    out
+}
+
 #[cfg(windows)]
 mod platform {
     use super::{existing_file_from, initial_dir_from};
@@ -348,11 +358,11 @@ mod platform {
     };
     use winapi::um::shellapi::DragQueryFileW;
     use winapi::um::winbase::{
-        GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT,
+        GMEM_MOVEABLE, GMEM_ZEROINIT, GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock,
     };
     use winapi::um::winuser::{
-        CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
-        OpenClipboard, SetClipboardData, CF_HDROP,
+        CF_HDROP, CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
+        OpenClipboard, SetClipboardData,
     };
 
     #[repr(C)]
@@ -722,6 +732,50 @@ mod platform {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::clipboard_paths_from_uri_text;
+
+    #[test]
+    fn clipboard_uri_text_parses_uri_list() {
+        let parsed = clipboard_paths_from_uri_text(
+            "# copied from a file manager\nfile:///tmp/alpha%20one.txt\r\nfile:///tmp/beta\n",
+        );
+
+        assert_eq!(
+            parsed,
+            vec!["/tmp/alpha one.txt".to_string(), "/tmp/beta".to_string()]
+        );
+    }
+
+    #[test]
+    fn clipboard_uri_text_parses_gnome_copied_files() {
+        let parsed = clipboard_paths_from_uri_text(
+            "copy\nfile:///home/me/project\nfile:///home/me/project/src\n",
+        );
+
+        assert_eq!(
+            parsed,
+            vec![
+                "/home/me/project".to_string(),
+                "/home/me/project/src".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn clipboard_uri_text_deduplicates_paths() {
+        let parsed = clipboard_paths_from_uri_text(
+            "file:///tmp/same\nfile:///tmp/same\nfile:///tmp/other\n",
+        );
+
+        assert_eq!(
+            parsed,
+            vec!["/tmp/same".to_string(), "/tmp/other".to_string()]
+        );
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod platform {
     use std::process::Command;
@@ -811,7 +865,36 @@ mod platform {
     }
 
     pub fn clipboard_read_files() -> Result<Vec<String>, String> {
-        Ok(Vec::new())
+        let script = r#"
+use framework "Foundation"
+use framework "AppKit"
+use scripting additions
+
+set pb to current application's NSPasteboard's generalPasteboard()
+set urls to pb's readObjectsForClasses:{current application's NSURL} options:(missing value)
+set paths to {}
+repeat with u in urls
+    if (u's isFileURL()) as boolean then
+        set end of paths to (u's |path|()) as text
+    end if
+end repeat
+set AppleScript's text item delimiters to linefeed
+return paths as text
+"#;
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|e| format!("macOS clipboard: {e}"))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("macOS clipboard: {}", stderr.trim()));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|line| line.trim().to_string())
+            .filter(|line| !line.is_empty())
+            .collect())
     }
 
     pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
@@ -1097,7 +1180,46 @@ mod platform {
     }
 
     pub fn clipboard_read_files() -> Result<Vec<String>, String> {
+        const MIME_TYPES: &[&str] = &["x-special/gnome-copied-files", "text/uri-list"];
+        for mime in MIME_TYPES {
+            if let Some(payload) =
+                run_clipboard_reader("wl-paste", &["--no-newline", "--type", mime])?
+            {
+                let paths = super::clipboard_paths_from_uri_text(&payload);
+                if !paths.is_empty() {
+                    return Ok(paths);
+                }
+            }
+        }
+        for mime in MIME_TYPES {
+            if let Some(payload) =
+                run_clipboard_reader("xclip", &["-selection", "clipboard", "-t", mime, "-o"])?
+            {
+                let paths = super::clipboard_paths_from_uri_text(&payload);
+                if !paths.is_empty() {
+                    return Ok(paths);
+                }
+            }
+        }
+        if let Some(payload) = run_clipboard_reader("xsel", &["--clipboard", "--output"])? {
+            let paths = super::clipboard_paths_from_uri_text(&payload);
+            if !paths.is_empty() {
+                return Ok(paths);
+            }
+        }
         Ok(Vec::new())
+    }
+
+    fn run_clipboard_reader(program: &str, args: &[&str]) -> Result<Option<String>, String> {
+        match Command::new(program).args(args).output() {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(format!("{program}: {err}")),
+            Ok(output) if output.status.success() => {
+                let text = String::from_utf8_lossy(&output.stdout).to_string();
+                Ok((!text.trim().is_empty()).then_some(text))
+            }
+            Ok(_) => Ok(None),
+        }
     }
 
     pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
