@@ -333,6 +333,16 @@ export interface CodeWorkspaceTabInfo {
   initialFile?: CodeWorkspaceFileRef | null;
 }
 
+export interface RecentWorkspace {
+  id: string;
+  name: string;
+  roots: CodeWorkspaceRootInfo[];
+  looseFiles: CodeWorkspaceLooseFileInfo[];
+  lastOpenedAt: number;
+  lastActiveFile?: CodeWorkspaceFileRef | null;
+  isGitRepo: boolean;
+}
+
 export interface Tab {
   id: string;
   /**

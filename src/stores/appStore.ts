@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import type { CodeWorkspaceRootKind, Tab } from "../types";
+import type {
+  CodeWorkspaceFileRef,
+  CodeWorkspaceLooseFileInfo,
+  CodeWorkspaceRootInfo,
+  CodeWorkspaceRootKind,
+  RecentWorkspace,
+  Tab,
+} from "../types";
 import { t as tr } from "../lib/i18n";
 import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
@@ -101,6 +108,7 @@ const TERMINAL_SPLIT_LAYOUT_KEY = "taomni.terminalSplitLayout";
 const SQL_ECHO_KEY = "taomni.sqlEcho";
 const SIDEBAR_COLLAPSED_KEY = "taomni.sidebarCollapsed";
 const WELCOME_RECENT_SESSION_LIMIT_KEY = "taomni.welcomeRecentSessionLimit";
+const RECENT_WORKSPACES_KEY = "taomni.recentWorkspaces.v1";
 
 const DEFAULT_WELCOME_RECENT_SESSION_LIMIT = 20;
 const MIN_WELCOME_RECENT_SESSION_LIMIT = 1;
@@ -131,6 +139,7 @@ interface AppState {
   uiFontFamily: string;
   uiFontSize: number;
   welcomeRecentSessionLimit: number;
+  recentWorkspaces: RecentWorkspace[];
   /**
    * Transient focus filter for the open-tab strip (issue #121). When set, the
    * strip only renders tabs matching the filter; the rest are hidden, not
@@ -221,6 +230,10 @@ interface AppState {
   setUiFontFamily: (font: string) => void;
   setUiFontSize: (size: number) => void;
   setWelcomeRecentSessionLimit: (limit: number) => void;
+  upsertRecentWorkspace: (workspace: RecentWorkspace) => void;
+  recordCodeWorkspaceTab: (tabId: string) => void;
+  removeRecentWorkspace: (id: string) => void;
+  clearRecentWorkspaces: () => void;
   setTabFilter: (filter: TabFilter | null) => void;
   clearTabFilter: () => void;
   /** Record a terminal tab's latest OSC-7 cwd (see {@link cwdByTab}). */
@@ -367,6 +380,233 @@ function writeWelcomeRecentSessionLimit(limit: number) {
   }
 }
 
+function hashString(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function normalizeWorkspacePath(path: string): string {
+  const trimmed = path.trim();
+  const normalized = trimmed.replace(/\\/g, "/").replace(/\/+$/, "");
+  return normalized || trimmed;
+}
+
+function workspacePathName(path: string, fallback = "Workspace"): string {
+  const normalized = normalizeWorkspacePath(path);
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] || fallback;
+}
+
+function rootIdForPath(path: string): string {
+  return `root-${hashString(normalizeWorkspacePath(path))}`;
+}
+
+function looseIdForPath(path: string): string {
+  return `loose-${hashString(normalizeWorkspacePath(path))}`;
+}
+
+function normalizeRecentRoot(root: CodeWorkspaceRootInfo): CodeWorkspaceRootInfo | null {
+  const path = normalizeWorkspacePath(root.path ?? "");
+  if (!path) return null;
+  const kind: CodeWorkspaceRootKind = root.kind === "folder" ? "folder" : "git";
+  return {
+    id: root.id?.trim() || rootIdForPath(path),
+    name: root.name?.trim() || workspacePathName(path),
+    path,
+    kind,
+  };
+}
+
+function normalizeRecentLooseFile(file: CodeWorkspaceLooseFileInfo): CodeWorkspaceLooseFileInfo | null {
+  const path = normalizeWorkspacePath(file.path ?? "");
+  if (!path) return null;
+  return {
+    id: file.id?.trim() || looseIdForPath(path),
+    name: file.name?.trim() || workspacePathName(path, "File"),
+    path,
+  };
+}
+
+function normalizeRecentRoots(roots: readonly CodeWorkspaceRootInfo[] | undefined): CodeWorkspaceRootInfo[] {
+  const next: CodeWorkspaceRootInfo[] = [];
+  for (const root of roots ?? []) {
+    const normalized = normalizeRecentRoot(root);
+    if (normalized && !next.some((item) => item.path === normalized.path)) {
+      next.push(normalized);
+    }
+  }
+  return next;
+}
+
+function normalizeRecentLooseFiles(files: readonly CodeWorkspaceLooseFileInfo[] | undefined): CodeWorkspaceLooseFileInfo[] {
+  const next: CodeWorkspaceLooseFileInfo[] = [];
+  for (const file of files ?? []) {
+    const normalized = normalizeRecentLooseFile(file);
+    if (normalized && !next.some((item) => item.path === normalized.path)) {
+      next.push(normalized);
+    }
+  }
+  return next;
+}
+
+function normalizeRecentFileRef(
+  ref: CodeWorkspaceFileRef | null | undefined,
+  roots: readonly CodeWorkspaceRootInfo[],
+  looseFiles: readonly CodeWorkspaceLooseFileInfo[],
+): CodeWorkspaceFileRef | null {
+  if (!ref) return null;
+  if (ref.kind === "root") {
+    const root = roots.find((item) => item.id === ref.rootId);
+    if (!root) return null;
+    return { kind: "root", rootId: root.id, path: ref.path };
+  }
+  const loose = looseFiles.find((item) => item.id === ref.id);
+  if (!loose) return null;
+  return { kind: "loose", id: loose.id, path: loose.path };
+}
+
+function fileRefFromContext(file: CodeWorkspaceFileContext | null | undefined): CodeWorkspaceFileRef | null {
+  if (!file) return null;
+  if (file.kind === "root") {
+    return { kind: "root", rootId: file.rootId, path: file.path };
+  }
+  return { kind: "loose", id: file.id, path: file.path };
+}
+
+export function recentWorkspaceIdFromParts(
+  roots: readonly CodeWorkspaceRootInfo[],
+  looseFiles: readonly CodeWorkspaceLooseFileInfo[] = [],
+): string {
+  const identity = JSON.stringify({
+    roots: roots
+      .map((root) => ({ path: normalizeWorkspacePath(root.path), kind: root.kind }))
+      .sort((a, b) => `${a.kind}:${a.path}`.localeCompare(`${b.kind}:${b.path}`)),
+    looseFiles: looseFiles
+      .map((file) => normalizeWorkspacePath(file.path))
+      .sort((a, b) => a.localeCompare(b)),
+  });
+  return `workspace-${hashString(identity)}`;
+}
+
+function recentWorkspaceName(
+  explicitName: string | undefined,
+  roots: readonly CodeWorkspaceRootInfo[],
+  looseFiles: readonly CodeWorkspaceLooseFileInfo[],
+): string {
+  const trimmed = explicitName?.trim();
+  if (trimmed) return trimmed;
+  if (roots.length === 1 && looseFiles.length === 0) return roots[0].name;
+  if (roots.length === 0 && looseFiles.length === 1) return looseFiles[0].name;
+  if (roots.length === 0 && looseFiles.length > 0) return "Editor Workspace";
+  return "Code Workspace";
+}
+
+function recentWorkspaceFromTab(
+  tab: Tab | undefined,
+  context: CodeWorkspaceContext | undefined,
+  now: number,
+): RecentWorkspace | null {
+  if (!tab?.codeWorkspace) return null;
+  const contextRoots = context?.roots?.map((root) => ({
+    id: root.id,
+    name: root.name,
+    path: root.path,
+    kind: root.kind,
+  }));
+  let roots = normalizeRecentRoots(contextRoots ?? tab.codeWorkspace.roots);
+  if (roots.length === 0 && tab.codeWorkspace.repoRoot.trim()) {
+    const path = normalizeWorkspacePath(tab.codeWorkspace.repoRoot);
+    roots = [{
+      id: rootIdForPath(path),
+      name: workspacePathName(path),
+      path,
+      kind: "git",
+    }];
+  }
+  const contextLooseFiles = context?.looseFiles?.map((file) => ({
+    id: file.id,
+    name: file.name,
+    path: file.path,
+  }));
+  const looseFiles = normalizeRecentLooseFiles(contextLooseFiles ?? tab.codeWorkspace.looseFiles);
+  if (roots.length === 0 && looseFiles.length === 0) return null;
+
+  const activeFile = normalizeRecentFileRef(
+    fileRefFromContext(context?.activeFile) ?? tab.codeWorkspace.initialFile ?? null,
+    roots,
+    looseFiles,
+  );
+  return {
+    id: recentWorkspaceIdFromParts(roots, looseFiles),
+    name: recentWorkspaceName(tab.codeWorkspace.name, roots, looseFiles),
+    roots,
+    looseFiles,
+    lastOpenedAt: now,
+    lastActiveFile: activeFile,
+    isGitRepo: roots.some((root) => root.kind === "git"),
+  };
+}
+
+function normalizeRecentWorkspace(workspace: RecentWorkspace): RecentWorkspace | null {
+  const roots = normalizeRecentRoots(workspace.roots);
+  const looseFiles = normalizeRecentLooseFiles(workspace.looseFiles);
+  if (roots.length === 0 && looseFiles.length === 0) return null;
+  const activeFile = normalizeRecentFileRef(workspace.lastActiveFile ?? null, roots, looseFiles);
+  return {
+    id: recentWorkspaceIdFromParts(roots, looseFiles),
+    name: recentWorkspaceName(workspace.name, roots, looseFiles),
+    roots,
+    looseFiles,
+    lastOpenedAt: Number.isFinite(workspace.lastOpenedAt) ? workspace.lastOpenedAt : Date.now(),
+    lastActiveFile: activeFile,
+    isGitRepo: workspace.isGitRepo || roots.some((root) => root.kind === "git"),
+  };
+}
+
+function upsertRecentWorkspaceList(
+  current: readonly RecentWorkspace[],
+  workspace: RecentWorkspace | null,
+  limit: number,
+): RecentWorkspace[] {
+  if (!workspace) return current as RecentWorkspace[];
+  const normalized = normalizeRecentWorkspace(workspace);
+  if (!normalized) return current as RecentWorkspace[];
+  return [
+    normalized,
+    ...current.filter((item) => item.id !== normalized.id),
+  ]
+    .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
+    .slice(0, clampWelcomeRecentSessionLimit(limit));
+}
+
+function readRecentWorkspaces(limit: number): RecentWorkspace[] {
+  try {
+    const raw = window.localStorage.getItem(RECENT_WORKSPACES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const workspaces = parsed
+      .map((item) => normalizeRecentWorkspace(item as RecentWorkspace))
+      .filter((item): item is RecentWorkspace => !!item)
+      .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
+      .slice(0, clampWelcomeRecentSessionLimit(limit));
+    return workspaces;
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentWorkspaces(workspaces: readonly RecentWorkspace[]) {
+  try {
+    window.localStorage.setItem(RECENT_WORKSPACES_KEY, JSON.stringify(workspaces));
+  } catch {
+    // Ignore storage failures; the in-memory list still works.
+  }
+}
+
 function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
   const next = new Set<string>();
   for (const id of ids) {
@@ -405,6 +645,8 @@ function activeTabIsTerminal(tabs: Tab[], activeTabId: string | null): boolean {
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+const initialWelcomeRecentSessionLimit = readWelcomeRecentSessionLimit();
 
 /**
  * Build the title for a duplicated tab. The base name is the source title with
@@ -479,15 +721,25 @@ export const useAppStore = create<AppState>((set) => ({
   terminalSplitInputLockedTabIds: new Set(),
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
-  welcomeRecentSessionLimit: readWelcomeRecentSessionLimit(),
+  welcomeRecentSessionLimit: initialWelcomeRecentSessionLimit,
+  recentWorkspaces: readRecentWorkspaces(initialWelcomeRecentSessionLimit),
   tabFilter: null,
 
   addTab: (tab) =>
     set((s) => {
       const nextTabs = [...s.tabs, tab];
+      const recentWorkspaces = upsertRecentWorkspaceList(
+        s.recentWorkspaces,
+        recentWorkspaceFromTab(tab, undefined, Date.now()),
+        s.welcomeRecentSessionLimit,
+      );
+      if (recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentWorkspaces);
+      }
       return {
         tabs: nextTabs,
         activeTabId: tab.id,
+        recentWorkspaces,
         // A freshly opened tab must be visible, so drop any active focus filter.
         tabFilter: null,
         terminalSplitActive: tab.type === "terminal" ? s.terminalSplitActive : false,
@@ -516,9 +768,18 @@ export const useAppStore = create<AppState>((set) => ({
       };
       const next = s.tabs.slice();
       next.splice(idx + 1, 0, copy);
+      const recentWorkspaces = upsertRecentWorkspaceList(
+        s.recentWorkspaces,
+        recentWorkspaceFromTab(copy, undefined, Date.now()),
+        s.welcomeRecentSessionLimit,
+      );
+      if (recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentWorkspaces);
+      }
       return {
         tabs: next,
         activeTabId: copy.id,
+        recentWorkspaces,
         // A freshly opened tab must be visible, so drop any active focus filter.
         tabFilter: null,
         terminalSplitActive: copy.type === "terminal" ? s.terminalSplitActive : false,
@@ -529,15 +790,25 @@ export const useAppStore = create<AppState>((set) => ({
   removeTab: (id) =>
     set((s) => {
       const idx = s.tabs.findIndex((t) => t.id === id);
+      const tab = idx >= 0 ? s.tabs[idx] : undefined;
       const next = s.tabs.filter((t) => t.id !== id);
       let activeId = s.activeTabId;
       if (activeId === id) {
         activeId = next[Math.min(idx, next.length - 1)]?.id ?? null;
       }
       const validIds = new Set(next.map((tab) => tab.id));
+      const recentWorkspaces = upsertRecentWorkspaceList(
+        s.recentWorkspaces,
+        recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[id], Date.now()),
+        s.welcomeRecentSessionLimit,
+      );
+      if (recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentWorkspaces);
+      }
       return {
         tabs: next,
         activeTabId: activeId,
+        recentWorkspaces,
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
@@ -549,15 +820,29 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => {
       const idSet = new Set(ids);
       const activeIndex = s.tabs.findIndex((t) => t.id === s.activeTabId);
+      const closingTabs = s.tabs.filter((tab) => idSet.has(tab.id));
       const next = s.tabs.filter((t) => !idSet.has(t.id));
       let activeId = s.activeTabId;
       if (!activeId || idSet.has(activeId)) {
         activeId = next[Math.min(activeIndex, next.length - 1)]?.id ?? null;
       }
       const validIds = new Set(next.map((tab) => tab.id));
+      let recentWorkspaces = s.recentWorkspaces;
+      const now = Date.now();
+      for (const tab of closingTabs) {
+        recentWorkspaces = upsertRecentWorkspaceList(
+          recentWorkspaces,
+          recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[tab.id], now),
+          s.welcomeRecentSessionLimit,
+        );
+      }
+      if (recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentWorkspaces);
+      }
       return {
         tabs: next,
         activeTabId: activeId,
+        recentWorkspaces,
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
@@ -574,8 +859,17 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveTab: (id) =>
     set((s) => {
       const tab = s.tabs.find((item) => item.id === id);
+      const recentWorkspaces = upsertRecentWorkspaceList(
+        s.recentWorkspaces,
+        recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[id], Date.now()),
+        s.welcomeRecentSessionLimit,
+      );
+      if (recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentWorkspaces);
+      }
       return {
         activeTabId: id,
+        recentWorkspaces,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,
       };
     }),
@@ -782,10 +1076,52 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 
   setWelcomeRecentSessionLimit: (limit) =>
-    set(() => {
+    set((s) => {
       const next = clampWelcomeRecentSessionLimit(limit);
       writeWelcomeRecentSessionLimit(next);
-      return { welcomeRecentSessionLimit: next };
+      const recentWorkspaces = s.recentWorkspaces.slice(0, next);
+      writeRecentWorkspaces(recentWorkspaces);
+      return { welcomeRecentSessionLimit: next, recentWorkspaces };
+    }),
+
+  upsertRecentWorkspace: (workspace) =>
+    set((s) => {
+      const recentWorkspaces = upsertRecentWorkspaceList(
+        s.recentWorkspaces,
+        { ...workspace, lastOpenedAt: workspace.lastOpenedAt || Date.now() },
+        s.welcomeRecentSessionLimit,
+      );
+      writeRecentWorkspaces(recentWorkspaces);
+      return { recentWorkspaces };
+    }),
+
+  recordCodeWorkspaceTab: (tabId) =>
+    set((s) => {
+      const tab = s.tabs.find((item) => item.id === tabId);
+      const recentWorkspaces = upsertRecentWorkspaceList(
+        s.recentWorkspaces,
+        recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[tabId], Date.now()),
+        s.welcomeRecentSessionLimit,
+      );
+      if (recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentWorkspaces);
+      }
+      return recentWorkspaces === s.recentWorkspaces ? s : { recentWorkspaces };
+    }),
+
+  removeRecentWorkspace: (id) =>
+    set((s) => {
+      const recentWorkspaces = s.recentWorkspaces.filter((workspace) => workspace.id !== id);
+      if (recentWorkspaces.length === s.recentWorkspaces.length) return s;
+      writeRecentWorkspaces(recentWorkspaces);
+      return { recentWorkspaces };
+    }),
+
+  clearRecentWorkspaces: () =>
+    set((s) => {
+      if (s.recentWorkspaces.length === 0) return s;
+      writeRecentWorkspaces([]);
+      return { recentWorkspaces: [] };
     }),
 
   setTabFilter: (filter) => set({ tabFilter: filter }),
