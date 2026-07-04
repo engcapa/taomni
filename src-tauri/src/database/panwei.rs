@@ -4,14 +4,24 @@
 //! authentication that regular PostgreSQL clients do not implement.
 
 use std::{
+    future::Future,
+    io,
+    pin::Pin,
     sync::Arc,
+    task::{Context, Poll},
     time::{Duration, Instant},
 };
 
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::task::JoinHandle;
 use tokio_opengauss::{
-    config::SslMode, types::ToSql, Client as OgClient, Config as OgConfig, NoTls, Row as OgRow,
+    config::SslMode,
+    tls::{
+        ChannelBinding as OgChannelBinding, MakeTlsConnect, TlsConnect, TlsStream as OgTlsStream,
+    },
+    types::ToSql,
+    Client as OgClient, Config as OgConfig, Error as OgError, NoTls, Row as OgRow,
     SimpleQueryMessage,
 };
 use tokio_util::sync::CancellationToken;
@@ -23,6 +33,111 @@ use super::{
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
 const FALLBACK_SCHEMA: &str = "public";
+
+#[derive(Clone)]
+struct PanWeiNativeTls {
+    connector: tokio_native_tls::TlsConnector,
+}
+
+struct PanWeiNativeTlsConnect {
+    connector: tokio_native_tls::TlsConnector,
+    domain: String,
+}
+
+struct PanWeiNativeTlsStream<S>(tokio_native_tls::TlsStream<S>);
+
+impl PanWeiNativeTls {
+    fn new() -> Result<Self, native_tls::Error> {
+        let mut builder = native_tls::TlsConnector::builder();
+        // The UI currently exposes a single "encrypted connection" checkbox,
+        // without CA/certificate pinning fields. Match SQL Server's existing
+        // trust_cert behavior so self-signed intranet PanWeiDB deployments can
+        // still get transport encryption.
+        builder.danger_accept_invalid_certs(true);
+        builder.danger_accept_invalid_hostnames(true);
+        Ok(Self {
+            connector: tokio_native_tls::TlsConnector::from(builder.build()?),
+        })
+    }
+}
+
+impl<S> MakeTlsConnect<S> for PanWeiNativeTls
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    type Stream = PanWeiNativeTlsStream<S>;
+    type TlsConnect = PanWeiNativeTlsConnect;
+    type Error = native_tls::Error;
+
+    fn make_tls_connect(&mut self, domain: &str) -> Result<Self::TlsConnect, Self::Error> {
+        Ok(PanWeiNativeTlsConnect {
+            connector: self.connector.clone(),
+            domain: domain.to_string(),
+        })
+    }
+}
+
+impl<S> TlsConnect<S> for PanWeiNativeTlsConnect
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    type Stream = PanWeiNativeTlsStream<S>;
+    type Error = native_tls::Error;
+    type Future =
+        Pin<Box<dyn Future<Output = Result<PanWeiNativeTlsStream<S>, native_tls::Error>> + Send>>;
+
+    fn connect(self, stream: S) -> Self::Future {
+        Box::pin(async move {
+            self.connector
+                .connect(&self.domain, stream)
+                .await
+                .map(PanWeiNativeTlsStream)
+        })
+    }
+}
+
+impl<S> AsyncRead for PanWeiNativeTlsStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.0).poll_read(cx, buf)
+    }
+}
+
+impl<S> AsyncWrite for PanWeiNativeTlsStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.0).poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.0).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.0).poll_shutdown(cx)
+    }
+}
+
+impl<S> OgTlsStream for PanWeiNativeTlsStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    fn channel_binding(&self) -> OgChannelBinding {
+        OgChannelBinding::none()
+    }
+}
 
 #[derive(Clone)]
 pub struct PanWeiClient {
@@ -58,18 +173,15 @@ fn timeout(config: &DbConfig) -> Duration {
     })
 }
 
-pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHandle, String> {
-    if config.ssl {
-        return Err(
-            "PanWeiDB SSL connections are not supported by the native openGauss connector yet."
-                .into(),
-        );
-    }
-
+fn build_connect_config(config: &DbConfig, password: Option<&str>) -> OgConfig {
     let mut opts = OgConfig::new();
     opts.host(&config.host)
         .port(config.port)
-        .ssl_mode(SslMode::Disable)
+        .ssl_mode(if config.ssl {
+            SslMode::Require
+        } else {
+            SslMode::Disable
+        })
         .connect_timeout(timeout(config))
         .application_name("Taomni");
     if let Some(user) = config.username.as_deref().filter(|u| !u.is_empty()) {
@@ -81,20 +193,44 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
     if let Some(db) = config.database.as_deref().filter(|d| !d.is_empty()) {
         opts.dbname(db);
     }
+    opts
+}
+
+fn spawn_connection_task<C>(connection: C) -> JoinHandle<()>
+where
+    C: Future<Output = Result<(), OgError>> + Send + 'static,
+{
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            log::debug!("PanWeiDB connection task ended: {e}");
+        }
+    })
+}
+
+pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHandle, String> {
+    let opts = build_connect_config(config, password);
+
+    if config.ssl {
+        let tls = PanWeiNativeTls::new()
+            .map_err(|e| format!("PanWeiDB TLS configuration failed: {e}"))?;
+        let (client, connection) = tokio::time::timeout(timeout(config), opts.connect(tls))
+            .await
+            .map_err(|_| "PanWeiDB connect timed out".to_string())?
+            .map_err(|e| format!("PanWeiDB TLS connect failed: {e}"))?;
+        return Ok(DbHandle::PanWeiDB(PanWeiClient::new(
+            client,
+            spawn_connection_task(connection),
+        )));
+    }
 
     let (client, connection) = tokio::time::timeout(timeout(config), opts.connect(NoTls))
         .await
         .map_err(|_| "PanWeiDB connect timed out".to_string())?
         .map_err(|e| format!("PanWeiDB connect failed: {e}"))?;
-    let connection_task = tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            log::debug!("PanWeiDB connection task ended: {e}");
-        }
-    });
 
     Ok(DbHandle::PanWeiDB(PanWeiClient::new(
         client,
-        connection_task,
+        spawn_connection_task(connection),
     )))
 }
 
@@ -768,5 +904,51 @@ mod tests {
             Some("panwei_omm")
         ));
         assert!(!should_use_show_tables_fallback("public", None));
+    }
+
+    #[test]
+    fn config_uses_required_ssl_mode_when_tls_is_enabled() {
+        let config = DbConfig {
+            engine: "PanWeiDB".to_string(),
+            host: "127.0.0.1".to_string(),
+            port: 17700,
+            username: Some("panwei_omm".to_string()),
+            password: None,
+            catalog: None,
+            database: Some("panweidb".to_string()),
+            ssl: true,
+            timeout_secs: None,
+            http_port: None,
+            protocol: None,
+            db_index: None,
+            network_settings: None,
+        };
+        assert_eq!(
+            build_connect_config(&config, None).get_ssl_mode(),
+            SslMode::Require
+        );
+    }
+
+    #[test]
+    fn config_disables_ssl_mode_when_tls_is_disabled() {
+        let config = DbConfig {
+            engine: "PanWeiDB".to_string(),
+            host: "127.0.0.1".to_string(),
+            port: 17700,
+            username: Some("panwei_omm".to_string()),
+            password: None,
+            catalog: None,
+            database: Some("panweidb".to_string()),
+            ssl: false,
+            timeout_secs: None,
+            http_port: None,
+            protocol: None,
+            db_index: None,
+            network_settings: None,
+        };
+        assert_eq!(
+            build_connect_config(&config, None).get_ssl_mode(),
+            SslMode::Disable
+        );
     }
 }
