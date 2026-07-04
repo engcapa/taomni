@@ -504,7 +504,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       if (!target) return;
       if (
         target.closest('[data-testid="ai-chat-drawer"]') ||
-        target.closest('[data-testid="ai-chat-drawer-ribbon"]')
+        target.closest('[data-testid="ai-chat-drawer-ribbon"]') ||
+        target.closest('[data-testid="ai-chat-safety-gate"]')
       ) {
         return;
       }

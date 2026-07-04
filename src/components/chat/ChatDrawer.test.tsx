@@ -333,6 +333,20 @@ describe("ChatDrawer layout resizing", () => {
     });
   });
 
+  it("keeps a floating drawer open when the AI safety gate is clicked", () => {
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: false });
+    render(
+      <>
+        <ChatDrawer />
+        <div data-testid="ai-chat-safety-gate">Safety gate</div>
+      </>,
+    );
+
+    fireEvent.pointerDown(screen.getByTestId("ai-chat-safety-gate"));
+
+    expect(useChatStore.getState().drawerOpen).toBe(true);
+  });
+
   it("resizes a top drawer by dragging its bottom edge", () => {
     useChatStore.setState({ drawerPosition: "top" });
     render(<ChatDrawer />);

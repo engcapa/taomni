@@ -1,4 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type CSSProperties,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ActionCard, type ActionCardDecision } from "./ActionCard";
@@ -109,6 +115,82 @@ function fmtBytes(n: number): string {
 }
 
 const LARGE_UPLOAD_THRESHOLD_BYTES = 60 * 1024 * 1024;
+const SAFETY_GATE_DRAWER_SELECTOR = '[data-testid="ai-chat-drawer"]';
+const SAFETY_GATE_INSET = 12;
+const SAFETY_GATE_VIEWPORT_MARGIN = 16;
+const SAFETY_GATE_MAX_WIDTH = 420;
+const SAFETY_GATE_MIN_WIDTH = 260;
+
+interface SafetyGatePlacement {
+  anchored: boolean;
+  style: CSSProperties;
+}
+
+function viewportSafetyGatePlacement(): SafetyGatePlacement {
+  return {
+    anchored: false,
+    style: {
+      right: SAFETY_GATE_VIEWPORT_MARGIN,
+      bottom: SAFETY_GATE_VIEWPORT_MARGIN,
+      width: `min(calc(100vw - ${SAFETY_GATE_VIEWPORT_MARGIN * 2}px), ${SAFETY_GATE_MAX_WIDTH}px)`,
+    },
+  };
+}
+
+function computeSafetyGatePlacement(): SafetyGatePlacement {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return viewportSafetyGatePlacement();
+  }
+  const drawer = document.querySelector<HTMLElement>(SAFETY_GATE_DRAWER_SELECTOR);
+  if (!drawer) return viewportSafetyGatePlacement();
+  const rect = drawer.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return viewportSafetyGatePlacement();
+  const width = Math.min(
+    SAFETY_GATE_MAX_WIDTH,
+    Math.max(SAFETY_GATE_MIN_WIDTH, rect.width - SAFETY_GATE_INSET * 2),
+  );
+  return {
+    anchored: true,
+    style: {
+      right: Math.max(
+        SAFETY_GATE_VIEWPORT_MARGIN,
+        window.innerWidth - rect.right + SAFETY_GATE_INSET,
+      ),
+      bottom: Math.max(
+        SAFETY_GATE_VIEWPORT_MARGIN,
+        window.innerHeight - rect.bottom + SAFETY_GATE_INSET,
+      ),
+      width,
+    },
+  };
+}
+
+function useSafetyGatePlacement(active: boolean): SafetyGatePlacement {
+  const [placement, setPlacement] = useState<SafetyGatePlacement>(viewportSafetyGatePlacement);
+  const updatePlacement = useCallback(() => {
+    setPlacement(computeSafetyGatePlacement());
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!active) return;
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+    let resizeObserver: ResizeObserver | null = null;
+    const drawer = document.querySelector<HTMLElement>(SAFETY_GATE_DRAWER_SELECTOR);
+    if (drawer && typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(updatePlacement);
+      resizeObserver.observe(drawer);
+    }
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+      resizeObserver?.disconnect();
+    };
+  }, [active, updatePlacement]);
+
+  return active ? placement : viewportSafetyGatePlacement();
+}
 
 /** Short human description of what a tool call will do, for the ActionCard. */
 function describe(tool: string, rawArgs: Record<string, unknown> | null | undefined): string {
@@ -777,6 +859,7 @@ export function CcAgentBridge() {
   }, []);
 
   const head = queue[0] ?? null;
+  const safetyGatePlacement = useSafetyGatePlacement(Boolean(head));
 
   // --- captured-run progress (方案4) -----------------------------------
   useEffect(() => {
@@ -900,7 +983,12 @@ export function CcAgentBridge() {
         </div>
       )}
       {head && (
-        <div className="fixed bottom-4 right-4 z-[1000] max-w-[420px] shadow-lg">
+        <div
+          className="fixed z-[1000] shadow-lg"
+          style={safetyGatePlacement.style}
+          data-testid="ai-chat-safety-gate"
+          data-anchor={safetyGatePlacement.anchored ? "chat-drawer" : "viewport"}
+        >
           <ActionCard
             tool={head.tool}
             description={describe(head.tool, head.args)}
