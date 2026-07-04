@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "AI-native remote workspace for developers"
 authors = ["engcapa"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
 rust-version = "1.94"
 
 [lib]

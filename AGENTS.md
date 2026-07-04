@@ -16,7 +16,7 @@ Taomni is a Tauri 2 desktop app with a React 19/TypeScript frontend and Rust bac
 
 ## Coding Style & Naming Conventions
 
-Use TypeScript strict mode and keep code free of unused locals and parameters. Follow existing style: two-space indentation in TS/TSX, double quotes, React components in `PascalCase`, hooks prefixed with `use`, stores named `*Store.ts`, and tests named `*.test.ts` or `*.test.tsx`. Rust code should follow `rustfmt` defaults, snake_case modules/functions, and feature gates already defined in `src-tauri/Cargo.toml`. Do not run global `cargo fmt`; format only the Rust code snippets you changed.
+Use TypeScript strict mode and keep code free of unused locals and parameters. Follow existing style: two-space indentation in TS/TSX, double quotes, React components in `PascalCase`, hooks prefixed with `use`, stores named `*Store.ts`, and tests named `*.test.ts` or `*.test.tsx`. Rust code should follow `rustfmt` defaults with edition 2024, snake_case modules/functions, and feature gates already defined in `src-tauri/Cargo.toml`. Do not add a repository-level Rust toolchain pin unless explicitly requested. Do not run project-wide `cargo fmt`; if Rust formatting is necessary, run `rustfmt --edition 2024 <changed .rs files>` only on files you edited.
 
 ## Testing Guidelines
 

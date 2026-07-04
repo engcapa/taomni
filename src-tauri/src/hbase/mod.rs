@@ -538,7 +538,7 @@ async fn build_session(
 /// authentication, avoiding the need for an external `kinit` subprocess.
 fn try_keytab_kinit(config: &HBaseConfig) -> Result<(), String> {
     if let Some(krb5_conf) = config.krb5_conf_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        std::env::set_var("KRB5_CONFIG", krb5_conf);
+        set_kerberos_env_var("KRB5_CONFIG", krb5_conf);
     }
 
     let keytab = match config.keytab_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
@@ -549,13 +549,23 @@ fn try_keytab_kinit(config: &HBaseConfig) -> Result<(), String> {
         .ok_or_else(|| "Keytab auth requires a client principal (e.g. user@REALM)".to_string())?;
 
     // Set the client keytab path variable so MIT Kerberos/Heimdal auto-authenticates.
-    std::env::set_var("KRB5_CLIENT_KTNAME", keytab);
+    set_kerberos_env_var("KRB5_CLIENT_KTNAME", keytab);
 
     // Isolate the ticket cache for this connection so we don't read or pollute the system cache.
     let cache_name = format!("MEMORY:taomni_hbase_{}", principal);
-    std::env::set_var("KRB5CCNAME", &cache_name);
+    set_kerberos_env_var("KRB5CCNAME", &cache_name);
 
     Ok(())
+}
+
+fn set_kerberos_env_var(key: &str, value: &str) {
+    // SAFETY: The current Kerberos integration is process-environment based:
+    // MIT Kerberos/Heimdal read these variables when the native HBase client
+    // establishes GSSAPI auth. Keep all Rust 2024 env mutation in this helper
+    // until the Kerberos layer can accept per-connection configuration.
+    unsafe {
+        std::env::set_var(key, value);
+    }
 }
 
 /// Construct the native client from the connection config.
