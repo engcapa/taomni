@@ -248,6 +248,7 @@ pub async fn rdp_connect(
     if let Some(n) = network.as_mut() {
         crate::terminal::resolve_proxy_session(&state, n)?;
         n.resolve_proxy_pass(&state.vault)?;
+        crate::terminal::resolve_jump_credentials(&state, n)?;
     }
 
     let session = spawn_rdp_relay(RdpSpawnConfig {
@@ -318,6 +319,7 @@ pub async fn rdp_test_connection(
     if let Some(n) = network.as_mut() {
         crate::terminal::resolve_proxy_session(&state, n)?;
         n.resolve_proxy_pass(&state.vault)?;
+        crate::terminal::resolve_jump_credentials(&state, n)?;
     }
 
     let transport =

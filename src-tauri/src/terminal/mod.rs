@@ -346,7 +346,9 @@ pub(crate) fn resolve_jump_credentials(
                             .map(|s| s.to_string())
                     })
                     .unwrap_or_default();
-                network.jump_password = pass_ref;
+                if !pass_ref.is_empty() {
+                    network.jump_password = pass_ref;
+                }
             }
         }
     }

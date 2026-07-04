@@ -79,7 +79,9 @@ pub async fn sftp_attach(
         crate::terminal::network::NetworkSettings::from_json(network_settings_json.as_deref());
     let network = match network {
         Some(mut n) => {
+            crate::terminal::resolve_proxy_session(&state, &mut n)?;
             n.resolve_proxy_pass(&state.vault)?;
+            crate::terminal::resolve_jump_credentials(&state, &mut n)?;
             Some(n)
         }
         None => None,
