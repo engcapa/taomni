@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { isTauriRuntime } from "../runtime";
 
 export const CHAT_MAX_ATTACHMENTS = 10;
 export const CHAT_MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
@@ -34,6 +35,19 @@ export async function statChatAttachmentPaths(paths: string[]): Promise<ChatAtta
   const unique = uniquePaths(paths);
   if (unique.length === 0) return [];
   return await invoke<ChatAttachment[]>("chat_stat_attachment_paths", { paths: unique });
+}
+
+export async function readClipboardImageAttachments(blobs: Blob[]): Promise<ChatAttachment[]> {
+  try {
+    const attachment = await invoke<ChatAttachment | null>("chat_read_clipboard_image_attachment");
+    if (attachment) return [attachment];
+  } catch {
+    // Browser preview / permission fallback below.
+  }
+
+  if (isTauriRuntime()) return [];
+  const imageBlobs = blobs.filter((blob) => blob.type.startsWith("image/"));
+  return await Promise.all(imageBlobs.map(blobToClipboardAttachment));
 }
 
 export function mergeChatAttachments(
@@ -83,4 +97,26 @@ export function uniquePaths(paths: string[]): string[] {
     out.push(clean);
   }
   return out;
+}
+
+async function blobToClipboardAttachment(blob: Blob, index: number): Promise<ChatAttachment> {
+  const dataUrl = await blobToDataUrl(blob);
+  return {
+    id: `clipboard-image-${Date.now()}-${index}`,
+    kind: "image",
+    path: dataUrl,
+    name: "Pasted image",
+    size: blob.size,
+    mime: blob.type || "image/png",
+    preview_url: dataUrl,
+  };
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read pasted image"));
+    reader.readAsDataURL(blob);
+  });
 }

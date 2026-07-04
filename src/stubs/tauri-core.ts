@@ -1936,6 +1936,17 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         } satisfies StubChatAttachment;
       }) as T;
     }
+    case "chat_read_clipboard_image_attachment": {
+      return ({
+        id: `stub-clipboard-image-${Date.now()}`,
+        kind: "image",
+        path: `clipboard://pasted-image-${Date.now()}.png`,
+        name: "Pasted image",
+        size: 0,
+        mime: "image/png",
+        preview_url: stubGeneratedImageDataUri("pasted clipboard image"),
+      } satisfies StubChatAttachment) as T;
+    }
     case "chat_send": {
       const req = (args as InvokeArgs | undefined)?.req as { thread_id?: string; content?: string; attachments?: StubChatAttachment[] } | undefined;
       const threadId = req?.thread_id ?? "";

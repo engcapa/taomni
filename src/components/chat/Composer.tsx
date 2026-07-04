@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -16,6 +17,7 @@ import {
   formatAttachmentBytes,
   mergeChatAttachments,
   pickChatAttachmentPaths,
+  readClipboardImageAttachments,
   statChatAttachmentPaths,
   type ChatAttachment,
 } from "../../lib/chat/attachments";
@@ -254,6 +256,22 @@ export function Composer({
     }
   };
 
+  const handlePaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    if (!attachmentsEnabled || draftDisabled) return;
+    const imageBlobs = clipboardImageBlobs(event.clipboardData);
+    if (imageBlobs.length === 0) return;
+    event.preventDefault();
+    void (async () => {
+      try {
+        const incoming = await readClipboardImageAttachments(imageBlobs);
+        addResolvedAttachments(incoming);
+      } catch (e) {
+        setAttachmentError(String(e));
+      }
+      textareaRef.current?.focus();
+    })();
+  };
+
   const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -344,6 +362,7 @@ export function Composer({
           disabled={draftDisabled}
           style={{ height: composerHeight, minHeight: MIN_COMPOSER_HEIGHT, maxHeight: MAX_COMPOSER_HEIGHT }}
           onChange={(e) => setText(e.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
               e.preventDefault();
@@ -367,6 +386,25 @@ export function Composer({
       </div>
     </div>
   );
+}
+
+function clipboardImageBlobs(data: DataTransfer): Blob[] {
+  const blobs: Blob[] = [];
+  const seen = new Set<File>();
+  for (const item of Array.from(data.items ?? [])) {
+    if (item.kind !== "file") continue;
+    const file = item.getAsFile();
+    const mime = item.type || file?.type || "";
+    if (!file || !mime.startsWith("image/") || seen.has(file)) continue;
+    seen.add(file);
+    blobs.push(file);
+  }
+  for (const file of Array.from(data.files ?? [])) {
+    if (!file.type.startsWith("image/") || seen.has(file)) continue;
+    seen.add(file);
+    blobs.push(file);
+  }
+  return blobs;
 }
 
 function refToToken(ref: AttachmentRef): string {

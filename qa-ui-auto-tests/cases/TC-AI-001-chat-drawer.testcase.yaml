@@ -4,6 +4,7 @@ description: |
   Verifies the AI Chat Drawer surface (F-AI-2.4): Welcome exposes Chat Tao,
   opening it creates a tab-bound drawer, the header exposes New / History /
   position / pin / hide controls, the composer exposes attach and resize controls,
+  top/bottom floating mode exposes the drawer opacity slider,
   the composer placeholder advertises the
   @reference syntax, typing `@terminal:last-30` raises an attachment chip,
   and hiding the drawer leaves a Tao ribbon that can reopen it.
@@ -29,6 +30,13 @@ steps:
   - assert_visible: '[data-testid="ai-chat-drawer-position"]'
   - assert_visible: '[data-testid="ai-chat-drawer-pin"]'
   - assert_visible: '[data-testid="ai-chat-drawer-hide"]'
+  # Move to top floating mode; opacity controls only exist for top/bottom floating drawers.
+  - click: '[data-testid="ai-chat-drawer-position"]'
+  - click: 'text=Top'
+  - wait_for: '[data-testid="ai-chat-drawer-opacity"]'
+  - click: '[data-testid="ai-chat-drawer-opacity"]'
+  - wait_for: '[data-testid="ai-chat-drawer-opacity-slider"]'
+  - click: '[data-testid="ai-chat-drawer-opacity-slider"]'
   - assert_visible: '[data-testid="ai-chat-composer"]'
   - assert_visible: '[data-testid="ai-chat-attach-button"]'
   - assert_visible: '[data-testid="ai-chat-composer-resize"]'

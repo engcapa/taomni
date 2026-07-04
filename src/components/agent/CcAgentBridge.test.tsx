@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
@@ -119,6 +119,7 @@ function seedStreamingToolCard(): void {
 
 afterEach(() => {
   cleanup();
+  document.querySelectorAll('[data-testid="ai-chat-drawer"]').forEach((node) => node.remove());
   vi.clearAllMocks();
   useSftpStore.setState({ sessions: {} });
   useTransferStore.setState({ items: [] });
@@ -133,6 +134,48 @@ afterEach(() => {
     sending: false,
   });
   useAppStore.setState({ statusMessage: "" });
+});
+
+describe("CcAgentBridge permission gate", () => {
+  it("anchors permission prompts to the AI chat drawer when it is visible", async () => {
+    Object.defineProperty(window, "innerWidth", { value: 1000, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    const drawer = document.createElement("div");
+    drawer.setAttribute("data-testid", "ai-chat-drawer");
+    drawer.getBoundingClientRect = vi.fn(() => ({
+      x: 200,
+      y: 100,
+      left: 200,
+      top: 100,
+      right: 700,
+      bottom: 500,
+      width: 500,
+      height: 400,
+      toJSON: () => ({}),
+    }));
+    document.body.appendChild(drawer);
+
+    render(<CcAgentBridge />);
+    await act(async () => {
+      await emit("agent-cc-permission", {
+        callId: "permission-1",
+        threadId: "thread-1",
+        tool: "run_in_terminal",
+        args: { command: "touch /tmp/example" },
+        trust: "default",
+      });
+    });
+
+    await waitFor(() => {
+      const gate = screen.getByTestId("ai-chat-safety-gate");
+      expect(gate).toHaveAttribute("data-anchor", "chat-drawer");
+      expect(gate).toHaveStyle("right: 312px");
+      expect(gate).toHaveStyle("bottom: 312px");
+      expect(gate).toHaveStyle("width: 420px");
+    });
+
+    drawer.remove();
+  });
 });
 
 describe("CcAgentBridge SFTP upload", () => {
