@@ -109,6 +109,7 @@ import {
 } from "../../lib/mailHtml";
 import { openLocalPath, selectUploadFile, temporaryFilePath } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
+import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
@@ -802,6 +803,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
   const openTabChat = useChatStore((s) => s.openTabChat);
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
+  const pushMailNew = useTaoAlertStore((s) => s.pushMailNew);
 
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
@@ -1342,6 +1344,15 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
 
     try {
       const result = await mailSyncAllFolders(info, { limit, includeBodies });
+      const newMessages = result.newMessages ?? 0;
+      if (indicator === "none" && newMessages > 0) {
+        pushMailNew(
+          tabId,
+          info.sessionId,
+          info.displayName?.trim() || info.emailAddress || info.sessionId,
+          newMessages,
+        );
+      }
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return result;
@@ -1371,7 +1382,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, loadCachedMessages, selectedFolder, warmRecentBodies]);
+  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, warmRecentBodies]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     const key = messageKey(message);

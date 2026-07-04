@@ -284,6 +284,7 @@ pub struct MailSyncAllResult {
     pub account_id: String,
     pub folders: Vec<MailFolder>,
     pub fetched_messages: usize,
+    pub new_messages: usize,
     pub cached_bodies: usize,
     pub synced_at: i64,
 }
@@ -853,12 +854,20 @@ pub async fn mail_sync_all_folders(
         let mut imap = connect_imap(&account)?;
         let mut folders = imap.list_folders(&account.config.session_id)?;
         let mut messages = Vec::new();
+        let mut new_messages = 0usize;
         for listed in folders.clone() {
             let folder_name = listed.name;
             let state = sync_states.get(&folder_name).copied().unwrap_or_default();
             match imap.sync_folder_incremental(&account, &folder_name, state, limit, include_bodies)
             {
                 Ok((synced_folder, mut synced_messages)) => {
+                    let same_uid_validity = state.max_uid > 0
+                        && (state.uid_validity.is_none()
+                            || synced_folder.uid_validity.is_none()
+                            || state.uid_validity == synced_folder.uid_validity);
+                    if same_uid_validity {
+                        new_messages += synced_messages.len();
+                    }
                     merge_selected_folder(&mut folders, synced_folder);
                     messages.append(&mut synced_messages);
                 }
@@ -872,7 +881,7 @@ pub async fn mail_sync_all_folders(
             .iter()
             .filter(|m| m.body_cached_at.is_some())
             .count();
-        Ok::<_, String>((folders, messages, cached_bodies))
+        Ok::<_, String>((folders, messages, cached_bodies, new_messages))
     })
     .await
     .map_err(|e| format!("mail sync all task failed: {e}"))??;
@@ -888,6 +897,7 @@ pub async fn mail_sync_all_folders(
         account_id,
         folders: result.0,
         fetched_messages,
+        new_messages: result.3,
         cached_bodies: result.2,
         synced_at: now_ts(),
     })

@@ -18,10 +18,16 @@ export interface TaoAlert {
   source: TaoAlertSource;
   kind: TaoAlertKind;
   title: string;
+  /** Aggregated item count for sources that collapse many events into one alert. */
+  count?: number;
   /** Chat target (source === "chat"). */
   threadId?: string | null;
   /** Notes target (source === "notes"). */
   noteId?: string | null;
+  /** Mail tab target (source === "mail"). */
+  mailTabId?: string | null;
+  /** Mail account/session id (source === "mail"). */
+  mailAccountId?: string | null;
   fireAt: number;
 }
 
@@ -73,9 +79,13 @@ export function noteAlertToTao(alert: NoteAlert): TaoAlert {
  * Merge pending notes alerts with chat ai_done alerts into one priority-sorted
  * list (highest severity first, then earliest fire time).
  */
-export function buildTaoAlerts(noteAlerts: NoteAlert[], aiDone: TaoAlert[]): TaoAlert[] {
+export function buildTaoAlerts(
+  noteAlerts: NoteAlert[],
+  aiDone: TaoAlert[],
+  mailNew: TaoAlert[] = [],
+): TaoAlert[] {
   const fromNotes = (noteAlerts ?? []).filter((a) => a.state === "pending").map(noteAlertToTao);
-  const merged = [...fromNotes, ...(aiDone ?? [])];
+  const merged = [...fromNotes, ...(aiDone ?? []), ...(mailNew ?? [])];
   merged.sort((a, b) => {
     const pa = taoAlertPriority(a.kind);
     const pb = taoAlertPriority(b.kind);

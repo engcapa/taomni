@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
+  Bell,
   Bot,
   Check,
   ChevronDown,
@@ -7,6 +8,7 @@ import {
   History,
   Image as ImageIcon,
   Link2,
+  Mail,
   MessageSquare,
   PanelBottomOpen,
   PanelLeftOpen,
@@ -92,6 +94,13 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const notesPanelMode = useNotesStore((s) => s.panelMode);
   const setNotesPanelMode = useNotesStore((s) => s.setPanelMode);
   const notesTheme = useNotesStore((s) => s.theme);
+  const noteAlerts = useNotesStore((s) => s.alerts);
+  const setActiveNote = useNotesStore((s) => s.setActiveNote);
+  const ackNoteAlert = useNotesStore((s) => s.ackAlert);
+  const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
+  const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
+  const ackAiDone = useTaoAlertStore((s) => s.ack);
+  const clearMailTab = useTaoAlertStore((s) => s.clearMailTab);
   const [error, setError] = useState<string | null>(null);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
@@ -115,6 +124,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeTab = useAppStore((s) =>
     s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
+  const setActiveAppTab = useAppStore((s) => s.setActiveTab);
   const activeTabId = activeTab?.id ?? null;
   const activeTabType = activeTab?.type ?? null;
   const activeChatTabId = isChatCapableTabType(activeTabType)
@@ -162,6 +172,48 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       : threads.filter((thread) => thread.linked_session_id),
     [drawerTabId, threads],
   );
+  const taoAlerts = useMemo(
+    () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts),
+    [noteAlerts, aiDoneAlerts, mailNewAlerts],
+  );
+  const alertBadgeCount = useMemo(
+    () => taoAlerts.reduce((sum, alert) => sum + (alert.count ?? 1), 0),
+    [taoAlerts],
+  );
+
+  const jumpToAlert = (alert: TaoAlert) => {
+    if (alert.source === "notes") {
+      setHubTab("notes");
+      if (alert.noteId) setActiveNote(alert.noteId);
+      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
+      void ackNoteAlert(rawId);
+      return;
+    }
+    if (alert.source === "mail") {
+      const tabId = alert.mailTabId;
+      if (tabId && useAppStore.getState().tabs.some((tab) => tab.id === tabId)) {
+        setActiveAppTab(tabId);
+        clearMailTab(tabId);
+      }
+      return;
+    }
+    setHubTab("chat");
+    if (alert.threadId) setActiveThread(alert.threadId);
+    ackAiDone(alert.id);
+  };
+
+  const ackAlert = (alert: TaoAlert) => {
+    if (alert.source === "notes") {
+      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
+      void ackNoteAlert(rawId);
+      return;
+    }
+    if (alert.source === "mail") {
+      if (alert.mailTabId) clearMailTab(alert.mailTabId);
+      return;
+    }
+    ackAiDone(alert.id);
+  };
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiConfig = useAiStore((s) => s.config);
@@ -625,10 +677,18 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           className="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0"
           style={{ background: "var(--taomni-panel-bg)" }}
         >
-          <Bot className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
+          {hubTab === "notes" ? (
+            <StickyNote className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
+          ) : hubTab === "notifications" ? (
+            <Bell className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
+          ) : (
+            <Bot className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
+          )}
           <span className="text-[13px] font-semibold flex-1 truncate">
             {hubTab === "notes"
               ? t("notes.title")
+              : hubTab === "notifications"
+                ? t("tao.tabNotifications")
               : activeThread?.title ?? t("chat.drawerTitle")}
           </span>
           <div className="relative">
@@ -734,7 +794,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
         </div>
 
-        {/* Tao Hub tab strip — one drawer, two tabs (Chat | 便签). */}
+        {/* Tao Hub tab strip — one drawer, three tabs (Chat | 便签 | Notifications). */}
         <div
           className="flex items-stretch border-b border-[var(--taomni-divider)] shrink-0 text-[11px]"
           role="tablist"
@@ -770,9 +830,39 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             <StickyNote className="w-3.5 h-3.5" />
             <span>{t("tao.tabNotes")}</span>
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={hubTab === "notifications"}
+            data-testid="tao-hub-tab-notifications"
+            className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
+              hubTab === "notifications"
+                ? "border-[var(--taomni-accent)] text-[var(--taomni-accent)]"
+                : "border-transparent text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            }`}
+            onClick={() => setHubTab("notifications")}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            <span>{t("tao.tabNotifications")}</span>
+            {alertBadgeCount > 0 && (
+              <span
+                className="min-w-[14px] h-[14px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center bg-[var(--taomni-accent)] text-white"
+                data-testid="tao-hub-notifications-badge"
+              >
+                {alertBadgeCount > 99 ? "99+" : alertBadgeCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {hubTab === "notes" ? (
+        {hubTab === "notifications" ? (
+          <TaoAlertInbox
+            alerts={taoAlerts}
+            onJump={jumpToAlert}
+            onAck={ackAlert}
+            embedded
+          />
+        ) : hubTab === "notes" ? (
           notesPanelMode === "floating" ? (
             <div
               className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-[12px] text-[var(--taomni-text-muted)]"
@@ -1058,24 +1148,25 @@ export function ChatDrawerRibbon() {
   const drawerPinned = useChatStore((s) => s.drawerPinned);
   const ribbonOffsetRatio = useChatStore((s) => s.ribbonOffsetRatio);
   const openTabChat = useChatStore((s) => s.openTabChat);
-  const setActiveThread = useChatStore((s) => s.setActiveThread);
   const setRibbonPlacement = useChatStore((s) => s.setRibbonPlacement);
   const setHubTab = useTaoHubStore((s) => s.setHubTab);
   const noteAlerts = useNotesStore((s) => s.alerts);
-  const setActiveNote = useNotesStore((s) => s.setActiveNote);
-  const ackNoteAlert = useNotesStore((s) => s.ackAlert);
   const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
-  const ackAiDone = useTaoAlertStore((s) => s.ack);
-  const [showInbox, setShowInbox] = useState(false);
+  const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
+  const pruneMailTabs = useTaoAlertStore((s) => s.pruneMailTabs);
   const bumpRef = useRef(0);
   const [bumping, setBumping] = useState(false);
-  const activeTab = useAppStore((s) =>
-    s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
+  const tabs = useAppStore((s) => s.tabs);
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const activeTab = useMemo(
+    () => tabs.find((tab) => tab.id === activeTabId) ?? null,
+    [tabs, activeTabId],
   );
   const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const suppressClickRef = useRef(false);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const [dragPreview, setDragPreview] = useState<{ x: number; y: number } | null>(null);
+  const [signalIndex, setSignalIndex] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -1085,30 +1176,73 @@ export function ChatDrawerRibbon() {
     };
   }, []);
 
-  // Unified Tao alerts (notes due/overdue/reminder + chat ai_done), priority-sorted.
+  // Unified Tao alerts (notes due/overdue/reminder + chat ai_done + mail), priority-sorted.
   const taoAlerts = useMemo(
-    () => buildTaoAlerts(noteAlerts, aiDoneAlerts),
-    [noteAlerts, aiDoneAlerts],
+    () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts),
+    [noteAlerts, aiDoneAlerts, mailNewAlerts],
   );
-  // Bump the ribbon 2-3 times when a new alert appears (§7.2).
-  useEffect(() => {
-    if (taoAlerts.length > bumpRef.current) {
-      setBumping(true);
-      const id = window.setTimeout(() => setBumping(false), 1200);
-      bumpRef.current = taoAlerts.length;
-      return () => window.clearTimeout(id);
+  const alertBadgeCount = useMemo(
+    () => taoAlerts.reduce((sum, alert) => sum + (alert.count ?? 1), 0),
+    [taoAlerts],
+  );
+  const ribbonSignals = useMemo(() => {
+    const next: Array<"mail" | "notes" | "chat"> = [];
+    for (const alert of taoAlerts) {
+      const source = alert.source === "mail" ? "mail" : alert.source === "notes" ? "notes" : "chat";
+      if (!next.includes(source)) next.push(source);
     }
-    bumpRef.current = taoAlerts.length;
-  }, [taoAlerts.length]);
+    return next;
+  }, [taoAlerts]);
+  const ribbonSignalKey = ribbonSignals.join("|");
+  useEffect(() => {
+    pruneMailTabs(tabs.map((tab) => tab.id));
+  }, [pruneMailTabs, tabs]);
+  useEffect(() => {
+    setSignalIndex(0);
+    if (ribbonSignals.length <= 1) return;
+    const id = window.setInterval(() => {
+      setSignalIndex((current) => (current + 1) % ribbonSignals.length);
+    }, 1400);
+    return () => window.clearInterval(id);
+  }, [ribbonSignalKey, ribbonSignals.length]);
+  const activeSignal = ribbonSignals.length > 0
+    ? ribbonSignals[signalIndex % ribbonSignals.length]
+    : null;
+  const RibbonSignalIcon = activeSignal === "mail"
+    ? Mail
+    : activeSignal === "notes"
+      ? StickyNote
+      : Bot;
+  const hasAlerts = taoAlerts.length > 0;
+  const hostTab = activeTab && isChatCapableTabType(activeTab.type)
+    ? activeTab
+    : tabs.find((tab) => isChatCapableTabType(tab.type)) ?? activeTab;
+  const chatTabId = hostTab?.chatTabId ?? hostTab?.id ?? null;
+  const hostTitle = hostTab?.title ?? activeTab?.title ?? "Taomni";
+  const ribbonTitle = hasAlerts ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: hostTitle });
+  const ribbonAria = ribbonTitle;
+  const badgeText = alertBadgeCount > 99 ? "99+" : String(alertBadgeCount);
 
-  if (drawerOpen || !activeTab || !isChatCapableTabType(activeTab.type)) return null;
+  useEffect(
+    () => {
+      if (alertBadgeCount > bumpRef.current) {
+        setBumping(true);
+        const id = window.setTimeout(() => setBumping(false), 1200);
+        bumpRef.current = alertBadgeCount;
+        return () => window.clearTimeout(id);
+      }
+      bumpRef.current = alertBadgeCount;
+    },
+    [alertBadgeCount],
+  );
 
-  const chatTabId = activeTab.chatTabId ?? activeTab.id;
-  const placementClass = ribbonPlacementClass(drawerPosition);
+  if (drawerOpen || !activeTab || !chatTabId || (!hasAlerts && !isChatCapableTabType(activeTab.type))) return null;
+
+  const placementClass = ribbonPlacementClass(drawerPosition, hasAlerts);
   const textClass = ribbonTextClass(drawerPosition);
   const dragging = dragPreview !== null;
   const ribbonClass = dragging
-    ? "fixed h-9 w-9 rounded-full border"
+    ? "fixed h-10 w-10 rounded-full border"
     : `absolute ${placementClass} border`;
   const ribbonStyle: CSSProperties = {
     background: "var(--taomni-tao-ribbon-bg)",
@@ -1146,30 +1280,6 @@ export function ChatDrawerRibbon() {
       : colorBucket === "amber"
         ? "bg-amber-400 text-black"
         : "bg-[var(--taomni-accent)] text-white";
-
-  const jumpToAlert = (alert: TaoAlert) => {
-    setShowInbox(false);
-    void openTabChat(chatTabId);
-    if (alert.source === "notes") {
-      setHubTab("notes");
-      if (alert.noteId) setActiveNote(alert.noteId);
-      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
-      void ackNoteAlert(rawId);
-    } else {
-      setHubTab("chat");
-      if (alert.threadId) setActiveThread(alert.threadId);
-      ackAiDone(alert.id);
-    }
-  };
-
-  const ackAlert = (alert: TaoAlert) => {
-    if (alert.source === "notes") {
-      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
-      void ackNoteAlert(rawId);
-    } else {
-      ackAiDone(alert.id);
-    }
-  };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
@@ -1236,7 +1346,10 @@ export function ChatDrawerRibbon() {
       : SIDE_RIBBON_HOVER_OPEN_DELAY_MS;
     hoverOpenTimerRef.current = window.setTimeout(() => {
       hoverOpenTimerRef.current = null;
-      if (!dragRef.current) void openTabChat(chatTabId);
+      if (!dragRef.current) {
+        if (hasAlerts) setHubTab("notifications");
+        void openTabChat(chatTabId);
+      }
     }, delay);
   };
 
@@ -1253,11 +1366,11 @@ export function ChatDrawerRibbon() {
         data-testid="ai-chat-drawer-ribbon"
         data-position={drawerPosition}
         data-dragging={dragging || undefined}
-        data-alert-count={taoAlerts.length || undefined}
+        data-alert-count={alertBadgeCount || undefined}
         className={`${ribbonClass} z-40 flex items-center justify-center text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
         style={ribbonStyle}
-        title={taoAlerts.length > 0 ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: activeTab.title })}
-        aria-label={taoAlerts.length > 0 ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: activeTab.title })}
+        title={ribbonTitle}
+        aria-label={ribbonAria}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -1270,58 +1383,30 @@ export function ChatDrawerRibbon() {
             event.stopPropagation();
             return;
           }
-          if (taoAlerts.length === 1) {
-            jumpToAlert(taoAlerts[0]);
-            return;
-          }
-          if (taoAlerts.length > 1) {
-            setShowInbox((v) => !v);
+          if (hasAlerts) {
+            setHubTab("notifications");
+            void openTabChat(chatTabId);
             return;
           }
           void openTabChat(chatTabId);
         }}
       >
-        <span className={textClass}>Tao</span>
-        {taoAlerts.length > 0 && (
+        {hasAlerts ? (
+          <RibbonSignalIcon className="w-4 h-4" data-testid="tao-ribbon-alert-icon" />
+        ) : (
+          <span className={textClass}>Tao</span>
+        )}
+        {hasAlerts && (
           <span
             className={`absolute -top-1 -right-1 min-w-[13px] h-[13px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center ${badgeBg}`}
             data-testid="tao-ribbon-badge"
           >
-            {taoAlerts.length}
+            {badgeText}
           </span>
         )}
       </button>
-      {showInbox && taoAlerts.length > 0 && (
-        <div
-          className="absolute z-50"
-          style={ribbonInboxStyle(drawerPosition, ribbonOffsetRatio)}
-          data-testid="tao-ribbon-inbox-anchor"
-        >
-          <TaoAlertInbox
-            alerts={taoAlerts}
-            onJump={jumpToAlert}
-            onAck={ackAlert}
-            onClose={() => setShowInbox(false)}
-          />
-        </div>
-      )}
     </>
   );
-}
-
-/** Position the alert inbox popover just inside the ribbon's docked edge. */
-function ribbonInboxStyle(edge: ChatDrawerPosition, offsetRatio: number): CSSProperties {
-  const pct = `${(Math.min(0.88, Math.max(0.12, offsetRatio)) * 100).toFixed(2)}%`;
-  switch (edge) {
-    case "left":
-      return { left: 12, top: pct, transform: "translateY(-50%)" };
-    case "right":
-      return { right: 12, top: pct, transform: "translateY(-50%)" };
-    case "top":
-      return { top: 12, left: pct, transform: "translateX(-50%)" };
-    case "bottom":
-      return { bottom: 12, left: pct, transform: "translateX(-50%)" };
-  }
 }
 
 function capabilityForMode(mode: ChatThreadMode): LlmProviderCapability {
@@ -1360,18 +1445,18 @@ function positionIcon(position: ChatDrawerPosition) {
   }
 }
 
-function ribbonPlacementClass(position: ChatDrawerPosition): string {
+function ribbonPlacementClass(position: ChatDrawerPosition, alertMode = false): string {
   // Shape only (size / rounding / open border side); the position along the
   // edge is applied via inline style from ribbonPositionStyle().
   switch (position) {
     case "left":
-      return "h-10 w-5 rounded-r-full border-l-0";
+      return alertMode ? "h-12 w-7 rounded-r-full border-l-0" : "h-10 w-5 rounded-r-full border-l-0";
     case "right":
-      return "h-10 w-5 rounded-l-full border-r-0";
+      return alertMode ? "h-12 w-7 rounded-l-full border-r-0" : "h-10 w-5 rounded-l-full border-r-0";
     case "top":
-      return "h-5 w-10 rounded-b-full border-t-0";
+      return alertMode ? "h-7 w-12 rounded-b-full border-t-0" : "h-5 w-10 rounded-b-full border-t-0";
     case "bottom":
-      return "h-5 w-10 rounded-t-full border-b-0";
+      return alertMode ? "h-7 w-12 rounded-t-full border-b-0" : "h-5 w-10 rounded-t-full border-b-0";
   }
 }
 

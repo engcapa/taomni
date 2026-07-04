@@ -1,12 +1,12 @@
 import { create } from "zustand";
 
 /**
- * Tao Hub is the two-tab surface (Chat | 便签) reached through the Tao Ribbon.
+ * Tao Hub is the tabbed surface (Chat | 便签 | Notifications) reached through the Tao Ribbon.
  * The hub tab is a top-level UI concern shared by chat and notes, so it lives
  * in its own store rather than in chatStore (which stays chat-only) or
  * notesStore (notes data).
  */
-export type TaoHubTab = "chat" | "notes";
+export type TaoHubTab = "chat" | "notes" | "notifications";
 
 const HUB_TAB_STORAGE_KEY = "taomni.taoHub.lastTab.v1";
 
@@ -21,6 +21,7 @@ function readLastTab(): TaoHubTab {
 }
 
 function writeLastTab(tab: TaoHubTab): void {
+  if (tab === "notifications") return;
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(HUB_TAB_STORAGE_KEY, tab);

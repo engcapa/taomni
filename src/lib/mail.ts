@@ -77,6 +77,7 @@ export interface MailSyncAllResult {
   accountId: string;
   folders: MailFolder[];
   fetchedMessages: number;
+  newMessages?: number;
   cachedBodies: number;
   syncedAt: number;
 }

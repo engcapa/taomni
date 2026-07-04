@@ -4,6 +4,7 @@ import type { MailTabInfo } from "../../types";
 import type { MailFolder, MailMessageBody, MailMessageHeader } from "../../lib/mail";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { MailClientTab } from "./MailClientTab";
+import { useTaoAlertStore } from "../../stores/taoAlertStore";
 
 const mailMocks = vi.hoisted(() => ({
   mailClearCache: vi.fn(),
@@ -180,6 +181,7 @@ describe("MailClientTab", () => {
       accountId: info.sessionId,
       folders: [folder],
       fetchedMessages: 0,
+      newMessages: 0,
       cachedBodies: 0,
       syncedAt: 0,
     });
@@ -195,11 +197,13 @@ describe("MailClientTab", () => {
       limit: 1,
       hasMore: false,
     });
+    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
   });
 
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
   });
 
   it("keeps the loaded body when double-click opens the message in a tab", async () => {
@@ -441,6 +445,40 @@ describe("MailClientTab", () => {
       0,
     );
     expect(screen.getAllByText(/Header arrived before the body cache is warm/).length).toBeGreaterThan(0);
+  });
+
+  it("pushes a Tao mail notification when periodic sync reports new messages", async () => {
+    vi.useFakeTimers();
+    const intervalInfo: MailTabInfo = {
+      ...info,
+      sync: { ...info.sync, onOpen: false, intervalMinutes: 1 },
+    };
+    mailMocks.mailSyncAllFolders.mockResolvedValue({
+      accountId: info.sessionId,
+      folders: [folder],
+      fetchedMessages: 2,
+      newMessages: 2,
+      cachedBodies: 0,
+      syncedAt: 2,
+    });
+
+    render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible={false} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(useTaoAlertStore.getState().mailNew).toMatchObject([
+      {
+        id: "mail:mail-tab",
+        source: "mail",
+        kind: "mail_new",
+        title: "Me",
+        count: 2,
+        mailTabId: "mail-tab",
+        mailAccountId: info.sessionId,
+      },
+    ]);
   });
 
   it("skips overlapping periodic sync ticks while a sync is still running", async () => {
