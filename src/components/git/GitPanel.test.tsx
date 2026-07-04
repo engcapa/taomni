@@ -156,6 +156,7 @@ describe("GitPanel", () => {
         authorEmail: "ada@example.com",
         date: "2026-06-30T10:00:00Z",
         subject: "Initial commit",
+        body: "",
         refs: [],
       },
     ]);
