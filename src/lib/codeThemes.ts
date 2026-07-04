@@ -1,3 +1,5 @@
+import type { ITheme } from "@xterm/xterm";
+
 // Editor colour themes for the shared code view (Code Workspace + Git diff view).
 //
 // Unlike terminal themes (an 8-colour ANSI `ITheme` from which syntax colours
@@ -399,6 +401,24 @@ export function getCodeThemeDefinition(id: string): CodeThemeDefinition | undefi
   return CODE_THEME_BY_ID[id];
 }
 
+export function terminalThemeFromCodeTheme(definition: CodeThemeDefinition): ITheme {
+  const palette = definition.palette;
+  return {
+    background: palette.background,
+    foreground: palette.foreground,
+    cursor: palette.cursor ?? palette.foreground,
+    selectionBackground: palette.selection ?? palette.background,
+    black: palette.background,
+    red: palette.deleted ?? palette.escape ?? palette.keyword,
+    green: palette.added ?? palette.string,
+    yellow: palette.number,
+    blue: palette.modified ?? palette.function,
+    magenta: palette.property ?? palette.keyword,
+    cyan: palette.type,
+    white: palette.foreground,
+  };
+}
+
 /** True when `id` names one of the editor themes in this registry. */
 export function isCodeThemeId(id: string): boolean {
   return id in CODE_THEME_BY_ID;
@@ -408,7 +428,6 @@ export function isCodeThemeId(id: string): boolean {
 export function resolveSystemCodeThemeId(resolvedAppTheme: "light" | "dark"): string {
   return resolvedAppTheme === "dark" ? SYSTEM_DARK_CODE_THEME : SYSTEM_LIGHT_CODE_THEME;
 }
-
 
 
 

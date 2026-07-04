@@ -4,6 +4,7 @@ import {
   CODE_THEME_DEFINITIONS,
   codeThemeVariablesFromPalette,
   getCodeThemeDefinition,
+  terminalThemeFromCodeTheme,
   type CodeThemeDefinition,
   type CodeThemeVars,
 } from "../../lib/codeThemes";
@@ -223,6 +224,16 @@ export function buildTerminalThemeOptions({
       testId: `terminal-theme-option-${definition.id}`,
     });
   }
+  for (const definition of CODE_THEME_DEFINITIONS) {
+    if (getTerminalThemeDefinition(definition.id)) continue;
+    options.push({
+      value: definition.id,
+      label: definition.name,
+      group: definition.variant === "light" ? lightGroup : darkGroup,
+      preview: <TerminalThemeLinePreview theme={terminalThemeFromCodeTheme(definition)} />,
+      testId: `terminal-theme-option-${definition.id}`,
+    });
+  }
   return options;
 }
 
@@ -323,18 +334,6 @@ export function buildMailThemeOptions({
       testId: `mail-theme-option-terminal-${definition.id}`,
     })),
   ];
-}
-
-function terminalThemeFromCodeTheme(definition: CodeThemeDefinition): ITheme {
-  const palette = definition.palette;
-  return {
-    background: palette.background,
-    foreground: palette.foreground,
-    cursor: palette.cursor ?? palette.foreground,
-    selectionBackground: palette.selection ?? palette.background,
-    blue: palette.modified ?? palette.function,
-    cyan: palette.type,
-  };
 }
 
 export function resolvedAppThemeForMode(mode: AppThemeMode, resolvedTheme: ResolvedAppTheme): ResolvedAppTheme {

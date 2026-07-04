@@ -2,7 +2,7 @@ import type { ITheme } from "@xterm/xterm";
 import {
   getCodeThemeDefinition,
   isCodeThemeId,
-  type CodeThemeDefinition,
+  terminalThemeFromCodeTheme,
 } from "./codeThemes";
 import { resolveTerminalThemeWithSystem } from "./terminalProfile";
 import { getTerminalThemeDefinition, resolveThemeId } from "./themes";
@@ -34,22 +34,4 @@ export function resolveMailTheme(value: string, appPrefersDark: boolean): ITheme
     if (definition) return terminalThemeFromCodeTheme(definition);
   }
   return resolveTerminalThemeWithSystem(value, appPrefersDark);
-}
-
-function terminalThemeFromCodeTheme(definition: CodeThemeDefinition): ITheme {
-  const palette = definition.palette;
-  return {
-    background: palette.background,
-    foreground: palette.foreground,
-    cursor: palette.cursor ?? palette.foreground,
-    selectionBackground: palette.selection ?? palette.background,
-    black: palette.background,
-    red: palette.deleted ?? palette.escape ?? palette.keyword,
-    green: palette.added ?? palette.string,
-    yellow: palette.number,
-    blue: palette.modified ?? palette.function,
-    magenta: palette.property ?? palette.keyword,
-    cyan: palette.type,
-    white: palette.foreground,
-  };
 }

@@ -1551,6 +1551,27 @@ describe("TerminalPanel focus behavior", () => {
     }));
   });
 
+  it("offers code view themes in the terminal appearance context menu", async () => {
+    const onProfileChange = vi.fn();
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{ ...DEFAULT_TERMINAL_PROFILE, theme: "classic" }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-appearance"));
+    fireEvent.click(await screen.findByTestId("terminal-context-theme-option-dracula"));
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "dracula" }));
+  });
+
   it("does not render the Git rail button inside the terminal pane", async () => {
     const onOpen = vi.fn();
     const onSessionReady = vi.fn();

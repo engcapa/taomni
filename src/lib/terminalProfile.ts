@@ -1,5 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
 import { terminalThemes } from "./themes";
+import { getCodeThemeDefinition, terminalThemeFromCodeTheme } from "./codeThemes";
 import { getDefaultTerminalFontFamily } from "./systemFonts";
 
 export type TerminalCursorStyle = "block" | "underline" | "bar";
@@ -236,6 +237,8 @@ export function resolveTerminalThemeWithSystem(theme: string, appPrefersDark: bo
 
 export function resolveTerminalTheme(theme: string): ITheme {
   if (terminalThemes[theme]) return terminalThemes[theme];
+  const codeTheme = getCodeThemeDefinition(theme);
+  if (codeTheme) return terminalThemeFromCodeTheme(codeTheme);
   const custom = parseCustomTerminalTheme(theme);
   if (!custom) return terminalThemes.classic;
 
