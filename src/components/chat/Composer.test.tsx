@@ -131,6 +131,49 @@ describe("Composer attachments", () => {
     expect(await screen.findByText("drop.png (2.0 KiB)")).toBeInTheDocument();
   });
 
+  it("attaches pasted clipboard images as image chips", async () => {
+    const pasted = {
+      ...attachment("/tmp/taomni-chat-clipboard.png"),
+      name: "Pasted image",
+    };
+    invokeMock.mockImplementation((command: string, args: { paths?: string[] }) => {
+      if (command === "chat_read_clipboard_image_attachment") {
+        return Promise.resolve(pasted);
+      }
+      if (command === "chat_stat_attachment_paths") {
+        return Promise.resolve((args.paths ?? []).map((path, index) => attachment(path, index)));
+      }
+      return Promise.resolve(null);
+    });
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(<Composer onSend={onSend} sending={false} />);
+
+    const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
+    const file = new File(["png"], "clipboard.png", { type: "image/png" });
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [
+          {
+            kind: "file",
+            type: "image/png",
+            getAsFile: () => file,
+          },
+        ],
+        files: [file],
+        getData: () => "",
+      },
+    });
+
+    expect(await screen.findByText("Pasted image (2.0 KiB)")).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenCalledWith("chat_read_clipboard_image_attachment");
+
+    fireEvent.click(screen.getByTitle("Send (Ctrl+Enter)"));
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    expect(onSend.mock.calls[0][0]).toBe("Please review the attached files.");
+    expect(onSend.mock.calls[0][2]).toEqual([pasted]);
+  });
+
   it("rejects more than ten attachments", async () => {
     const paths = Array.from({ length: 11 }, (_, i) => `C:\\tmp\\file-${i}.txt`);
     dialogOpenMock.mockResolvedValue(paths);

@@ -62,6 +62,34 @@ pub async fn chat_stat_attachment_paths(
     stat_attachment_paths(paths)
 }
 
+#[tauri::command]
+pub fn chat_read_clipboard_image_attachment(
+    state: State<'_, AppState>,
+) -> Result<store::ChatAttachment, String> {
+    let (width, height, bytes) = {
+        let mut guard = state
+            .clipboard
+            .lock()
+            .map_err(|e| format!("clipboard lock: {}", e))?;
+        if guard.is_none() {
+            *guard =
+                Some(arboard::Clipboard::new().map_err(|e| format!("clipboard init: {}", e))?);
+        }
+        let clipboard = guard
+            .as_mut()
+            .ok_or_else(|| "clipboard unavailable".to_string())?;
+        let image = clipboard
+            .get_image()
+            .map_err(|_| "Clipboard does not contain an image.".to_string())?;
+        (
+            image.width as u32,
+            image.height as u32,
+            image.bytes.to_vec(),
+        )
+    };
+    clipboard_image_attachment_from_rgba(width, height, &bytes)
+}
+
 fn stat_attachment_paths(paths: Vec<String>) -> Result<Vec<store::ChatAttachment>, String> {
     if paths.len() > CHAT_MAX_ATTACHMENTS {
         return Err(format!("Attach up to {CHAT_MAX_ATTACHMENTS} files."));
@@ -164,6 +192,26 @@ fn stat_attachment_path(path: &str, id: Option<String>) -> Result<store::ChatAtt
         mime: Some(mime),
         preview_url: None,
     })
+}
+
+fn clipboard_image_attachment_from_rgba(
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+) -> Result<store::ChatAttachment, String> {
+    let buf =
+        image::RgbaImage::from_raw(width, height, rgba.to_vec()).ok_or("invalid image buffer")?;
+    let path = std::env::temp_dir().join(format!(
+        "taomni-chat-clipboard-{}.png",
+        Uuid::new_v4()
+    ));
+    buf.save(&path)
+        .map_err(|e| format!("save clipboard image: {e}"))?;
+    let mut attachment = stat_attachment_path(&path.to_string_lossy(), None)?;
+    attachment.name = "Pasted image".into();
+    attachment.mime = Some("image/png".into());
+    attachment.kind = "image".into();
+    Ok(attachment)
 }
 
 fn normalize_path_for_display(path: String) -> String {
@@ -3209,6 +3257,20 @@ mod cc_tool_use_tests {
             }
             _ => panic!("expected multimodal content parts"),
         }
+    }
+
+    #[test]
+    fn clipboard_rgba_image_becomes_pasted_image_attachment() {
+        let rgba = [255_u8, 0, 0, 255];
+        let att = clipboard_image_attachment_from_rgba(1, 1, &rgba).unwrap();
+
+        assert_eq!(att.kind, "image");
+        assert_eq!(att.name, "Pasted image");
+        assert_eq!(att.mime.as_deref(), Some("image/png"));
+        assert!(att.path.ends_with(".png"));
+        assert!(std::path::Path::new(&att.path).exists());
+
+        let _ = std::fs::remove_file(&att.path);
     }
 
     #[test]
