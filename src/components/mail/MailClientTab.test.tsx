@@ -442,4 +442,46 @@ describe("MailClientTab", () => {
     );
     expect(screen.getAllByText(/Header arrived before the body cache is warm/).length).toBeGreaterThan(0);
   });
+
+  it("skips overlapping periodic sync ticks while a sync is still running", async () => {
+    vi.useFakeTimers();
+    const intervalInfo: MailTabInfo = {
+      ...info,
+      sync: { ...info.sync, onOpen: false, intervalMinutes: 1 },
+    };
+    const syncResult = {
+      accountId: info.sessionId,
+      folders: [folder],
+      fetchedMessages: 1,
+      cachedBodies: 0,
+      syncedAt: 2,
+    };
+    let resolveSync!: (value: typeof syncResult) => void;
+    mailMocks.mailSyncAllFolders.mockReturnValue(new Promise((resolve) => {
+      resolveSync = resolve;
+    }));
+
+    render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible={false} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSync(syncResult);
+      await Promise.resolve();
+    });
+    mailMocks.mailSyncAllFolders.mockResolvedValue(syncResult);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(2);
+  });
 });

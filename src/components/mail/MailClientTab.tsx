@@ -781,6 +781,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const bodyRequestsRef = useRef<Map<string, Promise<MailMessageBody>>>(new Map());
   const bodyLoadSeqRef = useRef(0);
   const bodyWarmSeqRef = useRef(0);
+  const syncInFlightRef = useRef(false);
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
   const foldersRef = useRef<MailFolder[]>([]);
@@ -1262,6 +1263,14 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
     const includeBodies = options.includeBodies ?? false;
 
+    if (syncInFlightRef.current) {
+      if (indicator !== "none" && visibleRef.current) {
+        setStatus("Mail sync already running");
+      }
+      return null;
+    }
+    syncInFlightRef.current = true;
+
     if (indicator === "more") {
       setLoadingMoreMessages(true);
     } else if (indicator === "sync") {
@@ -1299,6 +1308,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       if (indicator !== "none") setError(String(e));
       return null;
     } finally {
+      syncInFlightRef.current = false;
       if (indicator === "more") {
         if (visibleRef.current) setLoadingMoreMessages(false);
       } else if (indicator === "sync") {
@@ -1315,6 +1325,14 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     const limit = Math.max(1, options.limit ?? batchSize);
     const includeBodies = options.includeBodies ?? false;
     const activeBeforeSync = selectedFolder;
+
+    if (syncInFlightRef.current) {
+      if (indicator !== "none" && visibleRef.current) {
+        setStatus("Mail sync already running");
+      }
+      return null;
+    }
+    syncInFlightRef.current = true;
 
     if (indicator === "sync") {
       setSyncing(true);
@@ -1348,6 +1366,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       if (indicator !== "none") setError(String(e));
       return null;
     } finally {
+      syncInFlightRef.current = false;
       if (indicator === "sync") {
         if (visibleRef.current) setSyncing(false);
       }

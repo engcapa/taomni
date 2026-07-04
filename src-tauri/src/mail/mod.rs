@@ -10,14 +10,14 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{Message, SmtpTransport, Transport};
 use mail_parser::{Address as ParsedAddress, MessageParser, MimeHeaders, PartType};
 use native_tls::TlsConnector;
-use rusqlite::{params, Connection, OptionalExtension, Result as SqlResult};
+use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -26,6 +26,7 @@ use crate::state::AppState;
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 const DEFAULT_MESSAGE_LIMIT: usize = 200;
 const DEFAULT_BODY_MAX_BYTES: usize = 256 * 1024;
+const IMAP_LOGIN_RETRY_DELAYS_MS: [u64; 2] = [500, 1500];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MailConnectionSecurity {
@@ -897,7 +898,9 @@ pub async fn mail_list_cached_folders(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
-    with_mail_db(&state, &account_id, |db| list_cached_folders(db, &account_id))
+    with_mail_db(&state, &account_id, |db| {
+        list_cached_folders(db, &account_id)
+    })
 }
 
 #[tauri::command]
@@ -1018,7 +1021,9 @@ pub async fn mail_save_draft(
     if account_id.is_empty() {
         return Err("mail account id is required".into());
     }
-    with_mail_db(&state, account_id, |db| save_mail_draft(db, account_id, draft))
+    with_mail_db(&state, account_id, |db| {
+        save_mail_draft(db, account_id, draft)
+    })
 }
 
 #[tauri::command]
@@ -1035,7 +1040,9 @@ pub async fn mail_delete_draft(
     if draft_id.is_empty() {
         return Err("mail draft id is required".into());
     }
-    with_mail_db(&state, account_id, |db| delete_mail_draft(db, account_id, draft_id))
+    with_mail_db(&state, account_id, |db| {
+        delete_mail_draft(db, account_id, draft_id)
+    })
 }
 
 #[tauri::command]
@@ -1043,7 +1050,9 @@ pub async fn mail_index_cached_contacts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    with_mail_db(&state, &account_id, |db| reindex_cached_contacts(db, &account_id))
+    with_mail_db(&state, &account_id, |db| {
+        reindex_cached_contacts(db, &account_id)
+    })
 }
 
 #[tauri::command]
@@ -1586,13 +1595,54 @@ fn connect_imap(account: &ResolvedMailAccount) -> Result<ActiveImapSession, Stri
 }
 
 fn login_imap_client<T: Read + Write>(
-    client: imap::Client<T>,
+    mut client: imap::Client<T>,
     username: &str,
     password: &str,
 ) -> Result<imap::Session<T>, String> {
-    client
-        .login(username, password)
-        .map_err(|(e, _)| format!("IMAP login failed: {e}"))
+    for attempt in 0..=IMAP_LOGIN_RETRY_DELAYS_MS.len() {
+        match client.login(username, password) {
+            Ok(session) => return Ok(session),
+            Err((e, next_client)) => {
+                let message = e.to_string();
+                client = next_client;
+                let retry_limit_reached = attempt >= IMAP_LOGIN_RETRY_DELAYS_MS.len();
+                let retryable = should_retry_imap_login(&message);
+                if retry_limit_reached || !retryable {
+                    return Err(format!("IMAP login failed: {message}"));
+                }
+
+                let delay_ms = IMAP_LOGIN_RETRY_DELAYS_MS[attempt];
+                tracing::debug!(
+                    "transient IMAP login failure; retrying in {delay_ms}ms: {message}"
+                );
+                std::thread::sleep(Duration::from_millis(delay_ms));
+            }
+        }
+    }
+
+    Err("IMAP login failed".into())
+}
+
+fn should_retry_imap_login(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    if message.contains("authenticationfailed")
+        || message.contains("authentication failed")
+        || message.contains("invalid credentials")
+        || message.contains("invalid login")
+        || message.contains("bad credentials")
+        || (message.contains("password") && message.contains("incorrect"))
+    {
+        return false;
+    }
+
+    message.contains("login error")
+        || message.contains("no response")
+        || message.contains("temporar")
+        || message.contains("try again")
+        || message.contains("rate")
+        || message.contains("throttl")
+        || message.contains("too many")
+        || message.contains("timeout")
 }
 
 fn tcp_connect(host: &str, port: u16) -> Result<TcpStream, String> {
@@ -3788,6 +3838,20 @@ mod tests {
     }
 
     #[test]
+    fn imap_login_retry_classifies_transient_and_auth_errors() {
+        assert!(should_retry_imap_login("No Response: LOGIN Login error"));
+        assert!(should_retry_imap_login(
+            "temporary rate limit, try again later"
+        ));
+        assert!(!should_retry_imap_login(
+            "NO [AUTHENTICATIONFAILED] Invalid credentials"
+        ));
+        assert!(!should_retry_imap_login(
+            "NO invalid login or password incorrect"
+        ));
+    }
+
+    #[test]
     fn parse_body_decodes_headers_and_preview() {
         let parsed = parse_body_message("acct", "INBOX", 7, Some(512), &sample_message(), 4096);
         assert_eq!(parsed.header.subject, "测试邮件");
@@ -3969,8 +4033,7 @@ mod tests {
     }
 
     #[test]
-    fn build_send_message_nests_related_body_inside_mixed_when_inline_and_regular_attachments_exist(
-    ) {
+    fn build_send_message_nests_related_body_inside_mixed() {
         let dir = tempfile::tempdir().unwrap();
         let image_path = dir.path().join("logo.png");
         let report_path = dir.path().join("report.txt");
@@ -4082,10 +4145,11 @@ mod tests {
         .unwrap();
         let messages = list_cached_messages(&conn, "acct", "INBOX", 20, 0).unwrap();
         let one = messages.iter().find(|m| m.uid == 1).unwrap();
-        assert!(one
-            .flags
-            .iter()
-            .any(|f| f.eq_ignore_ascii_case("\\Flagged")));
+        assert!(
+            one.flags
+                .iter()
+                .any(|f| f.eq_ignore_ascii_case("\\Flagged"))
+        );
         assert!(!one.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")));
         let two = messages.iter().find(|m| m.uid == 2).unwrap();
         assert!(two.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")));
