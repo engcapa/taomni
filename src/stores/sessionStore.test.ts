@@ -140,7 +140,7 @@ describe("sessionStore batch operations", () => {
     expect(saved[0].group_path).toBeNull();
   });
 
-  it("updateSessionsTerminalTheme writes terminal profiles and skips mail sessions", async () => {
+  it("updateSessionsTerminalTheme writes terminal profiles and skips non-terminal sessions", async () => {
     const ssh: SessionConfig = {
       ...a,
       options_json: JSON.stringify({
@@ -160,8 +160,15 @@ describe("sessionStore batch operations", () => {
         terminalProfile: { theme: "system" },
       }),
     };
+    const sftp: SessionConfig = {
+      ...makeSession("sftp", "SFTP", null),
+      session_type: "SFTP",
+      options_json: JSON.stringify({
+        terminalProfile: { theme: "classic" },
+      }),
+    };
     useSessionStore.setState({
-      sessions: [ssh, mail],
+      sessions: [ssh, mail, sftp],
       groups: [],
       loading: false,
       selectedSessionId: null,
@@ -173,7 +180,7 @@ describe("sessionStore batch operations", () => {
       saved.push(cfg);
     });
 
-    const count = await useSessionStore.getState().updateSessionsTerminalTheme(["a", "mail"], "kanagawa-wave");
+    const count = await useSessionStore.getState().updateSessionsTerminalTheme(["a", "mail", "sftp"], "kanagawa-wave");
 
     expect(count).toBe(1);
     expect(saved).toHaveLength(1);
@@ -184,7 +191,7 @@ describe("sessionStore batch operations", () => {
     expect(options.terminalProfile.fontSize).toBe(18);
   });
 
-  it("updateSessionsTerminalAppearance writes font settings and skips mail sessions", async () => {
+  it("updateSessionsTerminalAppearance writes font settings and skips non-terminal sessions", async () => {
     const ssh: SessionConfig = {
       ...a,
       options_json: JSON.stringify({
@@ -203,8 +210,15 @@ describe("sessionStore batch operations", () => {
         terminalProfile: { theme: "system" },
       }),
     };
+    const rdp: SessionConfig = {
+      ...makeSession("rdp", "RDP", null),
+      session_type: "RDP",
+      options_json: JSON.stringify({
+        terminalProfile: { theme: "classic" },
+      }),
+    };
     useSessionStore.setState({
-      sessions: [ssh, mail],
+      sessions: [ssh, mail, rdp],
       groups: [],
       loading: false,
       selectedSessionId: null,
@@ -216,7 +230,7 @@ describe("sessionStore batch operations", () => {
       saved.push(cfg);
     });
 
-    const count = await useSessionStore.getState().updateSessionsTerminalAppearance(["a", "mail"], {
+    const count = await useSessionStore.getState().updateSessionsTerminalAppearance(["a", "mail", "rdp"], {
       fontFamily: '"JetBrains Mono", monospace',
       fontSize: 16,
     });

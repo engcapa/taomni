@@ -521,6 +521,85 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["SFTP", "advanced-ssh-settings"],
+    ["VNC", "network-settings"],
+    ["Browser", "network-settings"],
+  ])("hides Terminal settings for %s sessions", async (initialProto, expectedSectionTestId) => {
+    renderEditor(undefined, { initialProto });
+
+    await waitFor(() => expect(screen.getByTestId(expectedSectionTestId)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /terminal settings/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-appearance-settings")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      "RDP",
+      {
+        id: "old-rdp",
+        name: "Old RDP",
+        session_type: "RDP",
+        group_path: null,
+        host: "rdp.example.com",
+        port: 3389,
+        username: "user",
+        auth_method: "None" as const,
+        options_json: JSON.stringify({ domain: "CORP", terminalProfile: { fontSize: 18 } }),
+        created_at: 1,
+        updated_at: 1,
+        last_connected_at: null,
+        sort_order: 0,
+      },
+    ],
+    [
+      "Presto",
+      {
+        id: "old-presto",
+        name: "Old Presto",
+        session_type: "Presto",
+        group_path: null,
+        host: "presto.example.com",
+        port: 8080,
+        username: "analyst",
+        auth_method: "None" as const,
+        options_json: JSON.stringify({ dbCatalog: "hive", terminalProfile: { theme: "classic" } }),
+        created_at: 1,
+        updated_at: 1,
+        last_connected_at: null,
+        sort_order: 0,
+      },
+    ],
+    [
+      "S3",
+      {
+        id: "old-s3",
+        name: "Old S3",
+        session_type: "S3",
+        group_path: null,
+        host: "s3.example.com",
+        port: 443,
+        username: null,
+        auth_method: "None" as const,
+        options_json: JSON.stringify({ endpoint: "https://s3.example.com", terminalProfile: { fontSize: 20 } }),
+        created_at: 1,
+        updated_at: 1,
+        last_connected_at: null,
+        sort_order: 0,
+      },
+    ],
+  ])("removes stale terminalProfile when saving %s sessions", async (_label, session) => {
+    const user = userEvent.setup();
+    renderEditor(session);
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedOptions = JSON.parse(ipcMocks.saveSession.mock.calls[0][0].options_json);
+    expect(savedOptions).not.toHaveProperty("terminalProfile");
+  });
+
   it("persists local Shell launch options through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "Shell" });
