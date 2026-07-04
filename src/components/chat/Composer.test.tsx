@@ -66,6 +66,29 @@ describe("Composer attachments", () => {
     expect(onSend.mock.calls[0][2]).toEqual([attachment("C:\\tmp\\diagram.png")]);
   });
 
+  it("allows drafting and attaching while sending but blocks send", async () => {
+    dialogOpenMock.mockResolvedValue(["C:\\tmp\\next.txt"]);
+    const onSend = vi.fn().mockResolvedValue(undefined);
+
+    render(<Composer onSend={onSend} sending={true} />);
+
+    const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
+    expect(textarea).not.toBeDisabled();
+    fireEvent.change(textarea, { target: { value: "next question" } });
+    expect(textarea.value).toBe("next question");
+
+    const attachButton = screen.getByTestId("ai-chat-attach-button");
+    expect(attachButton).not.toBeDisabled();
+    fireEvent.click(attachButton);
+    expect(await screen.findByText("next.txt (2.0 KiB)")).toBeInTheDocument();
+
+    const sendButton = screen.getByTitle("Send (Ctrl+Enter)");
+    expect(sendButton).toBeDisabled();
+    fireEvent.click(sendButton);
+    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
   it("attaches OS-dropped file paths to the composer", async () => {
     const onSend = vi.fn().mockResolvedValue(undefined);
     render(<Composer onSend={onSend} sending={false} />);

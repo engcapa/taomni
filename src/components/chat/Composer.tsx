@@ -66,6 +66,7 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pending = useChatStore((s) => s.pendingComposerText);
   const consumePending = useChatStore((s) => s.consumePendingComposerText);
+  const draftDisabled = disabled === true;
 
   // Pick up text staged by the SelectionToolbar's "Send to AI".
   useEffect(() => {
@@ -101,17 +102,17 @@ export function Composer({
   }, [t]);
 
   const addResolvedAttachments = useCallback((incoming: ChatAttachment[]) => {
-    if (!attachmentsEnabled) return;
+    if (!attachmentsEnabled || draftDisabled) return;
     if (incoming.length === 0) return;
     setSelectedAttachments((current) => {
       const result = mergeChatAttachments(current, incoming);
       showMergeError(result.error);
       return result.attachments;
     });
-  }, [attachmentsEnabled, showMergeError]);
+  }, [attachmentsEnabled, draftDisabled, showMergeError]);
 
   const addAttachmentPaths = useCallback(async (paths: string[]) => {
-    if (!attachmentsEnabled) return;
+    if (!attachmentsEnabled || draftDisabled) return;
     if (paths.length === 0) return;
     try {
       const incoming = await statChatAttachmentPaths(paths);
@@ -119,7 +120,7 @@ export function Composer({
     } catch (e) {
       setAttachmentError(String(e));
     }
-  }, [addResolvedAttachments, attachmentsEnabled]);
+  }, [addResolvedAttachments, attachmentsEnabled, draftDisabled]);
 
   useEffect(() => {
     if (attachmentsEnabled) return;
@@ -130,7 +131,7 @@ export function Composer({
 
   useEffect(() => {
     const handleNativeFileDrop = (event: Event) => {
-      if (!attachmentsEnabled) return;
+      if (!attachmentsEnabled || draftDisabled) return;
       const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
       if (!detail?.paths?.length) return;
       const root = rootRef.current;
@@ -143,7 +144,7 @@ export function Composer({
 
     window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
     return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-  }, [addAttachmentPaths, attachmentsEnabled]);
+  }, [addAttachmentPaths, attachmentsEnabled, draftDisabled]);
 
   const handleRemove = (index: number) => {
     // Reconstruct text by stripping the n-th @-token. Simple: re-build from
@@ -160,7 +161,7 @@ export function Composer({
   };
 
   const handleSend = async () => {
-    if (sending) return;
+    if (sending || draftDisabled) return;
 
     // Resolve terminal references to terminal_context. Multiple @terminal
     // refs are merged; we take the largest line count.
@@ -208,14 +209,14 @@ export function Composer({
   };
 
   const handlePickFiles = async () => {
-    if (!attachmentsEnabled) return;
+    if (!attachmentsEnabled || draftDisabled) return;
     const paths = await pickChatAttachmentPaths();
     await addAttachmentPaths(paths);
     textareaRef.current?.focus();
   };
 
   const handleDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!attachmentsEnabled) return;
+    if (!attachmentsEnabled || draftDisabled) return;
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
@@ -223,7 +224,7 @@ export function Composer({
   };
 
   const handleDrop = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!attachmentsEnabled) return;
+    if (!attachmentsEnabled || draftDisabled) return;
     if (!isOsFileDrag(event.dataTransfer)) return;
     event.preventDefault();
     setDraggingFiles(false);
@@ -311,7 +312,7 @@ export function Composer({
             type="button"
             className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
             onClick={() => void handlePickFiles()}
-            disabled={disabled || sending}
+            disabled={draftDisabled}
             title={t("attachment.addFiles")}
             aria-label={t("attachment.addFiles")}
             data-testid="ai-chat-attach-button"
@@ -324,7 +325,7 @@ export function Composer({
           className="taomni-input flex-1 text-[12px] resize-none py-1.5"
           placeholder={placeholder ?? t("chat.inputPlaceholder")}
           value={text}
-          disabled={disabled || sending}
+          disabled={draftDisabled}
           style={{ height: composerHeight, minHeight: MIN_COMPOSER_HEIGHT, maxHeight: MAX_COMPOSER_HEIGHT }}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -338,7 +339,7 @@ export function Composer({
           type="button"
           className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
           onClick={handleSend}
-          disabled={!canSend || sending || disabled}
+          disabled={!canSend || sending || draftDisabled}
           title={t("chat.sendShortcutTitle")}
         >
           {sending ? (
