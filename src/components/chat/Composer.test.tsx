@@ -34,6 +34,7 @@ describe("Composer attachments", () => {
     dialogOpenMock.mockReset();
     useChatStore.setState({
       pendingComposerText: "",
+      composerDrafts: {},
       consumePendingComposerText: () => "",
     });
     invokeMock.mockImplementation((command: string, args: { paths?: string[] }) => {
@@ -87,6 +88,31 @@ describe("Composer attachments", () => {
     fireEvent.click(sendButton);
     fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("restores an unsent draft for the same draft key", async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = render(<Composer draftKey="thread:draft-1" onSend={onSend} sending={false} />);
+
+    const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "unfinished question" } });
+
+    await waitFor(() => {
+      expect(useChatStore.getState().composerDrafts["thread:draft-1"]?.text).toBe("unfinished question");
+    });
+
+    unmount();
+    render(<Composer draftKey="thread:draft-1" onSend={onSend} sending={false} />);
+
+    const restored = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
+    expect(restored.value).toBe("unfinished question");
+
+    fireEvent.click(screen.getByTitle("Send (Ctrl+Enter)"));
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith("unfinished question", undefined, []));
+    await waitFor(() => {
+      expect(useChatStore.getState().composerDrafts["thread:draft-1"]).toBeUndefined();
+    });
   });
 
   it("attaches OS-dropped file paths to the composer", async () => {

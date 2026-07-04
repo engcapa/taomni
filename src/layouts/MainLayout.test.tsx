@@ -538,6 +538,39 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(useAppStore.getState().activeTabId).toBe("settings");
   });
 
+  it("keeps the settings tab mounted when switching away", async () => {
+    useAppStore.setState({
+      tabs: [
+        ...useAppStore.getState().tabs,
+        { id: "settings", type: "settings", title: "Settings", closable: true },
+      ],
+      activeTabId: "settings",
+    });
+
+    render(<MainLayout />);
+
+    const wrapper = screen.getByTestId("settings-tab-panel") as HTMLElement;
+    const panel = screen.getByTestId("settings-panel");
+    expect(wrapper.style.display).toBe("block");
+
+    act(() => {
+      useAppStore.getState().setActiveTab("ssh-tab");
+    });
+
+    await waitFor(() => {
+      expect(wrapper.style.display).toBe("none");
+    });
+    expect(panel).toBeInTheDocument();
+
+    act(() => {
+      useAppStore.getState().setActiveTab("settings");
+    });
+
+    await waitFor(() => {
+      expect(wrapper.style.display).toBe("block");
+    });
+  });
+
   it("passes a Git rail action to the sidebar for the active local terminal", () => {
     useAppStore.setState({
       tabs: [{ id: "local-tab", type: "terminal", title: "Local terminal", closable: true }],

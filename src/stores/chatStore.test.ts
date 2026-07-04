@@ -136,6 +136,7 @@ describe("chatStore new thread provider selection", () => {
       drawerPosition: "right",
       drawerPinned: true,
       pendingComposerText: "",
+      composerDrafts: {},
     });
     invokeMock.mockImplementation((command: string, args: { providerId?: string | null; linkedSessionId?: string | null; mode?: string | null }) => {
       if (command !== "chat_new_thread") throw new Error(`unexpected command: ${command}`);
@@ -238,6 +239,7 @@ describe("chatStore media generation", () => {
       drawerPosition: "right",
       drawerPinned: true,
       pendingComposerText: "",
+      composerDrafts: {},
     });
     invokeMock.mockImplementation((command: string) => {
       if (command !== "chat_generate_media") throw new Error(`unexpected command: ${command}`);
@@ -328,6 +330,7 @@ describe("chatStore DB MCP context bridge", () => {
       drawerPosition: "right",
       drawerPinned: true,
       pendingComposerText: "",
+      composerDrafts: {},
     });
     useAppStore.setState({
       tabs: [
@@ -425,6 +428,7 @@ describe("chatStore code workspace context bridge", () => {
       drawerPosition: "right",
       drawerPinned: true,
       pendingComposerText: "",
+      composerDrafts: {},
     });
     useAppStore.setState({
       tabs: [
@@ -508,6 +512,7 @@ describe("chatStore drawer lifecycle", () => {
       drawerPosition: "right",
       drawerPinned: true,
       pendingComposerText: "",
+      composerDrafts: {},
     });
   });
 
