@@ -145,6 +145,7 @@ describe("ChatDrawer provider and echo controls", () => {
       drawerHeight: 420,
       drawerPosition: "right",
       drawerPinned: true,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });
@@ -308,6 +309,7 @@ describe("ChatDrawer layout resizing", () => {
       drawerWidth: 380,
       drawerHeight: 420,
       drawerPinned: false,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });
@@ -399,6 +401,40 @@ describe("ChatDrawer layout resizing", () => {
     expect(drawer.className).toContain("relative");
     expect(drawer.className).not.toContain("w-full");
     expect(screen.getByTestId("ai-chat-drawer-pin")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("adjusts opacity only for top or bottom floating drawers", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1280, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 900, configurable: true });
+    useChatStore.setState({
+      drawerPosition: "top",
+      drawerPinned: false,
+      drawerFloatingOpacity: 0.8,
+    });
+    render(<ChatDrawer />);
+
+    expect(screen.getByTestId("ai-chat-drawer")).toHaveStyle("opacity: 0.8");
+    fireEvent.click(screen.getByTestId("ai-chat-drawer-opacity"));
+    const slider = screen.getByTestId("ai-chat-drawer-opacity-slider") as HTMLInputElement;
+    expect(slider.value).toBe("0.8");
+
+    fireEvent.change(slider, { target: { value: "0.7" } });
+
+    expect(useChatStore.getState().drawerFloatingOpacity).toBe(0.7);
+    expect(JSON.parse(window.localStorage.getItem("taomni.chatDrawer.layout.v1") ?? "{}"))
+      .toMatchObject({ floatingOpacity: 0.7 });
+  });
+
+  it("does not show opacity controls for left or right floating drawers", () => {
+    useChatStore.setState({
+      drawerPosition: "left",
+      drawerPinned: false,
+      drawerFloatingOpacity: 0.75,
+    });
+    render(<ChatDrawer />);
+
+    expect(screen.getByTestId("ai-chat-drawer")).not.toHaveStyle("opacity: 0.75");
+    expect(screen.queryByTestId("ai-chat-drawer-opacity")).not.toBeInTheDocument();
   });
 
   it("shows the Tao Hub tab strip with Chat and Notes tabs", () => {

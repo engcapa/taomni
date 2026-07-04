@@ -135,6 +135,7 @@ describe("chatStore new thread provider selection", () => {
       drawerHeight: 420,
       drawerPosition: "right",
       drawerPinned: true,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });
@@ -209,6 +210,20 @@ describe("chatStore new thread provider selection", () => {
       activeThreadIdByTabId: { "term-1": "old-thread" },
     });
   });
+
+  it("clamps and persists the floating drawer opacity preference", () => {
+    useChatStore.getState().setDrawerFloatingOpacity(0.2);
+
+    expect(useChatStore.getState().drawerFloatingOpacity).toBe(0.65);
+    expect(JSON.parse(window.localStorage.getItem("taomni.chatDrawer.layout.v1") ?? "{}"))
+      .toMatchObject({ floatingOpacity: 0.65 });
+
+    useChatStore.getState().setDrawerFloatingOpacity(1.2);
+
+    expect(useChatStore.getState().drawerFloatingOpacity).toBe(1);
+    expect(JSON.parse(window.localStorage.getItem("taomni.chatDrawer.layout.v1") ?? "{}"))
+      .toMatchObject({ floatingOpacity: 1 });
+  });
 });
 
 describe("chatStore media generation", () => {
@@ -238,6 +253,7 @@ describe("chatStore media generation", () => {
       drawerHeight: 420,
       drawerPosition: "right",
       drawerPinned: true,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });
@@ -329,6 +345,7 @@ describe("chatStore DB MCP context bridge", () => {
       drawerHeight: 420,
       drawerPosition: "right",
       drawerPinned: true,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });
@@ -427,6 +444,7 @@ describe("chatStore code workspace context bridge", () => {
       drawerHeight: 420,
       drawerPosition: "right",
       drawerPinned: true,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });
@@ -511,6 +529,7 @@ describe("chatStore drawer lifecycle", () => {
       drawerHeight: 420,
       drawerPosition: "right",
       drawerPinned: true,
+      drawerFloatingOpacity: 1,
       pendingComposerText: "",
       composerDrafts: {},
     });

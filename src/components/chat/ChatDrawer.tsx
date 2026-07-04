@@ -18,6 +18,7 @@ import {
   PinOff,
   Plus,
   RefreshCw,
+  SlidersHorizontal,
   StickyNote,
   TerminalSquare,
   Video,
@@ -81,14 +82,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const t = useT();
   const {
     threads, activeThreadId, messages, sendingByThreadId, drawerOpen, drawerWidth,
-    drawerHeight, drawerPosition, drawerPinned, drawerTabId,
+    drawerHeight, drawerPosition, drawerPinned, drawerFloatingOpacity, drawerTabId,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     sendMessage, hideDrawer, setDrawerWidth, setDrawerHeight, setDrawerPosition,
-    setDrawerPinned, dismissDrawer, purgeOldThreads, stopSending,
+    setDrawerPinned, setDrawerFloatingOpacity, dismissDrawer, purgeOldThreads, stopSending,
   } = useChatStore();
 
   const [showHistory, setShowHistory] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
+  const [showOpacityMenu, setShowOpacityMenu] = useState(false);
   const hubTab = useTaoHubStore((s) => s.hubTab);
   const setHubTab = useTaoHubStore((s) => s.setHubTab);
   const notesPanelMode = useNotesStore((s) => s.panelMode);
@@ -495,6 +497,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const stackedInline = dockMode === "stacked-inline";
   const floating = dockMode === "floating";
   const pinnedActive = sideBySide || stackedInline;
+  const topBottomFloating = floating && (drawerPosition === "top" || drawerPosition === "bottom");
 
   useEffect(() => {
     if (!drawerOpen || !floating) return;
@@ -510,6 +513,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         return;
       }
       setShowPositionMenu(false);
+      setShowOpacityMenu(false);
       dismissDrawer();
     };
 
@@ -598,6 +602,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         transform: "translateX(-50%)",
         [drawerPosition]: 0,
       };
+  if (topBottomFloating) {
+    containerStyle.opacity = drawerFloatingOpacity;
+  }
   const themedContainerStyle: CSSProperties = hubTab === "notes"
     ? { ...containerStyle, ...notesThemeStyle(notesTheme) }
     : containerStyle;
@@ -748,6 +755,50 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           >
             {pinnedActive ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
           </button>
+          {topBottomFloating && (
+            <div className="relative">
+              <button
+                type="button"
+                className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${
+                  drawerFloatingOpacity < 1 ? "text-[var(--taomni-accent)]" : ""
+                }`}
+                onClick={() => setShowOpacityMenu((v) => !v)}
+                title={t("chat.drawerOpacityTitle", { value: Math.round(drawerFloatingOpacity * 100) })}
+                aria-label={t("chat.drawerOpacityAria")}
+                aria-pressed={showOpacityMenu}
+                data-testid="ai-chat-drawer-opacity"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </button>
+              {showOpacityMenu && (
+                <div
+                  className="absolute right-0 top-7 z-30 w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg px-2 py-1.5"
+                  style={{ background: "var(--taomni-panel-bg)" }}
+                  data-testid="ai-chat-drawer-opacity-menu"
+                >
+                  <label
+                    className="mb-1 flex items-center justify-between gap-2 text-[10px] text-[var(--taomni-text-muted)]"
+                    htmlFor="ai-chat-drawer-opacity-slider"
+                  >
+                    <span>{t("chat.drawerOpacityLabel")}</span>
+                    <span>{Math.round(drawerFloatingOpacity * 100)}%</span>
+                  </label>
+                  <input
+                    id="ai-chat-drawer-opacity-slider"
+                    type="range"
+                    min={0.65}
+                    max={1}
+                    step={0.05}
+                    value={drawerFloatingOpacity}
+                    onChange={(event) => setDrawerFloatingOpacity(Number(event.currentTarget.value))}
+                    aria-label={t("chat.drawerOpacityAria")}
+                    className="w-full accent-[var(--taomni-accent)]"
+                    data-testid="ai-chat-drawer-opacity-slider"
+                  />
+                </div>
+              )}
+            </div>
+          )}
           {hubTab === "chat" && (
             <>
               <button

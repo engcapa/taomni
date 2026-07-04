@@ -101,12 +101,15 @@ type DrawerScope = "tab" | null;
 export type ChatDrawerPosition = "left" | "right" | "top" | "bottom";
 
 const CHAT_DRAWER_LAYOUT_STORAGE_KEY = "taomni.chatDrawer.layout.v1";
+const MIN_DRAWER_FLOATING_OPACITY = 0.65;
+const MAX_DRAWER_FLOATING_OPACITY = 1;
 
 interface ChatDrawerLayoutPrefs {
   position: ChatDrawerPosition;
   pinned: boolean;
   width: number;
   height: number;
+  floatingOpacity: number;
   /** Tao Ribbon offset along its docked edge, 0..1. */
   ribbonOffsetRatio: number;
 }
@@ -175,12 +178,19 @@ function clampDrawerHeight(height: number): number {
   return Math.max(220, Math.min(viewportMax, Math.round(height)));
 }
 
+function clampDrawerFloatingOpacity(opacity: number): number {
+  if (!Number.isFinite(opacity)) return MAX_DRAWER_FLOATING_OPACITY;
+  const rounded = Math.round(opacity * 100) / 100;
+  return Math.max(MIN_DRAWER_FLOATING_OPACITY, Math.min(MAX_DRAWER_FLOATING_OPACITY, rounded));
+}
+
 function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
   const fallback: ChatDrawerLayoutPrefs = {
     position: "right",
     pinned: true,
     width: 380,
     height: 420,
+    floatingOpacity: 1,
     ribbonOffsetRatio: 0.5,
   };
   if (typeof window === "undefined") return fallback;
@@ -196,6 +206,10 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
       typeof parsed.ribbonOffsetRatio === "number" && Number.isFinite(parsed.ribbonOffsetRatio)
         ? Math.min(1, Math.max(0, parsed.ribbonOffsetRatio))
         : fallback.ribbonOffsetRatio;
+    const floatingOpacity =
+      typeof parsed.floatingOpacity === "number"
+        ? clampDrawerFloatingOpacity(parsed.floatingOpacity)
+        : fallback.floatingOpacity;
     return {
       position,
       pinned:
@@ -204,6 +218,7 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
           : position === "left" || position === "right",
       width: clampDrawerWidth(Number(parsed.width) || fallback.width),
       height: clampDrawerHeight(Number(parsed.height) || fallback.height),
+      floatingOpacity,
       ribbonOffsetRatio,
     };
   } catch {
@@ -271,6 +286,7 @@ interface ChatStore {
   drawerHeight: number;
   drawerPosition: ChatDrawerPosition;
   drawerPinned: boolean;
+  drawerFloatingOpacity: number;
   /// Tao Ribbon offset along its docked edge (0..1); the edge itself mirrors
   /// `drawerPosition`.
   ribbonOffsetRatio: number;
@@ -321,6 +337,7 @@ interface ChatStore {
   setDrawerHeight: (h: number) => void;
   setDrawerPosition: (position: ChatDrawerPosition) => void;
   setDrawerPinned: (pinned: boolean) => void;
+  setDrawerFloatingOpacity: (opacity: number) => void;
   /// Set the Tao Ribbon's docked edge + offset in one shot. The edge updates
   /// `drawerPosition` (and pinned defaults) so the drawer opens from that edge.
   setRibbonPlacement: (position: ChatDrawerPosition, offsetRatio: number) => void;
@@ -413,6 +430,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerHeight: initialDrawerLayoutPrefs.height,
   drawerPosition: initialDrawerLayoutPrefs.position,
   drawerPinned: initialDrawerLayoutPrefs.pinned,
+  drawerFloatingOpacity: initialDrawerLayoutPrefs.floatingOpacity,
   ribbonOffsetRatio: initialDrawerLayoutPrefs.ribbonOffsetRatio,
   pendingComposerText: "",
   composerDrafts: {},
@@ -897,6 +915,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // Any edge can now be pinned (top/bottom dock as a horizontal band; §8).
     writeDrawerLayoutPrefs({ pinned });
     set({ drawerPinned: pinned });
+  },
+  setDrawerFloatingOpacity: (opacity) => {
+    const floatingOpacity = clampDrawerFloatingOpacity(opacity);
+    writeDrawerLayoutPrefs({ floatingOpacity });
+    set({ drawerFloatingOpacity: floatingOpacity });
   },
   setRibbonPlacement: (position, offsetRatio) => {
     const pinned = position === "left" || position === "right";
