@@ -441,6 +441,8 @@ function sqlTextExpression(engine: SqlEngine, expression: string): string {
     case "PostgreSQL":
     case "PanWeiDB":
       return `${expression}::text`;
+    case "Oracle":
+      return `CAST(${expression} AS VARCHAR2(4000))`;
     case "SQLServer":
       return `CAST(${expression} AS NVARCHAR(MAX))`;
     case "ClickHouse":
@@ -522,7 +524,8 @@ function buildGeneratedResultSql({
   }
   const orderBy = sortCol !== null && sortDir ? `ORDER BY ${columnSql(sortCol)} ${sortDir.toUpperCase()}` : "";
   if (whereClauses.length === 0 && !orderBy) return null;
-  const lines = ["SELECT *", "FROM (", indentSql(baseSql), ") AS taomni_result"];
+  const alias = engine === "Oracle" ? ") taomni_result" : ") AS taomni_result";
+  const lines = ["SELECT *", "FROM (", indentSql(baseSql), alias];
   if (whereClauses.length > 0) lines.push(`WHERE ${whereClauses.join("\n  AND ")}`);
   if (orderBy) lines.push(orderBy);
   return `${lines.join("\n")};`;

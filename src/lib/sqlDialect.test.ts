@@ -34,6 +34,7 @@ describe("sqlDialect identifiers", () => {
     expect(quoteIdent("ClickHouse", "x")).toBe("`x`");
     expect(quoteIdent("PostgreSQL", 'a"b')).toBe('"a""b"');
     expect(quoteIdent("PanWeiDB", 'a"b')).toBe('"a""b"');
+    expect(quoteIdent("Oracle", 'a"b')).toBe('"a""b"');
     expect(quoteIdent("Presto", "x")).toBe('"x"');
     expect(quoteIdent("SQLServer", "a]b")).toBe("[a]]b]");
   });
@@ -45,6 +46,9 @@ describe("sqlDialect identifiers", () => {
       '"c"."s"."t"',
     );
     expect(qualifiedName("Presto", { schema: "s", name: "t" })).toBe('"s"."t"');
+    expect(qualifiedName("Oracle", { schema: "APP", name: "ORDERS" })).toBe(
+      '"APP"."ORDERS"',
+    );
     expect(qualifiedName("SQLServer", { schema: "dbo", name: "orders" })).toBe(
       "[dbo].[orders]",
     );
@@ -58,6 +62,7 @@ describe("sqlDialect identifiers", () => {
   it("narrows engine strings", () => {
     expect(asSqlEngine("PostgreSQL")).toBe("PostgreSQL");
     expect(asSqlEngine("PanWeiDB")).toBe("PanWeiDB");
+    expect(asSqlEngine("Oracle")).toBe("Oracle");
     expect(asSqlEngine("SQLServer")).toBe("SQLServer");
     expect(asSqlEngine("StarRocks")).toBe("StarRocks");
     expect(asSqlEngine("nonsense")).toBe("MySQL");
@@ -66,6 +71,7 @@ describe("sqlDialect identifiers", () => {
   it("emits the right set-default statement", () => {
     expect(setDefaultSchemaSql("PostgreSQL", "s")).toBe('SET search_path TO "s"');
     expect(setDefaultSchemaSql("PanWeiDB", "s")).toBe('SET search_path TO "s"');
+    expect(setDefaultSchemaSql("Oracle", "APP")).toBe('ALTER SESSION SET CURRENT_SCHEMA = "APP"');
     expect(setDefaultSchemaSql("Presto", "s", "c")).toBe('USE "c"."s"');
     expect(setDefaultSchemaSql("MySQL", "s")).toBe("USE `s`");
     expect(setDefaultSchemaSql("StarRocks", "s")).toBe("USE `s`");
@@ -78,6 +84,7 @@ describe("sqlDialect capabilities", () => {
     expect(categoriesForEngine("MySQL")).toContain("trigger");
     expect(categoriesForEngine("PostgreSQL")).toContain("sequence");
     expect(categoriesForEngine("PanWeiDB")).toContain("sequence");
+    expect(categoriesForEngine("Oracle")).toContain("trigger");
     expect(categoriesForEngine("SQLServer")).toContain("procedure");
     expect(categoriesForEngine("StarRocks")).toEqual(["table", "view"]);
     expect(categoriesForEngine("ClickHouse")).toContain("dictionary");
@@ -86,11 +93,13 @@ describe("sqlDialect capabilities", () => {
 
   it("gates inline edit / indexes to row stores", () => {
     expect(supportsInlineEdit("MySQL")).toBe(true);
+    expect(supportsInlineEdit("Oracle")).toBe(true);
     expect(supportsInlineEdit("SQLServer")).toBe(true);
     expect(supportsInlineEdit("StarRocks")).toBe(false);
     expect(supportsInlineEdit("ClickHouse")).toBe(false);
     expect(supportsIndexes("PostgreSQL")).toBe(true);
     expect(supportsIndexes("PanWeiDB")).toBe(true);
+    expect(supportsIndexes("Oracle")).toBe(true);
     expect(supportsIndexes("SQLServer")).toBe(true);
     expect(supportsIndexes("StarRocks")).toBe(false);
     expect(supportsIndexes("Presto")).toBe(false);
@@ -102,6 +111,9 @@ describe("sqlDialect capabilities", () => {
     expect(actionMode("PostgreSQL", "renameDatabase")).toBe("execute");
     expect(actionMode("PostgreSQL", "disableTrigger")).toBe("execute");
     expect(actionMode("PanWeiDB", "disableTrigger")).toBe("execute");
+    expect(actionMode("Oracle", "disableTrigger")).toBe("execute");
+    expect(actionMode("Oracle", "dropDatabase")).toBe("editor");
+    expect(actionMode("Oracle", "renameDatabase")).toBe("disabled");
     expect(actionMode("SQLServer", "disableTrigger")).toBe("execute");
     expect(actionMode("SQLServer", "renameDatabase")).toBe("disabled");
     expect(actionMode("MySQL", "disableTrigger")).toBe("disabled");
@@ -122,6 +134,9 @@ describe("sqlDialect DML templates", () => {
     expect(selectStatement("MySQL", t, [], 50)).toContain("SELECT *\nFROM `db`.`orders`");
     expect(selectStatement("SQLServer", t, ["id"], 25)).toContain(
       "SELECT TOP (25) [id]\nFROM [db].[orders];",
+    );
+    expect(selectStatement("Oracle", { schema: "APP", name: "ORDERS" }, ["ID"], 25)).toContain(
+      'SELECT "ID"\nFROM "APP"."ORDERS"\nFETCH FIRST 25 ROWS ONLY;',
     );
   });
 
@@ -197,12 +212,20 @@ describe("sqlDialect destructive builders", () => {
         nullable: false,
       }),
     ).toContain('ALTER TABLE "s"."t" ALTER COLUMN "a" TYPE text;');
+    expect(
+      alterColumnStatement("Oracle", { schema: "APP", name: "ORDERS" }, {
+        oldName: "TOTAL",
+        newName: "AMOUNT",
+        type: "NUMBER(12,2)",
+      }),
+    ).toContain('ALTER TABLE "APP"."ORDERS" RENAME COLUMN "TOTAL" TO "AMOUNT";');
   });
 
   it("database drop/rename and triggers", () => {
     expect(dropDatabaseStatement("MySQL", "db")).toBe("DROP DATABASE `db`;");
     expect(dropDatabaseStatement("PostgreSQL", "s")).toBe('DROP SCHEMA "s";');
     expect(renameDatabaseStatement("ClickHouse", "a", "b")).toBe("RENAME DATABASE `a` TO `b`;");
+    expect(dropDatabaseStatement("Oracle", "APP")).toBe('DROP USER "APP" CASCADE;');
     expect(renameDatabaseStatement("PostgreSQL", "a", "b")).toBe('ALTER SCHEMA "a" RENAME TO "b";');
     expect(dropTriggerStatement("PostgreSQL", "s", "trg", "t")).toBe(
       'DROP TRIGGER "trg" ON "s"."t";',
@@ -210,6 +233,9 @@ describe("sqlDialect destructive builders", () => {
     expect(dropTriggerStatement("MySQL", "db", "trg")).toBe("DROP TRIGGER `db`.`trg`;");
     expect(disableTriggerStatement("PostgreSQL", "s", "trg", "t")).toBe(
       'ALTER TABLE "s"."t" DISABLE TRIGGER "trg";',
+    );
+    expect(disableTriggerStatement("Oracle", "APP", "TRG", "ORDERS")).toBe(
+      'ALTER TRIGGER "APP"."TRG" DISABLE;',
     );
   });
 });
@@ -219,8 +245,14 @@ describe("sqlDialect routine invocation + templates", () => {
     expect(callStatement("MySQL", { schema: "db", name: "p" })).toBe(
       "CALL `db`.`p`(/* params */);",
     );
+    expect(callStatement("Oracle", { schema: "APP", name: "P" })).toContain(
+      '  "APP"."P"(/* params */);',
+    );
     expect(functionCallStatement("PostgreSQL", { schema: "s", name: "f" })).toBe(
       'SELECT "s"."f"(/* params */);',
+    );
+    expect(functionCallStatement("Oracle", { schema: "APP", name: "F" })).toBe(
+      'SELECT "APP"."F"(/* params */) FROM dual;',
     );
   });
 
@@ -228,6 +260,7 @@ describe("sqlDialect routine invocation + templates", () => {
     expect(createTemplate("MySQL", "table", "db")).toContain("CREATE TABLE `db`.`new_table`");
     expect(createTemplate("ClickHouse", "table", "db")).toContain("ENGINE = MergeTree()");
     expect(createTemplate("PostgreSQL", "function", "s")).toContain("LANGUAGE plpgsql");
+    expect(createTemplate("Oracle", "procedure", "APP")).toContain("CREATE OR REPLACE PROCEDURE");
     expect(createTemplate("MySQL", "view", "db")).toContain("CREATE VIEW `db`.`new_view`");
   });
 });

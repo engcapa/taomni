@@ -693,6 +693,33 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("persists Oracle database settings with the default port", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Oracle" });
+
+    await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "oracle.example.com");
+    await user.type(screen.getByLabelText("Database username"), "billing");
+    await user.type(screen.getByLabelText("Oracle service or schema"), "ORCLPDB1");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig).toMatchObject({
+      session_type: "Oracle",
+      host: "oracle.example.com",
+      port: 1521,
+      username: "billing",
+    });
+    expect(savedOptions).toMatchObject({
+      dbDatabase: "ORCLPDB1",
+      dbTimeout: "15",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("persists PanWeiDB database settings through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "PanWeiDB" });

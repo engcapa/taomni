@@ -3217,7 +3217,7 @@ controls:
 
 ---
 
-## 23. 数据库客户端 — SQL（MySQL / PostgreSQL / PanWeiDB / ClickHouse）
+## 23. 数据库客户端 — SQL（MySQL / PostgreSQL / PanWeiDB / Oracle / SQLServer / StarRocks / ClickHouse / Presto）
 
 ### 23.1 SQL 客户端 `DbClientTab` ✅
 
@@ -3260,7 +3260,7 @@ controls:
   - id: db-name
     selector: 'input[aria-label="Database name"]'
     kind: interactive
-    optional: true       # hidden for Redis; present for MySQL/PostgreSQL/PanWeiDB/ClickHouse
+    optional: true       # hidden for Redis; present for MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto
   - id: db-save-in-vault
     selector: '[data-testid="db-save-in-vault"]'
     kind: interactive
@@ -3401,14 +3401,14 @@ controls:
   # Format/History/Save) use title= only — no stable testid yet; promote when covered.
 -->
 
-- DB 会话（MySQL/PostgreSQL/PanWeiDB/ClickHouse）经 `SessionEditor` 创建（proto 选择器 + database section 由 F6.3 拥有），打开后 `MainLayout.openDbTab` 挂载 `DbClientTab`（`type:"database"`），与 SFTP/VNC 一样常驻挂载以便查询跨标签存活
+- DB 会话（MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto）经 `SessionEditor` 创建（proto 选择器 + database section 由 F6.3 拥有），打开后 `MainLayout.openDbTab` 挂载 `DbClientTab`（`type:"database"`），与 SFTP/VNC 一样常驻挂载以便查询跨标签存活
 - 左侧 `SchemaTree`：懒加载 schema→table→column/index 展开（`db-schema-drawer-handle` 抽屉折叠）；右侧查询工作区为多 query 面板（最多 4 个）的 tab 布局
 - `SqlEditorPanel` 封装 CodeMirror 6：按引擎选 dialect、schema-aware 自动补全（`SQLNamespace`），暴露命令式 `SqlEditorHandle`；工具条 Run (F5) / Run selection / Cancel / Format / History / Save / Rows / Sheets / Schema 选择；执行时按 SQL 语句范围拆分并给每个 result sheet 绑定 `sourceRef`
 - SQL 历史持久化到 SQLite `sql_history`，按 workspace/session + engine 查询；History 面板支持 Run / Select / +Tab / JSON / Ask AI / Refresh / Clear / Delete；当前 editor 语句面板用 cursor/selection 定位多 SQL 文档中的单条语句，并提供同一套 Run / Select / +Tab / JSON / Ask AI 交互
 - `QueryResultGrid` 为手写虚拟化网格（行高 24 + overscan）：NULL 徽标、数值右对齐、排序、CSV/单元格复制、完整值查看（Ctrl+Enter / 右键菜单，保留长文本和换行）、列显隐、聚合统计、行筛选、Table/List/Chart 视图、增删改行 + 提交/撤销；过滤/排序会生成包裹源 SQL 的 derived SQL，自动创建/复用 `Generated SQL` query 面板并支持显式替换仍匹配的来源语句
 - 查询工作区跨会话持久化（`queryRegistry` + `ef0b686`），结果可经 Export Grid 对话框导出
 - 浮动工具条复用共享 `FloatingToolbar`（F10.1，`db-floating-toolbar`）：Chat 入口 / 最大化 / 分离到独立窗口（`db-detach`，分离/重挂载行为属 F-Detach-1）
-- **e2e 测试限制**：实际查询需活的 MySQL/PostgreSQL/PanWeiDB/ClickHouse fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 DB proto → 填 host/port → 保存 → 打开标签 → schema-tree / sql-editor / query-result-grid 挂载」的路由路径（参照 TC-111 RDP scaffold 模式），真实查询/编辑留待配置 DB fixture 的手动/native 回归
+- **e2e 测试限制**：实际查询需活的 MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 DB proto → 填 host/port → 保存 → 打开标签 → schema-tree / sql-editor / query-result-grid 挂载」的路由路径（参照 TC-111 RDP scaffold 模式），真实查询/编辑留待配置 DB fixture 的手动/native 回归
 
 ---
 

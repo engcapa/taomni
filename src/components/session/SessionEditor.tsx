@@ -118,7 +118,7 @@ import type { SftpPathMapping } from "../../types";
 type Proto =
   | "SSH" | "Telnet" | "Rlogin" | "RDP" | "VNC" | "FTP" | "SFTP"
   | "Serial" | "File" | "Shell" | "Browser" | "Mosh" | "S3" | "WSL"
-  | "MySQL" | "PostgreSQL" | "PanWeiDB" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
+  | "MySQL" | "PostgreSQL" | "PanWeiDB" | "Oracle" | "SQLServer" | "StarRocks" | "ClickHouse" | "Presto" | "Redis" | "HBaseShell"
   | "Proxy" | "Mail";
 
 type SectionTab = "advanced" | "terminal" | "appearance" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage" | "mail";
@@ -142,6 +142,7 @@ const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "MySQL",      icon: <Database className="w-7 h-7" />, color: "#00758f" },
   { id: "PostgreSQL", icon: <Database className="w-7 h-7" />, color: "#336791" },
   { id: "PanWeiDB",   icon: <Database className="w-7 h-7" />, color: "#0b8f6a" },
+  { id: "Oracle",     icon: <Database className="w-7 h-7" />, color: "#c74634" },
   { id: "SQLServer",  icon: <Database className="w-7 h-7" />, color: "#cc2927" },
   { id: "StarRocks",  icon: <Database className="w-7 h-7" />, color: "#0f8f8c" },
   { id: "ClickHouse", icon: <Database className="w-7 h-7" />, color: "#e6a817" },
@@ -156,11 +157,11 @@ const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22, Telnet: 23, Rlogin: 513, RDP: 3389, VNC: 5900,
   FTP: 21, SFTP: 22, Serial: 0, File: 0, Shell: 0,
   Browser: 0, Mosh: 60001, S3: 443, WSL: 0,
-  MySQL: 3306, PostgreSQL: 5432, PanWeiDB: 5432, SQLServer: 1433, StarRocks: 9030, ClickHouse: 9000, Presto: 8080, Redis: 6379,
+  MySQL: 3306, PostgreSQL: 5432, PanWeiDB: 5432, Oracle: 1521, SQLServer: 1433, StarRocks: 9030, ClickHouse: 9000, Presto: 8080, Redis: 6379,
   HBaseShell: 8080, Proxy: 3128, Mail: 993,
 };
 
-const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "PanWeiDB", "SQLServer", "StarRocks", "ClickHouse", "Presto", "Redis"];
+const DB_PROTOS: Proto[] = ["MySQL", "PostgreSQL", "PanWeiDB", "Oracle", "SQLServer", "StarRocks", "ClickHouse", "Presto", "Redis"];
 const PLANNED_CLIENT_PROTOS = new Set<Proto>();
 
 /** Map UI proto to the backend session_type string. Object storage ("S3"
@@ -1527,6 +1528,7 @@ function DatabaseSettings({
   const isRedis = proto === "Redis";
   const isClickHouse = proto === "ClickHouse";
   const isPresto = proto === "Presto";
+  const isOracle = proto === "Oracle";
   return (
     <div data-testid="database-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label="Username">
@@ -1582,12 +1584,12 @@ function DatabaseSettings({
       )}
 
       {!isRedis && (
-        <Field label={isPresto ? "Schema" : "Database"}>
+        <Field label={isPresto ? "Schema" : isOracle ? "Service / Schema" : "Database"}>
           <input
             className="taomni-input w-64"
             value={database}
-            aria-label={isPresto ? "Presto schema" : "Database name"}
-            placeholder={isPresto ? "(optional) default schema" : "database / schema name"}
+            aria-label={isPresto ? "Presto schema" : isOracle ? "Oracle service or schema" : "Database name"}
+            placeholder={isPresto ? "(optional) default schema" : isOracle ? "service name (e.g. ORCLPDB1)" : "database / schema name"}
             onChange={(e) => setDatabase(e.target.value)}
           />
         </Field>
@@ -2152,7 +2154,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
   const [fileExtraArgs, setFileExtraArgs] = useState(() => optionString(initialOptions, "fileExtraArgs", ""));
 
-  /* --- database session options (MySQL/PostgreSQL/PanWeiDB/SQLServer/StarRocks/ClickHouse/Presto/Redis) --- */
+  /* --- database session options (MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto/Redis) --- */
   const [dbCatalog, setDbCatalog] = useState(() => optionString(initialOptions, "dbCatalog", ""));
   const [dbDatabase, setDbDatabase] = useState(() => optionString(initialOptions, "dbDatabase", ""));
   const [dbSsl, setDbSsl] = useState(() => optionBoolean(initialOptions, "dbSsl", false));
