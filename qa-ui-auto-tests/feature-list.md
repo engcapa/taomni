@@ -2448,7 +2448,7 @@ controls:
 id: F-AI-2.4
 status: done
 area: ai/chat
-components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, SearchProgressChip, CodeBlockToolbar]
+components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, SearchProgressChip, CodeBlockToolbar, CcAgentBridge]
 files:
   - src/components/chat/ChatDrawer.tsx
   - src/components/chat/ChatThreadList.tsx
@@ -2457,6 +2457,7 @@ files:
   - src/components/chat/MessageBubble.tsx
   - src/components/chat/SearchProgressChip.tsx
   - src/components/chat/CodeBlockToolbar.tsx
+  - src/components/agent/CcAgentBridge.tsx
   - src/lib/chat/attachments.ts
   - src/lib/chat/composerRefs.ts
   - src/lib/chat/renderFormatted.ts
@@ -2514,6 +2515,22 @@ controls:
     selector: '[data-testid="ai-chat-drawer-pin"]'
     kind: interactive
     optional: true
+  - id: ai-chat-drawer-opacity
+    selector: '[data-testid="ai-chat-drawer-opacity"]'
+    kind: interactive
+    optional: true       # only top/bottom floating drawer
+  - id: ai-chat-drawer-opacity-menu
+    selector: '[data-testid="ai-chat-drawer-opacity-menu"]'
+    kind: display
+    optional: true       # only while opacity popover is open
+  - id: ai-chat-drawer-opacity-slider
+    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+    kind: interactive
+    optional: true       # only while opacity popover is open
+  - id: ai-chat-safety-gate
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    kind: display
+    optional: true       # only while a Claude Code / Codex permission prompt is pending
   - id: ai-chat-provider-select
     selector: 'select[aria-label="Thread LLM provider"]'
     kind: interactive
@@ -2534,14 +2551,15 @@ controls:
 
 - 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope/tabId` + `drawerPosition` 控制状态机；线程始终绑定到 tab
 - **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或隐藏态 `ai-chat-drawer-ribbon` 打开 tab-bound drawer
-- **抽屉头部**：位置切换 / 固定切换 / 复制全部对话 / 新对话 / 历史对话 / 隐藏到 ribbon
+- **抽屉头部**：位置切换 / 固定切换 / 顶部或底部悬浮透明度 / 复制全部对话 / 新对话 / 历史对话 / 隐藏到 ribbon
 - **Thread badge 区**：显示 thread 绑定的 tab (`Link2` 图标 + tab 标题)；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
-- **Composer**：`Ctrl+Enter` 发送、附件按钮（paperclip）/ 拖拽文件到输入区添加本地附件，最多 10 个文件且总计最多 100 MiB；`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`，其中 `@file` 在发送前转为结构化文件附件
+- **Composer**：`Ctrl+Enter` 发送、附件按钮（paperclip）/ 拖拽文件到输入区 / 粘贴剪贴板图片添加本地附件，最多 10 个文件且总计最多 100 MiB；`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`，其中 `@file` 在发送前转为结构化文件附件
 - **附件分发**：Claude Code / Codex 分支收到本地文件路径清单并按需读取；普通 LLM 分支不会收到本机路径，文本附件转为内容片段，图片附件转为多模态图片 block，其他二进制仅发送文件名/类型/大小摘要
 - **Composer resize**：输入框高度可通过 `ai-chat-composer-resize` 拖拽调整并持久化
 - **Format cycling**：右上角按钮按 `md → html → plain` 循环显示格式
+- **AI safety gate**：Claude Code / Codex 权限 prompt 的 `ActionCard` 优先附着到可见 `ai-chat-drawer` 右下角；点击 gate 不会触发悬浮抽屉自动隐藏
 - 历史对话面板可删除 thread；删除当前 thread 时自动落到下一个或新建
-- 左/右固定时抽屉与原 tab 并列并占用宽度；左/右悬浮以及上/下位置覆盖在 tab 上方；宽度/高度、位置和固定状态持久化
+- 左/右固定时抽屉与原 tab 并列并占用宽度；左/右悬浮以及上/下位置覆盖在 tab 上方；宽度/高度、位置、固定状态，以及顶部/底部悬浮透明度持久化
 
 ### 14.5 Web Search Provider 矩阵 ✅
 

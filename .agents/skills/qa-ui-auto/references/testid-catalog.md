@@ -23,6 +23,10 @@
 - `[data-testid="ai-chat-drawer-ribbon"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-ribbon
 - `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
 - `[data-testid="ai-chat-drawer-pin"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-pin
+- `[data-testid="ai-chat-drawer-opacity"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity
+- `[data-testid="ai-chat-drawer-opacity-menu"]` — display [optional] — F-AI-2.4.ai-chat-drawer-opacity-menu
+- `[data-testid="ai-chat-drawer-opacity-slider"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity-slider
+- `[data-testid="ai-chat-safety-gate"]` — display [optional] — F-AI-2.4.ai-chat-safety-gate
 - `select[aria-label="Thread LLM provider"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select
 - `select[aria-label="Thread output format"]` — interactive [optional] — F-AI-2.4.ai-chat-output-format
 - `button[aria-label="Convert visible transcript to another format"]` — interactive [optional] — F-AI-2.4.ai-chat-format-cycle
@@ -100,6 +104,25 @@
 - `[data-testid="schema-tree"]` — display [optional] — F-DB-1.schema-tree
 - `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
+- `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
+- `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
+- `[data-testid="query-result-generated-sql-sync"]` — interactive [optional] — F-DB-1.query-result-generated-sql-sync
+- `[data-testid="query-result-generated-sql-replace"]` — interactive [optional] — F-DB-1.query-result-generated-sql-replace
+- `[data-testid="db-query-history-panel"]` — display [optional] — F-DB-1.query-history-panel
+- `[data-testid="db-query-history-refresh"]` — interactive [optional] — F-DB-1.query-history-refresh
+- `[data-testid="db-query-history-clear"]` — interactive [optional] — F-DB-1.query-history-clear
+- `[data-testid="db-query-history-run"]` — interactive [optional] — F-DB-1.query-history-run
+- `[data-testid="db-query-history-select"]` — interactive [optional] — F-DB-1.query-history-select
+- `[data-testid="db-query-history-open-tab"]` — interactive [optional] — F-DB-1.query-history-open-tab
+- `[data-testid="db-query-history-json"]` — interactive [optional] — F-DB-1.query-history-json
+- `[data-testid="db-query-history-ask-ai"]` — interactive [optional] — F-DB-1.query-history-ask-ai
+- `[data-testid="db-query-history-delete"]` — interactive [optional] — F-DB-1.query-history-delete
+- `[data-testid="db-current-statement-panel"]` — display [optional] — F-DB-1.current-statement-panel
+- `[data-testid="db-current-statement-run"]` — interactive [optional] — F-DB-1.current-statement-run
+- `[data-testid="db-current-statement-select"]` — interactive [optional] — F-DB-1.current-statement-select
+- `[data-testid="db-current-statement-open-tab"]` — interactive [optional] — F-DB-1.current-statement-open-tab
+- `[data-testid="db-current-statement-json"]` — interactive [optional] — F-DB-1.current-statement-json
+- `[data-testid="db-current-statement-ask-ai"]` — interactive [optional] — F-DB-1.current-statement-ask-ai
 - `[data-testid="query-cell-value-dialog"]` — display [optional] — F-DB-1.query-cell-value-dialog
 - `[data-testid="query-cell-value-text"]` — display [optional] — F-DB-1.query-cell-value-text
 - `[data-testid="query-cell-value-copy"]` — interactive [optional] — F-DB-1.query-cell-value-copy
@@ -159,6 +182,15 @@
 - `[data-testid="mail-compose-attachments"]` — display — F-MAIL-2.compose-attachments
 - `[data-testid="mail-compose-attachment-chip"]` — display — F-MAIL-2.compose-attachment-chip
 - `[data-testid="mail-compose-save-draft"]` — interactive — F-MAIL-2.compose-save-draft
+
+## mail/settings (F-MAIL-4)
+
+- `[data-testid="mail-appearance-settings"]` — display — F-MAIL-4.mail-appearance-settings
+- `[data-testid="mail-theme-select"]` — interactive — F-MAIL-4.mail-theme-select
+- `[data-testid^="mail-theme-option-"]` — interactive [optional] — F-MAIL-4.mail-theme-options
+- `[data-testid="mail-appearance-preview"]` — display — F-MAIL-4.mail-appearance-preview
+- `input[aria-label="Mail background hex"]` — interactive — F-MAIL-4.mail-background
+- `input[aria-label="Mail foreground hex"]` — interactive — F-MAIL-4.mail-foreground
 
 ## mail/sync (F-MAIL-3)
 
@@ -227,10 +259,8 @@
 
 ## main/theme (F5.5)
 
-- `[data-testid="app-theme-light"]` — interactive — F5.5.theme-light
-- `[data-testid="app-theme-dark"]` — interactive — F5.5.theme-dark
-- `[data-testid="app-theme-system"]` — interactive — F5.5.theme-system
-- `select[aria-label="Application theme"]` — interactive [optional] — F5.5.theme-compact-select
+- `[data-testid="app-theme-select"]` — interactive — F5.5.theme-select
+- `[data-testid^="app-theme-"]` — interactive [optional] — F5.5.theme-options
 - `button[aria-label="Cycle application theme"]` — interactive [optional] — F5.5.theme-icon-button
 
 ## main/welcome (F1.6)
@@ -300,6 +330,7 @@
 - `[data-testid="note-editor-back"]` — interactive [optional] — F-TAO-1.note-editor-back
 - `[data-testid="notes-settings-toggle"]` — interactive [optional] — F-TAO-1.notes-settings-toggle
 - `[data-testid="note-theme-settings"]` — display [optional] — F-TAO-1.note-theme-settings
+- `[data-testid="note-theme-select"]` — interactive [optional] — F-TAO-1.note-theme-select
 - `[data-testid="note-theme-paper"]` — interactive [optional] — F-TAO-1.note-theme-paper
 - `[data-testid="note-panel-mode-floating"]` — interactive [optional] — F-TAO-1.note-panel-mode-floating
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
@@ -346,6 +377,8 @@
 - `[data-testid="session-edit"]` — interactive — F6.2.session-edit
 - `[data-testid="session-duplicate"]` — interactive — F6.2.session-duplicate
 - `[data-testid="session-delete"]` — interactive — F6.2.session-delete
+- `[data-testid="context-menu-item-set-terminal-theme"]` — interactive [optional] — F6.2.context-set-terminal-theme
+- `[data-testid^="session-terminal-theme-option-"]` — interactive [optional] — F6.2.context-terminal-theme-options
 
 ## sessions (F6.3)
 
@@ -365,6 +398,7 @@
 - `[data-testid="session-proto-wsl"]` — interactive [optional] — F6.3.proto-wsl
 - `[data-testid="session-proto-mysql"]` — interactive [optional] — F6.3.proto-mysql
 - `[data-testid="session-proto-postgresql"]` — interactive [optional] — F6.3.proto-postgresql
+- `[data-testid="session-proto-panweidb"]` — interactive [optional] — F6.3.proto-panweidb
 - `[data-testid="session-proto-clickhouse"]` — interactive [optional] — F6.3.proto-clickhouse
 - `[data-testid="session-proto-redis"]` — interactive [optional] — F6.3.proto-redis
 - `[data-testid="session-host"]` — interactive — F6.3.host
@@ -381,11 +415,13 @@
 - `[data-testid="local-shell-preview"]` — display [optional] — F6.3.local-shell-preview
 - `[data-testid="session-section-bookmark"]` — interactive — F6.3.section-bookmark
 - `[data-testid="session-section-advanced"]` — interactive — F6.3.section-advanced
-- `[data-testid="session-section-terminal"]` — interactive — F6.3.section-terminal
+- `[data-testid="session-section-terminal"]` — interactive [optional] — F6.3.section-terminal
+- `[data-testid="session-section-appearance"]` — interactive [optional] — F6.3.section-appearance
 - `[data-testid="session-section-network"]` — interactive — F6.3.section-network
 - `[data-testid="session-section-database"]` — interactive [optional] — F6.3.section-database
 - `[data-testid="advanced-ssh-settings"]` — display — F6.3.advanced-body
-- `[data-testid="terminal-settings"]` — display — F6.3.terminal-body
+- `[data-testid="terminal-settings"]` — display [optional] — F6.3.terminal-body
+- `[data-testid="mail-appearance-settings"]` — display [optional] — F6.3.mail-appearance-body
 - `[data-testid="network-settings"]` — display — F6.3.network-body
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body
 - `input[aria-label="Execute command"]` — interactive — F6.3.advanced-execute-command
@@ -459,16 +495,21 @@
 - `[data-testid="import-json"]` — interactive [optional] — F-ImportPreview-1.import-json
 - `[data-testid="import-mobaxterm"]` — interactive [optional] — F-ImportPreview-1.import-mobaxterm
 - `[data-testid="import-csv"]` — interactive [optional] — F-ImportPreview-1.import-csv
+- `[data-testid="download-csv-template"]` — interactive [optional] — F-ImportPreview-1.download-csv-template
 - `[data-testid="import-openssh"]` — interactive [optional] — F-ImportPreview-1.import-openssh
 - `[data-testid="export-json"]` — interactive [optional] — F-ImportPreview-1.export-json
 - `[data-testid="export-mobaxterm"]` — interactive [optional] — F-ImportPreview-1.export-mobaxterm
 - `[data-testid="export-csv"]` — interactive [optional] — F-ImportPreview-1.export-csv
 - `[data-testid="export-html"]` — interactive [optional] — F-ImportPreview-1.export-html
 
+## sessions/multiselect (F-Sidebar-1)
+
+- `[data-testid="context-menu-item-set-terminal-theme"]` — interactive [optional] — F-Sidebar-1.set-terminal-theme
+- `[data-testid^="session-terminal-theme-option-"]` — interactive [optional] — F-Sidebar-1.terminal-theme-options
+
 ## settings (F11.1)
 
 - `[data-testid="settings-panel"]` — display — F11.1.panel-root
-- `[data-testid="settings-reset-terminal-profile"]` — interactive — F11.1.reset-terminal-profile
 - `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
 
 ## sftp (F7.2)
@@ -540,7 +581,9 @@
 ## terminal/appearance (F5.2)
 
 - `[data-testid="terminal-appearance-settings"]` — display — F5.2.appearance-root
-- `[data-testid="terminal-theme-gallery"]` — display — F5.2.theme-gallery
+- `[data-testid="terminal-theme-select"]` — interactive — F5.2.theme-select
+- `[data-testid^="terminal-theme-option-"]` — interactive [optional] — F5.2.theme-options
+- `[data-testid="terminal-context-set-local-default-theme"]` — interactive [optional] — F5.2.local-default-theme
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
 - `[data-testid="terminal-preview-cursor"]` — display — F5.2.preview-cursor
 - `input[aria-label="Terminal font size"]` — interactive — F5.2.font-size
@@ -594,13 +637,10 @@
 
 ## terminal/right-menu (F4.2)
 
-- `text="Font settings"` — interactive [optional] — F4.2.font-settings
-  ↳ `[data-testid="context-menu-item-font-settings"]` — alias
-- `[data-testid="context-menu-item-more-fonts"]` — interactive [optional] — F4.2.font-more-fonts
-- `input[placeholder="Search fonts..."]` — interactive [optional] — F4.2.font-picker-search
-- `text="No matching fonts found"` — display [optional] — F4.2.font-picker-empty
-- `[data-testid="context-menu-item-display-font-ligatures"]` — interactive [optional] — F4.2.font-ligatures-toggle
-  ↳ `text="Display font ligatures"` — alias
+- `text="Zoom in"` — interactive [optional] — F4.2.zoom-in
+- `text="Zoom out"` — interactive [optional] — F4.2.zoom-out
+- `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
+- `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `text="Read-only terminal"` — interactive [optional] — F4.2.read-only-toggle
 - `text="Toggle terminal scrollbar"` — interactive [optional] — F4.2.scrollbar-toggle
