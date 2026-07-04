@@ -17,6 +17,7 @@ vi.mock("../../lib/ipc", () => ({
 
 const CODE_VIEW_STORAGE_KEY = "taomni.codeViewProfile.v1";
 const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
+const LOCAL_TERMINAL_STORAGE_KEY = "taomni.localTerminalProfile.v1";
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
@@ -46,12 +47,13 @@ describe("SettingsPanel", () => {
     cleanup();
   });
 
-  it("does not expose global terminal appearance settings", () => {
+  it("exposes local terminal defaults instead of global terminal appearance settings", () => {
     render(<SettingsPanel />);
 
     expect(screen.queryByText("Terminal Appearance")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("terminal-appearance-settings")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("terminal-theme-select")).not.toBeInTheDocument();
+    expect(screen.getByText("Local Terminal Defaults")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-appearance-settings")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-theme-select")).toBeInTheDocument();
   });
 
   it("persists the global application theme mode", async () => {
@@ -112,6 +114,25 @@ describe("SettingsPanel", () => {
       expect(saved.theme).toBe("terminal:kanagawa-wave");
     });
   }, 10_000);
+
+  it("persists local terminal default behavior settings", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    const terminalFontSelect = screen.getByLabelText("Terminal font");
+    await waitFor(() => expect(within(terminalFontSelect).getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
+
+    await user.selectOptions(terminalFontSelect, "JetBrains Mono");
+    fireEvent.change(screen.getByLabelText("Scrollback lines"), { target: { value: "4321" } });
+    await user.click(screen.getByLabelText("Read-only terminal"));
+
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem(LOCAL_TERMINAL_STORAGE_KEY) ?? "{}");
+      expect(saved.fontFamily).toContain("JetBrains Mono");
+      expect(saved.scrollback).toBe(4321);
+      expect(saved.readOnly).toBe(true);
+    });
+  });
 
   it("persists the welcome recent session history limit", () => {
     render(<SettingsPanel />);

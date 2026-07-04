@@ -268,6 +268,7 @@ const sshInfo = {
 
 describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
     terminalMocks.state.onResizeHandler = null;
@@ -1721,6 +1722,77 @@ describe("TerminalPanel focus behavior", () => {
 
     const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
     expect(stored.theme).toBe(SYSTEM_TERMINAL_THEME);
+  });
+
+  it("saves all current terminal settings as the local terminal default after confirmation", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "dracula",
+          readOnly: true,
+          showScrollbar: false,
+          copyOnSelect: true,
+          scrollback: 4321,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-profile"));
+    fireEvent.click(await screen.findByRole("button", { name: "Save defaults" }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+      expect(stored).toMatchObject({
+        theme: "dracula",
+        readOnly: true,
+        showScrollbar: false,
+        copyOnSelect: true,
+        scrollback: 4321,
+      });
+    });
+  });
+
+  it("opens the current terminal settings dialog and applies behavior changes", async () => {
+    const onProfileChange = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          readOnly: false,
+          scrollback: 10000,
+        }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-change-settings"));
+
+    expect(await screen.findByTestId("terminal-current-settings-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Read-only terminal"));
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ readOnly: true }));
+
+    fireEvent.change(screen.getByLabelText("Scrollback lines"), { target: { value: "2222" } });
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      readOnly: true,
+      scrollback: 2222,
+    }));
   });
 
   it("opens Git from the terminal shortcut", async () => {

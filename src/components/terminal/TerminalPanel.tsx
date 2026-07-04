@@ -37,6 +37,7 @@ import {
   isMonospaceFont,
   useSystemFonts,
 } from "../../lib/systemFonts";
+import { TerminalAppearanceSettings } from "./TerminalAppearanceSettings";
 import { TerminalAppearanceMenuPanel } from "./TerminalAppearanceMenuPanel";
 import {
   attachTerminalImeGuard,
@@ -67,7 +68,7 @@ import {
   FT_BUTTON_ACTIVE_OVERRIDE,
   FT_ICON_BUTTON_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
+import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2, X } from "lucide-react";
 import {
   createOsc7BlankingSuppressor,
   type InputEchoSuppressor,
@@ -326,6 +327,7 @@ export function TerminalPanel({
 }: TerminalPanelProps) {
   const t = useT();
   const { confirm: confirmPaste, render: pasteConfirmDialog } = useConfirmDialog();
+  const { confirm: confirmTerminalDefaults, render: terminalDefaultsConfirmDialog } = useConfirmDialog();
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
@@ -424,6 +426,7 @@ export function TerminalPanel({
   const [blockSelection, setBlockSelection] = useState<TerminalBlockSelection | null>(null);
   const [commonCommands, setCommonCommands] = useState<UserCommonCommand[]>(initialProfile.commonCommands);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
 
   const commitTerminalProfilePatch = useCallback((patch: Partial<TerminalProfile>) => {
     const next: TerminalProfile = { ...currentTerminalProfileRef.current, ...patch };
@@ -1500,6 +1503,30 @@ export function TerminalPanel({
     focusTerminal();
   }, [commitTerminalProfilePatch, focusTerminal]);
 
+  const saveCurrentAppearanceAsLocalDefault = useCallback(() => {
+    const currentDefault = loadLocalTerminalDefaultProfile();
+    const currentProfile = currentTerminalProfileRef.current;
+    saveLocalTerminalDefaultProfile({
+      ...currentDefault,
+      theme: currentProfile.theme,
+      fontFamily: currentProfile.fontFamily,
+      fontSize: currentProfile.fontSize,
+      fontLigatures: currentProfile.fontLigatures,
+    });
+    setStatusMessage(t("terminal.localDefaultAppearanceSaved"));
+  }, [setStatusMessage, t]);
+
+  const saveCurrentProfileAsLocalDefault = useCallback(async () => {
+    const confirmed = await confirmTerminalDefaults({
+      title: t("terminal.saveAllLocalDefaultConfirmTitle"),
+      message: t("terminal.saveAllLocalDefaultConfirmMessage"),
+      confirmLabel: t("terminal.saveAllLocalDefaultConfirmButton"),
+    });
+    if (!confirmed) return;
+    saveLocalTerminalDefaultProfile(currentTerminalProfileRef.current);
+    setStatusMessage(t("terminal.localDefaultProfileSaved"));
+  }, [confirmTerminalDefaults, setStatusMessage, t]);
+
   const selectZmodemSendFiles = useCallback(async (): Promise<ZmodemSendFile[]> => {
     const filePaths = await selectUploadFile();
     if (!filePaths || filePaths.length === 0) return [];
@@ -1838,22 +1865,20 @@ export function TerminalPanel({
         ),
       },
       ...(isLocal
-        ? [{
-            label: "Set current appearance as default for new local terminals",
-            testId: "terminal-context-set-local-default-theme",
-            onClick: () => {
-              const currentDefault = loadLocalTerminalDefaultProfile();
-              const currentProfile = currentTerminalProfileRef.current;
-              saveLocalTerminalDefaultProfile({
-                ...currentDefault,
-                theme: currentProfile.theme,
-                fontFamily: currentProfile.fontFamily,
-                fontSize: currentProfile.fontSize,
-                fontLigatures: currentProfile.fontLigatures,
-              });
-              setStatusMessage("Default appearance for new local terminals updated");
+        ? [
+            {
+              label: t("terminal.contextSetAppearanceDefault"),
+              testId: "terminal-context-set-local-default-theme",
+              onClick: saveCurrentAppearanceAsLocalDefault,
             },
-          }]
+            {
+              label: t("terminal.contextSetProfileDefault"),
+              testId: "terminal-context-set-local-default-profile",
+              onClick: () => {
+                void saveCurrentProfileAsLocalDefault();
+              },
+            },
+          ]
         : []),
       {
         label: "Terminal display",
@@ -1894,7 +1919,11 @@ export function TerminalPanel({
       { label: "", separator: true },
       { label: "Send file using Z-modem", onClick: () => void startZmodemSend(), disabled: zmodemState !== "idle" },
       { label: "", separator: true },
-      { label: "Change current terminal settings...", disabled: true },
+      {
+        label: t("terminal.contextChangeSettings"),
+        testId: "terminal-context-change-settings",
+        onClick: () => setSettingsDialogOpen(true),
+      },
       {
         label: "Special Command",
         children: [
@@ -1958,10 +1987,13 @@ export function TerminalPanel({
     resetFontSize,
     resetOutput,
     saveBufferToFile,
+    saveCurrentAppearanceAsLocalDefault,
+    saveCurrentProfileAsLocalDefault,
     showScrollbar,
     setStatusMessage,
     syntaxMode,
     setSyntaxModeAndFocus,
+    t,
     themeName,
     sendSpecialSignal,
     tabId,
@@ -3537,6 +3569,22 @@ export function TerminalPanel({
 
       {contextMenu.render}
       {pasteConfirmDialog}
+      {terminalDefaultsConfirmDialog}
+
+      {settingsDialogOpen && (
+        <CurrentTerminalSettingsDialog
+          profile={currentTerminalProfileRef.current}
+          isLocal={isLocal}
+          onProfileChange={commitTerminalProfilePatch}
+          onSaveAsLocalDefault={() => {
+            void saveCurrentProfileAsLocalDefault();
+          }}
+          onClose={() => {
+            setSettingsDialogOpen(false);
+            focusTerminal();
+          }}
+        />
+      )}
 
       {conflictDialogState && (
         <ZmodemConflictDialog
@@ -3626,6 +3674,77 @@ export function TerminalPanel({
         }}
         onDismiss={() => setSelectionToolbar(null)}
       />
+    </div>
+  );
+}
+
+function CurrentTerminalSettingsDialog({
+  profile,
+  isLocal,
+  onProfileChange,
+  onSaveAsLocalDefault,
+  onClose,
+}: {
+  profile: TerminalProfile;
+  isLocal: boolean;
+  onProfileChange: (profile: TerminalProfile) => void;
+  onSaveAsLocalDefault: () => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+
+  return (
+    <div
+      className="fixed inset-0 z-[900] flex items-center justify-center bg-black/40 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("terminal.currentSettingsTitle")}
+        data-testid="terminal-current-settings-dialog"
+        className="max-h-[calc(100vh-32px)] w-[900px] max-w-[calc(100vw-32px)] overflow-hidden rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] shadow-xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex h-10 items-center gap-3 border-b border-[var(--taomni-divider)] px-3">
+          <div className="text-[13px] font-semibold">{t("terminal.currentSettingsTitle")}</div>
+          <button
+            type="button"
+            className="taomni-btn ml-auto h-7 w-7 p-0 inline-flex items-center justify-center"
+            aria-label={t("terminal.currentSettingsClose")}
+            onClick={onClose}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="max-h-[calc(100vh-112px)] overflow-auto p-3">
+          <TerminalAppearanceSettings
+            profile={profile}
+            onProfileChange={onProfileChange}
+            showCustomColors
+            allowSystemTheme
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] px-3 py-2">
+          {isLocal && (
+            <button
+              type="button"
+              className="taomni-btn h-8 px-3"
+              onClick={onSaveAsLocalDefault}
+            >
+              {t("terminal.currentSettingsSaveAsLocalDefault")}
+            </button>
+          )}
+          <button type="button" className="taomni-btn h-8 px-3" onClick={onClose}>
+            {t("terminal.currentSettingsClose")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
