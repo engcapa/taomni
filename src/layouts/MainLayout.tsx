@@ -123,9 +123,23 @@ const RedisClientTab = lazy(() => import("../components/database/RedisClientTab"
 const HBaseShellTab = lazy(() => import("../components/database/HBaseShellTab"));
 const ProxyTestTab = lazy(() => import("../components/proxy/ProxyTestTab"));
 
-interface PendingAuth {
+interface PendingSessionAuth {
+  kind: "session";
   session: SessionConfig;
 }
+
+interface PendingJumpAuth {
+  kind: "jump";
+  session: SessionConfig;
+  jumpSession?: SessionConfig;
+  host: string;
+  port: number;
+  username: string;
+  manual: boolean;
+  onResolved: (session: SessionConfig) => void;
+}
+
+type PendingAuth = PendingSessionAuth | PendingJumpAuth;
 
 interface ControlToolDispatch {
   callId: string;
@@ -333,6 +347,69 @@ function passwordRefFromOptions(session: SessionConfig): string | null {
   const opts = parseSessionOptions(session.options_json);
   const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
   return ref && ref.startsWith("vault:") ? ref : null;
+}
+
+interface MissingJumpPassword {
+  session: SessionConfig;
+  jumpSession?: SessionConfig;
+  host: string;
+  port: number;
+  username: string;
+  manual: boolean;
+}
+
+function missingJumpPasswordForSession(
+  session: SessionConfig,
+  allSessions: SessionConfig[],
+): MissingJumpPassword | null {
+  const ns = getSessionNetworkSettings(session.options_json);
+  if (ns.proxyKind !== "ssh-tunnel") return null;
+  if (ns.jumpPassword.trim()) return null;
+
+  const jumpSessionId = ns.jumpSessionId.trim();
+  if (jumpSessionId) {
+    const jumpSession = allSessions.find((s) => s.id === jumpSessionId);
+    if (!jumpSession) return null;
+    const { method } = resolveSessionAuth(jumpSession);
+    if (method !== "Password") return null;
+    if (passwordRefFromOptions(jumpSession)) return null;
+    return {
+      session,
+      jumpSession,
+      host: jumpSession.host,
+      port: jumpSession.port,
+      username: jumpSession.username ?? "root",
+      manual: false,
+    };
+  }
+
+  if (ns.jumpAuthKind !== "Password") return null;
+  if (!ns.jumpHost.trim()) return null;
+  return {
+    session,
+    host: ns.jumpHost.trim(),
+    port: parseInt(ns.jumpPort, 10) || 22,
+    username: ns.jumpUser.trim() || "root",
+    manual: true,
+  };
+}
+
+function sessionWithJumpPassword(
+  session: SessionConfig,
+  password: string,
+  saveAuth = false,
+): SessionConfig {
+  const opts = parseSessionOptions(session.options_json);
+  const ns = getSessionNetworkSettings(session.options_json);
+  const updated = {
+    ...opts,
+    networkSettings: {
+      ...ns,
+      jumpPassword: password,
+      jumpSaveAuth: saveAuth || ns.jumpSaveAuth,
+    },
+  };
+  return { ...session, options_json: JSON.stringify(updated) };
 }
 
 function mailSmtpPasswordRefFromOptions(session: SessionConfig): string | null {
@@ -1888,6 +1965,24 @@ export function MainLayout() {
     return "awaiting-vault";
   }, []);
 
+  const openAfterJumpPassword = useCallback((
+    session: SessionConfig,
+    open: (session: SessionConfig) => void,
+  ): ConnectQueueOutcome => {
+    const missing = missingJumpPasswordForSession(session, sessions);
+    if (missing) {
+      awaitingManualAuthRef.current = true;
+      setPendingAuth({
+        kind: "jump",
+        ...missing,
+        onResolved: open,
+      });
+      return "awaiting-auth";
+    }
+    open(session);
+    return "opened";
+  }, [sessions]);
+
   const openQueuedSession = useCallback((
     session: SessionConfig,
     localShellOverride?: LocalShellSelection,
@@ -1899,14 +1994,14 @@ export function MainLayout() {
         if (ref) {
           const vaultState = useVaultStore.getState().state;
           if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
-          openSshTab(session, "Password", ref);
+          return openAfterJumpPassword(session, (effectiveSession) => openSshTab(effectiveSession, "Password", ref));
         } else {
           awaitingManualAuthRef.current = true;
-          setPendingAuth({ session });
+          setPendingAuth({ kind: "session", session });
           return "awaiting-auth";
         }
       } else {
-        openSshTab(session, method, data);
+        return openAfterJumpPassword(session, (effectiveSession) => openSshTab(effectiveSession, method, data));
       }
     } else if (session.session_type === "SFTP") {
       const { method, data } = resolveSessionAuth(session);
@@ -1915,14 +2010,14 @@ export function MainLayout() {
         if (ref) {
           const vaultState = useVaultStore.getState().state;
           if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
-          openSftpTab(session, "Password", ref);
+          return openAfterJumpPassword(session, (effectiveSession) => openSftpTab(effectiveSession, "Password", ref));
         } else {
           awaitingManualAuthRef.current = true;
-          setPendingAuth({ session });
+          setPendingAuth({ kind: "session", session });
           return "awaiting-auth";
         }
       } else {
-        openSftpTab(session, method, data);
+        return openAfterJumpPassword(session, (effectiveSession) => openSftpTab(effectiveSession, method, data));
       }
     } else if (session.session_type === "LocalShell") {
       openLocalTab(
@@ -1941,7 +2036,7 @@ export function MainLayout() {
           openVncTab(session, ref);
         } else {
           awaitingManualAuthRef.current = true;
-          setPendingAuth({ session });
+          setPendingAuth({ kind: "session", session });
           return "awaiting-auth";
         }
       } else {
@@ -1954,14 +2049,14 @@ export function MainLayout() {
         if (ref) {
           const vaultState = useVaultStore.getState().state;
           if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
-          openRdpTab(session, ref);
+          return openAfterJumpPassword(session, (effectiveSession) => openRdpTab(effectiveSession, ref));
         } else {
           awaitingManualAuthRef.current = true;
-          setPendingAuth({ session });
+          setPendingAuth({ kind: "session", session });
           return "awaiting-auth";
         }
       } else {
-        openRdpTab(session, data ?? undefined);
+        return openAfterJumpPassword(session, (effectiveSession) => openRdpTab(effectiveSession, data ?? undefined));
       }
     } else if (session.session_type === "File") {
       openFileSession(session);
@@ -1987,9 +2082,9 @@ export function MainLayout() {
       if (ref) {
         const vaultState = useVaultStore.getState().state;
         if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
-        openDbTab(session, ref);
+        return openAfterJumpPassword(session, (effectiveSession) => openDbTab(effectiveSession, ref));
       } else {
-        openDbTab(session, undefined);
+        return openAfterJumpPassword(session, (effectiveSession) => openDbTab(effectiveSession, undefined));
       }
     } else if (session.session_type === "HBaseShell") {
       const ref = passwordRefFromOptions(session);
@@ -2010,7 +2105,7 @@ export function MainLayout() {
         const vaultState = useVaultStore.getState().state;
         if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session);
       }
-      openObjectStorageTab(session);
+      return openAfterJumpPassword(session, openObjectStorageTab);
     } else if (session.session_type === "Mail") {
       const existing = tabsRef.current.find((tab) => tab.type === "mail" && tab.sessionId === session.id);
       if (existing) {
@@ -2046,6 +2141,7 @@ export function MainLayout() {
     openObjectStorageTab,
     openMailTab,
     queueVaultUnlock,
+    openAfterJumpPassword,
     setActiveTab,
   ]);
 
@@ -2098,6 +2194,41 @@ export function MainLayout() {
     const session = pendingAuth.session;
     let credential: string = password;
 
+    if (pendingAuth.kind === "jump") {
+      let persistJumpPasswordOnTarget = false;
+      if (saveToVault) {
+        const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
+        if (ready) {
+          try {
+            const label = `${pendingAuth.username}@${pendingAuth.host}:${pendingAuth.port}`;
+            const result = await vaultPut("ssh-password", label, password);
+            credential = result.reference;
+
+            if (pendingAuth.jumpSession) {
+              const opts = parseSessionOptions(pendingAuth.jumpSession.options_json);
+              await updateSession({
+                ...pendingAuth.jumpSession,
+                options_json: JSON.stringify({ ...opts, passwordRef: result.reference }),
+              });
+            } else if (pendingAuth.manual) {
+              persistJumpPasswordOnTarget = true;
+              await updateSession(sessionWithJumpPassword(session, result.reference, true));
+            }
+          } catch (err) {
+            console.error("Failed to save jump host password to vault:", err);
+            credential = password;
+            persistJumpPasswordOnTarget = false;
+          }
+        }
+      }
+
+      pendingAuth.onResolved(sessionWithJumpPassword(session, credential, persistJumpPasswordOnTarget));
+      setPendingAuth(null);
+      awaitingManualAuthRef.current = false;
+      continueConnectQueueRef.current();
+      return;
+    }
+
     if (saveToVault) {
       // Make sure the vault is ready (set master password if empty, unlock if
       // locked) via the on-demand gate before encrypting. If the user cancels
@@ -2129,19 +2260,22 @@ export function MainLayout() {
       }
     }
 
+    let outcome: ConnectQueueOutcome = "opened";
     if (session.session_type === "SFTP") {
-      openSftpTab(session, "Password", credential);
+      outcome = openAfterJumpPassword(session, (effectiveSession) => openSftpTab(effectiveSession, "Password", credential));
     } else if (session.session_type === "VNC") {
       openVncTab(session, credential);
     } else if (session.session_type === "RDP") {
-      openRdpTab(session, credential);
+      outcome = openAfterJumpPassword(session, (effectiveSession) => openRdpTab(effectiveSession, credential));
     } else {
-      openSshTab(session, "Password", credential);
+      outcome = openAfterJumpPassword(session, (effectiveSession) => openSshTab(effectiveSession, "Password", credential));
     }
-    setPendingAuth(null);
-    awaitingManualAuthRef.current = false;
-    continueConnectQueueRef.current();
-  }, [pendingAuth, openSftpTab, openSshTab, openVncTab, openRdpTab, updateSession]);
+    if (outcome === "opened") {
+      setPendingAuth(null);
+      awaitingManualAuthRef.current = false;
+      continueConnectQueueRef.current();
+    }
+  }, [pendingAuth, openAfterJumpPassword, openSftpTab, openSshTab, openVncTab, openRdpTab, updateSession]);
 
   const handleQuickConnect = useCallback((value: string) => {
     try {
@@ -2162,7 +2296,7 @@ export function MainLayout() {
       ) {
         if (session.auth_method === "Password") {
           awaitingManualAuthRef.current = true;
-          setPendingAuth({ session });
+          setPendingAuth({ kind: "session", session });
         } else {
           const authMethod = typeof session.auth_method === "string" ? session.auth_method : "PrivateKey";
           if (session.session_type === "SFTP") {
@@ -3617,8 +3751,8 @@ export function MainLayout() {
 
       {pendingAuth && (
         <AuthPrompt
-          host={pendingAuth.session.host}
-          username={pendingAuth.session.username ?? "root"}
+          host={pendingAuth.kind === "jump" ? pendingAuth.host : pendingAuth.session.host}
+          username={pendingAuth.kind === "jump" ? pendingAuth.username : pendingAuth.session.username ?? "root"}
           onSubmit={handleAuthSubmit}
           onCancel={() => {
             setPendingAuth(null);

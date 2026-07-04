@@ -1,8 +1,8 @@
+use russh::ChannelStream;
 use russh::client::{self, KeyboardInteractiveAuthResponse};
 use russh::keys::ssh_key::{Algorithm as SshAlgorithm, EcdsaCurve, HashAlg};
 use russh::keys::{self, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
-use russh::{client::Msg, kex, mac, ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty};
-use russh::ChannelStream;
+use russh::{ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty, client::Msg, kex, mac};
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
@@ -10,11 +10,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::UnboundedSender;
 
-use crate::terminal::network::{establish_transport, NetworkSettings};
+use crate::terminal::network::{NetworkSettings, establish_transport};
 use crate::terminal::x11_forward::{self, XForward};
+
+pub const MISSING_JUMP_PASSWORD_ERROR: &str = "TAOMNI_MISSING_JUMP_PASSWORD";
 
 pub struct SshSession {
     pub handle: client::Handle<SshHandler>,
@@ -205,6 +207,14 @@ pub(crate) async fn build_ssh_transport(
                 }
                 _ => SshAuth::Password(n.jump_password.clone()),
             };
+            if let SshAuth::Password(password) = &jump_auth {
+                if password.is_empty() {
+                    return Err(format!(
+                        "{MISSING_JUMP_PASSWORD_ERROR}: SSH jump host password is required for {}@{}:{}",
+                        n.jump_user, n.jump_host, n.jump_port
+                    ));
+                }
+            }
 
             // The jump connection is always direct: pass no network settings so
             // it cannot itself recurse into another jump/proxy hop. Boxed to
@@ -759,7 +769,7 @@ pub async fn connect_ssh_authenticated_with_prompter(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     fn live_ssh_target() -> Option<(String, u16, String, String)> {
         let host = std::env::var("TAOMNI_LIVE_SSH_HOST").ok()?;
@@ -788,6 +798,22 @@ mod tests {
         })
         .await
         .expect("timed out waiting for SSH terminal output")
+    }
+
+    #[tokio::test]
+    async fn jump_host_password_auth_requires_non_empty_password() {
+        let mut net = NetworkSettings::default();
+        net.proxy_kind = "ssh-tunnel".into();
+        net.jump_host = "127.0.0.1".into();
+        net.jump_port = 22;
+        net.jump_user = "ops".into();
+        net.jump_auth_kind = "Password".into();
+
+        let err = match build_ssh_transport("example.com", 22, Some(&net)).await {
+            Ok(_) => panic!("empty jump password should fail before dialing"),
+            Err(err) => err,
+        };
+        assert!(err.contains(MISSING_JUMP_PASSWORD_ERROR));
     }
 
     #[tokio::test]

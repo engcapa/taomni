@@ -3,9 +3,10 @@
 //! Three modes converge on the same `Box<dyn AsyncRead + AsyncWrite + Unpin + Send>`:
 //!
 //! - **Direct TCP** — same DNS / IP-version logic as SSH and VNC.
-//! - **HTTP CONNECT or SOCKS5 proxy** — delegated to
+//! - **HTTP CONNECT or SOCKS5 proxy / SSH jump host** — delegated to
 //!   [`crate::terminal::network::establish_transport`], which already
-//!   speaks both with auth.
+//!   speaks both proxy protocols with auth, and
+//!   [`crate::terminal::ssh::build_ssh_transport`] for SSH jump hosts.
 //! - **RD Gateway (MS-TSGU)** — a hand-rolled RPC-over-HTTPS twin-channel
 //!   wrapper in [`super::gateway`] that exposes its tunnelled stream as
 //!   `AsyncRead + AsyncWrite`.
@@ -22,7 +23,8 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 
 use crate::rdp::gateway::{self, GatewayOpt};
-use crate::terminal::network::{establish_transport, NetworkSettings};
+use crate::terminal::network::{NetworkSettings, establish_transport};
+use crate::terminal::ssh::{SshTransport, build_ssh_transport};
 
 pub struct RdpTransport {
     pub stream: RdpStream,
@@ -31,6 +33,7 @@ pub struct RdpTransport {
 
 pub enum RdpStream {
     Tcp(TcpStream),
+    Ssh(SshTransport),
     Gateway(gateway::GatewayStream),
 }
 
@@ -42,6 +45,7 @@ impl AsyncRead for RdpStream {
     ) -> Poll<std::io::Result<()>> {
         match self.as_mut().get_mut() {
             Self::Tcp(stream) => Pin::new(stream).poll_read(cx, buf),
+            Self::Ssh(stream) => Pin::new(stream).poll_read(cx, buf),
             Self::Gateway(stream) => Pin::new(stream).poll_read(cx, buf),
         }
     }
@@ -55,6 +59,7 @@ impl AsyncWrite for RdpStream {
     ) -> Poll<std::io::Result<usize>> {
         match self.as_mut().get_mut() {
             Self::Tcp(stream) => Pin::new(stream).poll_write(cx, buf),
+            Self::Ssh(stream) => Pin::new(stream).poll_write(cx, buf),
             Self::Gateway(stream) => Pin::new(stream).poll_write(cx, buf),
         }
     }
@@ -62,6 +67,7 @@ impl AsyncWrite for RdpStream {
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.as_mut().get_mut() {
             Self::Tcp(stream) => Pin::new(stream).poll_flush(cx),
+            Self::Ssh(stream) => Pin::new(stream).poll_flush(cx),
             Self::Gateway(stream) => Pin::new(stream).poll_flush(cx),
         }
     }
@@ -69,6 +75,7 @@ impl AsyncWrite for RdpStream {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.as_mut().get_mut() {
             Self::Tcp(stream) => Pin::new(stream).poll_shutdown(cx),
+            Self::Ssh(stream) => Pin::new(stream).poll_shutdown(cx),
             Self::Gateway(stream) => Pin::new(stream).poll_shutdown(cx),
         }
     }
@@ -80,8 +87,8 @@ impl AsyncWrite for RdpStream {
 ///
 /// 1. If `gateway` is `Some`, route through the RD Gateway. The host/port
 ///    arguments are the *target* RDP server inside the gateway tunnel.
-/// 2. Else, if `network` indicates a non-`none` proxy (`http` / `socks5`),
-///    route through that proxy via the existing SSH transport helper.
+/// 2. Else, if `network` indicates a non-`none` route (`http` / `socks5` /
+///    `ssh-tunnel`), route through the matching shared transport helper.
 /// 3. Else, direct TCP.
 pub async fn open_transport(
     host: &str,
@@ -118,8 +125,15 @@ pub async fn open_transport(
                 local_addr,
             })
         }
+        "ssh-tunnel" => {
+            let s = build_ssh_transport(host, port, network).await?;
+            Ok(RdpTransport {
+                stream: RdpStream::Ssh(s),
+                local_addr: SocketAddr::from(([0, 0, 0, 0], 0)),
+            })
+        }
         other => Err(format!(
-            "Proxy type '{}' is not implemented for RDP (supported: none, http, socks5, plus RD Gateway).",
+            "Proxy type '{}' is not implemented for RDP (supported: none, http, socks5, ssh-tunnel, plus RD Gateway).",
             other,
         )),
     }
@@ -155,5 +169,22 @@ mod tests {
             Err(e) => e,
         };
         assert!(err.contains("not implemented"));
+    }
+
+    #[tokio::test]
+    async fn ssh_tunnel_uses_shared_ssh_transport() {
+        let mut net = NetworkSettings::default();
+        net.proxy_kind = "ssh-tunnel".into();
+        net.jump_host = "127.0.0.1".into();
+        net.jump_port = 22;
+        net.jump_user = "ops".into();
+        net.jump_auth_kind = "Password".into();
+
+        let res = open_transport("rdp.internal", 3389, Some(&net), None).await;
+        let err = match res {
+            Ok(_) => panic!("empty jump password should fail in shared SSH transport"),
+            Err(err) => err,
+        };
+        assert!(err.contains(crate::terminal::ssh::MISSING_JUMP_PASSWORD_ERROR));
     }
 }
