@@ -9,8 +9,22 @@ import {
 
 export type SessionTerminalAppearancePatch = Partial<Pick<TerminalProfile, "theme" | "fontFamily" | "fontSize">>;
 
+const TERMINAL_APPEARANCE_SESSION_TYPES = new Set([
+  "SSH",
+  "LocalShell",
+  "FTP",
+  "Telnet",
+  "Rlogin",
+  "Serial",
+  "Mosh",
+]);
+
+export function supportsTerminalAppearanceSessionType(sessionType: string | undefined | null): boolean {
+  return !!sessionType && TERMINAL_APPEARANCE_SESSION_TYPES.has(sessionType);
+}
+
 export function isTerminalThemeSession(session: SessionConfig): boolean {
-  return session.session_type !== "Mail";
+  return supportsTerminalAppearanceSessionType(session.session_type);
 }
 
 export function getSessionTerminalTheme(session: SessionConfig): string {

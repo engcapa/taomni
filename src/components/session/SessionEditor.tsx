@@ -76,6 +76,7 @@ import {
   parseSessionOptions,
   type TerminalProfile,
 } from "../../lib/terminalProfile";
+import { supportsTerminalAppearanceSessionType } from "../../lib/sessionTerminalTheme";
 import {
   buildWslLaunchArgs,
   parseWslOptions,
@@ -246,6 +247,12 @@ function stripSerialOptions(options: Record<string, unknown>): Record<string, un
 function stripMailIdentityOptions(options: Record<string, unknown>): Record<string, unknown> {
   const next = { ...options };
   delete next.mailEmailAddress;
+  return next;
+}
+
+function stripTerminalProfileOption(options: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...options };
+  delete next.terminalProfile;
   return next;
 }
 
@@ -2327,6 +2334,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const isMail = proto === "Mail";
   const isObjectStorage = proto === "S3";
   const isPlannedClient = PLANNED_CLIENT_PROTOS.has(proto);
+  const supportsTerminalAppearance = supportsTerminalAppearanceSessionType(protoToSessionType(proto));
   const folderOptions = useMemo(() => {
     const options = new Set<string>([
       SESSION_ROOT_LABEL,
@@ -2410,11 +2418,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
      *  refs by handleSave). Falls back to current form state when omitted. */
     ossConfigValue?: Record<string, unknown>;
   } = {}): string => {
-    const previousOptionsBase = stripSerialOptions(
+    const rawPreviousOptions = stripSerialOptions(
       stripLocalShellLaunchOptions(
         stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
       ),
     );
+    const previousOptionsBase = supportsTerminalAppearance || isMail
+      ? rawPreviousOptions
+      : stripTerminalProfileOption(rawPreviousOptions);
     const previousOptions = proto === "Mail"
       ? stripMailIdentityOptions(previousOptionsBase)
       : previousOptionsBase;
@@ -2522,13 +2533,15 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         }
       : {};
 
+    const terminalProfileOverrides = supportsTerminalAppearance || isMail ? { terminalProfile } : {};
+
     return JSON.stringify({
       ...previousOptions,
       x11, x11Trusted, compression, startupCmd,
       description, tags, doNotExit, disableAiWrite,
       remoteEnv, sshBrowser, usePrivKey,
       fileEmbedInTab, fileExtraArgs,
-      terminalProfile,
+      ...terminalProfileOverrides,
       // SSH password vault reference (vault:<id>). Empty string means no
       // saved password; the user types it on connect.
       passwordRef: passwordRefValue || "",
@@ -3362,10 +3375,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         // (terminal appearance is meaningless for a graphical RDP session).
         ...(isRdp
           ? [{ id: "rdp" as SectionTab, label: t("rdp.options.title"), icon: <Monitor className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
-          : [{ id: "terminal" as SectionTab, label: t("sessionEditor2.sectionTerminal"), icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> }]),
+          : supportsTerminalAppearance
+            ? [{ id: "terminal" as SectionTab, label: t("sessionEditor2.sectionTerminal"), icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
+            : []),
         { id: "network",  label: t("sessionEditor2.sectionNetwork"),  icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"),  icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ];
+
+  const fallbackSection: SectionTab = isRdp
+    ? "rdp"
+    : supportsTerminalAppearance
+      ? "terminal"
+      : isSSH
+        ? "advanced"
+        : "network";
 
   /* If we switched away from SSH and were on the advanced tab, fall back.
    * Likewise default RDP to its own options tab and bounce non-RDP protos
@@ -3382,17 +3405,17 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         : isDb || isHBase
         ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
-          ? (isRdp ? "rdp" : "terminal")
+          ? fallbackSection
           : section === "rdp" && !isRdp
-            ? "terminal"
+            ? fallbackSection
             : section === "mappings" && proto !== "SFTP"
-              ? "terminal"
-              : section === "terminal" && isRdp
-              ? "rdp"
+              ? fallbackSection
+              : section === "terminal" && !supportsTerminalAppearance
+              ? fallbackSection
               : section === "database"
-                ? "terminal"
+                ? fallbackSection
                 : section === "appearance"
-                  ? "terminal"
+                  ? fallbackSection
                   : section;
 
   const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth: 600, minHeight: 400 });
