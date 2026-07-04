@@ -154,6 +154,9 @@ describe("ChatDrawer provider and echo controls", () => {
     cleanup();
     window.localStorage.clear();
     vi.clearAllMocks();
+    useTaoHubStore.setState({ hubTab: "chat" });
+    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
+    useNotesStore.setState({ alerts: [] });
   });
 
   it("puts the active LLM provider before local agents", () => {
@@ -313,6 +316,9 @@ describe("ChatDrawer layout resizing", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    useTaoHubStore.setState({ hubTab: "chat" });
+    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
+    useNotesStore.setState({ alerts: [] });
   });
 
   it("dismisses a floating drawer on outside pointer down", () => {
@@ -386,6 +392,7 @@ describe("ChatDrawer layout resizing", () => {
     render(<ChatDrawer />);
     expect(screen.getByTestId("tao-hub-tab-chat")).toBeInTheDocument();
     expect(screen.getByTestId("tao-hub-tab-notes")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-hub-tab-notifications")).toBeInTheDocument();
     // Chat tab active by default → composer present, notes panel absent.
     expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
   });
@@ -403,6 +410,54 @@ describe("ChatDrawer layout resizing", () => {
     expect(useTaoHubStore.getState().hubTab).toBe("chat");
     expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
   });
+
+  it("opens mail notifications as a Tao Hub tab and clears only the clicked mail tab", () => {
+    useTaoHubStore.setState({ hubTab: "chat" });
+    useAppStore.setState({
+      tabs: [
+        { id: "term-1", type: "terminal", title: "Terminal 1", closable: true },
+        { id: "mail-1", type: "mail", title: "Work mail", closable: true },
+        { id: "mail-2", type: "mail", title: "Ops mail", closable: true },
+      ],
+      activeTabId: "term-1",
+    });
+    useTaoAlertStore.setState({
+      mailNew: [
+        {
+          id: "mail:mail-1",
+          source: "mail",
+          kind: "mail_new",
+          title: "Work mail",
+          count: 3,
+          mailTabId: "mail-1",
+          mailAccountId: "acct-1",
+          fireAt: 1,
+        },
+        {
+          id: "mail:mail-2",
+          source: "mail",
+          kind: "mail_new",
+          title: "Ops mail",
+          count: 1,
+          mailTabId: "mail-2",
+          mailAccountId: "acct-2",
+          fireAt: 2,
+        },
+      ],
+    });
+
+    render(<ChatDrawer />);
+
+    fireEvent.click(screen.getByTestId("tao-hub-tab-notifications"));
+    expect(screen.getByTestId("tao-alert-inbox")).toBeInTheDocument();
+    expect(screen.getAllByTestId("tao-alert-inbox-item")).toHaveLength(2);
+    expect(screen.getByTestId("tao-hub-notifications-badge")).toHaveTextContent("4");
+
+    fireEvent.click(screen.getAllByTestId("tao-alert-jump")[0]);
+
+    expect(useAppStore.getState().activeTabId).toBe("mail-1");
+    expect(useTaoAlertStore.getState().mailNew.map((alert) => alert.mailTabId)).toEqual(["mail-2"]);
+  });
 });
 
 describe("ChatDrawerRibbon", () => {
@@ -410,7 +465,7 @@ describe("ChatDrawerRibbon", () => {
     cleanup();
     vi.clearAllMocks();
     useNotesStore.setState({ alerts: [] });
-    useTaoAlertStore.setState({ aiDone: [] });
+    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
   });
 
   it("shows only Tao and opens the stable chat tab id", () => {
@@ -511,7 +566,7 @@ describe("ChatDrawerRibbon", () => {
     }
   });
 
-  it("badges pending alerts and jumps to the overdue note on click", () => {
+  it("badges pending alerts and opens the Notifications hub tab on click", () => {
     const openTabChat = vi.fn().mockResolvedValue(undefined);
     const setActiveNote = vi.fn();
     const ackAlert = vi.fn().mockResolvedValue(undefined);
@@ -549,17 +604,18 @@ describe("ChatDrawerRibbon", () => {
     expect(screen.getByTestId("tao-ribbon-badge")).toHaveTextContent("1");
     fireEvent.click(screen.getByTestId("ai-chat-drawer-ribbon"));
     expect(openTabChat).toHaveBeenCalledWith("stable-chat");
-    expect(setActiveNote).toHaveBeenCalledWith("note-7");
-    expect(ackAlert).toHaveBeenCalledWith("evt-1");
-    expect(useTaoHubStore.getState().hubTab).toBe("notes");
+    expect(setActiveNote).not.toHaveBeenCalled();
+    expect(ackAlert).not.toHaveBeenCalled();
+    expect(useTaoHubStore.getState().hubTab).toBe("notifications");
   });
 
-  it("opens the alert inbox when multiple alerts are pending", () => {
+  it("opens the Notifications hub tab when multiple alerts are pending", () => {
+    const openTabChat = vi.fn().mockResolvedValue(undefined);
     useAppStore.setState({
       tabs: [{ id: "term-1", chatTabId: "stable-chat", type: "terminal", title: "T", closable: true }],
       activeTabId: "term-1",
     });
-    useChatStore.setState({ drawerOpen: false, drawerPosition: "left", drawerPinned: true });
+    useChatStore.setState({ drawerOpen: false, drawerPosition: "left", drawerPinned: true, openTabChat });
     useNotesStore.setState({
       alerts: [
         { id: "a", note_id: "n1", kind: "overdue", state: "pending", fire_at: 1, acknowledged_at: null, note_title: "A", due_at: 1, reminder_at: null },
@@ -573,7 +629,7 @@ describe("ChatDrawerRibbon", () => {
     );
     expect(screen.getByTestId("tao-ribbon-badge")).toHaveTextContent("2");
     fireEvent.click(screen.getByTestId("ai-chat-drawer-ribbon"));
-    expect(screen.getByTestId("tao-alert-inbox")).toBeInTheDocument();
-    expect(screen.getAllByTestId("tao-alert-inbox-item")).toHaveLength(2);
+    expect(openTabChat).toHaveBeenCalledWith("stable-chat");
+    expect(useTaoHubStore.getState().hubTab).toBe("notifications");
   });
 });

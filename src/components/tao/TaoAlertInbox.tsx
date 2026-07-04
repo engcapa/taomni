@@ -1,12 +1,13 @@
-import { AlertTriangle, Bell, Bot, Clock, X } from "lucide-react";
+import { AlertTriangle, Bell, Bot, Clock, Mail, X } from "lucide-react";
 import type { TaoAlert, TaoAlertKind } from "../../lib/tao/taoAlerts";
-import { useT } from "../../lib/i18n";
+import { useT, type TranslateFn } from "../../lib/i18n";
 
 interface TaoAlertInboxProps {
   alerts: TaoAlert[];
   onJump: (alert: TaoAlert) => void;
   onAck: (alert: TaoAlert) => void;
-  onClose: () => void;
+  onClose?: () => void;
+  embedded?: boolean;
 }
 
 function kindIcon(kind: TaoAlertKind) {
@@ -17,53 +18,64 @@ function kindIcon(kind: TaoAlertKind) {
       return AlertTriangle;
     case "note_due_soon":
       return Clock;
+    case "mail_new":
+      return Mail;
     default:
       return Bell;
   }
 }
 
-function kindLabelKey(kind: TaoAlertKind): string {
-  switch (kind) {
+function alertSubtitle(alert: TaoAlert, t: TranslateFn): string {
+  if (alert.kind === "mail_new") {
+    return t("tao.alertMailNewCount", { count: alert.count ?? 1 });
+  }
+  switch (alert.kind) {
     case "ai_done":
-      return "tao.alertAiDone";
+      return t("tao.alertAiDone");
     case "note_overdue":
-      return "tao.alertOverdue";
+      return t("tao.alertOverdue");
     case "note_due_soon":
-      return "tao.alertDueSoon";
+      return t("tao.alertDueSoon");
     default:
-      return "tao.alertReminder";
+      return t("tao.alertReminder");
   }
 }
 
 /** A compact list of pending Tao alerts with jump + dismiss actions (§7.3). */
-export function TaoAlertInbox({ alerts, onJump, onAck, onClose }: TaoAlertInboxProps) {
+export function TaoAlertInbox({ alerts, onJump, onAck, onClose, embedded = false }: TaoAlertInboxProps) {
   const t = useT();
   return (
     <div
-      className="rounded-md border border-[var(--taomni-divider)] shadow-xl overflow-hidden min-w-[220px] max-w-[300px]"
+      className={
+        embedded
+          ? "h-full min-w-0 overflow-hidden flex flex-col"
+          : "rounded-md border border-[var(--taomni-divider)] shadow-xl overflow-hidden min-w-[220px] max-w-[300px]"
+      }
       style={{ background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}
       data-testid="tao-alert-inbox"
       role="menu"
     >
-      <div className="flex items-center gap-2 px-2 h-7 border-b border-[var(--taomni-divider)]">
+      <div className="flex items-center gap-2 px-2 h-7 border-b border-[var(--taomni-divider)] shrink-0">
         <Bell className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
         <span className="text-[12px] font-semibold flex-1">{t("tao.alertInboxTitle")}</span>
-        <button
-          type="button"
-          className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center"
-          onClick={onClose}
-          aria-label={t("notes.close")}
-          data-testid="tao-alert-inbox-close"
-        >
-          <X className="w-3 h-3" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center"
+            onClick={onClose}
+            aria-label={t("notes.close")}
+            data-testid="tao-alert-inbox-close"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
       </div>
       {alerts.length === 0 ? (
         <div className="px-3 py-4 text-center text-[11px] text-[var(--taomni-text-muted)]">
           {t("tao.alertInboxEmpty")}
         </div>
       ) : (
-        <ul className="max-h-64 overflow-y-auto">
+        <ul className={embedded ? "flex-1 min-h-0 overflow-y-auto" : "max-h-64 overflow-y-auto"}>
           {alerts.map((alert) => {
             const Icon = kindIcon(alert.kind);
             const color =
@@ -83,7 +95,7 @@ export function TaoAlertInbox({ alerts, onJump, onAck, onClose }: TaoAlertInboxP
                     data-testid="tao-alert-jump"
                   >
                     <div className="text-[11px] truncate">{alert.title}</div>
-                    <div className="text-[10px] text-[var(--taomni-text-muted)]">{t(kindLabelKey(alert.kind))}</div>
+                    <div className="text-[10px] text-[var(--taomni-text-muted)]">{alertSubtitle(alert, t)}</div>
                   </button>
                   <button
                     type="button"
