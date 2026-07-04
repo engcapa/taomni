@@ -4,10 +4,10 @@ import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import {
-  DEFAULT_LOCAL_TERMINAL_PROFILE,
+  DEFAULT_TERMINAL_DEFAULT_PROFILE,
   DEFAULT_TERMINAL_PROFILE,
-  loadLocalTerminalDefaultProfile,
-  saveLocalTerminalDefaultProfile,
+  loadTerminalDefaultProfile,
+  saveTerminalDefaultProfile,
   type TerminalProfile,
 } from "../../lib/terminalProfile";
 import {
@@ -104,8 +104,8 @@ function SettingsAnchor({
 
 export function SettingsPanel() {
   const [codeViewProfile, setCodeViewProfile] = useState<CodeViewProfile>(() => loadCodeViewProfile());
-  const [localTerminalProfile, setLocalTerminalProfile] = useState<TerminalProfile>(
-    () => loadLocalTerminalDefaultProfile(),
+  const [terminalDefaultProfile, setTerminalDefaultProfile] = useState<TerminalProfile>(
+    () => loadTerminalDefaultProfile(),
   );
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
@@ -186,14 +186,14 @@ export function SettingsPanel() {
     saveCodeViewProfile(codeViewProfile);
   }, [codeViewProfile]);
 
-  const handleLocalTerminalProfileChange = useCallback((profile: TerminalProfile) => {
-    setLocalTerminalProfile(profile);
-    saveLocalTerminalDefaultProfile(profile);
+  const handleTerminalDefaultProfileChange = useCallback((profile: TerminalProfile) => {
+    setTerminalDefaultProfile(profile);
+    saveTerminalDefaultProfile(profile);
   }, []);
 
-  const resetLocalTerminalProfile = useCallback(() => {
-    setLocalTerminalProfile(DEFAULT_LOCAL_TERMINAL_PROFILE);
-    saveLocalTerminalDefaultProfile(DEFAULT_LOCAL_TERMINAL_PROFILE);
+  const resetTerminalDefaultProfile = useCallback(() => {
+    setTerminalDefaultProfile(DEFAULT_TERMINAL_DEFAULT_PROFILE);
+    saveTerminalDefaultProfile(DEFAULT_TERMINAL_DEFAULT_PROFILE);
   }, []);
 
   return (
@@ -442,29 +442,29 @@ export function SettingsPanel() {
             />
           </SettingsAnchor>
 
-          <SettingsAnchor id="local-terminal-defaults">
+          <SettingsAnchor id="terminal-defaults">
             <div className="mt-6 mb-4 flex items-center gap-3">
               <Terminal className="w-4 h-4 text-[var(--taomni-accent)]" />
               <div>
-                <div className="text-[18px] font-semibold">{t("settings.localTerminalDefaultsTitle")}</div>
+                <div className="text-[18px] font-semibold">{t("settings.terminalDefaultsTitle")}</div>
                 <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                  {t("settings.localTerminalDefaultsSubtitle")}
+                  {t("settings.terminalDefaultsSubtitle")}
                 </div>
               </div>
               <button
-                data-testid="settings-reset-local-terminal-profile"
+                data-testid="settings-reset-terminal-default-profile"
                 className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
                 type="button"
-                onClick={resetLocalTerminalProfile}
-                title={t("settings.resetLocalTerminalDefaults")}
+                onClick={resetTerminalDefaultProfile}
+                title={t("settings.resetTerminalDefaults")}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 {t("settings.reset")}
               </button>
             </div>
             <TerminalAppearanceSettings
-              profile={localTerminalProfile}
-              onProfileChange={handleLocalTerminalProfileChange}
+              profile={terminalDefaultProfile}
+              onProfileChange={handleTerminalDefaultProfileChange}
               showCustomColors
               allowSystemTheme
             />

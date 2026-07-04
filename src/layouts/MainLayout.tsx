@@ -92,7 +92,7 @@ import { parseSessionOptions } from "../lib/terminalProfile";
 import {
   DEFAULT_MAIL_TERMINAL_PROFILE,
   getSessionTerminalProfile,
-  loadLocalTerminalDefaultProfile,
+  loadTerminalDefaultProfile,
   type TerminalProfile,
 } from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
@@ -807,10 +807,7 @@ export function MainLayout() {
     const liveProfile = terminalProfileOverrides[source.id]
       ?? (source.sessionId ? terminalProfilesBySessionId.get(source.sessionId) : undefined)
       ?? source.terminalProfile;
-    if (!source.sessionId && !source.ssh && !source.commandTerminal) {
-      return liveProfile ?? loadLocalTerminalDefaultProfile();
-    }
-    return liveProfile;
+    return liveProfile ?? loadTerminalDefaultProfile();
   }, [terminalProfileOverrides, terminalProfilesBySessionId]);
 
   // Duplicate a tab. Terminal tabs try to open the copy in the source's current
@@ -1406,7 +1403,7 @@ export function MainLayout() {
     initialCwd?: string,
   ) => {
     const id = `local-${Date.now()}`;
-    const resolvedTerminalProfile = terminalProfile ?? (sessionId ? undefined : loadLocalTerminalDefaultProfile());
+    const resolvedTerminalProfile = terminalProfile ?? loadTerminalDefaultProfile();
     const requestedTitle = title || tr("tabs.localTerminal");
     const resolvedTitle = computeNewTerminalTitle(
       requestedTitle,
@@ -1832,7 +1829,7 @@ export function MainLayout() {
         authData,
         optionsJson: session.options_json,
       },
-      terminalProfile: getSessionTerminalProfile(session.options_json),
+      terminalProfile: getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile(),
     });
     void markConnected(session.id);
   }, [addTab, markConnected]);
@@ -1860,7 +1857,7 @@ export function MainLayout() {
       sessionId: session.id,
       closable: true,
       commandTerminal,
-      terminalProfile: getSessionTerminalProfile(session.options_json),
+      terminalProfile: getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile(),
     });
     void markConnected(session.id);
   }, [addTab, markConnected, setStatusMessage]);

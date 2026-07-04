@@ -1615,7 +1615,7 @@ describe("TerminalPanel focus behavior", () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("saves the current theme as the default for new local terminals", async () => {
+  it("saves the current theme as the default for new terminals", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1636,11 +1636,11 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
 
-    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
     expect(stored.theme).toBe("kanagawa-wave");
   });
 
-  it("saves appearance changes made in the open context menu as the local terminal default", async () => {
+  it("saves appearance changes made in the open context menu as the terminal default", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1665,12 +1665,12 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.click(screen.getByLabelText("Increase terminal font size"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
 
-    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
     expect(stored.theme).toBe("kanagawa-wave");
     expect(stored.fontSize).toBe(15);
   });
 
-  it("does not auto-save local terminal appearance changes for future local terminals", async () => {
+  it("does not auto-save terminal appearance changes for future terminals", async () => {
     window.localStorage.clear();
     const onSessionReady = vi.fn();
 
@@ -1696,10 +1696,10 @@ describe("TerminalPanel focus behavior", () => {
 
     fireEvent.change(screen.getByTestId("terminal-context-font-size"), { target: { value: "18" } });
 
-    expect(window.localStorage.getItem("taomni.localTerminalProfile.v1")).toBeNull();
+    expect(window.localStorage.getItem("taomni.terminalDefaultProfile.v1")).toBeNull();
   });
 
-  it("keeps follow-system as a savable local terminal default theme", async () => {
+  it("keeps follow-system as a savable terminal default theme", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1720,11 +1720,11 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
 
-    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
     expect(stored.theme).toBe(SYSTEM_TERMINAL_THEME);
   });
 
-  it("saves all current terminal settings as the local terminal default after confirmation", async () => {
+  it("saves all current terminal settings as the terminal default after confirmation", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1751,7 +1751,7 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Save defaults" }));
 
     await waitFor(() => {
-      const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+      const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
       expect(stored).toMatchObject({
         theme: "dracula",
         readOnly: true,

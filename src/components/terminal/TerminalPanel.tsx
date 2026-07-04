@@ -14,13 +14,12 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {
-  DEFAULT_TERMINAL_PROFILE,
   isCustomTerminalTheme,
-  loadLocalTerminalDefaultProfile,
+  loadTerminalDefaultProfile,
   parseSessionOptions,
   resolveTerminalTheme,
   resolveTerminalThemeWithSystem,
-  saveLocalTerminalDefaultProfile,
+  saveTerminalDefaultProfile,
   type TerminalProfile,
   type TerminalSyntaxMode,
   type UserCommonCommand,
@@ -384,7 +383,7 @@ export function TerminalPanel({
   const isLocal = !ssh && !commandTerminal;
   const initialProfileRef = useRef<TerminalProfile | null>(null);
   if (!initialProfileRef.current) {
-    initialProfileRef.current = terminalProfile ?? (isLocal ? loadLocalTerminalDefaultProfile() : DEFAULT_TERMINAL_PROFILE);
+    initialProfileRef.current = terminalProfile ?? loadTerminalDefaultProfile();
   }
   const initialProfile = initialProfileRef.current;
   const appliedTerminalProfileSignatureRef = useRef<string | null>(
@@ -1503,28 +1502,28 @@ export function TerminalPanel({
     focusTerminal();
   }, [commitTerminalProfilePatch, focusTerminal]);
 
-  const saveCurrentAppearanceAsLocalDefault = useCallback(() => {
-    const currentDefault = loadLocalTerminalDefaultProfile();
+  const saveCurrentAppearanceAsTerminalDefault = useCallback(() => {
+    const currentDefault = loadTerminalDefaultProfile();
     const currentProfile = currentTerminalProfileRef.current;
-    saveLocalTerminalDefaultProfile({
+    saveTerminalDefaultProfile({
       ...currentDefault,
       theme: currentProfile.theme,
       fontFamily: currentProfile.fontFamily,
       fontSize: currentProfile.fontSize,
       fontLigatures: currentProfile.fontLigatures,
     });
-    setStatusMessage(t("terminal.localDefaultAppearanceSaved"));
+    setStatusMessage(t("terminal.defaultAppearanceSaved"));
   }, [setStatusMessage, t]);
 
-  const saveCurrentProfileAsLocalDefault = useCallback(async () => {
+  const saveCurrentProfileAsTerminalDefault = useCallback(async () => {
     const confirmed = await confirmTerminalDefaults({
-      title: t("terminal.saveAllLocalDefaultConfirmTitle"),
-      message: t("terminal.saveAllLocalDefaultConfirmMessage"),
-      confirmLabel: t("terminal.saveAllLocalDefaultConfirmButton"),
+      title: t("terminal.saveAllDefaultConfirmTitle"),
+      message: t("terminal.saveAllDefaultConfirmMessage"),
+      confirmLabel: t("terminal.saveAllDefaultConfirmButton"),
     });
     if (!confirmed) return;
-    saveLocalTerminalDefaultProfile(currentTerminalProfileRef.current);
-    setStatusMessage(t("terminal.localDefaultProfileSaved"));
+    saveTerminalDefaultProfile(currentTerminalProfileRef.current);
+    setStatusMessage(t("terminal.defaultProfileSaved"));
   }, [confirmTerminalDefaults, setStatusMessage, t]);
 
   const selectZmodemSendFiles = useCallback(async (): Promise<ZmodemSendFile[]> => {
@@ -1864,22 +1863,18 @@ export function TerminalPanel({
           />
         ),
       },
-      ...(isLocal
-        ? [
-            {
-              label: t("terminal.contextSetAppearanceDefault"),
-              testId: "terminal-context-set-local-default-theme",
-              onClick: saveCurrentAppearanceAsLocalDefault,
-            },
-            {
-              label: t("terminal.contextSetProfileDefault"),
-              testId: "terminal-context-set-local-default-profile",
-              onClick: () => {
-                void saveCurrentProfileAsLocalDefault();
-              },
-            },
-          ]
-        : []),
+      {
+        label: t("terminal.contextSetAppearanceDefault"),
+        testId: "terminal-context-set-local-default-theme",
+        onClick: saveCurrentAppearanceAsTerminalDefault,
+      },
+      {
+        label: t("terminal.contextSetProfileDefault"),
+        testId: "terminal-context-set-local-default-profile",
+        onClick: () => {
+          void saveCurrentProfileAsTerminalDefault();
+        },
+      },
       {
         label: "Terminal display",
         children: [
@@ -1977,7 +1972,6 @@ export function TerminalPanel({
     gitState.kind,
     gitToggle,
     increaseFontSize,
-    isLocal,
     isMac,
     openSearch,
     pasteFromClipboard,
@@ -1987,8 +1981,8 @@ export function TerminalPanel({
     resetFontSize,
     resetOutput,
     saveBufferToFile,
-    saveCurrentAppearanceAsLocalDefault,
-    saveCurrentProfileAsLocalDefault,
+    saveCurrentAppearanceAsTerminalDefault,
+    saveCurrentProfileAsTerminalDefault,
     showScrollbar,
     setStatusMessage,
     syntaxMode,
@@ -3574,10 +3568,9 @@ export function TerminalPanel({
       {settingsDialogOpen && (
         <CurrentTerminalSettingsDialog
           profile={currentTerminalProfileRef.current}
-          isLocal={isLocal}
           onProfileChange={commitTerminalProfilePatch}
-          onSaveAsLocalDefault={() => {
-            void saveCurrentProfileAsLocalDefault();
+          onSaveAsDefault={() => {
+            void saveCurrentProfileAsTerminalDefault();
           }}
           onClose={() => {
             setSettingsDialogOpen(false);
@@ -3680,15 +3673,13 @@ export function TerminalPanel({
 
 function CurrentTerminalSettingsDialog({
   profile,
-  isLocal,
   onProfileChange,
-  onSaveAsLocalDefault,
+  onSaveAsDefault,
   onClose,
 }: {
   profile: TerminalProfile;
-  isLocal: boolean;
   onProfileChange: (profile: TerminalProfile) => void;
-  onSaveAsLocalDefault: () => void;
+  onSaveAsDefault: () => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -3731,15 +3722,13 @@ function CurrentTerminalSettingsDialog({
           />
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] px-3 py-2">
-          {isLocal && (
-            <button
-              type="button"
-              className="taomni-btn h-8 px-3"
-              onClick={onSaveAsLocalDefault}
-            >
-              {t("terminal.currentSettingsSaveAsLocalDefault")}
-            </button>
-          )}
+          <button
+            type="button"
+            className="taomni-btn h-8 px-3"
+            onClick={onSaveAsDefault}
+          >
+            {t("terminal.currentSettingsSaveAsDefault")}
+          </button>
           <button type="button" className="taomni-btn h-8 px-3" onClick={onClose}>
             {t("terminal.currentSettingsClose")}
           </button>

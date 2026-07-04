@@ -17,7 +17,7 @@ vi.mock("../../lib/ipc", () => ({
 
 const CODE_VIEW_STORAGE_KEY = "taomni.codeViewProfile.v1";
 const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
-const LOCAL_TERMINAL_STORAGE_KEY = "taomni.localTerminalProfile.v1";
+const TERMINAL_DEFAULT_STORAGE_KEY = "taomni.terminalDefaultProfile.v1";
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
@@ -47,11 +47,11 @@ describe("SettingsPanel", () => {
     cleanup();
   });
 
-  it("exposes local terminal defaults instead of global terminal appearance settings", () => {
+  it("exposes terminal defaults instead of legacy terminal appearance settings", () => {
     render(<SettingsPanel />);
 
     expect(screen.queryByText("Terminal Appearance")).not.toBeInTheDocument();
-    expect(screen.getByText("Local Terminal Defaults")).toBeInTheDocument();
+    expect(screen.getByText("Terminal Defaults")).toBeInTheDocument();
     expect(screen.getByTestId("terminal-appearance-settings")).toBeInTheDocument();
     expect(screen.getByTestId("terminal-theme-select")).toBeInTheDocument();
   });
@@ -115,7 +115,7 @@ describe("SettingsPanel", () => {
     });
   }, 10_000);
 
-  it("persists local terminal default behavior settings", async () => {
+  it("persists global terminal default behavior settings", async () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
@@ -127,7 +127,7 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByLabelText("Read-only terminal"));
 
     await waitFor(() => {
-      const saved = JSON.parse(window.localStorage.getItem(LOCAL_TERMINAL_STORAGE_KEY) ?? "{}");
+      const saved = JSON.parse(window.localStorage.getItem(TERMINAL_DEFAULT_STORAGE_KEY) ?? "{}");
       expect(saved.fontFamily).toContain("JetBrains Mono");
       expect(saved.scrollback).toBe(4321);
       expect(saved.readOnly).toBe(true);

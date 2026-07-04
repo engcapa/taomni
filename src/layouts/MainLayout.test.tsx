@@ -577,7 +577,7 @@ describe("MainLayout attached SFTP sidebar", () => {
   });
 
   it("opens a local terminal from Ctrl+Shift+T outside the welcome tab", async () => {
-    window.localStorage.setItem("taomni.localTerminalProfile.v1", JSON.stringify({
+    window.localStorage.setItem("taomni.terminalDefaultProfile.v1", JSON.stringify({
       ...DEFAULT_TERMINAL_PROFILE,
       theme: "kanagawa-wave",
     }));
@@ -1141,8 +1141,8 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
-  it("duplicates temporary local terminals with the saved local default profile when no live profile exists", async () => {
-    window.localStorage.setItem("taomni.localTerminalProfile.v1", JSON.stringify({
+  it("duplicates temporary local terminals with the saved terminal default profile when no live profile exists", async () => {
+    window.localStorage.setItem("taomni.terminalDefaultProfile.v1", JSON.stringify({
       ...DEFAULT_TERMINAL_PROFILE,
       theme: "termius-dark",
       fontSize: 18,
@@ -1209,6 +1209,44 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
     await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith("browser-1"));
     expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
+  });
+
+  it("opens saved SSH sessions without a profile using the terminal default profile", async () => {
+    window.localStorage.setItem("taomni.terminalDefaultProfile.v1", JSON.stringify({
+      ...DEFAULT_TERMINAL_PROFILE,
+      fontSize: 18,
+      theme: "kanagawa-wave",
+    }));
+    render(<MainLayout />);
+
+    const session: SessionConfig = {
+      id: "ssh-default-profile",
+      name: "Default SSH",
+      session_type: "SSH",
+      group_path: null,
+      host: "ssh-default.example.test",
+      port: 22,
+      username: "root",
+      auth_method: "Agent",
+      options_json: "{}",
+      created_at: 0,
+      updated_at: 0,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    useSessionStore.setState({ sessions: [session], groups: [] });
+
+    await act(async () => {
+      sidebarMock.props.at(-1)?.onConnectSession?.(session);
+    });
+
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((item) => item.sessionId === "ssh-default-profile");
+      expect(tab?.terminalProfile).toMatchObject({
+        fontSize: 18,
+        theme: "kanagawa-wave",
+      });
+    });
   });
 
   it.each<[string, string, string, string, number, string]>([

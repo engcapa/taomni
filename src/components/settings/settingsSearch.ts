@@ -48,12 +48,12 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
-    id: "local-terminal-defaults",
-    titleKeys: ["settings.localTerminalDefaultsTitle", "terminalAppearance.behaviorHeading"],
+    id: "terminal-defaults",
+    titleKeys: ["settings.terminalDefaultsTitle", "terminalAppearance.behaviorHeading"],
     terms: [
-      "local terminal", "terminal defaults", "terminal behavior", "terminal font", "terminal theme",
+      "terminal", "ssh terminal", "local terminal", "terminal defaults", "terminal behavior", "terminal font", "terminal theme",
       "cursor", "scrollback", "right click", "copy on select", "bracketed paste", "osc 52",
-      "本地终端", "终端默认", "终端行为", "终端字体", "终端主题",
+      "终端", "ssh 终端", "本地终端", "终端默认", "终端行为", "终端字体", "终端主题",
       "光标", "回滚", "右键", "选中即复制", "括号粘贴",
     ],
   },

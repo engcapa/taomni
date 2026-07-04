@@ -1,7 +1,7 @@
 import type { SessionConfig } from "./ipc";
 import {
-  DEFAULT_TERMINAL_PROFILE,
   getSessionTerminalProfile,
+  loadTerminalDefaultProfile,
   normalizeTerminalProfile,
   parseSessionOptions,
   type TerminalProfile,
@@ -14,11 +14,11 @@ export function isTerminalThemeSession(session: SessionConfig): boolean {
 }
 
 export function getSessionTerminalTheme(session: SessionConfig): string {
-  return (getSessionTerminalProfile(session.options_json) ?? DEFAULT_TERMINAL_PROFILE).theme;
+  return (getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile()).theme;
 }
 
 export function getSessionTerminalProfileForThemeUpdate(session: SessionConfig): TerminalProfile {
-  return getSessionTerminalProfile(session.options_json) ?? DEFAULT_TERMINAL_PROFILE;
+  return getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile();
 }
 
 export function withSessionTerminalTheme(
