@@ -42,6 +42,12 @@ const quickConnectMock = vi.hoisted(() => ({
   }>,
 }));
 
+const controlBarMock = vi.hoisted(() => ({
+  props: [] as Array<{
+    onDuplicateTab?: (id: string) => void;
+  }>,
+}));
+
 const dbClientMock = vi.hoisted(() => ({
   props: [] as Array<{ tabId?: string; info?: Record<string, unknown>; visible?: boolean }>,
 }));
@@ -108,27 +114,32 @@ vi.mock("../components/tabbar/ControlBar", () => ({
   ControlBar: ({
     onCommand,
     onCloseWindow,
+    onDuplicateTab,
     onToggleSidebar,
     slotRef,
   }: {
     onCommand?: (command: string) => void;
     onCloseWindow?: () => void;
+    onDuplicateTab?: (id: string) => void;
     onToggleSidebar?: () => void;
     slotRef?: (el: HTMLDivElement | null) => void;
-  }) => (
-    <div data-testid="control-bar">
-      <button type="button" data-testid="window-close" onClick={() => onCloseWindow?.()}>
-        Close
-      </button>
-      <button type="button" data-testid="mock-menu-exit" onClick={() => onCommand?.("exit")}>
-        Exit
-      </button>
-      <button type="button" data-testid="mock-sidebar-toggle" onClick={() => onToggleSidebar?.()}>
-        Sidebar
-      </button>
-      <div ref={slotRef} data-testid="tab-action-slot" />
-    </div>
-  ),
+  }) => {
+    controlBarMock.props.push({ onDuplicateTab });
+    return (
+      <div data-testid="control-bar">
+        <button type="button" data-testid="window-close" onClick={() => onCloseWindow?.()}>
+          Close
+        </button>
+        <button type="button" data-testid="mock-menu-exit" onClick={() => onCommand?.("exit")}>
+          Exit
+        </button>
+        <button type="button" data-testid="mock-sidebar-toggle" onClick={() => onToggleSidebar?.()}>
+          Sidebar
+        </button>
+        <div ref={slotRef} data-testid="tab-action-slot" />
+      </div>
+    );
+  },
 }));
 
 vi.mock("../components/quickconnect/QuickConnect", () => ({
@@ -376,6 +387,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     terminalPanelMock.props = [];
     sidebarMock.props = [];
     quickConnectMock.props = [];
+    controlBarMock.props = [];
     dbClientMock.props = [];
     hbaseShellMock.props = [];
     sftpSidebarMock.props = [];
@@ -1011,6 +1023,14 @@ describe("MainLayout attached SFTP sidebar", () => {
           id: "ssh-tab",
           type: "terminal",
           title: "root@example.test",
+          ssh: {
+            host: "example.test",
+            port: 22,
+            username: "root",
+            authMethod: "Password",
+            authData: "secret",
+            optionsJson: undefined,
+          },
           closable: true,
           terminalProfile: {
             ...DEFAULT_TERMINAL_PROFILE,
@@ -1034,6 +1054,92 @@ describe("MainLayout attached SFTP sidebar", () => {
     await waitFor(() => {
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-font-size", "21");
       expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-theme", "kanagawa-wave");
+    });
+  });
+
+  it("duplicates terminal tabs with the current runtime terminal profile", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        {
+          id: "ssh-tab",
+          type: "terminal",
+          title: "root@example.test",
+          ssh: {
+            host: "example.test",
+            port: 22,
+            username: "root",
+            authMethod: "Password",
+            authData: "secret",
+            optionsJson: undefined,
+          },
+          closable: true,
+          terminalProfile: {
+            ...DEFAULT_TERMINAL_PROFILE,
+            fontSize: 14,
+            theme: "classic",
+          },
+        },
+      ],
+      activeTabId: "ssh-tab",
+      sidebarCollapsed: false,
+      statusMessage: "Ready",
+    });
+
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByTestId("mock-terminal-profile-change-ssh-tab"));
+    await waitFor(() => {
+      expect(screen.getByTestId("terminal-panel")).toHaveAttribute("data-terminal-font-size", "21");
+    });
+
+    await act(async () => {
+      controlBarMock.props.at(-1)?.onDuplicateTab?.("ssh-tab");
+    });
+
+    await waitFor(() => {
+      const copy = useAppStore.getState().tabs.find((tab) => tab.id !== "ssh-tab" && tab.title === "root@example.test-1");
+      expect(copy?.terminalProfile).toMatchObject({
+        fontSize: 21,
+        theme: "kanagawa-wave",
+      });
+    });
+  });
+
+  it("duplicates temporary local terminals with the saved local default profile when no live profile exists", async () => {
+    window.localStorage.setItem("taomni.localTerminalProfile.v1", JSON.stringify({
+      ...DEFAULT_TERMINAL_PROFILE,
+      theme: "termius-dark",
+      fontSize: 18,
+    }));
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        {
+          id: "local-tab",
+          type: "terminal",
+          title: "Local",
+          closable: true,
+          localShell: { id: "command-prompt", name: "Command Prompt" },
+        },
+      ],
+      activeTabId: "local-tab",
+      sidebarCollapsed: false,
+      statusMessage: "Ready",
+    });
+
+    render(<MainLayout />);
+
+    await act(async () => {
+      controlBarMock.props.at(-1)?.onDuplicateTab?.("local-tab");
+    });
+
+    await waitFor(() => {
+      const copy = useAppStore.getState().tabs.find((tab) => tab.id !== "local-tab" && tab.title === "Local-1");
+      expect(copy?.terminalProfile).toMatchObject({
+        fontSize: 18,
+        theme: "termius-dark",
+      });
     });
   });
 

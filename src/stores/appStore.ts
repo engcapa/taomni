@@ -39,6 +39,11 @@ export interface CodeWorkspaceContext {
   lsp?: CodeWorkspaceLspContext | null;
 }
 
+type DuplicateTabOverrides = {
+  terminalInitialCwd?: string;
+  terminalProfile?: Tab["terminalProfile"];
+};
+
 export interface CodeWorkspaceRootContext {
   id: string;
   name: string;
@@ -185,8 +190,9 @@ interface AppState {
    * then "Server-2", and duplicating "Server-1" continues the same family).
    * `overrides.terminalInitialCwd`, when provided, is carried onto the copy so
    * a duplicated local/SSH terminal can open in the source terminal's cwd.
+   * `overrides.terminalProfile` carries the source tab's live appearance.
    */
-  duplicateTab: (id: string, overrides?: { terminalInitialCwd?: string }) => void;
+  duplicateTab: (id: string, overrides?: DuplicateTabOverrides) => void;
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
@@ -505,6 +511,8 @@ export const useAppStore = create<AppState>((set) => ({
         // for other tab kinds (and when none was resolved).
         terminalInitialCwd:
           source.type === "terminal" ? overrides?.terminalInitialCwd : undefined,
+        terminalProfile:
+          source.type === "terminal" ? overrides?.terminalProfile ?? source.terminalProfile : source.terminalProfile,
       };
       const next = s.tabs.slice();
       next.splice(idx + 1, 0, copy);

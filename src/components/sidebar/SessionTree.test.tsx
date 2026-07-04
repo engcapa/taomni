@@ -313,4 +313,24 @@ describe("SessionTree multi-select batch operations", () => {
     ));
     expect(savedFontSizes.filter((size) => size === 16)).toHaveLength(2);
   });
+
+  it("keeps session appearance draft patches cumulative while saves are pending", async () => {
+    render(<SessionTree />);
+    selectBothIpySessions();
+
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    const item = screen.getByTestId("context-menu-item-set-terminal-theme");
+    fireEvent.mouseEnter(item.parentElement!);
+
+    fireEvent.click(await screen.findByTestId("session-terminal-theme-option-kanagawa-wave"));
+    fireEvent.click(await screen.findByLabelText("Increase text size"));
+
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(4));
+    const lastTwo = ipcMocks.saveSession.mock.calls.slice(-2).map(([cfg]) => JSON.parse(cfg.options_json));
+    expect(lastTwo.map((options) => options.terminalProfile.theme)).toEqual([
+      "kanagawa-wave",
+      "kanagawa-wave",
+    ]);
+    expect(lastTwo.map((options) => options.terminalProfile.fontSize)).toEqual([15, 15]);
+  });
 });

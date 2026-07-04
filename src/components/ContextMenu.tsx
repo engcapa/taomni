@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight } from "lucide-react";
 
@@ -257,22 +257,25 @@ function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
 export function useContextMenu() {
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
-  const show = (e: React.MouseEvent, items: MenuItem[]) => {
+  const show = useCallback((e: React.MouseEvent, items: MenuItem[]) => {
     e.preventDefault();
     e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, items });
-  };
-  const showAt = (x: number, y: number, items: MenuItem[]) => {
+  }, []);
+  const showAt = useCallback((x: number, y: number, items: MenuItem[]) => {
     setMenu({ x, y, items });
-  };
+  }, []);
+  const refreshItems = useCallback((items: MenuItem[]) => {
+    setMenu((current) => current ? { ...current, items } : current);
+  }, []);
 
-  const close = () => setMenu(null);
+  const close = useCallback(() => setMenu(null), []);
 
   const render = menu ? (
     <ContextMenu items={menu.items} x={menu.x} y={menu.y} onClose={close} />
   ) : null;
 
-  return { show, showAt, close, render, isOpen: menu !== null };
+  return { show, showAt, refreshItems, close, render, isOpen: menu !== null };
 }
 
 function slugForTestId(value: string): string {
