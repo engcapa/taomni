@@ -19,11 +19,42 @@ export interface WorkspaceFile {
   hash: string;
 }
 
+export interface WorkspaceCompactChain {
+  path: string;
+  entries: WorkspaceEntry[];
+}
+
 export function workspaceListDir(
   repoRoot: string,
   path = "",
 ): Promise<WorkspaceEntry[]> {
   return invoke<WorkspaceEntry[]>("workspace_list_dir", { repoRoot, path });
+}
+
+export function workspaceCompactChain(
+  repoRoot: string,
+  path: string,
+  maxDepth?: number,
+): Promise<WorkspaceCompactChain> {
+  return invoke<WorkspaceCompactChain>("workspace_compact_chain", {
+    repoRoot,
+    path,
+    maxDepth: maxDepth ?? null,
+  });
+}
+
+export function workspaceListFilesRecursive(
+  repoRoot: string,
+  path = "",
+  maxDepth?: number,
+  maxFiles?: number,
+): Promise<WorkspaceEntry[]> {
+  return invoke<WorkspaceEntry[]>("workspace_list_files_recursive", {
+    repoRoot,
+    path,
+    maxDepth: maxDepth ?? null,
+    maxFiles: maxFiles ?? null,
+  });
 }
 
 export function workspaceReadFile(

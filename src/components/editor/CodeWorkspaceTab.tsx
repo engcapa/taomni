@@ -56,6 +56,7 @@ import {
   FolderOpen,
   FolderPlus,
   Info,
+  List,
   ListTree,
   Columns2,
   Eye,
@@ -74,7 +75,9 @@ import {
 import {
   workspaceCreateDir,
   workspaceCreateFile,
+  workspaceCompactChain,
   workspaceDeletePath,
+  workspaceListFilesRecursive,
   workspaceListDir,
   workspaceReadFile,
   workspaceReadLooseFile,
@@ -184,11 +187,15 @@ type TreeSelection =
   | { kind: "file"; ref: CodeWorkspaceFileRef };
 
 type MarkdownViewMode = "edit" | "preview" | "split";
+type TreeViewMode = "tree" | "compact" | "flat";
 
 const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
 const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
 const CUSTOM_LSP_COMMAND_ID = "__custom__";
 const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
+const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
+const FLAT_VIEW_MAX_FILES = 2_000;
+const FLAT_VIEW_MAX_DEPTH = 25;
 const CODE_WORKSPACE_MIN_FONT_SIZE = 8;
 const CODE_WORKSPACE_MAX_FONT_SIZE = 32;
 const CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE = 12;
@@ -206,6 +213,22 @@ const DEFAULT_DIR_STATE: DirectoryState = {
   loaded: false,
   loading: false,
   error: null,
+};
+
+interface FlatFilesState {
+  entries: WorkspaceEntry[];
+  loading: boolean;
+  loaded: boolean;
+  error: string | null;
+  truncated: boolean;
+}
+
+const DEFAULT_FLAT_FILES_STATE: FlatFilesState = {
+  entries: [],
+  loading: false,
+  loaded: false,
+  error: null,
+  truncated: false,
 };
 
 const WORKSPACE_EDITOR_STYLE = EditorView.theme({
@@ -548,6 +571,23 @@ function writeCodeWorkspaceTreeFontSize(size: number): void {
   }
 }
 
+function readCodeWorkspaceTreeViewMode(): TreeViewMode {
+  try {
+    const raw = window.localStorage.getItem(TREE_VIEW_MODE_KEY);
+    return raw === "compact" || raw === "flat" || raw === "tree" ? raw : "tree";
+  } catch {
+    return "tree";
+  }
+}
+
+function writeCodeWorkspaceTreeViewMode(mode: TreeViewMode): void {
+  try {
+    window.localStorage.setItem(TREE_VIEW_MODE_KEY, mode);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 function emptyLspFileState(): LspFileState {
   return {
     status: null,
@@ -649,9 +689,12 @@ export function CodeWorkspaceTab({
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
   const [codeViewProfile, setCodeViewProfileState] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
+  const [treeViewMode, setTreeViewModeState] = useState<TreeViewMode>(() => readCodeWorkspaceTreeViewMode());
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
+  const [compactChains, setCompactChains] = useState<Record<string, { path: string; entries: WorkspaceEntry[]; loading: boolean; error: string | null }>>({});
+  const [flatFiles, setFlatFiles] = useState<Record<string, FlatFilesState>>({});
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => root.id)));
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => rootDirKey(root.id, ""))));
   const [treeFilter, setTreeFilter] = useState("");
@@ -680,6 +723,8 @@ export function CodeWorkspaceTab({
   const lspFilesRef = useRef(lspFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
+  const compactChainsRef = useRef(compactChains);
+  const flatFilesRef = useRef(flatFiles);
   const lspVersionRef = useRef<Record<string, number>>({});
   const revealNonceRef = useRef(0);
   const initialOpenedKeyRef = useRef<string | null>(null);
@@ -704,6 +749,14 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     looseFilesRef.current = looseFiles;
   }, [looseFiles]);
+
+  useEffect(() => {
+    compactChainsRef.current = compactChains;
+  }, [compactChains]);
+
+  useEffect(() => {
+    flatFilesRef.current = flatFiles;
+  }, [flatFiles]);
 
   useEffect(() => {
     openFilesRef.current = openFiles;
@@ -792,6 +845,12 @@ export function CodeWorkspaceTab({
     },
     [setTreeFontSize],
   );
+
+  const setTreeViewMode = useCallback((mode: TreeViewMode) => {
+    setTreeViewModeState(mode);
+    writeCodeWorkspaceTreeViewMode(mode);
+    setStatusMessage(`File tree view: ${mode}`);
+  }, [setStatusMessage]);
 
   const zoomTargetForNode = useCallback((target: EventTarget | null): "tree" | "editor" => {
     const node = target instanceof Node ? target : null;
@@ -1115,11 +1174,125 @@ export function CodeWorkspaceTab({
     [findRoot, setStatusMessage],
   );
 
+  const loadCompactChain = useCallback(
+    async (rootId: string, path: string) => {
+      const root = findRoot(rootId);
+      if (!root) return;
+      const key = rootDirKey(rootId, path);
+      const cached = compactChainsRef.current[key];
+      if (cached?.loading || (cached && !cached.error)) return;
+      setCompactChains((current) => ({
+        ...current,
+        [key]: {
+          path,
+          entries: current[key]?.entries ?? [],
+          loading: true,
+          error: null,
+        },
+      }));
+      try {
+        const chain = await workspaceCompactChain(root.path, path, 16);
+        setCompactChains((current) => ({
+          ...current,
+          [key]: {
+            path: chain.path,
+            entries: chain.entries,
+            loading: false,
+            error: null,
+          },
+        }));
+        setDirectories((current) => ({
+          ...current,
+          [rootDirKey(rootId, chain.path)]: {
+            entries: chain.entries,
+            loaded: true,
+            loading: false,
+            error: null,
+          },
+        }));
+      } catch (err) {
+        const message = errorMessage(err);
+        setCompactChains((current) => ({
+          ...current,
+          [key]: {
+            path,
+            entries: [],
+            loading: false,
+            error: message,
+          },
+        }));
+      }
+    },
+    [findRoot],
+  );
+
+  const loadFlatFiles = useCallback(
+    async (rootId: string, force = false) => {
+      const root = findRoot(rootId);
+      if (!root) return;
+      const cached = flatFilesRef.current[rootId];
+      if (!force && (cached?.loading || cached?.loaded)) return;
+      setFlatFiles((current) => ({
+        ...current,
+        [rootId]: {
+          ...(current[rootId] ?? DEFAULT_FLAT_FILES_STATE),
+          loading: true,
+          error: null,
+        },
+      }));
+      try {
+        const entries = await workspaceListFilesRecursive(root.path, "", FLAT_VIEW_MAX_DEPTH, FLAT_VIEW_MAX_FILES);
+        setFlatFiles((current) => ({
+          ...current,
+          [rootId]: {
+            entries,
+            loading: false,
+            loaded: true,
+            error: null,
+            truncated: entries.length >= FLAT_VIEW_MAX_FILES,
+          },
+        }));
+      } catch (err) {
+        const message = errorMessage(err);
+        setFlatFiles((current) => ({
+          ...current,
+          [rootId]: {
+            entries: current[rootId]?.entries ?? [],
+            loading: false,
+            loaded: true,
+            error: message,
+            truncated: false,
+          },
+        }));
+        setStatusMessage(message);
+      }
+    },
+    [findRoot, setStatusMessage],
+  );
+
   useEffect(() => {
     roots.forEach((root) => {
       if (expandedRoots.has(root.id)) void loadDir(root.id, "");
     });
   }, [expandedRoots, loadDir, roots]);
+
+  useEffect(() => {
+    if (treeViewMode !== "compact") return;
+    for (const [key, state] of Object.entries(directories)) {
+      if (!state.loaded || state.error) continue;
+      const [rootId] = key.split(":", 1);
+      for (const entry of state.entries) {
+        if (entry.fileType === "dir" && !shouldHideEntry(entry)) {
+          void loadCompactChain(rootId, entry.path);
+        }
+      }
+    }
+  }, [directories, loadCompactChain, treeViewMode]);
+
+  useEffect(() => {
+    if (treeViewMode !== "flat") return;
+    roots.forEach((root) => void loadFlatFiles(root.id));
+  }, [loadFlatFiles, roots, treeViewMode]);
 
   const openFile = useCallback(
     async (ref: CodeWorkspaceFileRef) => {
@@ -1219,10 +1392,13 @@ export function CodeWorkspaceTab({
 
   const refreshTree = useCallback(() => {
     setDirectories({});
+    setCompactChains({});
+    setFlatFiles({});
     rootsRef.current.forEach((root) => {
       if (expandedRoots.has(root.id)) void loadDir(root.id, "");
+      if (treeViewMode === "flat") void loadFlatFiles(root.id, true);
     });
-  }, [expandedRoots, loadDir]);
+  }, [expandedRoots, loadDir, loadFlatFiles, treeViewMode]);
 
   const toggleRoot = useCallback(
     (rootId: string) => {
@@ -1906,6 +2082,105 @@ export function CodeWorkspaceTab({
     return () => setTabCodeWorkspaceContext(tabId, null);
   }, [setTabCodeWorkspaceContext, tabId]);
 
+  function compactEntryName(entry: WorkspaceEntry, chain: { path: string } | undefined): string {
+    if (!chain || chain.path === entry.path) return entry.name;
+    const suffix = chain.path.startsWith(`${entry.path}/`) ? chain.path.slice(entry.path.length + 1) : "";
+    return suffix ? `${entry.name}/${suffix}` : entry.name;
+  }
+
+  function flatExtensionGroup(path: string): string {
+    const name = basename(path);
+    const dot = name.lastIndexOf(".");
+    if (dot <= 0 || dot === name.length - 1) return "No extension";
+    return name.slice(dot).toLowerCase();
+  }
+
+  function renderFlatEntries(root: CodeWorkspaceRootInfo): ReactNode {
+    const state = flatFiles[root.id] ?? DEFAULT_FLAT_FILES_STATE;
+    const filter = treeFilter.trim().toLowerCase();
+    if (state.loading && !state.loaded) {
+      return (
+        <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-4 text-[var(--taomni-code-muted)]">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>Loading files</span>
+        </div>
+      );
+    }
+    if (state.error) {
+      return (
+        <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-500">
+          {state.error}
+        </div>
+      );
+    }
+    const entries = state.entries.filter((entry) => {
+      if (shouldHideEntry(entry)) return false;
+      if (!filter) return true;
+      return entry.name.toLowerCase().includes(filter) || entry.path.toLowerCase().includes(filter);
+    });
+    if (entries.length === 0) {
+      return (
+        <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
+          {state.loaded ? "No files" : "Not loaded"}
+        </div>
+      );
+    }
+    const groups = new Map<string, WorkspaceEntry[]>();
+    for (const entry of entries) {
+      const group = flatExtensionGroup(entry.path);
+      groups.set(group, [...(groups.get(group) ?? []), entry]);
+    }
+    return (
+      <>
+        {state.truncated && (
+          <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">
+            Showing first {FLAT_VIEW_MAX_FILES} files
+          </div>
+        )}
+        {[...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([group, groupEntries]) => (
+          <Fragment key={`${root.id}:flat:${group}`}>
+            <div
+              className="h-6 flex items-center gap-1.5 px-4 font-semibold text-[var(--taomni-code-muted)]"
+              style={{ fontSize: "var(--taomni-code-tree-small-font-size)" }}
+            >
+              <File className="w-3.5 h-3.5" />
+              <span>{group}</span>
+              <span className="ml-auto text-[10px] font-normal">{groupEntries.length}</span>
+            </div>
+            {groupEntries.map((entry) => {
+              const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: entry.path };
+              const key = fileKey(ref);
+              const active = activeKey === key;
+              const isSelected = selected?.kind === "file" && isRootRef(selected.ref, root.id, entry.path);
+              const open = openFiles[key];
+              return (
+                <button
+                  key={`${root.id}:flat:${entry.path}`}
+                  type="button"
+                  data-testid="code-workspace-flat-file"
+                  data-root-id={root.id}
+                  data-path={entry.path}
+                  data-active={active || undefined}
+                  data-selected={isSelected || undefined}
+                  className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
+                  title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
+                  onClick={() => {
+                    setSelected({ kind: "file", ref });
+                    void openFile(ref);
+                  }}
+                >
+                  <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                  <span className="truncate">{entry.path}</span>
+                  {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
+                </button>
+              );
+            })}
+          </Fragment>
+        ))}
+      </>
+    );
+  }
+
   function renderEntries(root: CodeWorkspaceRootInfo, path: string, depth: number): ReactNode {
     const state = directories[rootDirKey(root.id, path)] ?? DEFAULT_DIR_STATE;
     const filter = treeFilter.trim().toLowerCase();
@@ -1938,26 +2213,29 @@ export function CodeWorkspaceTab({
     }
     return entries.map((entry) => {
       const isDir = entry.fileType === "dir";
-      const dirKey = rootDirKey(root.id, entry.path);
+      const chain = treeViewMode === "compact" && !filter ? compactChains[rootDirKey(root.id, entry.path)] : undefined;
+      const displayPath = isDir && chain?.path ? chain.path : entry.path;
+      const displayName = isDir ? compactEntryName(entry, chain) : entry.name;
+      const dirKey = rootDirKey(root.id, displayPath);
       const isExpanded = expandedDirs.has(dirKey);
       const rowStyle = { paddingLeft: `${10 + depth * 14}px` };
       if (isDir) {
         const childState = directories[dirKey];
-        const isSelected = selected?.kind === "dir" && selected.rootId === root.id && selected.path === entry.path;
+        const isSelected = selected?.kind === "dir" && selected.rootId === root.id && selected.path === displayPath;
         return (
           <Fragment key={`${root.id}:${entry.path}`}>
             <button
               type="button"
               data-testid="code-workspace-tree-dir"
               data-root-id={root.id}
-              data-path={entry.path}
+              data-path={displayPath}
               data-selected={isSelected || undefined}
               className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
               style={rowStyle}
-              title={`${root.name} / ${entry.path}`}
+              title={`${root.name} / ${displayPath}`}
               onClick={() => {
-                setSelected({ kind: "dir", rootId: root.id, path: entry.path });
-                toggleDir(root.id, entry.path);
+                setSelected({ kind: "dir", rootId: root.id, path: displayPath });
+                toggleDir(root.id, displayPath);
               }}
             >
               {isExpanded ? (
@@ -1966,10 +2244,10 @@ export function CodeWorkspaceTab({
                 <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
               )}
               <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
-              <span className="truncate">{entry.name}</span>
-              {childState?.loading && <Loader2 className="ml-auto w-3 h-3 animate-spin" />}
+              <span className="truncate">{displayName}</span>
+              {(childState?.loading || chain?.loading) && <Loader2 className="ml-auto w-3 h-3 animate-spin" />}
             </button>
-            {isExpanded && renderEntries(root, entry.path, depth + 1)}
+            {isExpanded && renderEntries(root, displayPath, depth + 1)}
           </Fragment>
         );
       }
@@ -2093,6 +2371,29 @@ export function CodeWorkspaceTab({
               />
               <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
                 <IconButton
+                  label="Tree view"
+                  testId="code-workspace-view-tree"
+                  icon={<ListTree className="w-3.5 h-3.5" />}
+                  active={treeViewMode === "tree"}
+                  onClick={() => setTreeViewMode("tree")}
+                />
+                <IconButton
+                  label="Compact tree view"
+                  testId="code-workspace-view-compact"
+                  icon={<Columns2 className="w-3.5 h-3.5" />}
+                  active={treeViewMode === "compact"}
+                  onClick={() => setTreeViewMode("compact")}
+                />
+                <IconButton
+                  label="Flat file view"
+                  testId="code-workspace-view-flat"
+                  icon={<List className="w-3.5 h-3.5" />}
+                  active={treeViewMode === "flat"}
+                  onClick={() => setTreeViewMode("flat")}
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+                <IconButton
                   label="Tree zoom out"
                   testId="code-workspace-tree-zoom-out"
                   icon={<ZoomOut className="w-3.5 h-3.5" />}
@@ -2157,7 +2458,11 @@ export function CodeWorkspaceTab({
                       <span className="truncate">{root.name}</span>
                       <span className="ml-auto shrink-0 text-[10px] font-normal text-[var(--taomni-code-muted)]">{root.kind}</span>
                     </button>
-                    {expanded && renderEntries(root, "", 1)}
+                    {expanded && (
+                      treeViewMode === "flat"
+                        ? renderFlatEntries(root)
+                        : renderEntries(root, "", 1)
+                    )}
                   </Fragment>
                 );
               })}
@@ -2984,12 +3289,14 @@ function IconButton({
   icon,
   disabled,
   testId,
+  active,
   onClick,
 }: {
   label: string;
   icon: ReactNode;
   disabled?: boolean;
   testId?: string;
+  active?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -2997,9 +3304,11 @@ function IconButton({
       type="button"
       title={label}
       aria-label={label}
+      aria-pressed={active}
       data-testid={testId}
+      data-active={active || undefined}
       disabled={disabled}
-      className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40 disabled:cursor-default"
+      className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-accent)] disabled:opacity-40 disabled:cursor-default"
       onClick={onClick}
     >
       {icon}

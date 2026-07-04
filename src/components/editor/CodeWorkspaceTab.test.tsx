@@ -13,6 +13,8 @@ import { CodeWorkspaceTab } from "./CodeWorkspaceTab";
 
 const workspaceMocks = vi.hoisted(() => ({
   workspaceListDir: vi.fn(),
+  workspaceCompactChain: vi.fn(),
+  workspaceListFilesRecursive: vi.fn(),
   workspaceReadFile: vi.fn(),
   workspaceReadLooseFile: vi.fn(),
   workspaceWriteFile: vi.fn(),
@@ -144,6 +146,8 @@ describe("CodeWorkspaceTab", () => {
       codeWorkspaceByTab: {},
     });
     workspaceMocks.workspaceListDir.mockReset();
+    workspaceMocks.workspaceCompactChain.mockReset();
+    workspaceMocks.workspaceListFilesRecursive.mockReset();
     workspaceMocks.workspaceReadFile.mockReset();
     workspaceMocks.workspaceReadLooseFile.mockReset();
     workspaceMocks.workspaceWriteFile.mockReset();
@@ -175,6 +179,8 @@ describe("CodeWorkspaceTab", () => {
       diagnostics: [],
     });
     workspaceMocks.workspaceListDir.mockResolvedValue([]);
+    workspaceMocks.workspaceCompactChain.mockResolvedValue({ path: "", entries: [] });
+    workspaceMocks.workspaceListFilesRecursive.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -339,6 +345,75 @@ describe("CodeWorkspaceTab", () => {
 
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-out"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
+  });
+
+  it("persists and renders the flat file view with extension groups", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-flat",
+      name: "Flat",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceListFilesRecursive.mockResolvedValue([
+      entry("README.md", "README.md"),
+      entry("App.tsx", "src/App.tsx"),
+    ]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.tsx", "export function App() {}"));
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Flat")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-view-flat"));
+
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeViewMode.v1")).toBe("flat");
+    expect(await screen.findByText(".md")).toBeInTheDocument();
+    expect(await screen.findByText(".tsx")).toBeInTheDocument();
+    expect(screen.getAllByTestId("code-workspace-flat-file")).toHaveLength(2);
+
+    fireEvent.click(screen.getByText("src/App.tsx"));
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
+    });
+  });
+
+  it("renders compact directory chains and expands the endpoint", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-compact",
+      name: "Compact",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceCompactChain.mockResolvedValue({
+      path: "src/main/java/com/example",
+      entries: [entry("UserService.java", "src/main/java/com/example/UserService.java")],
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file(
+      "src/main/java/com/example/UserService.java",
+      "class UserService {}",
+    ));
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Compact")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-view-compact"));
+
+    const compactDir = await screen.findByText("src/main/java/com/example");
+    fireEvent.click(compactDir);
+    expect(await screen.findByText("UserService.java")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("UserService.java"));
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith(
+        "/repo/app",
+        "src/main/java/com/example/UserService.java",
+      );
+    });
   });
 
   it("has no theme picker and follows the shared Code View Appearance profile", async () => {
