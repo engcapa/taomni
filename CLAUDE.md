@@ -72,7 +72,7 @@ Frontend calls Tauri commands (Rust `#[tauri::command]`) via `invoke()`. Termina
 - ES2022 build target in Vite (Tauri 2 targets modern WebView)
 - Database: SQLite named `taomni.db` in the platform app-data directory (resolved from the `com.taomni.app` identifier)
 - Release: push a `v<version>` git tag (must equal `v` + `package.json` version) to trigger GitHub Actions cross-platform builds; manual `Release Bundle` workflow runs without a tag produce artifacts only
-- Formatting: do not run project-wide `cargo fmt` (it churns large numbers of unrelated files). Only format the code you changed this session (e.g. apply rustfmt to the changed lines/files), keeping the diff minimal
+- Formatting: Rust code uses edition 2024. Do not pin the Rust toolchain unless explicitly requested. Do not run project-wide `cargo fmt` (it churns large numbers of unrelated files). If Rust formatting is necessary, run `rustfmt --edition 2024 <changed .rs files>` only on files you edited, keeping the diff minimal
 
 ## Testing
 
