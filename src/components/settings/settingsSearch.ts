@@ -48,6 +48,16 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "terminal-defaults",
+    titleKeys: ["settings.terminalDefaultsTitle", "terminalAppearance.behaviorHeading"],
+    terms: [
+      "terminal", "ssh terminal", "local terminal", "terminal defaults", "terminal behavior", "terminal font", "terminal theme",
+      "cursor", "scrollback", "right click", "copy on select", "bracketed paste", "osc 52",
+      "终端", "ssh 终端", "本地终端", "终端默认", "终端行为", "终端字体", "终端主题",
+      "光标", "回滚", "右键", "选中即复制", "括号粘贴",
+    ],
+  },
+  {
     id: "vault",
     titleKeys: ["vaultSettings.sectionTitle"],
     terms: ["vault", "password", "secret", "master password", "credentials", "credential vault", "encryption", "密钥库", "保险库", "密码", "凭据", "主密码", "加密"],

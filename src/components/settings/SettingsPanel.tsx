@@ -1,9 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Type, Undo, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Terminal, Type, Undo, X } from "lucide-react";
 import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
-import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
+import {
+  DEFAULT_TERMINAL_DEFAULT_PROFILE,
+  DEFAULT_TERMINAL_PROFILE,
+  loadTerminalDefaultProfile,
+  saveTerminalDefaultProfile,
+  type TerminalProfile,
+} from "../../lib/terminalProfile";
 import {
   DEFAULT_CODE_VIEW_PROFILE,
   applyCodeViewProfile,
@@ -32,6 +38,7 @@ import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
 import { useAiStore } from "../../stores/aiStore";
 import { matchingIds } from "./settingsSearch";
 import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
+import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -97,6 +104,9 @@ function SettingsAnchor({
 
 export function SettingsPanel() {
   const [codeViewProfile, setCodeViewProfile] = useState<CodeViewProfile>(() => loadCodeViewProfile());
+  const [terminalDefaultProfile, setTerminalDefaultProfile] = useState<TerminalProfile>(
+    () => loadTerminalDefaultProfile(),
+  );
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
@@ -175,6 +185,16 @@ export function SettingsPanel() {
   useEffect(() => {
     saveCodeViewProfile(codeViewProfile);
   }, [codeViewProfile]);
+
+  const handleTerminalDefaultProfileChange = useCallback((profile: TerminalProfile) => {
+    setTerminalDefaultProfile(profile);
+    saveTerminalDefaultProfile(profile);
+  }, []);
+
+  const resetTerminalDefaultProfile = useCallback(() => {
+    setTerminalDefaultProfile(DEFAULT_TERMINAL_DEFAULT_PROFILE);
+    saveTerminalDefaultProfile(DEFAULT_TERMINAL_DEFAULT_PROFILE);
+  }, []);
 
   return (
     <SettingsSearchContext.Provider value={ctxValue}>
@@ -419,6 +439,34 @@ export function SettingsPanel() {
               profile={codeViewProfile}
               terminalProfile={DEFAULT_TERMINAL_PROFILE}
               onProfileChange={setCodeViewProfile}
+            />
+          </SettingsAnchor>
+
+          <SettingsAnchor id="terminal-defaults">
+            <div className="mt-6 mb-4 flex items-center gap-3">
+              <Terminal className="w-4 h-4 text-[var(--taomni-accent)]" />
+              <div>
+                <div className="text-[18px] font-semibold">{t("settings.terminalDefaultsTitle")}</div>
+                <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                  {t("settings.terminalDefaultsSubtitle")}
+                </div>
+              </div>
+              <button
+                data-testid="settings-reset-terminal-default-profile"
+                className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
+                type="button"
+                onClick={resetTerminalDefaultProfile}
+                title={t("settings.resetTerminalDefaults")}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {t("settings.reset")}
+              </button>
+            </div>
+            <TerminalAppearanceSettings
+              profile={terminalDefaultProfile}
+              onProfileChange={handleTerminalDefaultProfileChange}
+              showCustomColors
+              allowSystemTheme
             />
           </SettingsAnchor>
 

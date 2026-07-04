@@ -1040,7 +1040,7 @@ controls:
 - 实时预览反映光标样式与闪烁状态
 
 ### 5.4 配置持久化 ✅
-- 临时本地终端默认配置：`localStorage` 的 `taomni.localTerminalProfile.v1`（用于 `+` 号新开本地终端）
+- 终端默认配置：`localStorage` 的 `taomni.terminalDefaultProfile.v1`（用于新建 SSH / 本地终端；旧 `taomni.localTerminalProfile.v1` 仅作兼容读取）
 - 保存会话 override：`session.options_json.terminalProfile`
 - 活跃终端可在不重启的情况下应用主题/字体/字号/连字变化
 

@@ -268,6 +268,7 @@ const sshInfo = {
 
 describe("TerminalPanel focus behavior", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
     terminalMocks.state.onResizeHandler = null;
@@ -1551,6 +1552,27 @@ describe("TerminalPanel focus behavior", () => {
     }));
   });
 
+  it("offers code view themes in the terminal appearance context menu", async () => {
+    const onProfileChange = vi.fn();
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{ ...DEFAULT_TERMINAL_PROFILE, theme: "classic" }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.mouseEnter(await screen.findByTestId("context-menu-item-appearance"));
+    fireEvent.click(await screen.findByTestId("terminal-context-theme-option-dracula"));
+
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "dracula" }));
+  });
+
   it("does not render the Git rail button inside the terminal pane", async () => {
     const onOpen = vi.fn();
     const onSessionReady = vi.fn();
@@ -1593,7 +1615,7 @@ describe("TerminalPanel focus behavior", () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("saves the current theme as the default for new local terminals", async () => {
+  it("saves the current theme as the default for new terminals", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1614,11 +1636,11 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
 
-    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
     expect(stored.theme).toBe("kanagawa-wave");
   });
 
-  it("saves appearance changes made in the open context menu as the local terminal default", async () => {
+  it("saves appearance changes made in the open context menu as the terminal default", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1643,12 +1665,12 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.click(screen.getByLabelText("Increase terminal font size"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
 
-    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
     expect(stored.theme).toBe("kanagawa-wave");
     expect(stored.fontSize).toBe(15);
   });
 
-  it("does not auto-save local terminal appearance changes for future local terminals", async () => {
+  it("does not auto-save terminal appearance changes for future terminals", async () => {
     window.localStorage.clear();
     const onSessionReady = vi.fn();
 
@@ -1674,10 +1696,10 @@ describe("TerminalPanel focus behavior", () => {
 
     fireEvent.change(screen.getByTestId("terminal-context-font-size"), { target: { value: "18" } });
 
-    expect(window.localStorage.getItem("taomni.localTerminalProfile.v1")).toBeNull();
+    expect(window.localStorage.getItem("taomni.terminalDefaultProfile.v1")).toBeNull();
   });
 
-  it("keeps follow-system as a savable local terminal default theme", async () => {
+  it("keeps follow-system as a savable terminal default theme", async () => {
     const onSessionReady = vi.fn();
 
     render(
@@ -1698,8 +1720,79 @@ describe("TerminalPanel focus behavior", () => {
     fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
     fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-theme"));
 
-    const stored = JSON.parse(window.localStorage.getItem("taomni.localTerminalProfile.v1") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
     expect(stored.theme).toBe(SYSTEM_TERMINAL_THEME);
+  });
+
+  it("saves all current terminal settings as the terminal default after confirmation", async () => {
+    const onSessionReady = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        onSessionReady={onSessionReady}
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          theme: "dracula",
+          readOnly: true,
+          showScrollbar: false,
+          copyOnSelect: true,
+          scrollback: 4321,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-set-local-default-profile"));
+    fireEvent.click(await screen.findByRole("button", { name: "Save defaults" }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem("taomni.terminalDefaultProfile.v1") ?? "{}");
+      expect(stored).toMatchObject({
+        theme: "dracula",
+        readOnly: true,
+        showScrollbar: false,
+        copyOnSelect: true,
+        scrollback: 4321,
+      });
+    });
+  });
+
+  it("opens the current terminal settings dialog and applies behavior changes", async () => {
+    const onProfileChange = vi.fn();
+
+    render(
+      <TerminalPanel
+        visible
+        terminalProfile={{
+          ...DEFAULT_TERMINAL_PROFILE,
+          readOnly: false,
+          scrollback: 10000,
+        }}
+        onTerminalProfileChange={onProfileChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(terminalMocks.terminalCtor).toHaveBeenCalled();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-change-settings"));
+
+    expect(await screen.findByTestId("terminal-current-settings-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Read-only terminal"));
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({ readOnly: true }));
+
+    fireEvent.change(screen.getByLabelText("Scrollback lines"), { target: { value: "2222" } });
+    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      readOnly: true,
+      scrollback: 2222,
+    }));
   });
 
   it("opens Git from the terminal shortcut", async () => {

@@ -407,6 +407,24 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(JSON.parse(savedConfig.options_json).terminalProfile.fontFamily).toContain("JetBrains Mono");
   });
 
+  it("defaults new SSH sessions to the global terminal default profile", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("taomni.terminalDefaultProfile.v1", JSON.stringify({
+      fontSize: 17,
+      theme: "kanagawa-wave",
+    }));
+    renderEditor();
+
+    await user.type(screen.getByLabelText("Remote host"), "default-profile.example.com");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    expect(JSON.parse(savedConfig.options_json).terminalProfile).toMatchObject({
+      fontSize: 17,
+      theme: "kanagawa-wave",
+    });
+  });
+
   it("persists WSL launch options through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "WSL" });

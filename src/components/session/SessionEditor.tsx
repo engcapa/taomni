@@ -69,11 +69,10 @@ import {
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import {
-  DEFAULT_TERMINAL_PROFILE,
   DEFAULT_MAIL_TERMINAL_PROFILE,
   SYSTEM_TERMINAL_THEME,
   getSessionTerminalProfile,
-  loadLocalTerminalDefaultProfile,
+  loadTerminalDefaultProfile,
   parseSessionOptions,
   type TerminalProfile,
 } from "../../lib/terminalProfile";
@@ -554,8 +553,7 @@ function initialTerminalProfileForProto(optionsJson: string | null | undefined, 
 
 function defaultTerminalProfileForProto(proto: Proto): TerminalProfile {
   if (proto === "Mail") return DEFAULT_MAIL_TERMINAL_PROFILE;
-  if (proto === "Shell" || proto === "WSL") return loadLocalTerminalDefaultProfile();
-  return DEFAULT_TERMINAL_PROFILE;
+  return loadTerminalDefaultProfile();
 }
 
 /** Proxy selector + (HTTP/SOCKS5) proxy fields or the SSH jump-host section.
