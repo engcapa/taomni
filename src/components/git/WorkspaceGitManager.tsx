@@ -39,7 +39,11 @@ import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { GitPanel } from "./GitPanel";
 import { WorkspaceChangesView } from "./WorkspaceChangesView";
-import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
+import {
+  retainWorkspaceChangeKeys,
+  workspaceChangeKey,
+  workspacePathsByRepoFromKeys,
+} from "./workspaceGitKeys";
 
 interface WorkspaceGitManagerProps {
   workspaceName?: string | null;
@@ -156,8 +160,8 @@ export function WorkspaceGitManager({
   }, [treeMode]);
 
   useEffect(() => {
-    setUncheckedChangeKeys((current) => retainKeys(current, validChangeKeys));
-    setSelectedChangeKeys((current) => retainKeys(current, validChangeKeys));
+    setUncheckedChangeKeys((current) => retainWorkspaceChangeKeys(current, validChangeKeys));
+    setSelectedChangeKeys((current) => retainWorkspaceChangeKeys(current, validChangeKeys));
     setFocusedChangeKey((current) => {
       if (current && validChangeKeys.has(current)) return current;
       return allChangeKeys[0] ?? null;
@@ -391,7 +395,7 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, runChangeAction, snapshots]);
 
   const stageSelectedChanges = useCallback(() => {
-    const pathsByRepo = pathsByRepoFromKeys(selectedOperationKeys);
+    const pathsByRepo = workspacePathsByRepoFromKeys(selectedOperationKeys);
     const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
     void runChangeAction("Stage", targets, async (root) => {
       const paths = pathsByRepo[root.repoRoot] ?? [];
@@ -402,7 +406,7 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
 
   const unstageSelectedChanges = useCallback(() => {
-    const pathsByRepo = pathsByRepoFromKeys(selectedOperationKeys);
+    const pathsByRepo = workspacePathsByRepoFromKeys(selectedOperationKeys);
     const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
     void runChangeAction("Unstage", targets, async (root) => {
       const paths = pathsByRepo[root.repoRoot] ?? [];
@@ -413,7 +417,7 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
 
   const discardSelectedChanges = useCallback(() => {
-    const pathsByRepo = pathsByRepoFromKeys(selectedOperationKeys);
+    const pathsByRepo = workspacePathsByRepoFromKeys(selectedOperationKeys);
     const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
     const count = Object.values(pathsByRepo).reduce((total, paths) => total + paths.length, 0);
     if (count === 0) return;
@@ -812,25 +816,6 @@ function pullBranchForRemote(snapshot: GitSnapshot, remoteName: string): string 
     return snapshot.upstream.slice(prefix.length) || snapshot.currentBranch;
   }
   return snapshot.currentBranch;
-}
-
-function retainKeys(current: Set<string>, valid: Set<string>): Set<string> {
-  const next = new Set([...current].filter((key) => valid.has(key)));
-  if (next.size !== current.size) return next;
-  for (const key of next) {
-    if (!current.has(key)) return next;
-  }
-  return current;
-}
-
-function pathsByRepoFromKeys(keys: string[]): Record<string, string[]> {
-  const byRepo: Record<string, string[]> = {};
-  for (const key of keys) {
-    const parsed = parseWorkspaceChangeKey(key);
-    if (!parsed) continue;
-    (byRepo[parsed.repoRoot] ??= []).push(parsed.path);
-  }
-  return byRepo;
 }
 
 function errorMessage(err: unknown): string {

@@ -69,6 +69,17 @@ function snapshot(repoRoot: string, changes: GitSnapshot["changes"] = []): GitSn
   };
 }
 
+function change(path: string): GitSnapshot["changes"][number] {
+  return {
+    path,
+    oldPath: null,
+    status: "modified",
+    staged: false,
+    unstaged: true,
+    conflict: false,
+  };
+}
+
 describe("WorkspaceGitManager", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -161,6 +172,43 @@ describe("WorkspaceGitManager", () => {
         "batch commit",
         false,
         ["src/App.tsx"],
+      );
+    });
+    expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps workspace change selections isolated when repositories contain the same file path", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      repoRoot === "/repo/app"
+        ? snapshot("/repo/app", [change("README.md")])
+        : snapshot("/repo/service", [change("README.md")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getAllByText("README.md")).toHaveLength(2));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select changes in app" }));
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "commit service only" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => {
+      expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+        "/repo/service",
+        "commit service only",
+        false,
+        ["README.md"],
       );
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);

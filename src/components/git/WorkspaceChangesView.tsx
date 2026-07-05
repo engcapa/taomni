@@ -215,6 +215,7 @@ function RepoChangeGroup({
         <TriCheckbox
           state={checkState(checkedCount, changes.length)}
           disabled={changes.length === 0}
+          ariaLabel={`Select changes in ${root.name}`}
           onChange={(value) => onToggleRepoChecked(root.repoRoot, value)}
         />
         <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
@@ -254,10 +255,12 @@ function RepoChangeGroup({
 function TriCheckbox({
   state,
   disabled,
+  ariaLabel,
   onChange,
 }: {
   state: TriState;
   disabled?: boolean;
+  ariaLabel?: string;
   onChange: (value: boolean) => void;
 }) {
   const ref = useRef<HTMLInputElement | null>(null);
@@ -271,6 +274,7 @@ function TriCheckbox({
       className="shrink-0 accent-[var(--taomni-accent)]"
       checked={state === "all"}
       disabled={disabled}
+      aria-label={ariaLabel}
       onChange={(event) => onChange(event.target.checked)}
     />
   );
