@@ -13,6 +13,9 @@ import { CodeWorkspaceTab } from "./CodeWorkspaceTab";
 
 const workspaceMocks = vi.hoisted(() => ({
   workspaceListDir: vi.fn(),
+  workspaceCompactChain: vi.fn(),
+  workspaceListFilesRecursive: vi.fn(),
+  workspaceDetectGitRoots: vi.fn(),
   workspaceReadFile: vi.fn(),
   workspaceReadLooseFile: vi.fn(),
   workspaceWriteFile: vi.fn(),
@@ -40,14 +43,39 @@ const ipcMocks = vi.hoisted(() => ({
   selectFolderPath: vi.fn(),
 }));
 
+const gitMocks = vi.hoisted(() => ({
+  gitSnapshot: vi.fn(),
+  gitChangeLabel: vi.fn((change: { conflict?: boolean; status: string }) => (
+    change.conflict ? "Conflicted" : change.status[0]?.toUpperCase() + change.status.slice(1)
+  )),
+}));
+
 vi.mock("../../lib/editor/workspace", () => workspaceMocks);
 
 vi.mock("../../lib/editor/lsp", () => lspMocks);
 
 vi.mock("../../lib/ipc", () => ipcMocks);
 
+vi.mock("../../lib/git", () => gitMocks);
+
 vi.mock("../git/diffLanguage", () => ({
   languageForPath: vi.fn(async () => null),
+}));
+
+vi.mock("./WorkspaceGitContainer", () => ({
+  WorkspaceGitContainer: ({
+    gitRoots,
+    activeRootId,
+  }: {
+    gitRoots: Array<{ repoRoot: string; name: string }>;
+    activeRootId: string | null;
+  }) => (
+    <div data-testid="workspace-git-container" data-active-root-id={activeRootId ?? ""}>
+      {gitRoots.map((root) => (
+        <span key={root.repoRoot}>{root.name}</span>
+      ))}
+    </div>
+  ),
 }));
 
 function file(
@@ -144,6 +172,9 @@ describe("CodeWorkspaceTab", () => {
       codeWorkspaceByTab: {},
     });
     workspaceMocks.workspaceListDir.mockReset();
+    workspaceMocks.workspaceCompactChain.mockReset();
+    workspaceMocks.workspaceListFilesRecursive.mockReset();
+    workspaceMocks.workspaceDetectGitRoots.mockReset();
     workspaceMocks.workspaceReadFile.mockReset();
     workspaceMocks.workspaceReadLooseFile.mockReset();
     workspaceMocks.workspaceWriteFile.mockReset();
@@ -163,6 +194,8 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspReferences.mockReset();
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
+    gitMocks.gitSnapshot.mockReset();
+    gitMocks.gitChangeLabel.mockClear();
     vi.mocked(mermaid.initialize).mockClear();
     vi.mocked(mermaid.render).mockClear();
     lspMocks.lspDetectServers.mockResolvedValue([]);
@@ -175,6 +208,34 @@ describe("CodeWorkspaceTab", () => {
       diagnostics: [],
     });
     workspaceMocks.workspaceListDir.mockResolvedValue([]);
+    workspaceMocks.workspaceCompactChain.mockResolvedValue({ path: "", entries: [] });
+    workspaceMocks.workspaceListFilesRecursive.mockResolvedValue([]);
+    workspaceMocks.workspaceDetectGitRoots.mockResolvedValue([]);
+    gitMocks.gitSnapshot.mockResolvedValue({
+      repoRoot: "/repo/app",
+      currentBranch: "main",
+      headOid: null,
+      detached: false,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      changes: [],
+      remotes: [],
+      branches: [],
+      stashes: [],
+      tags: [],
+      settings: {
+        userName: null,
+        userEmail: null,
+        httpProxy: null,
+        httpsProxy: null,
+        pullRebase: null,
+        pushDefault: null,
+        coreAutocrlf: null,
+        coreFilemode: null,
+        commitGpgsign: null,
+      },
+    });
   });
 
   afterEach(() => {
@@ -339,6 +400,150 @@ describe("CodeWorkspaceTab", () => {
 
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-out"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
+  });
+
+  it("persists and renders the flat file view with extension groups", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-flat",
+      name: "Flat",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceListFilesRecursive.mockResolvedValue([
+      entry("README.md", "README.md"),
+      entry("App.tsx", "src/App.tsx"),
+    ]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.tsx", "export function App() {}"));
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Flat")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-view-flat"));
+
+    expect(window.localStorage.getItem("taomni.codeWorkspace.treeViewMode.v1")).toBe("flat");
+    expect(await screen.findByText(".md")).toBeInTheDocument();
+    expect(await screen.findByText(".tsx")).toBeInTheDocument();
+    expect(screen.getAllByTestId("code-workspace-flat-file")).toHaveLength(2);
+
+    fireEvent.click(screen.getByText("src/App.tsx"));
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
+    });
+  });
+
+  it("renders compact directory chains and expands the endpoint", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-compact",
+      name: "Compact",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceCompactChain.mockResolvedValue({
+      path: "src/main/java/com/example",
+      entries: [entry("UserService.java", "src/main/java/com/example/UserService.java")],
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file(
+      "src/main/java/com/example/UserService.java",
+      "class UserService {}",
+    ));
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Compact")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-view-compact"));
+
+    const compactDir = await screen.findByText("src/main/java/com/example");
+    fireEvent.click(compactDir);
+    expect(await screen.findByText("UserService.java")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("UserService.java"));
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith(
+        "/repo/app",
+        "src/main/java/com/example/UserService.java",
+      );
+    });
+  });
+
+  it("detects git roots, decorates file changes, and opens the embedded git panel", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-git",
+      name: "Git",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/App.tsx" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("App.tsx", "src/App.tsx")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.tsx", "export function App() {}"));
+    workspaceMocks.workspaceDetectGitRoots.mockResolvedValue([
+      {
+        id: "app",
+        name: "app",
+        path: "/repo/app",
+        repoRoot: "/repo/app",
+        rootIds: ["app"],
+      },
+    ]);
+    gitMocks.gitSnapshot.mockResolvedValue({
+      repoRoot: "/repo/app",
+      currentBranch: "main",
+      headOid: null,
+      detached: false,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      changes: [
+        {
+          path: "src/App.tsx",
+          oldPath: null,
+          status: "modified",
+          staged: false,
+          unstaged: true,
+          conflict: false,
+        },
+      ],
+      remotes: [],
+      branches: [],
+      stashes: [],
+      tags: [],
+      settings: {
+        userName: null,
+        userEmail: null,
+        httpProxy: null,
+        httpsProxy: null,
+        pullRebase: null,
+        pushDefault: null,
+        coreAutocrlf: null,
+        coreFilemode: null,
+        commitGpgsign: null,
+      },
+    });
+
+    renderWorkspace(workspace);
+
+    expect(await screen.findByText("Code · Git")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceDetectGitRoots).toHaveBeenCalledWith([
+        { id: "app", name: "app", path: "/repo/app" },
+      ]);
+      expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/repo/app");
+    });
+    expect(await screen.findByTestId("code-workspace-git-status")).toHaveTextContent("M");
+
+    await waitFor(() => expect(screen.getByTestId("code-workspace-git-panel-toggle")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("code-workspace-git-panel-toggle"));
+
+    const container = await screen.findByTestId("workspace-git-container");
+    expect(container).toHaveAttribute("data-active-root-id", "app");
+    expect(container).toHaveTextContent("app");
+    expect(window.localStorage.getItem("taomni.codeWorkspace.bottomPanelOpen.v1")).toBe("true");
   });
 
   it("has no theme picker and follows the shared Code View Appearance profile", async () => {

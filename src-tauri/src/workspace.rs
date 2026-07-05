@@ -1,10 +1,14 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 const DEFAULT_MAX_TEXT_BYTES: u64 = 5 * 1024 * 1024;
+const DEFAULT_RECURSIVE_MAX_DEPTH: usize = 25;
+const DEFAULT_RECURSIVE_MAX_FILES: usize = 2_000;
+const HARD_RECURSIVE_MAX_DEPTH: usize = 100;
+const HARD_RECURSIVE_MAX_FILES: usize = 10_000;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +31,31 @@ pub struct WorkspaceFile {
     pub hash: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceCompactChain {
+    pub path: String,
+    pub entries: Vec<WorkspaceEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceGitRootCandidate {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceGitRoot {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub repo_root: String,
+    pub root_ids: Vec<String>,
+}
+
 #[tauri::command]
 pub fn workspace_list_dir(
     repo_root: String,
@@ -39,25 +68,97 @@ pub fn workspace_list_dir(
         return Err(format!("Not a directory: {}", target.display()));
     }
 
-    let mut entries = Vec::new();
-    let read = fs::read_dir(&target).map_err(|e| format!("read {}: {e}", target.display()))?;
-    for item in read {
-        let Ok(item) = item else {
+    list_workspace_entries(&root, &target)
+}
+
+#[tauri::command]
+pub fn workspace_compact_chain(
+    repo_root: String,
+    path: String,
+    max_depth: Option<usize>,
+) -> Result<WorkspaceCompactChain, String> {
+    let root = canonical_repo_root(&repo_root)?;
+    let mut current = resolve_existing_path(&root, &path)?;
+    let limit = max_depth.unwrap_or(16).min(HARD_RECURSIVE_MAX_DEPTH);
+
+    for _ in 0..limit {
+        let entries = list_workspace_entries(&root, &current)?;
+        if entries.len() != 1 || entries[0].file_type != "dir" {
+            return Ok(WorkspaceCompactChain {
+                path: relative_path(&root, &current)?,
+                entries,
+            });
+        }
+        current = resolve_existing_path(&root, &entries[0].path)?;
+    }
+
+    Ok(WorkspaceCompactChain {
+        path: relative_path(&root, &current)?,
+        entries: list_workspace_entries(&root, &current)?,
+    })
+}
+
+#[tauri::command]
+pub fn workspace_list_files_recursive(
+    repo_root: String,
+    path: Option<String>,
+    max_depth: Option<usize>,
+    max_files: Option<usize>,
+) -> Result<Vec<WorkspaceEntry>, String> {
+    let root = canonical_repo_root(&repo_root)?;
+    let start = resolve_existing_path(&root, path.as_deref().unwrap_or(""))?;
+    let meta = fs::metadata(&start).map_err(|e| format!("stat {}: {e}", start.display()))?;
+    if !meta.is_dir() {
+        return Err(format!("Not a directory: {}", start.display()));
+    }
+
+    let max_depth = max_depth
+        .unwrap_or(DEFAULT_RECURSIVE_MAX_DEPTH)
+        .min(HARD_RECURSIVE_MAX_DEPTH);
+    let max_files = max_files
+        .unwrap_or(DEFAULT_RECURSIVE_MAX_FILES)
+        .min(HARD_RECURSIVE_MAX_FILES);
+    let mut files = Vec::new();
+    collect_workspace_files(&root, &start, 0, max_depth, max_files, &mut files)?;
+    files.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn workspace_detect_git_roots(
+    roots: Vec<WorkspaceGitRootCandidate>,
+) -> Result<Vec<WorkspaceGitRoot>, String> {
+    let mut repos: Vec<WorkspaceGitRoot> = Vec::new();
+    for root in roots {
+        let Ok(path) = fs::canonicalize(&root.path) else {
             continue;
         };
-        let path = item.path();
-        if let Ok(entry) = workspace_entry(&root, &path) {
-            entries.push(entry);
+        let Ok(meta) = fs::metadata(&path) else {
+            continue;
+        };
+        if !meta.is_dir() {
+            continue;
         }
+        let Some(repo_root) = find_git_repo_root(&path) else {
+            continue;
+        };
+        let repo_root = path_to_string(&repo_root);
+        if let Some(existing) = repos.iter_mut().find(|item| item.repo_root == repo_root) {
+            if !existing.root_ids.contains(&root.id) {
+                existing.root_ids.push(root.id);
+            }
+            continue;
+        }
+        repos.push(WorkspaceGitRoot {
+            id: root.id.clone(),
+            name: root.name,
+            path: path_to_string(&path),
+            repo_root,
+            root_ids: vec![root.id],
+        });
     }
-    entries.sort_by(
-        |a, b| match (a.file_type.as_str() == "dir", b.file_type.as_str() == "dir") {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        },
-    );
-    Ok(entries)
+    repos.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(repos)
 }
 
 #[tauri::command]
@@ -397,7 +498,7 @@ fn sanitize_relative_path(value: &str) -> Result<PathBuf, String> {
             Component::CurDir => {}
             Component::ParentDir => return Err("Workspace paths cannot contain '..'".into()),
             Component::RootDir | Component::Prefix(_) => {
-                return Err("Workspace paths must be relative".into())
+                return Err("Workspace paths must be relative".into());
             }
         }
     }
@@ -453,6 +554,78 @@ fn reject_protected_loose_write(target: &Path) -> Result<(), String> {
         .any(|component| matches!(component, Component::Normal(part) if part == ".git"))
     {
         return Err("Writing inside .git is not allowed".into());
+    }
+    Ok(())
+}
+
+fn list_workspace_entries(root: &Path, target: &Path) -> Result<Vec<WorkspaceEntry>, String> {
+    let mut entries = Vec::new();
+    let read = fs::read_dir(target).map_err(|e| format!("read {}: {e}", target.display()))?;
+    for item in read {
+        let Ok(item) = item else {
+            continue;
+        };
+        let path = item.path();
+        if let Ok(entry) = workspace_entry(root, &path) {
+            entries.push(entry);
+        }
+    }
+    entries.sort_by(
+        |a, b| match (a.file_type.as_str() == "dir", b.file_type.as_str() == "dir") {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        },
+    );
+    Ok(entries)
+}
+
+fn find_git_repo_root(path: &Path) -> Option<PathBuf> {
+    let mut current = Some(path);
+    while let Some(dir) = current {
+        if dir.join(".git").exists() {
+            return Some(dir.to_path_buf());
+        }
+        current = dir.parent();
+    }
+    None
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
+fn collect_workspace_files(
+    root: &Path,
+    dir: &Path,
+    depth: usize,
+    max_depth: usize,
+    max_files: usize,
+    files: &mut Vec<WorkspaceEntry>,
+) -> Result<(), String> {
+    if depth > max_depth || files.len() >= max_files {
+        return Ok(());
+    }
+    for entry in list_workspace_entries(root, dir)? {
+        if entry.path == ".git" || entry.path.starts_with(".git/") {
+            continue;
+        }
+        match entry.file_type.as_str() {
+            "file" => {
+                files.push(entry);
+                if files.len() >= max_files {
+                    return Ok(());
+                }
+            }
+            "dir" if depth < max_depth => {
+                let child = resolve_existing_path(root, &entry.path)?;
+                collect_workspace_files(root, &child, depth + 1, max_depth, max_files, files)?;
+                if files.len() >= max_files {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
     }
     Ok(())
 }
@@ -664,6 +837,83 @@ mod tests {
 
         workspace_delete_path(root, "src".into(), Some(true)).unwrap();
         assert!(!dir.path().join("src").exists());
+    }
+
+    #[test]
+    fn returns_compact_chain_endpoint() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+        fs::create_dir_all(dir.path().join("src/main/java/com/example/service")).unwrap();
+        fs::write(
+            dir.path()
+                .join("src/main/java/com/example/service/UserService.java"),
+            "class UserService {}",
+        )
+        .unwrap();
+
+        let chain = workspace_compact_chain(root, "src".into(), Some(16)).unwrap();
+
+        assert_eq!(chain.path, "src/main/java/com/example/service");
+        assert_eq!(chain.entries.len(), 1);
+        assert_eq!(
+            chain.entries[0].path,
+            "src/main/java/com/example/service/UserService.java"
+        );
+    }
+
+    #[test]
+    fn recursively_lists_files_with_limits_and_skips_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+        fs::create_dir_all(dir.path().join("src/a")).unwrap();
+        fs::create_dir_all(dir.path().join(".git")).unwrap();
+        fs::write(dir.path().join("src/a/one.ts"), "one").unwrap();
+        fs::write(dir.path().join("src/two.ts"), "two").unwrap();
+        fs::write(dir.path().join(".git/config"), "hidden").unwrap();
+
+        let files = workspace_list_files_recursive(root.clone(), None, Some(10), Some(10)).unwrap();
+        let paths: Vec<_> = files.iter().map(|entry| entry.path.as_str()).collect();
+        assert_eq!(paths, vec!["src/a/one.ts", "src/two.ts"]);
+
+        let limited = workspace_list_files_recursive(root, None, Some(10), Some(1)).unwrap();
+        assert_eq!(limited.len(), 1);
+    }
+
+    #[test]
+    fn detects_git_roots_and_deduplicates_nested_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        let nested = repo.join("packages/app");
+        let plain = dir.path().join("plain");
+        fs::create_dir_all(repo.join(".git")).unwrap();
+        fs::create_dir_all(&nested).unwrap();
+        fs::create_dir_all(&plain).unwrap();
+
+        let repos = workspace_detect_git_roots(vec![
+            WorkspaceGitRootCandidate {
+                id: "repo".into(),
+                name: "repo".into(),
+                path: repo.to_string_lossy().to_string(),
+            },
+            WorkspaceGitRootCandidate {
+                id: "app".into(),
+                name: "app".into(),
+                path: nested.to_string_lossy().to_string(),
+            },
+            WorkspaceGitRootCandidate {
+                id: "plain".into(),
+                name: "plain".into(),
+                path: plain.to_string_lossy().to_string(),
+            },
+        ])
+        .unwrap();
+
+        let repo_root = repo.to_string_lossy().to_string();
+        let detected = repos
+            .iter()
+            .find(|item| item.repo_root == repo_root)
+            .expect("target repo should be detected");
+        assert_eq!(detected.root_ids, vec!["repo", "app"]);
     }
 
     #[test]

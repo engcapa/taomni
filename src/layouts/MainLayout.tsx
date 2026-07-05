@@ -70,8 +70,8 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, CodeWorkspaceRootInfo } from "../types";
-import { computeNewTerminalTitle, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../types";
+import { computeNewTerminalTitle, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
@@ -596,6 +596,7 @@ export function MainLayout() {
     terminalSplitLayout,
     terminalSplitInputLockedTabIds,
     welcomeRecentSessionLimit,
+    recentWorkspaces,
     toggleMultiExec,
     selectAllTerminalTabs,
     clearMultiExecSelection,
@@ -605,6 +606,8 @@ export function MainLayout() {
     toggleTerminalSplitInputLock,
     clearTerminalSplitInputLocks,
     setTabHasNewOutput,
+    removeRecentWorkspace,
+    clearRecentWorkspaces,
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -1753,6 +1756,12 @@ export function MainLayout() {
     void markConnected(session.id);
   }, [handleOpenLocalPath, markConnected, setStatusMessage]);
 
+  const revealRecentCodeWorkspace = useCallback((workspace: RecentWorkspace) => {
+    const target = workspace.roots[0]?.path ?? workspace.looseFiles[0]?.path;
+    if (!target) return;
+    void handleOpenLocalPath(target, { embedFolder: false });
+  }, [handleOpenLocalPath]);
+
   const openGitTab = useCallback((repoRoot: string) => {
     const normalized = repoRoot.trim();
     if (!normalized) return;
@@ -1770,38 +1779,71 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
-  const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
-    const normalized = repoRoot.trim();
-    if (!normalized) return;
+  const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
+    const roots = workspace.roots ?? [];
+    const looseFiles = workspace.looseFiles ?? [];
+    const identity = recentWorkspaceIdFromParts(roots, looseFiles);
     const existing = tabsRef.current.find(
-      (tab) => tab.type === "code-workspace" && tab.codeWorkspace?.repoRoot === normalized,
+      (tab) => {
+        if (tab.type !== "code-workspace" || !tab.codeWorkspace) return false;
+        if (workspace.workspaceId && tab.codeWorkspace.workspaceId === workspace.workspaceId) return true;
+        if (tab.codeWorkspace.workspaceId === identity) return true;
+        const tabRoots = tab.codeWorkspace.roots ?? [];
+        const tabLooseFiles = tab.codeWorkspace.looseFiles ?? [];
+        if (tabRoots.length === 0 && tabLooseFiles.length === 0) return false;
+        return recentWorkspaceIdFromParts(tabRoots, tabLooseFiles) === identity;
+      },
     );
     if (existing) {
       setActiveTab(existing.id);
       return;
     }
+    const title = workspace.name?.trim()
+      || (roots.length === 1 && looseFiles.length === 0 ? roots[0].name : "")
+      || (roots.length === 0 && looseFiles.length > 0 ? "Editor Workspace" : "Code Workspace");
+    addTab({
+      id: `code-workspace-${Date.now()}`,
+      type: "code-workspace",
+      title: `Code · ${title}`,
+      closable: true,
+      codeWorkspace: {
+        ...workspace,
+        workspaceId: workspace.workspaceId ?? identity,
+        name: title,
+      },
+    });
+  }, [addTab, setActiveTab]);
+
+  const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
+    const normalized = repoRoot.trim();
+    if (!normalized) return;
     const root: CodeWorkspaceRootInfo = {
       id: `root-${Date.now()}`,
       name: gitRepoName(normalized),
       path: normalized,
       kind: "git",
     };
-    addTab({
-      id: `code-workspace-${Date.now()}`,
-      type: "code-workspace",
-      title: `Code · ${gitRepoName(normalized)}`,
-      closable: true,
-      codeWorkspace: {
-        repoRoot: normalized,
-        initialPath: initialPath ?? null,
-        workspaceId: `workspace-${Date.now()}`,
-        name: root.name,
-        roots: [root],
-        looseFiles: [],
-        initialFile: initialPath ? { kind: "root", rootId: root.id, path: initialPath } : null,
-      },
+    openCodeWorkspaceInfo({
+      repoRoot: normalized,
+      initialPath: initialPath ?? null,
+      workspaceId: recentWorkspaceIdFromParts([root], []),
+      name: root.name,
+      roots: [root],
+      looseFiles: [],
+      initialFile: initialPath ? { kind: "root", rootId: root.id, path: initialPath } : null,
     });
-  }, [addTab, setActiveTab]);
+  }, [openCodeWorkspaceInfo]);
+
+  const openRecentCodeWorkspace = useCallback((workspace: RecentWorkspace) => {
+    openCodeWorkspaceInfo({
+      repoRoot: workspace.roots[0]?.path ?? "",
+      workspaceId: workspace.id,
+      name: workspace.name,
+      roots: workspace.roots,
+      looseFiles: workspace.looseFiles,
+      initialFile: workspace.lastActiveFile ?? null,
+    });
+  }, [openCodeWorkspaceInfo]);
 
   const openEmptyCodeWorkspaceTab = useCallback(() => {
     const id = `code-workspace-${Date.now()}`;
@@ -1820,6 +1862,11 @@ export function MainLayout() {
       },
     });
   }, [addTab]);
+
+  const openNewCodeWorkspaceFromWelcome = useCallback(async () => {
+    const path = await selectFolderPath();
+    if (path) openCodeWorkspaceTab(path);
+  }, [openCodeWorkspaceTab]);
 
   const openGitRepository = useCallback(async (path?: string | null) => {
     const target = path ?? await selectFolderPath();
@@ -3120,12 +3167,18 @@ export function MainLayout() {
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
                     onOpenLanChat={openLanChatTab}
                     recentSessions={welcomeRecentSessions}
+                    recentWorkspaces={recentWorkspaces}
                     mailSessions={welcomeMailSessions}
                     onOpenMailSession={handleConnectSession}
                     onOpenRecentSession={handleConnectSession}
                     onOpenRecentSessions={handleConnectSessions}
                     onEditRecentSession={handleEditSession}
                     onRevealRecentSession={handleRevealRecentSession}
+                    onOpenRecentWorkspace={openRecentCodeWorkspace}
+                    onRemoveRecentWorkspace={(workspace) => removeRecentWorkspace(workspace.id)}
+                    onClearRecentWorkspaces={clearRecentWorkspaces}
+                    onRevealRecentWorkspace={revealRecentCodeWorkspace}
+                    onOpenNewWorkspace={() => void openNewCodeWorkspaceFromWelcome()}
                     onOpenSettings={openSettingsTab}
                   />
                 )}

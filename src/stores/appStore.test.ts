@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { computeNewTerminalTitle, useAppStore } from "./appStore";
-import type { Tab } from "../types";
+import type { RecentWorkspace, Tab } from "../types";
 
 const tab = (id: string, overrides: Partial<Tab> = {}): Tab => ({
   id,
@@ -319,6 +319,99 @@ describe("appStore.dbSelectedObjects", () => {
   });
 });
 
+describe("appStore.recentWorkspaces", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useAppStore.setState({
+      tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
+      activeTabId: "welcome",
+      codeWorkspaceByTab: {},
+      recentWorkspaces: [],
+      welcomeRecentSessionLimit: 20,
+    });
+  });
+
+  it("records a code workspace tab from the latest workspace context", () => {
+    const root = {
+      id: "root-main",
+      name: "taomni",
+      path: "/work/taomni",
+      kind: "git" as const,
+    };
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        tab("code", {
+          type: "code-workspace",
+          title: "Code · taomni",
+          codeWorkspace: {
+            repoRoot: "/work/taomni",
+            workspaceId: "workspace-taomni",
+            name: "taomni",
+            roots: [root],
+            looseFiles: [],
+            initialFile: null,
+          },
+        }),
+      ],
+      codeWorkspaceByTab: {
+        code: {
+          repoRoot: "/work/taomni",
+          activePath: "src/App.tsx",
+          openPaths: ["src/App.tsx"],
+          dirtyPaths: [],
+          roots: [root],
+          looseFiles: [],
+          activeFile: { kind: "root", rootId: "root-main", path: "src/App.tsx" },
+          openFiles: [{ kind: "root", rootId: "root-main", path: "src/App.tsx" }],
+          dirtyFiles: [],
+          lsp: null,
+        },
+      },
+    });
+
+    useAppStore.getState().recordCodeWorkspaceTab("code");
+
+    const recent = useAppStore.getState().recentWorkspaces;
+    expect(recent).toHaveLength(1);
+    expect(recent[0]).toMatchObject({
+      name: "taomni",
+      roots: [root],
+      isGitRepo: true,
+      lastActiveFile: { kind: "root", rootId: "root-main", path: "src/App.tsx" },
+    });
+    expect(JSON.parse(window.localStorage.getItem("taomni.recentWorkspaces.v1") ?? "[]")).toHaveLength(1);
+  });
+
+  it("persists, limits, removes, and clears recent workspace entries", () => {
+    useAppStore.setState({ welcomeRecentSessionLimit: 2 });
+    const workspace = (name: string, path: string, lastOpenedAt: number): RecentWorkspace => ({
+      id: name,
+      name,
+      roots: [{ id: `root-${name}`, name, path, kind: "folder" }],
+      looseFiles: [],
+      lastOpenedAt,
+      lastActiveFile: null,
+      isGitRepo: false,
+    });
+
+    useAppStore.getState().upsertRecentWorkspace(workspace("one", "/tmp/one", 1));
+    useAppStore.getState().upsertRecentWorkspace(workspace("two", "/tmp/two", 2));
+    useAppStore.getState().upsertRecentWorkspace(workspace("three", "/tmp/three", 3));
+
+    expect(useAppStore.getState().recentWorkspaces.map((item) => item.name)).toEqual(["three", "two"]);
+    expect(JSON.parse(window.localStorage.getItem("taomni.recentWorkspaces.v1") ?? "[]")).toHaveLength(2);
+
+    const removeId = useAppStore.getState().recentWorkspaces[0].id;
+    useAppStore.getState().removeRecentWorkspace(removeId);
+    expect(useAppStore.getState().recentWorkspaces.map((item) => item.name)).toEqual(["two"]);
+
+    useAppStore.getState().clearRecentWorkspaces();
+    expect(useAppStore.getState().recentWorkspaces).toEqual([]);
+    expect(window.localStorage.getItem("taomni.recentWorkspaces.v1")).toBe("[]");
+  });
+});
+
 describe("appStore.sidebar", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -408,4 +501,3 @@ describe("appStore.terminalSplit", () => {
     expect(useAppStore.getState().multiExecSelectedTabIds.has("a")).toBe(true);
   });
 });
-

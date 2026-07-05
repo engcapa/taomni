@@ -4,6 +4,7 @@ import { WelcomePanel } from "./WelcomePanel";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import type { SessionConfig } from "../lib/ipc";
+import type { RecentWorkspace } from "../types";
 
 const ipcMocks = vi.hoisted(() => ({
   listCommonLocalDirectories: vi.fn(),
@@ -33,6 +34,10 @@ vi.mock("../lib/runtime", () => ({
 
 vi.mock("../lib/sftp", () => ({
   sftpLocalHome: vi.fn(async () => "/home/test"),
+}));
+
+vi.mock("../lib/clipboard", () => ({
+  writeText: vi.fn(async () => undefined),
 }));
 
 describe("WelcomePanel", () => {
@@ -198,10 +203,71 @@ describe("WelcomePanel", () => {
     expect(editSession).toHaveBeenCalledWith(recentSessions[1]);
   });
 
+  it("shows recent workspaces with filter, open, reveal, copy, remove, and context actions", async () => {
+    const recentWorkspaces: RecentWorkspace[] = [
+      workspace("workspace-taomni", "taomni", "/work/taomni", 300, "git"),
+      workspace("workspace-docs", "docs", "/work/docs", 100, "folder"),
+    ];
+    const openWorkspace = vi.fn();
+    const removeWorkspace = vi.fn();
+    const revealWorkspace = vi.fn();
+    const openNewWorkspace = vi.fn();
+
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={vi.fn()}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+        recentWorkspaces={recentWorkspaces}
+        onOpenRecentWorkspace={openWorkspace}
+        onRemoveRecentWorkspace={removeWorkspace}
+        onRevealRecentWorkspace={revealWorkspace}
+        onOpenNewWorkspace={openNewWorkspace}
+        onClearRecentWorkspaces={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("welcome-recent-workspaces")).toBeInTheDocument();
+    expect(screen.getAllByTestId("welcome-recent-workspace-row")).toHaveLength(2);
+
+    fireEvent.change(screen.getByTestId("welcome-recent-workspace-filter"), {
+      target: { value: "docs" },
+    });
+    const filteredRow = screen.getByTestId("welcome-recent-workspace-row");
+    expect(filteredRow).toHaveAttribute("data-workspace-name", "docs");
+
+    fireEvent.click(filteredRow);
+    expect(openWorkspace).toHaveBeenCalledWith(recentWorkspaces[1]);
+
+    fireEvent.click(within(filteredRow).getByTestId("welcome-recent-workspace-copy-path"));
+    await waitFor(() => {
+      expect(useAppStore.getState().statusMessage).toBe("Workspace path copied to clipboard");
+    });
+
+    fireEvent.click(within(filteredRow).getByTestId("welcome-recent-workspace-reveal"));
+    expect(revealWorkspace).toHaveBeenCalledWith(recentWorkspaces[1]);
+
+    fireEvent.click(within(filteredRow).getByTestId("welcome-recent-workspace-remove"));
+    expect(removeWorkspace).toHaveBeenCalledWith(recentWorkspaces[1]);
+
+    fireEvent.contextMenu(filteredRow);
+    expect(screen.getByTestId("context-menu-item-open-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-reveal-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-copy-workspace-path")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-remove-workspace")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("welcome-recent-workspace-open-new"));
+    expect(openNewWorkspace).toHaveBeenCalled();
+  });
+
   it("sets a terminal theme for selected recent sessions from the context menu", async () => {
     const recentSessions: SessionConfig[] = [
       session("ssh-prod", "Prod SSH", "SSH", "prod.example.com", 22, 300),
-      session("sftp-prod", "Prod SFTP", "SFTP", "files.example.com", 22, 200),
+      session("ftp-prod", "Prod FTP", "FTP", "files.example.com", 21, 200),
       session("mail-work", "Work Mail", "Mail", "imap.example.com", 993, 100),
     ];
     useSessionStore.setState({
@@ -233,8 +299,10 @@ describe("WelcomePanel", () => {
 
     const rows = screen.getAllByTestId("welcome-recent-session-row");
     fireEvent.click(within(rows[0]).getByTestId("welcome-recent-select"));
-    fireEvent.click(within(rows[1]).getByTestId("welcome-recent-select"));
-    fireEvent.contextMenu(rows[0]);
+    const updatedRows = screen.getAllByTestId("welcome-recent-session-row");
+    fireEvent.click(within(updatedRows[1]).getByTestId("welcome-recent-select"));
+    await waitFor(() => expect(screen.getByText("2 selected")).toBeInTheDocument());
+    fireEvent.contextMenu(screen.getAllByTestId("welcome-recent-session-row")[0]);
     const item = screen.getByTestId("context-menu-item-set-terminal-theme");
     fireEvent.mouseEnter(item.parentElement!);
     expect(await screen.findByTestId("session-terminal-font-select")).toBeInTheDocument();
@@ -242,7 +310,7 @@ describe("WelcomePanel", () => {
 
     await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
     expect(ipcMocks.saveSession.mock.calls.map(([cfg]) => cfg.id).sort()).toEqual([
-      "sftp-prod",
+      "ftp-prod",
       "ssh-prod",
     ]);
     const themes = ipcMocks.saveSession.mock.calls.map(([cfg]) =>
@@ -316,5 +384,23 @@ function session(
     updated_at: 0,
     last_connected_at: lastConnectedAt,
     sort_order: 0,
+  };
+}
+
+function workspace(
+  id: string,
+  name: string,
+  path: string,
+  lastOpenedAt: number,
+  kind: "git" | "folder",
+): RecentWorkspace {
+  return {
+    id,
+    name,
+    roots: [{ id: `root-${id}`, name, path, kind }],
+    looseFiles: [],
+    lastOpenedAt,
+    lastActiveFile: null,
+    isGitRepo: kind === "git",
   };
 }
