@@ -1,11 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
-import { useTaoAlertStore } from "../../stores/taoAlertStore";
+import { DEFAULT_TAO_ALERT_HISTORY_LIMIT, useTaoAlertStore } from "../../stores/taoAlertStore";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -18,6 +18,15 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
 }));
+
+function resetTaoAlertStore() {
+  useTaoAlertStore.setState({
+    aiDone: [],
+    mailNew: [],
+    history: [],
+    historyLimit: DEFAULT_TAO_ALERT_HISTORY_LIMIT,
+  });
+}
 
 function makeConfig(): AiConfig {
   return {
@@ -156,7 +165,7 @@ describe("ChatDrawer provider and echo controls", () => {
     window.localStorage.clear();
     vi.clearAllMocks();
     useTaoHubStore.setState({ hubTab: "chat" });
-    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
+    resetTaoAlertStore();
     useNotesStore.setState({ alerts: [] });
   });
 
@@ -319,7 +328,7 @@ describe("ChatDrawer layout resizing", () => {
     cleanup();
     vi.clearAllMocks();
     useTaoHubStore.setState({ hubTab: "chat" });
-    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
+    resetTaoAlertStore();
     useNotesStore.setState({ alerts: [] });
   });
 
@@ -522,6 +531,40 @@ describe("ChatDrawer layout resizing", () => {
     expect(useAppStore.getState().activeTabId).toBe("mail-1");
     expect(useTaoAlertStore.getState().mailNew.map((alert) => alert.mailTabId)).toEqual(["mail-2"]);
   });
+
+  it("keeps dismissed notifications hidden until history is searched and supports clearing history", async () => {
+    useTaoHubStore.setState({ hubTab: "notifications" });
+    useTaoAlertStore.setState({
+      mailNew: [
+        {
+          id: "mail:mail-1",
+          source: "mail",
+          kind: "mail_new",
+          title: "Work mail",
+          count: 2,
+          mailTabId: "mail-1",
+          mailAccountId: "acct-1",
+          fireAt: 10,
+        },
+      ],
+    });
+
+    render(<ChatDrawer />);
+
+    expect(screen.getByTestId("tao-alert-inbox-item")).toBeInTheDocument();
+    expect(screen.queryByTestId("tao-alert-history-result")).not.toBeInTheDocument();
+    await waitFor(() => expect(useTaoAlertStore.getState().history).toHaveLength(1));
+
+    fireEvent.click(screen.getByTestId("tao-alert-ack"));
+    expect(screen.queryByTestId("tao-alert-inbox-item")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("tao-alert-history-search"), { target: { value: "Work" } });
+    expect(screen.getByTestId("tao-alert-history-result")).toHaveTextContent("Work mail");
+
+    fireEvent.click(screen.getByTestId("tao-alert-history-clear"));
+    expect(screen.queryByTestId("tao-alert-history-result")).not.toBeInTheDocument();
+    expect(useTaoAlertStore.getState().history).toHaveLength(0);
+  });
 });
 
 describe("ChatDrawerRibbon", () => {
@@ -529,7 +572,7 @@ describe("ChatDrawerRibbon", () => {
     cleanup();
     vi.clearAllMocks();
     useNotesStore.setState({ alerts: [] });
-    useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
+    resetTaoAlertStore();
   });
 
   it("shows only Tao and opens the stable chat tab id", () => {
@@ -657,7 +700,7 @@ describe("ChatDrawerRibbon", () => {
       setActiveNote,
       ackAlert,
     });
-    useTaoAlertStore.setState({ aiDone: [] });
+    resetTaoAlertStore();
 
     render(
       <div className="relative h-32 w-32">

@@ -99,6 +99,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const ackNoteAlert = useNotesStore((s) => s.ackAlert);
   const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
   const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
+  const alertHistory = useTaoAlertStore((s) => s.history);
+  const alertHistoryLimit = useTaoAlertStore((s) => s.historyLimit);
+  const recordAlertHistory = useTaoAlertStore((s) => s.recordHistory);
+  const setAlertHistoryLimit = useTaoAlertStore((s) => s.setHistoryLimit);
+  const clearAlertHistory = useTaoAlertStore((s) => s.clearHistory);
   const ackAiDone = useTaoAlertStore((s) => s.ack);
   const clearMailTab = useTaoAlertStore((s) => s.clearMailTab);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +185,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     () => taoAlerts.reduce((sum, alert) => sum + (alert.count ?? 1), 0),
     [taoAlerts],
   );
+  useEffect(() => {
+    recordAlertHistory(taoAlerts);
+  }, [recordAlertHistory, taoAlerts]);
 
   const jumpToAlert = (alert: TaoAlert) => {
     if (alert.source === "notes") {
@@ -909,8 +917,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         {hubTab === "notifications" ? (
           <TaoAlertInbox
             alerts={taoAlerts}
+            history={alertHistory}
+            historyLimit={alertHistoryLimit}
             onJump={jumpToAlert}
             onAck={ackAlert}
+            onHistoryLimitChange={setAlertHistoryLimit}
+            onClearHistory={clearAlertHistory}
             embedded
           />
         ) : hubTab === "notes" ? (
@@ -1187,6 +1199,7 @@ export function ChatDrawerRibbon() {
   const noteAlerts = useNotesStore((s) => s.alerts);
   const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
   const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
+  const recordAlertHistory = useTaoAlertStore((s) => s.recordHistory);
   const pruneMailTabs = useTaoAlertStore((s) => s.pruneMailTabs);
   const bumpRef = useRef(0);
   const [bumping, setBumping] = useState(false);
@@ -1219,6 +1232,9 @@ export function ChatDrawerRibbon() {
     () => taoAlerts.reduce((sum, alert) => sum + (alert.count ?? 1), 0),
     [taoAlerts],
   );
+  useEffect(() => {
+    recordAlertHistory(taoAlerts);
+  }, [recordAlertHistory, taoAlerts]);
   const ribbonSignals = useMemo(() => {
     const next: Array<"mail" | "notes" | "chat"> = [];
     for (const alert of taoAlerts) {

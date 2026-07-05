@@ -1,0 +1,33 @@
+id: TC-NOTES-007
+title: Tao notifications history controls mount without showing history by default
+description: |
+  Verifies the Notifications tab controls for F-TAO-1: the pending-alert inbox
+  opens from Tao Hub, historical notifications are not rendered while the
+  search box is empty, and the history search, 30/300 retention, and manual
+  clear controls are present. State semantics are covered by Vitest.
+covers: [F-TAO-1]
+tags: [notes, tao, notifications, history, p2]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="status-bar"]'
+  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+  - click: '[data-testid="ai-chat-drawer-ribbon"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  - click: '[data-testid="tao-hub-tab-notifications"]'
+  - wait_for: '[data-testid="tao-alert-inbox"]'
+  - assert_visible: '[data-testid="tao-alert-history-search"]'
+  - assert_visible: '[data-testid="tao-alert-history-limit-30"]'
+  - assert_visible: '[data-testid="tao-alert-history-limit-300"]'
+  - assert_visible: '[data-testid="tao-alert-history-clear"]'
+  - assert_disabled: '[data-testid="tao-alert-history-clear"]'
+  - assert_not_visible: '[data-testid="tao-alert-history-result"]'
+  - fill: { selector: '[data-testid="tao-alert-history-search"]', value: "qa-no-history-match" }
+  - assert_text: { selector: '[data-testid="tao-alert-inbox"]', contains: "No matching history" }
+  - click: '[data-testid="tao-alert-history-limit-30"]'
+  - assert_attribute: { selector: '[data-testid="tao-alert-history-limit-30"]', name: "aria-pressed", equals: "true" }
+  - click: '[data-testid="tao-alert-history-limit-300"]'
+  - assert_attribute: { selector: '[data-testid="tao-alert-history-limit-300"]', name: "aria-pressed", equals: "true" }
+  - screenshot: notes-007-notifications-history-controls.png
