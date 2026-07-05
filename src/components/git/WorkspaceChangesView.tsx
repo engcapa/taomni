@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   GitBranch,
   Loader2,
   Search,
@@ -48,6 +50,12 @@ export interface WorkspaceChangesViewProps {
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
+  repoCommitMessages: Record<string, string>;
+  setRepoCommitMessage: (repoRoot: string, message: string) => void;
+  commitRepo: (repoRoot: string) => void;
+  commitRepoAndPush: (repoRoot: string) => void;
+  checkedChangePathsByRepo: Record<string, string[]>;
+  pushableRepoRoots: Set<string>;
 }
 
 export function WorkspaceChangesView({
@@ -78,6 +86,12 @@ export function WorkspaceChangesView({
   onToggleChecked,
   onSelect,
   onContextMenu,
+  repoCommitMessages,
+  setRepoCommitMessage,
+  commitRepo,
+  commitRepoAndPush,
+  checkedChangePathsByRepo,
+  pushableRepoRoots,
 }: WorkspaceChangesViewProps) {
   const [filter, setFilter] = useState("");
   const normalizedFilter = filter.trim().toLowerCase();
@@ -111,6 +125,15 @@ export function WorkspaceChangesView({
     return { root, change };
   }, [focusedKey, roots, snapshots]);
   const canCommit = !busy && checkedCount > 0 && commitMessage.trim().length > 0;
+  const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(() => new Set());
+  const toggleRepoCollapsed = (repoRoot: string) => {
+    setCollapsedRepos((current) => {
+      const next = new Set(current);
+      if (next.has(repoRoot)) next.delete(repoRoot);
+      else next.add(repoRoot);
+      return next;
+    });
+  };
 
   return (
     <PanelGroup orientation="horizontal" id="workspace-git-changes-layout">
@@ -165,6 +188,15 @@ export function WorkspaceChangesView({
               checkedKeys={checkedKeys}
               selectedKeys={selectedKeys}
               focusedKey={focusedKey}
+              collapsed={collapsedRepos.has(root.repoRoot)}
+              onToggleCollapsed={() => toggleRepoCollapsed(root.repoRoot)}
+              busy={busy}
+              commitMessage={repoCommitMessages[root.repoRoot] ?? ""}
+              onCommitMessageChange={(value) => setRepoCommitMessage(root.repoRoot, value)}
+              onCommit={() => commitRepo(root.repoRoot)}
+              onCommitAndPush={() => commitRepoAndPush(root.repoRoot)}
+              checkedRepoPathCount={checkedChangePathsByRepo[root.repoRoot]?.length ?? 0}
+              canPush={pushableRepoRoots.has(root.repoRoot)}
               onToggleChecked={onToggleChecked}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
@@ -211,6 +243,15 @@ function RepoChangeGroup({
   checkedKeys,
   selectedKeys,
   focusedKey,
+  collapsed,
+  onToggleCollapsed,
+  busy,
+  commitMessage,
+  onCommitMessageChange,
+  onCommit,
+  onCommitAndPush,
+  checkedRepoPathCount,
+  canPush,
   onToggleChecked,
   onSelect,
   onContextMenu,
@@ -224,6 +265,15 @@ function RepoChangeGroup({
   checkedKeys: Set<string>;
   selectedKeys: Set<string>;
   focusedKey: string | null;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  busy: boolean;
+  commitMessage: string;
+  onCommitMessageChange: (value: string) => void;
+  onCommit: () => void;
+  onCommitAndPush: () => void;
+  checkedRepoPathCount: number;
+  canPush: boolean;
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
@@ -244,10 +294,34 @@ function RepoChangeGroup({
   );
   const parsedFocus = focusedKey ? parseWorkspaceChangeKey(focusedKey) : null;
   const activePath = parsedFocus?.repoRoot === root.repoRoot ? parsedFocus.path : null;
+  const stagedChanges = changes.filter((change) => change.staged);
+  const unstagedChanges = changes.filter((change) => !change.staged);
+  const canCommitRepo = !busy && checkedRepoPathCount > 0 && commitMessage.trim().length > 0;
+
+  const renderTree = (subset: GitSnapshot["changes"]) => (
+    <ChangesTree
+      changes={subset}
+      treeMode={treeMode}
+      checked={checkedPaths}
+      onToggleChecked={(paths, value) => onToggleChecked(root.repoRoot, paths, value)}
+      selected={selectedPaths}
+      activePath={activePath}
+      onSelect={(path, mods) => onSelect(root.repoRoot, path, mods)}
+      onContextMenu={(path, event) => onContextMenu(root.repoRoot, path, event)}
+    />
+  );
 
   return (
     <section className="border-b border-[var(--taomni-divider)]">
       <div className="h-8 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+        <button
+          type="button"
+          className="shrink-0 flex items-center justify-center text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
+          aria-label={collapsed ? `Expand ${root.name}` : `Collapse ${root.name}`}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
         <TriCheckbox
           state={checkState(checkedCount, changes.length)}
           disabled={changes.length === 0}
@@ -264,21 +338,55 @@ function RepoChangeGroup({
           {checkedCount}/{changes.length}
         </span>
       </div>
-      {error ? (
+      {collapsed ? null : error ? (
         <div className="px-8 py-2 text-[11px] text-red-500" title={error}>
           {error}
         </div>
       ) : changes.length > 0 ? (
-        <ChangesTree
-          changes={changes}
-          treeMode={treeMode}
-          checked={checkedPaths}
-          onToggleChecked={(paths, value) => onToggleChecked(root.repoRoot, paths, value)}
-          selected={selectedPaths}
-          activePath={activePath}
-          onSelect={(path, mods) => onSelect(root.repoRoot, path, mods)}
-          onContextMenu={(path, event) => onContextMenu(root.repoRoot, path, event)}
-        />
+        <>
+          {stagedChanges.length > 0 && (
+            <>
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-bg)]">
+                Staged ({stagedChanges.length})
+              </div>
+              {renderTree(stagedChanges)}
+            </>
+          )}
+          {unstagedChanges.length > 0 && (
+            <>
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-bg)]">
+                Changes ({unstagedChanges.length})
+              </div>
+              {renderTree(unstagedChanges)}
+            </>
+          )}
+          <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-[var(--taomni-divider)]">
+            <input
+              className="taomni-input h-7 min-w-0 flex-1 text-[12px]"
+              value={commitMessage}
+              placeholder={`Message for ${root.name}`}
+              onChange={(event) => onCommitMessageChange(event.target.value)}
+            />
+            <button
+              type="button"
+              className="taomni-btn h-7 px-2 text-[11px]"
+              aria-label={`Commit ${root.name}`}
+              disabled={!canCommitRepo}
+              onClick={onCommit}
+            >
+              Commit
+            </button>
+            <button
+              type="button"
+              className="taomni-btn h-7 px-2 text-[11px]"
+              aria-label={`Commit and push ${root.name}`}
+              disabled={!canCommitRepo || !canPush}
+              onClick={onCommitAndPush}
+            >
+              Commit &amp; Push
+            </button>
+          </div>
+        </>
       ) : loading ? (
         <div className="px-8 py-2 text-[11px] text-[var(--taomni-text-muted)]">
           Loading changes...
