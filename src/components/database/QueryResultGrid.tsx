@@ -89,14 +89,15 @@ export interface QueryGridCommitPayload {
 interface QueryResultGridProps {
   result: DbQueryResult;
   sourceSql?: string;
+  baseSql?: string;
   sqlEngine?: string;
   running?: boolean;
   cancelling?: boolean;
   onRefresh?: (mode: QueryRefreshMode) => void;
   onCancel?: () => void;
   onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
-  onGeneratedSqlChange?: (sql: string | null) => void;
   onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
+  onGeneratedSqlQuery?: (sql: string) => void | Promise<void>;
   onStatus?: (message: string) => void;
 }
 
@@ -151,6 +152,7 @@ interface DistinctColumnSummary {
 
 interface GeneratedResultSqlOptions {
   sourceSql?: string;
+  currentSql?: string;
   sqlEngine?: string;
   columns: DbColumn[];
   visibleColumnIndexes: number[];
@@ -429,6 +431,10 @@ function stripSqlTerminator(sql: string): string {
   return sql.trim().replace(/;+\s*$/, "");
 }
 
+function sqlWithTerminator(sql: string): string {
+  return `${stripSqlTerminator(sql)};`;
+}
+
 function indentSql(sql: string): string {
   return sql.split(/\r?\n/).map((line) => `  ${line}`).join("\n");
 }
@@ -486,8 +492,229 @@ function selectedValuesCondition(columnSql: string, values: (string | null)[]): 
   return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
 }
 
+function isIdentChar(char: string | undefined): boolean {
+  return !!char && /[A-Za-z0-9_$]/.test(char);
+}
+
+function keywordMatchAt(sql: string, index: number, pattern: RegExp): number {
+  if (isIdentChar(sql[index - 1])) return 0;
+  const match = sql.slice(index).match(pattern);
+  if (!match) return 0;
+  const end = index + match[0].length;
+  return isIdentChar(sql[end]) ? 0 : match[0].length;
+}
+
+function topLevelSqlClauses(sql: string): Record<string, number> {
+  const clauses: Record<string, number> = {};
+  let depth = 0;
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let backtickQuoted = false;
+  let bracketQuoted = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+
+    if (lineComment) {
+      if (ch === "\n") lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (ch === "*" && next === "/") {
+        blockComment = false;
+        i += 1;
+      }
+      continue;
+    }
+    if (singleQuoted) {
+      if (ch === "'" && next === "'") i += 1;
+      else if (ch === "'") singleQuoted = false;
+      continue;
+    }
+    if (doubleQuoted) {
+      if (ch === "\"" && next === "\"") i += 1;
+      else if (ch === "\"") doubleQuoted = false;
+      continue;
+    }
+    if (backtickQuoted) {
+      if (ch === "`" && next === "`") i += 1;
+      else if (ch === "`") backtickQuoted = false;
+      continue;
+    }
+    if (bracketQuoted) {
+      if (ch === "]" && next === "]") i += 1;
+      else if (ch === "]") bracketQuoted = false;
+      continue;
+    }
+
+    if (ch === "-" && next === "-") {
+      lineComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      blockComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "'") {
+      singleQuoted = true;
+      continue;
+    }
+    if (ch === "\"") {
+      doubleQuoted = true;
+      continue;
+    }
+    if (ch === "`") {
+      backtickQuoted = true;
+      continue;
+    }
+    if (ch === "[") {
+      bracketQuoted = true;
+      continue;
+    }
+    if (ch === "(") {
+      depth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+
+    if (depth !== 0) continue;
+    const checks: Array<[string, RegExp]> = [
+      ["select", /^select\b/i],
+      ["from", /^from\b/i],
+      ["where", /^where\b/i],
+      ["groupBy", /^group\s+by\b/i],
+      ["having", /^having\b/i],
+      ["orderBy", /^order\s+by\b/i],
+      ["limit", /^limit\b/i],
+      ["offset", /^offset\b/i],
+      ["fetch", /^fetch\b/i],
+      ["for", /^for\b/i],
+      ["union", /^union\b/i],
+      ["intersect", /^intersect\b/i],
+      ["except", /^except\b/i],
+    ];
+    for (const [name, pattern] of checks) {
+      if (clauses[name] !== undefined) continue;
+      if (keywordMatchAt(sql, i, pattern) > 0) clauses[name] = i;
+    }
+  }
+  return clauses;
+}
+
+function firstClauseAfter(clauses: Record<string, number>, names: string[], after = -1): number | null {
+  const indexes = names
+    .map((name) => clauses[name])
+    .filter((index): index is number => index !== undefined && index > after);
+  return indexes.length > 0 ? Math.min(...indexes) : null;
+}
+
+function selectListContainsTopLevelStar(sql: string, clauses: Record<string, number>): boolean {
+  const selectStart = clauses.select;
+  const fromStart = clauses.from;
+  if (selectStart === undefined || fromStart === undefined || fromStart <= selectStart) return false;
+  const list = sql.slice(selectStart + "select".length, fromStart);
+  let depth = 0;
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let backtickQuoted = false;
+  let bracketQuoted = false;
+  for (let i = 0; i < list.length; i += 1) {
+    const ch = list[i];
+    const next = list[i + 1];
+    if (singleQuoted) {
+      if (ch === "'" && next === "'") i += 1;
+      else if (ch === "'") singleQuoted = false;
+      continue;
+    }
+    if (doubleQuoted) {
+      if (ch === "\"" && next === "\"") i += 1;
+      else if (ch === "\"") doubleQuoted = false;
+      continue;
+    }
+    if (backtickQuoted) {
+      if (ch === "`" && next === "`") i += 1;
+      else if (ch === "`") backtickQuoted = false;
+      continue;
+    }
+    if (bracketQuoted) {
+      if (ch === "]" && next === "]") i += 1;
+      else if (ch === "]") bracketQuoted = false;
+      continue;
+    }
+    if (ch === "'") singleQuoted = true;
+    else if (ch === "\"") doubleQuoted = true;
+    else if (ch === "`") backtickQuoted = true;
+    else if (ch === "[") bracketQuoted = true;
+    else if (ch === "(") depth += 1;
+    else if (ch === ")") depth = Math.max(0, depth - 1);
+    else if (depth === 0 && ch === "*") return true;
+  }
+  return false;
+}
+
+function withoutTopLevelOrderBy(sql: string, clauses: Record<string, number>): string {
+  const orderStart = clauses.orderBy;
+  if (orderStart === undefined) return sql;
+  const orderEnd = firstClauseAfter(clauses, ["limit", "offset", "fetch", "for"], orderStart) ?? sql.length;
+  const before = sql.slice(0, orderStart).trimEnd();
+  const after = sql.slice(orderEnd).trimStart();
+  return after ? `${before}\n${after}` : before;
+}
+
+function tryBuildInlineResultSql(baseSql: string, whereClauses: string[], orderBy: string): string | null {
+  let sql = stripSqlTerminator(baseSql);
+  if (!/^\s*select\b/i.test(sql) || /^\s*with\b/i.test(sql)) return null;
+  let clauses = topLevelSqlClauses(sql);
+  if (
+    clauses.select === undefined ||
+    clauses.from === undefined ||
+    clauses.union !== undefined ||
+    clauses.intersect !== undefined ||
+    clauses.except !== undefined ||
+    clauses.groupBy !== undefined ||
+    clauses.having !== undefined ||
+    !selectListContainsTopLevelStar(sql, clauses)
+  ) {
+    return null;
+  }
+
+  if (orderBy) {
+    sql = withoutTopLevelOrderBy(sql, clauses);
+    clauses = topLevelSqlClauses(sql);
+  }
+
+  if (whereClauses.length > 0) {
+    const tailStart = firstClauseAfter(clauses, ["orderBy", "limit", "offset", "fetch", "for"]);
+    const whereSql = whereClauses.join("\n  AND ");
+    if (clauses.where !== undefined) {
+      const insertAt = tailStart ?? sql.length;
+      sql = `${sql.slice(0, insertAt).trimEnd()}\n  AND ${whereSql}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
+    } else {
+      const insertAt = tailStart ?? sql.length;
+      sql = `${sql.slice(0, insertAt).trimEnd()}\nWHERE ${whereSql}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
+    }
+    clauses = topLevelSqlClauses(sql);
+  }
+
+  if (orderBy) {
+    const insertAt = firstClauseAfter(clauses, ["limit", "offset", "fetch", "for"]) ?? sql.length;
+    sql = `${sql.slice(0, insertAt).trimEnd()}\n${orderBy}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
+  }
+
+  return sqlWithTerminator(sql);
+}
+
 function buildGeneratedResultSql({
   sourceSql,
+  currentSql,
   sqlEngine,
   columns,
   visibleColumnIndexes,
@@ -498,6 +725,7 @@ function buildGeneratedResultSql({
 }: GeneratedResultSqlOptions): string | null {
   const baseSql = stripSqlTerminator(sourceSql ?? "");
   if (!baseSql || !sqlEngine) return null;
+  const currentBaseSql = stripSqlTerminator(currentSql ?? sourceSql ?? "");
   const engine = asSqlEngine(sqlEngine);
   const whereClauses: string[] = [];
   const columnSql = (columnIndex: number) =>
@@ -512,18 +740,23 @@ function buildGeneratedResultSql({
   }
   for (const filter of columnFilters) {
     const column = columnSql(filter.columnIndex);
-    if (filter.text) {
+    const selectedCondition = selectedValuesCondition(column, filter.selectedValues);
+    if (selectedCondition) {
+      whereClauses.push(selectedCondition);
+    } else if (filter.text) {
       whereClauses.push(
         filter.mode === "exact"
           ? `${column} = ${dialectSqlLiteral(filter.text)}`
           : sqlLikeCondition(sqlTextExpression(engine, column), filter.text),
       );
     }
-    const selectedCondition = selectedValuesCondition(column, filter.selectedValues);
-    if (selectedCondition) whereClauses.push(selectedCondition);
   }
   const orderBy = sortCol !== null && sortDir ? `ORDER BY ${columnSql(sortCol)} ${sortDir.toUpperCase()}` : "";
-  if (whereClauses.length === 0 && !orderBy) return null;
+  if (whereClauses.length === 0 && !orderBy) {
+    return currentBaseSql && currentBaseSql !== baseSql ? sqlWithTerminator(baseSql) : null;
+  }
+  const inlineSql = tryBuildInlineResultSql(baseSql, whereClauses, orderBy);
+  if (inlineSql) return inlineSql;
   const alias = engine === "Oracle" ? ") taomni_result" : ") AS taomni_result";
   const lines = ["SELECT *", "FROM (", indentSql(baseSql), alias];
   if (whereClauses.length > 0) lines.push(`WHERE ${whereClauses.join("\n  AND ")}`);
@@ -951,14 +1184,15 @@ function isGridBlockSelectionMouseEvent(event: Pick<MouseEvent<HTMLElement>, "bu
 export function QueryResultGrid({
   result,
   sourceSql,
+  baseSql,
   sqlEngine,
   running = false,
   cancelling = false,
   onRefresh,
   onCancel,
   onCommitChanges,
-  onGeneratedSqlChange,
   onGeneratedSqlSync,
+  onGeneratedSqlQuery,
   onStatus,
 }: QueryResultGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -984,6 +1218,7 @@ export function QueryResultGrid({
   const [filterOpen, setFilterOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState<Record<number, ColumnFilterConfig>>({});
   const [openColumnFilter, setOpenColumnFilter] = useState<OpenColumnFilter | null>(null);
+  const [draftColumnFilter, setDraftColumnFilter] = useState<ColumnFilterConfig>(DEFAULT_COLUMN_FILTER);
   const [searchText, setSearchText] = useState("");
   const [showStats, setShowStats] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
@@ -994,12 +1229,7 @@ export function QueryResultGrid({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [cellValueViewer, setCellValueViewer] = useState<CellValueViewer | null>(null);
   const [localNotice, setLocalNotice] = useState("");
-  const generatedSqlChangeRef = useRef(onGeneratedSqlChange);
   const { show: openCellMenu, showAt: openMenuAt, render: menu } = useContextMenu();
-
-  useEffect(() => {
-    generatedSqlChangeRef.current = onGeneratedSqlChange;
-  }, [onGeneratedSqlChange]);
 
   useEffect(() => {
     setRows(makeRows(result));
@@ -1016,6 +1246,7 @@ export function QueryResultGrid({
     setColumnWidths({});
     setColumnFilters({});
     setOpenColumnFilter(null);
+    setDraftColumnFilter(DEFAULT_COLUMN_FILTER);
     setCellBlockSelection(null);
     setExportColumns(defaultExportColumns(result.columns));
   }, [result.columns]);
@@ -1080,7 +1311,8 @@ export function QueryResultGrid({
   const generatedSql = useMemo(
     () =>
       buildGeneratedResultSql({
-        sourceSql,
+        sourceSql: baseSql ?? sourceSql,
+        currentSql: sourceSql,
         sqlEngine,
         columns: result.columns,
         visibleColumnIndexes,
@@ -1089,15 +1321,8 @@ export function QueryResultGrid({
         sortCol,
         sortDir,
       }),
-    [activeColumnFilters, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
+    [activeColumnFilters, baseSql, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
   );
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      generatedSqlChangeRef.current?.(generatedSql);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [generatedSql]);
 
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
@@ -1109,7 +1334,7 @@ export function QueryResultGrid({
         const rawValue = row.values[filter.columnIndex] ?? null;
         if (filter.selectedValues.length > 0) {
           const selected = new Set(filter.selectedValues.map(filterValueKey));
-          if (!selected.has(filterValueKey(rawValue))) return false;
+          return selected.has(filterValueKey(rawValue));
         }
         if (!filter.text) return true;
         const value = (rawValue ?? "").toLowerCase();
@@ -1212,29 +1437,26 @@ export function QueryResultGrid({
     openMenuAt(rect.left, rect.bottom + 4, items);
   };
 
-  const updateColumnFilter = (columnIndex: number, patch: Partial<ColumnFilterConfig>) => {
-    setColumnFilters((current) => {
-      const previous = current[columnIndex] ?? DEFAULT_COLUMN_FILTER;
-      return { ...current, [columnIndex]: { ...previous, ...patch } };
-    });
-  };
-
-  const toggleColumnFilterValue = (columnIndex: number, value: string | null) => {
-    setColumnFilters((current) => {
-      const previous = current[columnIndex] ?? DEFAULT_COLUMN_FILTER;
-      const key = filterValueKey(value);
-      const selected = previous.selectedValues.some((item) => filterValueKey(item) === key)
-        ? previous.selectedValues.filter((item) => filterValueKey(item) !== key)
-        : [...previous.selectedValues, value];
-      return { ...current, [columnIndex]: { ...previous, selectedValues: selected } };
-    });
-  };
-
-  const clearColumnFilter = (columnIndex: number) => {
+  const applyColumnFilter = (columnIndex: number, config: ColumnFilterConfig) => {
     setColumnFilters((current) => {
       const next = { ...current };
-      delete next[columnIndex];
+      if (isColumnFilterActive(config)) next[columnIndex] = config;
+      else delete next[columnIndex];
       return next;
+    });
+  };
+
+  const updateDraftColumnFilter = (patch: Partial<ColumnFilterConfig>) => {
+    setDraftColumnFilter((current) => ({ ...current, ...patch }));
+  };
+
+  const toggleDraftColumnFilterValue = (value: string | null) => {
+    setDraftColumnFilter((current) => {
+      const key = filterValueKey(value);
+      const selected = current.selectedValues.some((item) => filterValueKey(item) === key)
+        ? current.selectedValues.filter((item) => filterValueKey(item) !== key)
+        : [...current.selectedValues, value];
+      return { ...current, selectedValues: selected };
     });
   };
 
@@ -1250,6 +1472,12 @@ export function QueryResultGrid({
     const width = 280;
     const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
     const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 360));
+    const current = columnFilters[columnIndex] ?? DEFAULT_COLUMN_FILTER;
+    setDraftColumnFilter({
+      text: current.text,
+      mode: current.mode,
+      selectedValues: [...current.selectedValues],
+    });
     setOpenColumnFilter({ columnIndex, left, top });
   };
 
@@ -1676,10 +1904,52 @@ export function QueryResultGrid({
     }
   };
 
-  const syncGeneratedSql = (mode: QueryGeneratedSqlSyncMode) => {
-    if (!generatedSql) return;
+  const generatedSqlForFilters = (filters: Record<number, ColumnFilterConfig>): string | null => {
+    const activeFilters = Object.entries(filters)
+      .map(([rawIndex, config]) => ({
+        columnIndex: Number(rawIndex),
+        text: config.text.trim(),
+        mode: config.mode,
+        selectedValues: config.selectedValues,
+      }))
+      .filter(
+        (filter) =>
+          Number.isInteger(filter.columnIndex) &&
+          filter.columnIndex >= 0 &&
+          filter.columnIndex < result.columns.length &&
+          (filter.text.length > 0 || filter.selectedValues.length > 0),
+      );
+    return buildGeneratedResultSql({
+      sourceSql: baseSql ?? sourceSql,
+      currentSql: sourceSql,
+      sqlEngine,
+      columns: result.columns,
+      visibleColumnIndexes,
+      globalFilterText: filterText,
+      columnFilters: activeFilters,
+      sortCol,
+      sortDir,
+    });
+  };
+
+  const queryGeneratedSql = (sql = generatedSql) => {
+    if (!sql) {
+      setStatus("No local filter or sort changes to query.");
+      return;
+    }
+    if (onGeneratedSqlQuery) {
+      void Promise.resolve(onGeneratedSqlQuery(sql)).catch((err) => {
+        setStatus(`Query generated SQL failed: ${String(err)}`);
+      });
+      return;
+    }
+    syncGeneratedSql("sync", sql);
+  };
+
+  const syncGeneratedSql = (mode: QueryGeneratedSqlSyncMode, sql = generatedSql) => {
+    if (!sql) return;
     if (onGeneratedSqlSync) {
-      onGeneratedSqlSync(generatedSql, mode);
+      onGeneratedSqlSync(sql, mode);
       return;
     }
     const targetTab = getActiveQueryTab() ?? listQueryTabs().find((entry) => entry.engine === sqlEngine);
@@ -1687,7 +1957,7 @@ export function QueryResultGrid({
       setStatus("No SQL Commander editor is available.");
       return;
     }
-    targetTab.insertQuery(generatedSql, { destination: "current", position: "last" });
+    targetTab.insertQuery(sql, { destination: "current", position: "last" });
     setStatus("Inserted generated SQL in SQL Commander.");
   };
 
@@ -1799,14 +2069,20 @@ export function QueryResultGrid({
   const openFilterColumnIndex = openColumnFilter?.columnIndex ?? null;
   const openFilterColumn = openFilterColumnIndex !== null ? result.columns[openFilterColumnIndex] : null;
   const openFilterConfig = openFilterColumnIndex !== null
-    ? columnFilters[openFilterColumnIndex] ?? DEFAULT_COLUMN_FILTER
+    ? draftColumnFilter
     : DEFAULT_COLUMN_FILTER;
   const openFilterDistinctValues = useMemo(
-    () =>
-      openFilterColumnIndex === null
-        ? { values: [], total: 0, truncated: false }
-        : distinctValuesForColumn(rows, openFilterColumnIndex),
-    [openFilterColumnIndex, rows],
+    () => {
+      if (openFilterColumnIndex === null) return { values: [], total: 0, truncated: false };
+      const summary = distinctValuesForColumn(rows, openFilterColumnIndex);
+      const needle = draftColumnFilter.text.trim().toLowerCase();
+      if (!needle) return summary;
+      return {
+        ...summary,
+        values: summary.values.filter((item) => item.label.toLowerCase().includes(needle)),
+      };
+    },
+    [draftColumnFilter.text, openFilterColumnIndex, rows],
   );
   const openFilterSelectedKeys = new Set(openFilterConfig.selectedValues.map(filterValueKey));
   const filterModeButtonStyle = (active: boolean): CSSProperties | undefined =>
@@ -1817,6 +2093,20 @@ export function QueryResultGrid({
           color: "var(--taomni-accent)",
         }
       : undefined;
+  const applyLocalColumnFilter = () => {
+    if (openFilterColumnIndex === null) return;
+    applyColumnFilter(openFilterColumnIndex, draftColumnFilter);
+    setOpenColumnFilter(null);
+  };
+  const queryColumnFilter = () => {
+    if (openFilterColumnIndex === null) return;
+    const nextFilters = { ...columnFilters };
+    if (isColumnFilterActive(draftColumnFilter)) nextFilters[openFilterColumnIndex] = draftColumnFilter;
+    else delete nextFilters[openFilterColumnIndex];
+    setColumnFilters(nextFilters);
+    setOpenColumnFilter(null);
+    queryGeneratedSql(generatedSqlForFilters(nextFilters));
+  };
 
   const stats = useMemo(() => {
     return visibleColumnIndexes.map((columnIndex) => {
@@ -2094,6 +2384,19 @@ export function QueryResultGrid({
           </code>
           <button
             type="button"
+            data-testid="query-result-generated-sql-query"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            data-primary="true"
+            title="Apply local filters and sort as a database query"
+            aria-label="Query generated SQL"
+            disabled={running || cancelling}
+            onClick={() => queryGeneratedSql()}
+          >
+            <Check className="w-3.5 h-3.5" />
+            Query
+          </button>
+          <button
+            type="button"
             data-testid="query-result-generated-sql-copy"
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Copy generated SQL"
@@ -2113,17 +2416,6 @@ export function QueryResultGrid({
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Sync
-          </button>
-          <button
-            type="button"
-            data-testid="query-result-generated-sql-replace"
-            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
-            title="Replace the source SQL when it still matches this result"
-            aria-label="Replace source SQL"
-            onClick={() => syncGeneratedSql("replaceSource")}
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            Replace
           </button>
         </div>
       )}
@@ -2446,7 +2738,7 @@ export function QueryResultGrid({
               className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
               title="Clear column filter"
               aria-label={`Clear filter for ${openFilterColumn.name}`}
-              onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}
+              onClick={() => setDraftColumnFilter(DEFAULT_COLUMN_FILTER)}
             >
               <Ban className="w-3.5 h-3.5" />
             </button>
@@ -2454,9 +2746,9 @@ export function QueryResultGrid({
           <input
             autoFocus
             value={openFilterConfig.text}
-            onChange={(event) => updateColumnFilter(openColumnFilter.columnIndex, { text: event.target.value })}
+            onChange={(event) => updateDraftColumnFilter({ text: event.target.value })}
             onKeyDown={(event) => {
-              if (event.key === "Enter") setOpenColumnFilter(null);
+              if (event.key === "Enter") applyLocalColumnFilter();
               if (event.key === "Escape") setOpenColumnFilter(null);
             }}
             className="taomni-input h-7 w-full text-[12px]"
@@ -2468,7 +2760,7 @@ export function QueryResultGrid({
               type="button"
               className="taomni-btn h-7"
               style={filterModeButtonStyle(openFilterConfig.mode === "fuzzy")}
-              onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { mode: "fuzzy" })}
+              onClick={() => updateDraftColumnFilter({ mode: "fuzzy" })}
             >
               Fuzzy
             </button>
@@ -2476,7 +2768,7 @@ export function QueryResultGrid({
               type="button"
               className="taomni-btn h-7"
               style={filterModeButtonStyle(openFilterConfig.mode === "exact")}
-              onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { mode: "exact" })}
+              onClick={() => updateDraftColumnFilter({ mode: "exact" })}
             >
               Exact
             </button>
@@ -2508,7 +2800,7 @@ export function QueryResultGrid({
                     type="checkbox"
                     className="h-3 w-3 shrink-0"
                     checked={openFilterSelectedKeys.has(item.key)}
-                    onChange={() => toggleColumnFilterValue(openColumnFilter.columnIndex, item.value)}
+                    onChange={() => toggleDraftColumnFilterValue(item.value)}
                     aria-label={`Select ${item.label} for ${openFilterColumn.name}`}
                   />
                   <span className="min-w-0 flex-1 truncate font-mono">{item.label}</span>
@@ -2523,20 +2815,17 @@ export function QueryResultGrid({
             </div>
           )}
           <div className="mt-2 flex items-center justify-end gap-1">
-            {openFilterConfig.selectedValues.length > 0 && (
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2"
-                onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { selectedValues: [] })}
-              >
-                Clear values
-              </button>
-            )}
-            <button type="button" className="taomni-btn h-7 px-2" onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}>
+            <button type="button" className="taomni-btn h-7 px-2" onClick={() => setOpenColumnFilter(null)}>
+              Close
+            </button>
+            <button type="button" className="taomni-btn h-7 px-2" onClick={() => setDraftColumnFilter(DEFAULT_COLUMN_FILTER)}>
               Clear
             </button>
-            <button type="button" className="taomni-btn h-7 px-2" data-primary="true" onClick={() => setOpenColumnFilter(null)}>
-              Done
+            <button type="button" className="taomni-btn h-7 px-2" onClick={applyLocalColumnFilter}>
+              Local
+            </button>
+            <button type="button" className="taomni-btn h-7 px-2" data-primary="true" onClick={queryColumnFilter} disabled={running || cancelling}>
+              Query
             </button>
           </div>
         </div>

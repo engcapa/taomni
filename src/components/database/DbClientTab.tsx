@@ -129,6 +129,7 @@ type ResultSubTab = "results" | "messages";
 interface ResultSheet {
   id: string;
   title: string;
+  baseSql: string;
   sql: string;
   sourceRef: SqlStatementSourceRef | null;
   generatedTargetPanelId: string | null;
@@ -479,6 +480,7 @@ function newResultSheet(
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `sheet-${Date.now()}-${Math.random()}`,
     title: `Result ${ordinal}`,
+    baseSql: sql,
     sql,
     sourceRef,
     generatedTargetPanelId: null,
@@ -1227,10 +1229,10 @@ export default function DbClientTab({
   }, [connectionSessionId]);
 
   const refreshSheet = useCallback(
-    async (panelId: string, sheetId: string, mode: QueryRefreshMode) => {
-      const panel = panels.find((p) => p.id === panelId);
+    async (panelId: string, sheetId: string, mode: QueryRefreshMode, sqlOverride?: string) => {
+      const panel = panelsRef.current.find((p) => p.id === panelId);
       const sheet = panel?.sheets.find((candidate) => candidate.id === sheetId);
-      const trimmed = sheet?.sql.trim() ?? "";
+      const trimmed = (sqlOverride ?? sheet?.sql ?? "").trim();
       if (!panel || !sheet || !trimmed) return;
       if (panel.sheets.some((candidate) => candidate.running)) return;
 
@@ -1240,6 +1242,7 @@ export default function DbClientTab({
         delete timersRef.current[sheetId];
       }
       patchSheet(panelId, sheetId, {
+        sql: trimmed,
         result: mode === "clearView" ? emptyQueryResult() : sheet.result ?? emptyQueryResult(),
         error: null,
         warnings: [],
@@ -1253,7 +1256,7 @@ export default function DbClientTab({
 
       await streamQueryIntoSheet(panelId, sheetId, trimmed, effectiveLimit, true);
     },
-    [panels, patchSheet, rowLimit, streamQueryIntoSheet],
+    [patchSheet, rowLimit, streamQueryIntoSheet],
   );
 
   const commitGridChanges = useCallback(
@@ -1720,25 +1723,6 @@ export default function DbClientTab({
     setPanelDocState(panelId, doc);
   };
 
-  const updateResultSheetState = (
-    panelId: string,
-    sheetId: string,
-    updater: (sheet: ResultSheet) => ResultSheet,
-  ) => {
-    setPanels((prev) => {
-      const next = prev.map((panel) =>
-        panel.id === panelId
-          ? {
-              ...panel,
-              sheets: panel.sheets.map((sheet) => (sheet.id === sheetId ? updater(sheet) : sheet)),
-            }
-          : panel,
-      );
-      panelsRef.current = next;
-      return next;
-    });
-  };
-
   const syncGeneratedSqlPanel = (
     resultPanelId: string,
     sheetId: string,
@@ -1796,32 +1780,45 @@ export default function DbClientTab({
     return targetPanel.id;
   };
 
-  const updateGeneratedSqlFromSheet = (resultPanelId: string, sheetId: string, generatedSql: string | null) => {
-    if (!generatedSql) return;
-    syncGeneratedSqlPanel(resultPanelId, sheetId, generatedSql, null, { activate: false });
-  };
-
-  const replaceGeneratedSqlSource = (resultPanelId: string, sheetId: string, generatedSql: string) => {
+  const replaceGeneratedSqlSource = (
+    resultPanelId: string,
+    sheetId: string,
+    generatedSql: string,
+    options: {
+      activate?: boolean;
+      focus?: boolean;
+      status?: string | null;
+      fallback?: boolean;
+      updateSheetSql?: boolean;
+    } = {},
+  ): boolean => {
+    const activate = options.activate ?? true;
+    const focus = options.focus ?? true;
+    const status = options.status ?? "Replaced source SQL with generated SQL.";
+    const fallbackEnabled = options.fallback ?? true;
+    const updateSheetSql = options.updateSheetSql ?? false;
     const fallback = () =>
-      syncGeneratedSqlPanel(
-        resultPanelId,
-        sheetId,
-        generatedSql,
-        "Source SQL changed; synced generated SQL to a query editor instead.",
-      );
+      fallbackEnabled
+        ? syncGeneratedSqlPanel(
+            resultPanelId,
+            sheetId,
+            generatedSql,
+            "Source SQL changed; synced generated SQL to a query editor instead.",
+          )
+        : null;
     const livePanels = panelsRef.current;
     const resultPanel = livePanels.find((panel) => panel.id === resultPanelId);
     const sheet = resultPanel?.sheets.find((candidate) => candidate.id === sheetId);
     const sourceRef = sheet?.sourceRef;
     if (!sheet || !sourceRef || sourceRef.origin !== "editor" || sourceRef.from === null || sourceRef.to === null) {
       fallback();
-      return;
+      return false;
     }
 
     const sourcePanel = livePanels.find((panel) => panel.id === sourceRef.panelId);
     if (!sourcePanel) {
       fallback();
-      return;
+      return false;
     }
 
     const from = sourceRef.from;
@@ -1830,30 +1827,73 @@ export default function DbClientTab({
     const sourceDoc = editor?.getValue() ?? sourcePanel.doc;
     if (from < 0 || to < from || to > sourceDoc.length) {
       fallback();
-      return;
+      return false;
     }
 
     const currentSql = sourceDoc.slice(from, to);
     if (currentSql !== sourceRef.sql || hashSqlText(currentSql) !== sourceRef.exactHash) {
       fallback();
-      return;
+      return false;
     }
 
     const nextDoc = `${sourceDoc.slice(0, from)}${generatedSql}${sourceDoc.slice(to)}`;
-    editor?.replaceRange(from, to, generatedSql);
-    setPanelDocState(sourcePanel.id, nextDoc);
-    updateResultSheetState(resultPanelId, sheetId, (current) => ({
-      ...current,
-      sourceRef: {
-        ...sourceRef,
-        sql: generatedSql,
-        to: from + generatedSql.length,
-        exactHash: hashSqlText(generatedSql),
-        parentSheetId: sheetId,
-      },
-    }));
-    setActivePanelId(sourcePanel.id);
-    setStatusMessage("Replaced source SQL with generated SQL.");
+    const delta = generatedSql.length - (to - from);
+    editor?.replaceRange(from, to, generatedSql, { focus });
+    const nextPanels = livePanels.map((panel) => {
+      const patchedPanel =
+        panel.id === sourcePanel.id ? { ...panel, doc: nextDoc, dirty: true } : panel;
+      const sheets = patchedPanel.sheets.map((candidate) => {
+        const candidateRef = candidate.sourceRef;
+        let nextRef = candidateRef;
+        if (
+          candidateRef &&
+          candidateRef.panelId === sourcePanel.id &&
+          candidateRef.from !== null &&
+          candidateRef.to !== null
+        ) {
+          if (candidateRef.id === sourceRef.id) {
+            nextRef = {
+              ...candidateRef,
+              sql: generatedSql,
+              to: from + generatedSql.length,
+              exactHash: hashSqlText(generatedSql),
+              parentSheetId: sheetId,
+            };
+          } else if (candidateRef.from >= to) {
+            nextRef = {
+              ...candidateRef,
+              from: candidateRef.from + delta,
+              to: candidateRef.to + delta,
+            };
+          }
+        }
+        return {
+          ...candidate,
+          sql: updateSheetSql && panel.id === resultPanelId && candidate.id === sheetId
+            ? generatedSql
+            : candidate.sql,
+          sourceRef: nextRef,
+        };
+      });
+      return { ...patchedPanel, sheets };
+    });
+    panelsRef.current = nextPanels;
+    setPanels(nextPanels);
+    if (activate) setActivePanelId(sourcePanel.id);
+    if (status) setStatusMessage(status);
+    return true;
+  };
+
+  const queryGeneratedSqlFromSheet = async (resultPanelId: string, sheetId: string, generatedSql: string) => {
+    const replaced = replaceGeneratedSqlSource(resultPanelId, sheetId, generatedSql, {
+      activate: false,
+      focus: false,
+      status: null,
+      updateSheetSql: true,
+    });
+    if (!replaced) return;
+    setStatusMessage("Applied result filters to SQL; refreshing result.");
+    await refreshSheet(resultPanelId, sheetId, "clearView", generatedSql);
   };
 
   const syncGeneratedSqlFromSheet = (
@@ -1863,7 +1903,7 @@ export default function DbClientTab({
     mode: QueryGeneratedSqlSyncMode,
   ) => {
     if (mode === "replaceSource") {
-      replaceGeneratedSqlSource(resultPanelId, sheetId, generatedSql);
+      replaceGeneratedSqlSource(resultPanelId, sheetId, generatedSql, { updateSheetSql: true });
       return;
     }
     syncGeneratedSqlPanel(resultPanelId, sheetId, generatedSql);
@@ -2427,11 +2467,11 @@ export default function DbClientTab({
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
                     onRefreshSheet={(sheetId, mode) => void refreshSheet(activePanel.id, sheetId, mode)}
                     onCommitGridChanges={(sheetId, payload) => commitGridChanges(activePanel.id, sheetId, payload)}
-                    onGeneratedSqlChange={(sheetId, sql) =>
-                      updateGeneratedSqlFromSheet(activePanel.id, sheetId, sql)
-                    }
                     onGeneratedSqlSync={(sheetId, sql, mode) =>
                       syncGeneratedSqlFromSheet(activePanel.id, sheetId, sql, mode)
+                    }
+                    onGeneratedSqlQuery={(sheetId, sql) =>
+                      queryGeneratedSqlFromSheet(activePanel.id, sheetId, sql)
                     }
                     onCancel={() => cancelQuery(activePanel.id)}
                     onStatus={setStatusMessage}
@@ -2757,8 +2797,8 @@ function ResultArea({
   onTabChange,
   onRefreshSheet,
   onCommitGridChanges,
-  onGeneratedSqlChange,
   onGeneratedSqlSync,
+  onGeneratedSqlQuery,
   onCancel,
   onStatus,
 }: {
@@ -2769,8 +2809,8 @@ function ResultArea({
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
   onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
   onCommitGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<void>;
-  onGeneratedSqlChange: (sheetId: string, sql: string | null) => void;
   onGeneratedSqlSync: (sheetId: string, sql: string, mode: QueryGeneratedSqlSyncMode) => void;
+  onGeneratedSqlQuery: (sheetId: string, sql: string) => void | Promise<void>;
   onCancel: () => void;
   onStatus: (message: string) => void;
 }) {
@@ -2881,14 +2921,15 @@ function ResultArea({
               <QueryResultGrid
                 result={sheet.result}
                 sourceSql={sheet.sql}
+                baseSql={sheet.baseSql}
                 sqlEngine={sqlEngine}
                 running={sheet.running}
                 cancelling={sheet.cancelling}
                 onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
                 onCancel={onCancel}
                 onCommitChanges={(payload) => onCommitGridChanges(sheet.id, payload)}
-                onGeneratedSqlChange={(sql) => onGeneratedSqlChange(sheet.id, sql)}
                 onGeneratedSqlSync={(sql, mode) => onGeneratedSqlSync(sheet.id, sql, mode)}
+                onGeneratedSqlQuery={(sql) => onGeneratedSqlQuery(sheet.id, sql)}
                 onStatus={onStatus}
               />
             </div>

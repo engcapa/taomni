@@ -105,13 +105,16 @@ describe("QueryResultGrid", () => {
 
     fireEvent.click(screen.getByLabelText("Filter column name"));
     fireEvent.change(screen.getByLabelText("Filter name"), { target: { value: "Ann" } });
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
 
     const body = within(screen.getByTestId("query-result-grid-scroll"));
     expect(body.getByText("Ann")).toBeInTheDocument();
     expect(body.getByText("Anne")).toBeInTheDocument();
     expect(body.queryByText("Bob")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByLabelText("Filter column name"));
     fireEvent.click(screen.getByRole("button", { name: "Exact" }));
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
 
     expect(body.getByText("Ann")).toBeInTheDocument();
     expect(body.queryByText("Anne")).not.toBeInTheDocument();
@@ -130,6 +133,7 @@ describe("QueryResultGrid", () => {
 
     expect(screen.getByText("Distinct values")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Select active for status"));
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
 
     const body = within(screen.getByTestId("query-result-grid-scroll"));
     expect(body.getByText("Ann")).toBeInTheDocument();
@@ -141,6 +145,29 @@ describe("QueryResultGrid", () => {
     fireEvent.click(screen.getByRole("button", { name: "status" }));
 
     expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+  });
+
+  it("submits local sorting as an explicit query", () => {
+    const onGeneratedSqlQuery = vi.fn();
+    render(
+      <QueryResultGrid
+        result={filterResult()}
+        sourceSql="select * from users limit 100"
+        sqlEngine="MySQL"
+        onGeneratedSqlQuery={onGeneratedSqlQuery}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+    expect(screen.getByTestId("query-result-generated-sql")).not.toHaveTextContent("FROM (");
+
+    fireEvent.click(screen.getByTestId("query-result-generated-sql-query"));
+
+    expect(onGeneratedSqlQuery).toHaveBeenCalledWith(
+      "select * from users\nORDER BY `status` DESC\nlimit 100;",
+    );
   });
 
   it("copies only the rectangular cell block selected with Alt drag", () => {

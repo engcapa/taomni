@@ -136,25 +136,19 @@ vi.mock("./SqlEditorPanel", () => ({
 
 vi.mock("./QueryResultGrid", () => ({
   QueryResultGrid: ({
-    onGeneratedSqlChange,
     onGeneratedSqlSync,
+    onGeneratedSqlQuery,
   }: {
-    onGeneratedSqlChange?: (sql: string | null) => void;
     onGeneratedSqlSync?: (sql: string, mode: "sync" | "replaceSource") => void;
+    onGeneratedSqlQuery?: (sql: string) => void;
   }) => {
-    useEffect(() => {
-      const timer = window.setTimeout(() => onGeneratedSqlChange?.(dbChildProps.generatedSql), 0);
-      return () => window.clearTimeout(timer);
-      // The real grid only emits when generatedSql changes; keep this mock to one mount emission.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
     return (
       <div data-testid="query-result-grid">
         <button type="button" data-testid="sync-generated-sql" onClick={() => onGeneratedSqlSync?.(dbChildProps.generatedSql, "sync")}>
           sync generated
         </button>
-        <button type="button" data-testid="replace-source-sql" onClick={() => onGeneratedSqlSync?.(dbChildProps.generatedSql, "replaceSource")}>
-          replace source
+        <button type="button" data-testid="query-generated-sql" onClick={() => onGeneratedSqlQuery?.(dbChildProps.generatedSql)}>
+          query generated
         </button>
       </div>
     );
@@ -355,7 +349,7 @@ describe("DbClientTab connection lifecycle", () => {
     });
   });
 
-  it("auto-creates one generated SQL query panel and reuses it on manual sync", async () => {
+  it("creates one generated SQL query panel only after manual sync", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
@@ -364,7 +358,7 @@ describe("DbClientTab connection lifecycle", () => {
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getAllByTitle("Generated SQL")).toHaveLength(1));
+    expect(screen.queryAllByTitle("Generated SQL")).toHaveLength(0);
     expect(screen.getByTestId("query-result-grid")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("sync-generated-sql"));
@@ -372,7 +366,7 @@ describe("DbClientTab connection lifecycle", () => {
     await waitFor(() => expect(screen.getAllByTitle("Generated SQL")).toHaveLength(1));
   });
 
-  it("replaces the matching source statement with generated SQL", async () => {
+  it("queries generated SQL by replacing the source statement and refreshing the current sheet", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
@@ -381,7 +375,13 @@ describe("DbClientTab connection lifecycle", () => {
     fireEvent.click(screen.getByTitle("Run (F5)"));
     await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId("replace-source-sql"));
+    fireEvent.click(screen.getByTestId("query-generated-sql"));
+
+    await waitFor(() => {
+      const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
+      expect(calls.at(-1)?.[1]).toContain("ORDER BY \"one\" DESC");
+    });
+
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => {
